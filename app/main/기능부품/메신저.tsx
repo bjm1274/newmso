@@ -23,6 +23,15 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
   const [groupName, setGroupName] = useState('');
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
 
+  // 채팅 고도화용 로컬 상태 (DEMO 모드: Supabase 미연동)
+  const [polls, setPolls] = useState<any[]>([]);
+  const [showPollModal, setShowPollModal] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollOptions, setPollOptions] = useState('찬성, 반대');
+  const [pollVotes, setPollVotes] = useState<any>({});      // { pollId: { optionIndex: count } }
+  const [reactions, setReactions] = useState<any>({});      // { messageId: { '👍': count, '❗': count } }
+  const [pinnedIds, setPinnedIds] = useState<string[]>([]); // 고정 메시지 ID 목록
+
   const fetchData = async () => {
     // 메시지 로드
     const { data: msgs } = await supabase
@@ -61,6 +70,11 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
   }, [selectedRoomId]);
 
   useEffect(() => { scrollRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages.length]);
+
+  const pinnedMessages = useMemo(
+    () => messages.filter((m) => pinnedIds.includes(m.id)),
+    [messages, pinnedIds]
+  );
 
   const handleSendMessage = async (fileUrl?: string) => {
     if (!inputMsg.trim() && !fileUrl) return;
@@ -138,6 +152,65 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
     );
   }, [staffs, searchTerm]);
 
+  // DEMO: 투표 생성
+  const handleCreatePoll = () => {
+    if (!pollQuestion.trim()) {
+      alert('질문을 입력해 주세요.');
+      return;
+    }
+    const options = pollOptions
+      .split(',')
+      .map((o) => o.trim())
+      .filter((o) => o.length > 0);
+    if (options.length < 2) {
+      alert('선택지는 최소 2개 이상 입력해 주세요.');
+      return;
+    }
+    const id = Date.now().toString();
+    setPolls((prev: any[]) => [
+      ...prev,
+      { id, room_id: selectedRoomId, question: pollQuestion, options },
+    ]);
+    setPollQuestion('');
+    setPollOptions('찬성, 반대');
+    setShowPollModal(false);
+  };
+
+  const handleVote = (pollId: string, optionIndex: number) => {
+    setPollVotes((prev: any) => {
+      const existing = prev[pollId] || {};
+      const current = existing[optionIndex] || 0;
+      return {
+        ...prev,
+        [pollId]: {
+          ...existing,
+          [optionIndex]: current + 1,
+        },
+      };
+    });
+  };
+
+  const toggleReaction = (messageId: string, emoji: string) => {
+    setReactions((prev: any) => {
+      const current = prev[messageId] || {};
+      const count = current[emoji] || 0;
+      const nextCount = count === 0 ? 1 : 0;
+      return {
+        ...prev,
+        [messageId]: {
+          ...current,
+          [emoji]: nextCount,
+        },
+      };
+    });
+  };
+
+  const togglePin = (messageId: string) => {
+    setPinnedIds((prev) =>
+      prev.includes(messageId) ? prev.filter((id) => id !== messageId) : [...prev, messageId]
+    );
+  };
+
   return (
     <div className="flex flex-1 overflow-hidden relative font-sans h-full bg-white">
       {/* 좌측 사이드바: 검색 및 목록 */}
@@ -211,6 +284,20 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
         )}
 
         <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
+          {pinnedMessages.length > 0 && (
+            <div className="bg-yellow-50 border border-yellow-100 rounded-2xl p-4 space-y-2">
+              <p className="text-[10px] font-black text-yellow-700 uppercase tracking-widest">
+                📌 고정된 메시지
+              </p>
+              {pinnedMessages.map((msg: any) => (
+                <div key={msg.id} className="text-xs text-gray-700 font-bold truncate">
+                  {msg.staff?.name && <span className="text-gray-400 mr-1">[{msg.staff.name}]</span>}
+                  {msg.content}
+                </div>
+              ))}
+            </div>
+          )}
+
           {messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center opacity-20">
               <span className="text-6xl mb-4">💬</span>
@@ -230,20 +317,100 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
                     onClick={() => setActiveActionMsg(msg)} 
                     className={`group relative p-4 rounded-2xl text-sm shadow-sm cursor-pointer transition-all max-w-[70%] ${isMine ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white border rounded-tl-none hover:border-blue-200'}`}
                   >
+                    {/* 상단 고정 토글 */}
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); togglePin(msg.id); }}
+                      className={`absolute -top-3 ${isMine ? 'right-2' : 'left-2'} text-[10px] font-black ${
+                        pinnedIds.includes(msg.id) ? 'text-yellow-300' : 'text-gray-300'
+                      }`}
+                    >
+                      {pinnedIds.includes(msg.id) ? '★' : '☆'}
+                    </button>
+
                     {msg.content}
                     {msg.file_url && (
-                      <a href={msg.file_url} target="_blank" className={`block mt-2 p-2 rounded-lg text-[10px] font-bold border flex items-center gap-2 ${isMine ? 'bg-white/10 border-white/20' : 'bg-gray-50 border-gray-100 text-blue-600'}`}>
+                      <a
+                        href={msg.file_url}
+                        target="_blank"
+                        className={`block mt-2 p-2 rounded-lg text-[10px] font-bold border flex items-center gap-2 ${
+                          isMine ? 'bg-white/10 border-white/20' : 'bg-gray-50 border-gray-100 text-blue-600'
+                        }`}
+                      >
                         📎 파일 첨부됨
                       </a>
                     )}
-                    <span className={`absolute bottom-0 ${isMine ? 'right-full mr-2' : 'left-full ml-2'} text-[8px] font-bold text-gray-300 whitespace-nowrap`}>
-                      {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+
+                    {/* 이모지 반응 */}
+                    <div className="mt-2 flex items-center gap-2 text-[10px]">
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); toggleReaction(msg.id, '👍'); }}
+                        className="px-2 py-1 rounded-full bg-black/5 hover:bg-black/10 text-xs"
+                      >
+                        👍
+                      </button>
+                      {reactions[msg.id] && reactions[msg.id]['👍'] > 0 && (
+                        <span className="text-gray-300 font-black">
+                          👍 {reactions[msg.id]['👍']}
+                        </span>
+                      )}
+                    </div>
+
+                    <span
+                      className={`absolute bottom-0 ${isMine ? 'right-full mr-2' : 'left-full ml-2'} text-[8px] font-bold text-gray-300 whitespace-nowrap`}
+                    >
+                      {new Date(msg.created_at).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
                     </span>
                   </div>
                 </div>
               );
             })
           )}
+
+          {/* 투표 메시지들 (DEMO: 로컬 상태) */}
+          {polls
+            .filter((p: any) => p.room_id === selectedRoomId)
+            .map((poll: any) => {
+              const votes = pollVotes[poll.id] || {};
+              const totalVotes = (Object.values(votes) as number[]).reduce(
+                (a: number, b: number) => a + b,
+                0
+              );
+              return (
+                <div
+                  key={poll.id}
+                  className="max-w-[70%] bg-white border border-blue-100 rounded-2xl p-4 shadow-sm text-xs font-bold text-gray-700"
+                >
+                  <p className="text-[10px] font-black text-blue-600 mb-2">📊 투표</p>
+                  <p className="mb-3 text-sm">{poll.question}</p>
+                  <div className="space-y-1">
+                    {poll.options.map((opt: string, idx: number) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleVote(poll.id, idx)}
+                        className="w-full flex justify-between items-center px-3 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-[11px]"
+                      >
+                        <span>{opt}</span>
+                        <span className="text-blue-700">
+                          {(votes[idx] || 0)}표
+                          {totalVotes > 0 && (
+                            <span className="ml-1 text-[9px] text-blue-400">
+                              ({Math.round(((votes[idx] || 0) / totalVotes) * 100)}%)
+                            </span>
+                          )}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+
           <div ref={scrollRef} />
         </div>
 
@@ -258,6 +425,7 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
            <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-[2rem] border border-gray-100 focus-within:bg-white focus-within:ring-4 focus-within:ring-blue-50 transition-all">
              <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
              <button onClick={()=>fileInputRef.current?.click()} className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-blue-600 transition-colors">📎</button>
+             <button onClick={()=>setShowPollModal(true)} className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-blue-600 transition-colors">📊</button>
              <input 
                className="flex-1 bg-transparent p-2 outline-none text-sm font-bold" 
                placeholder="메시지를 입력하세요..."
@@ -314,6 +482,54 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
           </div>
         )}
       </main>
+
+      {/* 투표 생성 모달 (DEMO) */}
+      {showPollModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-md rounded-3xl p-6 space-y-4 shadow-2xl border border-gray-200">
+            <h3 className="text-lg font-black text-gray-900">새 투표 만들기</h3>
+            <p className="text-[10px] text-gray-500 font-bold">
+              질문과 선택지를 입력하세요. 선택지는 콤마(,)로 구분합니다.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase">질문</label>
+                <input
+                  value={pollQuestion}
+                  onChange={(e) => setPollQuestion(e.target.value)}
+                  className="w-full mt-1 p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500"
+                  placeholder="예: 이번 주 회의 시간은 언제가 좋을까요?"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase">선택지 (쉼표로 구분)</label>
+                <input
+                  value={pollOptions}
+                  onChange={(e) => setPollOptions(e.target.value)}
+                  className="w-full mt-1 p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500"
+                  placeholder="찬성, 반대"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowPollModal(false)}
+                className="flex-1 py-3 rounded-xl text-[10px] font-black text-gray-400 hover:bg-gray-50"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={handleCreatePoll}
+                className="flex-1 py-3 rounded-xl text-[10px] font-black bg-blue-600 text-white hover:bg-blue-700 shadow-md"
+              >
+                투표 생성
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
