@@ -60,7 +60,7 @@ export function useInventoryAlertSystem(inventory: any[], user: any) {
 
       if (!adminUsers || adminUsers.length === 0) return;
 
-      const notifications = [];
+      const notifications: any[] = [];
 
       // 재고 부족 알림 생성
       if (lowStock.length > 0) {

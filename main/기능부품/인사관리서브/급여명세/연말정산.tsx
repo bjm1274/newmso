@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
-export default function YearEndSettlement() {
+export default function YearEndSettlement({ staffs = [], selectedCo }: any) {
   const [staffList, setStaffList] = useState<any[]>([]);
   const [settlementData, setSettlementData] = useState<any[]>([]);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());

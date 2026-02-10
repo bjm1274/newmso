@@ -19,7 +19,7 @@ export default function IntegratedInventoryManagement({ user }: any) {
   const [notifications, setNotifications] = useState<any[]>([]);
 
   // 재고 알림 시스템 활성화
-  const { lowStockItems } = useInventoryAlertSystem(inventory, user);
+  const { lowStockItems, expiryImminentItems } = useInventoryAlertSystem(inventory, user);
 
   useEffect(() => {
     fetchData();
@@ -123,7 +123,7 @@ export default function IntegratedInventoryManagement({ user }: any) {
   return (
     <div className="flex flex-col h-full bg-gray-50 overflow-hidden">
       {/* 알림 배지 */}
-      <InventoryAlertBadge count={lowStockItems.length} />
+      <InventoryAlertBadge lowCount={lowStockItems.length} expiryCount={expiryImminentItems.length} />
 
       {/* 탭 네비게이션 */}
       <div className="flex bg-white border-b border-gray-200 px-6 py-2 gap-2 overflow-x-auto">

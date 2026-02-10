@@ -220,7 +220,11 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
             messages.filter(m => (m.content||'').includes(searchTerm)).map((msg) => {
               const isMine = msg.sender_id === user.id;
               return (
-                <div key={msg.id} ref={el => msgRefs.current[msg.id] = el} className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}>
+                <div
+                  key={msg.id}
+                  ref={el => { msgRefs.current[msg.id] = el; }}
+                  className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}
+                >
                   {!isMine && <span className="text-[10px] text-gray-400 px-2 mb-1 font-bold">{msg.staff?.name} {msg.staff?.position}</span>}
                   <div 
                     onClick={() => setActiveActionMsg(msg)} 

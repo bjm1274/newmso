@@ -74,7 +74,7 @@ export default function PayrollPage() {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <AllowanceList />
-                  <DeductionSummary taxableIncome={currentEmp.base} />
+                  <DeductionSummary base={currentEmp.base} />
                 </div>
               </div>
             </div>

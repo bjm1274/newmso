@@ -7,6 +7,15 @@ import { setSelectedCompanyId as persistSelectedCompanyId, getSelectedCompanyId 
 import Sidebar from './기능부품/조직도서브/조직도측면창';
 import MainContent from './기능부품/조직도서브/조직도본문';
 
+type ERPData = {
+  staffs: any[];
+  depts: any[];
+  posts: any[];
+  tasks: any[];
+  surgeries: any[];
+  mris: any[];
+};
+
 export default function MainPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
@@ -19,7 +28,7 @@ export default function MainPage() {
   const [subView, setSubView] = useState('전체');
   const [selectedCo, setSelectedCo] = useState('전체'); 
 
-  const [data, setData] = useState({
+  const [data, setData] = useState<ERPData>({
     staffs: [],
     depts: [],
     posts: [],

@@ -12,7 +12,7 @@ import CompanyManager from './관리자전용서브/회사관리';
 
 export default function AdminView({ user, staffs = [], depts = [], onRefresh }: any) {
   const [activeTab, setActiveTab] = useState('경영대시보드');
-  const [inventory, setInventory] = useState([]);
+  const [inventory, setInventory] = useState<any[]>([]);
 
   const isMso = user?.company === 'SY INC.' || user?.permissions?.mso === true;
   if (!isMso) {

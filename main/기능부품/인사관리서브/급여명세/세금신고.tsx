@@ -1,5 +1,5 @@
 'use client';
-export default function TaxReporter() {
+export default function TaxReporter({ employees }: { employees?: any[] }) {
   return (
     <div className="border border-gray-200 p-6 bg-white rounded-none shadow-sm">
       <h3 className="text-[11px] font-black text-gray-800 uppercase mb-4 tracking-widest">Tax Report (원천세)</h3>

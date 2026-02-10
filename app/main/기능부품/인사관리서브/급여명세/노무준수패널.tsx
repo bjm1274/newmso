@@ -1,6 +1,6 @@
 'use client';
 // [디자인] image_21b997.png의 각진 스타일과 전문적인 데이터 그리드
-export default function CompliancePanel({ staffs }: { staffs: any[] }) {
+export default function CompliancePanel({ staffs, companyName }: { staffs: any[]; companyName?: string }) {
   // 원천세 집계 로직
   const totalTax = staffs.reduce((acc, s) => acc + Math.floor((s.base + (s.position || 0)) * 0.03), 0);
 
@@ -25,7 +25,7 @@ export default function CompliancePanel({ staffs }: { staffs: any[] }) {
         <h3 className="text-[11px] font-black text-gray-800 uppercase tracking-widest mb-4">Notification (알림톡)</h3>
         <div className="p-4 bg-blue-50 border border-blue-100 mb-4">
           <p className="text-[10px] text-blue-900 leading-relaxed font-bold">
-            [박철홍정형외과] {`{name}`}님, 02월 급여명세서가 발행되었습니다.
+            [{companyName ?? '회사'}] {`{name}`}님, 02월 급여명세서가 발행되었습니다.
           </p>
         </div>
         <button className="w-full py-3 bg-blue-600 text-white text-[10px] font-black shadow-lg">

@@ -171,14 +171,21 @@ export default function NotificationSystem({ user }: any) {
     setUnreadCount(prev => prev + 1);
 
     // 3. Supabase에 알림 기록 저장 (선택사항)
-    supabase.from('notifications').insert([{
-      user_id: user.id,
-      title: notif.title,
-      body: notif.body,
-      type: notif.type,
-      is_read: false,
-      created_at: new Date().toISOString()
-    }]).catch(err => console.error('알림 저장 실패:', err));
+    (async () => {
+      try {
+        const { error } = await supabase.from('notifications').insert([{
+          user_id: user.id,
+          title: notif.title,
+          body: notif.body,
+          type: notif.type,
+          is_read: false,
+          created_at: new Date().toISOString()
+        }]);
+        if (error) console.error('알림 저장 실패:', error);
+      } catch (err) {
+        console.error('알림 저장 실패:', err);
+      }
+    })();
   };
 
   const markAsRead = (id: string) => {
