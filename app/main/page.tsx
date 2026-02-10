@@ -144,7 +144,7 @@ export default function MainPage() {
   }
 
   return (
-    <div className="flex flex-col md:flex-row h-screen w-full bg-[#F5F6F8] overflow-hidden">
+    <div className="flex flex-col md:flex-row h-screen w-full bg-[#F5F6F8] overflow-hidden min-h-[100dvh]">
       <Sidebar 
         user={user} 
         mainMenu={mainMenu} 
@@ -155,7 +155,7 @@ export default function MainPage() {
         }} 
       />
 
-      <div className="flex-1 flex flex-col overflow-hidden pb-[70px] md:pb-0">
+      <div className="flex-1 flex flex-col overflow-hidden pb-[58px] md:pb-0">
         <MainContent 
           user={user}
           mainMenu={mainMenu}

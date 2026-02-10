@@ -71,64 +71,55 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col justify-center py-12 px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <div className="mx-auto h-20 w-20 bg-blue-600 rounded-[2rem] flex items-center justify-center shadow-2xl mb-8 animate-in zoom-in duration-500">
-          <span className="text-white text-3xl font-black">SY</span>
+    <div className="min-h-screen min-h-[100dvh] bg-[#F5F6F8] flex flex-col justify-center py-8 px-4 lg:px-8">
+      <div className="sm:mx-auto sm:w-full sm:max-w-sm text-center">
+        <div className="mx-auto h-16 w-16 bg-[#FEE500] rounded-2xl flex items-center justify-center shadow-sm mb-6 animate-in zoom-in duration-500">
+          <span className="text-[#191919] text-2xl font-black">SY</span>
         </div>
-        <h2 className="text-3xl md:text-4xl font-black text-gray-900 tracking-tighter">
+        <h2 className="text-2xl md:text-3xl font-black text-[#191919] tracking-tight">
           SY INC. 통합 시스템
         </h2>
-        <p className="mt-3 text-[11px] font-black text-blue-600 uppercase tracking-[0.2em]">
+        <p className="mt-2 text-[10px] font-semibold text-[#8E8E93] uppercase tracking-wider">
           통합 의료경영지원 시스템
         </p>
       </div>
 
-      <div className="mt-12 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-10 px-8 md:px-12 shadow-2xl rounded-[3rem] border border-gray-100 animate-in slide-in-from-bottom-10 duration-700">
-          <div className="space-y-8">
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-sm">
+        <div className="bg-white py-8 px-6 rounded-2xl shadow-sm border border-[#EBEBEB] animate-in slide-in-from-bottom-10 duration-500">
+          <div className="space-y-6">
             <div>
-              <label className="block text-[10px] font-black text-gray-400 mb-3 ml-2 uppercase tracking-widest">
-                사번 (아이디)
-              </label>
+              <label className="block text-[10px] font-semibold text-[#8E8E93] mb-2 ml-1">사번 (아이디)</label>
               <input 
                 type="text" 
                 value={loginId}
                 onChange={(e) => setLoginId(e.target.value)}
-                className="w-full p-5 bg-gray-50 rounded-2xl text-sm font-bold outline-none focus:ring-4 ring-blue-50 border-2 border-transparent focus:border-blue-100 transition-all text-gray-900"
+                className="w-full p-4 bg-[#F5F5F5] rounded-xl text-sm font-medium outline-none focus:ring-2 ring-[#FEE500]/30 border border-transparent focus:border-[#FEE500] transition-all text-[#191919]"
                 placeholder="사번 입력"
                 onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
               />
             </div>
-            
             <div>
-              <label className="block text-[10px] font-black text-gray-400 mb-3 ml-2 uppercase tracking-widest">
-                보안 비밀번호
-              </label>
+              <label className="block text-[10px] font-semibold text-[#8E8E93] mb-2 ml-1">비밀번호</label>
               <input 
                 type="password" 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full p-5 bg-gray-50 rounded-2xl text-sm font-bold outline-none focus:ring-4 ring-blue-50 border-2 border-transparent focus:border-blue-100 transition-all text-gray-900"
+                className="w-full p-4 bg-[#F5F5F5] rounded-xl text-sm font-medium outline-none focus:ring-2 ring-[#FEE500]/30 border border-transparent focus:border-[#FEE500] transition-all text-[#191919]"
                 placeholder="비밀번호 입력"
                 onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
               />
             </div>
-
             {error && (
-              <div className="bg-red-50 p-4 rounded-2xl border border-red-100 animate-in shake duration-300">
-                <p className="text-red-500 text-[11px] font-black flex items-center gap-2">
-                  <span>⚠️</span> {error}
-                </p>
+              <div className="bg-red-50 p-3 rounded-xl border border-red-100">
+                <p className="text-red-500 text-[11px] font-semibold flex items-center gap-2"><span>⚠️</span> {error}</p>
               </div>
             )}
-
             <button 
               onClick={handleLogin} 
               disabled={loading}
-              className="w-full py-6 bg-[#1E293B] text-white rounded-2xl font-black text-sm shadow-xl shadow-blue-100 hover:bg-black active:scale-95 transition-all mt-4 disabled:opacity-50"
+              className="w-full py-4 bg-[#FEE500] text-[#191919] rounded-xl font-bold text-sm hover:bg-[#F5DC00] active:scale-[0.98] transition-all disabled:opacity-50"
             >
-              {loading ? '인증 진행 중...' : '시스템 접속하기'}
+              {loading ? '인증 진행 중...' : '로그인'}
             </button>
           </div>
         </div>

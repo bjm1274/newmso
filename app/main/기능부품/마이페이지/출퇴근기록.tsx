@@ -1,15 +1,10 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { WORKPLACE_LOCATION, ALLOWED_DISTANCE_M } from '@/lib/location';
 
-// [필수 설정] 병원(목포시 송림로 73)의 정확한 좌표
-// 100m 오차 범위를 줄이려면 구글지도에서 '박철홍정형외과'를 우클릭하여 좌표를 복사해 넣으세요.
-const HOSPITAL_LOCATION = {
-  latitude: 34.816095,  // 위도 (예시)
-  longitude: 126.376992 // 경도 (예시)
-};
-
-const ALLOWED_RADIUS_METER = 100; // 허용 반경 (100m)
+const HOSPITAL_LOCATION = WORKPLACE_LOCATION;
+const ALLOWED_RADIUS_METER = ALLOWED_DISTANCE_M;
 
 export default function CommuteRecord({ user }: any) {
   const [logs, setLogs] = useState<any[]>([]);

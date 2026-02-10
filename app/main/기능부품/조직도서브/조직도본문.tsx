@@ -78,9 +78,9 @@ export default function MainContent({ user, mainMenu, data, subView, setSubView,
   });
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden relative bg-[#F8FAFC]">
+    <div className="flex-1 flex flex-col overflow-hidden relative bg-[#F5F6F8]">
       {isMso && hospitalCompanies.length > 0 && setSelectedCompanyId && (
-        <div className="shrink-0 px-4 py-2 bg-white border-b border-gray-100 flex items-center gap-3">
+        <div className="shrink-0 px-4 py-2 bg-white border-b border-[#EBEBEB] flex items-center gap-2">
           <span className="text-xs font-bold text-gray-500">회사 선택</span>
           <select
             value={selectedCo}

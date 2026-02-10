@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { WORKPLACE_LOCATION, ALLOWED_DISTANCE_M } from '@/lib/location';
 
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371000; 
@@ -24,9 +25,9 @@ export default function AttendanceSystem({ user, staffs, selectedCo, isAdminView
   const [viewMonth, setViewMonth] = useState(new Date().toISOString().slice(0, 7));
   const [userShift, setUserShift] = useState<any>(null);
 
-  const HOSPITAL_LAT = 37.4979;
-  const HOSPITAL_LON = 127.0276;
-  const ALLOWED_DISTANCE = 100;
+  const HOSPITAL_LAT = WORKPLACE_LOCATION.latitude;
+  const HOSPITAL_LON = WORKPLACE_LOCATION.longitude;
+  const ALLOWED_DISTANCE = ALLOWED_DISTANCE_M;
 
   useEffect(() => {
     const fetchUserShift = async () => {
