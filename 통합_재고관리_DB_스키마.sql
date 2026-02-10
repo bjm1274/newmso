@@ -1,0 +1,93 @@
+-- ==========================================
+-- 병원 ERP 통합 데이터베이스 스키마 (v4.3)
+-- 이름 기반 로그인 지원 및 재고관리 통합
+-- ==========================================
+
+-- 1. 직원 정보 테이블 (비밀번호 필드 추가)
+CREATE TABLE IF NOT EXISTS staffs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL UNIQUE, -- 아이디로 사용
+    password TEXT DEFAULT '1234', -- 기본 비밀번호
+    position TEXT,
+    department TEXT,
+    company TEXT,
+    role TEXT DEFAULT 'staff',
+    email TEXT,
+    phone TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 2. 재고 정보 테이블
+CREATE TABLE IF NOT EXISTS inventory (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    item_name TEXT NOT NULL,
+    category TEXT,
+    stock INTEGER DEFAULT 0,
+    min_stock INTEGER DEFAULT 10,
+    unit TEXT,
+    price INTEGER DEFAULT 0,
+    supplier TEXT,
+    expiry_date DATE,
+    lot_number TEXT,
+    is_udi_reportable BOOLEAN DEFAULT FALSE,
+    company TEXT,
+    department TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 3. 전자결재 테이블
+CREATE TABLE IF NOT EXISTS approvals (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title TEXT NOT NULL,
+    type TEXT NOT NULL, -- '물품신청', '인사명령', '양식신청', '출결정정'
+    content TEXT,
+    sender_id UUID REFERENCES staffs(id),
+    sender_name TEXT,
+    status TEXT DEFAULT '대기', -- '대기', '승인', '반려', '이동완료'
+    meta_data JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 4. 알림 테이블
+CREATE TABLE IF NOT EXISTS notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES staffs(id),
+    type TEXT,
+    title TEXT,
+    body TEXT,
+    is_read BOOLEAN DEFAULT FALSE,
+    metadata JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 5. 거래처 테이블
+CREATE TABLE IF NOT EXISTS suppliers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL UNIQUE,
+    contact_person TEXT,
+    phone TEXT,
+    address TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 6. 초기 필수 데이터 (박철홍 병원장 계정 - 이름 아이디 방식)
+-- 비밀번호는 요청하신 대로 'qkrcjfghd!!'로 설정합니다.
+INSERT INTO staffs (id, name, password, position, department, company, role)
+VALUES (
+    '00000000-0000-4000-a000-000000000001', 
+    '박철홍', 
+    'qkrcjfghd!!', 
+    '병원장', 
+    '행정팀', 
+    '박철홍정형외과', 
+    'admin'
+)
+ON CONFLICT (name) DO UPDATE SET 
+    password = EXCLUDED.password,
+    position = EXCLUDED.position, 
+    role = EXCLUDED.role;
+
+-- 7. 인덱스 설정
+CREATE INDEX IF NOT EXISTS idx_staffs_name ON staffs(name);
+CREATE INDEX IF NOT EXISTS idx_inventory_company_dept ON inventory(company, department);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
