@@ -14,7 +14,7 @@ export default function 구성원관리({ 직원목록 = [], 부서목록 = [], 
     성명: '', 전화번호: '', 사업체: '박철홍정형외과', 팀: '원무팀', 직함: '', 입사일: '', 퇴사일: '',
     주민번호: '', 이메일: '', 주소: '', 면허사항: '', 계좌정보: '', 임금정보: '', 상태: '재직',
     연차총개수: 15, 연차사용개수: 0, 근무형태ID: '',
-    base_salary: 0, meal_allowance: 100000, vehicle_allowance: 0 // 급여 필드 추가
+    base_salary: 0
   });
 
   useEffect(() => {
@@ -54,7 +54,7 @@ export default function 구성원관리({ 직원목록 = [], 부서목록 = [], 
         license: 신규직원.면허사항, bank_account: 신규직원.계좌정보, salary_info: 신규직원.임금정보,
         joined_at: 신규직원.입사일, resigned_at: 신규직원.퇴사일 || null, status: 신규직원.상태,
         annual_leave_total: 신규직원.연차총개수, annual_leave_used: 신규직원.연차사용개수, shift_id: 신규직원.근무형태ID || null,
-        base_salary: 신규직원.base_salary, meal_allowance: 신규직원.meal_allowance, vehicle_allowance: 신규직원.vehicle_allowance
+        base_salary: 신규직원.base_salary
       };
 
       if (편집모드 && 선택된직원ID) {
@@ -69,7 +69,7 @@ export default function 구성원관리({ 직원목록 = [], 부서목록 = [], 
           console.error(insertErr);
           return alert('직원 등록 실패: ' + (insertErr.message || 'DB 오류'));
         }
-        alert(`직원 등록 완료! 사번: ${newEmployeeNo}`);
+        alert(`직원 등록 완료! 로그인 아이디(이름): ${신규직원.성명}`);
       }
       닫기함수(); 새로고침();
     } catch (error) { alert('처리 중 오류가 발생했습니다.'); }
@@ -84,7 +84,7 @@ export default function 구성원관리({ 직원목록 = [], 부서목록 = [], 
       주소: 직원.address || '', 면허사항: 직원.license || '', 계좌정보: 직원.bank_account || '',
       임금정보: 직원.salary_info || '', 상태: 직원.status || '재직',
       연차총개수: 직원.annual_leave_total || 15, 연차사용개수: 직원.annual_leave_used || 0, 근무형태ID: 직원.shift_id || '',
-      base_salary: 직원.base_salary || 0, meal_allowance: 직원.meal_allowance || 100000, vehicle_allowance: 직원.vehicle_allowance || 0
+      base_salary: 직원.base_salary || 0
     });
     편집모드설정(true);
   };
@@ -95,7 +95,7 @@ export default function 구성원관리({ 직원목록 = [], 부서목록 = [], 
       성명: '', 전화번호: '', 사업체: '박철홍정형외과', 팀: '원무팀', 직함: '', 입사일: '', 퇴사일: '',
       주민번호: '', 이메일: '', 주소: '', 면허사항: '', 계좌정보: '', 임금정보: '', 상태: '재직',
       연차총개수: 15, 연차사용개수: 0, 근무형태ID: '',
-      base_salary: 0, meal_allowance: 100000, vehicle_allowance: 0
+      base_salary: 0
     });
     창닫기();
   };
@@ -264,15 +264,7 @@ export default function 구성원관리({ 직원목록 = [], 부서목록 = [], 
                     <label className="text-[9px] font-black text-gray-400">기본급 (월)</label>
                     <input type="number" value={신규직원.base_salary} onChange={e => 신규직원설정({...신규직원, base_salary: Number(e.target.value)})} className="w-full p-3 bg-white rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100" placeholder="0" />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-gray-400">비과세 식대</label>
-                    <input type="number" value={신규직원.meal_allowance} onChange={e => 신규직원설정({...신규직원, meal_allowance: Number(e.target.value)})} className="w-full p-3 bg-white rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100" />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-gray-400">비과세 차량유지비</label>
-                    <input type="number" value={신규직원.vehicle_allowance} onChange={e => 신규직원설정({...신규직원, vehicle_allowance: Number(e.target.value)})} className="w-full p-3 bg-white rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100" />
-                  </div>
-                  <p className="text-[8px] font-bold text-gray-400 leading-tight">* 입력된 급여 정보는 연봉 계약 및 매월 급여 정산 시 기초 데이터로 자동 활용됩니다.</p>
+                  <p className="text-[8px] font-bold text-gray-400 leading-tight">* 비과세 항목은 인사관리 → 계약관리에서 근로계약서/변경계약서 발송 시 등록합니다.</p>
                 </div>
               </div>
             </div>

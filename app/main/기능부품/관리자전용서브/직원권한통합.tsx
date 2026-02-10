@@ -2,14 +2,50 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
-const permissionLabels: Record<string, string> = {
-  mso: 'MSO 전용 (전체 기능·관리자 메뉴)',
-  hr: '인사관리 조회',
-  mso_plus_all: 'MSO + 전체회사 동시관리',
-  inventory: '재고관리 접근',
-  approval: '전자결재 사용',
-  admin: '관리자 메뉴 접근 (MSO일 때만 유효)'
-};
+const PERM_GROUPS = [
+  {
+    label: '기본 권한',
+    items: [
+      { key: 'mso', label: 'MSO 전용 (전체 기능·관리자 메뉴)' },
+      { key: 'hr', label: '인사관리 전체 접근' },
+      { key: 'mso_plus_all', label: 'MSO + 전체회사 동시관리' },
+      { key: 'inventory', label: '재고관리 접근' },
+      { key: 'approval', label: '전자결재 사용' },
+      { key: 'admin', label: '관리자 메뉴 접근 (MSO일 때만)' }
+    ]
+  },
+  {
+    label: '메인 메뉴별 접근',
+    items: [
+      { key: 'menu_내정보', label: '내 정보' },
+      { key: 'menu_조직도', label: '조직도' },
+      { key: 'menu_추가기능', label: '추가기능' },
+      { key: 'menu_채팅', label: '채팅' },
+      { key: 'menu_AI채팅', label: 'AI채팅' },
+      { key: 'menu_게시판', label: '게시판' },
+      { key: 'menu_알림', label: '알림' },
+      { key: 'menu_전자결재', label: '전자결재' },
+      { key: 'menu_근태관리', label: '근태관리' },
+      { key: 'menu_인사관리', label: '인사관리' },
+      { key: 'menu_재고관리', label: '재고관리' },
+      { key: 'menu_관리자', label: '관리자 (MSO필수)' }
+    ]
+  },
+  {
+    label: '인사관리 세부 메뉴 (인사 권한 있을 때)',
+    items: [
+      { key: 'hr_구성원', label: '구성원' },
+      { key: 'hr_계약', label: '계약' },
+      { key: 'hr_근무형태', label: '근무형태' },
+      { key: 'hr_근태', label: '근태' },
+      { key: 'hr_급여', label: '급여' },
+      { key: 'hr_연차휴가', label: '연차/휴가' },
+      { key: 'hr_캘린더', label: '캘린더' },
+      { key: 'hr_비품대여', label: '비품대여' },
+      { key: 'hr_증명서', label: '증명서' }
+    ]
+  }
+];
 
 export default function 직원권한통합({ onRefresh }: { onRefresh?: () => void }) {
   const [staffs, setStaffs] = useState<any[]>([]);
@@ -136,23 +172,30 @@ export default function 직원권한통합({ onRefresh }: { onRefresh?: () => vo
               </div>
             </div>
 
-            <div className="space-y-4">
-              <p className="text-sm font-black text-gray-800">🔐 세부 권한(Permissions)</p>
-              {Object.keys(permissionLabels).map(key => (
-                <div key={key} className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-                  <span className="text-xs font-bold text-gray-800">{permissionLabels[key]}</span>
-                  <button
-                    onClick={() => togglePermission(selectedStaff.id, key)}
-                    className={`w-14 h-8 rounded-full transition-all relative ${selectedStaff.permissions?.[key] ? 'bg-blue-600' : 'bg-gray-200'}`}
-                  >
-                    <div className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow-md transition-all ${selectedStaff.permissions?.[key] ? 'left-7' : 'left-1'}`}></div>
-                  </button>
+            <div className="space-y-6">
+              <p className="text-sm font-black text-gray-800">🔐 세부 권한 (메뉴별 설정)</p>
+              {PERM_GROUPS.map((group, gi) => (
+                <div key={gi} className="space-y-3">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">{group.label}</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {group.items.map(({ key, label }) => (
+                      <div key={key} className="flex justify-between items-center bg-white p-3 rounded-xl shadow-sm border border-gray-100">
+                        <span className="text-[11px] font-semibold text-gray-800 truncate">{label}</span>
+                        <button
+                          onClick={() => togglePermission(selectedStaff.id, key)}
+                          className={`w-12 h-6 rounded-full transition-all relative shrink-0 ${selectedStaff.permissions?.[key] ? 'bg-[#3182F6]' : 'bg-gray-200'}`}
+                        >
+                          <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${selectedStaff.permissions?.[key] ? 'left-6' : 'left-0.5'}`}></div>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
 
             <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100">
-              <p className="text-[10px] font-black text-amber-800">📌 MSO 전용: 관리자 메뉴·회사 선택 등 | 인사관리: 부서장 등 인사 메뉴 접근</p>
+              <p className="text-[10px] font-black text-amber-800">📌 메인 메뉴: 사이드바에 표시 여부 | 인사 세부: 인사관리 내 탭 접근 | MSO/관리자: 별도 조건 필요</p>
             </div>
           </div>
         ) : (

@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import SignaturePad from '@/app/components/SignaturePad';
 
 import OrgChart from './조직도그림'; 
 import MyPage from '../마이페이지'; 
@@ -19,6 +20,8 @@ export default function MainContent({ user, mainMenu, data, subView, setSubView,
   const [pendingContract, setPendingContract] = useState<any>(null);
   const [annualLeaveNotice, setAnnualLeaveNotice] = useState<any>(null);
   const [signature, setSignature] = useState('');
+  const [signatureMode, setSignatureMode] = useState<'none' | 'type' | 'pad'>('none');
+  const [contractTemplate, setContractTemplate] = useState<string>('');
 
   useEffect(() => {
     const checkNotifications = async () => {
@@ -31,7 +34,16 @@ export default function MainContent({ user, mainMenu, data, subView, setSubView,
         .eq('status', '서명대기')
         .single();
       
-      if (contract) setPendingContract(contract);
+      if (contract) {
+        setPendingContract(contract);
+        const companyName = user.company || '전체';
+        const { data: tmpl } = await supabase.from('contract_templates').select('template_content').eq('company_name', companyName).single();
+        if (tmpl?.template_content) setContractTemplate(tmpl.template_content);
+        else {
+          const { data: fallback } = await supabase.from('contract_templates').select('template_content').eq('company_name', '전체').single();
+          setContractTemplate(fallback?.template_content || '');
+        }
+      }
 
       const { data: staff } = await supabase
         .from('staff_members')
@@ -51,19 +63,27 @@ export default function MainContent({ user, mainMenu, data, subView, setSubView,
   }, [user]);
 
   const handleSignContract = async () => {
-    if (!signature.trim()) return alert("서명을 입력해주세요.");
+    const sigData = signature?.trim();
+    if (!sigData) return alert("서명하기 버튼을 눌러 서명칸에서 서명하거나, 성함을 입력해주세요.");
     try {
       const { error } = await supabase
         .from('employment_contracts')
-        .update({ status: '서명완료', signed_at: new Date().toISOString(), signature_data: signature })
+        .update({ status: '서명완료', signed_at: new Date().toISOString(), signature_data: sigData })
         .eq('id', pendingContract.id);
       if (error) throw error;
       alert("근로계약서 서명이 완료되었습니다.");
       setPendingContract(null);
+      setSignature('');
+      setSignatureMode('none');
       if (onRefresh) onRefresh();
     } catch (err) {
       alert("서명 저장 중 오류가 발생했습니다.");
     }
+  };
+
+  const handleSignaturePadSave = (dataUrl: string) => {
+    setSignature(dataUrl);
+    setSignatureMode('none');
   };
 
   const isMso = user?.company === 'SY INC.' || user?.permissions?.mso === true;
@@ -78,9 +98,9 @@ export default function MainContent({ user, mainMenu, data, subView, setSubView,
   });
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden relative bg-[#F5F6F8]">
+    <div className="flex-1 flex flex-col overflow-hidden relative bg-[#F9FAFB]">
       {isMso && hospitalCompanies.length > 0 && setSelectedCompanyId && (
-        <div className="shrink-0 px-4 py-2 bg-white border-b border-[#EBEBEB] flex items-center gap-2">
+        <div className="shrink-0 px-4 py-2 bg-white border-b border-[#E5E8EB] flex items-center gap-2">
           <span className="text-xs font-bold text-gray-500">회사 선택</span>
           <select
             value={selectedCo}
@@ -116,31 +136,40 @@ export default function MainContent({ user, mainMenu, data, subView, setSubView,
       {mainMenu === '추가기능' && <div className="flex-1 overflow-hidden"><추가기능 /></div>}
       {mainMenu === '관리자' && <div className="flex-1 overflow-hidden"><AdminView user={user} staffs={data.staffs} depts={data.depts} onRefresh={onRefresh} /></div>}
 
-      {/* 근로계약서 서명 팝업 - 모바일 최적화 */}
+      {/* 근로계약서 서명 팝업 - 모바일/PC 서명 지원 */}
       {pendingContract && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[9999] flex items-end md:items-center justify-center p-0 md:p-4">
-          <div className="bg-white w-full max-w-2xl rounded-t-[2.5rem] md:rounded-[3rem] shadow-2xl border-t-8 border-blue-600 flex flex-col animate-in slide-in-from-bottom duration-300 max-h-[90vh] overflow-y-auto">
-            <div className="p-8 md:p-10 border-b border-gray-50">
-              <h2 className="text-2xl font-black text-gray-900 tracking-tighter italic">근로계약서 서명 요청</h2>
-              <p className="text-xs text-blue-600 font-bold mt-1 uppercase tracking-widest">본 계약서는 법적 효력을 갖는 전자 문서입니다.</p>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-md z-[9999] flex items-end md:items-center justify-center p-0 md:p-4">
+          <div className="bg-white w-full max-w-2xl rounded-t-[24px] md:rounded-[24px] shadow-2xl border-t-4 border-[#3182F6] flex flex-col animate-in slide-in-from-bottom duration-300 max-h-[90vh] overflow-y-auto">
+            <div className="p-8 md:p-10 border-b border-[#E5E8EB]">
+              <h2 className="text-2xl font-bold text-[#191F28] tracking-tight">근로계약서 서명 요청</h2>
+              <p className="text-xs text-[#3182F6] font-semibold mt-1 uppercase tracking-wider">본 계약서는 법적 효력을 갖는 전자 문서입니다.</p>
             </div>
             <div className="p-8 md:p-10 space-y-8">
-              <div className="bg-gray-50 p-6 md:p-8 rounded-2xl border border-gray-100 text-xs leading-relaxed text-gray-600 font-medium">
-                <h3 className="text-sm font-black text-gray-800 mb-6 text-center underline underline-offset-8">표준 근로계약서 (요약)</h3>
-                <div className="space-y-3">
-                  <p>1. 근로계약기간: 입사일로부터 정함이 없는 기간</p>
-                  <p>2. 근무장소: 소속 병원 내 지정 장소</p>
-                  <p>3. 업무내용: 채용 시 결정된 직무 및 부수 업무</p>
-                  <p>4. 소정근로시간: 주 40시간 (운영 스케줄에 따름)</p>
-                  <p>5. 임금: 연봉계약서 및 급여 규정에 따름</p>
-                </div>
-                <p className="mt-8 text-center font-black text-gray-400 italic">[상기 내용을 확인하였으며 이에 동의합니다]</p>
+              <div className="bg-[#F2F4F6] p-6 md:p-8 rounded-[16px] border border-[#E5E8EB] text-xs leading-relaxed text-[#4E5968] font-medium max-h-[40vh] overflow-y-auto custom-scrollbar">
+                <h3 className="text-sm font-bold text-[#191F28] mb-4 text-center underline underline-offset-8">{pendingContract.contract_type || '표준 근로계약서'}</h3>
+                <div className="whitespace-pre-wrap">{contractTemplate || '제1조(계약의 목적)\n본 계약은 근로기준법에 따라 사용자와 근로자 간의 근로조건을 정함을 목적으로 한다.\n\n제2조(근로계약기간) 입사일로부터 정함이 없는 기간\n\n제3조(근무장소) 소속 병원 내 지정 장소\n\n제4조(업무내용) 채용 시 결정된 직무 및 부수 업무\n\n제5조(소정근로시간) 주 40시간 (운영 스케줄에 따름)\n\n제6조(임금) 연봉계약서 및 급여 규정에 따름\n\n[상기 내용을 확인하였으며 이에 동의합니다]'}</div>
               </div>
+
               <div className="space-y-4">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">전자 서명 (성함 입력)</label>
-                <input type="text" value={signature} onChange={(e) => setSignature(e.target.value)} placeholder="본인의 성함을 정자로 입력해주세요" className="w-full p-5 bg-blue-50/50 border-2 border-blue-100 rounded-2xl outline-none focus:border-blue-600 font-black text-xl text-center transition-all" />
+                <label className="text-[11px] font-semibold text-[#8B95A1] uppercase tracking-wider">전자 서명</label>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={() => { setSignatureMode(signatureMode === 'pad' ? 'none' : 'pad'); setSignature(''); }} className={`px-4 py-2.5 rounded-[12px] text-[13px] font-semibold transition-all ${signatureMode === 'pad' ? 'bg-[#3182F6] text-white' : 'bg-[#F2F4F6] text-[#4E5968] hover:bg-[#E5E8EB]'}`}>
+                    ✍️ 서명하기 (화면에 직접 서명)
+                  </button>
+                  <button type="button" onClick={() => { setSignatureMode(signatureMode === 'type' ? 'none' : 'type'); setSignature(''); }} className={`px-4 py-2.5 rounded-[12px] text-[13px] font-semibold transition-all ${signatureMode === 'type' ? 'bg-[#3182F6] text-white' : 'bg-[#F2F4F6] text-[#4E5968] hover:bg-[#E5E8EB]'}`}>
+                    ⌨️ 성함 입력
+                  </button>
+                </div>
+                {signatureMode === 'pad' && <SignaturePad onSave={handleSignaturePadSave} width={400} height={180} />}
+                {signatureMode === 'type' && <input type="text" value={signature} onChange={(e) => setSignature(e.target.value)} placeholder="본인의 성함을 정자로 입력해주세요" className="w-full p-5 bg-[#E8F3FF]/50 border-2 border-[#E8F3FF] rounded-[16px] outline-none focus:border-[#3182F6] font-semibold text-xl text-center transition-all" />}
+                {signature && !signatureMode && (
+                  <div className="flex items-center gap-3 p-3 bg-[#E8F3FF] rounded-[12px]">
+                    {signature.startsWith('data:image') ? <img src={signature} alt="서명" className="h-12 object-contain bg-white rounded border" /> : <span className="font-semibold text-[#191F28]">{signature}</span>}
+                    <button type="button" onClick={() => setSignature('')} className="text-[#8B95A1] text-sm hover:text-[#191F28]">변경</button>
+                  </div>
+                )}
               </div>
-              <button onClick={handleSignContract} className="w-full py-5 bg-blue-600 text-white font-black rounded-2xl text-sm shadow-xl shadow-blue-100 hover:scale-[0.99] active:scale-95 transition-all">확인 및 전자서명 완료</button>
+              <button onClick={handleSignContract} disabled={!signature?.trim()} className="w-full py-5 bg-[#3182F6] text-white font-semibold rounded-[16px] text-[15px] hover:bg-[#1B64DA] active:scale-[0.99] transition-all disabled:opacity-50 disabled:cursor-not-allowed">확인 및 전자서명 완료</button>
             </div>
           </div>
         </div>
@@ -149,19 +178,19 @@ export default function MainContent({ user, mainMenu, data, subView, setSubView,
       {/* 연차 촉진 알림 - 모바일 대응 */}
       {annualLeaveNotice && !pendingContract && (
         <div className="fixed bottom-24 right-4 left-4 md:left-auto md:right-10 z-[9998] animate-in slide-in-from-bottom-10">
-          <div className="bg-white border-2 border-gray-900 p-6 md:p-8 shadow-2xl rounded-[2rem] w-full md:w-80 space-y-4">
+          <div className="bg-white border border-[#E5E8EB] p-6 md:p-8 shadow-[0_4px_20px_rgba(0,0,0,0.08)] rounded-[20px] w-full md:w-80 space-y-4">
             <div className="flex justify-between items-start">
-              <h3 className="text-lg font-black text-gray-800 italic tracking-tighter">연차 사용 촉진 알림</h3>
-              <button onClick={() => setAnnualLeaveNotice(null)} className="text-gray-400 hover:text-gray-900 text-xl">✕</button>
+              <h3 className="text-lg font-bold text-[#191F28] tracking-tight">연차 사용 촉진 알림</h3>
+              <button onClick={() => setAnnualLeaveNotice(null)} className="text-[#8B95A1] hover:text-[#191F28] text-xl">✕</button>
             </div>
-            <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
-              <p className="text-[10px] font-black text-orange-600 uppercase mb-1 tracking-widest">법적 준수 사항</p>
-              <p className="text-xs font-bold text-gray-700 leading-relaxed">
-                {user.name}님, 현재 잔여 연차가 <span className="text-orange-600 font-black">{annualLeaveNotice.remaining}일</span> 남았습니다. 
+            <div className="bg-[#FFF8E6] p-4 rounded-[12px] border border-[#FFE4A0]">
+              <p className="text-[11px] font-semibold text-[#F59E0B] uppercase mb-1 tracking-wider">법적 준수 사항</p>
+              <p className="text-xs font-medium text-[#4E5968] leading-relaxed">
+                {user.name}님, 현재 잔여 연차가 <span className="text-[#F59E0B] font-bold">{annualLeaveNotice.remaining}일</span> 남았습니다. 
                 근로기준법 제61조에 의거하여 연차 사용을 권고드립니다.
               </p>
             </div>
-            <button onClick={() => setAnnualLeaveNotice(null)} className="w-full py-4 bg-gray-900 text-white text-[11px] font-black rounded-xl hover:bg-black transition-all">확인했습니다</button>
+            <button onClick={() => setAnnualLeaveNotice(null)} className="w-full py-4 bg-[#3182F6] text-white text-[13px] font-semibold rounded-[12px] hover:bg-[#1B64DA] transition-all">확인했습니다</button>
           </div>
         </div>
       )}

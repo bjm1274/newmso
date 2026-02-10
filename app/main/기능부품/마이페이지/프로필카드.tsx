@@ -51,7 +51,8 @@ export default function MyProfileCard({ user: initialUser }: any) {
   const handleLogout = () => {
     if (confirm('로그아웃 하시겠습니까?')) {
       localStorage.removeItem('user_session');
-      router.push('/login');
+      localStorage.removeItem('erp_user');
+      router.push('/');
     }
   };
 
@@ -175,7 +176,7 @@ export default function MyProfileCard({ user: initialUser }: any) {
 
       {/* 로그아웃 버튼 */}
       <div className="pt-8 border-t border-gray-50">
-        <button onClick={handleLogout} className="w-full py-8 rounded-[2.5rem] bg-[#1D1E21] text-white text-xl font-black hover:bg-black transition-all shadow-2xl flex items-center justify-center gap-5">
+        <button onClick={handleLogout} className="w-full py-8 rounded-[20px] bg-[#3182F6] text-white text-[17px] font-semibold hover:bg-[#1B64DA] transition-all shadow-sm flex items-center justify-center gap-5">
           <span className="text-3xl">🚪</span>
           <span className="tracking-tight">시스템 안전 로그아웃</span>
         </button>
