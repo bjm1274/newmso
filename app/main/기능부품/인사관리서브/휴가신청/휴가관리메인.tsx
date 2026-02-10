@@ -1,73 +1,67 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
 import AnnualLeavePromotion from './연차촉진시스템';
 
+type StaffLite = {
+  id: string;
+  name: string;
+  company?: string;
+  department?: string;
+};
+
+type Leave = {
+  id: string;
+  staff: StaffLite;
+  leave_type: string;
+  start_date: string;
+  end_date: string;
+  reason: string;
+  status: '대기' | '승인' | '반려';
+};
+
 export default function LeaveManagement({ staffs, selectedCo, onRefresh }: any) {
-  const [leaves, setLeaves] = useState<any[]>([]);
+  const [leaves, setLeaves] = useState<Leave[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('연차/휴가 신청내역');
-  const [leaveConfig, setLeaveConfig] = useState('입사일 기준');
-
-  const fetchLeaves = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('leave_requests')
-        .select('*, staff_members(name, company, department)')
-        .order('created_at', { ascending: false });
-      
-      if (!error && data) {
-        let filtered = data;
-        if (selectedCo && selectedCo !== '전체') {
-          filtered = data.filter((l: any) => l.staff_members?.company === selectedCo);
-        }
-        setLeaves(filtered);
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [leaveConfig, setLeaveConfig] = useState<'입사일 기준' | '회계연도 기준'>('입사일 기준');
 
   useEffect(() => {
-    fetchLeaves();
-  }, [selectedCo]);
+    // DEMO: staffs 정보를 기반으로 임시 휴가 신청 데이터 생성
+    setLoading(true);
+    const baseDate = new Date();
+    const demoLeaves: Leave[] = (staffs as StaffLite[])
+      .filter((s) => selectedCo === '전체' || s.company === selectedCo)
+      .slice(0, 10)
+      .map((s, idx) => {
+        const start = new Date(baseDate);
+        start.setDate(start.getDate() - idx * 3);
+        const end = new Date(start);
+        end.setDate(start.getDate() + 1);
+        return {
+          id: `${idx}`,
+          staff: s,
+          leave_type: idx % 4 === 0 ? '연차' : idx % 4 === 1 ? '반차' : idx % 4 === 2 ? '병가' : '경조',
+          start_date: start.toISOString().slice(0, 10),
+          end_date: end.toISOString().slice(0, 10),
+          reason: idx % 3 === 0 ? '가족행사' : idx % 3 === 1 ? '개인 사유' : '건강검진',
+          status: idx % 5 === 0 ? '대기' : '승인',
+        };
+      });
+    setLeaves(demoLeaves);
+    setLoading(false);
+  }, [staffs, selectedCo]);
 
-  const handleStatusUpdate = async (id: string, status: string) => {
-    const { error } = await supabase
-      .from('leave_requests')
-      .update({ status })
-      .eq('id', id);
-    
-    if (!error) {
-      alert(`신청이 ${status}되었습니다.`);
-      fetchLeaves();
-      if (onRefresh) onRefresh();
-    }
+  const handleStatusUpdate = (id: string, status: Leave['status']) => {
+    setLeaves((prev) => prev.map((l) => (l.id === id ? { ...l, status } : l)));
+    alert(`신청이 ${status} 처리되었습니다. (DEMO 모드, 실제 DB에는 반영되지 않음)`);
+    if (onRefresh) onRefresh();
   };
 
-  const handleApplyLeaveConfig = async (type: string) => {
-    if (!confirm(`${type}으로 연차 산정 방식을 변경하고 전 직원의 연차를 재계산하시겠습니까?`)) return;
-    
-    setLoading(true);
-    try {
-      // 실제 운영 환경에서는 서버 사이드 로직(RPC 또는 Edge Function)으로 처리하는 것이 안전함
-      // 여기서는 시뮬레이션을 위해 상태 업데이트 및 알림 처리
-      setLeaveConfig(type);
-      
-      // 1. 설정 저장 (DB가 있다면)
-      // await supabase.from('system_settings').upsert({ key: 'leave_calc_type', value: type });
-
-      // 2. 전 직원 연차 재계산 알림 (데모용)
-      alert(`${type} 기준 연차 재계산이 완료되었습니다. (근로기준법 제60조 준수)`);
-      if (onRefresh) onRefresh();
-    } catch (err) {
-      alert('설정 적용 중 오류가 발생했습니다.');
-    } finally {
-      setLoading(false);
-    }
+  const handleApplyLeaveConfig = (type: '입사일 기준' | '회계연도 기준') => {
+    if (!confirm(`${type}으로 연차 산정 방식을 변경하고 전 직원의 연차를 재계산한다고 가정합니다.`)) return;
+    setLeaveConfig(type);
+    alert(`${type} 기준 연차 재계산이 완료되었다고 가정합니다. (DEMO)`);
+    if (onRefresh) onRefresh();
   };
 
   return (

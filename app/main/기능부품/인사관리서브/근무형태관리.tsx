@@ -1,12 +1,48 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+
+type Shift = {
+  id: string;
+  name: string;
+  start_time: string;
+  end_time: string;
+  description?: string;
+  company: string;
+};
+
+const DEMO_SHIFTS: Shift[] = [
+  {
+    id: 'day',
+    name: '데이(일반)',
+    start_time: '09:00',
+    end_time: '18:00',
+    description: '일반 행정/외래 근무 (휴게 1시간 포함)',
+    company: 'SY INC.',
+  },
+  {
+    id: 'night',
+    name: '나이트전담',
+    start_time: '23:00',
+    end_time: '08:00',
+    description: '입원병동 야간 전담 근무',
+    company: '박철홍정형외과',
+  },
+  {
+    id: 'swing',
+    name: '스윙(중간근무)',
+    start_time: '13:00',
+    end_time: '22:00',
+    description: '외래/수술 연계 중간 근무',
+    company: '수연의원',
+  },
+];
 
 export default function ShiftManagement({ selectedCo }: any) {
-  const [shifts, setShifts] = useState<any[]>([]);
+  const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newShift, setNewShift] = useState({
+  const [newShift, setNewShift] = useState<Shift>({
+    id: '',
     name: '',
     start_time: '09:00',
     end_time: '18:00',
@@ -14,16 +50,13 @@ export default function ShiftManagement({ selectedCo }: any) {
     company: '박철홍정형외과'
   });
 
-  const fetchShifts = async () => {
+  const fetchShifts = () => {
     setLoading(true);
-    const { data } = await supabase.from('work_shifts').select('*');
-    if (data) {
-      let filtered = data;
-      if (selectedCo && selectedCo !== '전체') {
-        filtered = data.filter((s: any) => s.company === selectedCo);
-      }
-      setShifts(filtered);
+    let data = DEMO_SHIFTS;
+    if (selectedCo && selectedCo !== '전체') {
+      data = data.filter((s) => s.company === selectedCo);
     }
+    setShifts(data);
     setLoading(false);
   };
 
@@ -31,21 +64,21 @@ export default function ShiftManagement({ selectedCo }: any) {
     fetchShifts();
   }, [selectedCo]);
 
-  const handleAddShift = async () => {
+  const handleAddShift = () => {
     if (!newShift.name) return alert('근무 형태 명칭을 입력하세요.');
-    const { error } = await supabase.from('work_shifts').insert([newShift]);
-    if (!error) {
-      alert('근무 형태가 생성되었습니다.');
-      setShowAddModal(false);
-      setNewShift({ name: '', start_time: '09:00', end_time: '18:00', description: '', company: '박철홍정형외과' });
-      fetchShifts();
-    }
+    const created: Shift = {
+      ...newShift,
+      id: `${Date.now()}`,
+    };
+    setShifts((prev) => [...prev, created]);
+    alert('근무 형태가(가) 임시로 추가되었습니다. (나중에 Supabase work_shifts 테이블과 연동 예정)');
+    setShowAddModal(false);
+    setNewShift({ id: '', name: '', start_time: '09:00', end_time: '18:00', description: '', company: '박철홍정형외과' });
   };
 
-  const handleDeleteShift = async (id: string) => {
+  const handleDeleteShift = (id: string) => {
     if (!confirm('이 근무 형태를 삭제하시겠습니까?')) return;
-    const { error } = await supabase.from('work_shifts').delete().eq('id', id);
-    if (!error) fetchShifts();
+    setShifts((prev) => prev.filter((s) => s.id !== id));
   };
 
   return (
