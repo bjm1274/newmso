@@ -9,6 +9,7 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
   const menus = [
     { id: '내정보', icon: '🆔', label: '내 정보' },
     { id: '조직도', icon: '👤', label: '조직도' },
+    { id: '추가기능', icon: '🔗', label: '추가기능' },
     { id: '채팅', icon: '✉️', label: '채팅' },
     { id: 'AI채팅', icon: '✨', label: 'AI채팅' },
     { id: '게시판', icon: '📋', label: '게시판' },
@@ -16,7 +17,6 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
     { id: '전자결재', icon: '✍️', label: '전자결재' },
     { id: '인사관리', icon: '👥', label: '인사관리' },
     { id: '재고관리', icon: '📦', label: '재고관리' },
-    { id: '추가기능', icon: '🔗', label: '추가기능' },
     { id: '관리자', icon: '⚙️', label: '관리자' } 
   ];
 
