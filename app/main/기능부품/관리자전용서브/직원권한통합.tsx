@@ -36,6 +36,7 @@ const PERM_GROUPS = [
     items: [
       { key: 'hr_구성원', label: '구성원' },
       { key: 'hr_계약', label: '계약' },
+      { key: 'hr_문서보관함', label: '문서 보관함' },
       { key: 'hr_근무형태', label: '근무형태' },
       { key: 'hr_근태', label: '근태' },
       { key: 'hr_급여', label: '급여' },

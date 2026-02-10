@@ -11,6 +11,7 @@ import CalendarSync from './캘린더동기화';
 import ShiftManagement from './인사관리서브/근무형태관리';
 import AssetLoanManager from './인사관리서브/비품장비대여관리';
 import ContractMain from './인사관리서브/계약관리';
+import 문서보관함 from './인사관리서브/문서보관함';
 
 export default function 인사관리({ user, staffs, depts, onRefresh }: any) {
   const [현재메뉴, 메뉴설정] = useState('구성원');
@@ -23,8 +24,8 @@ export default function 인사관리({ user, staffs, depts, onRefresh }: any) {
   const hasAccess = p.mso === true || user?.company === 'SY INC.' || p.hr === true || p.menu_인사관리 === true;
 
   const HR_TABS = [
-    { id: '구성원', perm: 'hr_구성원' }, { id: '계약', perm: 'hr_계약' }, { id: '근무형태', perm: 'hr_근무형태' },
-    { id: '근태', perm: 'hr_근태' }, { id: '급여', perm: 'hr_급여' }, { id: '연차/휴가', perm: 'hr_연차휴가' },
+    { id: '구성원', perm: 'hr_구성원' }, { id: '계약', perm: 'hr_계약' }, { id: '문서보관함', perm: 'hr_문서보관함' },
+    { id: '근무형태', perm: 'hr_근무형태' }, { id: '근태', perm: 'hr_근태' }, { id: '급여', perm: 'hr_급여' }, { id: '연차/휴가', perm: 'hr_연차휴가' },
     { id: '캘린더', perm: 'hr_캘린더' }, { id: '비품대여', perm: 'hr_비품대여' }, { id: '증명서', perm: 'hr_증명서' }
   ];
   const visibleHrTabs = HR_TABS.filter(t => p[t.perm] !== false);
@@ -82,6 +83,7 @@ export default function 인사관리({ user, staffs, depts, onRefresh }: any) {
             />
           )}
           {activeMenu === '계약' && <ContractMain staffs={staffs} selectedCo={선택사업체} onRefresh={onRefresh} />}
+          {activeMenu === '문서보관함' && <문서보관함 user={user} selectedCo={선택사업체} />}
           {activeMenu === '근무형태' && <ShiftManagement selectedCo={선택사업체} />}
           {activeMenu === '근태' && (
             <div className="flex flex-col h-full">

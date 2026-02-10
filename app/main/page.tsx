@@ -6,6 +6,7 @@ import { setSelectedCompanyId as persistSelectedCompanyId, getSelectedCompanyId 
 
 import Sidebar from './기능부품/조직도서브/조직도측면창';
 import MainContent from './기능부품/조직도서브/조직도본문';
+import GlobalSearch from '@/app/components/GlobalSearch';
 
 type ERPData = {
   staffs: any[];
@@ -155,6 +156,19 @@ export default function MainPage() {
       />
 
       <div className="flex-1 flex flex-col overflow-hidden pb-[58px] md:pb-0 relative">
+        <div className="hidden md:flex shrink-0 px-4 py-2 bg-white border-b border-[#E5E8EB] items-center gap-2">
+          <GlobalSearch
+            user={user}
+            staffs={data.staffs}
+            posts={data.posts}
+            onSelect={(type, id) => {
+              if (type === 'staff') setMainMenu('조직도');
+              else if (type === 'post') setMainMenu('게시판');
+              else if (type === 'approval') setMainMenu('전자결재');
+              else if (type === 'message') setMainMenu('채팅');
+            }}
+          />
+        </div>
         {loading && (
           <div className="absolute inset-0 bg-white/60 z-40 flex items-center justify-center">
             <div className="w-10 h-10 border-2 border-[#3182F6] rounded-full border-t-transparent animate-spin" />

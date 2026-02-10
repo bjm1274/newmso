@@ -93,3 +93,30 @@ CREATE TABLE IF NOT EXISTS contract_templates (
 INSERT INTO contract_templates (company_name, template_content) VALUES
   ('전체', '[근로계약서 표준안]\n\n제1조(계약의 목적)\n본 계약은 근로기준법에 따라 사용자와 근로자 간의 근로조건을 정함을 목적으로 한다.\n\n제2조(근로계약기간)\n입사일로부터 정함이 없는 기간\n\n제3조(근무장소)\n소속 병원 내 지정 장소\n\n제4조(업무내용)\n채용 시 결정된 직무 및 부수 업무\n\n제5조(소정근로시간)\n주 40시간 (운영 스케줄에 따름)\n\n제6조(임금)\n연봉계약서 및 급여 규정에 따름\n\n[상기 내용을 확인하였으며 이에 동의합니다]')
 ON CONFLICT (company_name) DO NOTHING;
+
+-- 6. 문서 보관함 (규정·양식·계약서 중앙 보관·버전 관리)
+CREATE TABLE IF NOT EXISTS document_repository (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  category TEXT NOT NULL CHECK (category IN ('규정','양식','계약서','기타')),
+  content TEXT,
+  file_url TEXT,
+  version INT DEFAULT 1,
+  company_name TEXT DEFAULT '전체',
+  created_by UUID REFERENCES staff_members(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_document_repo_category ON document_repository(category);
+CREATE INDEX IF NOT EXISTS idx_document_repo_company ON document_repository(company_name);
+
+CREATE TABLE IF NOT EXISTS document_versions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  document_id UUID NOT NULL REFERENCES document_repository(id) ON DELETE CASCADE,
+  version INT NOT NULL,
+  content TEXT,
+  file_url TEXT,
+  created_by UUID REFERENCES staff_members(id),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_document_versions_doc ON document_versions(document_id);
