@@ -7,13 +7,21 @@ import InterimSettlement from './급여명세/중간정산';
 import YearEndSettlement from './급여명세/연말정산';
 import SalarySettlement from './급여명세/급여정산';
 
+type Staff = {
+  id: number;
+  name: string;
+  company?: string;
+  position?: string;
+  base?: number;
+};
+
 export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any) {
   const [activeTab, setActiveTab] = useState('대장');
   const [selectedStaffId, setSelectedStaffId] = useState(1);
   const [checkedIds, setCheckedIds] = useState<number[]>([]);
   
-  const filtered = selectedCo === '전체' ? staffs : staffs.filter((s:any) => s.company === selectedCo);
-  const current = filtered.find((s:any) => s.id === selectedStaffId) || filtered[0];
+  const filtered: Staff[] = selectedCo === '전체' ? staffs : staffs.filter((s: Staff) => s.company === selectedCo);
+  const current = filtered.find((s) => s.id === selectedStaffId) || filtered[0];
 
   const handleAction = (type: string) => {
     if (checkedIds.length === 0) return alert("대상을 선택해 주세요.");
@@ -51,11 +59,13 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
             {activeTab === '대장' && (
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
                 <div className="xl:col-span-2 space-y-8">
-                    {current && <SalaryDetail staff={current} />}
-                    <PayrollTable staffs={filtered} checkedIds={checkedIds} setCheckedIds={setCheckedIds} onSelect={setSelectedStaffId} />
+                  {current && <SalaryDetail staff={current} />}
+                  <PayrollTable staffs={filtered} checkedIds={checkedIds} setCheckedIds={setCheckedIds} onSelect={setSelectedStaffId} />
                 </div>
-                <aside className="space-y-8">
-                    <CompliancePanel staffs={filtered.filter((s:any) => checkedIds.includes(s.id))} companyName={selectedCo} />
+                <aside className="space-y-6">
+                  <CompliancePanel staffs={filtered.filter((s: Staff) => checkedIds.includes(s.id))} companyName={selectedCo} />
+                  {current && <BenefitSummary staff={current} />}
+                  {current && <SalarySimulationSummary staff={current} />}
                 </aside>
               </div>
             )}
@@ -69,6 +79,68 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// 복리후생 요약 (DEMO 버전 – 나중에 Supabase 연동 예정)
+function BenefitSummary({ staff }: { staff: Staff }) {
+  const base = staff.base ?? 3_000_000;
+  const welfare = Math.round(base * 0.05);   // 예: 기본급의 5%를 복리후생 예산으로 가정
+  const pension = Math.round(base * 0.045);
+  const health = Math.round(base * 0.03545);
+
+  return (
+    <div className="border border-gray-200 p-6 bg-white rounded-[1.75rem] shadow-sm">
+      <h3 className="text-[11px] font-black text-gray-800 uppercase tracking-widest mb-4">
+        Benefits & Social Insurance (DEMO)
+      </h3>
+      <div className="space-y-2 text-xs font-bold text-gray-600">
+        <div className="flex justify-between">
+          <span>복리후생 예산 (추정)</span>
+          <span className="text-blue-600">{welfare.toLocaleString()}원 / 월</span>
+        </div>
+        <div className="flex justify-between">
+          <span>국민연금 (회사부담 추정)</span>
+          <span className="text-red-500">-{pension.toLocaleString()}원</span>
+        </div>
+        <div className="flex justify-between">
+          <span>건강보험 (회사부담 추정)</span>
+          <span className="text-red-500">-{health.toLocaleString()}원</span>
+        </div>
+      </div>
+      <p className="mt-3 text-[10px] text-gray-400">
+        * 실제 수치는 향후 Supabase 급여/복리후생 테이블과 연동하여 자동 계산됩니다.
+      </p>
+    </div>
+  );
+}
+
+// 급여 시뮬레이션 간단 요약 (DEMO)
+function SalarySimulationSummary({ staff }: { staff: Staff }) {
+  const base = staff.base ?? 3_000_000;
+  const scenarios = [
+    { name: '기준안', total: base },
+    { name: '인상안 A (+5%)', total: Math.round(base * 1.05) },
+    { name: '인상안 B (+10%)', total: Math.round(base * 1.1) },
+  ];
+
+  return (
+    <div className="border border-blue-100 p-6 bg-blue-50/40 rounded-[1.75rem] shadow-sm">
+      <h3 className="text-[11px] font-black text-blue-700 uppercase tracking-widest mb-4">
+        Salary Simulation (DEMO)
+      </h3>
+      <div className="space-y-2 text-xs font-bold text-gray-700">
+        {scenarios.map((s) => (
+          <div key={s.name} className="flex justify-between">
+            <span>{s.name}</span>
+            <span className="text-blue-700">{s.total.toLocaleString()}원</span>
+          </div>
+        ))}
+      </div>
+      <p className="mt-3 text-[10px] text-blue-500">
+        * 향후 `salary_simulations` 테이블과 연동하여 실제 시나리오를 저장/비교할 수 있습니다.
+      </p>
     </div>
   );
 }
