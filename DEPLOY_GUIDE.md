@@ -48,13 +48,20 @@ npm run dev
 1. [Vercel](https://vercel.com) 계정
 2. GitHub에 프로젝트 푸시
 
-### 3-2. 배포
-1. Vercel 대시보드 → **Add New** → **Project**
-2. GitHub 레포지토리 선택
-3. **Environment Variables**에 추가:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-4. **Deploy** 클릭
+### 3-2. 배포 (방법 A: Vercel 대시보드)
+1. [vercel.com](https://vercel.com) 로그인
+2. **Add New** → **Project**
+3. GitHub에서 `bjm1274/newmso` 레포지토리 Import
+4. **Environment Variables**에 추가:
+   - `NEXT_PUBLIC_SUPABASE_URL` = Supabase 프로젝트 URL
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = Supabase anon key
+5. **Deploy** 클릭
+
+### 3-3. 배포 (방법 B: Vercel CLI)
+```bash
+npx vercel login     # 먼저 로그인
+npx vercel --prod    # 프로덕션 배포
+```
 
 ### 3-3. 빌드 명령
 - Build Command: `npm run build`

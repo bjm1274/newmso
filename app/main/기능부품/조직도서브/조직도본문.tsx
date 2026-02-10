@@ -13,6 +13,7 @@ import AdminView from '../관리자전용';
 import AttendanceView from '../근태시스템';
 import AIChatView from '../AI채팅';
 import NotificationInbox from '../알림인박스';
+import 추가기능 from '../추가기능';
 
 export default function MainContent({ user, mainMenu, data, subView, setSubView, selectedCo, setSelectedCo, companies = [], selectedCompanyId, setSelectedCompanyId, onRefresh }: any) {
   const [pendingContract, setPendingContract] = useState<any>(null);
@@ -112,6 +113,7 @@ export default function MainContent({ user, mainMenu, data, subView, setSubView,
       {mainMenu === '근태관리' && <div className="flex-1 overflow-hidden"><AttendanceView user={user} staffs={data.staffs} selectedCo={selectedCo} /></div>}
       {mainMenu === '인사관리' && <div className="flex-1 overflow-hidden"><HRView user={user} staffs={data.staffs} depts={data.depts} selectedCo={selectedCo} onRefresh={onRefresh} /></div>}
       {mainMenu === '재고관리' && <div className="flex-1 overflow-hidden"><InventoryView user={user} depts={data.depts} onRefresh={onRefresh} selectedCo={selectedCo} /></div>}
+      {mainMenu === '추가기능' && <div className="flex-1 overflow-hidden"><추가기능 /></div>}
       {mainMenu === '관리자' && <div className="flex-1 overflow-hidden"><AdminView user={user} staffs={data.staffs} depts={data.depts} onRefresh={onRefresh} /></div>}
 
       {/* 근로계약서 서명 팝업 - 모바일 최적화 */}

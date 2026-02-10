@@ -16,6 +16,7 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
     { id: '전자결재', icon: '✍️', label: '전자결재' },
     { id: '인사관리', icon: '👥', label: '인사관리' },
     { id: '재고관리', icon: '📦', label: '재고관리' },
+    { id: '추가기능', icon: '🔗', label: '추가기능' },
     { id: '관리자', icon: '⚙️', label: '관리자' } 
   ];
 
