@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { CERTIFICATE_TYPES } from '@/lib/certificate-types';
 
 export default function FormRequest({ user, staffs }: any) {
   const [selectedForm, setSelectedForm] = useState('재직증명서');
@@ -9,13 +10,7 @@ export default function FormRequest({ user, staffs }: any) {
   const [urgency, setUrgency] = useState('일반');
   const [submitting, setSubmitting] = useState(false);
 
-  const forms = [
-    { id: '재직증명서', label: '재직증명서', desc: '현재 재직 중임을 증명' },
-    { id: '경력증명서', label: '경력증명서', desc: '근무 경력 및 직책 증명' },
-    { id: '퇴직증명서', label: '퇴직증명서', desc: '퇴직 사실 증명' },
-    { id: '급여인증서', label: '급여인증서', desc: '급여 지급 증명' },
-    { id: '근무확인서', label: '근무확인서', desc: '근무 기간 및 부서 확인' }
-  ];
+  const forms = CERTIFICATE_TYPES;
 
   const handleSubmit = async () => {
     if (!selectedStaff || !purpose) return alert('필수 항목을 입력해주세요.');
@@ -24,12 +19,15 @@ export default function FormRequest({ user, staffs }: any) {
 
     try {
       // 1. 결재 신청 생성
+      const targetStaffName = staffs?.find((s: any) => s.id === selectedStaff)?.name || selectedStaff;
       const { data: approval, error: approvalError } = await supabase.from('approvals').insert([{
         sender_id: user.id,
-        approver_id: staffs?.find((s: any) => s.position === '팀장' || s.position === '부장')?.id,
+        sender_name: user.name,
+        sender_company: user.company,
+        current_approver_id: staffs?.find((s: any) => s.position === '팀장' || s.position === '부장')?.id || null,
         type: '양식신청',
         title: `${selectedForm} 신청`,
-        content: `신청자: ${selectedStaff}\n용도: ${purpose}\n긴급도: ${urgency}`,
+        content: `신청자: ${targetStaffName}\n대상: ${targetStaffName}\n용도: ${purpose}\n긴급도: ${urgency}`,
         meta_data: {
           form_type: selectedForm,
           target_staff: selectedStaff,

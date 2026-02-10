@@ -8,11 +8,15 @@ export default function BoardView({ user }: any) {
   const [showNewPost, setShowNewPost] = useState(false);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [tagsInput, setTagsInput] = useState('');
   const [scheduleDate, setScheduleDate] = useState('');
   const [scheduleTime, setScheduleTime] = useState('');
   const [scheduleRoom, setScheduleRoom] = useState('');
   const [schedulePatient, setSchedulePatient] = useState('');
   const [loading, setLoading] = useState(false);
+  const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
+  const [comments, setComments] = useState<Record<string, any[]>>({});
+  const [newComment, setNewComment] = useState('');
 
   const boards = [
     { id: '공지사항', label: '📢 공지사항', icon: '📢' },
@@ -30,6 +34,40 @@ export default function BoardView({ user }: any) {
     fetchPosts();
   }, [activeBoard]);
 
+  const fetchComments = async (postId: string) => {
+    const { data } = await supabase
+      .from('board_post_comments')
+      .select('*')
+      .eq('post_id', postId)
+      .order('created_at', { ascending: true });
+    setComments((prev) => ({ ...prev, [postId]: data || [] }));
+  };
+
+  const handleLike = async (post: any) => {
+    const postId = post.id;
+    const likes = (post.likes_count ?? 0) + 1;
+    await supabase.from('board_posts').update({ likes_count: likes }).eq('id', postId);
+    setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, likes_count: likes } : p)));
+  };
+
+  const handleAddComment = async (postId: string) => {
+    if (!newComment.trim() || !user?.id) return;
+    const { data } = await supabase
+      .from('board_post_comments')
+      .insert([{ post_id: postId, author_id: user.id, author_name: user.name, content: newComment.trim() }])
+      .select()
+      .single();
+    if (data) {
+      setComments((prev) => ({ ...prev, [postId]: [...(prev[postId] || []), data] }));
+      setNewComment('');
+    }
+  };
+
+  const handleExpandPost = (postId: string) => {
+    setExpandedPostId((prev) => (prev === postId ? null : postId));
+    if (expandedPostId !== postId) fetchComments(postId);
+  };
+
   const handleNewPost = async () => {
     if (!title) return alert('제목을 입력해주세요.');
     if (activeBoard === '수술일정' || activeBoard === 'MRI일정') {
@@ -40,16 +78,20 @@ export default function BoardView({ user }: any) {
 
     setLoading(true);
     try {
+      const tags = tagsInput ? tagsInput.split(',').map((t) => t.trim()).filter(Boolean) : [];
       const postData = {
         board_type: activeBoard,
         title: title,
         content: content || null,
+        tags: tags,
         schedule_date: scheduleDate || null,
         schedule_time: scheduleTime || null,
         schedule_room: scheduleRoom || null,
         patient_name: schedulePatient || null,
         author_name: user?.name || '익명',
-        created_at: new Date().toISOString()
+        author_id: user?.id,
+        likes_count: 0,
+        created_at: new Date().toISOString(),
       };
 
       const { error } = await supabase.from('board_posts').insert([postData]);
@@ -61,6 +103,7 @@ export default function BoardView({ user }: any) {
         setScheduleTime('');
         setScheduleRoom('');
         setSchedulePatient('');
+        setTagsInput('');
         setShowNewPost(false);
         fetchPosts();
       }
@@ -146,15 +189,26 @@ export default function BoardView({ user }: any) {
                 </div>
               </div>
             ) : (
-              <div>
-                <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2 block">내용</label>
-                <textarea
+              <>
+                <div>
+                  <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2 block">태그 (쉼표로 구분)</label>
+                  <input
+                    value={tagsInput}
+                    onChange={(e) => setTagsInput(e.target.value)}
+                    placeholder="예: 공지, 회의, 환영"
+                    className="w-full p-4 bg-gray-50 rounded-xl border-none outline-none text-sm font-bold focus:ring-2 focus:ring-blue-100 mb-4"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2 block">내용</label>
+                  <textarea
                   value={content}
                   onChange={e => setContent(e.target.value)}
                   placeholder="게시물 내용을 입력하세요."
                   className="w-full h-32 md:h-48 p-4 bg-gray-50 rounded-xl border-none outline-none text-sm font-bold leading-relaxed focus:ring-2 focus:ring-blue-100 resize-none"
                 />
-              </div>
+                </div>
+              </>
             )}
           </div>
 
@@ -174,7 +228,7 @@ export default function BoardView({ user }: any) {
           posts.map((post, idx) => (
             <div
               key={post.id || idx}
-              className="bg-white p-6 border border-gray-100 shadow-sm rounded-[1.5rem] md:rounded-[2rem] hover:border-blue-300 hover:shadow-xl hover:shadow-blue-50/50 transition-all group cursor-pointer flex flex-col justify-between"
+              className="bg-white p-6 border border-gray-100 shadow-sm rounded-[1.5rem] md:rounded-[2rem] hover:border-blue-300 hover:shadow-xl hover:shadow-blue-50/50 transition-all group flex flex-col justify-between"
             >
               {(activeBoard === '수술일정' || activeBoard === 'MRI일정') ? (
                 <div className="space-y-4">
@@ -211,14 +265,43 @@ export default function BoardView({ user }: any) {
                     <p className="text-xs md:text-sm text-gray-500 mt-3 line-clamp-3 leading-relaxed">{post.content}</p>
                   </div>
                   <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-50">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center text-[10px]">👤</div>
-                      <span className="text-[10px] font-bold text-gray-400">{post.author_name}</span>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1">
+                        <div className="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center text-[10px]">👤</div>
+                        <span className="text-[10px] font-bold text-gray-400">{post.author_name}</span>
+                      </div>
+                      <button onClick={() => handleLike(post)} className="flex items-center gap-1 text-gray-500 hover:text-red-500 text-[10px] font-bold">
+                        👍 {post.likes_count ?? 0}
+                      </button>
+                      <button onClick={() => handleExpandPost(post.id)} className="flex items-center gap-1 text-gray-500 hover:text-blue-500 text-[10px] font-bold">
+                        💬 댓글
+                      </button>
                     </div>
                     <span className="text-[10px] font-bold text-gray-300">
                       {new Date(post.created_at).toLocaleDateString()}
                     </span>
                   </div>
+                  {(Array.isArray(post.tags) ? post.tags : []).length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {(Array.isArray(post.tags) ? post.tags : []).map((tag: string, i: number) => (
+                        <span key={i} className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[9px] font-bold">{tag}</span>
+                      ))}
+                    </div>
+                  )}
+                  {expandedPostId === post.id && (
+                    <div className="mt-4 pt-4 border-t border-gray-100 space-y-2">
+                      {(comments[post.id] || []).map((c: any) => (
+                        <div key={c.id} className="text-xs text-gray-600 flex gap-2">
+                          <span className="font-bold">{c.author_name}:</span>
+                          <span>{c.content}</span>
+                        </div>
+                      ))}
+                      <div className="flex gap-2">
+                        <input value={expandedPostId === post.id ? newComment : ''} onChange={(e) => setNewComment(e.target.value)} placeholder="댓글 입력" className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-xs" />
+                        <button onClick={() => handleAddComment(post.id)} className="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold">등록</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

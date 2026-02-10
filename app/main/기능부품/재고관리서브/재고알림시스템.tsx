@@ -22,7 +22,7 @@ export function useInventoryAlertSystem(inventory: any[], user: any) {
     if (!inventory || inventory.length === 0) return;
 
     // 1. 최소 재고 미달 품목 찾기
-    const lowStock = inventory.filter((item: any) => item.quantity <= item.min_quantity);
+    const lowStock = inventory.filter((item: any) => (item.quantity ?? item.stock ?? 0) <= (item.min_quantity ?? item.min_stock ?? 0));
     setLowStockItems(lowStock);
 
     // 2. 유효기간 임박 품목 찾기 (30일 이내)
@@ -52,11 +52,11 @@ export function useInventoryAlertSystem(inventory: any[], user: any) {
 
   const sendInventoryAlerts = async (lowStock: any[], expiryImminent: any[]) => {
     try {
-      // 행정팀 사용자 조회
+      // 행정팀 사용자 조회 (staff_members 테이블 사용)
       const { data: adminUsers } = await supabase
-        .from('staffs')
+        .from('staff_members')
         .select('id')
-        .or('dept.eq.행정부,dept.eq.총무팀,dept.eq.원무팀');
+        .or('department.eq.행정팀,department.eq.총무팀,department.eq.원무팀,department.eq.행정부');
 
       if (!adminUsers || adminUsers.length === 0) return;
 

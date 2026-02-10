@@ -62,8 +62,17 @@ export default function MainPage() {
     }
 
     if (parsedUser?.company === 'SY INC.' || parsedUser?.permissions?.mso) {
-      supabase.from('companies').select('id, name, type').eq('is_active', true).order('type').then(({ data: list }) => {
-        setCompanies(list || []);
+      supabase.from('companies').select('id, name, type').eq('is_active', true).then(({ data: list }) => {
+        const sorted = (list || []).sort((a: any, b: any) => {
+          const order = ['박철홍정형외과', '수연의원', 'SY INC.'];
+          const ia = order.indexOf(a.name);
+          const ib = order.indexOf(b.name);
+          if (ia >= 0 && ib >= 0) return ia - ib;
+          if (ia >= 0) return -1;
+          if (ib >= 0) return 1;
+          return (a.name || '').localeCompare(b.name || '');
+        });
+        setCompanies(sorted);
       });
       const savedId = getSelectedCompanyId();
       if (savedId) setSelectedCompanyIdState(savedId);

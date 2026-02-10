@@ -69,6 +69,19 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
             }
         }
 
+        if (item.type === '양식신청' && item.meta_data?.form_type && item.meta_data?.target_staff && item.meta_data?.auto_issue) {
+          try {
+            const sn = `CERT-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(Date.now()).slice(-6)}`;
+            await supabase.from('certificate_issuances').insert({
+              staff_id: item.meta_data.target_staff,
+              cert_type: item.meta_data.form_type,
+              serial_no: sn,
+              purpose: item.meta_data.purpose || '제출용',
+              issued_by: user?.id,
+            });
+          } catch (_) {}
+        }
+
         alert("최종 승인 처리가 완료되었습니다."); 
         fetchApprovals();
     }
@@ -136,7 +149,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                   </label>
                   
                   <div className="flex gap-1 bg-white/50 p-1 rounded-xl w-full md:w-auto overflow-x-auto no-scrollbar">
-                    {['전체', '박철홍정형외과', 'SY INC.', '수연의원'].map(co => (
+                    {['전체', '박철홍정형외과', '수연의원', 'SY INC.'].map(co => (
                       <button 
                         key={co} 
                         onClick={() => setSelectedCo(co)}

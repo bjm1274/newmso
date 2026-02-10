@@ -4,15 +4,20 @@ import 구성원관리 from './인사관리서브/구성원현황';
 import CertificateGenerator from './인사관리서브/증명서발급';
 import PayrollMain from './인사관리서브/급여관리';
 import AttendanceSystem from './근태시스템';
+import AttendanceMain from './인사관리서브/근태기록/근태관리메인';
 import LeaveManagement from './인사관리서브/휴가신청/휴가관리메인';
+import SharedCalendarView from './공유캘린더';
+import CalendarSync from './캘린더동기화';
 import ShiftManagement from './인사관리서브/근무형태관리';
+import AssetLoanManager from './인사관리서브/비품장비대여관리';
 
 export default function 인사관리({ user, staffs, depts, onRefresh }: any) {
   const [현재메뉴, 메뉴설정] = useState('구성원');
   const [선택사업체, 사업체설정] = useState('전체');
-  const [등록창상태, 창상태설정] = useState(false); 
+  const [등록창상태, 창상태설정] = useState(false);
+  const [근태뷰, 근태뷰설정] = useState<'실시간' | '월별'>('실시간'); 
 
-  const 사업체목록 = ["전체", "SY INC.", "박철홍정형외과", "수연의원"];
+  const 사업체목록 = ["전체", "박철홍정형외과", "수연의원", "SY INC."];
 
   const hasAccess = user?.permissions?.mso === true || user?.company === 'SY INC.' || user?.permissions?.hr === true;
 
@@ -40,7 +45,7 @@ export default function 인사관리({ user, staffs, depts, onRefresh }: any) {
             <button onClick={() => 창상태설정(true)} className="w-full md:w-auto bg-[#1E293B] text-white px-6 py-2.5 text-[11px] font-black rounded-xl shadow-md hover:bg-black transition-all">신규 직원 등록</button>
             
             <div className="flex gap-1 bg-gray-100 p-1 rounded-xl border border-gray-200 overflow-x-auto no-scrollbar">
-              {['구성원', '근무형태', '근태', '급여', '휴가', '증명서'].map(이름 => (
+              {['구성원', '근무형태', '근태', '급여', '연차/휴가', '캘린더', '비품대여', '증명서'].map(이름 => (
                 <button key={이름} onClick={() => 메뉴설정(이름)} className={`flex-1 px-4 py-2 text-[10px] font-black transition-all rounded-lg whitespace-nowrap ${현재메뉴 === 이름 ? 'bg-white shadow-md text-blue-600' : 'text-gray-400'}`}>{이름}</button>
               ))}
             </div>
@@ -68,9 +73,24 @@ export default function 인사관리({ user, staffs, depts, onRefresh }: any) {
             />
           )}
           {현재메뉴 === '근무형태' && <ShiftManagement selectedCo={선택사업체} />}
-          {현재메뉴 === '근태' && <AttendanceSystem user={user} staffs={staffs} selectedCo={선택사업체} isAdminView={true} />}
+          {현재메뉴 === '근태' && (
+            <div className="flex flex-col h-full">
+              <div className="flex gap-2 mb-4">
+                <button onClick={() => 근태뷰설정('실시간')} className={`px-4 py-2 text-xs font-black rounded-xl ${근태뷰 === '실시간' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500'}`}>실시간 출퇴근</button>
+                <button onClick={() => 근태뷰설정('월별')} className={`px-4 py-2 text-xs font-black rounded-xl ${근태뷰 === '월별' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500'}`}>월별/일별 대장</button>
+              </div>
+              {근태뷰 === '실시간' ? <AttendanceSystem user={user} staffs={staffs} selectedCo={선택사업체} isAdminView={true} /> : <AttendanceMain staffs={staffs} selectedCo={선택사업체} />}
+            </div>
+          )}
           {현재메뉴 === '급여' && <PayrollMain staffs={staffs} selectedCo={선택사업체} />}
-          {현재메뉴 === '휴가' && <LeaveManagement staffs={staffs} selectedCo={선택사업체} />}
+          {현재메뉴 === '연차/휴가' && <LeaveManagement staffs={staffs} selectedCo={선택사업체} />}
+          {현재메뉴 === '캘린더' && (
+            <div className="p-4 md:p-10 flex flex-col lg:flex-row gap-8">
+              <div className="flex-1"><SharedCalendarView user={user} /></div>
+              <div className="lg:w-80 shrink-0"><CalendarSync /></div>
+            </div>
+          )}
+          {현재메뉴 === '비품대여' && <div className="p-4 md:p-10"><AssetLoanManager staffs={staffs} selectedCo={선택사업체} /></div>}
           {현재메뉴 === '증명서' && <div className="p-4 md:p-10"><CertificateGenerator staffs={staffs} /></div>}
         </section>
       </main>

@@ -147,11 +147,32 @@ export default function NotificationSystem({ user }: any) {
         )
         .subscribe();
 
+      // E. 메신저 새 메시지 (방 멤버인 경우 - 본인 제외)
+      const messagesChannel = supabase
+        .channel('messages-realtime-hub')
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'messages' },
+          (payload: any) => {
+            if (payload.new.sender_id === user.id) return;
+            const notif = {
+              id: payload.new.id,
+              title: `💬 새 메시지`,
+              body: (payload.new.content || '📎 파일').slice(0, 50),
+              type: 'message',
+              data: payload.new
+            };
+            handleNotification(notif);
+          }
+        )
+        .subscribe();
+
       return () => {
         supabase.removeChannel(approvalsChannel);
         supabase.removeChannel(inventoryChannel);
         supabase.removeChannel(payrollChannel);
         supabase.removeChannel(educationChannel);
+        supabase.removeChannel(messagesChannel);
       };
     };
 
@@ -207,10 +228,11 @@ export default function NotificationSystem({ user }: any) {
         <div
           key={notif.id}
           className={`p-4 rounded-2xl shadow-2xl border-l-4 animate-in slide-in-from-right duration-300 cursor-pointer ${
-            notif.type === 'approval' ? 'bg-blue-50 border-blue-600' :
-            notif.type === 'inventory' ? 'bg-orange-50 border-orange-600' :
-            notif.type === 'payroll' ? 'bg-green-50 border-green-600' :
-            'bg-purple-50 border-purple-600'
+            notif.type === 'approval' ? 'bg-blue-50 border-blue-600 dark:bg-blue-950/30 dark:border-blue-500' :
+            notif.type === 'inventory' ? 'bg-orange-50 border-orange-600 dark:bg-orange-950/30 dark:border-orange-500' :
+            notif.type === 'payroll' ? 'bg-green-50 border-green-600 dark:bg-green-950/30 dark:border-green-500' :
+            notif.type === 'message' ? 'bg-indigo-50 border-indigo-600 dark:bg-indigo-950/30 dark:border-indigo-500' :
+            'bg-purple-50 border-purple-600 dark:bg-purple-950/30 dark:border-purple-500'
           }`}
           onClick={() => markAsRead(notif.id)}
         >

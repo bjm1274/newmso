@@ -1,92 +1,102 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 
 export default function BusinessDashboard({ staffs = [], inventory = [] }: any) {
-  const [metrics, setMetrics] = useState<any>({
-    totalLaborCost: 0,
-    inventoryValue: 0,
-    pendingApprovals: 0,
-    efficiencyScore: 0
-  });
+  const [metrics, setMetrics] = useState<any>({});
+  const [approvals, setApprovals] = useState<any[]>([]);
+  const [attendances, setAttendances] = useState<any[]>([]);
+  const [leaves, setLeaves] = useState<any[]>([]);
 
   useEffect(() => {
-    // [BI 로직] 데이터가 로딩되기 전 방어 코드
-    if (!staffs || !inventory) return;
+    const fetch = async () => {
+      const { data: appr } = await supabase.from('approvals').select('status').eq('status', '대기');
+      const today = new Date().toISOString().slice(0, 10);
+      const { data: att } = await supabase.from('attendances').select('status').gte('work_date', today).lte('work_date', today);
+      const { data: lv } = await supabase.from('leave_requests').select('status, leave_type').eq('status', '승인');
+      setApprovals(appr || []);
+      setAttendances(att || []);
+      setLeaves(lv || []);
+    };
+    fetch();
+  }, []);
 
-    // 인사, 재고, 결재 데이터를 통합하여 핵심 경영 지표 산출
-    const laborCost = staffs.length * 3500000; // 평균 급여 시뮬레이션
-    const invValue = inventory.reduce((acc: number, item: any) => acc + (item.stock * (item.unit_price || item.price || 1000)), 0);
-    const score = 85 + Math.random() * 10;
+  useEffect(() => {
+    const laborCost = staffs.reduce((s: number, st: any) => s + (st.base_salary || 0), 0);
+    const invValue = inventory.reduce((acc: number, item: any) => acc + ((item.quantity ?? item.stock ?? 0) * (item.unit_price || 0)), 0);
+    const totalStaff = staffs.length;
+    const onLeave = leaves.filter(l => l.leave_type === '연차').length;
+    const attendanceRate = totalStaff > 0 ? ((totalStaff - onLeave) / totalStaff * 100).toFixed(1) : 0;
+    const leaveUsage = staffs.reduce((s: number, st: any) => s + (st.annual_leave_used || 0), 0);
+    const leaveTotal = staffs.reduce((s: number, st: any) => s + (st.annual_leave_total || 15), 0);
+    const leaveRate = leaveTotal > 0 ? (leaveUsage / leaveTotal * 100).toFixed(1) : 0;
 
     setMetrics({
       totalLaborCost: laborCost,
       inventoryValue: invValue,
-      pendingApprovals: 12,
-      efficiencyScore: score.toFixed(1)
+      pendingApprovals: approvals.length,
+      attendanceRate,
+      leaveUsageRate: leaveRate,
+      efficiencyScore: (85 + Math.random() * 10).toFixed(1)
     });
-  }, [staffs, inventory]);
+  }, [staffs, inventory, approvals, leaves]);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {/* KPI 카드 1: 인건비 */}
-        <div className="bg-white p-8 border border-gray-100 shadow-sm flex flex-col justify-between">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">예상 월 인건비</p>
-          <p className="text-2xl font-black text-gray-800 mt-2">₩ {(metrics.totalLaborCost / 100000000).toFixed(1)}억</p>
-          <div className="w-full bg-gray-50 h-1 mt-4"><div className="w-[70%] h-full bg-blue-600"></div></div>
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        <div className="bg-white p-6 border border-gray-100 shadow-sm rounded-2xl">
+          <p className="text-[9px] font-black text-gray-400 uppercase">월 인건비</p>
+          <p className="text-xl font-black text-gray-800 mt-1">₩{(metrics.totalLaborCost || 0).toLocaleString()}</p>
         </div>
-        {/* KPI 카드 2: 재고 자산 */}
-        <div className="bg-white p-8 border border-gray-100 shadow-sm flex flex-col justify-between">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">보유 재고 가치</p>
-          <p className="text-2xl font-black text-gray-800 mt-2">₩ {metrics.inventoryValue.toLocaleString()}</p>
-           <div className="w-full bg-gray-50 h-1 mt-4"><div className="w-[45%] h-full bg-green-500"></div></div>
+        <div className="bg-white p-6 border border-gray-100 shadow-sm rounded-2xl">
+          <p className="text-[9px] font-black text-gray-400 uppercase">재고 가치</p>
+          <p className="text-xl font-black text-gray-800 mt-1">₩{(metrics.inventoryValue || 0).toLocaleString()}</p>
         </div>
-        {/* KPI 카드 3: 결재 대기 */}
-        <div className="bg-white p-8 border border-gray-100 shadow-sm flex flex-col justify-between">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">결재 대기 문서</p>
-          <p className="text-2xl font-black text-red-500 mt-2">{metrics.pendingApprovals}건</p>
-           <div className="w-full bg-gray-50 h-1 mt-4"><div className="w-[30%] h-full bg-red-500"></div></div>
+        <div className="bg-white p-6 border border-gray-100 shadow-sm rounded-2xl">
+          <p className="text-[9px] font-black text-gray-400 uppercase">결재 대기</p>
+          <p className="text-xl font-black text-red-500 mt-1">{metrics.pendingApprovals ?? 0}건</p>
         </div>
-        {/* KPI 카드 4: 경영 효율 지수 */}
-        <div className="bg-white p-8 border border-gray-100 shadow-sm flex flex-col justify-between">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">경영 효율 지수</p>
-          <p className="text-2xl font-black text-blue-600 mt-2">{metrics.efficiencyScore}</p>
-           <div className="w-full bg-gray-50 h-1 mt-4"><div className="w-[85%] h-full bg-purple-500"></div></div>
+        <div className="bg-white p-6 border border-gray-100 shadow-sm rounded-2xl">
+          <p className="text-[9px] font-black text-gray-400 uppercase">출퇴근률</p>
+          <p className="text-xl font-black text-blue-600 mt-1">{metrics.attendanceRate ?? '-'}%</p>
+        </div>
+        <div className="bg-white p-6 border border-gray-100 shadow-sm rounded-2xl">
+          <p className="text-[9px] font-black text-gray-400 uppercase">연차 사용률</p>
+          <p className="text-xl font-black text-purple-600 mt-1">{metrics.leaveUsageRate ?? '-'}%</p>
+        </div>
+        <div className="bg-white p-6 border border-gray-100 shadow-sm rounded-2xl">
+          <p className="text-[9px] font-black text-gray-400 uppercase">효율 지수</p>
+          <p className="text-xl font-black text-green-600 mt-1">{metrics.efficiencyScore ?? '-'}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* 부서별 예산 현황 */}
-        <div className="bg-white border border-gray-100 p-8">
-          <h3 className="text-xs font-black text-gray-800 uppercase mb-6 tracking-tighter">Department Budget Status</h3>
+        <div className="bg-white border border-gray-100 p-8 rounded-2xl shadow-sm">
+          <h3 className="text-xs font-black text-gray-800 uppercase mb-6">부서별 현황</h3>
           <div className="space-y-4">
-            {['진료부', '간호부', '원무과', '관리팀', '영업부'].map(dept => (
+            {(Array.from(new Set(staffs.map((s: any) => s.department))).filter(Boolean) as string[]).slice(0, 6).map((dept) => (
               <div key={dept} className="space-y-1">
                 <div className="flex justify-between text-[10px] font-bold">
-                  <span className="text-gray-600">{dept}</span>
-                  <span className="text-gray-400">₩{Math.floor(Math.random() * 500 + 1000)}만</span>
+                  <span>{dept}</span>
+                  <span>{staffs.filter((s: any) => s.department === dept).length}명</span>
                 </div>
                 <div className="w-full h-2 bg-gray-50 rounded-full overflow-hidden">
-                  <div className="h-full bg-blue-500" style={{ width: `${Math.random() * 60 + 30}%` }} />
+                  <div className="h-full bg-blue-500" style={{ width: `${Math.min(100, staffs.filter((s: any) => s.department === dept).length * 20)}%` }} />
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* 재고 소모 트렌드 */}
-        <div className="bg-white border border-gray-100 p-8">
-          <h3 className="text-xs font-black text-gray-800 uppercase mb-6 tracking-tighter">Inventory Consumption Trend</h3>
-          <div className="h-40 flex items-end justify-between gap-2 px-4">
+        <div className="bg-white border border-gray-100 p-8 rounded-2xl shadow-sm">
+          <h3 className="text-xs font-black text-gray-800 uppercase mb-6">재고 추이</h3>
+          <div className="h-40 flex items-end justify-between gap-2">
             {[40, 65, 45, 90, 55, 70, 85].map((h, i) => (
-              <div key={i} className="flex-1 flex flex-col items-center gap-2">
-                <div className="w-full bg-gray-100 relative group">
-                  <div 
-                    className="w-full bg-blue-600/20 group-hover:bg-blue-600 transition-all cursor-pointer" 
-                    style={{ height: `${h}%` }}
-                  />
+              <div key={i} className="flex-1 flex flex-col items-center gap-2 h-full">
+                <div className="w-full flex-1 flex flex-col justify-end bg-gray-100 rounded-t overflow-hidden min-h-[80px]">
+                  <div className="w-full bg-blue-600/80 transition-all" style={{ height: `${h}%` }} />
                 </div>
-                <span className="text-[9px] font-bold text-gray-400">{i + 1}일</span>
+                <span className="text-[9px] font-bold text-gray-400">{['월','화','수','목','금','토','일'][i]}</span>
               </div>
             ))}
           </div>

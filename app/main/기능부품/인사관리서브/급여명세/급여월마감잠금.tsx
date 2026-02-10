@@ -1,0 +1,38 @@
+'use client';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
+
+export default function PayrollLockPanel({ yearMonth, companyName, onLockChange }: any) {
+  const [locked, setLocked] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from('payroll_locks').select('id').eq('year_month', yearMonth).eq('company_name', companyName || '전체').single();
+      setLocked(!!data);
+    })();
+  }, [yearMonth, companyName]);
+
+  const toggle = async () => {
+    setLoading(true);
+    if (locked) {
+      await supabase.from('payroll_locks').delete().eq('year_month', yearMonth).eq('company_name', companyName || '전체');
+      setLocked(false);
+    } else {
+      const u = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('erp_user') || '{}') : {};
+      await supabase.from('payroll_locks').insert({ year_month: yearMonth, company_name: companyName || '전체', locked_by: u.id });
+      setLocked(true);
+    }
+    onLockChange?.();
+    setLoading(false);
+  };
+
+  return (
+    <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl">
+      <span className="text-xs font-bold text-gray-600">{yearMonth} 마감</span>
+      <button onClick={toggle} disabled={loading} className={`px-4 py-2 text-[10px] font-black rounded-lg ${locked ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+        {locked ? '🔒 잠금됨' : '🔓 잠금하기'}
+      </button>
+    </div>
+  );
+}

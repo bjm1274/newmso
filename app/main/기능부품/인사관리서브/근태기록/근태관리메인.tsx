@@ -1,9 +1,9 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 
 export default function AttendanceMain({ staffs, selectedCo }: any) {
-  const [viewMode, setViewMode] = useState<'daily' | 'monthly' | 'calendar'>('monthly');
+  const [viewMode, setViewMode] = useState<'daily' | 'monthly' | 'calendar' | 'dashboard'>('monthly');
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
   const [attendanceData, setAttendanceData] = useState<any[]>([]);
@@ -14,9 +14,27 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
   const fetchAttendance = async () => {
     setLoading(true);
     try {
-      // 실제 운영 시에는 DB에서 해당 월/일의 데이터를 가져옴
-      // const { data } = await supabase.from('attendance').select('*')...
-      setAttendanceData([]); 
+      const staffIds = filtered.map((s: any) => s.id);
+      if (staffIds.length === 0) {
+        setAttendanceData([]);
+        return;
+      }
+      const [startDate, endDate] = viewMode === 'daily'
+        ? [selectedDate, selectedDate]
+        : [`${selectedMonth}-01`, `${selectedMonth}-${String(daysInMonth).padStart(2, '0')}`];
+
+      const { data, error } = await supabase
+        .from('attendances')
+        .select('*')
+        .in('staff_id', staffIds)
+        .gte('work_date', startDate)
+        .lte('work_date', endDate);
+
+      if (error) throw error;
+      setAttendanceData(data || []);
+    } catch (err) {
+      console.error('근태 조회 실패:', err);
+      setAttendanceData([]);
     } finally {
       setLoading(false);
     }
@@ -24,7 +42,7 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
 
   useEffect(() => {
     fetchAttendance();
-  }, [selectedMonth, selectedDate, selectedCo]);
+  }, [selectedMonth, selectedDate, selectedCo, viewMode, filtered]);
 
   // 월별 일수 계산
   const getDaysInMonth = (monthStr: string) => {
@@ -34,6 +52,16 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
 
   const daysInMonth = getDaysInMonth(selectedMonth);
   const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+  const stats = useMemo(() => {
+    const total = attendanceData.length;
+    const present = attendanceData.filter((a: any) => a.status === 'present').length;
+    const late = attendanceData.filter((a: any) => a.status === 'late').length;
+    const earlyLeave = attendanceData.filter((a: any) => a.status === 'early_leave').length;
+    const absent = attendanceData.filter((a: any) => a.status === 'absent').length;
+    const rate = total > 0 ? Math.round((present / total) * 100) : 0;
+    return { total, present, late, earlyLeave, absent, rate };
+  }, [attendanceData]);
 
   return (
     <div className="flex flex-col h-full bg-[#FDFDFD] animate-in fade-in duration-500">
@@ -47,7 +75,8 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
               {[
                 { id: 'daily', label: '일별 현황' },
                 { id: 'monthly', label: '월별 대장' },
-                { id: 'calendar', label: '근태 달력' }
+                { id: 'calendar', label: '근태 달력' },
+                { id: 'dashboard', label: '대시보드' }
               ].map(mode => (
                 <button 
                   key={mode.id}
@@ -105,23 +134,33 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {filtered.map((s: any) => (
-                  <tr key={s.id} className="hover:bg-blue-50/30 transition-all group">
-                    <td className="px-8 py-5">
-                      <div className="flex flex-col">
-                        <span className="font-black text-gray-900">{s.name}</span>
-                        <span className="text-[9px] text-gray-400 font-bold uppercase">{s.department} / {s.position}</span>
-                      </div>
-                    </td>
-                    <td className="px-8 py-5 font-mono font-bold text-blue-600">08:52:14</td>
-                    <td className="px-8 py-5 font-mono font-bold text-gray-400">18:05:33</td>
-                    <td className="px-8 py-5 font-black text-gray-700">9시간 13분</td>
-                    <td className="px-8 py-5">
-                      <span className="px-3 py-1 bg-green-100 text-green-600 text-[9px] font-black rounded-full">정상</span>
-                    </td>
-                    <td className="px-8 py-5 text-right text-gray-300 text-[10px]">-</td>
-                  </tr>
-                ))}
+                {filtered.map((s: any) => {
+                  const att = attendanceData.find((a: any) => a.staff_id === s.id && a.work_date === selectedDate);
+                  const checkIn = att?.check_in_time ? new Date(att.check_in_time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '-';
+                  const checkOut = att?.check_out_time ? new Date(att.check_out_time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '-';
+                  const mins = att?.work_hours_minutes ?? 0;
+                  const workHrs = mins ? `${Math.floor(mins / 60)}시간 ${mins % 60}분` : '-';
+                  const statusMap: Record<string, string> = { present: '정상', absent: '결근', late: '지각', early_leave: '조퇴', sick_leave: '병가', annual_leave: '연차', holiday: '휴일', half_leave: '반차' };
+                  const statusLabel = statusMap[att?.status || 'present'] || '정상';
+                  const statusColor = att?.status === 'absent' || att?.status === 'late' ? 'bg-orange-100 text-orange-600' : 'bg-green-100 text-green-600';
+                  return (
+                    <tr key={s.id} className="hover:bg-blue-50/30 transition-all group">
+                      <td className="px-8 py-5">
+                        <div className="flex flex-col">
+                          <span className="font-black text-gray-900">{s.name}</span>
+                          <span className="text-[9px] text-gray-400 font-bold uppercase">{s.department} / {s.position}</span>
+                        </div>
+                      </td>
+                      <td className="px-8 py-5 font-mono font-bold text-blue-600">{checkIn}</td>
+                      <td className="px-8 py-5 font-mono font-bold text-gray-400">{checkOut}</td>
+                      <td className="px-8 py-5 font-black text-gray-700">{workHrs}</td>
+                      <td className="px-8 py-5">
+                        <span className={`px-3 py-1 ${statusColor} text-[9px] font-black rounded-full`}>{statusLabel}</span>
+                      </td>
+                      <td className="px-8 py-5 text-right text-gray-300 text-[10px]">{att?.notes || '-'}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -141,19 +180,74 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {filtered.map((s: any) => (
-                    <tr key={s.id} className="hover:bg-gray-25 transition-all">
-                      <td className="px-6 py-4 sticky left-0 bg-white z-10 border-r font-black text-xs text-gray-900">{s.name}</td>
-                      {daysArray.map(d => (
-                        <td key={d} className="px-3 py-4 text-center border-r text-[10px] font-bold text-gray-400">
-                          {d % 7 === 0 || d % 7 === 6 ? <span className="text-red-300">휴</span> : '출'}
-                        </td>
-                      ))}
-                      <td className="px-6 py-4 text-center bg-blue-50/30 font-black text-blue-600 text-xs">22일</td>
-                    </tr>
-                  ))}
+                  {filtered.map((s: any) => {
+                    let workDays = 0;
+                    return (
+                      <tr key={s.id} className="hover:bg-gray-25 transition-all">
+                        <td className="px-6 py-4 sticky left-0 bg-white z-10 border-r font-black text-xs text-gray-900">{s.name}</td>
+                        {daysArray.map((d) => {
+                          const dStr = `${selectedMonth}-${String(d).padStart(2, '0')}`;
+                          const att = attendanceData.find((a: any) => a.staff_id === s.id && a.work_date === dStr);
+                          const dayOfWeek = new Date(selectedMonth + '-' + d).getDay();
+                          const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                          const status = att?.status || (isWeekend ? 'holiday' : '');
+                          let label = '';
+                          if (status === 'annual_leave' || status === 'sick_leave') label = '휴';
+                          else if (status === 'holiday' || isWeekend) label = '휴';
+                          else if (status === 'present' || att) { label = '출'; workDays++; }
+                          else label = '-';
+                          return (
+                            <td key={d} className="px-3 py-4 text-center border-r text-[10px] font-bold text-gray-400">
+                              {isWeekend ? <span className="text-red-300">{label}</span> : label}
+                            </td>
+                          );
+                        })}
+                        <td className="px-6 py-4 text-center bg-blue-50/30 font-black text-blue-600 text-xs">{workDays}일</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {viewMode === 'dashboard' && (
+          <div className="space-y-8">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+                <p className="text-[9px] font-black text-gray-400 uppercase">출근률</p>
+                <p className="text-3xl font-black text-blue-600 mt-1">{stats.rate}%</p>
+              </div>
+              <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+                <p className="text-[9px] font-black text-gray-400 uppercase">정상 출근</p>
+                <p className="text-3xl font-black text-green-600 mt-1">{stats.present}건</p>
+              </div>
+              <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+                <p className="text-[9px] font-black text-gray-400 uppercase">지각</p>
+                <p className="text-3xl font-black text-orange-600 mt-1">{stats.late}건</p>
+              </div>
+              <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+                <p className="text-[9px] font-black text-gray-400 uppercase">조퇴</p>
+                <p className="text-3xl font-black text-amber-600 mt-1">{stats.earlyLeave}건</p>
+              </div>
+            </div>
+            <div className="bg-white border border-gray-100 rounded-2xl p-8 shadow-sm">
+              <h3 className="text-sm font-black text-gray-700 mb-4">상태별 비율</h3>
+              <div className="space-y-4">
+                <div>
+                  <div className="flex justify-between text-[10px] font-bold mb-1"><span>정상</span><span>{stats.total ? Math.round((stats.present / stats.total) * 100) : 0}%</span></div>
+                  <div className="h-3 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-green-500 rounded-full" style={{ width: `${stats.total ? (stats.present / stats.total) * 100 : 0}%` }} /></div>
+                </div>
+                <div>
+                  <div className="flex justify-between text-[10px] font-bold mb-1"><span>지각</span><span>{stats.total ? Math.round((stats.late / stats.total) * 100) : 0}%</span></div>
+                  <div className="h-3 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-orange-500 rounded-full" style={{ width: `${stats.total ? (stats.late / stats.total) * 100 : 0}%` }} /></div>
+                </div>
+                <div>
+                  <div className="flex justify-between text-[10px] font-bold mb-1"><span>조퇴</span><span>{stats.total ? Math.round((stats.earlyLeave / stats.total) * 100) : 0}%</span></div>
+                  <div className="h-3 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-amber-500 rounded-full" style={{ width: `${stats.total ? (stats.earlyLeave / stats.total) * 100 : 0}%` }} /></div>
+                </div>
+              </div>
             </div>
           </div>
         )}

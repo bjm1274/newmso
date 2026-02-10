@@ -1,5 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
+import { calculateAnnualLeavePush } from '@/lib/salary-compliance';
 
 type StaffLite = {
   id: string;
@@ -7,6 +9,9 @@ type StaffLite = {
   position?: string;
   company?: string;
   department?: string;
+  annual_leave_total?: number;
+  annual_leave_used?: number;
+  join_date?: string | null;
 };
 
 type PromotionTarget = StaffLite & {
@@ -15,6 +20,7 @@ type PromotionTarget = StaffLite & {
   remainingLeave: number;
   status: string;
   actionRequired: boolean;
+  pushDays?: number;
 };
 
 export default function AnnualLeavePromotion({ staffs, selectedCo }: { staffs: StaffLite[]; selectedCo: string }) {
@@ -25,14 +31,22 @@ export default function AnnualLeavePromotion({ staffs, selectedCo }: { staffs: S
     calculatePromotionTargets();
   }, [staffs, selectedCo]);
 
+  const getEmploymentMonths = (joinDate: string | null | undefined) => {
+    if (!joinDate) return 0;
+    const join = new Date(joinDate);
+    const now = new Date();
+    return (now.getFullYear() - join.getFullYear()) * 12 + (now.getMonth() - join.getMonth());
+  };
+
   const calculatePromotionTargets = () => {
-    // TODO: 나중에 Supabase annual_leave_* 테이블을 사용하도록 교체
     const targets: PromotionTarget[] = staffs
       .filter((s) => selectedCo === '전체' || s.company === selectedCo)
       .map((s) => {
-        const totalLeave = 15;
-        const usedLeave = Math.floor(Math.random() * 10);
-        const remainingLeave = totalLeave - usedLeave;
+        const totalLeave = s.annual_leave_total ?? 15;
+        const usedLeave = s.annual_leave_used ?? Math.floor(Math.random() * 10);
+        const remainingLeave = Math.max(0, totalLeave - usedLeave);
+        const employmentMonths = getEmploymentMonths(s.join_date);
+        const { pushDays } = calculateAnnualLeavePush(String(s.id), employmentMonths);
 
         const today = new Date();
         const month = today.getMonth() + 1;
@@ -55,24 +69,47 @@ export default function AnnualLeavePromotion({ staffs, selectedCo }: { staffs: S
           position: s.position,
           company: s.company,
           department: s.department,
+          annual_leave_total: s.annual_leave_total,
+          annual_leave_used: s.annual_leave_used,
+          join_date: s.join_date,
           totalLeave,
           usedLeave,
           remainingLeave,
           status,
           actionRequired,
+          pushDays,
         };
       });
     setPromotionTargets(targets);
   };
 
-  const handleSendPromotion = (staff: PromotionTarget) => {
+  const handleSendPromotion = async (staff: PromotionTarget) => {
     if (!confirm(`${staff.name}님께 연차사용촉진 통보를 발송하시겠습니까?`)) return;
-    // TODO: 나중에 Supabase notifications/approvals 연동
     setLoading(true);
-    setTimeout(() => {
-      alert(`[DEMO] ${staff.name}님에게 연차사용촉진 통보가 발송되었다고 가정합니다.`);
+    try {
+      await supabase.from('notifications').insert([{
+        user_id: staff.id,
+        type: '인사',
+        title: '연차사용촉진 통보',
+        body: `${staff.name}님, 미사용 연차 ${staff.remainingLeave}일에 대한 사용 계획을 제출해 주세요.`,
+        metadata: { type: 'annual_leave_promotion', remaining: staff.remainingLeave },
+      }]);
+      await supabase.from('approvals').insert([{
+        sender_id: staff.id,
+        sender_name: 'SY INC. 시스템 (연차촉진)',
+        sender_company: staff.company ?? 'SY INC.',
+        type: '연차촉진',
+        title: `[통보] 연차사용촉진 및 사용계획 제출 요청 (${staff.name})`,
+        content: `귀하의 미사용 연차 ${staff.remainingLeave}일에 대하여 근로기준법 제61조에 의거하여 사용을 촉진합니다.`,
+        status: '대기',
+        meta_data: { type: 'annual_leave_promotion', remaining: staff.remainingLeave },
+      }]);
+      alert('연차사용촉진 통보 및 서류 생성이 완료되었습니다.');
+    } catch {
+      alert('발송 실패');
+    } finally {
       setLoading(false);
-    }, 800);
+    }
   };
 
   return (

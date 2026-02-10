@@ -2,13 +2,19 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
-import StaffManager from './관리자전용서브/직원관리도구';
+import 직원권한통합 from './관리자전용서브/직원권한통합';
+import TeamManager from './관리자전용서브/팀관리';
+import AttendanceDeductionRules from './관리자전용서브/근태차감규칙설정';
 import ContractManager from './관리자전용서브/계약관리도구';
 import PopupManager from './관리자전용서브/팝업창관리자';
 import DataReseter from './관리자전용서브/데이터초기화';
+import DataBackup from './관리자전용서브/데이터백업';
+import AuditLogViewer from './관리자전용서브/감사로그뷰어';
 import BusinessDashboard from './관리자전용서브/경영대시보드';
-import 권한설정도구 from './관리자전용서브/권한설정도구';
 import CompanyManager from './관리자전용서브/회사관리';
+import ExcelBulkUpload from './관리자전용서브/엑셀일괄등록';
+import NotificationAutomation from './관리자전용서브/알림자동화설정';
+import CorporateCardTransactions from './인사관리서브/법인카드사용내역';
 
 export default function AdminView({ user, staffs = [], depts = [], onRefresh }: any) {
   const [activeTab, setActiveTab] = useState('경영대시보드');
@@ -34,13 +40,19 @@ export default function AdminView({ user, staffs = [], depts = [], onRefresh }: 
   }, []);
 
   const adminTabs = [
-    { id: '경영대시보드', label: '📊 경영 대시보드' },
-    { id: '회사관리', label: '🏢 회사 관리' },
-    { id: '직원마스터', label: '직원 마스터' },
-    { id: '권한설정', label: '직원별 권한 제어' },
-    { id: '전자계약설정', label: '전자계약 설정' },
-    { id: '팝업관리', label: '팝업 관리' },
-    { id: '데이터초기화', label: '시스템 초기화' }
+    { id: '경영대시보드', label: '📊 대시보드' },
+    { id: '엑셀등록', label: '📁 엑셀 일괄' },
+    { id: '알림자동화', label: '🔔 알림 자동화' },
+    { id: '근태차감규칙', label: '⏰ 근태 규칙' },
+    { id: '회사관리', label: '🏢 회사' },
+    { id: '팀관리', label: '팀' },
+    { id: '직원권한', label: '직원·권한' },
+    { id: '법인카드', label: '법인카드' },
+    { id: '전자계약설정', label: '계약' },
+    { id: '팝업관리', label: '팝업' },
+    { id: '감사로그', label: '감사 로그' },
+    { id: '데이터백업', label: '백업/복원' },
+    { id: '데이터초기화', label: '초기화' }
   ];
 
   return (
@@ -70,11 +82,17 @@ export default function AdminView({ user, staffs = [], depts = [], onRefresh }: 
 
       <main className="flex-1 overflow-y-auto p-10 custom-scrollbar bg-gray-50/30">
         {activeTab === '경영대시보드' && <BusinessDashboard staffs={staffs} inventory={inventory} />}
+        {activeTab === '엑셀등록' && <ExcelBulkUpload onRefresh={onRefresh} />}
+        {activeTab === '알림자동화' && <NotificationAutomation user={user} />}
+        {activeTab === '근태차감규칙' && <AttendanceDeductionRules />}
         {activeTab === '회사관리' && <CompanyManager />}
-        {activeTab === '직원마스터' && <StaffManager staffs={staffs} onRefresh={onRefresh} />}
-        {activeTab === '권한설정' && <권한설정도구 />}
+        {activeTab === '팀관리' && <TeamManager onRefresh={onRefresh} />}
+        {activeTab === '직원권한' && <직원권한통합 onRefresh={onRefresh} />}
         {activeTab === '전자계약설정' && <ContractManager />}
+        {activeTab === '법인카드' && <CorporateCardTransactions staffs={staffs} />}
         {activeTab === '팝업관리' && <PopupManager />}
+        {activeTab === '감사로그' && <AuditLogViewer />}
+        {activeTab === '데이터백업' && <DataBackup />}
         {activeTab === '데이터초기화' && <DataReseter onRefresh={onRefresh} />}
       </main>
     </div>

@@ -40,6 +40,22 @@ export default function AttendanceSystem({ user, staffs, selectedCo, isAdminView
     fetchUserShift();
   }, [user]);
 
+  const syncToAttendances = async (staffId: string, workDate: string, checkIn: string | null, checkOut: string | null, status: string) => {
+    try {
+      const mins = checkIn && checkOut
+        ? Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 60000)
+        : null;
+      await supabase.from('attendances').upsert({
+        staff_id: staffId,
+        work_date: workDate,
+        check_in_time: checkIn,
+        check_out_time: checkOut,
+        status,
+        work_hours_minutes: mins
+      }, { onConflict: 'staff_id,work_date' });
+    } catch (_) {}
+  };
+
   const getLocation = () => {
     if (!navigator.geolocation) {
       setError('이 기기는 GPS를 지원하지 않습니다.');
@@ -89,6 +105,7 @@ export default function AttendanceSystem({ user, staffs, selectedCo, isAdminView
         location_lon: currentLocation.longitude
       }]);
       if (!error) {
+        await syncToAttendances(user.id, today, checkInTime, null, status);
         alert(`✅ 출근 처리되었습니다. 상태: ${status}`);
         fetchTodayAttendance();
       }
@@ -105,12 +122,15 @@ export default function AttendanceSystem({ user, staffs, selectedCo, isAdminView
     try {
       const today = new Date().toISOString().split('T')[0];
       const checkOutTime = new Date().toISOString();
+      const todayRec = todayAttendance;
       const { error } = await supabase.from('attendance').update({
         check_out: checkOutTime,
         location_lat_out: currentLocation.latitude,
         location_lon_out: currentLocation.longitude
       }).eq('staff_id', user.id).eq('date', today);
       if (!error) {
+        const statusMap: Record<string, string> = { '정상': 'present', '지각': 'late' };
+        await syncToAttendances(user.id, today, todayRec?.check_in, checkOutTime, statusMap[todayRec?.status || '정상'] || 'present');
         alert('✅ 퇴근 처리되었습니다.');
         fetchTodayAttendance();
       }

@@ -1,14 +1,18 @@
 'use client';
 import { useState } from 'react';
+import { useTheme } from '@/lib/ThemeContext';
 
 export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
+  const { theme, setTheme, resolvedTheme } = useTheme();
   const [showMore, setShowMore] = useState(false);
 
   const menus = [
     { id: '내정보', icon: '🆔', label: '내 정보' },
     { id: '조직도', icon: '👤', label: '조직도' },
     { id: '채팅', icon: '✉️', label: '채팅' },
+    { id: 'AI채팅', icon: '✨', label: 'AI채팅' },
     { id: '게시판', icon: '📋', label: '게시판' },
+    { id: '알림', icon: '🔔', label: '알림' },
     { id: '전자결재', icon: '✍️', label: '전자결재' },
     { id: '인사관리', icon: '👥', label: '인사관리' },
     { id: '재고관리', icon: '📦', label: '재고관리' },
@@ -50,6 +54,14 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
             </button>
           ))}
         </div>
+        <button
+          onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+          className="mt-4 p-3 rounded-2xl text-gray-400 hover:bg-gray-800 hover:text-white transition-all"
+          title={resolvedTheme === 'dark' ? '라이트 모드' : '다크 모드'}
+          aria-label={resolvedTheme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
+        >
+          <span className="text-2xl">{resolvedTheme === 'dark' ? '☀️' : '🌙'}</span>
+        </button>
       </aside>
 
       {/* 모바일 하단 탭바 (md 미만) */}
@@ -82,6 +94,16 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
         <div className="md:hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-[90] animate-in fade-in duration-200" onClick={() => setShowMore(false)}>
           <div className="absolute bottom-[90px] left-4 right-4 bg-white rounded-[2.5rem] p-8 shadow-2xl animate-in slide-in-from-bottom-10 duration-300" onClick={e => e.stopPropagation()}>
             <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-6 border-b border-gray-50 pb-4">전체 메뉴</h3>
+            <div className="flex justify-between items-center mb-4 pb-4 border-b border-gray-100">
+              <span className="text-[10px] font-black text-gray-400 uppercase">테마</span>
+              <button
+                onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+                className="px-4 py-2 rounded-xl bg-gray-100 text-gray-700 text-xs font-bold"
+                aria-label="테마 전환"
+              >
+                {resolvedTheme === 'dark' ? '☀️ 라이트' : '🌙 다크'}
+              </button>
+            </div>
             <div className="grid grid-cols-3 gap-6">
               {secondaryMenus.map(m => (
                 <button 

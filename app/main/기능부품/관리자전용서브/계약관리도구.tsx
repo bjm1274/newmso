@@ -8,7 +8,7 @@ export default function ContractManager() {
   return (
     <div className="space-y-6 animate-in fade-in">
       <div className="flex gap-1 border-b border-gray-100 pb-4">
-        {["박철홍정형외과", "SY(법인)", "수연의원"].map(co => (
+        {["박철홍정형외과", "수연의원", "SY(법인)"].map(co => (
           <button key={co} onClick={() => setSelectedCo(co)} 
             className={`px-6 py-2 text-[10px] font-black border ${selectedCo === co ? 'bg-blue-600 border-blue-600 text-white shadow-lg' : 'bg-white text-gray-400 border-gray-100'}`}>
             {co}

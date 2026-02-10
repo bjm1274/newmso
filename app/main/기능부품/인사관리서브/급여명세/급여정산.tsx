@@ -1,19 +1,32 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { calculateAttendanceDeduction } from '@/lib/attendance-deduction';
+import { logAudit } from '@/lib/audit';
+import { fetchTaxFreeSettings, DEFAULT_SETTINGS, type TaxFreeSettings } from '@/lib/use-tax-free-settings';
 
 export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any) {
-  const [step, setStep] = useState(1); // 1: 대상 선택, 2: 수당 설정, 3: 정산 완료
+  const [step, setStep] = useState(1);
+  const [yearMonth, setYearMonth] = useState(new Date().toISOString().slice(0, 7));
   const [selectedStaffs, setSelectedStaffs] = useState<any[]>([]);
   const [settlementData, setSettlementData] = useState<any>({});
   const [loading, setLoading] = useState(false);
+  const [taxFreeLimits, setTaxFreeLimits] = useState<TaxFreeSettings>(DEFAULT_SETTINGS);
 
-  // 법적 비과세 한도 정의 (2024-2025 기준)
+  useEffect(() => {
+    let ok = true;
+    (async () => {
+      const s = await fetchTaxFreeSettings(selectedCo || '전체', parseInt(yearMonth.slice(0, 4)));
+      if (ok) setTaxFreeLimits(s);
+    })();
+    return () => { ok = false; };
+  }, [selectedCo, yearMonth]);
+
   const TAX_FREE_LIMITS = {
-    meal: 200000,      // 식대
-    vehicle: 200000,   // 자가운전보조금
-    childcare: 100000, // 보육수당
-    research: 200000   // 연구활동비
+    meal: taxFreeLimits.meal_limit,
+    vehicle: taxFreeLimits.vehicle_limit,
+    childcare: taxFreeLimits.childcare_limit,
+    research: taxFreeLimits.research_limit,
   };
 
   const filteredStaffs = staffs.filter((s: any) => selectedCo === '전체' || s.company === selectedCo);
@@ -26,27 +39,62 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
     }
   };
 
-  const handleNextStep = () => {
+  const handleNextStep = async () => {
     if (selectedStaffs.length === 0) return alert("정산 대상을 선택해 주세요.");
-    
-    const initialData: any = {};
-    selectedStaffs.forEach(s => {
-      initialData[s.id] = {
-        base_salary: s.base_salary || 0,
-        meal_allowance: s.meal_allowance || 0,
-        vehicle_allowance: s.vehicle_allowance || 0,
-        childcare_allowance: s.childcare_allowance || 0,
-        research_allowance: s.research_allowance || 0,
-        other_taxfree: s.other_taxfree || 0,
-        extra_allowance: 0, // 기타 수당 항목 (추가 입력용)
-        overtime_pay: 0,
-        bonus: 0,
-        apply_tax: true,
-        apply_insurance: true
-      };
-    });
-    setSettlementData(initialData);
-    setStep(2);
+    setLoading(true);
+    try {
+      const staffIds = selectedStaffs.map((s: any) => s.id);
+      const [startDate, endDate] = [`${yearMonth}-01`, `${yearMonth}-31`];
+
+      const { data: attendances } = await supabase
+        .from('attendances')
+        .select('*')
+        .in('staff_id', staffIds)
+        .gte('work_date', startDate)
+        .lte('work_date', endDate);
+
+      const ruleCompany = selectedCo === '전체' ? '전체' : selectedCo;
+      const { data: rule } = await supabase
+        .from('attendance_deduction_rules')
+        .select('*')
+        .eq('company_name', ruleCompany)
+        .single();
+      const fallback = await supabase.from('attendance_deduction_rules').select('*').eq('company_name', '전체').single();
+      const r = rule || fallback.data;
+
+      const initialData: any = {};
+      selectedStaffs.forEach((s: any) => {
+        const staffAtts = (attendances || []).filter((a: any) => a.staff_id === s.id);
+        const { total, detail } = calculateAttendanceDeduction(
+          s.base_salary || 0,
+          yearMonth,
+          staffAtts,
+          r ? { late_deduction_type: r.late_deduction_type, late_deduction_amount: r.late_deduction_amount, early_leave_deduction_type: r.early_leave_deduction_type, early_leave_deduction_amount: r.early_leave_deduction_amount } : undefined
+        );
+        initialData[s.id] = {
+          base_salary: s.base_salary || 0,
+          meal_allowance: s.meal_allowance || 0,
+          vehicle_allowance: s.vehicle_allowance || 0,
+          childcare_allowance: s.childcare_allowance || 0,
+          research_allowance: s.research_allowance || 0,
+          other_taxfree: s.other_taxfree || 0,
+          extra_allowance: 0,
+          overtime_pay: 0,
+          bonus: 0,
+          apply_tax: true,
+          apply_insurance: true,
+          attendance_deduction: total,
+          attendance_deduction_detail: detail,
+        };
+      });
+      setSettlementData(initialData);
+      setStep(2);
+    } catch (e) {
+      console.error(e);
+      alert('근태 데이터 로드 실패');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const updateData = (id: string, field: string, value: any) => {
@@ -74,10 +122,11 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
 
     const total_taxfree = meal_tf + vehicle_tf + childcare_tf + research_tf + Number(data.other_taxfree);
     
-    // 과세 대상: 기본급 + 한도초과 비과세분 + 연장수당 + 상여 + 기타수당
-    const total_taxable = Number(data.base_salary) + meal_taxable + vehicle_taxable + childcare_taxable + research_taxable + 
-                          Number(data.overtime_pay) + Number(data.bonus) + Number(data.extra_allowance);
-    
+    // 과세 대상: 기본급 + 한도초과 비과세분 + 연장수당 + 상여 + 기타수당 - 근태차감
+    const attendance_deduction = Number(data.attendance_deduction) || 0;
+    const total_taxable = Number(data.base_salary) + meal_taxable + vehicle_taxable + childcare_taxable + research_taxable +
+                          Number(data.overtime_pay) + Number(data.bonus) + Number(data.extra_allowance) - attendance_deduction;
+
     const total_payment = total_taxable + total_taxfree;
     
     // 공제 계산 (과세 대상 기준)
@@ -94,6 +143,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
       taxfree: total_taxfree,
       total: total_payment,
       deduction: Math.floor(deduction),
+      attendance_deduction,
       net: total_payment - Math.floor(deduction)
     };
   };
@@ -108,7 +158,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
         const data = settlementData[s.id];
         return {
           staff_id: s.id,
-          year_month: new Date().toISOString().slice(0, 7),
+          year_month: yearMonth,
           base_salary: data.base_salary,
           meal_allowance: data.meal_allowance,
           vehicle_allowance: data.vehicle_allowance,
@@ -122,12 +172,16 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
           total_taxfree: calc.taxfree,
           total_deduction: calc.deduction,
           net_pay: calc.net,
+          attendance_deduction: data.attendance_deduction || 0,
+          attendance_deduction_detail: data.attendance_deduction_detail || {},
           status: '확정'
         };
       });
 
       await supabase.from('payroll_records').upsert(records, { onConflict: 'staff_id,year_month' });
-      
+      const u = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('erp_user') || '{}') : {};
+      await logAudit('급여수정', 'payroll', yearMonth, { count: records.length, total: records.reduce((s: number, r: any) => s + (Number(r.net_pay) || 0), 0) }, u.id, u.name);
+
       alert("급여 정산 및 명세서 생성이 완료되었습니다. 법적 비과세 한도가 자동 적용되었습니다.");
       setStep(3);
       if (onRefresh) onRefresh();
@@ -157,8 +211,14 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
       <div className="p-8">
         {step === 1 && (
           <div className="space-y-6">
-            <div className="flex justify-between items-end">
-              <p className="text-sm font-bold text-gray-500">정산 대상을 선택하세요. (연봉 계약 정보 자동 연동)</p>
+            <div className="flex justify-between items-end flex-wrap gap-4">
+              <div className="flex items-center gap-4">
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase">정산 월</label>
+                  <input type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="ml-2 p-2 border rounded-xl text-sm font-bold" />
+                </div>
+                <p className="text-sm font-bold text-gray-500">정산 대상을 선택하세요. (근태 자동 반영)</p>
+              </div>
               <button onClick={() => setSelectedStaffs(filteredStaffs)} className="text-[10px] font-black text-blue-600 hover:underline">전체 선택</button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[400px] overflow-y-auto p-2 custom-scrollbar">
@@ -180,7 +240,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
                 </div>
               ))}
             </div>
-            <button onClick={handleNextStep} className="w-full py-5 bg-gray-900 text-white font-black rounded-2xl text-sm shadow-xl hover:scale-[0.99] transition-all">다음 단계: 수당 설정 및 정산</button>
+            <button onClick={handleNextStep} disabled={loading} className="w-full py-5 bg-gray-900 text-white font-black rounded-2xl text-sm shadow-xl hover:scale-[0.99] transition-all disabled:opacity-50">{loading ? '로딩 중...' : '다음 단계: 수당 설정 및 정산'}</button>
           </div>
         )}
 
@@ -222,6 +282,19 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
                           ₩ {res.taxfree.toLocaleString()}
                         </div>
                       </div>
+                      {(data.attendance_deduction || 0) > 0 && (
+                        <div className="col-span-full space-y-2">
+                          <label className="text-[10px] font-black text-orange-600 uppercase tracking-widest">근태 차감 (지각/조퇴/결근 자동 반영)</label>
+                          <div className="p-4 bg-orange-50 border border-orange-100 rounded-xl font-black text-sm text-orange-700">
+                            -₩ {(data.attendance_deduction || 0).toLocaleString()}
+                            {data.attendance_deduction_detail && Object.keys(data.attendance_deduction_detail).length > 0 && (
+                              <span className="ml-2 text-xs font-bold text-orange-500">
+                                (지각 {data.attendance_deduction_detail.late || 0}원 / 조퇴 {data.attendance_deduction_detail.early_leave || 0}원 / 결근 {data.attendance_deduction_detail.absent || 0}원)
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex justify-between items-center pt-4 border-t border-gray-200/50">

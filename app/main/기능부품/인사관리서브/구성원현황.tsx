@@ -1,11 +1,15 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import StaffHistoryTimeline from './인사이력타임라인';
+import OnboardingChecklist from './급여명세/입퇴사온보딩';
+import CertTransferPanel from './교육자격인사이동패널';
 
 export default function 구성원관리({ 직원목록 = [], 부서목록 = [], 선택사업체, 새로고침, 창상태, 창닫기 }: any) {
   const [편집모드, 편집모드설정] = useState(false);
   const [선택된직원ID, 선택된직원ID설정] = useState<number | null>(null);
   const [근무형태목록, 근무형태목록설정] = useState<any[]>([]);
+  const [팀목록캐시, 팀목록캐시설정] = useState<Record<string, string[]>>({});
   const [신규직원, 신규직원설정] = useState({
     성명: '', 전화번호: '', 사업체: '박철홍정형외과', 팀: '원무팀', 직함: '', 입사일: '', 퇴사일: '',
     주민번호: '', 이메일: '', 주소: '', 면허사항: '', 계좌정보: '', 임금정보: '', 상태: '재직',
@@ -21,7 +25,22 @@ export default function 구성원관리({ 직원목록 = [], 부서목록 = [], 
     fetchShifts();
   }, []);
 
+  useEffect(() => {
+    const fetchTeams = async () => {
+      const { data } = await supabase.from('org_teams').select('company_name, team_name, division').order('division').order('sort_order');
+      if (!data || data.length === 0) return;
+      const byCo: Record<string, string[]> = {};
+      (data as any[]).forEach((r: any) => {
+        if (!byCo[r.company_name]) byCo[r.company_name] = [];
+        byCo[r.company_name].push(r.team_name);
+      });
+      팀목록캐시설정(prev => ({ ...prev, ...byCo }));
+    };
+    fetchTeams();
+  }, []);
+
   const 팀목록가져오기 = (회사: string) => {
+    if (팀목록캐시[회사]?.length) return 팀목록캐시[회사];
     if (회사 === 'SY INC.') return ['경영지원팀', '재무팀', '인사팀', '전략기획팀', '마케팅팀'];
     return ['진료부', '진료팀', '병동팀', '수술팀', '외래팀', '검사팀', '원무팀', '총무팀', '행정팀', '관리팀'];
   };
@@ -43,8 +62,13 @@ export default function 구성원관리({ 직원목록 = [], 부서목록 = [], 
         alert('직원 정보가 수정되었습니다.');
       } else {
         const { data: maxNo } = await supabase.from('staff_members').select('employee_no').order('employee_no', { ascending: false }).limit(1).single();
-        const newEmployeeNo = Math.max(21, (maxNo?.employee_no || 20) + 1);
-        await supabase.from('staff_members').insert([{ ...commonData, employee_no: newEmployeeNo, role: 'staff', password: '' }]);
+        const lastNo = typeof maxNo?.employee_no === 'number' ? maxNo.employee_no : parseInt(String(maxNo?.employee_no || '0'), 10) || 0;
+        const newEmployeeNo = String(Math.max(21, lastNo + 1));
+        const { error: insertErr } = await supabase.from('staff_members').insert([{ ...commonData, employee_no: newEmployeeNo, role: 'staff', password: '', join_date: 신규직원.입사일 || null }]);
+        if (insertErr) {
+          console.error(insertErr);
+          return alert('직원 등록 실패: ' + (insertErr.message || 'DB 오류'));
+        }
         alert(`직원 등록 완료! 사번: ${newEmployeeNo}`);
       }
       닫기함수(); 새로고침();
@@ -85,6 +109,18 @@ export default function 구성원관리({ 직원목록 = [], 부서목록 = [], 
       </header>
 
       <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
+        {선택된직원ID && (
+          <div className="mb-6 space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <StaffHistoryTimeline staffId={선택된직원ID} staffName={필터목록.find((s: any) => s.id === 선택된직원ID)?.name || 직원목록.find((s: any) => s.id === 선택된직원ID)?.name || ''} />
+              <div className="flex gap-4 flex-wrap">
+                <OnboardingChecklist staffId={String(선택된직원ID)} staffName={필터목록.find((s: any) => s.id === 선택된직원ID)?.name || ''} type="입사" />
+                <OnboardingChecklist staffId={String(선택된직원ID)} staffName={필터목록.find((s: any) => s.id === 선택된직원ID)?.name || ''} type="퇴사" />
+              </div>
+            </div>
+            <CertTransferPanel staffId={String(선택된직원ID)} staffName={필터목록.find((s: any) => s.id === 선택된직원ID)?.name || ''} />
+          </div>
+        )}
         {/* PC 버전 테이블 */}
         <div className="hidden md:block bg-white border border-gray-100 rounded-[2rem] overflow-hidden shadow-xl">
           <table className="w-full text-left border-collapse">
@@ -189,8 +225,8 @@ export default function 구성원관리({ 직원목록 = [], 부서목록 = [], 
                     <label className="text-[9px] font-black text-gray-400">사업체</label>
                     <select value={신규직원.사업체} onChange={e => 신규직원설정({...신규직원, 사업체: e.target.value, 팀: 팀목록가져오기(e.target.value)[0]})} className="w-full p-3 bg-gray-50 rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100">
                       <option value="박철홍정형외과">박철홍정형외과</option>
-                      <option value="SY INC.">SY INC.</option>
                       <option value="수연의원">수연의원</option>
+                      <option value="SY INC.">SY INC.</option>
                     </select>
                   </div>
                   <div className="space-y-1">

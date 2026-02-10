@@ -111,7 +111,7 @@ export default function IntegratedInventoryManagement({ user }: any) {
     { id: '등록', icon: '+', label: '등록' }
   ];
 
-  const companies = ['전체', '박철홍정형외과', 'SY INC.', '수연의원'];
+  const companies = ['전체', '박철홍정형외과', '수연의원', 'SY INC.'];
   const hospitalDepts = ['전체', '진료부', '병동팀', '수술팀', '외래팀', '검사팀', '총무팀', '원무팀', '관리팀', '영양팀'];
 
   const filteredInventory = inventory.filter(item => {

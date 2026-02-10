@@ -2,10 +2,29 @@
 import { useState } from 'react';
 import SalaryDetail from './급여명세/급여상세';
 import PayrollTable from './급여명세/급여대장표';
+import PayrollMonthlySummary from './급여명세/급여대장월별요약';
+import LaborCostSimulation from './인력예측/인건비예측';
 import CompliancePanel from './급여명세/노무준수패널';
 import InterimSettlement from './급여명세/중간정산';
 import YearEndSettlement from './급여명세/연말정산';
 import SalarySettlement from './급여명세/급여정산';
+import SeveranceCalculator from './급여명세/퇴직금계산기';
+import PayrollEmailSender from './급여명세/급여명세서발송';
+import TaxFreeSettingsPanel from './급여명세/비과세항목설정';
+import LegalStandardsPanel from './급여명세/법정기준패널';
+import PayrollExport from './급여명세/급여대장내보내기';
+import WeeklyHoursMonitor from './급여명세/주52시간모니터링';
+import HRDashboardIntegrated from './급여명세/인사대시보드통합';
+import SeveranceLeaveDashboard from './급여명세/예상퇴직금연차대시보드';
+import LeaveDashboard from './급여명세/연차종합대시보드';
+import SalaryChangeHistory from './급여명세/급여변경이력';
+import OnboardingChecklist from './급여명세/입퇴사온보딩';
+import AuditLogDetail from './급여명세/감사로그상세';
+import PayrollLockPanel from './급여명세/급여월마감잠금';
+import ShiftPatternManager from './급여명세/교대제스케줄관리';
+import NotificationTemplatesPanel from './급여명세/알림템플릿관리';
+import PayrollSlipPDF from './급여명세/급여명세서PDF';
+import TaxInsuranceRatesPanel from './급여명세/세율보험요율관리';
 
 type Staff = {
   id: number;
@@ -23,18 +42,13 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
   const filtered: Staff[] = selectedCo === '전체' ? staffs : staffs.filter((s: Staff) => s.company === selectedCo);
   const current = filtered.find((s) => s.id === selectedStaffId) || filtered[0];
 
-  const handleAction = (type: string) => {
-    if (checkedIds.length === 0) return alert("대상을 선택해 주세요.");
-    alert(`${type === 'bank' ? '은행 이체 파일' : '알림톡 명세서'}를 생성합니다.`);
-  };
-
   return (
     <div className="flex flex-col h-full animate-in fade-in duration-500">
       <header className="p-6 md:p-8 border-b border-gray-50 bg-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
         <div>
           <h2 className="text-xl font-black text-gray-800 tracking-tighter">급여 통합 관리 <span className="text-sm text-blue-600 ml-2">[{selectedCo}]</span></h2>
           <div className="flex gap-4 mt-2">
-            {['대장', '급여정산', '중간정산', '연말정산'].map(tab => (
+            {['대장', '대시보드', '급여정산', '중간정산', '연말정산', '퇴직금', '설정'].map(tab => (
               <button 
                 key={tab} 
                 onClick={() => setActiveTab(tab)}
@@ -47,8 +61,7 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
         </div>
         {activeTab === '대장' && (
           <div className="flex gap-2 w-full md:w-auto">
-            <button onClick={() => handleAction('bank')} className="flex-1 md:flex-none px-5 py-2.5 bg-[#232933] text-white text-[10px] font-black rounded-xl shadow-lg">이체 SAM 생성</button>
-            <button onClick={() => handleAction('send')} className="flex-1 md:flex-none px-5 py-2.5 bg-[#2563EB] text-white text-[10px] font-black rounded-xl shadow-xl">명세서 발송</button>
+            <span className="text-[10px] font-bold text-gray-500 hidden md:inline">대장 내보내기: aside 패널에서 이용</span>
           </div>
         )}
       </header>
@@ -63,15 +76,36 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
                   <PayrollTable staffs={filtered} checkedIds={checkedIds} setCheckedIds={setCheckedIds} onSelect={setSelectedStaffId} />
                 </div>
                 <aside className="space-y-6">
+                  <PayrollExport staffs={filtered} checkedIds={checkedIds} selectedCo={selectedCo} yearMonth={new Date().toISOString().slice(0, 7)} />
+                  <PayrollMonthlySummary selectedCo={selectedCo} />
+                  <WeeklyHoursMonitor selectedCo={selectedCo} />
+                  <LaborCostSimulation staffs={filtered} selectedCo={selectedCo} />
                   <CompliancePanel staffs={filtered.filter((s: Staff) => checkedIds.includes(s.id))} companyName={selectedCo} />
                   {current && <BenefitSummary staff={current} />}
                   {current && <SalarySimulationSummary staff={current} />}
+                  {current && <PayrollSlipPDF staff={current} record={null} yearMonth={new Date().toISOString().slice(0, 7)} />}
+                  {current && <SalaryChangeHistory staffId={String(current.id)} staffName={current.name} />}
                 </aside>
               </div>
             )}
             {activeTab === '급여정산' && <SalarySettlement staffs={staffs} selectedCo={selectedCo} onRefresh={onRefresh} />}
-            {activeTab === '중간정산' && <InterimSettlement staffs={staffs} selectedCo={selectedCo} />}
+            {activeTab === '중간정산' && <InterimSettlement staffs={staffs} selectedCo={selectedCo} onRefresh={onRefresh} />}
             {activeTab === '연말정산' && <YearEndSettlement staffs={staffs} selectedCo={selectedCo} />}
+            {activeTab === '퇴직금' && <div className="flex gap-6 flex-wrap"><SeveranceCalculator /><PayrollEmailSender staffs={filtered} yearMonth={new Date().toISOString().slice(0, 7)} /><SeveranceLeaveDashboard staffs={filtered} /></div>}
+            {activeTab === '대시보드' && <HRDashboardIntegrated staffs={filtered} selectedCo={selectedCo} checkedIds={checkedIds} />}
+            {activeTab === '설정' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <TaxFreeSettingsPanel companyName={selectedCo} />
+                <LegalStandardsPanel />
+                <div className="space-y-6">
+                  <PayrollLockPanel yearMonth={new Date().toISOString().slice(0, 7)} companyName={selectedCo} />
+                  <TaxInsuranceRatesPanel companyName={selectedCo} />
+                  <ShiftPatternManager selectedCo={selectedCo} />
+                  <NotificationTemplatesPanel companyName={selectedCo} />
+                  <AuditLogDetail targetType="payroll" limit={20} />
+                </div>
+              </div>
+            )}
           </>
         ) : (
           <div className="h-full flex items-center justify-center bg-white border border-dashed border-gray-200 rounded-[2rem] p-20">

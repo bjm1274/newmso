@@ -1,17 +1,35 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 
 export default function OrgChart({ staffs = [], selectedCo, setSelectedCo }: any) {
   const [selectedMember, setSelectedMember] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
   
-  const companies = ['전체', 'SY INC.', '박철홍정형외과', '수연의원'];
+  const companies = ['전체', '박철홍정형외과', '수연의원', 'SY INC.'];
 
-  const hospitalStructure = [
-    { name: '진료부', teams: ['진료부', '진료팀'] },
-    { name: '간호부', teams: ['병동팀', '수술팀', '외래팀', '검사팀'] },
-    { name: '행정부', teams: ['행정팀', '총무팀', '원무팀', '관리팀', '영양팀'] },
+  const defaultHospitalStructure = [
+    { name: '진료부', teams: ['진료팀', '외래팀'] },
+    { name: '간호부', teams: ['병동팀', '수술팀', '외래간호팀', '검사팀'] },
+    { name: '총무부', teams: ['원무팀', '총무팀', '행정팀', '관리팀', '영양팀'] },
   ];
+  const [hospitalStructure, setHospitalStructure] = useState(defaultHospitalStructure);
+
+  useEffect(() => {
+    const co = selectedCo || '';
+    if (co !== '박철홍정형외과' && co !== '수연의원') return;
+    (async () => {
+      const { data } = await supabase.from('org_teams').select('division, team_name, sort_order').eq('company_name', co).order('division').order('sort_order');
+      if (data && data.length > 0) {
+        const divs = ['진료부', '간호부', '총무부'];
+        const built = divs.map(d => ({
+          name: d,
+          teams: (data as any[]).filter((r: any) => r.division === d).map((r: any) => r.team_name)
+        })).filter(d => d.teams.length > 0);
+        if (built.length > 0) setHospitalStructure(built);
+      }
+    })();
+  }, [selectedCo]);
 
   const msoStructure = [
     { name: '경영지원본부', teams: ['경영지원팀', '재무팀', '인사팀'] },
@@ -63,7 +81,7 @@ export default function OrgChart({ staffs = [], selectedCo, setSelectedCo }: any
     }
 
     return { type: 'list', members: coStaffs };
-  }, [staffs, selectedCo, searchQuery]);
+  }, [staffs, selectedCo, searchQuery, hospitalStructure]);
 
   return (
     <div className="flex flex-col h-full bg-[#F8FAFC] font-sans overflow-hidden">

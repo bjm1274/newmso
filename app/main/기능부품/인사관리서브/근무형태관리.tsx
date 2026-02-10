@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 
 type Shift = {
   id: string;
@@ -7,78 +8,84 @@ type Shift = {
   start_time: string;
   end_time: string;
   description?: string;
-  company: string;
+  company_name?: string;
 };
-
-const DEMO_SHIFTS: Shift[] = [
-  {
-    id: 'day',
-    name: '데이(일반)',
-    start_time: '09:00',
-    end_time: '18:00',
-    description: '일반 행정/외래 근무 (휴게 1시간 포함)',
-    company: 'SY INC.',
-  },
-  {
-    id: 'night',
-    name: '나이트전담',
-    start_time: '23:00',
-    end_time: '08:00',
-    description: '입원병동 야간 전담 근무',
-    company: '박철홍정형외과',
-  },
-  {
-    id: 'swing',
-    name: '스윙(중간근무)',
-    start_time: '13:00',
-    end_time: '22:00',
-    description: '외래/수술 연계 중간 근무',
-    company: '수연의원',
-  },
-];
 
 export default function ShiftManagement({ selectedCo }: any) {
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newShift, setNewShift] = useState<Shift>({
-    id: '',
+  const [newShift, setNewShift] = useState({
     name: '',
     start_time: '09:00',
     end_time: '18:00',
     description: '',
-    company: '박철홍정형외과'
+    company_name: '박철홍정형외과'
   });
 
-  const fetchShifts = () => {
+  const fetchShifts = async () => {
     setLoading(true);
-    let data = DEMO_SHIFTS;
-    if (selectedCo && selectedCo !== '전체') {
-      data = data.filter((s) => s.company === selectedCo);
+    try {
+      const { data, error } = await supabase
+        .from('work_shifts')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      let list = (data || []).map((s: any) => ({
+        id: s.id,
+        name: s.name,
+        start_time: s.start_time?.slice(0, 5) || '09:00',
+        end_time: s.end_time?.slice(0, 5) || '18:00',
+        description: s.description,
+        company_name: s.company_name,
+      }));
+      if (selectedCo && selectedCo !== '전체') {
+        list = list.filter((s: any) => s.company_name === selectedCo);
+      }
+      setShifts(list);
+    } catch (err) {
+      console.error('근무형태 조회 실패:', err);
+      setShifts([]);
+    } finally {
+      setLoading(false);
     }
-    setShifts(data);
-    setLoading(false);
   };
 
   useEffect(() => {
     fetchShifts();
   }, [selectedCo]);
 
-  const handleAddShift = () => {
+  const handleAddShift = async () => {
     if (!newShift.name) return alert('근무 형태 명칭을 입력하세요.');
-    const created: Shift = {
-      ...newShift,
-      id: `${Date.now()}`,
-    };
-    setShifts((prev) => [...prev, created]);
-    alert('근무 형태가(가) 임시로 추가되었습니다. (나중에 Supabase work_shifts 테이블과 연동 예정)');
-    setShowAddModal(false);
-    setNewShift({ id: '', name: '', start_time: '09:00', end_time: '18:00', description: '', company: '박철홍정형외과' });
+    try {
+      const { error } = await supabase.from('work_shifts').insert([{
+        name: newShift.name,
+        start_time: newShift.start_time,
+        end_time: newShift.end_time,
+        description: newShift.description || null,
+        company_name: newShift.company_name,
+      }]);
+      if (error) throw error;
+      alert('근무 형태가 등록되었습니다.');
+      setShowAddModal(false);
+      setNewShift({ name: '', start_time: '09:00', end_time: '18:00', description: '', company_name: '박철홍정형외과' });
+      fetchShifts();
+    } catch (err) {
+      alert('등록에 실패했습니다.');
+    }
   };
 
-  const handleDeleteShift = (id: string) => {
+  const handleDeleteShift = async (id: string) => {
     if (!confirm('이 근무 형태를 삭제하시겠습니까?')) return;
-    setShifts((prev) => prev.filter((s) => s.id !== id));
+    try {
+      const { error } = await supabase.from('work_shifts').update({ is_active: false }).eq('id', id);
+      if (error) throw error;
+      fetchShifts();
+    } catch (err) {
+      alert('삭제에 실패했습니다.');
+    }
   };
 
   return (
@@ -95,7 +102,7 @@ export default function ShiftManagement({ selectedCo }: any) {
         {shifts.map((shift) => (
           <div key={shift.id} className="bg-white border-2 border-gray-100 p-6 hover:border-blue-600 transition-all group relative">
             <div className="flex justify-between items-start mb-4">
-              <span className="px-2 py-1 bg-blue-50 text-blue-600 text-[9px] font-black uppercase">{shift.company}</span>
+              <span className="px-2 py-1 bg-blue-50 text-blue-600 text-[9px] font-black uppercase">{shift.company_name || '-'}</span>
               <button onClick={() => handleDeleteShift(shift.id)} className="text-gray-300 hover:text-red-500 transition-colors">✕</button>
             </div>
             <h3 className="text-lg font-black text-gray-800 mb-1">{shift.name}</h3>
@@ -141,10 +148,10 @@ export default function ShiftManagement({ selectedCo }: any) {
               </div>
               <div>
                 <label className="text-[10px] font-black text-gray-400 uppercase">적용 사업체</label>
-                <select value={newShift.company} onChange={e => setNewShift({...newShift, company: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 font-black text-xs">
+                <select value={newShift.company_name} onChange={e => setNewShift({...newShift, company_name: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 font-black text-xs">
                   <option value="박철홍정형외과">박철홍정형외과</option>
-                  <option value="SY INC.">SY INC.</option>
                   <option value="수연의원">수연의원</option>
+                  <option value="SY INC.">SY INC.</option>
                 </select>
               </div>
               <div>

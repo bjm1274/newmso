@@ -1,14 +1,71 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { supabase } from '@/lib/supabase';
+import { CERTIFICATE_TYPES } from '@/lib/certificate-types';
 
-export default function CertificateGenerator({ staffs }: any) {
+function formatDate(d: string | null) {
+  if (!d) return '현재';
+  return new Date(d).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\. /g, '.').replace('.', '');
+}
+
+export default function CertificateGenerator({ staffs = [] }: any) {
   const [selectedStaff, setSelectedStaff] = useState<any>(null);
   const [certType, setCertType] = useState('재직증명서');
+  const [purpose, setPurpose] = useState('금융기관 제출용');
+  const [serialNo, setSerialNo] = useState('');
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyList, setHistoryList] = useState<any[]>([]);
+  const printRef = useRef<HTMLDivElement>(null);
 
-  const handleIssue = () => {
-    if (!selectedStaff) return alert("발급 대상을 선택해주세요.");
-    alert(`${selectedStaff.name}님의 ${certType}가 발급되었습니다. (PDF 다운로드 시작)`);
+  const joined = selectedStaff?.joined_at || selectedStaff?.join_date;
+  const resigned = selectedStaff?.resigned_at;
+  const workPeriod = joined ? `${formatDate(joined)} ~ ${resigned ? formatDate(resigned) : '현재'}` : '-';
+  const baseSalary = selectedStaff?.base_salary ?? selectedStaff?.base ?? 0;
+  const totalPay = baseSalary + (selectedStaff?.meal_allowance ?? selectedStaff?.meal ?? 0);
+
+  const certClosingText: Record<string, string> = {
+    재직증명서: '위와 같이 재직 중임을 증명함.',
+    경력증명서: '위와 같이 경력을 증명함.',
+    퇴직증명서: '위와 같이 퇴직하였음을 증명함.',
+    급여인증서: '위와 같이 급여를 지급한 사실을 증명함.',
+    근무확인서: '위와 같이 근무하였음을 확인함.',
+    원천징수영수증: '위와 같이 원천징수한 사실을 증명함.',
+    소득금액증명원: '위와 같이 소득금액을 증명함.',
   };
+
+  const handleIssue = async () => {
+    if (!selectedStaff) return alert("발급 대상을 선택해주세요.");
+    const sn = `CERT-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(Date.now()).slice(-6)}`;
+    setSerialNo(sn);
+    const u = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('erp_user') || '{}') : {};
+    try {
+      await supabase.from('certificate_issuances').insert({
+        staff_id: selectedStaff.id,
+        cert_type: certType,
+        serial_no: sn,
+        purpose,
+        issued_by: u.id,
+      });
+    } catch (_) {}
+    setTimeout(() => {
+      if (!printRef.current) return;
+      const html = printRef.current.innerHTML.replace('제 2026-0001', `제 ${sn}`).replace(/2026-0001/g, sn);
+      const w = window.open('', '_blank');
+      if (!w) return;
+      w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${certType}</title><style>body{font-family:serif;padding:40px;max-width:600px;margin:0 auto}</style></head><body>${html}</body></html>`);
+      w.document.close();
+      w.print();
+      w.close();
+    }, 150);
+  };
+
+  useEffect(() => {
+    if (!showHistory) return;
+    (async () => {
+      const { data } = await supabase.from('certificate_issuances').select('*, staff_members(name, company)').order('issued_at', { ascending: false }).limit(30);
+      setHistoryList(data || []);
+    })();
+  }, [showHistory]);
 
   return (
     <div className="bg-[#F8FAFC] p-4 md:p-10 space-y-10 animate-in fade-in duration-500">
@@ -18,7 +75,7 @@ export default function CertificateGenerator({ staffs }: any) {
           <p className="text-[10px] text-blue-600 font-bold mt-1 uppercase tracking-widest">Digital Certificate Issuance Hub</p>
         </div>
         <div className="flex gap-2">
-          <button className="px-5 py-2.5 bg-white border border-gray-200 text-gray-600 text-[11px] font-black rounded-xl shadow-sm hover:bg-gray-50 transition-all">발급 이력 조회</button>
+          <button onClick={() => setShowHistory(true)} className="px-5 py-2.5 bg-white border border-gray-200 text-gray-600 text-[11px] font-black rounded-xl shadow-sm hover:bg-gray-50 transition-all">발급 이력 조회</button>
           <button className="px-5 py-2.5 bg-gray-900 text-white text-[11px] font-black rounded-xl shadow-lg hover:scale-[0.98] transition-all">직인 설정</button>
         </div>
       </div>
@@ -39,16 +96,20 @@ export default function CertificateGenerator({ staffs }: any) {
             </div>
 
             <div className="space-y-4">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">2. 증명서 종류</label>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">2. 용도</label>
+              <input type="text" value={purpose} onChange={e=>setPurpose(e.target.value)} placeholder="금융기관 제출용" className="w-full p-4 bg-gray-50 rounded-2xl text-sm font-bold border-none outline-none focus:ring-2 focus:ring-blue-100" />
+            </div>
+            <div className="space-y-4">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">3. 증명서 종류</label>
               <div className="grid grid-cols-1 gap-3">
-                {['재직증명서', '경력증명서', '퇴직증명서', '원천징수영수증'].map(t => (
+                {CERTIFICATE_TYPES.map((c) => (
                   <button 
-                    key={t} 
-                    onClick={() => setCertType(t)}
-                    className={`p-5 rounded-2xl text-xs font-black border-2 text-left transition-all flex justify-between items-center ${certType === t ? 'border-blue-600 bg-blue-50 text-blue-600' : 'border-gray-50 text-gray-400 hover:border-gray-100 bg-gray-50/50'}`}
+                    key={c.id} 
+                    onClick={() => setCertType(c.id)}
+                    className={`p-5 rounded-2xl text-xs font-black border-2 text-left transition-all flex justify-between items-center ${certType === c.id ? 'border-blue-600 bg-blue-50 text-blue-600' : 'border-gray-50 text-gray-400 hover:border-gray-100 bg-gray-50/50'}`}
                   >
-                    {t}
-                    {certType === t && <span className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></span>}
+                    <span>{c.label}</span>
+                    {certType === c.id && <span className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></span>}
                   </button>
                 ))}
               </div>
@@ -75,14 +136,14 @@ export default function CertificateGenerator({ staffs }: any) {
           <div className="absolute top-8 right-8 bg-gray-900 text-white px-4 py-1.5 text-[10px] font-black rounded-full tracking-widest">PREVIEW</div>
           
           {selectedStaff ? (
-            <div className="w-full max-w-[600px] bg-white shadow-2xl p-12 md:p-20 space-y-12 text-center border border-gray-100 relative animate-in zoom-in-95 duration-500">
+            <div ref={printRef} className="w-full max-w-[600px] bg-white shadow-2xl p-12 md:p-20 space-y-12 text-center border border-gray-100 relative animate-in zoom-in-95 duration-500">
               {/* 워터마크 */}
               <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none select-none">
                 <p className="text-9xl font-black -rotate-45">SY INC.</p>
               </div>
 
               <div className="space-y-2">
-                <p className="text-[10px] font-black text-gray-400 tracking-[0.5em]">제 2026-0001 호</p>
+                <p className="text-[10px] font-black text-gray-400 tracking-[0.5em]">제 {serialNo || '2026-0001'} 호</p>
                 <h4 className="text-4xl font-black tracking-[0.3em] text-gray-900 border-b-4 border-gray-900 pb-4 inline-block">{certType}</h4>
               </div>
 
@@ -102,16 +163,22 @@ export default function CertificateGenerator({ staffs }: any) {
                   </div>
                   <div className="flex border-b border-gray-100 pb-2">
                     <span className="w-24 text-[11px] font-black text-gray-400 uppercase">재직기간</span>
-                    <span className="text-sm font-black text-gray-800">2023.01.01 ~ 현재</span>
+                    <span className="text-sm font-black text-gray-800">{workPeriod}</span>
                   </div>
+                  {(certType === '급여인증서' || certType === '소득금액증명원' || certType === '원천징수영수증') && (
+                    <div className="flex border-b border-gray-100 pb-2">
+                      <span className="w-24 text-[11px] font-black text-gray-400 uppercase">월 급여액</span>
+                      <span className="text-sm font-black text-gray-800">{totalPay.toLocaleString()}원</span>
+                    </div>
+                  )}
                   <div className="flex border-b border-gray-100 pb-2">
                     <span className="w-24 text-[11px] font-black text-gray-400 uppercase">용 도</span>
-                    <span className="text-sm font-black text-gray-800">금융기관 제출용</span>
+                    <span className="text-sm font-black text-gray-800">{purpose}</span>
                   </div>
                 </div>
 
                 <div className="pt-24 text-center space-y-10">
-                  <p className="text-sm font-black text-gray-800 tracking-widest">위와 같이 재직 중임을 증명함.</p>
+                  <p className="text-sm font-black text-gray-800 tracking-widest">{certClosingText[certType] || '위와 같이 증명함.'}</p>
                   <p className="text-xs font-bold text-gray-400">{new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
                   
                   <div className="relative inline-block pt-10">
@@ -134,6 +201,23 @@ export default function CertificateGenerator({ staffs }: any) {
           )}
         </div>
       </div>
+
+      {showHistory && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowHistory(false)}>
+          <div className="bg-white rounded-2xl p-8 max-w-2xl w-full max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-black mb-4">발급 이력</h3>
+            <div className="space-y-2">
+              {historyList.map((r) => (
+                <div key={r.id} className="flex justify-between items-center py-2 border-b text-sm">
+                  <span>{r.staff_members?.name} · {r.cert_type}</span>
+                  <span className="text-gray-500">{r.serial_no} · {new Date(r.issued_at).toLocaleDateString()}</span>
+                </div>
+              ))}
+            </div>
+            <button onClick={() => setShowHistory(false)} className="mt-4 w-full py-3 bg-gray-900 text-white font-black rounded-xl">닫기</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

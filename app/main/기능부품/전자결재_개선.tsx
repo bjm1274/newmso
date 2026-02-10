@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { logAudit } from '@/lib/audit';
 
 export default function ApprovalSystemImproved({ user, onRefresh }: any) {
   const [activeTab, setActiveTab] = useState('목록');
@@ -9,6 +10,9 @@ export default function ApprovalSystemImproved({ user, onRefresh }: any) {
   const [selectedFormType, setSelectedFormType] = useState('');
   const [formData, setFormData] = useState<any>({});
   const [userAnnualLeave, setUserAnnualLeave] = useState<any>(null);
+  const [showHistoryModal, setShowHistoryModal] = useState<any>(null);
+  const [approvalHistory, setApprovalHistory] = useState<any[]>([]);
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
 
   const formTypes = [
     { id: '휴가신청', label: '🏖️ 휴가 신청', icon: '🏖️' },
@@ -22,6 +26,18 @@ export default function ApprovalSystemImproved({ user, onRefresh }: any) {
     fetchApprovals();
     fetchUserLeave();
   }, [user]);
+
+  const loadTemplate = async (formType: string) => {
+    const { data } = await supabase.from('approval_templates').select('default_values').eq('form_type', formType).single();
+    if (data?.default_values) setFormData((prev: any) => ({ ...prev, ...data.default_values }));
+    else setFormData({});
+  };
+
+  const fetchHistory = async (approvalId: string) => {
+    const { data } = await supabase.from('approval_history').select('*').eq('approval_id', approvalId).order('created_at', { ascending: true });
+    setApprovalHistory(data || []);
+    setShowHistoryModal(approvalId);
+  };
 
   const fetchApprovals = async () => {
     let query = supabase
@@ -86,6 +102,14 @@ export default function ApprovalSystemImproved({ user, onRefresh }: any) {
       }
     }
 
+    let attachmentUrl = '';
+    if (attachmentFile && selectedFormType === '휴가신청') {
+      const path = `leave/${Date.now()}_${attachmentFile.name}`;
+      const { error: upErr } = await supabase.storage.from('pchos-files').upload(path, attachmentFile);
+      if (!upErr) attachmentUrl = supabase.storage.from('pchos-files').getPublicUrl(path).data.publicUrl;
+    }
+    const metaWithAttachment = { ...formData, attachment_url: attachmentUrl || formData.attachment_url };
+
     const newApproval = {
       type: selectedFormType,
       sender_id: user.id,
@@ -94,18 +118,32 @@ export default function ApprovalSystemImproved({ user, onRefresh }: any) {
       status: '대기',
       title: `[${selectedFormType}] ${user.name} - ${formData.reason || formData.item_name || '신청'}`,
       content: formData.reason || '',
-      meta_data: formData,
+      meta_data: metaWithAttachment,
       created_at: new Date().toISOString(),
     };
 
-    const { error } = await supabase
-      .from('approvals')
-      .insert([newApproval]);
+    const { error } = await supabase.from('approvals').insert([newApproval]);
+
+    if (!error && selectedFormType === '휴가신청') {
+      const { start_date, end_date, leave_type, reason } = formData;
+      await supabase.from('leave_requests').insert([{
+        staff_id: user.id,
+        company_name: user.company,
+        leave_type: leave_type || '연차',
+        start_date,
+        end_date,
+        reason: reason || '',
+        status: '대기',
+        attachment_url: attachmentUrl || null,
+        attachment_name: attachmentFile?.name || null,
+      }]);
+    }
 
     if (!error) {
       setShowDraftModal(false);
       setSelectedFormType('');
       setFormData({});
+      setAttachmentFile(null);
       fetchApprovals();
       alert('결재가 상신되었습니다. MSO 관리자의 승인을 기다려주세요.');
     }
@@ -123,35 +161,56 @@ export default function ApprovalSystemImproved({ user, onRefresh }: any) {
 
       if (updateError) throw updateError;
 
-      // 2. 휴가 신청인 경우 연차 차감 및 휴가 기록 추가
+      await supabase.from('approval_history').insert([{ approval_id: approval.id, approver_id: user.id, approver_name: user.name, action: '승인' }]);
+
+      // 2. 출결정정 승인 시 attendance/attendances 반영
+      if (approval.type === '출결정정') {
+        const { date, type: correctionType } = approval.meta_data || {};
+        if (date && approval.sender_id) {
+          const newStatus = correctionType === '정상반영' || correctionType === '지각면제' ? 'present' : correctionType || 'present';
+          await supabase.from('attendance').upsert({
+            staff_id: approval.sender_id,
+            date: date,
+            status: newStatus === '정상반영' ? '정상' : newStatus === 'present' ? '정상' : '지각'
+          }, { onConflict: 'staff_id,date' });
+          await supabase.from('attendances').upsert({
+            staff_id: approval.sender_id,
+            work_date: date,
+            status: newStatus,
+          }, { onConflict: 'staff_id,work_date' });
+        }
+      }
+
+      // 3. 휴가 신청인 경우 leave_requests 동기화, 연차 차감
       if (approval.type === '휴가신청') {
-        const { start_date, end_date, leave_type } = approval.meta_data;
+        const { start_date, end_date, leave_type } = approval.meta_data || {};
         const days = calculateDays(start_date, end_date);
 
-        // 휴가 기록 추가
-        await supabase.from('attendance').upsert({
-          staff_id: approval.sender_id,
-          date: start_date,
-          status: '휴가',
-          is_approved: true
-        });
+        // leave_requests 테이블 상태 업데이트 (휴가관리메인과 동기화)
+        await supabase
+          .from('leave_requests')
+          .update({ status: '승인', approved_at: new Date().toISOString() })
+          .eq('staff_id', approval.sender_id)
+          .eq('start_date', start_date)
+          .eq('end_date', end_date)
+          .eq('status', '대기');
 
-        // 연차인 경우 차감
+        // 연차인 경우 annual_leave_used 증가
         if (leave_type === '연차') {
           const { data: staff } = await supabase
             .from('staff_members')
-            .select('annual_leave')
+            .select('annual_leave_used, annual_leave')
             .eq('id', approval.sender_id)
             .single();
-          
+          const used = (staff?.annual_leave_used ?? staff?.annual_leave ?? 0) + days;
           await supabase
             .from('staff_members')
-            .update({ annual_leave: (staff?.annual_leave || 0) - days })
+            .update({ annual_leave_used: used })
             .eq('id', approval.sender_id);
         }
       }
 
-      // 3. 알림 전송
+      // 4. 알림 전송
       await supabase.from('notifications').insert([{
         user_id: approval.sender_id,
         type: '결재승인',
@@ -160,6 +219,7 @@ export default function ApprovalSystemImproved({ user, onRefresh }: any) {
         metadata: { approval_id: approval.id }
       }]);
 
+      await logAudit('결재승인', 'approval', approval.id, { type: approval.type, title: approval.title }, user.id, user.name);
       fetchApprovals();
       if (onRefresh) onRefresh();
       alert('최종 승인 처리가 완료되었습니다.');
@@ -171,12 +231,12 @@ export default function ApprovalSystemImproved({ user, onRefresh }: any) {
 
   const rejectApproval = async (approval: any) => {
     if (!confirm('반려하시겠습니까?')) return;
+    const comment = prompt('반려 사유를 입력하세요 (선택)');
     
-    await supabase
-      .from('approvals')
-      .update({ status: '반려' })
-      .eq('id', approval.id);
-    
+    await supabase.from('approvals').update({ status: '반려', rejection_comment: comment || null }).eq('id', approval.id);
+    await supabase.from('approval_history').insert([{ approval_id: approval.id, approver_id: user.id, approver_name: user.name, action: '반려', comment: comment || null }]);
+    await logAudit('결재반려', 'approval', approval.id, { type: approval.type, comment }, user.id, user.name);
+
     await supabase.from('notifications').insert([{
       user_id: approval.sender_id,
       type: '결재반려',
@@ -244,12 +304,15 @@ export default function ApprovalSystemImproved({ user, onRefresh }: any) {
                 <p className="text-[10px] text-gray-400 font-bold mt-1">기안자: {approval.sender_name} | {new Date(approval.created_at).toLocaleString()}</p>
               </div>
               <div className="flex gap-2">
-                {approval.status === '대기' && (user.permissions?.mso || user.role === 'admin') && (
-                  <>
-                    <button onClick={() => approveApproval(approval)} className="px-4 py-2 bg-green-600 text-white text-[10px] font-black shadow-md rounded-lg hover:bg-green-700">승인</button>
-                    <button onClick={() => rejectApproval(approval)} className="px-4 py-2 bg-red-600 text-white text-[10px] font-black shadow-md rounded-lg hover:bg-red-700">반려</button>
-                  </>
-                )}
+                <div className="flex gap-2 items-center">
+                  <button onClick={() => fetchHistory(approval.id)} className="px-3 py-1.5 bg-gray-100 text-gray-600 text-[9px] font-black rounded-lg hover:bg-gray-200">이력</button>
+                  {approval.status === '대기' && (user.permissions?.mso || user.role === 'admin') && (
+                    <>
+                      <button onClick={() => approveApproval(approval)} className="px-4 py-2 bg-green-600 text-white text-[10px] font-black shadow-md rounded-lg hover:bg-green-700">승인</button>
+                      <button onClick={() => rejectApproval(approval)} className="px-4 py-2 bg-red-600 text-white text-[10px] font-black shadow-md rounded-lg hover:bg-red-700">반려</button>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -264,7 +327,7 @@ export default function ApprovalSystemImproved({ user, onRefresh }: any) {
             <div className="space-y-4">
               <div>
                 <label className="text-[10px] font-black text-gray-400 uppercase ml-2">양식 선택</label>
-                <select value={selectedFormType} onChange={e => setSelectedFormType(e.target.value)} className="w-full p-4 bg-gray-50 border-none rounded-2xl font-black text-xs outline-none focus:ring-2 ring-blue-100">
+                <select value={selectedFormType} onChange={e => { const v = e.target.value; setSelectedFormType(v); loadTemplate(v); }} className="w-full p-4 bg-gray-50 border-none rounded-2xl font-black text-xs outline-none focus:ring-2 ring-blue-100">
                   <option value="">양식을 선택하세요</option>
                   {formTypes.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
                 </select>
@@ -294,6 +357,30 @@ export default function ApprovalSystemImproved({ user, onRefresh }: any) {
                     <label className="text-[10px] font-black text-gray-400 uppercase ml-2">사유</label>
                     <textarea value={formData.reason || ''} onChange={e => setFormData({...formData, reason: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl font-black text-xs h-24" placeholder="상세 사유를 입력하세요" />
                   </div>
+                  <div className="col-span-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase ml-2">증빙 서류 (선택)</label>
+                    <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => setAttachmentFile(e.target.files?.[0] || null)} className="w-full p-2 text-xs" />
+                  </div>
+                </div>
+              )}
+
+              {selectedFormType === '출결정정' && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 uppercase ml-2">정정 대상일</label>
+                    <input type="date" value={formData.date || ''} onChange={e => setFormData({...formData, date: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl font-black text-xs" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 uppercase ml-2">정정 유형</label>
+                    <select value={formData.type || '정상반영'} onChange={e => setFormData({...formData, type: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl font-black text-xs">
+                      <option value="정상반영">정상 반영</option>
+                      <option value="지각면제">지각 면제</option>
+                    </select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase ml-2">사유</label>
+                    <input type="text" value={formData.reason || ''} onChange={e => setFormData({...formData, reason: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl font-black text-xs" placeholder="정정 사유" />
+                  </div>
                 </div>
               )}
 
@@ -315,8 +402,26 @@ export default function ApprovalSystemImproved({ user, onRefresh }: any) {
               )}
             </div>
 
+      {showHistoryModal && (
+        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4" onClick={() => setShowHistoryModal(null)}>
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full" onClick={e => e.stopPropagation()}>
+            <h4 className="font-black text-gray-800 mb-4">결재 이력</h4>
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {approvalHistory.map((h: any) => (
+                <div key={h.id} className="p-3 bg-gray-50 rounded-xl text-xs">
+                  <span className="font-black">{h.approver_name}</span> · {h.action}
+                  {h.comment && <p className="text-gray-500 mt-1">{h.comment}</p>}
+                  <p className="text-[10px] text-gray-400 mt-1">{new Date(h.created_at).toLocaleString()}</p>
+                </div>
+              ))}
+            </div>
+            <button onClick={() => setShowHistoryModal(null)} className="mt-4 w-full py-2 bg-gray-200 rounded-xl text-xs font-black">닫기</button>
+          </div>
+        </div>
+      )}
+
             <div className="flex gap-3 pt-4">
-              <button onClick={() => {setShowDraftModal(false); setSelectedFormType(''); setFormData({});}} className="flex-1 py-5 text-[10px] font-black text-gray-400 hover:bg-gray-50 rounded-2xl transition-all">취소</button>
+              <button onClick={() => {setShowDraftModal(false); setSelectedFormType(''); setFormData({}); setAttachmentFile(null);}} className="flex-1 py-5 text-[10px] font-black text-gray-400 hover:bg-gray-50 rounded-2xl transition-all">취소</button>
               <button onClick={createDraft} className="flex-[2] py-5 bg-[#1E293B] text-white text-[10px] font-black hover:bg-black rounded-2xl transition-all shadow-xl">결재 상신하기</button>
             </div>
           </div>

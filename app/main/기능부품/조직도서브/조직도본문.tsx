@@ -11,6 +11,8 @@ import HRView from '../인사관리';
 import InventoryView from '../재고관리_통합완성';
 import AdminView from '../관리자전용';
 import AttendanceView from '../근태시스템';
+import AIChatView from '../AI채팅';
+import NotificationInbox from '../알림인박스';
 
 export default function MainContent({ user, mainMenu, data, subView, setSubView, selectedCo, setSelectedCo, companies = [], selectedCompanyId, setSelectedCompanyId, onRefresh }: any) {
   const [pendingContract, setPendingContract] = useState<any>(null);
@@ -64,7 +66,15 @@ export default function MainContent({ user, mainMenu, data, subView, setSubView,
   };
 
   const isMso = user?.company === 'SY INC.' || user?.permissions?.mso === true;
-  const hospitalCompanies = (companies || []).filter((c: any) => c.type !== 'MSO');
+  const hospitalCompanies = (companies || []).filter((c: any) => c.type !== 'MSO').sort((a: any, b: any) => {
+    const order = ['박철홍정형외과', '수연의원', 'SY INC.'];
+    const ia = order.indexOf(a.name);
+    const ib = order.indexOf(b.name);
+    if (ia >= 0 && ib >= 0) return ia - ib;
+    if (ia >= 0) return -1;
+    if (ib >= 0) return 1;
+    return (a.name || '').localeCompare(b.name || '');
+  });
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden relative bg-[#F8FAFC]">
@@ -95,6 +105,8 @@ export default function MainContent({ user, mainMenu, data, subView, setSubView,
       {mainMenu === '내정보' && <div className="w-full flex-1 overflow-hidden"><MyPage user={user} /></div>}
       {mainMenu === '조직도' && <div className="flex-1 overflow-hidden"><OrgChart staffs={data.staffs} selectedCo={selectedCo} setSelectedCo={setSelectedCo} /></div>}
       {mainMenu === '채팅' && <div className="flex-1 overflow-hidden bg-white z-20"><ChatView user={user} onRefresh={onRefresh} staffs={data.staffs} /></div>}
+      {mainMenu === 'AI채팅' && <div className="flex-1 overflow-hidden"><AIChatView /></div>}
+      {mainMenu === '알림' && <div className="flex-1 overflow-hidden"><NotificationInbox user={user} onRefresh={onRefresh} /></div>}
       {mainMenu === '게시판' && <div className="flex-1 overflow-hidden"><BoardView user={user} posts={data.posts?.filter((p:any) => p.board_type === subView) || []} subView={subView} setSubView={setSubView} surgeries={data.surgeries} mris={data.mris} onRefresh={onRefresh} /></div>}
       {mainMenu === '전자결재' && <div className="flex-1 overflow-hidden"><ApprovalView user={user} staffs={data.staffs} selectedCo={selectedCo} setSelectedCo={setSelectedCo} selectedCompanyId={selectedCompanyId} onRefresh={onRefresh} /></div>}
       {mainMenu === '근태관리' && <div className="flex-1 overflow-hidden"><AttendanceView user={user} staffs={data.staffs} selectedCo={selectedCo} /></div>}

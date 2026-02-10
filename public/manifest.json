@@ -1,0 +1,14 @@
+{
+  "name": "SY INC. MSO 통합 시스템",
+  "short_name": "MSO",
+  "description": "병원 경영 통합 관리 시스템",
+  "start_url": "/main",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/icon-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

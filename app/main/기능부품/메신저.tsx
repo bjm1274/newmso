@@ -1,19 +1,32 @@
 'use client';
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { sendNotification } from './알림시스템';
 
 const NOTICE_ROOM_ID = '00000000-0000-0000-0000-000000000000';
+
+// 파일 URL이 이미지인지 확인
+function isImageUrl(url: string): boolean {
+  const ext = url.split('.').pop()?.toLowerCase();
+  return /^(jpg|jpeg|png|gif|webp|bmp|svg)$/.test(ext || '');
+}
 
 export default function ChatView({ user, onRefresh, staffs = [] }: any) {
   const [messages, setMessages] = useState<any[]>([]);
   const [latestNotice, setLatestNotice] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [msgSearchKeyword, setMsgSearchKeyword] = useState(''); // 메시지 본문 검색
+  const [searchDateFrom, setSearchDateFrom] = useState('');
+  const [searchDateTo, setSearchDateTo] = useState('');
+  const [searchFileOnly, setSearchFileOnly] = useState(false);
   const [inputMsg, setInputMsg] = useState('');
   const [activeActionMsg, setActiveActionMsg] = useState<any>(null);
   const [replyTo, setReplyTo] = useState<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const msgRefs = useRef<any>({}); 
+  const msgRefs = useRef<any>({});
+  const lastReadAtRef = useRef<string | null>(null);
+  const isFocusedRef = useRef(true);
 
   // 추가된 상태
   const [viewMode, setViewMode] = useState<'chat' | 'org'>('chat');
@@ -22,26 +35,29 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [groupName, setGroupName] = useState('');
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+  const [readCounts, setReadCounts] = useState<Record<string, number>>({});
+  const [showSearchPanel, setShowSearchPanel] = useState(false);
 
-  // 채팅 고도화용 로컬 상태 (DEMO 모드: Supabase 미연동)
+  const [roomNotifyOn, setRoomNotifyOn] = useState(true);
+
+  // DB 연동: 투표, 반응, 고정 (폴백: 로컬)
   const [polls, setPolls] = useState<any[]>([]);
+  const [pollVotes, setPollVotes] = useState<any>({});
+  const [reactions, setReactions] = useState<any>({});
+  const [pinnedIds, setPinnedIds] = useState<string[]>([]);
   const [showPollModal, setShowPollModal] = useState(false);
   const [pollQuestion, setPollQuestion] = useState('');
   const [pollOptions, setPollOptions] = useState('찬성, 반대');
-  const [pollVotes, setPollVotes] = useState<any>({});      // { pollId: { optionIndex: count } }
-  const [reactions, setReactions] = useState<any>({});      // { messageId: { '👍': count, '❗': count } }
-  const [pinnedIds, setPinnedIds] = useState<string[]>([]); // 고정 메시지 ID 목록
 
-  const fetchData = async () => {
-    // 메시지 로드
-    const { data: msgs } = await supabase
+  const fetchData = useCallback(async () => {
+    let query = supabase
       .from('messages')
       .select('*, staff:staff_members(name, photo_url)')
       .eq('room_id', selectedRoomId)
       .order('created_at', { ascending: true });
+    const { data: msgs } = await query;
     if (msgs) setMessages(msgs);
 
-    // 공지사항 로드
     const { data: notice } = await supabase
       .from('posts')
       .select('*')
@@ -51,23 +67,78 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
       .single();
     setLatestNotice(notice || null);
 
-    // 채팅방 목록 로드
-    const { data: rooms } = await supabase
-      .from('chat_rooms')
-      .select('*')
-      .order('created_at', { ascending: false });
+    const { data: rooms } = await supabase.from('chat_rooms').select('*').order('created_at', { ascending: false });
     setChatRooms(rooms || []);
-  };
+
+    // 읽음 수 집계
+    if (msgs?.length) {
+      const ids = msgs.map((m: any) => m.id);
+      const { data: reads } = await supabase.from('message_reads').select('message_id').in('message_id', ids);
+      const counts: Record<string, number> = {};
+      reads?.forEach((r: any) => { counts[r.message_id] = (counts[r.message_id] || 0) + 1; });
+      setReadCounts(counts);
+    }
+
+    // DB: 고정, 반응, 투표 로드
+    try {
+      const { data: pinned } = await supabase.from('pinned_messages').select('message_id').eq('room_id', selectedRoomId);
+      if (pinned) setPinnedIds(pinned.map((p: any) => p.message_id));
+
+      const { data: reacts } = await supabase.from('message_reactions').select('message_id, emoji').eq('emoji', '👍');
+      const reactMap: Record<string, number> = {};
+      reacts?.forEach((r: any) => { reactMap[r.message_id] = (reactMap[r.message_id] || 0) + 1; });
+      setReactions((prev: any) => ({ ...prev, ...reactMap }));
+
+      const { data: dbPolls } = await supabase.from('polls').select('*').eq('room_id', selectedRoomId);
+      if (dbPolls?.length) setPolls(dbPolls);
+      const { data: votes } = await supabase.from('poll_votes').select('poll_id, option_index');
+      const vMap: any = {};
+      votes?.forEach((v: any) => {
+        if (!vMap[v.poll_id]) vMap[v.poll_id] = {};
+        vMap[v.poll_id][v.option_index] = (vMap[v.poll_id][v.option_index] || 0) + 1;
+      });
+      setPollVotes(vMap);
+    } catch (_) { /* 테이블 없으면 무시 */ }
+
+    // 마지막 읽은 시점 업데이트
+    lastReadAtRef.current = new Date().toISOString();
+    await supabase.from('room_read_cursors').upsert({
+      user_id: user?.id,
+      room_id: selectedRoomId,
+      last_read_at: lastReadAtRef.current
+    }, { onConflict: 'user_id,room_id' });
+  }, [selectedRoomId, user?.id]);
+
+  const roomNotifyRef = useRef(true);
+  useEffect(() => { roomNotifyRef.current = roomNotifyOn; }, [roomNotifyOn]);
 
   useEffect(() => {
     fetchData();
-    const channel = supabase.channel(`chat-v3`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => fetchData())
+    const channel = supabase.channel(`chat-realtime-${selectedRoomId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `room_id=eq.${selectedRoomId}` }, (payload: any) => {
+        fetchData();
+        if (!isFocusedRef.current && payload.new?.sender_id !== user?.id && roomNotifyRef.current) {
+          const senderName = staffs.find((s: any) => s.id === payload.new.sender_id)?.name || '알 수 없음';
+          sendNotification(`💬 ${senderName}`, { body: (payload.new.content || '📎 파일').slice(0, 50) });
+        }
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_rooms' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pinned_messages' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'polls' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'poll_votes' }, () => fetchData())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [selectedRoomId]);
+  }, [selectedRoomId, fetchData, user?.id, staffs]);
+
+  useEffect(() => {
+    const onFocus = () => { isFocusedRef.current = true; };
+    const onBlur = () => { isFocusedRef.current = false; };
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('blur', onBlur);
+    return () => { window.removeEventListener('focus', onFocus); window.removeEventListener('blur', onBlur); };
+  }, []);
 
   useEffect(() => { scrollRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages.length]);
 
@@ -78,26 +149,41 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
 
   const handleSendMessage = async (fileUrl?: string) => {
     if (!inputMsg.trim() && !fileUrl) return;
+    const content = inputMsg.trim() || (fileUrl ? '📎 파일을 공유했습니다' : '');
     const { error } = await supabase.from('messages').insert([{ 
       room_id: selectedRoomId, 
       sender_id: user.id, 
-      content: inputMsg, 
-      file_url: fileUrl, 
-      reply_to_id: replyTo?.id 
+      content, 
+      file_url: fileUrl || null, 
+      reply_to_id: replyTo?.id || null 
     }]);
     if (!error) {
       setInputMsg(''); 
       setReplyTo(null);
       fetchData();
+    } else {
+      alert('메시지 전송에 실패했습니다.');
     }
   };
 
+  const [fileUploading, setFileUploading] = useState(false);
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const path = `chat/${Date.now()}_${file.name}`;
-    const { data } = await supabase.storage.from('pchos-files').upload(path, file);
-    if (data) handleSendMessage(supabase.storage.from('pchos-files').getPublicUrl(path).data.publicUrl);
+    setFileUploading(true);
+    try {
+      const path = `chat/${Date.now()}_${file.name}`;
+      const { data, error } = await supabase.storage.from('pchos-files').upload(path, file);
+      if (error) throw error;
+      const publicUrl = supabase.storage.from('pchos-files').getPublicUrl(path).data.publicUrl;
+      await handleSendMessage(publicUrl);
+    } catch (err) {
+      console.error('파일 업로드 실패:', err);
+      alert('파일 업로드에 실패했습니다. pchos-files 버킷이 생성되어 있는지 확인하세요.');
+    } finally {
+      setFileUploading(false);
+      e.target.value = '';
+    }
   };
 
   const handleAction = async (type: 'task' | 'notice') => {
@@ -152,63 +238,121 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
     );
   }, [staffs, searchTerm]);
 
-  // DEMO: 투표 생성
-  const handleCreatePoll = () => {
-    if (!pollQuestion.trim()) {
-      alert('질문을 입력해 주세요.');
-      return;
+  const handleCreatePoll = async () => {
+    if (!pollQuestion.trim()) { alert('질문을 입력해 주세요.'); return; }
+    const options = pollOptions.split(',').map((o) => o.trim()).filter((o) => o.length > 0);
+    if (options.length < 2) { alert('선택지는 최소 2개 이상 입력해 주세요.'); return; }
+    try {
+      const { data: poll, error } = await supabase.from('polls').insert([{
+        room_id: selectedRoomId, creator_id: user.id, question: pollQuestion, options
+      }]).select().single();
+      if (!error && poll) {
+        setPolls((p: any[]) => [...p, poll]);
+        setPollQuestion('');
+        setPollOptions('찬성, 반대');
+        setShowPollModal(false);
+      } else throw new Error();
+    } catch {
+      const id = Date.now().toString();
+      setPolls((p: any[]) => [...p, { id, room_id: selectedRoomId, question: pollQuestion, options }]);
+      setPollQuestion('');
+      setPollOptions('찬성, 반대');
+      setShowPollModal(false);
     }
-    const options = pollOptions
-      .split(',')
-      .map((o) => o.trim())
-      .filter((o) => o.length > 0);
-    if (options.length < 2) {
-      alert('선택지는 최소 2개 이상 입력해 주세요.');
-      return;
-    }
-    const id = Date.now().toString();
-    setPolls((prev: any[]) => [
-      ...prev,
-      { id, room_id: selectedRoomId, question: pollQuestion, options },
-    ]);
-    setPollQuestion('');
-    setPollOptions('찬성, 반대');
-    setShowPollModal(false);
   };
 
-  const handleVote = (pollId: string, optionIndex: number) => {
+  const handleVote = async (pollId: string, optionIndex: number) => {
+    try {
+      const { error } = await supabase.from('poll_votes').upsert(
+        { poll_id: pollId, user_id: user.id, option_index: optionIndex },
+        { onConflict: 'poll_id,user_id' }
+      );
+      if (!error) fetchData();
+    } catch (_) {}
     setPollVotes((prev: any) => {
-      const existing = prev[pollId] || {};
-      const current = existing[optionIndex] || 0;
-      return {
-        ...prev,
-        [pollId]: {
-          ...existing,
-          [optionIndex]: current + 1,
-        },
-      };
+      const ex = prev[pollId] || {};
+      return { ...prev, [pollId]: { ...ex, [optionIndex]: (ex[optionIndex] || 0) + 1 } };
     });
   };
 
-  const toggleReaction = (messageId: string, emoji: string) => {
-    setReactions((prev: any) => {
-      const current = prev[messageId] || {};
-      const count = current[emoji] || 0;
-      const nextCount = count === 0 ? 1 : 0;
-      return {
-        ...prev,
-        [messageId]: {
-          ...current,
-          [emoji]: nextCount,
-        },
-      };
-    });
+  const toggleReaction = async (messageId: string, emoji: string) => {
+    const hasReact = (reactions[messageId] || 0) > 0;
+    try {
+      if (hasReact) {
+        await supabase.from('message_reactions').delete().eq('message_id', messageId).eq('user_id', user.id).eq('emoji', emoji);
+      } else {
+        await supabase.from('message_reactions').insert([{ message_id: messageId, user_id: user.id, emoji }]);
+      }
+      fetchData();
+    } catch (_) {}
+    setReactions((prev: any) => ({
+      ...prev,
+      [messageId]: hasReact ? 0 : (prev[messageId] || 0) + 1
+    }));
   };
 
-  const togglePin = (messageId: string) => {
-    setPinnedIds((prev) =>
-      prev.includes(messageId) ? prev.filter((id) => id !== messageId) : [...prev, messageId]
-    );
+  const togglePin = async (messageId: string) => {
+    const isPinned = pinnedIds.includes(messageId);
+    try {
+      if (isPinned) {
+        await supabase.from('pinned_messages').delete().eq('room_id', selectedRoomId).eq('message_id', messageId);
+      } else {
+        await supabase.from('pinned_messages').insert([{ room_id: selectedRoomId, message_id: messageId, pinned_by: user.id }]);
+      }
+      setPinnedIds((p) => (isPinned ? p.filter((id) => id !== messageId) : [...p, messageId]));
+      fetchData();
+    } catch (_) {
+      setPinnedIds((p) => (isPinned ? p.filter((id) => id !== messageId) : [...p, messageId]));
+    }
+  };
+
+  const markMessageRead = async (msg: any) => {
+    if (msg.sender_id === user.id) return;
+    try {
+      await supabase.from('message_reads').upsert(
+        { user_id: user.id, message_id: msg.id, read_at: new Date().toISOString() },
+        { onConflict: 'user_id,message_id' }
+      );
+      fetchData(); // 읽음 수 갱신
+    } catch (_) {}
+  };
+
+  const filteredMessages = useMemo(() => {
+    let list = messages.filter((m: any) => !m.is_deleted);
+    if (msgSearchKeyword) list = list.filter((m) => (m.content || '').includes(msgSearchKeyword) || (m.file_url && '파일'.includes(msgSearchKeyword)));
+    if (searchFileOnly) list = list.filter((m) => !!m.file_url);
+    if (searchDateFrom) list = list.filter((m) => new Date(m.created_at).toISOString().slice(0, 10) >= searchDateFrom);
+    if (searchDateTo) list = list.filter((m) => new Date(m.created_at).toISOString().slice(0, 10) <= searchDateTo);
+    return list;
+  }, [messages, msgSearchKeyword, searchFileOnly, searchDateFrom, searchDateTo]);
+
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase.from('room_notification_settings').select('notifications_enabled').eq('user_id', user?.id).eq('room_id', selectedRoomId).single();
+      setRoomNotifyOn(data?.notifications_enabled !== false);
+    };
+    load();
+  }, [selectedRoomId, user?.id]);
+  const toggleRoomNotify = async () => {
+    setRoomNotifyOn((p) => !p);
+    await supabase.from('room_notification_settings').upsert({ user_id: user.id, room_id: selectedRoomId, notifications_enabled: !roomNotifyOn }, { onConflict: 'user_id,room_id' });
+  };
+
+  const deleteMessage = async (msg: any) => {
+    if (msg.sender_id !== user.id) return;
+    if (!confirm('이 메시지를 삭제하시겠습니까?')) return;
+    await supabase.from('messages').update({ is_deleted: true }).eq('id', msg.id);
+    fetchData();
+    setActiveActionMsg(null);
+  };
+  const [editingMsg, setEditingMsg] = useState<any>(null);
+  const [editContent, setEditContent] = useState('');
+  const saveEditMessage = async () => {
+    if (!editingMsg || editingMsg.sender_id !== user.id) return;
+    await supabase.from('messages').update({ content: editContent, edited_at: new Date().toISOString() }).eq('id', editingMsg.id);
+    fetchData();
+    setEditingMsg(null);
+    setEditContent('');
   };
 
   return (
@@ -225,8 +369,18 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
             className="w-full p-4 bg-white border border-gray-100 rounded-2xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-100" 
             placeholder={viewMode === 'chat' ? "채팅방 검색..." : "이름 또는 부서 검색..."}
             value={searchTerm} 
-            onChange={e => setSearchTerm(e.target.value)} 
+            onChange={e => setSearchTerm(e.target.value)}
+            aria-label="채팅방 또는 조직 검색"
           />
+          {viewMode === 'chat' && (
+            <button
+              onClick={() => setShowSearchPanel(!showSearchPanel)}
+              className="w-full py-2 text-[10px] font-black text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
+              aria-label="메시지 검색 패널 열기"
+            >
+              🔍 메시지 검색
+            </button>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-2 custom-scrollbar">
@@ -260,7 +414,23 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
                     <p className="text-xs font-black text-gray-800 truncate">{s.name}</p>
                     <p className="text-[9px] font-bold text-gray-400 truncate">{s.department} · {s.position}</p>
                   </div>
-                  <button onClick={() => {/* 1:1 채팅 로직 */}} className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-[9px] font-black hover:bg-blue-600 hover:text-white transition-all">대화</button>
+                  <button onClick={async () => {
+                    const otherId = s.id;
+                    const pair = new Set([user.id, otherId]);
+                    const { data: rooms } = await supabase.from('chat_rooms').select('id, members').eq('type', 'direct');
+                    const found = (rooms || []).find((r: any) => {
+                      const m = new Set((r.members || []).map((x: any) => String(x)));
+                      const p = new Set([String(user.id), String(otherId)]);
+                      return m.size === p.size && [...p].every((id) => m.has(id));
+                    });
+                    if (found) setSelectedRoomId(found.id);
+                    else {
+                      const { data: room } = await supabase.from('chat_rooms').insert([{ name: `${s.name}`, type: 'direct', members: [user.id, otherId] }]).select('id').single();
+                      if (room) setSelectedRoomId(room.id);
+                    }
+                    setViewMode('chat');
+                    fetchData();
+                  }} className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-[9px] font-black hover:bg-blue-600 hover:text-white transition-all">대화</button>
                 </div>
               ))}
             </div>
@@ -280,6 +450,27 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
             {(user.role === 'admin' || user.id === latestNotice.sender_id) && (
               <button onClick={removeNotice} className="ml-4 px-3 py-1.5 bg-white border border-orange-200 text-orange-600 rounded-lg text-[10px] font-black hover:bg-orange-600 hover:text-white transition-all shadow-sm">공지 내리기</button>
             )}
+          </div>
+        )}
+
+        {showSearchPanel && (
+          <div className="shrink-0 p-4 bg-gray-50 border-b border-gray-100 space-y-3">
+            <p className="text-[10px] font-black text-gray-500 uppercase">메시지 검색</p>
+            <div className="flex flex-wrap gap-2">
+              <input
+                value={msgSearchKeyword}
+                onChange={(e) => setMsgSearchKeyword(e.target.value)}
+                placeholder="키워드"
+                className="flex-1 min-w-[120px] p-2 text-xs font-bold border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-200"
+                aria-label="검색 키워드"
+              />
+              <input type="date" value={searchDateFrom} onChange={(e) => setSearchDateFrom(e.target.value)} className="p-2 text-[10px] font-bold border rounded-lg" aria-label="시작일" />
+              <input type="date" value={searchDateTo} onChange={(e) => setSearchDateTo(e.target.value)} className="p-2 text-[10px] font-bold border rounded-lg" aria-label="종료일" />
+              <label className="flex items-center gap-2 text-[10px] font-bold">
+                <input type="checkbox" checked={searchFileOnly} onChange={(e) => setSearchFileOnly(e.target.checked)} className="rounded" />
+                파일만
+              </label>
+            </div>
           </div>
         )}
 
@@ -304,8 +495,10 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
               <p className="font-black text-sm">대화 내용이 없습니다.</p>
             </div>
           ) : (
-            messages.filter(m => (m.content||'').includes(searchTerm)).map((msg) => {
+            filteredMessages.map((msg) => {
               const isMine = msg.sender_id === user.id;
+              const reactCount = typeof reactions[msg.id] === 'number' ? reactions[msg.id] : (reactions[msg.id]?.['👍'] || 0);
+              const readCount = readCounts[msg.id] || 0;
               return (
                 <div
                   key={msg.id}
@@ -314,56 +507,78 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
                 >
                   {!isMine && <span className="text-[10px] text-gray-400 px-2 mb-1 font-bold">{msg.staff?.name} {msg.staff?.position}</span>}
                   <div 
-                    onClick={() => setActiveActionMsg(msg)} 
+                    onClick={() => { setActiveActionMsg(msg); markMessageRead(msg); }}
                     className={`group relative p-4 rounded-2xl text-sm shadow-sm cursor-pointer transition-all max-w-[70%] ${isMine ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white border rounded-tl-none hover:border-blue-200'}`}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => e.key === 'Enter' && (setActiveActionMsg(msg), markMessageRead(msg))}
+                    aria-label={`${msg.staff?.name || '알 수 없음'} 메시지`}
                   >
-                    {/* 상단 고정 토글 */}
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); togglePin(msg.id); }}
-                      className={`absolute -top-3 ${isMine ? 'right-2' : 'left-2'} text-[10px] font-black ${
-                        pinnedIds.includes(msg.id) ? 'text-yellow-300' : 'text-gray-300'
+                      title={pinnedIds.includes(msg.id) ? '고정 해제' : '메시지 고정'}
+                      aria-label={pinnedIds.includes(msg.id) ? '고정 해제' : '메시지 고정'}
+                      className={`absolute top-2 ${isMine ? 'right-2' : 'left-2'} text-sm ${
+                        pinnedIds.includes(msg.id) ? 'text-yellow-500' : 'text-gray-300 hover:text-yellow-400'
                       }`}
                     >
                       {pinnedIds.includes(msg.id) ? '★' : '☆'}
                     </button>
 
+                    {msg.reply_to_id && (() => {
+                      const parent = messages.find((m: any) => m.id === msg.reply_to_id);
+                      return parent ? (
+                        <div className={`mb-2 p-2 rounded-lg text-[10px] border-l-2 ${
+                          isMine ? 'bg-white/10 border-white/30' : 'bg-gray-100 border-gray-300'
+                        }`}>
+                          <span className="font-bold opacity-80">↩️ {parent.staff?.name}: </span>
+                          <span className="truncate">{parent.content || '📎 파일'}</span>
+                        </div>
+                      ) : null;
+                    })()}
                     {msg.content}
                     {msg.file_url && (
-                      <a
-                        href={msg.file_url}
-                        target="_blank"
-                        className={`block mt-2 p-2 rounded-lg text-[10px] font-bold border flex items-center gap-2 ${
-                          isMine ? 'bg-white/10 border-white/20' : 'bg-gray-50 border-gray-100 text-blue-600'
-                        }`}
-                      >
-                        📎 파일 첨부됨
-                      </a>
+                      <div className="mt-2 space-y-1" onClick={(e) => e.stopPropagation()}>
+                        {isImageUrl(msg.file_url) ? (
+                          <a href={msg.file_url} target="_blank" rel="noopener noreferrer" className="block">
+                            <img src={msg.file_url} alt="첨부 이미지" className="max-w-[200px] max-h-[150px] rounded-lg object-cover border border-gray-200" />
+                          </a>
+                        ) : null}
+                        <a
+                          href={msg.file_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          download
+                          className={`block p-2 rounded-lg text-[10px] font-bold border flex items-center gap-2 hover:opacity-80 transition-opacity ${
+                            isMine ? 'bg-white/10 border-white/20' : 'bg-gray-50 border-gray-100 text-blue-600'
+                          }`}
+                        >
+                          📎 파일 첨부됨 — 다운로드
+                        </a>
+                      </div>
                     )}
 
-                    {/* 이모지 반응 */}
-                    <div className="mt-2 flex items-center gap-2 text-[10px]">
+                    <div className="mt-2 flex items-center gap-2 text-[10px] flex-wrap">
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); toggleReaction(msg.id, '👍'); }}
-                        className="px-2 py-1 rounded-full bg-black/5 hover:bg-black/10 text-xs"
+                        aria-label={`반응 ${reactCount}개`}
+                        className={`px-2 py-1 rounded-full text-xs transition-colors ${
+                          reactCount > 0 ? 'bg-blue-100 text-blue-600' : 'bg-black/5 hover:bg-black/10'
+                        }`}
                       >
-                        👍
+                        👍 {reactCount > 0 && <span className="font-black">{reactCount}</span>}
                       </button>
-                      {reactions[msg.id] && reactions[msg.id]['👍'] > 0 && (
-                        <span className="text-gray-300 font-black">
-                          👍 {reactions[msg.id]['👍']}
-                        </span>
+                      {readCount > 0 && !isMine && (
+                        <span className="text-gray-400 font-bold">{readCount}명이 읽음</span>
                       )}
                     </div>
 
                     <span
                       className={`absolute bottom-0 ${isMine ? 'right-full mr-2' : 'left-full ml-2'} text-[8px] font-bold text-gray-300 whitespace-nowrap`}
                     >
-                      {new Date(msg.created_at).toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                      {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
                 </div>
@@ -424,7 +639,14 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
            )}
            <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-[2rem] border border-gray-100 focus-within:bg-white focus-within:ring-4 focus-within:ring-blue-50 transition-all">
              <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
-             <button onClick={()=>fileInputRef.current?.click()} className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-blue-600 transition-colors">📎</button>
+             <button
+               onClick={()=>fileInputRef.current?.click()}
+               disabled={fileUploading}
+               title="파일 첨부"
+               className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-blue-600 transition-colors disabled:opacity-50"
+             >
+               {fileUploading ? <span className="animate-pulse text-xs">...</span> : '📎'}
+             </button>
              <button onClick={()=>setShowPollModal(true)} className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-blue-600 transition-colors">📊</button>
              <input 
                className="flex-1 bg-transparent p-2 outline-none text-sm font-bold" 
@@ -437,14 +659,41 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
            </div>
         </div>
 
+        {/* 알림 on/off */}
+        <div className="absolute top-4 right-4 z-10">
+          <button onClick={toggleRoomNotify} className="px-3 py-1.5 rounded-xl text-[10px] font-black bg-white/90 border border-gray-200 shadow-sm" title={roomNotifyOn ? '알림 켜짐' : '알림 꺼짐'}>
+            {roomNotifyOn ? '🔔 알림 on' : '🔕 알림 off'}
+          </button>
+        </div>
+
         {/* 액션 모달 */}
         {activeActionMsg && (
-          <div className="absolute inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-30 animate-in fade-in duration-200" onClick={()=>setActiveActionMsg(null)}>
+          <div className="absolute inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-30 animate-in fade-in duration-200" onClick={()=>{setActiveActionMsg(null); setEditingMsg(null);}}>
             <div className="bg-white p-6 rounded-[2.5rem] space-y-2 w-64 shadow-2xl animate-in zoom-in-95 duration-200" onClick={e=>e.stopPropagation()}>
               <button onClick={()=>{setReplyTo(activeActionMsg); setActiveActionMsg(null)}} className="w-full p-4 text-left hover:bg-blue-50 rounded-2xl text-xs font-black text-blue-600 transition-colors">↩️ 답글 달기</button>
+              {activeActionMsg.sender_id === user.id && (
+                <>
+                  <button onClick={()=>{setEditingMsg(activeActionMsg); setEditContent(activeActionMsg.content||''); setActiveActionMsg(null)}} className="w-full p-4 text-left hover:bg-gray-50 rounded-2xl text-xs font-black transition-colors">✏️ 수정</button>
+                  <button onClick={()=>deleteMessage(activeActionMsg)} className="w-full p-4 text-left hover:bg-red-50 rounded-2xl text-xs font-black text-red-600 transition-colors">🗑️ 삭제</button>
+                </>
+              )}
               <button onClick={()=>handleAction('task')} className="w-full p-4 text-left hover:bg-gray-50 rounded-2xl text-xs font-black transition-colors">✅ 할일로 등록</button>
               <button onClick={()=>handleAction('notice')} className="w-full p-4 text-left hover:bg-orange-50 rounded-2xl text-xs font-black text-orange-500 transition-colors">📢 공지로 등록</button>
               <button onClick={()=>setActiveActionMsg(null)} className="w-full p-4 text-center text-gray-400 text-[10px] font-black pt-4">닫기</button>
+            </div>
+          </div>
+        )}
+
+        {/* 수정 모달 */}
+        {editingMsg && (
+          <div className="absolute inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-30" onClick={()=>{setEditingMsg(null); setEditContent('');}}>
+            <div className="bg-white p-6 rounded-2xl w-80 shadow-2xl" onClick={e=>e.stopPropagation()}>
+              <p className="text-xs font-black text-gray-500 mb-2">메시지 수정</p>
+              <input value={editContent} onChange={e=>setEditContent(e.target.value)} className="w-full p-3 border rounded-xl text-sm mb-4" />
+              <div className="flex gap-2">
+                <button onClick={()=>{setEditingMsg(null); setEditContent('');}} className="flex-1 py-2 bg-gray-100 rounded-xl text-xs font-black">취소</button>
+                <button onClick={saveEditMessage} className="flex-1 py-2 bg-blue-600 text-white rounded-xl text-xs font-black">저장</button>
+              </div>
             </div>
           </div>
         )}
