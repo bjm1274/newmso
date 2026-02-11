@@ -78,7 +78,10 @@ ALTER TABLE employment_contracts ADD COLUMN IF NOT EXISTS vehicle_allowance BIGI
 ALTER TABLE employment_contracts ADD COLUMN IF NOT EXISTS childcare_allowance BIGINT DEFAULT 0;
 ALTER TABLE employment_contracts ADD COLUMN IF NOT EXISTS research_allowance BIGINT DEFAULT 0;
 ALTER TABLE employment_contracts ADD COLUMN IF NOT EXISTS other_taxfree BIGINT DEFAULT 0;
+ALTER TABLE employment_contracts ADD COLUMN IF NOT EXISTS position_allowance BIGINT DEFAULT 0;
 ALTER TABLE employment_contracts ADD COLUMN IF NOT EXISTS effective_date DATE;
+
+ALTER TABLE staff_members ADD COLUMN IF NOT EXISTS position_allowance BIGINT DEFAULT 0;
 -- staff_id 1건당 1개 계약(서명대기) 유지용 unique
 CREATE UNIQUE INDEX IF NOT EXISTS idx_employment_contracts_staff_id ON employment_contracts(staff_id);
 
@@ -120,3 +123,16 @@ CREATE TABLE IF NOT EXISTS document_versions (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_document_versions_doc ON document_versions(document_id);
+
+-- 7. 전자결재 추가 양식 (관리자 메뉴에서 추가/수정)
+CREATE TABLE IF NOT EXISTS approval_form_types (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  slug TEXT NOT NULL UNIQUE,
+  description TEXT,
+  sort_order INT DEFAULT 0,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_approval_form_types_active ON approval_form_types(is_active);

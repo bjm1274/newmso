@@ -203,15 +203,15 @@ export default function ChatMessenger({ user, staffs }: any) {
     <div className="flex h-full bg-white overflow-hidden">
       {/* 좌측 사이드바 */}
       <div className="w-80 border-r border-gray-200 flex flex-col shrink-0">
-        <div className="flex border-b border-gray-200">
+        <div className="flex gap-1 bg-gray-100 p-1 m-4 rounded-[12px]">
           {(['채팅', '공지', '검색'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`flex-1 py-3 font-black text-sm transition-all ${
+              className={`flex-1 py-2 font-black text-sm rounded-[12px] transition-all ${
                 activeTab === tab
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-800'
+                  ? 'bg-white shadow-md text-blue-600'
+                  : 'text-gray-400'
               }`}
             >
               {tab === '채팅' && '💬'}

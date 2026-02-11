@@ -1,8 +1,7 @@
 'use client';
 import { useState } from 'react';
-import { useTheme } from '@/lib/ThemeContext';
+
 export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
-  const { theme, setTheme, resolvedTheme } = useTheme();
   const [showMore, setShowMore] = useState(false);
 
   const menus = [
@@ -10,9 +9,7 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
     { id: '조직도', icon: '👤', label: '조직도' },
     { id: '추가기능', icon: '🔗', label: '추가기능' },
     { id: '채팅', icon: '✉️', label: '채팅' },
-    { id: 'AI채팅', icon: '✨', label: 'AI채팅' },
     { id: '게시판', icon: '📋', label: '게시판' },
-    { id: '알림', icon: '🔔', label: '알림' },
     { id: '전자결재', icon: '✍️', label: '전자결재' },
     { id: '인사관리', icon: '👥', label: '인사관리' },
     { id: '재고관리', icon: '📦', label: '재고관리' },
@@ -61,14 +58,6 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
             </button>
           ))}
         </div>
-        <button
-          onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
-          className="mt-2 p-2 rounded-[12px] text-[#8B95A1] hover:bg-[#F2F4F6] hover:text-[#191F28] transition-all"
-          title={resolvedTheme === 'dark' ? '라이트 모드' : '다크 모드'}
-          aria-label={resolvedTheme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
-        >
-          <span className="text-lg">{resolvedTheme === 'dark' ? '☀️' : '🌙'}</span>
-        </button>
       </aside>
 
       {/* 모바일 하단 탭바 - 토스 스타일 */}
@@ -101,16 +90,6 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
         <div className="md:hidden fixed inset-0 bg-black/20 z-[90] animate-in fade-in duration-200" onClick={() => setShowMore(false)}>
           <div className="absolute bottom-[64px] left-4 right-4 bg-white rounded-[16px] p-6 shadow-[0_4px_20px_rgba(0,0,0,0.08)] animate-in slide-in-from-bottom-10 duration-300" onClick={e => e.stopPropagation()}>
             <h3 className="text-[13px] font-semibold text-[#4E5968] mb-4 pb-3 border-b border-[#E5E8EB]">전체 메뉴</h3>
-            <div className="flex justify-between items-center mb-4 pb-3 border-b border-[#E5E8EB]">
-              <span className="text-[12px] font-medium text-[#8B95A1]">테마</span>
-              <button
-                onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
-                className="px-4 py-2 rounded-[12px] bg-[#F2F4F6] text-[#191F28] text-[12px] font-semibold"
-                aria-label="테마 전환"
-              >
-                {resolvedTheme === 'dark' ? '☀️ 라이트' : '🌙 다크'}
-              </button>
-            </div>
             <div className="grid grid-cols-3 gap-3">
               {secondaryMenus.map(m => (
                 <button 

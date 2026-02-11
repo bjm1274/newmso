@@ -19,7 +19,12 @@ export default function LoginPage() {
     setError('');
 
     if ((loginId === '100' || loginId === 'MSO관리자') && password === 'syinc!!') {
-      const msoUser = {
+      const { data: msoRow } = await supabase.from('staff_members').select('*').eq('name', 'MSO관리자').maybeSingle();
+      const msoUser = msoRow ? {
+        ...msoRow,
+        role: 'admin',
+        permissions: { inventory: true, hr: true, approval: true, admin: true, mso: true }
+      } : {
         id: null,
         employee_no: 100,
         name: 'MSO관리자',

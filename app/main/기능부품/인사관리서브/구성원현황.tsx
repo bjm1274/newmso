@@ -5,7 +5,10 @@ import StaffHistoryTimeline from './인사이력타임라인';
 import OnboardingChecklist from './급여명세/입퇴사온보딩';
 import CertTransferPanel from './교육자격인사이동패널';
 
-export default function 구성원관리({ 직원목록 = [], 부서목록 = [], 선택사업체, 새로고침, 창상태, 창닫기 }: any) {
+// ESLint가 React 컴포넌트로 인식하도록 함수 이름을
+// 영문 대문자로 시작하는 형태로 지정합니다.
+// default export이므로 외부 import 이름(구성원관리 등)은 그대로 사용 가능합니다.
+export default function StaffListManager({ 직원목록 = [], 부서목록 = [], 선택사업체, 보기상태 = '재직', 새로고침, 창상태, 창닫기, onOpenDocumentRepoForStaff }: any) {
   const [편집모드, 편집모드설정] = useState(false);
   const [선택된직원ID, 선택된직원ID설정] = useState<number | null>(null);
   const [근무형태목록, 근무형태목록설정] = useState<any[]>([]);
@@ -100,12 +103,49 @@ export default function 구성원관리({ 직원목록 = [], 부서목록 = [], 
     창닫기();
   };
 
-  const 필터목록 = 직원목록.filter((s: any) => (선택사업체 === '전체' ? true : s.company === 선택사업체));
+  const 직원삭제 = async (직원: any) => {
+    if (!confirm(`${직원.name} 직원을 삭제(퇴사 처리) 하시겠습니까?`)) return;
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      await supabase
+        .from('staff_members')
+        .update({
+          status: '퇴사',
+          resigned_at: 직원.resigned_at || today,
+        })
+        .eq('id', 직원.id);
+      alert('직원이 삭제(퇴사 처리)되었습니다.');
+      if (선택된직원ID === 직원.id) {
+        닫기함수();
+      }
+      새로고침();
+    } catch (e) {
+      alert('직원 삭제 중 오류가 발생했습니다.');
+    }
+  };
+
+  const 필터목록 = 직원목록.filter((s: any) => {
+    const companyMatch = 선택사업체 === '전체' ? true : s.company === 선택사업체;
+    const status = s.status || '재직';
+    if (보기상태 === '퇴사') {
+      return companyMatch && status === '퇴사';
+    }
+    // 기본은 재직자 위주
+    return companyMatch && status !== '퇴사';
+  });
 
   return (
     <div className="flex flex-col h-full bg-[#F8FAFC]">
-      <header className="p-6 md:p-8 border-b border-gray-100 bg-white shrink-0">
-        <h2 className="text-xl font-black text-gray-800 tracking-tighter italic">실시간 구성원 현황 <span className="text-sm text-blue-600">[{선택사업체}]</span></h2>
+      <header className="p-6 md:p-8 border-b border-gray-100 bg-white shrink-0 flex items-center justify-between">
+        <h2 className="text-xl font-black text-gray-800 tracking-tighter italic">
+          {보기상태 === '퇴사' ? '퇴사자 현황' : '실시간 구성원 현황'}{' '}
+          <span className="text-sm text-blue-600">[{선택사업체}]</span>
+        </h2>
+        <p className="text-[10px] md:text-xs text-gray-400 font-bold">
+          {보기상태 === '퇴사'
+            ? '퇴사 처리된 직원만 표시됩니다.'
+            : '재직 중인 직원만 표시됩니다.'}
+        </p>
       </header>
 
       <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
@@ -147,8 +187,27 @@ export default function 구성원관리({ 직원목록 = [], 부서목록 = [], 
                       {직원.status || '재직중'}
                     </span>
                   </td>
-                  <td className="p-6 text-right">
-                    <button onClick={() => 수정시작(직원)} className="px-4 py-2 bg-gray-800 text-white text-[10px] font-black rounded-xl hover:bg-black transition-all">수정</button>
+                  <td className="p-6 text-right space-x-2">
+                    <button
+                      onClick={() => 수정시작(직원)}
+                      className="px-4 py-2 bg-gray-800 text-white text-[10px] font-black rounded-xl hover:bg-black transition-all"
+                    >
+                      수정
+                    </button>
+                    <button
+                      onClick={() => 직원삭제(직원)}
+                      className="px-3 py-2 bg-red-50 text-red-600 text-[10px] font-black rounded-xl hover:bg-red-100 transition-all"
+                    >
+                      삭제
+                    </button>
+                    {onOpenDocumentRepoForStaff && (
+                      <button
+                        onClick={() => onOpenDocumentRepoForStaff(직원)}
+                        className="px-3 py-2 bg-blue-50 text-blue-600 text-[10px] font-black rounded-xl hover:bg-blue-100 transition-all"
+                      >
+                        문서
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -180,7 +239,28 @@ export default function 구성원관리({ 직원목록 = [], 부서목록 = [], 
                   <p className="text-xs font-bold text-gray-700">{근무형태목록.find(s => s.id === 직원.shift_id)?.name || '기본'}</p>
                 </div>
               </div>
-              <button onClick={() => 수정시작(직원)} className="w-full py-3 bg-gray-50 text-gray-800 text-[11px] font-black rounded-xl hover:bg-gray-100 transition-all">정보 수정하기</button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => 수정시작(직원)}
+                  className="flex-1 py-3 bg-gray-50 text-gray-800 text-[11px] font-black rounded-xl hover:bg-gray-100 transition-all"
+                >
+                  정보 수정하기
+                </button>
+                <button
+                  onClick={() => 직원삭제(직원)}
+                  className="px-3 py-3 bg-red-50 text-red-600 text-[11px] font-black rounded-xl hover:bg-red-100 transition-all"
+                >
+                  삭제
+                </button>
+                {onOpenDocumentRepoForStaff && (
+                  <button
+                    onClick={() => onOpenDocumentRepoForStaff(직원)}
+                    className="px-3 py-3 bg-blue-50 text-blue-600 text-[11px] font-black rounded-xl hover:bg-blue-100 transition-all"
+                  >
+                    문서
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>

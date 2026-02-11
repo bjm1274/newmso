@@ -1,24 +1,30 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 
-export default function 권한설정도구() {
+// 기본 내보내기 이름을 영문 대문자로 시작하게 변경해
+// React ESLint 규칙을 만족시키되, default export 이므로
+// 외부에서의 import 이름(권한설정도구 등)은 그대로 사용할 수 있습니다.
+export default function PermissionTool() {
   const [staffs, setStaffs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedStaff, setSelectedStaff] = useState<any>(null);
   const [newPassword, setNewPassword] = useState('');
   const [passwordSaving, setPasswordSaving] = useState(false);
 
-  useEffect(() => {
-    fetchStaffs();
-  }, []);
-
-  const fetchStaffs = async () => {
+  const fetchStaffs = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase.from('staff_members').select('*').order('employee_no');
+    const { data } = await supabase
+      .from('staff_members')
+      .select('*')
+      .order('employee_no');
     if (data) setStaffs(data);
     setLoading(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchStaffs();
+  }, [fetchStaffs]);
 
   const setPassword = async () => {
     if (!selectedStaff?.id || !newPassword.trim()) {

@@ -3,10 +3,10 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
 export default function MyTodoList({ user: initialUser }: any) {
-  // [핵심] 유저 정보 로컬 상태 관리 (복구된 정보를 담기 위해)
   const [user, setUser] = useState<any>(initialUser || {});
   const [tasks, setTasks] = useState<any[]>([]);
   const [newTask, setNewTask] = useState('');
+  const [recoverAttempted, setRecoverAttempted] = useState(false);
   
   // 날짜 설정
   const getToday = () => {
@@ -20,43 +20,47 @@ export default function MyTodoList({ user: initialUser }: any) {
   // 1. 유저 ID 확인 및 자동 복구 로직
   useEffect(() => {
     const checkAndRecoverUser = async () => {
-      // ID가 있으면 바로 사용
       if (initialUser?.id) {
         setUser(initialUser);
-        fetchTasks(initialUser.id); // 즉시 로딩 시작
+        fetchTasks(initialUser.id);
+        setRecoverAttempted(true);
         return;
       }
 
-      // ID가 없고 이름만 있다면? -> 복구 시도
       if (initialUser?.name) {
-        console.log(`ID 유실 감지. '${initialUser.name}'으로 복구 시도 중...`);
+        setRecoverAttempted(true);
         try {
           const { data, error } = await supabase
             .from('staff_members')
             .select('*')
             .eq('name', initialUser.name)
-            .single();
+            .maybeSingle();
 
           if (data && !error) {
-            console.log("ID 복구 성공:", data.id);
-            setUser(data); // 복구된 정보로 상태 업데이트
-            
-            // 세션 스토리지도 몰래 고쳐놓기 (다음번을 위해)
+            setUser(data);
             localStorage.setItem('user_session', JSON.stringify(data));
-            
-            // 복구된 ID로 할일 목록 불러오기
+            localStorage.setItem('erp_user', JSON.stringify(data));
             fetchTasks(data.id);
-          } else {
-            console.error("복구 실패: 사용자를 찾을 수 없음");
           }
-        } catch (err) {
-          console.error("복구 중 에러:", err);
-        }
+        } catch (_) {}
+      } else {
+        setRecoverAttempted(true);
       }
     };
 
     checkAndRecoverUser();
-  }, [initialUser, selectedDate]); // 날짜나 유저 정보가 바뀌면 실행
+  }, [initialUser, selectedDate]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel(`todos-realtime-${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'todos', filter: `user_id=eq.${user.id}` }, () => {
+        fetchTasks(user.id);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.id, selectedDate]);
 
   // 할일 목록 불러오기 (ID를 인자로 받음)
   const fetchTasks = async (userId: string) => {
@@ -164,7 +168,7 @@ export default function MyTodoList({ user: initialUser }: any) {
           value={newTask}
           onChange={(e) => setNewTask(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}
-          placeholder={user?.id ? `${selectedDate}의 할일을 입력하세요...` : "사용자 정보 확인 중..."}
+          placeholder={user?.id ? `${selectedDate}의 할일을 입력하세요...` : (recoverAttempted ? "직원 계정으로 로그인하면 할일을 등록할 수 있습니다." : "사용자 정보 확인 중...")}
           disabled={!user?.id}
           className="flex-1 bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:bg-white focus:border-blue-500 transition-all disabled:bg-gray-100"
         />
@@ -183,9 +187,10 @@ export default function MyTodoList({ user: initialUser }: any) {
             <div className="w-8 h-8 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin"></div>
           </div>
         ) : !user?.id ? (
-           <div className="h-60 flex flex-col items-center justify-center text-gray-400 gap-2">
-             <span className="text-2xl animate-bounce">🔍</span>
-             <p className="text-xs font-bold">사용자 ID를 복구하고 있습니다...</p>
+           <div className="h-60 flex flex-col items-center justify-center text-gray-400 gap-3 px-4 text-center">
+             <span className="text-3xl">📋</span>
+             <p className="text-xs font-bold">할일은 직원 계정(이름으로 로그인)으로 이용해 주세요.</p>
+             <p className="text-[10px] text-gray-300">MSO 관리자 계정은 이 기능을 사용할 수 없습니다.</p>
            </div>
         ) : tasks.length > 0 ? (
           <>

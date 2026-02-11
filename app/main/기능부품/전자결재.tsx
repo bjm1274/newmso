@@ -6,6 +6,7 @@ import SuppliesForm from './전자결재서브/비품구매양식';
 import AdminForms from './전자결재서브/관리행정양식';
 import FormRequest from './전자결재서브/양식신청';
 import AttendanceCorrectionForm from './전자결재서브/출결정정양식';
+import RepairRequestForm from './전자결재서브/수리요청서양식';
 
 export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, selectedCompanyId, onRefresh }: any) {
   const [viewMode, setViewMode] = useState('기안함');
@@ -15,8 +16,16 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const [formContent, setFormContent] = useState('');
   const [approverLine, setApproverLine] = useState<any[]>([]);
   const [extraData, setExtraData] = useState<any>({});
-
+  const [customFormTypes, setCustomFormTypes] = useState<{ name: string; slug: string }[]>([]);
   const isMso = user?.company === 'SY INC.' || user?.permissions?.mso === true;
+
+  const BUILTIN_FORM_TYPES = ['인사명령', '연차/휴가', '연장근무', '물품신청', '수리요청서', '업무기안', '업무협조', '양식신청', '출결정정'];
+
+  useEffect(() => {
+    supabase.from('approval_form_types').select('name, slug').eq('is_active', true).order('sort_order').then(({ data }) => {
+      setCustomFormTypes((data || []).map((r: any) => ({ name: r.name, slug: r.slug })));
+    });
+  }, []);
 
   const fetchApprovals = async () => {
     let query = supabase.from('approvals').select('*').order('created_at', { ascending: false });
@@ -29,6 +38,16 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   };
 
   useEffect(() => { fetchApprovals(); }, [selectedCompanyId, user?.id]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('approvals-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'approvals' }, () => {
+        fetchApprovals();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   const handleApproveAction = async (item: any) => {
     if (!confirm("승인하시겠습니까? 관련 데이터가 즉시 업데이트됩니다.")) return;
@@ -148,12 +167,12 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                     ✍️ 결재선 지정
                   </label>
                   
-                  <div className="flex gap-1 bg-white/50 p-1 rounded-xl w-full md:w-auto overflow-x-auto no-scrollbar">
+                  <div className="flex gap-1 bg-gray-100 p-1 rounded-[12px] w-full md:w-auto overflow-x-auto no-scrollbar">
                     {['전체', '박철홍정형외과', '수연의원', 'SY INC.'].map(co => (
                       <button 
                         key={co} 
                         onClick={() => setSelectedCo(co)}
-                        className={`flex-1 md:flex-none px-3 py-1.5 rounded-lg text-[9px] font-black transition-all whitespace-nowrap ${selectedCo === co ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-400 hover:bg-white'}`}
+                        className={`flex-1 md:flex-none px-3 py-1.5 rounded-[12px] text-[9px] font-black transition-all whitespace-nowrap ${selectedCo === co ? 'bg-white shadow-md text-blue-600' : 'text-gray-400'}`}
                       >
                         {co}
                       </button>
@@ -176,9 +195,12 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
               </div>
 
               <div className="flex gap-2 p-1.5 bg-gray-100 rounded-2xl md:rounded-[1.5rem] w-full overflow-x-auto no-scrollbar">
-                {['인사명령', '연차/휴가', '연장근무', '물품신청', '업무기안', '업무협조', '양식신청', '출결정정'].map(t => (
-                  <button key={t} onClick={()=>setFormType(t)} className={`flex-1 px-4 md:px-6 py-3 rounded-xl md:rounded-2xl text-[10px] font-black transition-all whitespace-nowrap ${formType===t ? 'bg-white text-blue-600 shadow-md' : 'text-gray-400 hover:text-gray-600'}`}>{t}</button>
-                ))}
+                {[...BUILTIN_FORM_TYPES, ...customFormTypes.map(c => c.slug)].map(t => {
+                  const label = BUILTIN_FORM_TYPES.includes(t) ? t : (customFormTypes.find(c => c.slug === t)?.name ?? t);
+                  return (
+                    <button key={t} onClick={()=>setFormType(t)} className={`flex-1 px-4 md:px-6 py-3 rounded-xl md:rounded-2xl text-[10px] font-black transition-all whitespace-nowrap ${formType===t ? 'bg-white text-blue-600 shadow-md' : 'text-gray-400 hover:text-gray-600'}`}>{label}</button>
+                  );
+                })}
               </div>
 
               <div className="min-h-[200px] animate-in fade-in duration-500">
@@ -186,6 +208,8 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                   <AttendanceForms user={user} staffs={staffs} formType={formType} setExtraData={setExtraData} setFormTitle={setFormTitle} />
                 ) : formType === '물품신청' ? (
                   <SuppliesForm setExtraData={setExtraData} />
+                ) : formType === '수리요청서' ? (
+                  <RepairRequestForm setExtraData={setExtraData} />
                 ) : formType === '양식신청' ? (
                   <FormRequest user={user} staffs={staffs} />
                 ) : formType === '출결정정' ? (
@@ -218,7 +242,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                   <div key={item.id} className="bg-white p-6 md:p-8 border border-gray-100 rounded-[2rem] md:rounded-[2.5rem] shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6 group hover:border-blue-300 hover:shadow-xl hover:shadow-blue-50 transition-all animate-in fade-in-up">
                     <div className="flex gap-4 md:gap-6 items-center">
                         <div className="w-14 h-14 md:w-16 md:h-16 bg-gray-50 shrink-0 rounded-2xl flex items-center justify-center text-xl md:text-2xl shadow-inner group-hover:bg-blue-50 transition-colors">
-                            {item.type === '물품신청' ? '📦' : item.type === '양식신청' ? '📄' : item.type === '인사명령' ? '🎖️' : '📋'}
+                            {item.type === '물품신청' ? '📦' : item.type === '양식신청' ? '📄' : item.type === '인사명령' ? '🎖️' : item.type === '수리요청서' ? '🔧' : '📋'}
                         </div>
                         <div>
                             <div className="flex flex-wrap gap-2 mb-2 items-center">

@@ -7,6 +7,7 @@ import { setSelectedCompanyId as persistSelectedCompanyId, getSelectedCompanyId 
 import Sidebar from './기능부품/조직도서브/조직도측면창';
 import MainContent from './기능부품/조직도서브/조직도본문';
 import GlobalSearch from '@/app/components/GlobalSearch';
+import GlobalNotificationBell from '@/app/components/GlobalNotificationBell';
 
 type ERPData = {
   staffs: any[];
@@ -27,7 +28,8 @@ export default function MainPage() {
   // 초기 상태를 로컬 스토리지에서 시도
   const [mainMenu, setMainMenu] = useState('조직도');
   const [subView, setSubView] = useState('전체');
-  const [selectedCo, setSelectedCo] = useState('전체'); 
+  const [selectedCo, setSelectedCo] = useState('전체');
+  const [initialMyPageTab, setInitialMyPageTab] = useState<string | null>(null); 
 
   const [data, setData] = useState<ERPData>({
     staffs: [],
@@ -156,7 +158,7 @@ export default function MainPage() {
       />
 
       <div className="flex-1 flex flex-col overflow-hidden pb-[58px] md:pb-0 relative">
-        <div className="hidden md:flex shrink-0 px-4 py-2 bg-white border-b border-[#E5E8EB] items-center gap-2">
+        <div className="hidden md:flex shrink-0 px-4 py-2 bg-white border-b border-[#E5E8EB] items-center gap-2 justify-end">
           <GlobalSearch
             user={user}
             staffs={data.staffs}
@@ -166,6 +168,13 @@ export default function MainPage() {
               else if (type === 'post') setMainMenu('게시판');
               else if (type === 'approval') setMainMenu('전자결재');
               else if (type === 'message') setMainMenu('채팅');
+            }}
+          />
+          <GlobalNotificationBell
+            user={user}
+            onOpenFull={() => {
+              setMainMenu('내정보');
+              setInitialMyPageTab('notifications');
             }}
           />
         </div>
@@ -189,6 +198,9 @@ export default function MainPage() {
             setSelectedCompanyIdState(id);
           }}
           onRefresh={() => fetchERPData(user, selectedCompanyId)}
+          initialMyPageTab={initialMyPageTab}
+          onConsumeMyPageInitialTab={() => setInitialMyPageTab(null)}
+          setMainMenu={setMainMenu}
         />
       </div>
     </div>

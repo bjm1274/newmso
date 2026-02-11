@@ -155,20 +155,20 @@ export default function CorporateCardTransactions({ staffs = [] }: any) {
           <p className="text-[10px] text-blue-600 font-bold uppercase tracking-widest">회사별 카드 등록 · 사용내역 실시간 반영</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
+          <div className="flex gap-1 bg-gray-100 p-1 rounded-[12px]">
             {COMPANIES.map((c) => (
               <button
                 key={c}
                 onClick={() => setSelectedCo(c)}
-                className={`px-4 py-2 text-[10px] font-black rounded-lg ${selectedCo === c ? 'bg-white shadow text-blue-600' : 'text-gray-400'}`}
+                className={`px-4 py-2 text-[10px] font-black rounded-[12px] transition-all ${selectedCo === c ? 'bg-white shadow-md text-blue-600' : 'text-gray-400'}`}
               >
                 {c}
               </button>
             ))}
           </div>
-          <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
-            <button onClick={() => setActiveTab('cards')} className={`px-4 py-2 text-[10px] font-black rounded-lg ${activeTab === 'cards' ? 'bg-white shadow' : ''}`}>카드 등록</button>
-            <button onClick={() => setActiveTab('transactions')} className={`px-4 py-2 text-[10px] font-black rounded-lg ${activeTab === 'transactions' ? 'bg-white shadow' : ''}`}>사용내역</button>
+          <div className="flex gap-1 bg-gray-100 p-1 rounded-[12px]">
+            <button onClick={() => setActiveTab('cards')} className={`px-4 py-2 text-[10px] font-black rounded-[12px] transition-all ${activeTab === 'cards' ? 'bg-white shadow-md text-blue-600' : 'text-gray-400'}`}>카드 등록</button>
+            <button onClick={() => setActiveTab('transactions')} className={`px-4 py-2 text-[10px] font-black rounded-[12px] transition-all ${activeTab === 'transactions' ? 'bg-white shadow-md text-blue-600' : 'text-gray-400'}`}>사용내역</button>
           </div>
         </div>
       </div>

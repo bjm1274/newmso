@@ -77,7 +77,7 @@ export default function AttendanceSystem({ user, staffs, selectedCo, isAdminView
   };
 
   const handleCheckIn = async () => {
-    if (!isWithinRange) return alert('병원 100m 이내에서만 출근 처리가 가능합니다.');
+    if (!isWithinRange) return alert('병원 300m 이내에서만 출근 처리가 가능합니다.');
     setLoading(true);
     try {
       const today = new Date().toISOString().split('T')[0];
@@ -118,7 +118,7 @@ export default function AttendanceSystem({ user, staffs, selectedCo, isAdminView
   };
 
   const handleCheckOut = async () => {
-    if (!isWithinRange) return alert('병원 100m 이내에서만 퇴근 처리가 가능합니다.');
+    if (!isWithinRange) return alert('병원 300m 이내에서만 퇴근 처리가 가능합니다.');
     setLoading(true);
     try {
       const today = new Date().toISOString().split('T')[0];

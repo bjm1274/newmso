@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 
 export default function BoardAdvanced() {
@@ -16,18 +16,18 @@ export default function BoardAdvanced() {
     { id: 'mri', label: '🔬 MRI일정표' },
   ];
 
-  useEffect(() => {
-    fetchPosts();
-  }, [activeBoard]);
-
-  const fetchPosts = async () => {
+  const fetchPosts = useCallback(async () => {
     const { data } = await supabase
       .from('board_posts')
       .select('*')
       .eq('board_type', activeBoard)
       .order('created_at', { ascending: false });
     setPosts(data || []);
-  };
+  }, [activeBoard]);
+
+  useEffect(() => {
+    fetchPosts();
+  }, [fetchPosts]);
 
   const createPost = async () => {
     if (!formData.title) {

@@ -1,9 +1,10 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
 export default function ProductRegistration({ user, suppliers, fetchInventory, fetchSuppliers }: any) {
   const [loading, setLoading] = useState(false);
+  const [departments, setDepartments] = useState<string[]>([]);
   const [productForm, setProductForm] = useState({
     item_name: '',
     category: '',
@@ -14,8 +15,30 @@ export default function ProductRegistration({ user, suppliers, fetchInventory, f
     expiry_date: '',
     lot_number: '',
     is_udi: false,
-    company: user?.company || '박철홍정형외과'
+    company: user?.company || '박철홍정형외과',
+    department: user?.department || ''
   });
+
+  // 수연의원 / SY INC. / 병원 전체의 부서명을 staff_members에서 동적으로 수집
+  useEffect(() => {
+    const loadDepts = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('staff_members')
+          .select('department, company');
+        if (error) return;
+        const list =
+          data
+            ?.map((s: any) => (s.department || '').trim())
+            .filter(Boolean) || [];
+        const unique = Array.from(new Set(list)).sort();
+        setDepartments(unique);
+      } catch (_) {
+        // 실패해도 치명적이지 않으므로 무시
+      }
+    };
+    loadDepts();
+  }, []);
 
   const handleRegisterProduct = async () => {
     if (!productForm.item_name || !productForm.category) return alert('제품명과 분류를 입력해주세요.');
@@ -26,7 +49,9 @@ export default function ProductRegistration({ user, suppliers, fetchInventory, f
         ...productForm,
         unit_price: productForm.unit_price || 0,
         expiry_date: productForm.expiry_date || null,
-        lot_number: productForm.lot_number || null
+        lot_number: productForm.lot_number || null,
+        // 재고 테이블에서 stock 컬럼을 함께 사용하므로 초기 재고 = quantity 로 맞춤
+        stock: productForm.quantity || 0,
       };
 
       const { error } = await supabase.from('inventory').insert([submissionData]);
@@ -44,7 +69,8 @@ export default function ProductRegistration({ user, suppliers, fetchInventory, f
         expiry_date: '',
         lot_number: '',
         is_udi: false,
-        company: user?.company || '박철홍정형외과'
+        company: user?.company || '박철홍정형외과',
+        department: user?.department || ''
       });
     } catch (err) {
       console.error('등록 실패:', err);
@@ -109,6 +135,20 @@ export default function ProductRegistration({ user, suppliers, fetchInventory, f
             <select value={productForm.supplier_name} onChange={e => setProductForm({...productForm, supplier_name: e.target.value})} className="w-full p-4 bg-gray-50 rounded-2xl border-none outline-none font-black text-sm focus:ring-2 focus:ring-blue-100">
               <option value="">업체 선택</option>
               {suppliers.map((s: any) => <option key={s.id} value={s.name}>{s.name}</option>)}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">배정 부서 (부서별 현황에 표시)</label>
+            <select
+              value={productForm.department}
+              onChange={e => setProductForm({...productForm, department: e.target.value})}
+              className="w-full p-4 bg-gray-50 rounded-2xl border-none outline-none font-black text-sm focus:ring-2 focus:ring-blue-100"
+            >
+              <option value="">미지정</option>
+              {departments.map((d) => (
+                <option key={d} value={d}>{d}</option>
+              ))}
             </select>
           </div>
 

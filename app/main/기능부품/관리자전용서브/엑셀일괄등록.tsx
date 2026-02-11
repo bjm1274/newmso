@@ -3,10 +3,24 @@ import { useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import * as XLSX from 'xlsx';
 
+type UploadMode = 'staff' | 'inventory' | 'inventory_ecount';
+
+// 이카운트 재고 엑셀 행 → 컬럼 매핑 (한글/영문 혼용 대응)
+function mapEcountRow(r: any) {
+  const itemName = String(r['품목명'] ?? r['품목'] ?? r['ItemName'] ?? r['item_name'] ?? '').trim();
+  const qty = parseInt(r['수량'] ?? r['재고'] ?? r['재고수량'] ?? r['Quantity'] ?? r['quantity'] ?? 0, 10) || 0;
+  const unitPrice = parseInt(r['단가'] ?? r['UnitPrice'] ?? r['unit_price'] ?? r['원가'] ?? 0, 10) || 0;
+  const category = String(r['품목그룹'] ?? r['분류'] ?? r['Category'] ?? r['category'] ?? r['규격'] ?? '').trim();
+  const company = String(r['회사'] ?? r['Company'] ?? r['company'] ?? '박철홍정형외과').trim() || '박철홍정형외과';
+  const minQty = parseInt(r['최소재고'] ?? r['안전재고'] ?? r['MinStock'] ?? r['min_quantity'] ?? 5, 10) || 5;
+  return { itemName, qty, unitPrice, category, company, minQty };
+}
+
 export default function ExcelBulkUpload({ onRefresh }: any) {
   const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<'staff' | 'inventory'>('staff');
+  const [mode, setMode] = useState<UploadMode>('staff');
   const [preview, setPreview] = useState<any[]>([]);
+  const [defaultCompany, setDefaultCompany] = useState('박철홍정형외과');
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -34,7 +48,8 @@ export default function ExcelBulkUpload({ onRefresh }: any) {
               join_date: r.입사일 ?? r.join_date ?? null
             }, { onConflict: 'employee_no' });
           }
-        } else {
+          alert(`${rows.length}건 등록 완료`);
+        } else if (mode === 'inventory') {
           for (const r of rows) {
             await supabase.from('inventory').insert({
               item_name: r.품목명 ?? r.item_name ?? '',
@@ -47,8 +62,45 @@ export default function ExcelBulkUpload({ onRefresh }: any) {
               category: r.분류 ?? r.category ?? ''
             });
           }
+          alert(`${rows.length}건 등록 완료`);
+        } else {
+          // 재고 리스트 - 이카운트 형식: 한 번에 올리고, 동일 품목+회사면 수정 반영
+          const { data: existingList } = await supabase.from('inventory').select('id, item_name, name, company');
+          const byKey: Record<string, { id: string }> = {};
+          (existingList || []).forEach((x: any) => {
+            const k = `${(x.company || '').trim()}|${(x.item_name || x.name || '').trim()}`;
+            byKey[k] = { id: x.id };
+          });
+          let inserted = 0;
+          let updated = 0;
+          for (const r of rows) {
+            const { itemName, qty, unitPrice, category, company, minQty } = mapEcountRow(r);
+            if (!itemName) continue;
+            const companyVal = company || defaultCompany;
+            const key = `${companyVal}|${itemName}`;
+            const existing = byKey[key];
+            const payload = {
+              item_name: itemName,
+              name: itemName,
+              quantity: qty,
+              stock: qty,
+              min_quantity: minQty,
+              min_stock: minQty,
+              unit_price: unitPrice,
+              company: companyVal,
+              category: category || null
+            };
+            if (existing?.id) {
+              await supabase.from('inventory').update(payload).eq('id', existing.id);
+              updated += 1;
+            } else {
+              const { data: insertedRow } = await supabase.from('inventory').insert(payload).select('id').single();
+              inserted += 1;
+              if (insertedRow?.id) byKey[key] = { id: insertedRow.id };
+            }
+          }
+          alert(`재고(이카운트) 반영 완료: 신규 ${inserted}건, 수정 ${updated}건`);
         }
-        alert(`${rows.length}건 등록 완료`);
         setPreview([]);
         if (onRefresh) onRefresh();
       }
@@ -61,16 +113,35 @@ export default function ExcelBulkUpload({ onRefresh }: any) {
     }
   };
 
+  const isEcount = mode === 'inventory_ecount';
+
   return (
     <div className="bg-white border border-gray-100 rounded-2xl p-8 shadow-xl max-w-2xl">
       <h3 className="text-xl font-black text-gray-900 mb-2">엑셀 일괄 등록</h3>
-      <p className="text-xs text-gray-500 font-bold mb-6">엑셀 파일(사번, 이름, 회사, 부서, 직급, 기본급, 입사일 또는 품목명, 수량, 단가) 업로드</p>
-      <div className="flex gap-2 mb-4">
+      <p className="text-xs text-gray-500 font-bold mb-6">
+        {mode === 'staff' && '엑셀: 사번, 이름, 회사, 부서, 직급, 기본급, 입사일'}
+        {mode === 'inventory' && '엑셀: 품목명, 수량, 단가, 회사, 분류'}
+        {isEcount && '이카운트에서 내보낸 재고/품목 엑셀을 그대로 업로드하면 품목명·수량·단가·분류 등이 재고 리스트에 반영됩니다.'}
+      </p>
+      <div className="flex flex-wrap gap-2 mb-4">
         <button onClick={() => setMode('staff')} className={`px-4 py-2 rounded-xl text-xs font-black ${mode === 'staff' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500'}`}>직원</button>
         <button onClick={() => setMode('inventory')} className={`px-4 py-2 rounded-xl text-xs font-black ${mode === 'inventory' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500'}`}>재고</button>
+        <button onClick={() => setMode('inventory_ecount')} className={`px-4 py-2 rounded-xl text-xs font-black ${mode === 'inventory_ecount' ? 'bg-teal-600 text-white' : 'bg-gray-100 text-gray-500'}`}>재고 리스트 (이카운트)</button>
       </div>
+      {isEcount && (
+        <div className="mb-4 p-3 bg-teal-50 border border-teal-100 rounded-xl text-[10px] text-teal-800">
+          <p className="font-black mb-1">이카운트 형식 컬럼 예시 (한글/영문 모두 인식)</p>
+          <p>품목코드, 품목명(품목), 규격, 단위, 수량(재고/재고수량), 단가(원가), 품목그룹(분류), 회사, 최소재고(안전재고)</p>
+          <div className="mt-2 flex items-center gap-2">
+            <label className="font-bold text-gray-600">엑셀에 회사가 없을 때 기본 회사:</label>
+            <input type="text" value={defaultCompany} onChange={e => setDefaultCompany(e.target.value)} className="border border-gray-200 rounded-lg px-2 py-1 w-40 text-sm" placeholder="박철홍정형외과" />
+          </div>
+        </div>
+      )}
       <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} className="hidden" />
-      <button onClick={() => fileRef.current?.click()} disabled={loading} className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl text-sm">📁 엑셀 파일 선택</button>
+      <button onClick={() => fileRef.current?.click()} disabled={loading} className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl text-sm hover:bg-blue-700 disabled:opacity-50">
+        {loading ? '처리 중...' : '📁 엑셀 파일 선택'}
+      </button>
       {preview.length > 0 && (
         <div className="mt-4 p-4 bg-gray-50 rounded-xl text-[10px] overflow-x-auto">
           <p className="font-black mb-2">미리보기 (상위 10건)</p>

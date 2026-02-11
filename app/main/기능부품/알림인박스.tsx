@@ -18,21 +18,39 @@ export default function NotificationInbox({ user, onRefresh }: any) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      setLoading(false);
+      setNotifications([]);
+      return;
+    }
 
     const fetchNotifications = async () => {
-      const { data } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(100);
-
-      setNotifications(data || []);
-      setLoading(false);
+      try {
+        const { data } = await supabase
+          .from('notifications')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(100);
+        setNotifications(data || []);
+      } catch (_) {
+        setNotifications([]);
+      } finally {
+        setLoading(false);
+      }
     };
 
+    setLoading(true);
     fetchNotifications();
+
+    const channel = supabase
+      .channel(`inbox-notifications-${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, () => {
+        fetchNotifications();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, [user?.id]);
 
   const filtered =
@@ -109,8 +127,13 @@ export default function NotificationInbox({ user, onRefresh }: any) {
 
       <main className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
         {loading ? (
-          <div className="flex items-center justify-center py-20">
+          <div className="flex flex-col items-center justify-center py-20 gap-3">
             <div className="w-8 h-8 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+            <p className="text-xs text-gray-400 font-bold">알림을 불러오는 중...</p>
+          </div>
+        ) : !user?.id ? (
+          <div className="text-center py-20 text-gray-400 text-sm font-bold">
+            직원 계정으로 로그인하면 알림을 확인할 수 있습니다.
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-20 text-gray-400 text-sm font-bold">

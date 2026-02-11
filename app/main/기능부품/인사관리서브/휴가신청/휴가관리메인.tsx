@@ -15,27 +15,28 @@ type Leave = {
   staff_members?: { name: string; company?: string; department?: string };
 };
 
-export default function LeaveManagement({ staffs, selectedCo, onRefresh }: any) {
+export default function LeaveManagement({ staffs = [], selectedCo, onRefresh }: any) {
   const [leaves, setLeaves] = useState<Leave[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('연차/휴가 신청내역');
   const [leaveConfig, setLeaveConfig] = useState<'입사일 기준' | '회계연도 기준'>('입사일 기준');
+  const staffList = Array.isArray(staffs) ? staffs : [];
 
   const fetchLeaves = async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
         .from('leave_requests')
-        .select(`
-          *,
-          staff_members(name, company, department)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      let list = data || [];
+      let list: any[] = data || [];
       if (selectedCo && selectedCo !== '전체') {
-        list = list.filter((l: any) => (l.staff_members?.company || l.company_name) === selectedCo);
+        list = list.filter((l: any) => {
+          const staff = staffList.find((s: any) => s.id === l.staff_id);
+          return (staff?.company || l.company_name) === selectedCo;
+        });
       }
       setLeaves(list);
     } catch (err) {
@@ -48,7 +49,7 @@ export default function LeaveManagement({ staffs, selectedCo, onRefresh }: any) 
 
   useEffect(() => {
     fetchLeaves();
-  }, [staffs, selectedCo]);
+  }, [selectedCo, staffs]);
 
   const handleStatusUpdate = async (id: string, status: '승인' | '반려') => {
     try {
@@ -93,7 +94,7 @@ export default function LeaveManagement({ staffs, selectedCo, onRefresh }: any) 
     if (!confirm('전 직원의 연차를 입사일 기준으로 재계산합니다. 진행할까요?')) return;
     setLoading(true);
     try {
-      for (const s of staffs) {
+      for (const s of staffList) {
         const joinDate = s.joined_at || s.join_date;
         if (!joinDate) continue;
         const join = new Date(joinDate);
@@ -173,7 +174,7 @@ export default function LeaveManagement({ staffs, selectedCo, onRefresh }: any) 
               <div className="p-6 bg-white border border-gray-100 shadow-sm rounded-[1.5rem] text-center">
                 <p className="text-[9px] font-black text-gray-400 uppercase">잔여 연차 (직원별)</p>
                 <p className="text-2xl font-black text-blue-600 mt-1">
-                  {staffs.filter((s: any) => {
+                  {staffList.filter((s: any) => {
                     const total = s.annual_leave_total ?? 15;
                     const used = s.annual_leave_used ?? 0;
                     return (total - used) > 0;
@@ -213,8 +214,12 @@ export default function LeaveManagement({ staffs, selectedCo, onRefresh }: any) 
                       <tr key={l.id} className="hover:bg-blue-50/30 transition-all group">
                         <td className="px-8 py-5">
                           <div className="flex flex-col">
-                            <span className="font-black text-gray-900 group-hover:text-blue-600 transition-colors">{l.staff_members?.name}</span>
-                            <span className="text-[9px] text-gray-400 uppercase">{l.staff_members?.company} / {l.staff_members?.department}</span>
+                            <span className="font-black text-gray-900 group-hover:text-blue-600 transition-colors">
+                              {staffList.find((s: any) => s.id === l.staff_id)?.name ?? l.staff_members?.name ?? '-'}
+                            </span>
+                            <span className="text-[9px] text-gray-400 uppercase">
+                              {staffList.find((s: any) => s.id === l.staff_id)?.company ?? l.staff_members?.company} / {staffList.find((s: any) => s.id === l.staff_id)?.department ?? l.staff_members?.department}
+                            </span>
                           </div>
                         </td>
                         <td className="px-8 py-5">
@@ -254,8 +259,8 @@ export default function LeaveManagement({ staffs, selectedCo, onRefresh }: any) 
           </div>
         )}
 
-        {activeTab === '연차 대시보드' && <LeaveDashboard staffs={staffs} selectedCo={selectedCo} />}
-        {activeTab === '연차사용촉진 자동화' && <AnnualLeavePromotion staffs={staffs} selectedCo={selectedCo} />}
+        {activeTab === '연차 대시보드' && <LeaveDashboard staffs={staffList} selectedCo={selectedCo} />}
+        {activeTab === '연차사용촉진 자동화' && <AnnualLeavePromotion staffs={staffList} selectedCo={selectedCo} />}
         
         {activeTab === '연차 자동부여 설정' && (
           <div className="bg-white p-10 border border-gray-100 shadow-xl rounded-[2.5rem] text-center max-w-2xl mx-auto">

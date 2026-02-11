@@ -15,11 +15,12 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: any) {
   // 확장된 비과세 항목 상태 (근로계약서·변경계약서·연봉계약서 공통)
   const [salaryInfo, setSalaryInfo] = useState({
     base_salary: 0,
-    meal_allowance: 0,      // 식대 (한도 20만)
-    vehicle_allowance: 0,   // 자가운전 (한도 20만)
-    childcare_allowance: 0, // 보육수당 (한도 10만)
-    research_allowance: 0,  // 연구활동비 (한도 20만)
-    other_taxfree: 0,       // 기타 비과세
+    meal_allowance: 0,       // 식대 (한도 20만)
+    vehicle_allowance: 0,    // 자가운전 (한도 20만)
+    childcare_allowance: 200000, // 보육수당 (20만원)
+    position_allowance: 0,   // 직책수당
+    research_allowance: 0,   // 연구활동비 (한도 20만)
+    other_taxfree: 0,        // 기타 비과세
     effective_date: new Date().toISOString().split('T')[0]
   });
 
@@ -49,6 +50,7 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: any) {
           meal_allowance: salaryInfo.meal_allowance,
           vehicle_allowance: salaryInfo.vehicle_allowance,
           childcare_allowance: salaryInfo.childcare_allowance,
+          position_allowance: salaryInfo.position_allowance,
           research_allowance: salaryInfo.research_allowance,
           other_taxfree: salaryInfo.other_taxfree,
           effective_date: salaryInfo.effective_date
@@ -64,6 +66,7 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: any) {
             meal_allowance: salaryInfo.meal_allowance,
             vehicle_allowance: salaryInfo.vehicle_allowance,
             childcare_allowance: salaryInfo.childcare_allowance,
+            position_allowance: salaryInfo.position_allowance,
             research_allowance: salaryInfo.research_allowance,
             other_taxfree: salaryInfo.other_taxfree
           }).eq('id', id)
@@ -80,9 +83,9 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: any) {
       <header className="p-8 border-b border-gray-100 bg-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
         <div>
           <h2 className="text-xl font-black text-gray-800 tracking-tighter italic">전자 계약 및 법적 비과세 관리 <span className="text-sm text-blue-600 ml-2">[{selectedCo}]</span></h2>
-          <div className="flex gap-4 mt-2 flex-wrap">
+          <div className="flex gap-1 bg-gray-100 p-1 rounded-[12px] w-fit mt-2">
             {['계약현황', '신규/변경계약서', '연봉계약갱신'].map(tab => (
-              <button key={tab} onClick={() => setActiveTab(tab)} className={`text-[11px] font-black tracking-widest uppercase transition-all ${activeTab === tab ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-300 hover:text-gray-500'}`}>{tab}</button>
+              <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 text-[11px] font-black tracking-widest uppercase rounded-[12px] transition-all whitespace-nowrap ${activeTab === tab ? 'bg-white shadow-md text-blue-600' : 'text-gray-400'}`}>{tab}</button>
             ))}
           </div>
         </div>
@@ -99,8 +102,8 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: any) {
                 <div className="flex gap-4 items-center">
                   <h3 className="text-lg font-bold">각종 비과세 항목 등록 (신규/변경 계약서)</h3>
                   <div className="flex gap-2">
-                    <button onClick={() => setContractSubType('신규')} className={`px-4 py-2 rounded-xl text-[11px] font-semibold transition-all ${contractSubType === '신규' ? 'bg-white text-[#3182F6]' : 'bg-white/20 hover:bg-white/30'}`}>신규 계약서</button>
-                    <button onClick={() => setContractSubType('변경')} className={`px-4 py-2 rounded-xl text-[11px] font-semibold transition-all ${contractSubType === '변경' ? 'bg-white text-[#3182F6]' : 'bg-white/20 hover:bg-white/30'}`}>변경 계약서</button>
+                    <button onClick={() => setContractSubType('신규')} className={`px-4 py-2 rounded-[12px] text-[11px] font-semibold transition-all ${contractSubType === '신규' ? 'bg-white text-[#3182F6]' : 'bg-white/20 hover:bg-white/30'}`}>신규 계약서</button>
+                    <button onClick={() => setContractSubType('변경')} className={`px-4 py-2 rounded-[12px] text-[11px] font-semibold transition-all ${contractSubType === '변경' ? 'bg-white text-[#3182F6]' : 'bg-white/20 hover:bg-white/30'}`}>변경 계약서</button>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -117,8 +120,12 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: any) {
                     <input type="number" value={salaryInfo.vehicle_allowance} onChange={(e) => setSalaryInfo({...salaryInfo, vehicle_allowance: Number(e.target.value)})} className="w-full p-3 bg-white/10 border border-white/20 rounded-xl font-semibold text-sm outline-none focus:bg-white/20 text-white" />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-semibold uppercase opacity-90">보육수당 (비과세 한도 10만)</label>
+                    <label className="text-[10px] font-semibold uppercase opacity-90">보육수당 (20만원)</label>
                     <input type="number" value={salaryInfo.childcare_allowance} onChange={(e) => setSalaryInfo({...salaryInfo, childcare_allowance: Number(e.target.value)})} className="w-full p-3 bg-white/10 border border-white/20 rounded-xl font-semibold text-sm outline-none focus:bg-white/20 text-white" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-semibold uppercase opacity-90">직책수당</label>
+                    <input type="number" value={salaryInfo.position_allowance} onChange={(e) => setSalaryInfo({...salaryInfo, position_allowance: Number(e.target.value)})} className="w-full p-3 bg-white/10 border border-white/20 rounded-xl font-semibold text-sm outline-none focus:bg-white/20 text-white" />
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-semibold uppercase opacity-90">연구활동비 (비과세 한도 20만)</label>
@@ -153,8 +160,12 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: any) {
                     <input type="number" value={salaryInfo.vehicle_allowance} onChange={(e) => setSalaryInfo({...salaryInfo, vehicle_allowance: Number(e.target.value)})} className="w-full p-4 bg-white/10 border border-white/20 rounded-xl font-black text-sm outline-none focus:bg-white/20 transition-all text-white" />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase opacity-70">보육수당 (비과세 한도 10만)</label>
+                    <label className="text-[10px] font-black uppercase opacity-70">보육수당 (20만원)</label>
                     <input type="number" value={salaryInfo.childcare_allowance} onChange={(e) => setSalaryInfo({...salaryInfo, childcare_allowance: Number(e.target.value)})} className="w-full p-4 bg-white/10 border border-white/20 rounded-xl font-black text-sm outline-none focus:bg-white/20 transition-all text-white" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase opacity-70">직책수당</label>
+                    <input type="number" value={salaryInfo.position_allowance} onChange={(e) => setSalaryInfo({...salaryInfo, position_allowance: Number(e.target.value)})} className="w-full p-4 bg-white/10 border border-white/20 rounded-xl font-black text-sm outline-none focus:bg-white/20 transition-all text-white" />
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase opacity-70">연구활동비 (비과세 한도 20만)</label>

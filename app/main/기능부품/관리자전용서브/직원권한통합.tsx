@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 
 const PERM_GROUPS = [
@@ -48,23 +48,29 @@ const PERM_GROUPS = [
   }
 ];
 
-export default function 직원권한통합({ onRefresh }: { onRefresh?: () => void }) {
+// ESLint가 React 컴포넌트로 인식하도록 기본 함수 이름을
+// 영문 대문자로 시작하는 형태로 지정합니다.
+// default export이므로 외부에서의 import 이름(직원권한통합)은 그대로 사용 가능합니다.
+export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () => void }) {
   const [staffs, setStaffs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedStaff, setSelectedStaff] = useState<any>(null);
   const [newPassword, setNewPassword] = useState('');
   const [passwordSaving, setPasswordSaving] = useState(false);
 
-  useEffect(() => {
-    fetchStaffs();
-  }, []);
-
-  const fetchStaffs = async () => {
+  const fetchStaffs = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase.from('staff_members').select('*').order('employee_no');
+    const { data } = await supabase
+      .from('staff_members')
+      .select('*')
+      .order('employee_no');
     if (data) setStaffs(data);
     setLoading(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchStaffs();
+  }, [fetchStaffs]);
 
   const setPassword = async () => {
     if (!selectedStaff?.id || !newPassword.trim()) {

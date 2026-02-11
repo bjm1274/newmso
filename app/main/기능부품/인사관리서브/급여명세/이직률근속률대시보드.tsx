@@ -7,12 +7,16 @@ export default function TurnoverDashboard({ staffs = [] }: any) {
   const active = total - resigned;
   const turnover = total ? ((resigned / total) * 100).toFixed(1) : '0';
 
+  // 컴포넌트 최초 렌더 시점 기준으로만 "오늘"을 고정해
+  // React의 순수성 규칙을 지키면서 계산합니다.
+  const [now] = useState(() => Date.now());
+
   const workDaysList = staffs
     .filter((s: any) => (s.status || '재직') !== '퇴사')
     .map((s: any) => {
       const j = s.joined_at || s.join_date;
       if (!j) return 0;
-      return Math.floor((Date.now() - new Date(j).getTime()) / (1000 * 60 * 60 * 24));
+      return Math.floor((now - new Date(j).getTime()) / (1000 * 60 * 60 * 24));
     });
   const avgTenure = workDaysList.length ? Math.round(workDaysList.reduce((a: number, b: number) => a + b, 0) / workDaysList.length) : 0;
   const avgYears = (avgTenure / 365).toFixed(1);

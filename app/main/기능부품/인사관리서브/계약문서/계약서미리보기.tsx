@@ -17,7 +17,9 @@ export default function ContractPreview({ contractId }: any) {
       </div>
 
       <div className="flex-1 space-y-6 text-[11px] leading-relaxed text-gray-700 font-medium">
-        <p className="font-bold">"{doc.company}"(이하 '갑')와 "근로자"(이하 '을')는 다음과 같이 근로계약을 체결한다.</p>
+        <p className="font-bold">
+          &quot;{doc.company}&quot;(이하 &apos;갑&apos;)와 &quot;근로자&quot;(이하 &apos;을&apos;)는 다음과 같이 근로계약을 체결한다.
+        </p>
         
         <div className="space-y-4">
           <section>

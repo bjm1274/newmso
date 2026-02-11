@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 
 const DIVISIONS = ['진료부', '간호부', '총무부'];
@@ -11,14 +11,19 @@ export default function TeamManager({ onRefresh }: { onRefresh?: () => void }) {
   const [adding, setAdding] = useState(false);
   const [newTeam, setNewTeam] = useState({ division: '진료부', team_name: '' });
 
-  useEffect(() => {
-    fetchTeams();
+  const fetchTeams = useCallback(async () => {
+    const { data } = await supabase
+      .from('org_teams')
+      .select('*')
+      .eq('company_name', company)
+      .order('division')
+      .order('sort_order');
+    setTeams(data || []);
   }, [company]);
 
-  const fetchTeams = async () => {
-    const { data } = await supabase.from('org_teams').select('*').eq('company_name', company).order('division').order('sort_order');
-    setTeams(data || []);
-  };
+  useEffect(() => {
+    fetchTeams();
+  }, [fetchTeams]);
 
   const handleAdd = async () => {
     if (!newTeam.team_name.trim()) return alert('팀명을 입력하세요.');

@@ -6,7 +6,7 @@ import { WORKPLACE_LOCATION, ALLOWED_DISTANCE_M } from '@/lib/location';
 const HOSPITAL_LOCATION = WORKPLACE_LOCATION;
 const ALLOWED_RADIUS_METER = ALLOWED_DISTANCE_M;
 
-export default function CommuteRecord({ user }: any) {
+export default function CommuteRecord({ user, onRequestCorrection }: any) {
   const [logs, setLogs] = useState<any[]>([]);
   const [todayLog, setTodayLog] = useState<any>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -83,7 +83,7 @@ export default function CommuteRecord({ user }: any) {
           if (dist <= ALLOWED_RADIUS_METER) {
             resolve(true); // 100m 이내 (성공)
           } else {
-            alert(`🏥 병원과 거리가 너무 멉니다! (현재 거리: ${Math.floor(dist)}m)\n병원 내(100m)에서만 출퇴근이 가능합니다.`);
+            alert(`🏥 병원과 거리가 너무 멉니다! (현재 거리: ${Math.floor(dist)}m)\n병원 내(300m)에서만 출퇴근이 가능합니다.`);
             resolve(false); // 100m 밖 (실패)
           }
         },
@@ -229,24 +229,47 @@ export default function CommuteRecord({ user }: any) {
         </div>
 
         <div className="space-y-4">
-          {logs.map((log) => (
-            <div key={log.id} className="flex items-center justify-between p-5 bg-gray-50 rounded-2xl border border-transparent hover:border-gray-200 transition-all">
-              <div className="flex items-center gap-6">
-                <div className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center font-black ${log.status === '지각' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
-                   <span className="text-[10px] opacity-60">{new Date(log.work_date).getMonth() + 1}월</span>
-                   <span className="text-lg leading-tight">{new Date(log.work_date).getDate()}일</span>
+          {logs.map((log) => {
+            const workDate = new Date(log.work_date);
+            return (
+              <div
+                key={log.id}
+                className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-5 bg-gray-50 rounded-2xl border border-transparent hover:border-gray-200 transition-all"
+              >
+                <div className="flex items-center gap-6">
+                  <div
+                    className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center font-black ${
+                      log.status === '지각' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'
+                    }`}
+                  >
+                    <span className="text-[10px] opacity-60">{workDate.getMonth() + 1}월</span>
+                    <span className="text-lg leading-tight">{workDate.getDate()}일</span>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-gray-400">
+                      {workDate.toLocaleDateString('ko-KR', { weekday: 'long' })}
+                    </p>
+                    <p className="font-black text-gray-900">{log.status}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs font-bold text-gray-400">{new Date(log.work_date).toLocaleDateString('ko-KR', { weekday: 'long' })}</p>
-                  <p className="font-black text-gray-900">{log.status}</p>
+                <div className="flex items-center gap-6 md:gap-10 justify-between md:justify-end w-full">
+                  <div className="flex gap-6">
+                    <TimeBox label="출근" time={formatTime(log.check_in_time)} />
+                    <TimeBox label="퇴근" time={formatTime(log.check_out_time)} />
+                  </div>
+                  {onRequestCorrection && (
+                    <button
+                      type="button"
+                      onClick={() => onRequestCorrection(log)}
+                      className="px-3 py-2 rounded-xl text-[11px] font-black border border-blue-100 text-blue-600 bg-white hover:bg-blue-50 shrink-0"
+                    >
+                      정정 요청
+                    </button>
+                  )}
                 </div>
               </div>
-              <div className="flex gap-10">
-                <TimeBox label="출근" time={formatTime(log.check_in_time)} />
-                <TimeBox label="퇴근" time={formatTime(log.check_out_time)} />
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

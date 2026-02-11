@@ -44,6 +44,7 @@ export default function ScanModule({ user, inventory, fetchInventory }: any) {
   const [scanMode, setScanMode] = useState<'명세서' | '바코드'>('명세서');
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [ocrProgress, setOcrProgress] = useState(0);
+  const [inputMethod, setInputMethod] = useState<'image' | 'camera'>('image');
 
   const startCamera = async () => {
     try {
@@ -64,6 +65,7 @@ export default function ScanModule({ user, inventory, fetchInventory }: any) {
     }
     setUploadedImage(null);
     setScannedData(null);
+    setInputMethod('image');
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -219,51 +221,133 @@ export default function ScanModule({ user, inventory, fetchInventory }: any) {
       <div className="bg-white p-6 md:p-10 border border-gray-100 shadow-xl rounded-[2.5rem]">
         <div className="mb-8">
           <h2 className="text-2xl font-black text-gray-900 tracking-tighter italic">거래명세서 스캔 입고</h2>
-          <p className="text-[10px] text-blue-600 font-bold mt-1 uppercase tracking-widest">PC 스캐너 → 이미지 업로드 → OCR → 자동입고</p>
+          <p className="text-[10px] text-blue-600 font-bold mt-1 uppercase tracking-widest">
+            {scanMode === '명세서'
+              ? '스캔 이미지 · 카메라 촬영으로 거래명세서 인식'
+              : '스캔 이미지 · 카메라 촬영으로 바코드 인식'}
+          </p>
         </div>
 
-        <div className="flex gap-2 mb-8">
+        {/* 스캔 종류 선택 (명세서 / 바코드) */}
+        <div className="flex gap-2 mb-4">
           {(['명세서', '바코드'] as const).map(mode => (
-            <button key={mode} onClick={() => { setScanMode(mode); setScannedData(null); setUploadedImage(null); }} className={`flex-1 py-4 rounded-2xl text-xs font-black transition-all ${scanMode === mode ? 'bg-blue-600 text-white shadow-xl' : 'bg-gray-50 text-gray-400'}`}>{mode} 스캔</button>
+            <button
+              key={mode}
+              onClick={() => {
+                setScanMode(mode);
+                setScannedData(null);
+                setUploadedImage(null);
+                setInputMethod('image');
+              }}
+              className={`flex-1 py-4 rounded-2xl text-xs font-black transition-all ${
+                scanMode === mode ? 'bg-blue-600 text-white shadow-xl' : 'bg-gray-50 text-gray-400'
+              }`}
+            >
+              {mode} 스캔
+            </button>
           ))}
         </div>
 
-        {/* PC 스캐너 안내 + 파일 업로드 */}
-        <div className="mb-8 p-6 bg-blue-50 rounded-2xl border border-blue-100">
-          <h4 className="text-sm font-black text-blue-800 mb-2">📄 1단계: 스캔 이미지 준비</h4>
-          <p className="text-xs font-bold text-blue-700 mb-4">
-            PC에 연결된 스캐너/복합기에서 거래명세서를 스캔한 뒤, 저장된 이미지 파일을 선택하세요.
-          </p>
-          <button onClick={triggerFileUpload} disabled={loading} className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-sm shadow-xl hover:scale-[0.98] transition-all disabled:opacity-50">
-            📁 스캔한 이미지 파일 선택
-          </button>
+        {/* 입력 방식 선택: 스캔 이미지 / 카메라 스캔 */}
+        <div className="mb-6 flex gap-2 bg-gray-50 p-2 rounded-2xl border border-gray-100">
+          {([
+            { id: 'image', label: '🖼 스캔 이미지' },
+            { id: 'camera', label: '📷 카메라 스캔' },
+          ] as const).map(m => (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => {
+                setInputMethod(m.id);
+                if (m.id !== 'camera') {
+                  stopCamera();
+                }
+              }}
+              className={`flex-1 py-3 rounded-2xl text-[11px] font-black transition-all ${
+                inputMethod === m.id ? 'bg-gray-900 text-white shadow-md' : 'bg-white text-gray-500'
+              }`}
+            >
+              {m.label}
+            </button>
+          ))}
         </div>
 
-        {/* 카메라 (모바일 대안) */}
-        <div className="relative bg-black rounded-[2rem] overflow-hidden aspect-video mb-8 shadow-2xl">
-          <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" style={{ display: isCameraActive ? 'block' : 'none' }} />
-          {uploadedImage && !isCameraActive && (
-            <img src={uploadedImage} alt="스캔" className="w-full h-full object-contain" />
-          )}
-          {!isCameraActive && !uploadedImage && (
-            <div className="absolute inset-0 flex items-center justify-center text-white/50 text-center">
-              <p className="text-5xl mb-2">📷</p>
-              <p className="font-black text-sm">카메라 촬영 (모바일)</p>
+        {/* 파일 기반 스캔 (스캔 이미지) */}
+        {inputMethod === 'image' && (
+          <div className="mb-8 p-6 bg-blue-50 rounded-2xl border border-blue-100">
+            <h4 className="text-sm font-black text-blue-800 mb-2">📄 스캔 이미지 파일로 인식</h4>
+            <p className="text-xs font-bold text-blue-700 mb-4">
+              {scanMode === '명세서'
+                ? '거래명세서를 스캐너·복합기에서 스캔(이미지)한 뒤, 저장된 파일을 선택해 주세요.'
+                : '제품 바코드가 잘 보이도록 스캔(이미지)한 뒤, 저장된 파일을 선택해 주세요.'}
+            </p>
+            <button
+              onClick={triggerFileUpload}
+              disabled={loading}
+              className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-sm shadow-xl hover:scale-[0.98] transition-all disabled:opacity-50"
+            >
+              📁 {scanMode === '명세서' ? '명세서 스캔 파일 선택' : '바코드 스캔 파일 선택'}
+            </button>
+          </div>
+        )}
+
+        {/* 카메라 스캔 */}
+        {inputMethod === 'camera' && (
+          <>
+            <div className="relative bg-black rounded-[2rem] overflow-hidden aspect-video mb-8 shadow-2xl">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                className="w-full h-full object-cover"
+                style={{ display: isCameraActive ? 'block' : 'none' }}
+              />
+              {uploadedImage && !isCameraActive && (
+                <img src={uploadedImage} alt="스캔" className="w-full h-full object-contain" />
+              )}
+              {!isCameraActive && !uploadedImage && (
+                <div className="absolute inset-0 flex items-center justify-center text-white/50 text-center">
+                  <div>
+                    <p className="text-5xl mb-2">📷</p>
+                    <p className="font-black text-sm">
+                      {scanMode === '명세서'
+                        ? '거래명세서를 화면에 맞춰 촬영하세요.'
+                        : '바코드가 선명하게 보이도록 촬영하세요.'}
+                    </p>
+                  </div>
+                </div>
+              )}
+              <canvas ref={canvasRef} style={{ display: 'none' }} />
             </div>
-          )}
-          <canvas ref={canvasRef} style={{ display: 'none' }} />
-        </div>
 
-        <div className="flex gap-3">
-          {!isCameraActive ? (
-            <button onClick={startCamera} className="flex-1 py-5 bg-gray-100 text-gray-600 rounded-2xl font-black text-sm">📷 카메라로 촬영</button>
-          ) : (
-            <>
-              <button onClick={capturePhoto} disabled={loading} className="flex-1 py-5 bg-green-600 text-white rounded-2xl font-black text-sm shadow-xl">📸 촬영 및 OCR</button>
-              <button onClick={stopCamera} className="px-8 py-5 bg-gray-100 text-gray-400 rounded-2xl font-black text-sm">✕</button>
-            </>
-          )}
-        </div>
+            <div className="flex gap-3">
+              {!isCameraActive ? (
+                <button
+                  onClick={startCamera}
+                  className="flex-1 py-5 bg-gray-100 text-gray-600 rounded-2xl font-black text-sm"
+                >
+                  📷 카메라 시작
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={capturePhoto}
+                    disabled={loading}
+                    className="flex-1 py-5 bg-green-600 text-white rounded-2xl font-black text-sm shadow-xl disabled:opacity-50"
+                  >
+                    {loading ? '인식 중...' : '📸 촬영 및 OCR'}
+                  </button>
+                  <button
+                    onClick={stopCamera}
+                    className="px-8 py-5 bg-gray-100 text-gray-400 rounded-2xl font-black text-sm"
+                  >
+                    ✕
+                  </button>
+                </>
+              )}
+            </div>
+          </>
+        )}
 
         {loading && ocrProgress > 0 && (
           <div className="mt-4">

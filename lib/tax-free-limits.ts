@@ -6,7 +6,7 @@
 export const TAX_FREE_LEGAL_LIMITS_2024 = {
   meal: { limit: 200_000, name: '식대·식사비', basis: '소득세법 시행령' },
   vehicle: { limit: 200_000, name: '자가운전보조금', basis: '소득세법' },
-  childcare: { limit: 100_000, name: '보육수당', basis: '근로기준법' },
+  childcare: { limit: 200_000, name: '보육수당', basis: '근로기준법 (기본 20만원)' },
   research: { limit: 200_000, name: '연구활동비', basis: '소득세법' },
   uniform: { limit: 300_000, name: '출장·업무용복', basis: '소득세법' },
   congratulations: { limit: 500_000, name: '경조사비', basis: '소득세법 (연1회)' },

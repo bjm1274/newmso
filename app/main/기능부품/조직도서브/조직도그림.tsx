@@ -87,10 +87,10 @@ export default function OrgChart({ staffs = [], selectedCo, setSelectedCo }: any
     <div className="flex flex-col h-full bg-[#F8FAFC] font-sans overflow-hidden">
       {/* 상단 필터 및 검색 - 모바일 대응 */}
       <div className="p-4 md:p-6 bg-white border-b border-gray-100 flex flex-col md:flex-row gap-4 justify-between items-center shrink-0 z-20 shadow-sm">
-        <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-full md:w-auto overflow-x-auto no-scrollbar">
+        <div className="flex gap-1 bg-gray-100 p-1 rounded-[12px] w-full md:w-auto overflow-x-auto no-scrollbar">
           {companies.map(co => (
             <button key={co} onClick={() => setSelectedCo(co)}
-              className={`px-4 md:px-6 py-2 text-[10px] md:text-[11px] font-black transition-all rounded-lg whitespace-nowrap ${selectedCo === co ? 'bg-white shadow-sm text-blue-600' : 'text-gray-400'}`}>
+              className={`px-4 md:px-6 py-2 text-[10px] md:text-[11px] font-black transition-all rounded-[12px] whitespace-nowrap ${selectedCo === co ? 'bg-white shadow-md text-blue-600' : 'text-gray-400'}`}>
               {co}
             </button>
           ))}

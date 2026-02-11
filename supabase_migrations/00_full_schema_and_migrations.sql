@@ -147,6 +147,7 @@ BEGIN
     ALTER TABLE inventory ADD COLUMN IF NOT EXISTS name VARCHAR(100);
     ALTER TABLE inventory ADD COLUMN IF NOT EXISTS stock INT DEFAULT 0;
     ALTER TABLE inventory ADD COLUMN IF NOT EXISTS min_stock INT DEFAULT 10;
+    ALTER TABLE inventory ADD COLUMN IF NOT EXISTS department VARCHAR(50);
     UPDATE inventory SET name = COALESCE(name, item_name), stock = COALESCE(NULLIF(stock,0), quantity) WHERE name IS NULL OR stock = 0;
   END IF;
 END $$;

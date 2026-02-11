@@ -47,12 +47,12 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
       <header className="p-6 md:p-8 border-b border-gray-50 bg-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
         <div>
           <h2 className="text-xl font-black text-gray-800 tracking-tighter">급여 통합 관리 <span className="text-sm text-blue-600 ml-2">[{selectedCo}]</span></h2>
-          <div className="flex gap-4 mt-2">
+          <div className="flex gap-1 bg-gray-100 p-1 rounded-[12px] w-fit mt-2 overflow-x-auto no-scrollbar">
             {['대장', '대시보드', '급여정산', '중간정산', '연말정산', '퇴직금', '설정'].map(tab => (
               <button 
                 key={tab} 
                 onClick={() => setActiveTab(tab)}
-                className={`text-[11px] font-black tracking-widest uppercase transition-all ${activeTab === tab ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-300 hover:text-gray-500'}`}
+                className={`px-4 py-2 text-[11px] font-black tracking-widest uppercase rounded-[12px] transition-all whitespace-nowrap ${activeTab === tab ? 'bg-white shadow-md text-blue-600' : 'text-gray-400'}`}
               >
                 {tab}
               </button>
@@ -109,7 +109,9 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
           </>
         ) : (
           <div className="h-full flex items-center justify-center bg-white border border-dashed border-gray-200 rounded-[2rem] p-20">
-            <p className="text-sm font-black text-gray-400">"{selectedCo}" 소속 인원이 없습니다.</p>
+            <p className="text-sm font-black text-gray-400">
+              &quot;{selectedCo}&quot; 소속 인원이 없습니다.
+            </p>
           </div>
         )}
       </div>

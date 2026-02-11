@@ -34,6 +34,16 @@ export default function BoardView({ user }: any) {
     fetchPosts();
   }, [activeBoard]);
 
+  useEffect(() => {
+    const channel = supabase
+      .channel('board-posts-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'board_posts' }, () => {
+        fetchPosts();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [activeBoard]);
+
   const fetchComments = async (postId: string) => {
     const { data } = await supabase
       .from('board_post_comments')

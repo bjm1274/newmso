@@ -1,16 +1,23 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 // 기능 컴포넌트 불러오기
 import MyProfileCard from './프로필카드';
 import SalarySlipContainer from './급여명세서';
 import MyTodoList from './나의할일';
 import CommuteRecord from './출퇴근기록';
-import MyCertificates from './증명서관리'; // [추가] 증명서 관리 컴포넌트
+import MyCertificates from './증명서관리';
+import NotificationInbox from '../알림인박스';
 
-export default function MyPageMain({ user }: any) {
-  // 탭 상태에 'certificates' 추가
-  const [activeTab, setActiveTab] = useState<'profile' | 'salary' | 'todo' | 'commute' | 'certificates'>('profile');
+export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInitialTab, onOpenApproval }: any) {
+  const [activeTab, setActiveTab] = useState<'profile' | 'salary' | 'todo' | 'commute' | 'certificates' | 'notifications'>('profile');
+
+  useEffect(() => {
+    if (initialMyPageTab === 'notifications') {
+      setActiveTab('notifications');
+      onConsumeMyPageInitialTab?.();
+    }
+  }, [initialMyPageTab, onConsumeMyPageInitialTab]);
 
   if (!user) return <div className="p-10 text-center font-bold">사용자 정보 로딩 중...</div>;
 
@@ -19,9 +26,42 @@ export default function MyPageMain({ user }: any) {
       
       {/* 상단 헤더 및 통합 탭 메뉴 */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 shrink-0">
-        <div className="text-left">
-          <h1 className="text-2xl font-black text-gray-900 tracking-tight">반갑습니다, {user.name}님 👋</h1>
-          <p className="text-xs font-bold text-gray-400 mt-1">박철홍정형외과 시스템에 접속 중입니다.</p>
+        <div className="text-left space-y-2">
+          <div>
+            <h1 className="text-2xl font-black text-gray-900 tracking-tight">반갑습니다, {user.name}님 👋</h1>
+            <p className="text-xs font-bold text-gray-400 mt-1">박철홍정형외과 시스템에 접속 중입니다.</p>
+          </div>
+          {/* 셀프서비스 빠른 메뉴 */}
+          <div className="flex flex-wrap gap-2 text-[11px]">
+            <button
+              type="button"
+              onClick={() => setActiveTab('profile')}
+              className="px-3 py-1.5 rounded-full bg-white/80 border border-gray-200 text-gray-700 font-black hover:bg-gray-900 hover:text-white transition-all"
+            >
+              내 정보 수정
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('certificates')}
+              className="px-3 py-1.5 rounded-full bg-white/80 border border-gray-200 text-gray-700 font-black hover:bg-gray-900 hover:text-white transition-all"
+            >
+              증명서 발급
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('commute')}
+              className="px-3 py-1.5 rounded-full bg-white/80 border border-gray-200 text-gray-700 font-black hover:bg-gray-900 hover:text-white transition-all"
+            >
+              출퇴근 정정 요청
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('salary')}
+              className="px-3 py-1.5 rounded-full bg-white/80 border border-gray-200 text-gray-700 font-black hover:bg-gray-900 hover:text-white transition-all"
+            >
+              급여명세서 확인
+            </button>
+          </div>
         </div>
 
         {/* 탭 네비게이션 (증명서 관리 추가) */}
@@ -51,6 +91,11 @@ export default function MyPageMain({ user }: any) {
             onClick={() => setActiveTab('salary')} 
             label="급여명세서" icon="💰" 
           />
+          <TabButton 
+            isActive={activeTab === 'notifications'} 
+            onClick={() => setActiveTab('notifications')} 
+            label="알림" icon="🔔" 
+          />
         </div>
       </div>
 
@@ -58,10 +103,22 @@ export default function MyPageMain({ user }: any) {
       <div className="flex-1 overflow-hidden relative">
         <div className="absolute inset-0 transition-all duration-300">
           {activeTab === 'profile' && <MyProfileCard user={user} />}
-          {activeTab === 'commute' && <CommuteRecord user={user} />}
+          {activeTab === 'commute' && (
+            <CommuteRecord
+              user={user}
+              onRequestCorrection={(log: any) =>
+                onOpenApproval?.({
+                  type: '출결정정',
+                  workDate: log.work_date,
+                  todayLog: log,
+                })
+              }
+            />
+          )}
           {activeTab === 'todo' && <MyTodoList user={user} />}
           {activeTab === 'salary' && <SalarySlipContainer user={user} />}
-          {activeTab === 'certificates' && <MyCertificates user={user} />} {/* [추가] 증명서 화면 연결 */}
+          {activeTab === 'certificates' && <MyCertificates user={user} />}
+          {activeTab === 'notifications' && <NotificationInbox user={user} onRefresh={() => {}} />}
         </div>
       </div>
 

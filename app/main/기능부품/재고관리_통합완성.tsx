@@ -5,7 +5,6 @@ import UDIManagement from './재고관리서브/UDI관리';
 import InvoiceManagement from './재고관리서브/명세서관리';
 import PurchaseOrderManagement from './재고관리서브/발주관리';
 import ScanModule from './재고관리서브/스캔모듈완성';
-import PhotoModule from './재고관리서브/촬영모듈';
 import ProductRegistration from './재고관리서브/물품등록';
 import { useInventoryAlertSystem, InventoryAlertBadge } from './재고관리서브/재고알림시스템';
 
@@ -42,8 +41,11 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
         (i.company || '').toLowerCase().includes(k)
       );
     }
+    if (selectedDept && selectedDept !== '전체') {
+      list = list.filter((i: any) => (i.department || '').trim() === selectedDept);
+    }
     return list;
-  }, [inventory, searchKeyword]);
+  }, [inventory, searchKeyword, selectedDept]);
 
   const fetchInventory = useCallback(async () => {
     setLoading(true);
@@ -143,7 +145,6 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
             <button onClick={() => setActiveView('명세서')} className={`px-4 py-2 rounded-xl text-[10px] font-black whitespace-nowrap transition-all ${activeView === '명세서' ? 'bg-[#00B44E] text-white shadow-lg' : 'bg-gray-100 text-gray-600'}`}>📄 명세서</button>
             <button onClick={() => setActiveView('발주')} className={`px-4 py-2 rounded-xl text-[10px] font-black whitespace-nowrap transition-all ${activeView === '발주' ? 'bg-[#FF6B00] text-white shadow-lg' : 'bg-gray-100 text-gray-600'}`}>📝 발주</button>
             <button onClick={() => setActiveView('스캔')} className={`px-4 py-2 rounded-xl text-[10px] font-black whitespace-nowrap transition-all ${activeView === '스캔' ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-100 text-gray-600'}`}>🔍 스캔</button>
-            <button onClick={() => setActiveView('촬영')} className={`px-4 py-2 rounded-xl text-[10px] font-black whitespace-nowrap transition-all ${activeView === '촬영' ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-100 text-gray-600'}`}>📸 촬영</button>
             <button onClick={() => setActiveView('등록')} className={`px-4 py-2 rounded-xl text-[10px] font-black whitespace-nowrap transition-all ${activeView === '등록' ? 'bg-blue-500 text-white shadow-lg' : 'bg-gray-100 text-gray-600'}`}>+ 등록</button>
             <button onClick={() => setActiveView('현황')} className={`px-4 py-2 rounded-xl text-[10px] font-black whitespace-nowrap transition-all ${activeView === '현황' ? 'bg-gray-800 text-white shadow-lg' : 'bg-gray-100 text-gray-600'}`}>📊 현황</button>
             <button onClick={() => { setShowLogs(true); fetchLogs(); }} className="px-4 py-2 rounded-xl text-[10px] font-black whitespace-nowrap transition-all bg-gray-100 text-gray-600 hover:bg-gray-200">📋 이력</button>
@@ -159,13 +160,25 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
             ) : (
               <div className="space-y-6">
                 <div className="flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center">
-                  <input
-                    type="text"
-                    placeholder="품목명·분류·LOT·회사 검색..."
-                    value={searchKeyword}
-                    onChange={(e) => setSearchKeyword(e.target.value)}
-                    className="flex-1 max-w-md px-4 py-3 rounded-xl border border-gray-200 bg-white text-sm font-bold focus:ring-2 focus:ring-blue-100 focus:border-blue-300 outline-none"
-                  />
+                  <div className="flex-1 flex flex-col sm:flex-row gap-2">
+                    <input
+                      type="text"
+                      placeholder="품목명·분류·LOT·회사 검색..."
+                      value={searchKeyword}
+                      onChange={(e) => setSearchKeyword(e.target.value)}
+                      className="flex-1 max-w-md px-4 py-3 rounded-xl border border-gray-200 bg-white text-sm font-bold focus:ring-2 focus:ring-blue-100 focus:border-blue-300 outline-none"
+                    />
+                    <select
+                      value={selectedDept}
+                      onChange={(e) => setSelectedDept(e.target.value)}
+                      className="px-3 py-3 rounded-xl border border-gray-200 bg-white text-sm font-bold min-w-[120px]"
+                    >
+                      <option value="전체">전체 부서</option>
+                      {Array.from(new Set(inventory.map((i: any) => (i.department || '').trim()).filter(Boolean))).sort().map((d) => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                  </div>
                   <button onClick={fetchInventory} className="px-4 py-3 rounded-xl bg-gray-100 text-gray-600 text-xs font-black hover:bg-gray-200 transition-all shrink-0">🔄 새로고침</button>
                 </div>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -259,7 +272,6 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
           {activeView === '명세서' && <InvoiceManagement user={user} inventory={inventory} suppliers={suppliers} fetchSuppliers={fetchSuppliers} />}
           {activeView === '발주' && <PurchaseOrderManagement user={user} inventory={inventory} suppliers={suppliers} fetchInventory={fetchInventory} />}
           {activeView === '스캔' && <ScanModule user={user} inventory={inventory} fetchInventory={fetchInventory} />}
-          {activeView === '촬영' && <PhotoModule user={user} inventory={inventory} fetchInventory={fetchInventory} />}
           {activeView === '등록' && <ProductRegistration user={user} suppliers={suppliers} fetchInventory={fetchInventory} fetchSuppliers={fetchSuppliers} />}
         </main>
       </div>

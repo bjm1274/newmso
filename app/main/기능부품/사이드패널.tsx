@@ -95,33 +95,33 @@ export default function StatusPanel({ user, tasks, surgeries, mris, attStatus, o
   return (
     <aside className="w-80 bg-white border-l border-gray-50 p-8 flex flex-col shadow-sm overflow-y-auto">
       {/* 탭 */}
-      <div className="flex gap-2 mb-6 bg-gray-50 p-2 rounded-xl">
+      <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-[12px]">
         <button
           onClick={() => setActiveTab('알림')}
-          className={`flex-1 px-3 py-2 rounded-lg text-[10px] font-black transition-all ${
+          className={`flex-1 px-3 py-2 rounded-[12px] text-[10px] font-black transition-all ${
             activeTab === '알림'
-              ? 'bg-blue-600 text-white shadow-lg'
-              : 'bg-white text-gray-400 border border-gray-200'
+              ? 'bg-white shadow-md text-blue-600'
+              : 'text-gray-400'
           }`}
         >
           🔔 {unreadCount > 0 && <span className="text-red-400">{unreadCount}</span>}
         </button>
         <button
           onClick={() => setActiveTab('일정')}
-          className={`flex-1 px-3 py-2 rounded-lg text-[10px] font-black transition-all ${
+          className={`flex-1 px-3 py-2 rounded-[12px] text-[10px] font-black transition-all ${
             activeTab === '일정'
-              ? 'bg-blue-600 text-white shadow-lg'
-              : 'bg-white text-gray-400 border border-gray-200'
+              ? 'bg-white shadow-md text-blue-600'
+              : 'text-gray-400'
           }`}
         >
           📅
         </button>
         <button
           onClick={() => setActiveTab('근태')}
-          className={`flex-1 px-3 py-2 rounded-lg text-[10px] font-black transition-all ${
+          className={`flex-1 px-3 py-2 rounded-[12px] text-[10px] font-black transition-all ${
             activeTab === '근태'
-              ? 'bg-blue-600 text-white shadow-lg'
-              : 'bg-white text-gray-400 border border-gray-200'
+              ? 'bg-white shadow-md text-blue-600'
+              : 'text-gray-400'
           }`}
         >
           ⏰
