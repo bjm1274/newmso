@@ -40,6 +40,7 @@ export default function ScanModule({ user, inventory, fetchInventory }: any) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [scannedData, setScannedData] = useState<any>(null);
+  const [scannedItems, setScannedItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [scanMode, setScanMode] = useState<'명세서' | '바코드'>('명세서');
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
@@ -65,6 +66,7 @@ export default function ScanModule({ user, inventory, fetchInventory }: any) {
     }
     setUploadedImage(null);
     setScannedData(null);
+    setScannedItems([]);
     setInputMethod('image');
   };
 
@@ -92,9 +94,12 @@ export default function ScanModule({ user, inventory, fetchInventory }: any) {
 
       if (scanMode === '명세서') {
         const items = parseStatementText(text);
-        setScannedData(items.length > 0 ? { items, supplier_name: '' } : null);
-        if (items.length === 0) alert('거래명세서에서 품목을 인식하지 못했습니다. 이미지 품질을 확인하세요.');
+        const editable = items.map((it) => ({ ...it }));
+        setScannedItems(editable);
+        setScannedData(editable.length > 0 ? { items: editable, supplier_name: '' } : null);
+        if (editable.length === 0) alert('거래명세서에서 품목을 인식하지 못했습니다. 이미지 품질을 확인하세요.');
       } else {
+        setScannedItems([]);
         setScannedData({ item_name: '스캔 품목', qty: 1, unit_price: 0 });
       }
     } catch (err) {
@@ -125,8 +130,11 @@ export default function ScanModule({ user, inventory, fetchInventory }: any) {
 
         if (scanMode === '명세서') {
           const items = parseStatementText(text);
-          setScannedData(items.length > 0 ? { items } : null);
+          const editable = items.map((it) => ({ ...it }));
+          setScannedItems(editable);
+          setScannedData(editable.length > 0 ? { items: editable } : null);
         } else {
+          setScannedItems([]);
           setScannedData({ item_name: '스캔 품목', qty: 1, unit_price: 0 });
         }
       }
@@ -140,11 +148,19 @@ export default function ScanModule({ user, inventory, fetchInventory }: any) {
     if (!scannedData) return;
     setLoading(true);
     try {
-      if (scanMode === '명세서' && scannedData.items?.length) {
+      if (scanMode === '명세서') {
+        const itemsToApply = (scannedItems.length ? scannedItems : scannedData.items) || [];
+        const validItems = itemsToApply.filter(
+          (it: any) => (it.item_name || '').trim().length >= 2 && (it.qty || 0) > 0,
+        );
+        if (validItems.length === 0) {
+          alert('입고할 품목이 없습니다. 품목명과 수량을 확인해 주세요.');
+          return;
+        }
         let successCount = 0;
         const company = user?.company || '박철홍정형외과';
 
-        for (const it of scannedData.items) {
+        for (const it of validItems) {
           const existing = inventory.find((i: any) =>
             (i.item_name || i.name || '').includes(it.item_name) || (it.item_name || '').includes(i.item_name || i.name || '')
           );
@@ -205,6 +221,7 @@ export default function ScanModule({ user, inventory, fetchInventory }: any) {
         }
       }
       setScannedData(null);
+      setScannedItems([]);
       setUploadedImage(null);
       stopCamera();
     } finally {
@@ -236,6 +253,7 @@ export default function ScanModule({ user, inventory, fetchInventory }: any) {
               onClick={() => {
                 setScanMode(mode);
                 setScannedData(null);
+                setScannedItems([]);
                 setUploadedImage(null);
                 setInputMethod('image');
               }}
@@ -360,22 +378,88 @@ export default function ScanModule({ user, inventory, fetchInventory }: any) {
 
         {scannedData && (
           <div className="mt-8 p-8 bg-blue-50/50 rounded-[2rem] border border-blue-100 animate-in slide-in-from-top-4">
-            <h4 className="text-sm font-black text-blue-600 mb-4 uppercase tracking-widest">분석 결과 (확인 후 입고)</h4>
+            <h4 className="text-sm font-black text-blue-600 mb-2 uppercase tracking-widest">
+              분석 결과 (입고 전 수정 가능)
+            </h4>
+            {scanMode === '명세서' && scannedItems.length > 0 && (
+              <p className="text-[11px] text-gray-500 mb-4">
+                인식 결과가 깨져 보이면, <span className="font-black">품목명·수량·단가를 직접 고치거나 불필요한 행은 삭제</span>한 뒤 아래 입고 버튼을 눌러 주세요.
+              </p>
+            )}
             <div className="space-y-4">
-              {scanMode === '명세서' && scannedData.items?.length ? (
-                scannedData.items.map((item: any, i: number) => (
-                  <div key={i} className="flex justify-between items-center text-xs font-bold text-gray-700 bg-white p-4 rounded-xl">
-                    <span>{item.item_name}</span>
-                    <span className="font-black text-blue-600">{item.qty}개 {item.unit_price ? `× ₩${item.unit_price.toLocaleString()}` : ''}</span>
+              {scanMode === '명세서' && scannedItems.length > 0 ? (
+                scannedItems.map((item: any, i: number) => (
+                  <div
+                    key={i}
+                    className="grid grid-cols-12 gap-2 items-center text-[11px] bg-white p-3 rounded-xl border border-gray-100"
+                  >
+                    <input
+                      value={item.item_name}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setScannedItems((prev) => {
+                          const copy = [...prev];
+                          copy[i] = { ...copy[i], item_name: v };
+                          return copy;
+                        });
+                      }}
+                      className="col-span-6 px-2 py-1.5 rounded-lg border border-gray-200 font-bold text-gray-800 text-xs"
+                      placeholder="품목명"
+                    />
+                    <input
+                      type="number"
+                      value={item.qty}
+                      onChange={(e) => {
+                        const v = Math.max(0, parseInt(e.target.value || '0', 10));
+                        setScannedItems((prev) => {
+                          const copy = [...prev];
+                          copy[i] = { ...copy[i], qty: v };
+                          return copy;
+                        });
+                      }}
+                      className="col-span-2 px-2 py-1.5 rounded-lg border border-gray-200 font-bold text-right text-xs"
+                      placeholder="수량"
+                    />
+                    <input
+                      type="number"
+                      value={item.unit_price ?? ''}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value || '0', 10);
+                        setScannedItems((prev) => {
+                          const copy = [...prev];
+                          copy[i] = { ...copy[i], unit_price: isNaN(v) ? 0 : v };
+                          return copy;
+                        });
+                      }}
+                      className="col-span-3 px-2 py-1.5 rounded-lg border border-gray-200 font-bold text-right text-xs"
+                      placeholder="단가(선택)"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setScannedItems((prev) => prev.filter((_, idx) => idx !== i))
+                      }
+                      className="col-span-1 text-[10px] font-black text-red-500 hover:text-red-700"
+                    >
+                      ✕
+                    </button>
                   </div>
                 ))
               ) : scanMode === '바코드' ? (
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center bg-white p-4 rounded-xl text-xs font-bold text-gray-700">
                   <span className="text-xs font-black text-gray-800">{scannedData.item_name}</span>
                   <span className="text-xs font-black text-blue-600">{scannedData.qty || 1}개</span>
                 </div>
-              ) : null}
-              <button onClick={handleConfirmScan} disabled={loading} className="w-full py-4 bg-blue-600 text-white rounded-xl font-black text-xs shadow-lg mt-4">✅ 입고 확정하기</button>
+              ) : (
+                <p className="text-[11px] text-gray-400">인식된 데이터가 없습니다.</p>
+              )}
+              <button
+                onClick={handleConfirmScan}
+                disabled={loading}
+                className="w-full py-4 bg-blue-600 text-white rounded-xl font-black text-xs shadow-lg mt-4 disabled:opacity-50"
+              >
+                ✅ 입고 확정하기
+              </button>
             </div>
           </div>
         )}
