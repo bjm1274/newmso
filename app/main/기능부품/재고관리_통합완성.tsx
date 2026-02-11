@@ -6,6 +6,7 @@ import InvoiceManagement from './재고관리서브/명세서관리';
 import PurchaseOrderManagement from './재고관리서브/발주관리';
 import ScanModule from './재고관리서브/스캔모듈완성';
 import ProductRegistration from './재고관리서브/물품등록';
+import ExcelBulkUpload from './관리자전용서브/엑셀일괄등록';
 import { useInventoryAlertSystem, InventoryAlertBadge } from './재고관리서브/재고알림시스템';
 
 export default function IntegratedInventoryManagement({ user, selectedCo, onRefresh }: any) {
@@ -19,6 +20,7 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
   const [stockAmount, setStockAmount] = useState(1);
   const [showLogs, setShowLogs] = useState(false);
   const [logs, setLogs] = useState<any[]>([]);
+  const [registrationMode, setRegistrationMode] = useState<'form' | 'excel'>('form');
 
   const { lowStockItems, expiryImminentItems } = useInventoryAlertSystem(inventory, user);
 
@@ -271,8 +273,51 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
           {activeView === 'UDI' && <UDIManagement user={user} inventory={inventory} fetchInventory={fetchInventory} />}
           {activeView === '명세서' && <InvoiceManagement user={user} inventory={inventory} suppliers={suppliers} fetchSuppliers={fetchSuppliers} />}
           {activeView === '발주' && <PurchaseOrderManagement user={user} inventory={inventory} suppliers={suppliers} fetchInventory={fetchInventory} />}
-          {activeView === '스캔' && <ScanModule user={user} inventory={inventory} fetchInventory={fetchInventory} />}
-          {activeView === '등록' && <ProductRegistration user={user} suppliers={suppliers} fetchInventory={fetchInventory} fetchSuppliers={fetchSuppliers} />}
+          {activeView === '스캔' && (
+            <ScanModule
+              user={user}
+              inventory={inventory}
+              fetchInventory={fetchInventory}
+            />
+          )}
+          {activeView === '등록' && (
+            <div className="space-y-4">
+              <div className="flex gap-2 mb-2">
+                <button
+                  type="button"
+                  onClick={() => setRegistrationMode('form')}
+                  className={`flex-1 px-4 py-3 rounded-xl text-[11px] font-black transition-all ${
+                    registrationMode === 'form'
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  ✏️ 일반 등록
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRegistrationMode('excel')}
+                  className={`flex-1 px-4 py-3 rounded-xl text-[11px] font-black transition-all ${
+                    registrationMode === 'excel'
+                      ? 'bg-emerald-600 text-white shadow-md'
+                      : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  📊 엑셀 일괄 등록
+                </button>
+              </div>
+              {registrationMode === 'form' ? (
+                <ProductRegistration
+                  user={user}
+                  suppliers={suppliers}
+                  fetchInventory={fetchInventory}
+                  fetchSuppliers={fetchSuppliers}
+                />
+              ) : (
+                <ExcelBulkUpload onRefresh={fetchInventory} />
+              )}
+            </div>
+          )}
         </main>
       </div>
 
