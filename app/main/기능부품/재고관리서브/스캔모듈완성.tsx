@@ -404,81 +404,116 @@ export default function ScanModule({ user, inventory, fetchInventory }: any) {
             )}
             <div className="space-y-4">
               {scanMode === '명세서' && scannedItems.length > 0 ? (
-                scannedItems.map((item: any, i: number) => (
-                  <div
-                    key={i}
-                    className="bg-white p-3 rounded-xl border border-gray-100 space-y-1"
-                  >
-                    <div className="grid grid-cols-12 gap-2 items-center text-[11px]">
-                      <input
-                        value={item.item_name}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setScannedItems((prev) => {
-                            const copy = [...prev];
-                            copy[i] = { ...copy[i], item_name: v };
-                            return copy;
-                          });
-                        }}
-                        className="col-span-6 px-2 py-1.5 rounded-lg border border-gray-200 font-bold text-gray-800 text-xs"
-                        placeholder="품목명"
-                      />
-                      <input
-                        type="number"
-                        value={item.qty}
-                        onChange={(e) => {
-                          const v = Math.max(0, parseInt(e.target.value || '0', 10));
-                          setScannedItems((prev) => {
-                            const copy = [...prev];
-                            copy[i] = { ...copy[i], qty: v };
-                            return copy;
-                          });
-                        }}
-                        className="col-span-2 px-2 py-1.5 rounded-lg border border-gray-200 font-bold text-right text-xs"
-                        placeholder="수량"
-                      />
-                      <input
-                        type="number"
-                        value={item.unit_price ?? ''}
-                        onChange={(e) => {
-                          const v = parseInt(e.target.value || '0', 10);
-                          setScannedItems((prev) => {
-                            const copy = [...prev];
-                            copy[i] = { ...copy[i], unit_price: isNaN(v) ? 0 : v };
-                            return copy;
-                          });
-                        }}
-                        className="col-span-3 px-2 py-1.5 rounded-lg border border-gray-200 font-bold text-right text-xs"
-                        placeholder="단가(선택)"
-                      />
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setScannedItems((prev) => prev.filter((_, idx) => idx !== i))
-                        }
-                        className="col-span-1 text-[10px] font-black text-red-500 hover:text-red-700"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                    {/* 명세서 한 줄 요약: 보험코드 / 품명 / 규격 / 수량 / 단가 / 유효기간 */}
-                    <p className="text-[10px] text-gray-400 mt-1">
-                      <span className="font-black text-gray-500">보험코드</span>{' '}
-                      {item.insurance_code || '-'} &nbsp;|&nbsp;
-                      <span className="font-black text-gray-500">품명</span>{' '}
-                      {(item.item_name || '').trim() || '-'} &nbsp;|&nbsp;
-                      <span className="font-black text-gray-500">규격</span>{' '}
-                      {item.spec || '-'} &nbsp;|&nbsp;
-                      <span className="font-black text-gray-500">수량</span>{' '}
-                      {item.qty || 0} &nbsp;|&nbsp;
-                      <span className="font-black text-gray-500">단가</span>{' '}
-                      {item.unit_price ? `${item.unit_price.toLocaleString()}원` : '-'}{' '}
-                      &nbsp;|&nbsp;
-                      <span className="font-black text-gray-500">유효기간</span>{' '}
-                      {item.expiry_date || '-'}
-                    </p>
+                <>
+                  {/* 명세서 스타일 헤더 */}
+                  <div className="hidden md:flex text-[10px] font-black text-gray-400 px-1">
+                    <div className="w-20">보험코드</div>
+                    <div className="flex-1">품명</div>
+                    <div className="w-32">규격</div>
+                    <div className="w-14 text-right">수량</div>
+                    <div className="w-24 text-right">단가</div>
+                    <div className="w-28 text-center">유효기간</div>
+                    <div className="w-8" />
                   </div>
-                ))
+                  {scannedItems.map((item: any, i: number) => (
+                    <div
+                      key={i}
+                      className="bg-white p-2 rounded-xl border border-gray-100 text-[11px]"
+                    >
+                      <div className="flex flex-col md:flex-row gap-2 items-center">
+                        <input
+                          value={item.insurance_code || ''}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setScannedItems((prev) => {
+                              const copy = [...prev];
+                              copy[i] = { ...copy[i], insurance_code: v };
+                              return copy;
+                            });
+                          }}
+                          className="w-full md:w-20 px-2 py-1.5 rounded-lg border border-gray-200 font-mono text-xs"
+                          placeholder="보험코드"
+                        />
+                        <input
+                          value={item.item_name}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setScannedItems((prev) => {
+                              const copy = [...prev];
+                              copy[i] = { ...copy[i], item_name: v };
+                              return copy;
+                            });
+                          }}
+                          className="flex-1 px-2 py-1.5 rounded-lg border border-gray-200 font-bold text-gray-800 text-xs"
+                          placeholder="품명"
+                        />
+                        <input
+                          value={item.spec || ''}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setScannedItems((prev) => {
+                              const copy = [...prev];
+                              copy[i] = { ...copy[i], spec: v };
+                              return copy;
+                            });
+                          }}
+                          className="w-full md:w-32 px-2 py-1.5 rounded-lg border border-gray-200 text-xs"
+                          placeholder="규격"
+                        />
+                        <input
+                          type="number"
+                          value={item.qty}
+                          onChange={(e) => {
+                            const v = Math.max(0, parseInt(e.target.value || '0', 10));
+                            setScannedItems((prev) => {
+                              const copy = [...prev];
+                              copy[i] = { ...copy[i], qty: v };
+                              return copy;
+                            });
+                          }}
+                          className="w-full md:w-14 px-2 py-1.5 rounded-lg border border-gray-200 font-bold text-right text-xs"
+                          placeholder="수량"
+                        />
+                        <input
+                          type="number"
+                          value={item.unit_price ?? ''}
+                          onChange={(e) => {
+                            const v = parseInt(e.target.value || '0', 10);
+                            setScannedItems((prev) => {
+                              const copy = [...prev];
+                              copy[i] = { ...copy[i], unit_price: isNaN(v) ? 0 : v };
+                              return copy;
+                            });
+                          }}
+                          className="w-full md:w-24 px-2 py-1.5 rounded-lg border border-gray-200 font-bold text-right text-xs"
+                          placeholder="단가"
+                        />
+                        <input
+                          type="date"
+                          value={item.expiry_date || ''}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setScannedItems((prev) => {
+                              const copy = [...prev];
+                              copy[i] = { ...copy[i], expiry_date: v };
+                              return copy;
+                            });
+                          }}
+                          className="w-full md:w-28 px-2 py-1.5 rounded-lg border border-gray-200 text-xs"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setScannedItems((prev) => prev.filter((_, idx) => idx !== i))
+                          }
+                          className="w-full md:w-8 text-[10px] font-black text-red-500 hover:text-red-700"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </>
               ) : scanMode === '바코드' ? (
                 <div className="flex justify-between items-center bg-white p-4 rounded-xl text-xs font-bold text-gray-700">
                   <span className="text-xs font-black text-gray-800">{scannedData.item_name}</span>
