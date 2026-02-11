@@ -15,7 +15,7 @@ type ParsedLine = {
 
 function parseStatementText(text: string): ParsedLine[] {
   const lines = text.split(/\n/).map(s => s.trim()).filter(Boolean);
-  const items: ParsedLine[] = [];
+  const strictItems: ParsedLine[] = [];
   const numPat = /[\d,]+/g;
 
   for (const line of lines) {
@@ -47,7 +47,7 @@ function parseStatementText(text: string): ParsedLine[] {
       const raw = (parts[2] || '').replace(/,/g, '');
       const unitPrice = parts.length >= 3 ? (parseInt(raw, 10) || undefined) : undefined;
       if (name && name.length >= 2 && !/^\d+$/.test(name) && qty > 0) {
-        items.push({ item_name: name, qty, unit_price: unitPrice, insurance_code: insuranceCode, spec: '', expiry_date: expiry });
+        strictItems.push({ item_name: name, qty, unit_price: unitPrice, insurance_code: insuranceCode, spec: '', expiry_date: expiry });
       }
     } else {
       // 한 줄에 "품목명 100개" 또는 "품목명 100 2000" 형태
@@ -55,11 +55,30 @@ function parseStatementText(text: string): ParsedLine[] {
       const namePart = line.replace(numPat, '').replace(/\s+/g, ' ').trim();
       if (nums && namePart.length >= 2 && !/^[\d\s,]+$/.test(namePart)) {
         const qty = parseInt(nums[0].replace(/,/g, ''), 10) || 0;
-        if (qty > 0) items.push({ item_name: namePart, qty, unit_price: nums[1] ? parseInt(nums[1].replace(/,/g, ''), 10) : undefined });
+        if (qty > 0) strictItems.push({ item_name: namePart, qty, unit_price: nums[1] ? parseInt(nums[1].replace(/,/g, ''), 10) : undefined });
       }
     }
   }
-  return items;
+
+  // 1차: 보험코드 기반 파싱에서 결과가 있으면 그대로 사용
+  if (strictItems.length > 0) return strictItems;
+
+  // 2차: 예전 방식의 느슨한 파서로 한 번 더 시도 (보험코드 없이라도 최소 품목/수량만 추출)
+  const fallback: ParsedLine[] = [];
+  for (const line of lines) {
+    const parts = line.split(/\s{2,}|\t/).filter(Boolean);
+    if (parts.length >= 2) {
+      const name = parts[0].replace(/[^\uAC00-\uD7A3\w\s\-\.]/g, '').trim();
+      const qtyMatch = parts[1].replace(/,/g, '').match(/\d+/);
+      const qty = qtyMatch ? parseInt(qtyMatch[0], 10) : 0;
+      const raw = (parts[2] || '').replace(/,/g, '');
+      const unitPrice = parts.length >= 3 ? (parseInt(raw, 10) || undefined) : undefined;
+      if (name && name.length >= 2 && !/^\d+$/.test(name) && qty > 0) {
+        fallback.push({ item_name: name, qty, unit_price: unitPrice });
+      }
+    }
+  }
+  return fallback;
 }
 
 export default function ScanModule({ user, inventory, fetchInventory }: any) {
