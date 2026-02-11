@@ -24,6 +24,16 @@ function parseStatementText(text: string): ParsedLine[] {
     if (!insuranceMatch) continue;
     const insuranceCode = insuranceMatch[0].toUpperCase();
 
+    // 유효기간 패턴 (예: 20271231, 2027-12-31, 2027.12.31)
+    let expiry: string | undefined;
+    const expiryRawMatch = line.match(/(20\d{2})[.\-\/]?(0[1-9]|1[0-2])[.\-\/]?(0[1-9]|[12]\d|3[01])/);
+    if (expiryRawMatch) {
+      const y = expiryRawMatch[1];
+      const m = expiryRawMatch[2];
+      const d = expiryRawMatch[3];
+      expiry = `${y}-${m}-${d}`;
+    }
+
     // 보험코드 이후 부분만 사용해서 품명/수량/단가 추출
     const afterCode = line.slice(line.indexOf(insuranceCode) + insuranceCode.length).trim();
 
@@ -37,7 +47,7 @@ function parseStatementText(text: string): ParsedLine[] {
       const raw = (parts[2] || '').replace(/,/g, '');
       const unitPrice = parts.length >= 3 ? (parseInt(raw, 10) || undefined) : undefined;
       if (name && name.length >= 2 && !/^\d+$/.test(name) && qty > 0) {
-        items.push({ item_name: name, qty, unit_price: unitPrice, insurance_code: insuranceCode, spec: '' });
+        items.push({ item_name: name, qty, unit_price: unitPrice, insurance_code: insuranceCode, spec: '', expiry_date: expiry });
       }
     } else {
       // 한 줄에 "품목명 100개" 또는 "품목명 100 2000" 형태
@@ -65,6 +75,27 @@ export default function ScanModule({ user, inventory, fetchInventory }: any) {
   const [ocrProgress, setOcrProgress] = useState(0);
   const [inputMethod, setInputMethod] = useState<'image' | 'camera'>('image');
 
+  // 공통 OCR 실행 함수 (이미지 DataURL → Tesseract)
+  const runOcrFromDataUrl = async (dataUrl: string) => {
+    setUploadedImage(dataUrl);
+    const { data: { text } } = await Tesseract.recognize(dataUrl, 'kor+eng', {
+      logger: (m) => {
+        if (m.status === 'recognizing text') setOcrProgress(Math.round(m.progress * 100));
+      }
+    });
+
+    if (scanMode === '명세서') {
+      const items = parseStatementText(text);
+      const editable = items.map((it) => ({ ...it }));
+      setScannedItems(editable);
+      setScannedData(editable.length > 0 ? { items: editable, supplier_name: '' } : null);
+      if (editable.length === 0) alert('거래명세서에서 품목을 인식하지 못했습니다. 이미지 품질을 확인하세요.');
+    } else {
+      setScannedItems([]);
+      setScannedData({ item_name: '스캔 품목', qty: 1, unit_price: 0 });
+    }
+  };
+
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
@@ -90,35 +121,43 @@ export default function ScanModule({ user, inventory, fetchInventory }: any) {
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !file.type.startsWith('image/')) {
-      alert('이미지 파일만 업로드 가능합니다.');
-      return;
-    }
+    if (!file) return;
     setLoading(true);
     setOcrProgress(0);
     try {
-      const dataUrl = await new Promise<string>((res) => {
-        const r = new FileReader();
-        r.onload = () => res(r.result as string);
-        r.readAsDataURL(file);
-      });
-      setUploadedImage(dataUrl);
+      let dataUrl: string | null = null;
 
-      const { data: { text } } = await Tesseract.recognize(dataUrl, 'kor+eng', {
-        logger: (m) => {
-          if (m.status === 'recognizing text') setOcrProgress(Math.round(m.progress * 100));
-        }
-      });
+      if (file.type.startsWith('image/')) {
+        dataUrl = await new Promise<string>((res) => {
+          const r = new FileReader();
+          r.onload = () => res(r.result as string);
+          r.readAsDataURL(file);
+        });
+      } else if (file.type === 'application/pdf') {
+        const pdfjs = await import('pdfjs-dist');
+        // CDN 기반 워커 설정 (Next.js 환경에서 간단히 사용)
+        (pdfjs as any).GlobalWorkerOptions.workerSrc =
+          'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-      if (scanMode === '명세서') {
-        const items = parseStatementText(text);
-        const editable = items.map((it) => ({ ...it }));
-        setScannedItems(editable);
-        setScannedData(editable.length > 0 ? { items: editable, supplier_name: '' } : null);
-        if (editable.length === 0) alert('거래명세서에서 품목을 인식하지 못했습니다. 이미지 품질을 확인하세요.');
+        const arrayBuffer = await file.arrayBuffer();
+        const loadingTask = (pdfjs as any).getDocument({ data: arrayBuffer });
+        const pdf = await loadingTask.promise;
+        const page = await pdf.getPage(1);
+        const viewport = page.getViewport({ scale: 2 });
+
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        await page.render({ canvasContext: ctx, viewport }).promise;
+        dataUrl = canvas.toDataURL('image/png');
       } else {
-        setScannedItems([]);
-        setScannedData({ item_name: '스캔 품목', qty: 1, unit_price: 0 });
+        alert('이미지 또는 PDF 파일만 업로드 가능합니다.');
+        return;
+      }
+
+      if (dataUrl) {
+        await runOcrFromDataUrl(dataUrl);
       }
     } catch (err) {
       console.error(err);
@@ -146,15 +185,7 @@ export default function ScanModule({ user, inventory, fetchInventory }: any) {
           logger: (m) => { if (m.status === 'recognizing text') setOcrProgress(Math.round(m.progress * 100)); }
         });
 
-        if (scanMode === '명세서') {
-          const items = parseStatementText(text);
-          const editable = items.map((it) => ({ ...it }));
-          setScannedItems(editable);
-          setScannedData(editable.length > 0 ? { items: editable } : null);
-        } else {
-          setScannedItems([]);
-          setScannedData({ item_name: '스캔 품목', qty: 1, unit_price: 0 });
-        }
+        await runOcrFromDataUrl(dataUrl);
       }
     } finally {
       setLoading(false);
@@ -254,7 +285,7 @@ export default function ScanModule({ user, inventory, fetchInventory }: any) {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+      <input ref={fileInputRef} type="file" accept="image/*,application/pdf" onChange={handleFileUpload} className="hidden" />
 
       <div className="bg-white p-6 md:p-10 border border-gray-100 shadow-xl rounded-[2.5rem]">
         <div className="mb-8">
