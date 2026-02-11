@@ -4,22 +4,35 @@ import { supabase } from '@/lib/supabase';
 import Tesseract from 'tesseract.js';
 
 /** 거래명세서 OCR 텍스트에서 품목·수량 파싱 */
-function parseStatementText(text: string): { item_name: string; qty: number; unit_price?: number }[] {
+type ParsedLine = {
+  item_name: string;
+  qty: number;
+  unit_price?: number;
+  insurance_code?: string;
+  spec?: string;
+  expiry_date?: string;
+};
+
+function parseStatementText(text: string): ParsedLine[] {
   const lines = text.split(/\n/).map(s => s.trim()).filter(Boolean);
-  const items: { item_name: string; qty: number; unit_price?: number }[] = [];
+  const items: ParsedLine[] = [];
   const numPat = /[\d,]+/g;
 
   for (const line of lines) {
     // "품목명  수량  단가  금액" 또는 "품목명 100 2000 200000" 형태
     const parts = line.split(/\s{2,}|\t/).filter(Boolean);
     if (parts.length >= 2) {
+      // 보험코드는 보통 맨 앞 1개 토큰(문자+숫자 조합)인 경우가 많으므로 참고용으로 분리
+      const firstTokenMatch = parts[0].match(/^[A-Za-z0-9]+/);
+      const insuranceCode = firstTokenMatch ? firstTokenMatch[0] : undefined;
+
       const name = parts[0].replace(/[^\uAC00-\uD7A3\w\s\-\.]/g, '').trim();
       const qtyMatch = parts[1].replace(/,/g, '').match(/\d+/);
       const qty = qtyMatch ? parseInt(qtyMatch[0], 10) : 0;
       const raw = (parts[2] || '').replace(/,/g, '');
       const unitPrice = parts.length >= 3 ? (parseInt(raw, 10) || undefined) : undefined;
       if (name && name.length >= 2 && !/^\d+$/.test(name) && qty > 0) {
-        items.push({ item_name: name, qty, unit_price: unitPrice });
+        items.push({ item_name: name, qty, unit_price: unitPrice, insurance_code: insuranceCode, spec: '' });
       }
     } else {
       // 한 줄에 "품목명 100개" 또는 "품목명 100 2000" 형태
@@ -188,7 +201,10 @@ export default function ScanModule({ user, inventory, fetchInventory }: any) {
               min_quantity: 5,
               unit_price: it.unit_price || 0,
               company,
-              category: '스캔입고'
+              category: '스캔입고',
+              insurance_code: it.insurance_code || null,
+              spec: it.spec || null,
+              expiry_date: it.expiry_date || null,
             }]).select('id').single();
             if (inserted) {
               await supabase.from('inventory_logs').insert([{

@@ -14,6 +14,8 @@ export default function ProductRegistration({ user, suppliers, fetchInventory, f
     supplier_name: '',
     expiry_date: '',
     lot_number: '',
+    insurance_code: '',
+    spec: '',
     is_udi: false,
     company: user?.company || '박철홍정형외과',
     department: user?.department || ''
@@ -50,6 +52,8 @@ export default function ProductRegistration({ user, suppliers, fetchInventory, f
         unit_price: productForm.unit_price || 0,
         expiry_date: productForm.expiry_date || null,
         lot_number: productForm.lot_number || null,
+        insurance_code: productForm.insurance_code || null,
+        spec: productForm.spec || null,
         // 재고 테이블에서 stock 컬럼을 함께 사용하므로 초기 재고 = quantity 로 맞춤
         stock: productForm.quantity || 0,
       };
@@ -68,6 +72,8 @@ export default function ProductRegistration({ user, suppliers, fetchInventory, f
         supplier_name: '',
         expiry_date: '',
         lot_number: '',
+        insurance_code: '',
+        spec: '',
         is_udi: false,
         company: user?.company || '박철홍정형외과',
         department: user?.department || ''
@@ -136,6 +142,26 @@ export default function ProductRegistration({ user, suppliers, fetchInventory, f
               <option value="">업체 선택</option>
               {suppliers.map((s: any) => <option key={s.id} value={s.name}>{s.name}</option>)}
             </select>
+          </div>
+
+          {/* 보험코드 · 규격 */}
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">보험코드 (선택)</label>
+            <input
+              value={productForm.insurance_code}
+              onChange={e => setProductForm({ ...productForm, insurance_code: e.target.value })}
+              className="w-full p-4 bg-gray-50 rounded-2xl border-none outline-none font-black text-sm focus:ring-2 focus:ring-blue-100"
+              placeholder="예: B0741301"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">규격 (선택)</label>
+            <input
+              value={productForm.spec}
+              onChange={e => setProductForm({ ...productForm, spec: e.target.value })}
+              className="w-full p-4 bg-gray-50 rounded-2xl border-none outline-none font-black text-sm focus:ring-2 focus:ring-blue-100"
+              placeholder="예: 1/0(고), 30매/BOX"
+            />
           </div>
 
           <div className="space-y-2">
