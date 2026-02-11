@@ -3,7 +3,7 @@ import { useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import Tesseract from 'tesseract.js';
 
-/** 거래명세서 OCR 텍스트에서 품목·수량 파싱 */
+/** 거래명세서 OCR 텍스트에서 품목·수량 파싱 (보험코드 패턴 기준으로 필터링) */
 type ParsedLine = {
   item_name: string;
   qty: number;
@@ -19,14 +19,19 @@ function parseStatementText(text: string): ParsedLine[] {
   const numPat = /[\d,]+/g;
 
   for (const line of lines) {
-    // "품목명  수량  단가  금액" 또는 "품목명 100 2000 200000" 형태
-    const parts = line.split(/\s{2,}|\t/).filter(Boolean);
-    if (parts.length >= 2) {
-      // 보험코드는 보통 맨 앞 1개 토큰(문자+숫자 조합)인 경우가 많으므로 참고용으로 분리
-      const firstTokenMatch = parts[0].match(/^[A-Za-z0-9]+/);
-      const insuranceCode = firstTokenMatch ? firstTokenMatch[0] : undefined;
+    // 보험코드 패턴(B+7자리 숫자 등)이 없는 줄은 품목 행이 아닐 확률이 높으므로 스킵
+    const insuranceMatch = line.match(/[A-Z]\d{7}/i);
+    if (!insuranceMatch) continue;
+    const insuranceCode = insuranceMatch[0].toUpperCase();
 
-      const name = parts[0].replace(/[^\uAC00-\uD7A3\w\s\-\.]/g, '').trim();
+    // 보험코드 이후 부분만 사용해서 품명/수량/단가 추출
+    const afterCode = line.slice(line.indexOf(insuranceCode) + insuranceCode.length).trim();
+
+    // "품목명   규격   수량   단가   금액" 형태를 가정하고 2칸 이상 공백/탭 기준으로 분리
+    const parts = afterCode.split(/\s{2,}|\t/).filter(Boolean);
+    if (parts.length >= 2) {
+      const nameAndSpec = parts[0].replace(/[^\uAC00-\uD7A3\w\s\-\.]/g, ' ').trim();
+      const name = nameAndSpec; // 우선 전체를 품명으로 두고, 필요 시 뒷부분을 규격으로 나눌 수 있음
       const qtyMatch = parts[1].replace(/,/g, '').match(/\d+/);
       const qty = qtyMatch ? parseInt(qtyMatch[0], 10) : 0;
       const raw = (parts[2] || '').replace(/,/g, '');
