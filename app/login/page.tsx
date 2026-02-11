@@ -127,6 +127,9 @@ export default function LoginPage() {
             >
               {loading ? '인증 진행 중...' : '로그인'}
             </button>
+            <p className="mt-4 text-[16px] text-gray-500 text-center font-bold tracking-wide">
+              Made by JM
+            </p>
           </div>
         </div>
         
