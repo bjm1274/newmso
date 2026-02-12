@@ -20,6 +20,9 @@ export default function BoardView({ user, setMainMenu }: any) {
   const [scheduleInpatient, setScheduleInpatient] = useState(false);
   const [scheduleGuardian, setScheduleGuardian] = useState(false);
   const [scheduleCaregiver, setScheduleCaregiver] = useState(false);
+  const [schedulePeriod, setSchedulePeriod] = useState('');
+  const [scheduleHour, setScheduleHour] = useState('');
+  const [scheduleMinute, setScheduleMinute] = useState('');
   const [loading, setLoading] = useState(false);
   const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
   const [comments, setComments] = useState<Record<string, any[]>>({});
@@ -35,6 +38,28 @@ export default function BoardView({ user, setMainMenu }: any) {
     { id: '수술일정', label: '🏥 수술일정표', icon: '🏥' },
     { id: 'MRI일정', label: '🔬 MRI일정표', icon: '🔬' }
   ];
+
+  // 오전/오후 + 시/분 드롭다운 값을 HH:MM 문자열로 변환
+  const updateScheduleTime = (period: string, hour: string, minute: string) => {
+    if (!period || !hour || !minute) {
+      setScheduleTime('');
+      return;
+    }
+    const hNum = parseInt(hour, 10);
+    if (Number.isNaN(hNum)) {
+      setScheduleTime('');
+      return;
+    }
+    let h24 = hNum;
+    if (period === '오전') {
+      if (h24 === 12) h24 = 0;
+    } else if (period === '오후') {
+      if (h24 !== 12) h24 = h24 + 12;
+    }
+    const hh = String(h24).padStart(2, '0');
+    const mm = minute.padStart(2, '0');
+    setScheduleTime(`${hh}:${mm}`);
+  };
 
   const fetchPosts = async () => {
     const { data } = await supabase.from('board_posts').select('*').eq('board_type', activeBoard).order('created_at', { ascending: false });
@@ -189,8 +214,8 @@ export default function BoardView({ user, setMainMenu }: any) {
         created_at: new Date().toISOString(),
       };
 
-      // 수술일정의 경우 수술 관련 체크값을 함께 저장
-      if (activeBoard === '수술일정') {
+      // 수술/검사 일정의 경우 수술 관련 체크값을 함께 저장
+      if (activeBoard === '수술일정' || activeBoard === 'MRI일정') {
         postData.surgery_fasting = scheduleFasting;
         postData.surgery_inpatient = scheduleInpatient;
         postData.surgery_guardian = scheduleGuardian;
@@ -204,6 +229,9 @@ export default function BoardView({ user, setMainMenu }: any) {
         setContent('');
         setScheduleDate('');
         setScheduleTime('');
+        setSchedulePeriod('');
+        setScheduleHour('');
+        setScheduleMinute('');
         setScheduleRoom('');
         setSchedulePatient('');
         setScheduleFasting(false);
@@ -317,49 +345,74 @@ export default function BoardView({ user, setMainMenu }: any) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2 block">날짜 (YYYYMMDD)</label>
+                    <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2 block">날짜 (YYYY-MM-DD)</label>
                     <input
                       type="text"
                       value={scheduleDate}
                       onChange={e => {
-                        let v = e.target.value;
-                        // 숫자 8자리만 허용 (YYYYMMDD)
-                        v = v.replace(/[^0-9]/g, '').slice(0, 8);
-                        setScheduleDate(v);
+                        // 숫자만 추출 후 YYYY-MM-DD 형태로 자동 포맷팅
+                        const digits = e.target.value.replace(/[^0-9]/g, '').slice(0, 8);
+                        let formatted = '';
+                        if (digits.length <= 4) {
+                          formatted = digits;
+                        } else if (digits.length <= 6) {
+                          formatted = `${digits.slice(0, 4)}-${digits.slice(4, 6)}`;
+                        } else {
+                          formatted = `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`;
+                        }
+                        setScheduleDate(formatted);
                       }}
                       className="w-full p-4 bg-gray-50 rounded-xl border-none outline-none text-sm font-bold focus:ring-2 focus:ring-blue-100"
                     />
                   </div>
                   <div>
                     <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2 block">시간</label>
-                    <input
-                      type="time"
-                      step={1800}
-                      value={scheduleTime}
-                      onChange={e => {
-                        const raw = e.target.value;
-                        if (!raw) {
-                          setScheduleTime('');
-                          return;
-                        }
-                        const [hh, mm] = raw.split(':').map((v) => parseInt(v, 10));
-                        if (isNaN(hh) || isNaN(mm)) {
-                          setScheduleTime(raw);
-                          return;
-                        }
-                        let h = hh;
-                        let m = mm;
-                        if (m < 15) m = 0;
-                        else if (m < 45) m = 30;
-                        else {
-                          m = 0;
-                          h = (h + 1) % 24;
-                        }
-                        const fixed = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-                        setScheduleTime(fixed);
-                      }}
-                      className="w-full p-4 bg-gray-50 rounded-xl border-none outline-none text-sm font-bold focus:ring-2 focus:ring-blue-100"
-                    />
+                    <div className="grid grid-cols-3 gap-2">
+                      <select
+                        value={schedulePeriod}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setSchedulePeriod(v);
+                          updateScheduleTime(v, scheduleHour, scheduleMinute);
+                        }}
+                        className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-xs font-bold focus:ring-2 focus:ring-blue-100"
+                      >
+                        <option value="">오전/오후</option>
+                        <option value="오전">오전</option>
+                        <option value="오후">오후</option>
+                      </select>
+                      <select
+                        value={scheduleHour}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setScheduleHour(v);
+                          updateScheduleTime(schedulePeriod, v, scheduleMinute);
+                        }}
+                        className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-xs font-bold focus:ring-2 focus:ring-blue-100"
+                      >
+                        <option value="">시간</option>
+                        {Array.from({ length: 12 }).map((_, idx) => {
+                          const h = idx + 1;
+                          const v = String(h).padStart(2, '0');
+                          return (
+                            <option key={v} value={v}>{v}시</option>
+                          );
+                        })}
+                      </select>
+                      <select
+                        value={scheduleMinute}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setScheduleMinute(v);
+                          updateScheduleTime(schedulePeriod, scheduleHour, v);
+                        }}
+                        className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-xs font-bold focus:ring-2 focus:ring-blue-100"
+                      >
+                        <option value="">분</option>
+                        <option value="00">00분</option>
+                        <option value="30">30분</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -372,10 +425,10 @@ export default function BoardView({ user, setMainMenu }: any) {
                     <input value={schedulePatient} onChange={e => setSchedulePatient(e.target.value)} placeholder="환자명 입력" className="w-full p-4 bg-gray-50 rounded-xl border-none outline-none text-sm font-bold focus:ring-2 focus:ring-blue-100" />
                   </div>
                 </div>
-                {activeBoard === '수술일정' && (
+                {(activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-1 block">
-                      수술 관련 체크
+                      {activeBoard === '수술일정' ? '수술 관련 체크' : '촬영 관련 체크'}
                     </label>
                     <div className="grid grid-cols-2 gap-2 text-[11px] font-bold text-gray-700">
                       <label className="inline-flex items-center gap-2 cursor-pointer">
@@ -487,7 +540,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                       <p className="text-[11px] font-black text-gray-800 line-clamp-1">{post.schedule_room}</p>
                     </div>
                   </div>
-                  {activeBoard === '수술일정' && (
+                  {(post.surgery_fasting || post.surgery_inpatient || post.surgery_guardian || post.surgery_caregiver) && (
                     <div className="pt-2 flex flex-wrap gap-1">
                       {post.surgery_fasting && (
                         <span className="px-2 py-1 rounded-full bg-red-50 text-red-600 text-[9px] font-black">
