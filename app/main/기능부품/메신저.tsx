@@ -396,11 +396,12 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
       chatRooms.filter((room: any) => {
         if (room.id === NOTICE_ROOM_ID) return true;
         // 공지메시지 방 하나만 특별 취급, 나머지는 일반 채팅방
-        // members가 지정된 경우: 해당 멤버만
-        if (Array.isArray(room.members) && room.members.length > 0) {
+        // members 배열이 존재하는 방은 "멤버 기반 방"으로 간주하고,
+        // 내 ID가 포함된 경우에만 목록에 노출
+        if (Array.isArray(room.members)) {
           return room.members.some((id: any) => String(id) === String(user?.id));
         }
-        // 그 외에는 기본적으로 표시
+        // members가 아직 설정되지 않은(구 버전) 방은 기존과 동일하게 모두에게 표시
         return true;
       }),
     [chatRooms, user?.id, isMso]
@@ -576,17 +577,28 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
       }
     }
     const content = trimmed || (fileUrl ? '📎 파일을 공유했습니다' : '');
-    const { error } = await supabase.from('messages').insert([{ 
+    const { data: inserted, error } = await supabase.from('messages').insert([{ 
       room_id: selectedRoomId, 
       sender_id: user.id, 
       content, 
       file_url: fileUrl || null, 
       reply_to_id: replyTo?.id || null 
-    }]);
-    if (!error) {
+    }]).select().single();
+    if (!error && inserted) {
       setInputMsg(''); 
       setReplyTo(null);
       fetchData();
+      // 백엔드 Edge Function을 통해 Web Push 발송 (앱이 닫혀 있어도 푸시)
+      try {
+        await supabase.functions.invoke('send-web-push', {
+          body: {
+            room_id: inserted.room_id,
+            message_id: inserted.id,
+          },
+        });
+      } catch (e) {
+        console.error('send-web-push 호출 실패:', e);
+      }
     } else {
       alert('메시지 전송에 실패했습니다.');
     }

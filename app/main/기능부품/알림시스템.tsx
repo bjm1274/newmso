@@ -2,8 +2,8 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
-// [핵심] 웹 푸시 알림 서비스 워커 등록 및 관리
-export async function initNotificationService() {
+// [핵심] 웹 푸시 알림 서비스 워커 등록 및 관리 + 푸시 구독 저장
+export async function initNotificationService(staffId?: string) {
   if (!('serviceWorker' in navigator) || !('Notification' in window)) {
     console.log('이 브라우저는 푸시 알림을 지원하지 않습니다.');
     return;
@@ -20,16 +20,60 @@ export async function initNotificationService() {
       console.log('알림 권한:', permission);
     }
 
-    // 3. 푸시 구독 토큰 생성 (선택사항: FCM 연동 시)
-    if (registration.pushManager) {
-      const subscription = await registration.pushManager.getSubscription();
+    // 3. 푸시 구독 토큰 생성 및 Supabase에 저장
+    if (registration.pushManager && Notification.permission === 'granted') {
+      let subscription = await registration.pushManager.getSubscription();
       if (!subscription) {
-        console.log('푸시 구독 설정 완료');
+        // VAPID 공개키 (환경변수로 주입: NEXT_PUBLIC_VAPID_PUBLIC_KEY)
+        const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+        const options: PushSubscriptionOptionsInit = {
+          userVisibleOnly: true,
+          applicationServerKey: vapidPublicKey
+            ? urlBase64ToUint8Array(vapidPublicKey)
+            : undefined,
+        };
+        subscription = await registration.pushManager.subscribe(options);
+      }
+
+      try {
+        const json: any = subscription.toJSON();
+        const endpoint: string = json.endpoint;
+        const p256dh: string = json.keys?.p256dh || '';
+        const auth: string = json.keys?.auth || '';
+
+        if (endpoint && p256dh && auth) {
+          await supabase
+            .from('push_subscriptions')
+            .upsert(
+              {
+                staff_id: staffId || null,
+                endpoint,
+                p256dh,
+                auth,
+              },
+              { onConflict: 'staff_id,endpoint' }
+            );
+          console.log('✅ 푸시 구독 정보 저장 완료');
+        }
+      } catch (e) {
+        console.error('푸시 구독 정보 저장 실패:', e);
       }
     }
   } catch (error) {
     console.error('Service Worker 등록 실패:', error);
   }
+}
+
+// base64 VAPID 키를 ArrayBuffer로 변환 (Push API에서 요구하는 형식)
+function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray.buffer;
 }
 
 // [핵심] 실시간 알림 발송 함수
@@ -58,13 +102,14 @@ export default function NotificationSystem({ user }: any) {
 
   useEffect(() => {
     // 1. 서비스 워커 초기화
-    initNotificationService();
+    initNotificationService(user?.id);
 
     // 2. Supabase 실시간 구독 설정
     const setupRealtimeListeners = async () => {
       // A. 결재 승인 알림 (user가 결재자인 경우)
       const approvalsChannel = supabase
         .channel('approvals-realtime')
+        // 1) 새 결재가 상신되어 내가 최초 결재자인 경우
         .on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'approvals' },
@@ -73,7 +118,24 @@ export default function NotificationSystem({ user }: any) {
               const notif = {
                 id: payload.new.id,
                 title: `📋 새 결재 요청: ${payload.new.title}`,
-                body: `${payload.new.sender_id}님이 결재를 요청했습니다.`,
+                body: `${payload.new.sender_name || '신청자'}님이 결재를 요청했습니다.`,
+                type: 'approval',
+                data: payload.new
+              };
+              handleNotification(notif);
+            }
+          }
+        )
+        // 2) 선행 결재자가 승인하여 "내 차례"로 넘어온 경우
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'approvals' },
+          (payload: any) => {
+            if (payload.new.approver_id === user.id && payload.new.status === '대기') {
+              const notif = {
+                id: payload.new.id,
+                title: `📋 결재 차례 도착: ${payload.new.title}`,
+                body: `${payload.new.sender_name || '신청자'} 문서의 결재 순서가 도착했습니다.`,
                 type: 'approval',
                 data: payload.new
               };

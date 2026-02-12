@@ -59,6 +59,19 @@ CREATE TABLE IF NOT EXISTS chat_rooms (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 웹 푸시 구독 (브라우저 푸시 토큰 저장용)
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  staff_id UUID REFERENCES staff_members(id) ON DELETE CASCADE,
+  endpoint TEXT NOT NULL,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_push_subscriptions_staff_endpoint
+  ON push_subscriptions(staff_id, endpoint);
+
 -- 메시지 (앱에서 사용하는 messages)
 CREATE TABLE IF NOT EXISTS messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
