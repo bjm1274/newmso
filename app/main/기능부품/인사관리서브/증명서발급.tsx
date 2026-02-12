@@ -72,7 +72,7 @@ export default function CertificateGenerator({ staffs = [] }: any) {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-black text-gray-900 tracking-tighter italic">디지털 증명서 발급 센터</h2>
-          <p className="text-[10px] text-blue-600 font-bold mt-1 uppercase tracking-widest">Digital Certificate Issuance Hub</p>
+          <p className="text-[10px] text-blue-600 font-bold mt-1 tracking-widest">직원 증명서 발급 허브</p>
         </div>
         <div className="flex gap-2">
           <button onClick={() => setShowHistory(true)} className="px-5 py-2.5 bg-white border border-gray-200 text-gray-600 text-[11px] font-black rounded-xl shadow-sm hover:bg-gray-50 transition-all">발급 이력 조회</button>

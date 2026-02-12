@@ -65,12 +65,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh }: any) {
     <div className="flex flex-col h-full bg-[#F8FAFC] overflow-hidden">
       {/* 헤더 - 모바일 대응 */}
       <header className="bg-white border-b border-gray-100 p-4 md:p-8 shrink-0 z-20 shadow-sm">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h1 className="text-xl md:text-2xl font-black text-gray-800 tracking-tight italic">SY INC. 인사 통합 제어</h1>
-            <p className="text-[10px] md:text-xs text-blue-600 font-bold mt-1 tracking-widest">인사 통합 관리 패널</p>
-          </div>
-          
+        <div className="flex flex-col md:flex-row justify-end items-center gap-3">
           <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
             <button onClick={() => 창상태설정(true)} className="w-full md:w-auto bg-[#1E293B] text-white px-6 py-2.5 text-[11px] font-black rounded-xl shadow-md hover:bg-black transition-all">신규 직원 등록</button>
             

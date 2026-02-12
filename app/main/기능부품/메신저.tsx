@@ -52,6 +52,8 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
 
   const [roomNotifyOn, setRoomNotifyOn] = useState(true);
 
+  const chatRoomsRef = useRef<any[]>([]);
+
   // DB 연동: 투표, 반응, 고정 (폴백: 로컬)
   const [polls, setPolls] = useState<any[]>([]);
   const [pollVotes, setPollVotes] = useState<any>({});
@@ -97,6 +99,10 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
     },
     [user?.id]
   );
+
+  useEffect(() => {
+    chatRoomsRef.current = chatRooms;
+  }, [chatRooms]);
 
   const fetchData = useCallback(async () => {
     let query = supabase
@@ -184,6 +190,34 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
     };
     loadRooms();
   }, [selectedRoomId, updateUnreadForRooms]);
+
+  // 전역 신규 메시지 감지: 어떤 방이든 새 메시지가 오면 안 읽은 개수와 화면 데이터를 자동 갱신
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel('chat-global-messages')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages' },
+        async (payload: any) => {
+          const msg: any = payload.new;
+          if (!msg || msg.sender_id === user.id) return;
+          // 방 목록이 준비된 경우 안 읽은 개수 재계산
+          if (chatRoomsRef.current.length) {
+            await updateUnreadForRooms(chatRoomsRef.current);
+          }
+          // 현재 보고 있는 방에 온 메시지면 목록도 즉시 새로고침
+          if (msg.room_id === selectedRoomId) {
+            fetchData();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, selectedRoomId, fetchData, updateUnreadForRooms]);
 
   useEffect(() => {
     if (!selectedRoomId) return;

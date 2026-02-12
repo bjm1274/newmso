@@ -191,7 +191,7 @@ export default function LeaveManagement({ staffs = [], selectedCo, onRefresh }: 
                 <p className="text-[9px] font-black text-gray-400 uppercase">잔여 연차 (직원별)</p>
                 <p className="text-2xl font-black text-blue-600 mt-1">
                   {staffList.filter((s: any) => {
-                    const total = s.annual_leave_total ?? 15;
+                    const total = typeof s.annual_leave_total === 'number' ? s.annual_leave_total : 0;
                     const used = s.annual_leave_used ?? 0;
                     return (total - used) > 0;
                   }).length}명

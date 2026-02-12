@@ -16,7 +16,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   const [신규직원, 신규직원설정] = useState({
     성명: '', 전화번호: '', 사업체: '박철홍정형외과', 팀: '원무팀', 직함: '', 입사일: '', 퇴사일: '',
     주민번호: '', 이메일: '', 주소: '', 면허사항: '', 계좌정보: '', 임금정보: '', 상태: '재직',
-    연차총개수: 15, 연차사용개수: 0, 근무형태ID: '',
+    // 신규 입사 시 잔여 연차(총개수)를 0에서 시작하도록 설정
+    연차총개수: 0, 연차사용개수: 0, 근무형태ID: '',
     base_salary: 0
   });
 
@@ -86,7 +87,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       퇴사일: 직원.resigned_at || '', 주민번호: 직원.resident_no || '', 이메일: 직원.email || '',
       주소: 직원.address || '', 면허사항: 직원.license || '', 계좌정보: 직원.bank_account || '',
       임금정보: 직원.salary_info || '', 상태: 직원.status || '재직',
-      연차총개수: 직원.annual_leave_total || 15, 연차사용개수: 직원.annual_leave_used || 0, 근무형태ID: 직원.shift_id || '',
+      연차총개수: typeof 직원.annual_leave_total === 'number' ? 직원.annual_leave_total : 0,
+      연차사용개수: 직원.annual_leave_used || 0, 근무형태ID: 직원.shift_id || '',
       base_salary: 직원.base_salary || 0
     });
     편집모드설정(true);
@@ -97,7 +99,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     신규직원설정({
       성명: '', 전화번호: '', 사업체: '박철홍정형외과', 팀: '원무팀', 직함: '', 입사일: '', 퇴사일: '',
       주민번호: '', 이메일: '', 주소: '', 면허사항: '', 계좌정보: '', 임금정보: '', 상태: '재직',
-      연차총개수: 15, 연차사용개수: 0, 근무형태ID: '',
+      연차총개수: 0, 연차사용개수: 0, 근무형태ID: '',
       base_salary: 0
     });
     창닫기();

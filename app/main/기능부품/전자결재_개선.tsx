@@ -253,8 +253,8 @@ export default function ApprovalSystemImproved({ user, onRefresh }: any) {
     <div className="space-y-6 p-8 bg-white h-full overflow-y-auto custom-scrollbar">
       <header className="flex justify-between items-center mb-8">
         <div>
-          <h2 className="text-2xl font-black text-gray-800 tracking-tighter italic">SY INC. 전자결재</h2>
-          <p className="text-xs text-blue-600 font-bold uppercase mt-1">MSO 통합 행정 승인 시스템</p>
+          <h2 className="text-2xl font-black text-gray-800 tracking-tighter italic">전자결재</h2>
+          <p className="text-xs text-blue-600 font-bold mt-1">통합 행정 승인 시스템</p>
         </div>
         <div className="bg-blue-50 px-4 py-2 border border-blue-100 rounded-xl">
           <p className="text-[10px] font-black text-blue-400 uppercase">나의 잔여 연차</p>

@@ -114,7 +114,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
     <div className="bg-white p-6 md:p-10 rounded-[2.5rem] border border-gray-100 shadow-xl animate-in fade-in duration-500">
       <div className="mb-8 border-b border-gray-50 pb-6">
         <h3 className="text-xl font-black text-gray-900 tracking-tighter italic">급여 중간정산 엔진</h3>
-        <p className="text-[10px] text-blue-600 font-bold mt-1 uppercase tracking-widest">Interim Payroll Settlement (퇴직자 포함)</p>
+        <p className="text-[10px] text-blue-600 font-bold mt-1 tracking-widest">퇴직자 포함 급여 중간정산</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">

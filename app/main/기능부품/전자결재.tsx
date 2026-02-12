@@ -141,8 +141,6 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       {/* 좌측 메뉴 - 모바일 상단 탭 전환 */}
       <aside className="w-full md:w-64 bg-white border-b md:border-r border-gray-100 shrink-0 z-10">
         <div className="p-4 md:p-8">
-          <h1 className="hidden md:block text-xl font-black text-gray-800 tracking-tight italic mb-8">전자결재 센터</h1>
-          
           <nav className="flex md:flex-col gap-2 overflow-x-auto no-scrollbar">
             {['기안함', '결재함', '작성하기'].map(m => (
               <button 

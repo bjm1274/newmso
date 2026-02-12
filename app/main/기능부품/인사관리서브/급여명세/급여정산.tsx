@@ -208,7 +208,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
       <div className="p-8 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
         <div>
           <h3 className="text-xl font-black text-gray-900 tracking-tighter italic">전문 급여 정산 시스템</h3>
-          <p className="text-[10px] text-blue-600 font-bold mt-1 uppercase tracking-widest">Payroll Settlement with Legal Tax-Free Limits</p>
+          <p className="text-[10px] text-blue-600 font-bold mt-1 tracking-widest">법적 비과세 한도를 자동 반영하는 급여 정산</p>
         </div>
         <div className="flex gap-2">
           {[1, 2, 3].map(s => (

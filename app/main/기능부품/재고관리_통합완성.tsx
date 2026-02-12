@@ -168,11 +168,7 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
     <div className="flex flex-col h-full bg-[#F8FAFC] overflow-hidden relative">
       <InventoryAlertBadge lowCount={lowStockItems.length} expiryCount={expiryImminentItems.length} />
       <header className="bg-white border-b border-gray-100 p-4 md:p-8 shrink-0 z-20 shadow-sm">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h1 className="text-xl md:text-2xl font-black text-gray-800 tracking-tight italic">SY INC. 재고 통합 제어</h1>
-            <p className="text-[10px] md:text-xs text-blue-600 font-bold mt-1 tracking-widest">재고 통합 관리 시스템</p>
-          </div>
+        <div className="flex justify-end items-center gap-4">
           <div className="flex gap-2 w-full md:w-auto overflow-x-auto no-scrollbar pb-1">
             <button onClick={() => setActiveView('UDI')} className={`px-4 py-2 rounded-xl text-[10px] font-black whitespace-nowrap transition-all ${activeView === 'UDI' ? 'bg-[#A11DFF] text-white shadow-lg' : 'bg-gray-100 text-gray-600'}`}>📡 UDI</button>
             <button onClick={() => setActiveView('명세서')} className={`px-4 py-2 rounded-xl text-[10px] font-black whitespace-nowrap transition-all ${activeView === '명세서' ? 'bg-[#00B44E] text-white shadow-lg' : 'bg-gray-100 text-gray-600'}`}>📄 명세서</button>
