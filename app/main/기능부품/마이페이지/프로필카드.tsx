@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { useTheme } from '@/lib/ThemeContext';
 
 export default function MyProfileCard({ user: initialUser }: any) {
   const router = useRouter();
@@ -19,7 +18,7 @@ export default function MyProfileCard({ user: initialUser }: any) {
     bank_name: initialUser?.bank_name || '',
     account_no: initialUser?.account_no || '',
   });
-  const { theme, resolvedTheme, setTheme } = useTheme();
+  // 다크모드 토글은 사용하지 않도록 제거 (항상 라이트 모드)
 
   // [핵심] 페이지 로드 시 ID가 없으면 '이름'으로 ID를 찾아내는 복구 로직
   useEffect(() => {
@@ -252,30 +251,6 @@ export default function MyProfileCard({ user: initialUser }: any) {
               >
                 {isEditing ? '수정 취소' : '내 정보 수정'}
               </button>
-            </div>
-            {/* 다크모드 설정 */}
-            <div className="mt-3 flex items-center gap-2">
-              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                화면 모드
-              </span>
-              <div className="flex gap-1 bg-gray-100 rounded-full p-1">
-                {(['light', 'dark', 'system'] as const).map((mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() => setTheme(mode)}
-                    className={`px-3 py-1 rounded-full text-[10px] font-black transition-colors ${
-                      theme === mode
-                        ? 'bg-gray-900 text-white'
-                        : 'bg-transparent text-gray-500 hover:bg-white hover:text-gray-800'
-                    }`}
-                  >
-                    {mode === 'light' && '라이트'}
-                    {mode === 'dark' && '다크'}
-                    {mode === 'system' && '자동'}
-                  </button>
-                ))}
-              </div>
             </div>
           </div>
           <p className="text-lg font-bold text-blue-600 underline decoration-blue-100 underline-offset-8">{user.department} 소속</p>
