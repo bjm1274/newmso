@@ -2,6 +2,52 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 
+// 수술·MRI 일정에서 자주 쓰는 문구(수술명/검사명) 프리셋
+const COMMON_SURGERY_NAMES = [
+  '관절경하 반월상연골 절제술',
+  '관절경하 회전근개 봉합술',
+  '전방십자인대 재건술',
+  '하지 정맥류 수술',
+  '척추 유합술',
+];
+
+const COMMON_MRI_NAMES = [
+  '요추부 MRI',
+  '경추부 MRI',
+  '무릎관절 MRI',
+  '어깨관절 MRI',
+  '뇌 MRI',
+];
+
+// 30분 간격 시간 옵션 (오전 → 오후 순)
+const HALF_HOUR_TIME_OPTIONS = Array.from({ length: 48 }, (_, idx) => {
+  const hour = Math.floor(idx / 2);
+  const minute = idx % 2 === 0 ? 0 : 30;
+  const hh = hour.toString().padStart(2, '0');
+  const mm = minute === 0 ? '00' : '30';
+  const displayHour = (hour % 12) === 0 ? 12 : (hour % 12);
+  const period = hour < 12 ? '오전' : '오후';
+  const label = `${period} ${displayHour.toString().padStart(2, '0')}:${mm}`;
+  return { value: `${hh}:${mm}`, label };
+});
+
+const getDatePart = (value?: string) => {
+  if (!value) return '';
+  const [date] = value.split('T');
+  return date || '';
+};
+
+const getTimePart = (value?: string) => {
+  if (!value) return '';
+  const [, time] = value.split('T');
+  return (time || '').slice(0, 5);
+};
+
+const combineDateTime = (date: string, time: string) => {
+  if (!date || !time) return '';
+  return `${date}T${time}`;
+};
+
 export default function BoardAdvanced() {
   const [activeBoard, setActiveBoard] = useState('공지');
   const [posts, setPosts] = useState<any[]>([]);
@@ -136,6 +182,12 @@ export default function BoardAdvanced() {
                           {post.doctor_name || '-'}
                         </p>
                       </div>
+                      <div className="bg-gray-50 p-3 rounded-lg">
+                        <p className="font-bold text-gray-600">방향</p>
+                        <p className="font-black text-gray-800 mt-1">
+                          {post.side || '-'}
+                        </p>
+                      </div>
                       {activeBoard === '수술' && (
                         <>
                           <div className="bg-blue-50 p-3 rounded-lg">
@@ -154,6 +206,18 @@ export default function BoardAdvanced() {
                             <p className="font-bold text-red-600">수혈</p>
                             <p className="font-black text-red-800 mt-1">
                               {post.blood_transfusion ? '필요' : '불필요'}
+                            </p>
+                          </div>
+                          <div className="bg-blue-50 p-3 rounded-lg">
+                            <p className="font-bold text-blue-600">보호자 상주</p>
+                            <p className="font-black text-blue-800 mt-1">
+                              {post.guardian_stay ? '상주' : '비상주'}
+                            </p>
+                          </div>
+                          <div className="bg-blue-50 p-3 rounded-lg">
+                            <p className="font-bold text-blue-600">입원 여부</p>
+                            <p className="font-black text-blue-800 mt-1">
+                              {post.hospitalization ? '입원' : '당일 퇴원'}
                             </p>
                           </div>
                           <div className="bg-gray-50 p-3 rounded-lg">
@@ -233,26 +297,54 @@ export default function BoardAdvanced() {
                       <label className="block text-sm font-bold text-gray-700 mb-2">
                         {activeBoard === '수술' ? '수술명' : '검사명'} *
                       </label>
-                      <input
-                        type="text"
-                        value={
-                          formData[
-                            activeBoard === '수술'
-                              ? 'surgery_name'
-                              : 'exam_name'
-                          ] || ''
-                        }
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            [activeBoard === '수술'
-                              ? 'surgery_name'
-                              : 'exam_name']: e.target.value,
-                          })
-                        }
-                        placeholder="수술명/검사명 입력"
-                        className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-600"
-                      />
+                      <div className="space-y-2">
+                        <select
+                          value=""
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            if (!v) return;
+                            setFormData({
+                              ...formData,
+                              [activeBoard === '수술'
+                                ? 'surgery_name'
+                                : 'exam_name']: v,
+                            });
+                          }}
+                          className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 focus:outline-none focus:border-blue-600"
+                        >
+                          <option value="">
+                            자주 쓰는 {activeBoard === '수술' ? '수술명' : '검사명'} 선택
+                          </option>
+                          {(activeBoard === '수술'
+                            ? COMMON_SURGERY_NAMES
+                            : COMMON_MRI_NAMES
+                          ).map((name) => (
+                            <option key={name} value={name}>
+                              {name}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="text"
+                          value={
+                            formData[
+                              activeBoard === '수술'
+                                ? 'surgery_name'
+                                : 'exam_name'
+                            ] || ''
+                          }
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              [activeBoard === '수술'
+                                ? 'surgery_name'
+                                : 'exam_name']: e.target.value,
+                            })
+                          }
+                          placeholder="수술명/검사명 입력"
+                          className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-600"
+                        />
+                      </div>
                     </div>
                     <div>
                       <label className="block text-sm font-bold text-gray-700 mb-2">
@@ -276,19 +368,52 @@ export default function BoardAdvanced() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-bold text-gray-700 mb-2">
-                        예정 시간 *
+                        예정 일시 *
                       </label>
-                      <input
-                        type="datetime-local"
-                        value={formData.scheduled_time || ''}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            scheduled_time: e.target.value,
-                          })
-                        }
-                        className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-600"
-                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="date"
+                          value={getDatePart(formData.scheduled_time || '')}
+                          onChange={(e) => {
+                            const newDate = e.target.value;
+                            const timePart =
+                              getTimePart(formData.scheduled_time || '') ||
+                              '09:00';
+                            setFormData({
+                              ...formData,
+                              scheduled_time: combineDateTime(
+                                newDate,
+                                timePart,
+                              ),
+                            });
+                          }}
+                          className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-600"
+                        />
+                        <select
+                          value={getTimePart(formData.scheduled_time || '')}
+                          onChange={(e) => {
+                            const time = e.target.value;
+                            const datePart =
+                              getDatePart(formData.scheduled_time || '') ||
+                              new Date().toISOString().slice(0, 10);
+                            setFormData({
+                              ...formData,
+                              scheduled_time: combineDateTime(
+                                datePart,
+                                time,
+                              ),
+                            });
+                          }}
+                          className="w-full px-3 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-600 text-sm"
+                        >
+                          <option value="">시간 선택</option>
+                          {HALF_HOUR_TIME_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                     <div>
                       <label className="block text-sm font-bold text-gray-700 mb-2">
@@ -306,6 +431,29 @@ export default function BoardAdvanced() {
                         placeholder="담당의명 입력"
                         className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-600"
                       />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
+                        방향
+                      </label>
+                      <select
+                        value={formData.side || ''}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            side: e.target.value,
+                          })
+                        }
+                        className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-600"
+                      >
+                        <option value="">선택 안 함</option>
+                        <option value="좌측">좌측</option>
+                        <option value="우측">우측</option>
+                        <option value="양측">양측</option>
+                      </select>
                     </div>
                   </div>
 
@@ -358,6 +506,38 @@ export default function BoardAdvanced() {
                           />
                           <span className="font-bold text-gray-700">
                             수혈 필요
+                          </span>
+                        </label>
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={formData.guardian_stay || false}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                guardian_stay: e.target.checked,
+                              })
+                            }
+                            className="w-5 h-5"
+                          />
+                          <span className="font-bold text-gray-700">
+                            보호자 상주
+                          </span>
+                        </label>
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={formData.hospitalization || false}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                hospitalization: e.target.checked,
+                              })
+                            }
+                            className="w-5 h-5"
+                          />
+                          <span className="font-bold text-gray-700">
+                            입원 예정
                           </span>
                         </label>
                       </div>
