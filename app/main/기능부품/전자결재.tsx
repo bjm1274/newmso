@@ -29,6 +29,20 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     });
   }, []);
 
+  // 부서장 이상(팀장/부장/실장/원장/병원장/대표이사)은 기본 결재선에 자동 추가
+  useEffect(() => {
+    if (!Array.isArray(staffs) || approverLine.length > 0 || viewMode !== '작성하기') return;
+    const approverPositions = ['팀장', '부장', '실장', '원장', '병원장', '대표이사'];
+    const defaultApprovers = staffs.filter((s: any) => {
+      const isApproverRole = approverPositions.includes(s.position);
+      const matchesCompany = selectedCo === '전체' || s.company === selectedCo;
+      return isApproverRole && matchesCompany;
+    });
+    if (defaultApprovers.length > 0) {
+      setApproverLine(defaultApprovers);
+    }
+  }, [staffs, selectedCo, viewMode, approverLine.length]);
+
   // 마지막으로 보던 탭(기안함/결재함/작성하기)을 복구
   useEffect(() => {
     if (typeof window === 'undefined') return;

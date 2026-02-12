@@ -57,7 +57,10 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         position: 신규직원.직함, resident_no: 신규직원.주민번호, email: 신규직원.이메일, address: 신규직원.주소,
         license: 신규직원.면허사항, bank_account: 신규직원.계좌정보, salary_info: 신규직원.임금정보,
         joined_at: 신규직원.입사일, resigned_at: 신규직원.퇴사일 || null, status: 신규직원.상태,
-        annual_leave_total: 신규직원.연차총개수, annual_leave_used: 신규직원.연차사용개수, shift_id: 신규직원.근무형태ID || null,
+        // 신규 입사 시 연차는 무조건 0에서 시작
+        annual_leave_total: 0,
+        annual_leave_used: 0,
+        shift_id: 신규직원.근무형태ID || null,
         base_salary: 신규직원.base_salary
       };
 

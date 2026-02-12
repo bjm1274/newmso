@@ -46,7 +46,7 @@ export default function LoginPage() {
         .select('*')
         .eq('name', loginId.trim())
         .limit(1);
-      const user = rows?.[0];
+      let user = rows?.[0];
 
       if (dbError || !user) {
         setError("등록된 이름(아이디)이 없습니다. 확인 후 다시 시도하세요.");
@@ -54,13 +54,24 @@ export default function LoginPage() {
         return;
       }
 
-      if (!user.password || user.password.toString().trim() === '') {
-        setError("비밀번호가 설정되지 않았습니다. 관리자에게 문의하세요.");
-        setLoading(false);
-        return;
+      // 1회차 로그인: DB에 비밀번호가 없으면, 처음 입력한 비밀번호를 바로 설정
+      let currentPassword = (user.password ?? '').toString().trim();
+      if (!currentPassword) {
+        const { error: pwErr } = await supabase
+          .from('staff_members')
+          .update({ password })
+          .eq('id', user.id);
+        if (pwErr) {
+          console.error('password set error', pwErr);
+          setError("비밀번호를 설정하는 중 오류가 발생했습니다. 다시 시도하거나 관리자에게 문의해주세요.");
+          setLoading(false);
+          return;
+        }
+        currentPassword = password;
+        user = { ...user, password: currentPassword };
       }
 
-      if (user.password !== password) {
+      if (currentPassword !== password) {
         setError("비밀번호가 일치하지 않습니다.");
         setLoading(false);
         return;

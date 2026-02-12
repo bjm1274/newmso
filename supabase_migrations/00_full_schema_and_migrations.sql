@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS staff_members (
   join_date DATE,
   status VARCHAR(20) DEFAULT '재직',
   role VARCHAR(20) DEFAULT 'user',
-  annual_leave_total DECIMAL(4,1) DEFAULT 15.0,
+  annual_leave_total DECIMAL(4,1) DEFAULT 0.0,
   annual_leave_used DECIMAL(4,1) DEFAULT 0.0,
   base_salary BIGINT DEFAULT 0,
   shift_id UUID,

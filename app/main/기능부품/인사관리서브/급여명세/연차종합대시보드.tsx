@@ -13,7 +13,7 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
     filtered.forEach((s: any) => {
       const dept = s.department || '미지정';
       if (!map[dept]) map[dept] = { total: 0, used: 0 };
-      map[dept].total += s.annual_leave_total ?? 15;
+      map[dept].total += s.annual_leave_total ?? 0;
       map[dept].used += s.annual_leave_used ?? 0;
     });
     setByDept(
@@ -103,7 +103,7 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
       ) : (
         <div className="space-y-2 max-h-[320px] overflow-y-auto custom-scrollbar">
           {personalList.map((s: any) => {
-            const total = s.annual_leave_total ?? 15;
+            const total = s.annual_leave_total ?? 0;
             const used = s.annual_leave_used ?? 0;
             const remain = Math.max(0, total - used);
             return (
