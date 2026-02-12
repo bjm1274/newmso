@@ -1,7 +1,17 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
-    { "path": "/api/cron/chat-retention", "schedule": "0 17 * * *" },
-    { "path": "/api/cron/backup", "schedule": "0 */6 * * *" },
-    { "path": "/api/cron/backup-full", "schedule": "0 15 * * *" }
+    {
+      "path": "/api/cron/chat-retention",
+      "schedule": "0 17 * * *"
+    },
+    {
+      "path": "/api/cron/backup",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/backup-full",
+      "schedule": "0 15 * * *"
+    }
   ]
 }
