@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 
 const CHAT_ROOM_KEY = 'erp_chat_last_room';
@@ -16,10 +16,18 @@ export default function BoardView({ user, setMainMenu }: any) {
   const [scheduleTime, setScheduleTime] = useState('');
   const [scheduleRoom, setScheduleRoom] = useState('');
   const [schedulePatient, setSchedulePatient] = useState('');
+  const [scheduleFasting, setScheduleFasting] = useState(false);
+  const [scheduleInpatient, setScheduleInpatient] = useState(false);
+  const [scheduleGuardian, setScheduleGuardian] = useState(false);
+  const [scheduleCaregiver, setScheduleCaregiver] = useState(false);
   const [loading, setLoading] = useState(false);
   const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
   const [comments, setComments] = useState<Record<string, any[]>>({});
   const [newComment, setNewComment] = useState('');
+
+  // 수술/검사명 프리셋 (Supabase surgery_templates / mri_templates)
+  const [surgeryTemplates, setSurgeryTemplates] = useState<any[]>([]);
+  const [mriTemplates, setMriTemplates] = useState<any[]>([]);
 
   const boards = [
     { id: '공지사항', label: '📢 공지사항', icon: '📢' },
@@ -32,6 +40,33 @@ export default function BoardView({ user, setMainMenu }: any) {
     const { data } = await supabase.from('board_posts').select('*').eq('board_type', activeBoard).order('created_at', { ascending: false });
     if (data) setPosts(data as any);
   };
+
+  // 수술·MRI 템플릿 불러오기
+  useEffect(() => {
+    const loadTemplates = async () => {
+      try {
+        const [{ data: s }, { data: m }] = await Promise.all([
+          supabase.from('surgery_templates').select('*').order('sort_order', { ascending: true }),
+          supabase.from('mri_templates').select('*').order('sort_order', { ascending: true }),
+        ]);
+        setSurgeryTemplates(s || []);
+        setMriTemplates(m || []);
+      } catch {
+        // 템플릿 테이블이 없거나 실패해도 치명적이지 않으므로 무시
+      }
+    };
+    loadTemplates();
+  }, []);
+
+  const currentTemplates = useMemo(
+    () =>
+      activeBoard === '수술일정'
+        ? surgeryTemplates
+        : activeBoard === 'MRI일정'
+        ? mriTemplates
+        : [],
+    [activeBoard, surgeryTemplates, mriTemplates]
+  );
 
   useEffect(() => {
     fetchPosts();
@@ -139,7 +174,7 @@ export default function BoardView({ user, setMainMenu }: any) {
     setLoading(true);
     try {
       const tags = tagsInput ? tagsInput.split(',').map((t) => t.trim()).filter(Boolean) : [];
-      const postData = {
+      const postData: any = {
         board_type: activeBoard,
         title: title,
         content: content || null,
@@ -154,6 +189,14 @@ export default function BoardView({ user, setMainMenu }: any) {
         created_at: new Date().toISOString(),
       };
 
+      // 수술일정의 경우 수술 관련 체크값을 함께 저장
+      if (activeBoard === '수술일정') {
+        postData.surgery_fasting = scheduleFasting;
+        postData.surgery_inpatient = scheduleInpatient;
+        postData.surgery_guardian = scheduleGuardian;
+        postData.surgery_caregiver = scheduleCaregiver;
+      }
+
       const { error } = await supabase.from('board_posts').insert([postData]);
       if (!error) {
         alert('게시물이 등록되었습니다.');
@@ -163,6 +206,10 @@ export default function BoardView({ user, setMainMenu }: any) {
         setScheduleTime('');
         setScheduleRoom('');
         setSchedulePatient('');
+        setScheduleFasting(false);
+        setScheduleInpatient(false);
+        setScheduleGuardian(false);
+        setScheduleCaregiver(false);
         setTagsInput('');
         setShowNewPost(false);
         fetchPosts();
@@ -221,32 +268,63 @@ export default function BoardView({ user, setMainMenu }: any) {
           <div className="space-y-4">
             <div>
               <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2 block">
-                {activeBoard === '수술일정' ? '수술명' : '제목'}
+                {activeBoard === '수술일정' ? '수술명' : activeBoard === 'MRI일정' ? '검사명' : '제목'}
               </label>
-              <input
-                value={title}
-                onChange={e => setTitle(e.target.value)}
-                placeholder={activeBoard === '수술일정' ? '수술명을 입력하세요.' : '게시물 제목을 입력하세요.'}
-                className="w-full p-4 bg-gray-50 rounded-xl border-none outline-none text-sm font-bold focus:ring-2 focus:ring-blue-100"
-              />
+              {(activeBoard === '수술일정' || activeBoard === 'MRI일정') ? (
+                <div className="space-y-2">
+                  <select
+                    value=""
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (!v) return;
+                      setTitle(v);
+                    }}
+                    className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-xs font-bold focus:ring-2 focus:ring-blue-100"
+                  >
+                    <option value="">
+                      {activeBoard === '수술일정'
+                        ? '자주 쓰는 수술명 선택'
+                        : '자주 쓰는 검사명 선택'}
+                    </option>
+                    {currentTemplates.map((t: any) => (
+                      <option key={t.id} value={t.name}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder={
+                      activeBoard === '수술일정'
+                        ? '수술명을 입력하거나 위에서 선택하세요.'
+                        : '검사명을 입력하거나 위에서 선택하세요.'
+                    }
+                    className="w-full p-4 bg-gray-50 rounded-xl border-none outline-none text-sm font-bold focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+              ) : (
+                <input
+                  value={title}
+                  onChange={e => setTitle(e.target.value)}
+                  placeholder="게시물 제목을 입력하세요."
+                  className="w-full p-4 bg-gray-50 rounded-xl border-none outline-none text-sm font-bold focus:ring-2 focus:ring-blue-100"
+                />
+              )}
             </div>
 
             {(activeBoard === '수술일정' || activeBoard === 'MRI일정') ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2 block">날짜</label>
+                    <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2 block">날짜 (YYYYMMDD)</label>
                     <input
-                      type="date"
+                      type="text"
                       value={scheduleDate}
                       onChange={e => {
                         let v = e.target.value;
-                        if (v && v.length === 8 && !v.includes('-')) {
-                          const y = v.slice(0, 4);
-                          const m = v.slice(4, 6);
-                          const d = v.slice(6, 8);
-                          v = `${y}-${m}-${d}`;
-                        }
+                        // 숫자 8자리만 허용 (YYYYMMDD)
+                        v = v.replace(/[^0-9]/g, '').slice(0, 8);
                         setScheduleDate(v);
                       }}
                       className="w-full p-4 bg-gray-50 rounded-xl border-none outline-none text-sm font-bold focus:ring-2 focus:ring-blue-100"
@@ -294,6 +372,51 @@ export default function BoardView({ user, setMainMenu }: any) {
                     <input value={schedulePatient} onChange={e => setSchedulePatient(e.target.value)} placeholder="환자명 입력" className="w-full p-4 bg-gray-50 rounded-xl border-none outline-none text-sm font-bold focus:ring-2 focus:ring-blue-100" />
                   </div>
                 </div>
+                {activeBoard === '수술일정' && (
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-1 block">
+                      수술 관련 체크
+                    </label>
+                    <div className="grid grid-cols-2 gap-2 text-[11px] font-bold text-gray-700">
+                      <label className="inline-flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={scheduleFasting}
+                          onChange={(e) => setScheduleFasting(e.target.checked)}
+                          className="w-4 h-4 rounded border-gray-300"
+                        />
+                        <span>금식 필요</span>
+                      </label>
+                      <label className="inline-flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={scheduleInpatient}
+                          onChange={(e) => setScheduleInpatient(e.target.checked)}
+                          className="w-4 h-4 rounded border-gray-300"
+                        />
+                          <span>입원 예정</span>
+                      </label>
+                      <label className="inline-flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={scheduleGuardian}
+                          onChange={(e) => setScheduleGuardian(e.target.checked)}
+                          className="w-4 h-4 rounded border-gray-300"
+                        />
+                        <span>보호자 동반</span>
+                      </label>
+                      <label className="inline-flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={scheduleCaregiver}
+                          onChange={(e) => setScheduleCaregiver(e.target.checked)}
+                          className="w-4 h-4 rounded border-gray-300"
+                        />
+                        <span>간병인 배치</span>
+                      </label>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <>
@@ -364,6 +487,30 @@ export default function BoardView({ user, setMainMenu }: any) {
                       <p className="text-[11px] font-black text-gray-800 line-clamp-1">{post.schedule_room}</p>
                     </div>
                   </div>
+                  {activeBoard === '수술일정' && (
+                    <div className="pt-2 flex flex-wrap gap-1">
+                      {post.surgery_fasting && (
+                        <span className="px-2 py-1 rounded-full bg-red-50 text-red-600 text-[9px] font-black">
+                          금식
+                        </span>
+                      )}
+                      {post.surgery_inpatient && (
+                        <span className="px-2 py-1 rounded-full bg-blue-50 text-blue-600 text-[9px] font-black">
+                          입원
+                        </span>
+                      )}
+                      {post.surgery_guardian && (
+                        <span className="px-2 py-1 rounded-full bg-emerald-50 text-emerald-600 text-[9px] font-black">
+                          보호자 동반
+                        </span>
+                      )}
+                      {post.surgery_caregiver && (
+                        <span className="px-2 py-1 rounded-full bg-purple-50 text-purple-600 text-[9px] font-black">
+                          간병인
+                        </span>
+                      )}
+                    </div>
+                  )}
                   <div className="pt-3 flex justify-end">
                     <button
                       type="button"
