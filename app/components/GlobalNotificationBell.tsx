@@ -8,6 +8,7 @@ const TYPE_ICONS: Record<string, string> = {
   inventory: '📦',
   payroll: '💰',
   education: '📚',
+  mention: '📣',
   인사: '👥',
   default: '🔔',
 };

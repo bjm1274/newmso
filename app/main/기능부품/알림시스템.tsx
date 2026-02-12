@@ -155,11 +155,23 @@ export default function NotificationSystem({ user }: any) {
           { event: 'INSERT', schema: 'public', table: 'messages' },
           (payload: any) => {
             if (payload.new.sender_id === user.id) return;
+            const content: string = payload.new.content || '';
+
+            // 기본값: 일반 새 메시지
+            let notifType = 'message';
+            let title = '💬 새 메시지';
+
+            // @멘션: 본인 이름이 '@이름' 형태로 포함된 경우 별도 알림
+            if (user?.name && content.includes(`@${user.name}`)) {
+              notifType = 'mention';
+              title = `📣 @멘션 도착`;
+            }
+
             const notif = {
               id: payload.new.id,
-              title: `💬 새 메시지`,
-              body: (payload.new.content || '📎 파일').slice(0, 50),
-              type: 'message',
+              title,
+              body: (content || '📎 파일').slice(0, 50),
+              type: notifType,
               data: payload.new
             };
             handleNotification(notif);

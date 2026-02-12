@@ -2,7 +2,10 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
-export default function BoardView({ user }: any) {
+const CHAT_ROOM_KEY = 'erp_chat_last_room';
+const CHAT_FOCUS_KEY = 'erp_chat_focus_keyword';
+
+export default function BoardView({ user, setMainMenu }: any) {
   const [activeBoard, setActiveBoard] = useState('공지사항');
   const [posts, setPosts] = useState<any[]>([]);
   const [showNewPost, setShowNewPost] = useState(false);
@@ -51,6 +54,53 @@ export default function BoardView({ user }: any) {
       .eq('post_id', postId)
       .order('created_at', { ascending: true });
     setComments((prev) => ({ ...prev, [postId]: data || [] }));
+  };
+
+  // 수술·MRI 일정 카드 → 관련 채팅방 열기
+  const openChatForSchedule = async (post: any) => {
+    if (!user?.id) {
+      alert('직원 계정으로 로그인한 경우에만 채팅을 사용할 수 있습니다.');
+      return;
+    }
+    const baseName = post.patient_name || post.title || '수술/검사 일정';
+    const kindLabel = activeBoard === '수술일정' ? '수술' : '검사';
+    const roomName = `[${kindLabel}] ${baseName}`;
+    try {
+      const { data: existing } = await supabase
+        .from('chat_rooms')
+        .select('*')
+        .eq('name', roomName)
+        .maybeSingle();
+      let roomId = existing?.id;
+      if (!roomId) {
+        const { data: created, error } = await supabase
+          .from('chat_rooms')
+          .insert([
+            {
+              name: roomName,
+              type: 'group',
+              members: [user.id],
+            },
+          ])
+          .select()
+          .single();
+        if (error || !created) {
+          alert('관련 채팅방 생성 중 오류가 발생했습니다.');
+          return;
+        }
+        roomId = created.id;
+      }
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(CHAT_ROOM_KEY, roomId);
+        if (post.patient_name) {
+          window.localStorage.setItem(CHAT_FOCUS_KEY, post.patient_name);
+        }
+      }
+      setMainMenu?.('채팅');
+    } catch (e) {
+      console.error('openChatForSchedule error', e);
+      alert('관련 채팅방을 여는 중 오류가 발생했습니다.');
+    }
   };
 
   const handleLike = async (post: any) => {
@@ -313,6 +363,15 @@ export default function BoardView({ user }: any) {
                       <p className="text-[8px] font-bold text-gray-400 uppercase">위치</p>
                       <p className="text-[11px] font-black text-gray-800 line-clamp-1">{post.schedule_room}</p>
                     </div>
+                  </div>
+                  <div className="pt-3 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => openChatForSchedule(post)}
+                      className="px-3 py-2 rounded-xl text-[10px] font-black bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                    >
+                      💬 이 일정 관련 채팅 열기
+                    </button>
                   </div>
                 </div>
               ) : (

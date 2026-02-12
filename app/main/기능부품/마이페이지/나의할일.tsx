@@ -72,8 +72,10 @@ export default function MyTodoList({ user: initialUser }: any) {
         .from('todos')
         .select('*')
         .eq('user_id', userId) // 복구된 ID 사용
-        .eq('task_date', selectedDate)
-        .order('is_complete', { ascending: true })
+        // 선택한 날짜까지의 모든 할일을 불러와서
+        // 완료되지 않은 것은 "carry-over" 되도록 한다.
+        .lte('task_date', selectedDate)
+        .order('task_date', { ascending: false })
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -147,8 +149,10 @@ export default function MyTodoList({ user: initialUser }: any) {
   };
 
   // 렌더링
+  // - 진행중: 선택한 날짜 이전에 생성되었더라도 완료되지 않았다면 모두 표시
+  // - 완료: 선택한 날짜의 완료된 내역만 표시
   const inProgressTasks = tasks.filter(t => !t.is_complete);
-  const completedTasks = tasks.filter(t => t.is_complete);
+  const completedTasks = tasks.filter(t => t.is_complete && t.task_date === selectedDate);
 
   return (
     <div className="bg-white border border-gray-100 shadow-sm rounded-[2.5rem] p-8 h-full flex flex-col space-y-6">
@@ -234,7 +238,16 @@ function TodoItem({ task, onToggle, onDelete }: any) {
       <button onClick={() => onToggle(task.id, task.is_complete)} className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all flex-shrink-0 ${task.is_complete ? 'bg-green-500 border-green-500 text-white' : 'border-gray-200 hover:border-blue-400'}`}>
         {task.is_complete && <span className="text-[10px] font-bold">V</span>}
       </button>
-      <span className={`flex-1 text-sm font-bold truncate ${task.is_complete ? 'text-gray-300 line-through decoration-2' : 'text-gray-700'}`}>{task.content}</span>
+      <div className="flex-1 flex items-center gap-2 min-w-0">
+        <span className={`flex-1 text-sm font-bold truncate ${task.is_complete ? 'text-gray-300 line-through decoration-2' : 'text-gray-700'}`}>
+          {task.content}
+        </span>
+        {task.task_date && (
+          <span className="shrink-0 text-[10px] font-bold text-gray-300">
+            {task.task_date}
+          </span>
+        )}
+      </div>
       <button onClick={() => onDelete(task.id)} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all text-[10px] font-black px-2 py-1 bg-gray-50 hover:bg-red-50 rounded-md">삭제</button>
     </div>
   );

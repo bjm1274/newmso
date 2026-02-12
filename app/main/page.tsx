@@ -84,6 +84,46 @@ export default function MainPage() {
     setSelectedCompanyIdState(getSelectedCompanyId());
   }, []);
 
+  // 온라인 상태(Presence) 업데이트: 일정 주기로 last_seen_at 갱신
+  useEffect(() => {
+    if (!user?.id) return;
+    let isCancelled = false;
+
+    const updatePresence = async (status: 'online' | 'away') => {
+      try {
+        await supabase
+          .from('staff_members')
+          .update({
+            last_seen_at: new Date().toISOString(),
+            presence_status: status,
+          })
+          .eq('id', user.id);
+      } catch {
+        // presence 업데이트 실패는 무시 (주요 기능과 무관)
+      }
+    };
+
+    updatePresence('online');
+
+    const intervalId = window.setInterval(() => {
+      if (!isCancelled) updatePresence('online');
+    }, 30_000);
+
+    const handleFocus = () => updatePresence('online');
+    const handleBlur = () => updatePresence('away');
+
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('blur', handleBlur);
+
+    return () => {
+      isCancelled = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('blur', handleBlur);
+      updatePresence('away');
+    };
+  }, [user?.id]);
+
   useEffect(() => {
     if (!user) return;
     fetchERPData(user, selectedCompanyId);
