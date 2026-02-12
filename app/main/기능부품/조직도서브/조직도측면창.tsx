@@ -63,8 +63,8 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
     <>
       {/* PC 사이드바 - 토스 스타일 */}
       <aside className="hidden md:flex w-[72px] bg-white border-r border-[#E5E8EB] flex-col items-center py-6 space-y-2 shrink-0 z-50 h-screen shadow-sm">
-        <div className="w-10 h-10 bg-[#3182F6] mb-4 flex items-center justify-center rounded-[12px]">
-          <span className="text-white font-bold text-base">SY</span>
+        <div className="w-10 h-10 mb-4 flex items-center justify-center rounded-[12px] overflow-hidden shrink-0">
+          <img src="/icon-192x192.png" alt="SY INC." className="w-full h-full object-contain" />
         </div>
         <div className="flex-1 flex flex-col space-y-1 overflow-y-auto no-scrollbar w-full px-2">
           {visibleMenus.map(m => (

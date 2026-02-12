@@ -168,12 +168,15 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
   return (
     <div className="h-full flex flex-col bg-gray-50 p-6 rounded-[3rem] overflow-hidden">
       
-      {/* 상단 헤더 및 통합 탭 메뉴 */}
+      {/* 상단 로고 및 헤더 */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 shrink-0">
         <div className="text-left space-y-2">
-          <h1 className="text-2xl font-black text-gray-900 tracking-tight">
-            반갑습니다, {user.name}님 👋
-          </h1>
+          <div className="flex items-center gap-3 mb-2">
+            <img src="/icon-192x192.png" alt="SY INC." className="h-10 w-10 object-contain shrink-0" />
+            <h1 className="text-2xl font-black text-gray-900 tracking-tight">
+              반갑습니다, {user.name}님 👋
+            </h1>
+          </div>
           <p className="text-xs font-bold text-gray-400">
             내 정보 · 출퇴근 · 할일 · 증명서 · 급여명세서를 한 곳에서 관리합니다.
           </p>

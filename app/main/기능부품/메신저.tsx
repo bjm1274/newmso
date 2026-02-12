@@ -102,6 +102,11 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
   const [showForwardModal, setShowForwardModal] = useState(false);
   const [forwardSourceMsg, setForwardSourceMsg] = useState<any>(null);
 
+  // 채팅방 멤버 추가용 상태
+  const [showAddMemberModal, setShowAddMemberModal] = useState(false);
+  const [addMemberSearch, setAddMemberSearch] = useState('');
+  const [addMemberSelectingIds, setAddMemberSelectingIds] = useState<string[]>([]);
+
   // 스레드 뷰(특정 메시지만 모아보기) 상태
   const [threadRoot, setThreadRoot] = useState<any | null>(null);
 
@@ -391,6 +396,27 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
     [chatRooms, selectedRoomId]
   );
 
+  // 현재 방에서 아직 포함되지 않은 직원들 (대화상대 추가용)
+  const addableMembers = useMemo(() => {
+    if (!selectedRoom) return [];
+    const currentMemberIds = new Set(
+      Array.isArray(selectedRoom.members)
+        ? selectedRoom.members.map((id: any) => String(id))
+        : []
+    );
+    return staffs
+      .filter((s: any) => !currentMemberIds.has(String(s.id)))
+      .filter((s: any) => {
+        if (!addMemberSearch.trim()) return true;
+        const key = addMemberSearch.trim();
+        return (
+          s.name?.includes(key) ||
+          s.department?.includes(key) ||
+          s.position?.includes(key)
+        );
+      });
+  }, [selectedRoom, staffs, addMemberSearch]);
+
   const visibleRooms = useMemo(
     () =>
       chatRooms.filter((room: any) => {
@@ -538,7 +564,12 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
     }
   };
 
-  const handleSendMessage = async (fileUrl?: string) => {
+  const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024; // 100MB
+  const handleSendMessage = async (
+    fileUrl?: string,
+    fileSizeBytes?: number,
+    fileKind?: 'image' | 'video' | 'file'
+  ) => {
     const trimmed = inputMsg.trim();
     if (!trimmed && !fileUrl) return;
 
@@ -577,13 +608,16 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
       }
     }
     const content = trimmed || (fileUrl ? '📎 파일을 공유했습니다' : '');
-    const { data: inserted, error } = await supabase.from('messages').insert([{ 
-      room_id: selectedRoomId, 
-      sender_id: user.id, 
-      content, 
-      file_url: fileUrl || null, 
-      reply_to_id: replyTo?.id || null 
-    }]).select().single();
+    const payload: Record<string, unknown> = {
+      room_id: selectedRoomId,
+      sender_id: user.id,
+      content,
+      file_url: fileUrl || null,
+      reply_to_id: replyTo?.id || null,
+    };
+    if (fileSizeBytes != null) payload.file_size_bytes = fileSizeBytes;
+    if (fileKind) payload.file_kind = fileKind;
+    const { data: inserted, error } = await supabase.from('messages').insert([payload]).select().single();
     if (!error && inserted) {
       setInputMsg(''); 
       setReplyTo(null);
@@ -605,16 +639,28 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
   };
 
   const [fileUploading, setFileUploading] = useState(false);
+  const getFileKind = (mime: string): 'image' | 'video' | 'file' => {
+    if (!mime) return 'file';
+    if (mime.startsWith('image/')) return 'image';
+    if (mime.startsWith('video/')) return 'video';
+    return 'file';
+  };
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      alert('파일 크기는 100MB 이하여야 합니다.');
+      e.target.value = '';
+      return;
+    }
     setFileUploading(true);
     try {
       const path = `chat/${Date.now()}_${file.name}`;
-      const { data, error } = await supabase.storage.from('pchos-files').upload(path, file);
+      const { error } = await supabase.storage.from('pchos-files').upload(path, file);
       if (error) throw error;
       const publicUrl = supabase.storage.from('pchos-files').getPublicUrl(path).data.publicUrl;
-      await handleSendMessage(publicUrl);
+      const fileKind = getFileKind(file.type || '');
+      await handleSendMessage(publicUrl, file.size, fileKind);
     } catch (err) {
       console.error('파일 업로드 실패:', err);
       alert('파일 업로드에 실패했습니다. pchos-files 버킷이 생성되어 있는지 확인하세요.');
@@ -947,7 +993,11 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
                   return r.id === NOTICE_ROOM_ID || name.includes(searchTerm);
                 })
                 .filter(room => !showUnreadOnly || room.id === NOTICE_ROOM_ID || (roomUnreadCounts[room.id] || 0) > 0)
-                .sort((a, b) => (roomUnreadCounts[b.id] || 0) - (roomUnreadCounts[a.id] || 0))
+                .sort((a, b) => {
+                  if (a.id === NOTICE_ROOM_ID) return -1;
+                  if (b.id === NOTICE_ROOM_ID) return 1;
+                  return (roomUnreadCounts[b.id] || 0) - (roomUnreadCounts[a.id] || 0);
+                })
                 .map(room => {
                   const unread = roomUnreadCounts[room.id] || 0;
                   const isSelected = selectedRoomId === room.id;
@@ -961,7 +1011,7 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
                       onClick={() => setRoom(room.id)}
                       className={`p-4 rounded-2xl cursor-pointer transition-all flex items-center justify-between gap-2 ${
                         isSelected
-                          ? 'bg-slate-100 text-slate-900 shadow-lg'
+                          ? 'bg-slate-100 shadow-lg border border-slate-200'
                           : 'bg-slate-800/60 border border-slate-700 hover:border-emerald-400'
                       }`}
                     >
@@ -983,7 +1033,7 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
                           />
                         )}
                         <div className="flex flex-col min-w-0">
-                          <p className="text-xs font-black truncate text-slate-50">
+                          <p className={`text-xs font-black truncate ${isSelected ? 'text-slate-900' : 'text-slate-50'}`}>
                             {isNoticeChannel ? '📢 ' : '👥 '}
                             {label}
                           </p>
@@ -1427,16 +1477,29 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
                     {roomNotifyOn ? '🔔 알림 on' : '🔕 알림 off'}
                   </button>
                   {selectedRoom?.id !== NOTICE_ROOM_ID && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowMediaPanel(false);
-                        handleLeaveRoom();
-                      }}
-                      className="px-3 py-1.5 text-[10px] font-black text-red-600 border border-red-100 rounded-xl hover:bg-red-50 transition-colors"
-                    >
-                      채팅방 나가기
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAddMemberModal(true);
+                          setAddMemberSearch('');
+                          setAddMemberSelectingIds([]);
+                        }}
+                        className="px-3 py-1.5 text-[10px] font-black text-blue-600 border border-blue-100 rounded-xl hover:bg-blue-50 transition-colors"
+                      >
+                        대화상대 추가
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowMediaPanel(false);
+                          handleLeaveRoom();
+                        }}
+                        className="px-3 py-1.5 text-[10px] font-black text-red-600 border border-red-100 rounded-xl hover:bg-red-50 transition-colors"
+                      >
+                        채팅방 나가기
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
@@ -2247,6 +2310,136 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
                 className="flex-1 py-3 rounded-xl text-[10px] font-black text-gray-400 hover:bg-gray-50"
               >
                 닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 채팅방 대화상대 추가 모달 */}
+      {showAddMemberModal && selectedRoom && (
+        <div
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+          onClick={() => {
+            setShowAddMemberModal(false);
+            setAddMemberSelectingIds([]);
+          }}
+        >
+          <div
+            className="bg-white w-full max-w-md rounded-3xl p-6 space-y-4 shadow-2xl border border-gray-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-black text-gray-900">
+              👥 대화상대 추가
+            </h3>
+            <p className="text-[11px] text-gray-500 font-bold">
+              현재 채팅방에 새로 초대할 직원을 선택하세요.
+            </p>
+            <input
+              type="text"
+              value={addMemberSearch}
+              onChange={(e) => setAddMemberSearch(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs font-bold outline-none focus:ring-2 focus:ring-blue-100"
+              placeholder="이름, 부서, 직급으로 검색"
+            />
+            <div className="max-h-64 overflow-y-auto custom-scrollbar space-y-1">
+              {addableMembers.length === 0 ? (
+                <p className="text-[11px] text-gray-400 font-bold py-4 text-center">
+                  추가할 수 있는 직원이 없습니다.
+                </p>
+              ) : (
+                addableMembers.map((s: any) => {
+                  const checked = addMemberSelectingIds.includes(s.id);
+                  return (
+                    <label
+                      key={s.id}
+                      className="flex items-center gap-3 px-3 py-2 rounded-xl border border-gray-100 hover:bg-gray-50 cursor-pointer text-[11px]"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setAddMemberSelectingIds((prev) =>
+                              prev.includes(s.id) ? prev : [...prev, s.id]
+                            );
+                          } else {
+                            setAddMemberSelectingIds((prev) =>
+                              prev.filter((id) => id !== s.id)
+                            );
+                          }
+                        }}
+                        className="w-3 h-3"
+                      />
+                      <span className="flex-1">
+                        <span className="font-black text-gray-800">
+                          {s.name}
+                        </span>
+                        <span className="ml-1 text-gray-400">
+                          {s.position ? ` ${s.position}` : ''}
+                          {s.company || s.department
+                            ? ` · ${s.company || s.department}`
+                            : ''}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddMemberModal(false);
+                  setAddMemberSelectingIds([]);
+                }}
+                className="flex-1 py-3 rounded-xl text-[10px] font-black text-gray-400 hover:bg-gray-50"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                disabled={addMemberSelectingIds.length === 0}
+                onClick={async () => {
+                  if (!selectedRoom) return;
+                  try {
+                    const currentMembers: any[] = Array.isArray(
+                      selectedRoom.members
+                    )
+                      ? selectedRoom.members
+                      : [];
+                    const setIds = new Set(
+                      currentMembers.map((id: any) => String(id))
+                    );
+                    addMemberSelectingIds.forEach((id) =>
+                      setIds.add(String(id))
+                    );
+                    const newMembers = Array.from(setIds);
+
+                    await supabase
+                      .from('chat_rooms')
+                      .update({ members: newMembers })
+                      .eq('id', selectedRoom.id);
+
+                    setChatRooms((prev) =>
+                      prev.map((room: any) =>
+                        room.id === selectedRoom.id
+                          ? { ...room, members: newMembers }
+                          : room
+                      )
+                    );
+                    setShowAddMemberModal(false);
+                    setAddMemberSelectingIds([]);
+                    alert('대화상대가 추가되었습니다.');
+                  } catch (e) {
+                    console.error('add members error', e);
+                    alert('대화상대 추가 중 오류가 발생했습니다.');
+                  }
+                }}
+                className="flex-1 py-3 rounded-xl text-[10px] font-black text-white bg-blue-600 disabled:bg-blue-300 hover:bg-blue-700"
+              >
+                추가하기
               </button>
             </div>
           </div>

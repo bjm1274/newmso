@@ -73,12 +73,15 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_push_subscriptions_staff_endpoint
   ON push_subscriptions(staff_id, endpoint);
 
 -- 메시지 (앱에서 사용하는 messages)
+-- 보관정책: 대화 5년, 사진/10MB이하 1년, 동영상·10MB초과 3개월, 100MB 초과 업로드 불가
 CREATE TABLE IF NOT EXISTS messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   room_id UUID NOT NULL REFERENCES chat_rooms(id) ON DELETE CASCADE,
   sender_id UUID REFERENCES staff_members(id),
   content TEXT,
   file_url TEXT,
+  file_size_bytes BIGINT,
+  file_kind VARCHAR(20),
   reply_to_id UUID REFERENCES messages(id) ON DELETE SET NULL,
   is_deleted BOOLEAN DEFAULT false,
   edited_at TIMESTAMPTZ,
