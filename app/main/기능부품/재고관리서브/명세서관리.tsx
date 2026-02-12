@@ -19,7 +19,13 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
   const [customPresets, setCustomPresets] = useState<any[]>([]);
   
   const [supplierForm, setSupplierForm] = useState({ 
-    name: '', contact: '', address: '', phone: '', email: '' 
+    name: '',
+    contact: '',
+    address: '',
+    phone: '',
+    email: '',
+    reg_num: '',
+    ceo: '',
   });
 
   const [invoiceData, setInvoiceData] = useState({
@@ -43,7 +49,7 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
       const { error } = await supabase.from('suppliers').insert([supplierForm]);
       if (!error) {
         alert('거래처가 등록되었습니다.');
-        setSupplierForm({ name: '', contact: '', address: '', phone: '', email: '' });
+        setSupplierForm({ name: '', contact: '', address: '', phone: '', email: '', reg_num: '', ceo: '' });
         setShowNewSupplier(false);
         fetchSuppliers();
       }
@@ -93,7 +99,7 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="bg-white p-6 md:p-10 border border-gray-100 shadow-xl rounded-[2.5rem]">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <h2 className="text-2xl font-black text-gray-900 tracking-tighter italic">거래처 및 명세서 관리</h2>
             <p className="text-[10px] text-green-600 font-bold mt-1 uppercase tracking-widest">Supplier & Invoice Control</p>
@@ -107,13 +113,56 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
         {showNewSupplier && (
           <div className="bg-gray-50 p-6 rounded-[2rem] space-y-4 mb-8 border border-gray-100 animate-in slide-in-from-top-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <input value={supplierForm.name} onChange={e => setSupplierForm({ ...supplierForm, name: e.target.value })} placeholder="거래처명 *" className="p-4 bg-white rounded-xl border-none outline-none text-sm font-black focus:ring-2 focus:ring-green-100" />
-              <input value={supplierForm.contact} onChange={e => setSupplierForm({ ...supplierForm, contact: e.target.value })} placeholder="담당자" className="p-4 bg-white rounded-xl border-none outline-none text-sm font-black focus:ring-2 focus:ring-green-100" />
-              <input value={supplierForm.phone} onChange={e => setSupplierForm({ ...supplierForm, phone: e.target.value })} placeholder="전화번호" className="p-4 bg-white rounded-xl border-none outline-none text-sm font-black focus:ring-2 focus:ring-green-100" />
-              <input value={supplierForm.email} onChange={e => setSupplierForm({ ...supplierForm, email: e.target.value })} placeholder="이메일" className="p-4 bg-white rounded-xl border-none outline-none text-sm font-black focus:ring-2 focus:ring-green-100" />
+              <input
+                value={supplierForm.name}
+                onChange={e => setSupplierForm({ ...supplierForm, name: e.target.value })}
+                placeholder="거래처명 *"
+                className="p-4 bg-white rounded-xl border border-gray-100 outline-none text-sm font-black focus:ring-2 focus:ring-green-100"
+              />
+              <input
+                value={supplierForm.ceo}
+                onChange={e => setSupplierForm({ ...supplierForm, ceo: e.target.value })}
+                placeholder="대표자 이름"
+                className="p-4 bg-white rounded-xl border border-gray-100 outline-none text-sm font-black focus:ring-2 focus:ring-green-100"
+              />
+              <input
+                value={supplierForm.reg_num}
+                onChange={e => setSupplierForm({ ...supplierForm, reg_num: e.target.value })}
+                placeholder="사업자등록번호 (예: 000-00-00000)"
+                className="p-4 bg-white rounded-xl border border-gray-100 outline-none text-sm font-black focus:ring-2 focus:ring-green-100"
+              />
+              <input
+                value={supplierForm.contact}
+                onChange={e => setSupplierForm({ ...supplierForm, contact: e.target.value })}
+                placeholder="담당자"
+                className="p-4 bg-white rounded-xl border border-gray-100 outline-none text-sm font-black focus:ring-2 focus:ring-green-100"
+              />
+              <input
+                value={supplierForm.phone}
+                onChange={e => setSupplierForm({ ...supplierForm, phone: e.target.value })}
+                placeholder="전화번호"
+                className="p-4 bg-white rounded-xl border border-gray-100 outline-none text-sm font-black focus:ring-2 focus:ring-green-100"
+              />
+              <input
+                value={supplierForm.email}
+                onChange={e => setSupplierForm({ ...supplierForm, email: e.target.value })}
+                placeholder="이메일"
+                className="p-4 bg-white rounded-xl border border-gray-100 outline-none text-sm font-black focus:ring-2 focus:ring-green-100"
+              />
             </div>
-            <input value={supplierForm.address} onChange={e => setSupplierForm({ ...supplierForm, address: e.target.value })} placeholder="주소" className="w-full p-4 bg-white rounded-xl border-none outline-none text-sm font-black focus:ring-2 focus:ring-green-100" />
-            <button onClick={handleAddSupplier} disabled={loading} className="w-full py-4 bg-green-600 text-white rounded-xl font-black text-sm shadow-lg disabled:opacity-50">거래처 등록하기</button>
+            <input
+              value={supplierForm.address}
+              onChange={e => setSupplierForm({ ...supplierForm, address: e.target.value })}
+              placeholder="주소"
+              className="w-full p-4 bg-white rounded-xl border border-gray-100 outline-none text-sm font-black focus:ring-2 focus:ring-green-100"
+            />
+            <button
+              onClick={handleAddSupplier}
+              disabled={loading}
+              className="w-full py-4 bg-green-600 text-white rounded-xl font-black text-sm shadow-lg disabled:opacity-50"
+            >
+              거래처 등록하기
+            </button>
           </div>
         )}
 
@@ -133,12 +182,35 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
 
       {showInvoiceForm && (
         <div className="bg-white p-6 md:p-10 border border-gray-100 shadow-2xl rounded-[2.5rem] animate-in slide-in-from-bottom-10">
-          <div className="flex justify-between items-center mb-8 border-b border-gray-50 pb-6">
-            <h3 className="text-xl font-black text-gray-900 tracking-tighter italic">거래명세서 작성 엔진</h3>
+          <div className="flex justify-between items-center mb-6 border-b border-gray-50 pb-4">
+            <div>
+              <h3 className="text-xl font-black text-gray-900 tracking-tighter italic">거래명세서 작성 엔진</h3>
+              <p className="text-[10px] text-gray-400 font-bold mt-1 uppercase tracking-widest">
+                발행일자 및 공급자/공급받는자 정보를 선택하세요
+              </p>
+            </div>
             <button onClick={() => setShowInvoiceForm(false)} className="text-gray-300 hover:text-red-500 text-2xl">✕</button>
           </div>
           
           <div className="space-y-8">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="text-[11px] text-gray-500 font-bold">
+                <span className="mr-1">📅 발행일자</span>
+                <span className="text-gray-400">(세금계산서/명세서 기준일)</span>
+              </div>
+              <input
+                type="date"
+                value={invoiceData.date}
+                onChange={(e) =>
+                  setInvoiceData((prev: any) => ({
+                    ...prev,
+                    date: e.target.value,
+                  }))
+                }
+                className="w-full md:w-48 p-3 bg-gray-50 rounded-xl border border-gray-100 outline-none text-xs font-black text-gray-800 focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="p-6 bg-blue-50/50 rounded-2xl border border-blue-100">
                 <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-4">공급자 정보 (업체 선택)</p>
@@ -150,10 +222,17 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
                       applyPreset('supplier', { ...PRESET_HOSPITAL });
                     } else {
                       const s = suppliers.find((sup: any) => String(sup.id) === value);
-                      if (s) applyPreset('supplier', { sangho: s.name, ceo: s.contact, addr: s.address, phone: s.phone });
+                      if (s)
+                        applyPreset('supplier', {
+                          reg_num: s.reg_num || '',
+                          sangho: s.name,
+                          ceo: s.ceo || s.contact || '',
+                          addr: s.address,
+                          phone: s.phone,
+                        });
                     }
                   }}
-                  className="w-full p-3 bg-white rounded-xl border-none outline-none font-black text-xs mb-4"
+                  className="w-full p-3 bg-white rounded-xl border border-blue-100 outline-none font-black text-xs mb-4"
                 >
                   <option value="">공급자 선택</option>
                   <option value="__HOSPITAL__">본원 (박철홍정형외과)</option>
@@ -163,15 +242,17 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
                     </option>
                   ))}
                 </select>
-                <div className="space-y-2 text-xs font-bold text-gray-700">
+                <div className="space-y-1 text-[11px] font-bold text-gray-700">
                   <p>상호: {invoiceData.supplier.sangho || '-'}</p>
-                  <p>대표: {invoiceData.supplier.ceo || '-'}</p>
+                  <p>사업자등록번호: {invoiceData.supplier.reg_num || '-'}</p>
+                  <p>대표자: {invoiceData.supplier.ceo || '-'}</p>
+                  <p>전화: {invoiceData.supplier.phone || '-'}</p>
                   <p>주소: {invoiceData.supplier.addr || '-'}</p>
                 </div>
               </div>
               <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100">
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">공급받는자 정보 (업체 선택)</p>
-                <select 
+                <select
                   value={invoiceData.receiver.sangho || ''}
                   onChange={(e) => {
                     const value = e.target.value;
@@ -179,70 +260,105 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
                       applyPreset('receiver', { ...PRESET_HOSPITAL });
                     } else {
                       const s = suppliers.find((sup: any) => String(sup.id) === value);
-                      if (s) applyPreset('receiver', { sangho: s.name, ceo: s.contact, addr: s.address, phone: s.phone });
+                      if (s)
+                        applyPreset('receiver', {
+                          reg_num: s.reg_num || '',
+                          sangho: s.name,
+                          ceo: s.ceo || s.contact || '',
+                          addr: s.address,
+                          phone: s.phone,
+                        });
                     }
                   }}
-                  className="w-full p-3 bg-white rounded-xl border-none outline-none font-black text-xs mb-4"
+                  className="w-full p-3 bg-white rounded-xl border border-gray-100 outline-none font-black text-xs mb-4"
                 >
                   <option value="">거래처 선택</option>
                   <option value="__HOSPITAL__">본원 (박철홍정형외과)</option>
-                  {suppliers.map((s: any) => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
+                  {suppliers.map((s: any) => (
+                    <option key={s.id} value={String(s.id)}>
+                      {s.name}
+                    </option>
+                  ))}
                 </select>
-                <div className="space-y-2 text-xs font-bold text-gray-700">
+                <div className="space-y-1 text-[11px] font-bold text-gray-700">
                   <p>상호: {invoiceData.receiver.sangho || '-'}</p>
-                  <p>대표: {invoiceData.receiver.ceo || '-'}</p>
+                  <p>사업자등록번호: {invoiceData.receiver.reg_num || '-'}</p>
+                  <p>대표자: {invoiceData.receiver.ceo || '-'}</p>
+                  <p>전화: {invoiceData.receiver.phone || '-'}</p>
                   <p>주소: {invoiceData.receiver.addr || '-'}</p>
                 </div>
               </div>
             </div>
 
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">품목 리스트</p>
-                <button onClick={addRow} className="text-[10px] font-black text-blue-600 hover:underline">+ 품목 추가</button>
-              </div>
-              <div className="overflow-x-auto no-scrollbar">
-                <table className="w-full text-left border-collapse min-w-[600px]">
-                  <thead>
-                    <tr className="bg-gray-50/50 border-b border-gray-100">
-                      <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase">품목명</th>
-                      <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase text-center">수량</th>
-                      <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase text-right">단가</th>
-                      <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase text-right">공급가액</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {invoiceData.items.map((item, idx) => (
-                      <tr key={idx}>
-                        <td className="px-4 py-3 relative">
-                          <input 
-                            value={item.name} 
-                            onChange={(e) => updateItem(idx, 'name', e.target.value)}
-                            onFocus={() => setFocusedRow(idx)}
-                            placeholder="품목 선택/입력"
-                            className="w-full bg-transparent outline-none text-xs font-black text-gray-800"
-                          />
-                          {focusedRow === idx && (
-                            <div className="absolute left-0 top-full w-full bg-white border border-gray-100 shadow-2xl z-50 rounded-xl max-h-40 overflow-y-auto">
-                              {inventory.filter((i: any) => i.item_name.includes(item.name)).map((i: any) => (
-                                <button key={i.id} onClick={() => selectItem(idx, i)} className="w-full text-left p-3 text-[10px] font-bold hover:bg-blue-50 border-b border-gray-50">{i.item_name}</button>
-                              ))}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <input type="number" value={item.qty} onChange={(e) => updateItem(idx, 'qty', e.target.value)} className="w-16 bg-transparent outline-none text-xs font-black text-center" />
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <input type="number" value={item.price} onChange={(e) => updateItem(idx, 'price', e.target.value)} className="w-24 bg-transparent outline-none text-xs font-black text-right" />
-                        </td>
-                        <td className="px-4 py-3 text-right text-xs font-black text-gray-900">{(item.supply_price || 0).toLocaleString()}원</td>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">품목 리스트</p>
+                  <button onClick={addRow} className="text-[10px] font-black text-blue-600 hover:underline">
+                    + 품목 추가
+                  </button>
+                </div>
+                <div className="overflow-x-auto no-scrollbar">
+                  <table className="w-full text-left border-collapse min-w-[600px]">
+                    <thead>
+                      <tr className="bg-gray-50/50 border-b border-gray-100">
+                        <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase">품목명</th>
+                        <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase text-center">수량</th>
+                        <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase text-right">단가</th>
+                        <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase text-right">공급가액</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {invoiceData.items.map((item, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50/70 transition-colors">
+                          <td className="px-4 py-3 relative">
+                            <input
+                              value={item.name}
+                              onChange={(e) => updateItem(idx, 'name', e.target.value)}
+                              onFocus={() => setFocusedRow(idx)}
+                              placeholder="품목 선택/입력"
+                              className="w-full px-3 py-2 bg-gray-50 rounded-lg border border-gray-200 outline-none text-xs font-black text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                            />
+                            {focusedRow === idx && (
+                              <div className="absolute left-0 top-full w-full bg-white border border-gray-100 shadow-2xl z-50 rounded-xl max-h-40 overflow-y-auto">
+                                {inventory
+                                  .filter((i: any) => i.item_name.includes(item.name))
+                                  .map((i: any) => (
+                                    <button
+                                      key={i.id}
+                                      onClick={() => selectItem(idx, i)}
+                                      className="w-full text-left p-3 text-[10px] font-bold hover:bg-blue-50 border-b border-gray-50"
+                                    >
+                                      {i.item_name}
+                                    </button>
+                                  ))}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <input
+                              type="number"
+                              value={item.qty}
+                              onChange={(e) => updateItem(idx, 'qty', e.target.value)}
+                              className="w-20 px-2 py-2 bg-gray-50 rounded-lg border border-gray-200 outline-none text-xs font-black text-center text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                            />
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <input
+                              type="number"
+                              value={item.price}
+                              onChange={(e) => updateItem(idx, 'price', e.target.value)}
+                              className="w-24 px-2 py-2 bg-gray-50 rounded-lg border border-gray-200 outline-none text-xs font-black text-right text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                            />
+                          </td>
+                          <td className="px-4 py-3 text-right text-xs font-black text-gray-900">
+                            {(item.supply_price || 0).toLocaleString()}원
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
 
             <div className="flex justify-end pt-6 border-t border-gray-50">
               <div className="text-right">
