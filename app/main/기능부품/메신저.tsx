@@ -54,6 +54,9 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
 
   const [roomNotifyOn, setRoomNotifyOn] = useState(true);
 
+  // 다중 선택 나가기용 상태
+  const [selectedRoomIdsForLeave, setSelectedRoomIdsForLeave] = useState<string[]>([]);
+
   const chatRoomsRef = useRef<any[]>([]);
 
   // @멘션 자동완성용 상태
@@ -387,7 +390,10 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
     () =>
       chatRooms.filter((room: any) => {
         if (room.id === NOTICE_ROOM_ID) return true;
-        // 시스템 공지 채널은 MSO/관리자만 접근
+        // 공지 채널 정책:
+        // - 전사 공지/팀 공지/시스템 공지 등 notice_type 있는 방은
+        //   일반 사용자가 임의로 나갈 수 없도록 "강제 참여" 개념으로 유지
+        // - 시스템 공지 채널은 MSO/관리자만 접근
         if (room.notice_type === 'system' && !isMso) return false;
         // members가 지정된 경우: 해당 멤버만
         if (Array.isArray(room.members) && room.members.length > 0) {
@@ -476,6 +482,58 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
       alert('채팅방에서 나갔습니다.');
     } catch {
       alert('채팅방 나가기 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handleBulkLeaveRooms = async () => {
+    if (!user?.id) return;
+    const targets = chatRooms.filter((room: any) => {
+      if (!selectedRoomIdsForLeave.includes(room.id)) return false;
+      // 공지성 채널(NOTICE_ROOM_ID 및 notice_type 있는 방)은 강제 참여 대상으로 남겨두기
+      if (room.id === NOTICE_ROOM_ID || room.notice_type) return false;
+      return true;
+    });
+    if (!targets.length) {
+      alert('나갈 수 있는 채팅방이 선택되지 않았습니다.');
+      return;
+    }
+    if (
+      !confirm(
+        `선택한 ${targets.length}개 채팅방에서 한 번에 나가시겠습니까?\n\n나간 후에는 다시 초대 받아야 합니다.`
+      )
+    )
+      return;
+
+    try {
+      const userIdStr = String(user.id);
+      const updates = targets.map((room: any) => {
+        const currentMembers: any[] = Array.isArray(room.members) ? room.members : [];
+        const newMembers = currentMembers.filter((id: any) => String(id) !== userIdStr);
+        return { id: room.id, members: newMembers };
+      });
+
+      for (const u of updates) {
+        await supabase.from('chat_rooms').update({ members: u.members }).eq('id', u.id);
+      }
+
+      setChatRooms((prev) =>
+        prev.map((room: any) => {
+          const upd = updates.find((u) => u.id === room.id);
+          return upd ? { ...room, members: upd.members } : room;
+        })
+      );
+
+      // 현재 보고 있던 방도 나간 방이면 선택 해제
+      if (selectedRoomId && updates.some((u) => u.id === selectedRoomId)) {
+        setRoom(null);
+        setMessages([]);
+      }
+
+      setSelectedRoomIdsForLeave([]);
+      alert('선택한 채팅방에서 나갔습니다.');
+    } catch (e) {
+      console.error('handleBulkLeaveRooms error', e);
+      alert('채팅방 일괄 나가기 중 오류가 발생했습니다.');
     }
   };
 
@@ -784,23 +842,67 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
             aria-label="채팅방 또는 조직 검색"
           />
           {viewMode === 'chat' && (
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowSearchPanel(!showSearchPanel)}
-                className="flex-1 py-2 text-[10px] font-black text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
-                aria-label="메시지 검색 패널 열기"
-              >
-                🔍 메시지 검색
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowUnreadOnly((v) => !v)}
-                className={`px-3 py-2 text-[10px] font-black rounded-xl border transition-colors ${
-                  showUnreadOnly ? 'bg-red-50 border-red-200 text-red-600' : 'bg-white border-gray-200 text-gray-400'
-                }`}
-              >
-                {showUnreadOnly ? '전체 보기' : '안읽은 방'}
-              </button>
+            <div className="flex flex-col gap-2">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowSearchPanel(!showSearchPanel)}
+                  className="flex-1 py-2 text-[10px] font-black text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
+                  aria-label="메시지 검색 패널 열기"
+                >
+                  🔍 메시지 검색
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowUnreadOnly((v) => !v)}
+                  className={`px-3 py-2 text-[10px] font-black rounded-xl border transition-colors ${
+                    showUnreadOnly ? 'bg-red-50 border-red-200 text-red-600' : 'bg-white border-gray-200 text-gray-400'
+                  }`}
+                >
+                  {showUnreadOnly ? '전체 보기' : '안읽은 방'}
+                </button>
+              </div>
+              <div className="flex gap-2">
+                <label className="flex-1 flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-xl cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={
+                      selectedRoomIdsForLeave.length > 0 &&
+                      visibleRooms.some(
+                        (room: any) =>
+                          !(
+                            room.id === NOTICE_ROOM_ID ||
+                            room.notice_type
+                          ) && selectedRoomIdsForLeave.includes(room.id)
+                      )
+                    }
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        const ids = visibleRooms
+                          .filter(
+                            (room: any) =>
+                              !(
+                                room.id === NOTICE_ROOM_ID ||
+                                room.notice_type
+                              )
+                          )
+                          .map((r: any) => r.id);
+                        setSelectedRoomIdsForLeave(ids);
+                      } else {
+                        setSelectedRoomIdsForLeave([]);
+                      }
+                    }}
+                  />
+                  <span className="text-[10px] font-black text-gray-500">일반 채팅방 전체 선택</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={handleBulkLeaveRooms}
+                  className="px-3 py-2 text-[10px] font-black rounded-xl bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-40"
+                  disabled={selectedRoomIdsForLeave.length === 0}
+                >
+                  선택 방 나가기
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -830,18 +932,38 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
                       : room.notice_type === 'system'
                       ? '시스템 공지'
                       : room.name || '채팅방';
+                  const isBulkSelectable = !isNoticeChannel;
+                  const checked = selectedRoomIdsForLeave.includes(room.id);
                   return (
                     <div 
                       key={room.id}
                       onClick={() => setRoom(room.id)}
-                      className={`p-4 rounded-2xl cursor-pointer transition-all flex items-center justify-between ${
+                      className={`p-4 rounded-2xl cursor-pointer transition-all flex items-center justify-between gap-2 ${
                         isSelected ? 'bg-blue-600 text-white shadow-lg' : 'bg-white border hover:border-blue-200'
                       }`}
                     >
-                      <p className="text-xs font-black truncate">
-                        {isNoticeChannel ? '📢 ' : '👥 '}
-                        {label}
-                      </p>
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        {isBulkSelectable && (
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              setSelectedRoomIdsForLeave((prev) =>
+                                e.target.checked
+                                  ? [...prev, room.id]
+                                  : prev.filter((id) => id !== room.id)
+                              );
+                            }}
+                            className="w-3 h-3 rounded border-gray-300"
+                          />
+                        )}
+                        <p className="text-xs font-black truncate">
+                          {isNoticeChannel ? '📢 ' : '👥 '}
+                          {label}
+                        </p>
+                      </div>
                       {unread > 0 && (
                         <span className={`ml-2 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full text-[10px] font-black ${
                           isSelected ? 'bg-white text-blue-600' : 'bg-red-500 text-white'

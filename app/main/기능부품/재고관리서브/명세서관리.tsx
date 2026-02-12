@@ -16,6 +16,7 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
   const [showNewSupplier, setShowNewSupplier] = useState(false);
   const [showInvoiceForm, setShowInvoiceForm] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
   const [customPresets, setCustomPresets] = useState<any[]>([]);
   
   const [supplierForm, setSupplierForm] = useState({ 
@@ -36,6 +37,7 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
   });
 
   const [focusedRow, setFocusedRow] = useState<number | null>(null);
+  const [editingSupplier, setEditingSupplier] = useState<any | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem('invoice_partners');
@@ -61,6 +63,70 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
       alert(`거래처 등록에 실패했습니다.\n\n${err?.message || ''}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const startEditSupplier = (supplier: any) => {
+    setEditingSupplier({
+      id: supplier.id,
+      name: supplier.name || '',
+      contact: supplier.contact || '',
+      address: supplier.address || '',
+      phone: supplier.phone || '',
+      email: supplier.email || '',
+      reg_num: supplier.reg_num || '',
+      ceo: supplier.ceo || '',
+    });
+  };
+
+  const handleUpdateSupplier = async () => {
+    if (!editingSupplier?.id) return;
+    if (!editingSupplier.name) return alert('거래처명을 입력해주세요.');
+    setEditLoading(true);
+    try {
+      const payload = {
+        name: editingSupplier.name,
+        contact: editingSupplier.contact,
+        address: editingSupplier.address,
+        phone: editingSupplier.phone,
+        email: editingSupplier.email,
+        reg_num: editingSupplier.reg_num,
+        ceo: editingSupplier.ceo,
+      };
+      const { error } = await supabase.from('suppliers').update(payload).eq('id', editingSupplier.id);
+      if (error) {
+        console.error('suppliers update error', error);
+        alert(`거래처 수정에 실패했습니다.\n\n${error.message || ''}`);
+      } else {
+        alert('거래처 정보가 수정되었습니다.');
+        setEditingSupplier(null);
+        fetchSuppliers();
+      }
+    } catch (err: any) {
+      console.error('handleUpdateSupplier error', err);
+      alert(`거래처 수정에 실패했습니다.\n\n${err?.message || ''}`);
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const handleDeleteSupplier = async (id: string) => {
+    if (!id) return;
+    const ok = window.confirm('해당 거래처를 삭제하시겠습니까?\n\n관련 발주/명세서 데이터가 있다면 영향이 있을 수 있습니다.');
+    if (!ok) return;
+    try {
+      const { error } = await supabase.from('suppliers').delete().eq('id', id);
+      if (error) {
+        console.error('suppliers delete error', error);
+        alert(`거래처 삭제에 실패했습니다.\n\n${error.message || ''}`);
+      } else {
+        alert('거래처가 삭제되었습니다.');
+        if (editingSupplier?.id === id) setEditingSupplier(null);
+        fetchSuppliers();
+      }
+    } catch (err: any) {
+      console.error('handleDeleteSupplier error', err);
+      alert(`거래처 삭제에 실패했습니다.\n\n${err?.message || ''}`);
     }
   };
 
@@ -172,17 +238,123 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {suppliers.map((supplier: any) => (
-            <div key={supplier.id} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all">
-              <p className="font-black text-gray-900 text-sm">{supplier.name}</p>
-              <div className="mt-3 space-y-1">
-                <p className="text-[10px] text-gray-400 font-bold flex items-center gap-2">👤 {supplier.contact || '-'}</p>
-                <p className="text-[10px] text-gray-400 font-bold flex items-center gap-2">📞 {supplier.phone || '-'}</p>
-                <p className="text-[10px] text-gray-400 font-bold flex items-center gap-2 truncate">📍 {supplier.address || '-'}</p>
+            <div
+              key={supplier.id}
+              className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
+            >
+              <div>
+                <p className="font-black text-gray-900 text-sm">{supplier.name}</p>
+                <div className="mt-3 space-y-1">
+                  <p className="text-[10px] text-gray-400 font-bold flex items-center gap-2">
+                    🧾 사업자번호: {supplier.reg_num || '-'}
+                  </p>
+                  <p className="text-[10px] text-gray-400 font-bold flex items-center gap-2">
+                    👤 대표자: {supplier.ceo || supplier.contact || '-'}
+                  </p>
+                  <p className="text-[10px] text-gray-400 font-bold flex items-center gap-2">
+                    📞 {supplier.phone || '-'}
+                  </p>
+                  <p className="text-[10px] text-gray-400 font-bold flex items-center gap-2 truncate">
+                    📍 {supplier.address || '-'}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  onClick={() => startEditSupplier(supplier)}
+                  className="px-3 py-1.5 rounded-lg text-[10px] font-black bg-blue-50 text-blue-600 hover:bg-blue-100"
+                >
+                  수정
+                </button>
+                <button
+                  onClick={() => handleDeleteSupplier(supplier.id)}
+                  className="px-3 py-1.5 rounded-lg text-[10px] font-black bg-red-50 text-red-600 hover:bg-red-100"
+                >
+                  삭제
+                </button>
               </div>
             </div>
           ))}
         </div>
       </div>
+
+      {editingSupplier && (
+        <div className="bg-white p-6 md:p-8 border border-blue-100 shadow-xl rounded-[2rem]">
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <h3 className="text-lg font-black text-gray-900">거래처 정보 수정</h3>
+              <p className="text-[10px] text-gray-400 font-bold mt-1 uppercase tracking-widest">
+                선택한 거래처의 정보를 수정합니다
+              </p>
+            </div>
+            <button
+              onClick={() => setEditingSupplier(null)}
+              className="text-gray-300 hover:text-red-500 text-xl"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <input
+              value={editingSupplier.name}
+              onChange={(e) => setEditingSupplier({ ...editingSupplier, name: e.target.value })}
+              placeholder="거래처명 *"
+              className="p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm font-black focus:bg-white focus:ring-2 focus:ring-blue-100"
+            />
+            <input
+              value={editingSupplier.ceo}
+              onChange={(e) => setEditingSupplier({ ...editingSupplier, ceo: e.target.value })}
+              placeholder="대표자 이름"
+              className="p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm font-black focus:bg-white focus:ring-2 focus:ring-blue-100"
+            />
+            <input
+              value={editingSupplier.reg_num}
+              onChange={(e) => setEditingSupplier({ ...editingSupplier, reg_num: e.target.value })}
+              placeholder="사업자등록번호 (예: 000-00-00000)"
+              className="p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm font-black focus:bg-white focus:ring-2 focus:ring-blue-100"
+            />
+            <input
+              value={editingSupplier.contact}
+              onChange={(e) => setEditingSupplier({ ...editingSupplier, contact: e.target.value })}
+              placeholder="담당자"
+              className="p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm font-black focus:bg-white focus:ring-2 focus:ring-blue-100"
+            />
+            <input
+              value={editingSupplier.phone}
+              onChange={(e) => setEditingSupplier({ ...editingSupplier, phone: e.target.value })}
+              placeholder="전화번호"
+              className="p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm font-black focus:bg-white focus:ring-2 focus:ring-blue-100"
+            />
+            <input
+              value={editingSupplier.email}
+              onChange={(e) => setEditingSupplier({ ...editingSupplier, email: e.target.value })}
+              placeholder="이메일"
+              className="p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm font-black focus:bg-white focus:ring-2 focus:ring-blue-100"
+            />
+          </div>
+          <input
+            value={editingSupplier.address}
+            onChange={(e) => setEditingSupplier({ ...editingSupplier, address: e.target.value })}
+            placeholder="주소"
+            className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm font-black focus:bg-white focus:ring-2 focus:ring-blue-100 mb-4"
+          />
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => setEditingSupplier(null)}
+              className="px-4 py-2 rounded-xl text-[11px] font-black bg-gray-100 text-gray-500 hover:bg-gray-200"
+            >
+              취소
+            </button>
+            <button
+              onClick={handleUpdateSupplier}
+              disabled={editLoading}
+              className="px-5 py-2 rounded-xl text-[11px] font-black bg-blue-600 text-white shadow-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {editLoading ? '저장 중...' : '변경 사항 저장'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {showInvoiceForm && (
         <div className="bg-white p-6 md:p-10 border border-gray-100 shadow-2xl rounded-[2.5rem] animate-in slide-in-from-bottom-10">
