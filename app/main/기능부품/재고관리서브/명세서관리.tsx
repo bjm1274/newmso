@@ -141,28 +141,57 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
           <div className="space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="p-6 bg-blue-50/50 rounded-2xl border border-blue-100">
-                <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-4">공급자 정보 (본원)</p>
+                <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-4">공급자 정보 (업체 선택)</p>
+                <select
+                  value={invoiceData.supplier.sangho || ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '__HOSPITAL__') {
+                      applyPreset('supplier', { ...PRESET_HOSPITAL });
+                    } else {
+                      const s = suppliers.find((sup: any) => String(sup.id) === value);
+                      if (s) applyPreset('supplier', { sangho: s.name, ceo: s.contact, addr: s.address, phone: s.phone });
+                    }
+                  }}
+                  className="w-full p-3 bg-white rounded-xl border-none outline-none font-black text-xs mb-4"
+                >
+                  <option value="">공급자 선택</option>
+                  <option value="__HOSPITAL__">본원 (박철홍정형외과)</option>
+                  {suppliers.map((s: any) => (
+                    <option key={s.id} value={String(s.id)}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
                 <div className="space-y-2 text-xs font-bold text-gray-700">
-                  <p>상호: {invoiceData.supplier.sangho}</p>
-                  <p>대표: {invoiceData.supplier.ceo}</p>
-                  <p>주소: {invoiceData.supplier.addr}</p>
+                  <p>상호: {invoiceData.supplier.sangho || '-'}</p>
+                  <p>대표: {invoiceData.supplier.ceo || '-'}</p>
+                  <p>주소: {invoiceData.supplier.addr || '-'}</p>
                 </div>
               </div>
               <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">공급받는자 정보 (거래처)</p>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">공급받는자 정보 (업체 선택)</p>
                 <select 
+                  value={invoiceData.receiver.sangho || ''}
                   onChange={(e) => {
-                    const s = suppliers.find((sup: any) => sup.id === parseInt(e.target.value));
-                    if (s) applyPreset('receiver', { sangho: s.name, ceo: s.contact, addr: s.address, phone: s.phone });
+                    const value = e.target.value;
+                    if (value === '__HOSPITAL__') {
+                      applyPreset('receiver', { ...PRESET_HOSPITAL });
+                    } else {
+                      const s = suppliers.find((sup: any) => String(sup.id) === value);
+                      if (s) applyPreset('receiver', { sangho: s.name, ceo: s.contact, addr: s.address, phone: s.phone });
+                    }
                   }}
                   className="w-full p-3 bg-white rounded-xl border-none outline-none font-black text-xs mb-4"
                 >
                   <option value="">거래처 선택</option>
-                  {suppliers.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  <option value="__HOSPITAL__">본원 (박철홍정형외과)</option>
+                  {suppliers.map((s: any) => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
                 </select>
                 <div className="space-y-2 text-xs font-bold text-gray-700">
                   <p>상호: {invoiceData.receiver.sangho || '-'}</p>
                   <p>대표: {invoiceData.receiver.ceo || '-'}</p>
+                  <p>주소: {invoiceData.receiver.addr || '-'}</p>
                 </div>
               </div>
             </div>

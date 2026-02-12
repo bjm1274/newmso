@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import 구성원관리 from './인사관리서브/구성원현황'; 
 import CertificateGenerator from './인사관리서브/증명서발급';
 import PayrollMain from './인사관리서브/급여관리';
@@ -17,6 +17,11 @@ import EducationMain from './인사관리서브/교육관리';
 // 기본 함수 이름을 영문 대문자로 시작하도록 변경해
 // React ESLint 규칙을 만족시킵니다. default export 이므로
 // 외부에서의 import 이름(인사관리)은 그대로 유지됩니다.
+const HR_TAB_KEY = 'erp_hr_tab';
+const HR_COMPANY_KEY = 'erp_hr_company';
+const HR_STATUS_KEY = 'erp_hr_status';
+const HR_ATT_VIEW_KEY = 'erp_hr_att_view';
+
 export default function HRMainView({ user, staffs, depts, onRefresh }: any) {
   const [현재메뉴, 메뉴설정] = useState('구성원');
   const [선택사업체, 사업체설정] = useState('전체');
@@ -44,6 +49,45 @@ export default function HRMainView({ user, staffs, depts, onRefresh }: any) {
   ];
   const visibleHrTabs = HR_TABS.filter(t => p[t.perm] !== false);
   const activeMenu = visibleHrTabs.some(t => t.id === 현재메뉴) ? 현재메뉴 : (visibleHrTabs[0]?.id || '구성원');
+
+  // 새로고침해도 HR 내에서 보던 탭·필터를 유지
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const savedTab = window.localStorage.getItem(HR_TAB_KEY);
+      const savedCo = window.localStorage.getItem(HR_COMPANY_KEY);
+      const savedStatus = window.localStorage.getItem(HR_STATUS_KEY) as '재직' | '퇴사' | null;
+      const savedAtt = window.localStorage.getItem(HR_ATT_VIEW_KEY) as '실시간' | '월별' | null;
+
+      if (savedTab && HR_TABS.some(t => t.id === savedTab)) {
+        메뉴설정(savedTab);
+      }
+      if (savedCo) {
+        사업체설정(savedCo);
+      }
+      if (savedStatus === '재직' || savedStatus === '퇴사') {
+        직원상태필터설정(savedStatus);
+      }
+      if (savedAtt === '실시간' || savedAtt === '월별') {
+        근태뷰설정(savedAtt);
+      }
+    } catch {
+      // ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(HR_TAB_KEY, activeMenu);
+      window.localStorage.setItem(HR_COMPANY_KEY, 선택사업체);
+      window.localStorage.setItem(HR_STATUS_KEY, 직원상태필터);
+      window.localStorage.setItem(HR_ATT_VIEW_KEY, 근태뷰);
+    } catch {
+      // ignore
+    }
+  }, [activeMenu, 선택사업체, 직원상태필터, 근태뷰]);
 
   const 퇴사서류보기 = (직원: any) => {
     문서연결대상설정({ id: 직원.id, name: 직원.name });

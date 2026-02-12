@@ -79,6 +79,40 @@ export default function MyProfileCard({ user: initialUser }: any) {
     }
   };
 
+  const verifyPasswordAndRun = async (onSuccess: () => void) => {
+    try {
+      let currentUser = user;
+      if (!currentUser?.id && initialUser?.name) {
+        await recoverUserIdentity(initialUser.name);
+        try {
+          const stored = localStorage.getItem('erp_user');
+          if (stored) currentUser = JSON.parse(stored);
+        } catch {
+          // ignore
+        }
+      }
+      if (!currentUser?.id) {
+        alert('직원 계정으로 로그인한 상태에서만 사용할 수 있습니다.');
+        return;
+      }
+      const input = window.prompt('본인 확인을 위해 현재 비밀번호를 입력해 주세요.');
+      if (!input) return;
+      const { data, error } = await supabase
+        .from('staff_members')
+        .select('id')
+        .eq('id', currentUser.id)
+        .eq('password', input)
+        .single();
+      if (error || !data) {
+        alert('비밀번호가 일치하지 않습니다.');
+        return;
+      }
+      onSuccess();
+    } catch {
+      alert('본인 확인 중 오류가 발생했습니다.');
+    }
+  };
+
   const uploadAvatar = async (event: any) => {
     try {
       setUploading(true);
@@ -235,14 +269,14 @@ export default function MyProfileCard({ user: initialUser }: any) {
             <h2 className="text-4xl font-black text-gray-900 tracking-tighter">{user.name} {user.position}</h2>
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setShowSecret(!showSecret)}
+                onClick={() => verifyPasswordAndRun(() => setShowSecret((v) => !v))}
                 className="text-[11px] font-black px-4 py-2 bg-gray-50 rounded-full text-gray-400 hover:text-blue-600 border border-transparent hover:border-blue-100"
               >
                 {showSecret ? '민감 정보 숨기기 🔒' : '보안 정보 보기 👁️'}
               </button>
               <button
                 type="button"
-                onClick={() => setIsEditing((v) => !v)}
+                onClick={() => verifyPasswordAndRun(() => setIsEditing((v) => !v))}
                 className={`text-[11px] font-black px-4 py-2 rounded-full border transition-all ${
                   isEditing
                     ? 'bg-red-50 text-red-500 border-red-100 hover:bg-red-100'

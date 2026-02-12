@@ -116,9 +116,13 @@ export default function BoardView({ user }: any) {
         setTagsInput('');
         setShowNewPost(false);
         fetchPosts();
+      } else {
+        alert(`게시물 등록에 실패했습니다.\n\n${error.message || ''}`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('게시물 등록 실패:', error);
+      const msg = typeof error?.message === 'string' ? error.message : '';
+      alert(`게시물 등록에 실패했습니다.\n\n${msg}`);
     } finally {
       setLoading(false);
     }
@@ -166,11 +170,13 @@ export default function BoardView({ user }: any) {
 
           <div className="space-y-4">
             <div>
-              <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2 block">제목</label>
+              <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2 block">
+                {activeBoard === '수술일정' ? '수술명' : '제목'}
+              </label>
               <input
                 value={title}
                 onChange={e => setTitle(e.target.value)}
-                placeholder="게시물 제목을 입력하세요."
+                placeholder={activeBoard === '수술일정' ? '수술명을 입력하세요.' : '게시물 제목을 입력하세요.'}
                 className="w-full p-4 bg-gray-50 rounded-xl border-none outline-none text-sm font-bold focus:ring-2 focus:ring-blue-100"
               />
             </div>
@@ -180,11 +186,52 @@ export default function BoardView({ user }: any) {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2 block">날짜</label>
-                    <input type="date" value={scheduleDate} onChange={e => setScheduleDate(e.target.value)} className="w-full p-4 bg-gray-50 rounded-xl border-none outline-none text-sm font-bold focus:ring-2 focus:ring-blue-100" />
+                    <input
+                      type="date"
+                      value={scheduleDate}
+                      onChange={e => {
+                        let v = e.target.value;
+                        if (v && v.length === 8 && !v.includes('-')) {
+                          const y = v.slice(0, 4);
+                          const m = v.slice(4, 6);
+                          const d = v.slice(6, 8);
+                          v = `${y}-${m}-${d}`;
+                        }
+                        setScheduleDate(v);
+                      }}
+                      className="w-full p-4 bg-gray-50 rounded-xl border-none outline-none text-sm font-bold focus:ring-2 focus:ring-blue-100"
+                    />
                   </div>
                   <div>
                     <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2 block">시간</label>
-                    <input type="time" value={scheduleTime} onChange={e => setScheduleTime(e.target.value)} className="w-full p-4 bg-gray-50 rounded-xl border-none outline-none text-sm font-bold focus:ring-2 focus:ring-blue-100" />
+                    <input
+                      type="time"
+                      step={1800}
+                      value={scheduleTime}
+                      onChange={e => {
+                        const raw = e.target.value;
+                        if (!raw) {
+                          setScheduleTime('');
+                          return;
+                        }
+                        const [hh, mm] = raw.split(':').map((v) => parseInt(v, 10));
+                        if (isNaN(hh) || isNaN(mm)) {
+                          setScheduleTime(raw);
+                          return;
+                        }
+                        let h = hh;
+                        let m = mm;
+                        if (m < 15) m = 0;
+                        else if (m < 45) m = 30;
+                        else {
+                          m = 0;
+                          h = (h + 1) % 24;
+                        }
+                        const fixed = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                        setScheduleTime(fixed);
+                      }}
+                      className="w-full p-4 bg-gray-50 rounded-xl border-none outline-none text-sm font-bold focus:ring-2 focus:ring-blue-100"
+                    />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">

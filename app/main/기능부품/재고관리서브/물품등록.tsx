@@ -60,7 +60,7 @@ export default function ProductRegistration({ user, suppliers, fetchInventory, f
 
       const { error } = await supabase.from('inventory').insert([submissionData]);
       if (error) throw error;
-      alert(`${productForm.item_name} 등록 완료`);
+      alert(`${productForm.item_name} 등록이 완료되었습니다.`);
       fetchInventory();
       // 폼 초기화
       setProductForm({
@@ -78,9 +78,13 @@ export default function ProductRegistration({ user, suppliers, fetchInventory, f
         company: user?.company || '박철홍정형외과',
         department: user?.department || ''
       });
-    } catch (err) {
-      console.error('등록 실패:', err);
-      alert('등록 실패');
+    } catch (err: any) {
+      console.warn('등록 실패:', err);
+      const message =
+        typeof err?.message === 'string'
+          ? err.message
+          : (err?.error_description || err?.details || '').toString();
+      alert(`등록 실패\n\n${message || '데이터베이스 제약 조건 때문에 저장에 실패했습니다. 필수 항목을 다시 확인해 주세요.'}`);
     } finally {
       setLoading(false);
     }
@@ -91,7 +95,7 @@ export default function ProductRegistration({ user, suppliers, fetchInventory, f
       <div className="bg-white p-6 md:p-10 border border-gray-100 shadow-xl rounded-[2.5rem]">
         <div className="mb-8">
           <h2 className="text-2xl font-black text-gray-900 tracking-tighter italic">신규 물품 자산 등록</h2>
-          <p className="text-[10px] text-blue-600 font-bold mt-1 uppercase tracking-widest">New Asset Registration</p>
+          <p className="text-[10px] text-blue-600 font-bold mt-1 tracking-widest">재고·자산 정보를 입력해 주세요.</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">

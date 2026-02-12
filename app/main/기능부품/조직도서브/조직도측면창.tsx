@@ -1,6 +1,8 @@
 'use client';
 import { useState } from 'react';
 
+const MYPAGE_TAB_KEY = 'erp_mypage_tab';
+
 export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
   const [showMore, setShowMore] = useState(false);
 
@@ -43,6 +45,20 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
   const primaryMenus = visibleMenus.slice(0, 4);
   const secondaryMenus = visibleMenus.slice(4);
 
+  const handleMenuClick = (menuId: string) => {
+    // 내정보 메뉴를 다시 누르면 내 정보 내부 탭을 초기화하도록 저장된 탭 키 제거
+    if (menuId === '내정보') {
+      try {
+        if (typeof window !== 'undefined') {
+          window.localStorage.removeItem(MYPAGE_TAB_KEY);
+        }
+      } catch {
+        // ignore
+      }
+    }
+    onMenuChange(menuId);
+  };
+
   return (
     <>
       {/* PC 사이드바 - 토스 스타일 */}
@@ -54,7 +70,7 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
           {visibleMenus.map(m => (
             <button 
               key={m.id} 
-              onClick={() => onMenuChange(m.id)}
+              onClick={() => handleMenuClick(m.id)}
               className={`w-full py-2.5 flex flex-col items-center justify-center rounded-[12px] transition-all ${
                 mainMenu === m.id 
                   ? 'bg-[#E8F3FF] text-[#3182F6]' 
@@ -73,7 +89,7 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
         {primaryMenus.map(m => (
           <button 
             key={m.id} 
-            onClick={() => { onMenuChange(m.id); setShowMore(false); }}
+            onClick={() => { handleMenuClick(m.id); setShowMore(false); }}
             className={`flex flex-col items-center justify-center py-2 px-2 min-w-0 flex-1 transition-all rounded-[12px] ${
               mainMenu === m.id && !showMore ? 'text-[#3182F6]' : 'text-[#8B95A1]'
             }`}
@@ -102,7 +118,7 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
               {secondaryMenus.map(m => (
                 <button 
                   key={m.id} 
-                  onClick={() => { onMenuChange(m.id); setShowMore(false); }}
+                  onClick={() => { handleMenuClick(m.id); setShowMore(false); }}
                   className={`flex flex-col items-center justify-center py-4 rounded-[12px] transition-all ${
                     mainMenu === m.id ? 'bg-[#E8F3FF] text-[#3182F6]' : 'bg-[#F2F4F6] text-[#191F28]'
                   }`}

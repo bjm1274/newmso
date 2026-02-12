@@ -143,6 +143,7 @@ export default function MainContent({
             initialMyPageTab={initialMyPageTab}
             onConsumeMyPageInitialTab={onConsumeMyPageInitialTab}
             onOpenApproval={() => setMainMenu('전자결재')}
+            setMainMenu={setMainMenu}
           />
         </div>
       )}

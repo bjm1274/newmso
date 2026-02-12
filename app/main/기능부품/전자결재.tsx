@@ -8,6 +8,8 @@ import FormRequest from './전자결재서브/양식신청';
 import AttendanceCorrectionForm from './전자결재서브/출결정정양식';
 import RepairRequestForm from './전자결재서브/수리요청서양식';
 
+const APPROVAL_VIEW_KEY = 'erp_approval_view';
+
 export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, selectedCompanyId, onRefresh }: any) {
   const [viewMode, setViewMode] = useState('기안함');
   const [approvals, setApprovals] = useState([]);
@@ -25,6 +27,19 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     supabase.from('approval_form_types').select('name, slug').eq('is_active', true).order('sort_order').then(({ data }) => {
       setCustomFormTypes((data || []).map((r: any) => ({ name: r.name, slug: r.slug })));
     });
+  }, []);
+
+  // 마지막으로 보던 탭(기안함/결재함/작성하기)을 복구
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const saved = window.localStorage.getItem(APPROVAL_VIEW_KEY);
+      if (saved && ['기안함', '결재함', '작성하기'].includes(saved)) {
+        setViewMode(saved);
+      }
+    } catch {
+      // ignore
+    }
   }, []);
 
   const fetchApprovals = async () => {
@@ -145,7 +160,12 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
             {['기안함', '결재함', '작성하기'].map(m => (
               <button 
                 key={m} 
-                onClick={() => setViewMode(m)} 
+                onClick={() => {
+                  setViewMode(m);
+                  if (typeof window !== 'undefined') {
+                    window.localStorage.setItem(APPROVAL_VIEW_KEY, m);
+                  }
+                }} 
                 className={`flex-1 md:w-full text-center md:text-left px-4 md:px-6 py-3 md:py-4 rounded-xl md:rounded-2xl text-[11px] md:text-xs font-black transition-all whitespace-nowrap ${viewMode === m ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-50 md:bg-transparent text-gray-400 hover:bg-white hover:shadow-sm'}`}
               >
                 {m === '기안함' && '📥 '}

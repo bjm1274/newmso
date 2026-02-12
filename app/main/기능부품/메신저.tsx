@@ -6,6 +6,7 @@ import { sendNotification } from './알림시스템';
 const NOTICE_ROOM_ID = '00000000-0000-0000-0000-000000000000';
 const NOTICE_ROOM_NAME = '공지메시지';
 const CAN_WRITE_NOTICE_POSITIONS = ['팀장', '부장', '실장', '원장', '병원장', '대표이사'];
+const CHAT_ROOM_KEY = 'erp_chat_last_room';
 
 // 파일 URL이 이미지인지 확인
 function isImageUrl(url: string): boolean {
@@ -53,6 +54,22 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
   const [roomNotifyOn, setRoomNotifyOn] = useState(true);
 
   const chatRoomsRef = useRef<any[]>([]);
+
+  // 현재 선택된 채팅방을 로컬스토리지에 함께 저장해서
+  // 새로고침 이후에도 마지막으로 보던 방으로 복원되도록 처리
+  const setRoom = (roomId: string | null) => {
+    setSelectedRoomId(roomId);
+    if (typeof window === 'undefined') return;
+    try {
+      if (roomId) {
+        window.localStorage.setItem(CHAT_ROOM_KEY, roomId);
+      } else {
+        window.localStorage.removeItem(CHAT_ROOM_KEY);
+      }
+    } catch {
+      // 로컬스토리지 오류는 앱 동작에 치명적이지 않으므로 무시
+    }
+  };
 
   // DB 연동: 투표, 반응, 고정 (폴백: 로컬)
   const [polls, setPolls] = useState<any[]>([]);
@@ -103,6 +120,21 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
   useEffect(() => {
     chatRoomsRef.current = chatRooms;
   }, [chatRooms]);
+
+  // 마지막으로 보던 채팅방 복구
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const saved = window.localStorage.getItem(CHAT_ROOM_KEY);
+      if (saved) {
+        setSelectedRoomId(saved);
+      } else {
+        setSelectedRoomId(NOTICE_ROOM_ID);
+      }
+    } catch {
+      setSelectedRoomId(NOTICE_ROOM_ID);
+    }
+  }, []);
 
   const fetchData = useCallback(async () => {
     let query = supabase
@@ -185,7 +217,6 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
       };
       const list = [noticeRoom, ...others];
       setChatRooms(list);
-      if (selectedRoomId === null) setSelectedRoomId(NOTICE_ROOM_ID);
       await updateUnreadForRooms(list);
     };
     loadRooms();
@@ -336,7 +367,7 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
           room.id === selectedRoom.id ? { ...room, members: newMembers } : room
         )
       );
-      setSelectedRoomId(null);
+      setRoom(null);
       setMessages([]);
       alert('채팅방에서 나갔습니다.');
     } catch {
@@ -416,7 +447,7 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
       setGroupName('');
       setSelectedMembers([]);
       setShowGroupModal(false);
-      setSelectedRoomId(room.id);
+      setRoom(room.id);
       fetchData();
     }
   };
@@ -593,7 +624,7 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
                   return (
                     <div 
                       key={room.id}
-                      onClick={() => setSelectedRoomId(room.id)}
+                      onClick={() => setRoom(room.id)}
                       className={`p-4 rounded-2xl cursor-pointer transition-all flex items-center justify-between ${
                         isSelected ? 'bg-blue-600 text-white shadow-lg' : 'bg-white border hover:border-blue-200'
                       }`}
@@ -633,10 +664,10 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
                       const p = new Set([String(user.id), String(otherId)]);
                       return m.size === p.size && [...p].every((id) => m.has(id));
                     });
-                    if (found) setSelectedRoomId(found.id);
+                    if (found) setRoom(found.id);
                     else {
                       const { data: room } = await supabase.from('chat_rooms').insert([{ name: `${s.name}`, type: 'direct', members: [user.id, otherId] }]).select('id').single();
-                      if (room) setSelectedRoomId(room.id);
+                      if (room) setRoom(room.id);
                     }
                     setViewMode('chat');
                     fetchData();
