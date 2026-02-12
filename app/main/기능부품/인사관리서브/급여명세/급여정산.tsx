@@ -41,6 +41,17 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
 
   const handleNextStep = async () => {
     if (selectedStaffs.length === 0) return alert("정산 대상을 선택해 주세요.");
+
+    // 기본급여가 설정되지 않은 직원은 명세서를 생성하지 못하도록 1단계에서 차단
+    const noBase = selectedStaffs.filter((s: any) => !s.base_salary || s.base_salary <= 0);
+    if (noBase.length > 0) {
+      const names = noBase.map((s: any) => s.name).join(', ');
+      alert(
+        `기본급(연봉)이 0원으로 설정된 직원이 포함되어 있어 급여 정산을 진행할 수 없습니다.\n\n` +
+        `기본급을 먼저 직원 등록 화면에서 입력해 주세요.\n\n문제 대상: ${names}`
+      );
+      return;
+    }
     setLoading(true);
     try {
       const staffIds = selectedStaffs.map((s: any) => s.id);

@@ -6,6 +6,7 @@ export default function SuppliesForm({ setExtraData }: any) {
   // MSO 삭제된 부서 목록
   const departments = ["병동팀", "수술팀", "외래팀", "검사팀", "총무팀", "원무팀", "진료부", "관리팀", "영양팀"];
   const [items, setItems] = useState([{ name: '', qty: 1, currentStock: null as number | null, dept: '', purpose: '', suggestions: [] as any[] }]);
+  const [bulkDept, setBulkDept] = useState('');
   const [inventory, setInventory] = useState<any[]>([]);
 
   useEffect(() => {
@@ -39,12 +40,38 @@ export default function SuppliesForm({ setExtraData }: any) {
     setItems(nl);
   };
 
+  const applyBulkDept = () => {
+    if (!bulkDept) return;
+    setItems(prev => prev.map(i => ({ ...i, dept: bulkDept })));
+  };
+
   return (
     <div className="border-t-2 border-b border-gray-200 overflow-hidden bg-white rounded-none">
-      <div className="p-4 bg-blue-50/50 border-b border-blue-100">
+      <div className="p-4 bg-blue-50/50 border-b border-blue-100 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2">
           <span className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></span> 실시간 재고 연동 모드 활성화
         </p>
+        <div className="flex items-center gap-2 text-[10px] font-black text-gray-500">
+          <span>수령부서 일괄 적용</span>
+          <select
+            value={bulkDept}
+            onChange={e => setBulkDept(e.target.value)}
+            className="px-2 py-1 border border-gray-200 rounded-lg bg-white text-[10px] font-bold"
+          >
+            <option value="">선택...</option>
+            {departments.map(d => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={applyBulkDept}
+            disabled={!bulkDept}
+            className="px-3 py-1 rounded-lg bg-gray-900 text-white text-[10px] font-black disabled:opacity-40"
+          >
+            전체 적용
+          </button>
+        </div>
       </div>
       <table className="w-full text-left border-collapse">
         <thead className="bg-gray-50 text-[10px] font-black text-gray-400 border-b border-gray-200">

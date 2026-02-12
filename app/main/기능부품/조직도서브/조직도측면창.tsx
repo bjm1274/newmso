@@ -21,7 +21,15 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
   const canAccessHr = isMso || p.hr === true;
   const canAccessInventory = p.inventory === true;
 
+  const hasAnyPermission =
+    !!p &&
+    Object.keys(p).some((key) => key !== 'mso' && key !== 'hr' && key !== 'inventory' && p[key] === true);
+
   const canSeeMenu = (menuId: string) => {
+    // 신규 직원(권한 미지정)은 기본적으로 '내정보'만 보이게
+    if (!hasAnyPermission && !isMso && user?.role !== 'admin') {
+      return menuId === '내정보';
+    }
     if (menuId === '관리자') return isMso && p.menu_관리자 !== false;
     if (menuId === '인사관리') return (canAccessHr || p.menu_인사관리 === true) && p.menu_인사관리 !== false;
     if (menuId === '재고관리') return (canAccessInventory || p.menu_재고관리 === true) && p.menu_재고관리 !== false;

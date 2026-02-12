@@ -285,7 +285,18 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                   </div>
                   <div className="space-y-1">
                     <label className="text-[9px] font-black text-gray-400">주민번호</label>
-                    <input type="text" value={신규직원.주민번호} onChange={e => 신규직원설정({...신규직원, 주민번호: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100" placeholder="000000-0000000" />
+                    <input
+                      type="text"
+                      value={신규직원.주민번호}
+                      maxLength={14}
+                      onChange={e => {
+                        const raw = e.target.value.replace(/[^0-9]/g, '').slice(0, 13);
+                        const formatted = raw.length > 6 ? `${raw.slice(0, 6)}-${raw.slice(6)}` : raw;
+                        신규직원설정({ ...신규직원, 주민번호: formatted });
+                      }}
+                      className="w-full p-3 bg-gray-50 rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100"
+                      placeholder="000000-0000000"
+                    />
                   </div>
                 </div>
                 <div className="space-y-1">

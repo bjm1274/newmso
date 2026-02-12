@@ -109,6 +109,11 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const handleSubmit = async () => {
     if (!formTitle || approverLine.length === 0) return alert("제목과 결재선을 지정해주세요.");
     
+    // 결재 유형별 참조 부서 설정 (알림/조회용 메타데이터)
+    const requiredCc = formType === '물품신청' ? ['관리팀', '행정팀'] : ['행정팀'];
+    const extraCc = Array.isArray((extraData as any)?.cc_departments) ? (extraData as any).cc_departments : [];
+    const cc_departments = Array.from(new Set([...extraCc, ...requiredCc]));
+
     const { error } = await supabase.from('approvals').insert([{
       sender_id: user.id,
       sender_name: user.name,
@@ -119,7 +124,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       type: formType,
       title: formTitle,
       content: formContent,
-      meta_data: extraData,
+      meta_data: { ...extraData, cc_departments },
       status: '대기'
     }]);
 
@@ -219,11 +224,28 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                 )}
               </div>
 
-              <div className="space-y-6 pt-8 md:pt-10 border-t border-gray-50">
-                <input value={formTitle} onChange={e=>setFormTitle(e.target.value)} className="w-full p-4 md:p-5 bg-gray-50 rounded-xl md:rounded-2xl font-black outline-none text-lg md:text-xl focus:ring-4 focus:ring-blue-50 border-none transition-all" placeholder="기안 제목을 입력하세요" />
-                <textarea value={formContent} onChange={e=>setFormContent(e.target.value)} className="w-full h-48 md:h-56 p-6 md:p-8 bg-gray-50 rounded-[1.5rem] md:rounded-[2rem] outline-none text-sm font-bold leading-relaxed border-none focus:ring-4 focus:ring-blue-50 transition-all" placeholder="상세 사유 및 내용을 입력하세요." />
-                <button onClick={handleSubmit} className="w-full py-4 md:py-5 bg-blue-600 text-white rounded-xl md:rounded-[2rem] font-black text-sm shadow-xl shadow-blue-100 hover:scale-[0.99] active:scale-95 transition-all">결재 상신</button>
-              </div>
+              {formType !== '양식신청' && (
+                <div className="space-y-6 pt-8 md:pt-10 border-t border-gray-50">
+                  <input
+                    value={formTitle}
+                    onChange={e => setFormTitle(e.target.value)}
+                    className="w-full p-4 md:p-5 bg-gray-50 rounded-xl md:rounded-2xl font-black outline-none text-lg md:text-xl focus:ring-4 focus:ring-blue-50 border-none transition-all"
+                    placeholder="기안 제목을 입력하세요"
+                  />
+                  <textarea
+                    value={formContent}
+                    onChange={e => setFormContent(e.target.value)}
+                    className="w-full h-48 md:h-56 p-6 md:p-8 bg-gray-50 rounded-[1.5rem] md:rounded-[2rem] outline-none text-sm font-bold leading-relaxed border-none focus:ring-4 focus:ring-blue-50 transition-all"
+                    placeholder="상세 사유 및 내용을 입력하세요."
+                  />
+                  <button
+                    onClick={handleSubmit}
+                    className="w-full py-4 md:py-5 bg-blue-600 text-white rounded-xl md:rounded-[2rem] font-black text-sm shadow-xl shadow-blue-100 hover:scale-[0.99] active:scale-95 transition-all"
+                  >
+                    결재 상신
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         ) : (

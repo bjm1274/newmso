@@ -14,7 +14,12 @@ export default function SalarySlipContainer({ user }: any) {
 
   useEffect(() => {
     if (!user) return;
-    const base = user.base_salary || 3500000;
+    // 기본급여가 설정되지 않은 경우 명세서 생성 자체를 막는다.
+    if (!user.base_salary || user.base_salary <= 0) {
+      setSalaryData(null);
+      return;
+    }
+    const base = user.base_salary;
     const month = currentDate.getMonth() + 1;
     const overtimePay = Math.floor((month % 2 === 0 ? 12.5 : 5.0) * 22000);
     const bonus = month === 12 ? 1500000 : 0;
@@ -31,6 +36,16 @@ export default function SalarySlipContainer({ user }: any) {
   }, [currentDate, user]);
 
   const handlePrint = () => { window.print(); };
+
+  if (!user?.base_salary || user.base_salary <= 0) {
+    return (
+      <div className="p-10 text-sm font-black text-gray-500">
+        아직 <span className="text-blue-600">기본급여</span>가 등록되지 않아 급여명세서를 생성할 수 없습니다.
+        <br />
+        인사 담당자에게 직원 기본급을 먼저 등록해 달라고 요청해 주세요.
+      </div>
+    );
+  }
 
   if (!salaryData) return <div className="p-10 text-gray-400 font-black">데이터 로딩 중...</div>;
 

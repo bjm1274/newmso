@@ -43,10 +43,12 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
   const [groupName, setGroupName] = useState('');
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [readCounts, setReadCounts] = useState<Record<string, number>>({});
+  const [roomUnreadCounts, setRoomUnreadCounts] = useState<Record<string, number>>({});
   const [showSearchPanel, setShowSearchPanel] = useState(false);
   const [toolbarMsgId, setToolbarMsgId] = useState<string | null>(null);
   const [showMediaPanel, setShowMediaPanel] = useState(false);
   const [mediaFilter, setMediaFilter] = useState<'all' | 'image' | 'file' | 'link'>('all');
+  const [showUnreadOnly, setShowUnreadOnly] = useState(false);
 
   const [roomNotifyOn, setRoomNotifyOn] = useState(true);
 
@@ -58,6 +60,43 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
   const [showPollModal, setShowPollModal] = useState(false);
   const [pollQuestion, setPollQuestion] = useState('');
   const [pollOptions, setPollOptions] = useState('찬성, 반대');
+
+  const updateUnreadForRooms = useCallback(
+    async (rooms: any[]) => {
+      if (!user?.id || !rooms?.length) return;
+      try {
+        const roomIds = rooms.map((r: any) => r.id);
+        const { data: cursors } = await supabase
+          .from('room_read_cursors')
+          .select('room_id, last_read_at')
+          .eq('user_id', user.id)
+          .in('room_id', roomIds);
+
+        const cursorMap: Record<string, string | null> = {};
+        (cursors || []).forEach((c: any) => {
+          cursorMap[c.room_id] = c.last_read_at;
+        });
+
+        const counts: Record<string, number> = {};
+        for (const roomId of roomIds) {
+          const last = cursorMap[roomId];
+          let query = supabase
+            .from('messages')
+            .select('id', { count: 'exact', head: true })
+            .eq('room_id', roomId)
+            .neq('sender_id', user.id)
+            .eq('is_deleted', false);
+          if (last) query = query.gt('created_at', last);
+          const { count } = await query;
+          counts[roomId] = count || 0;
+        }
+        setRoomUnreadCounts(counts);
+      } catch (e) {
+        console.error('채팅방 별 안읽은 메시지 계산 실패:', e);
+      }
+    },
+    [user?.id]
+  );
 
   const fetchData = useCallback(async () => {
     let query = supabase
@@ -71,7 +110,8 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
     const { data: rooms } = await supabase.from('chat_rooms').select('*').order('created_at', { ascending: false });
     const others = (rooms || []).filter((r: any) => r.id !== NOTICE_ROOM_ID);
     const noticeRoom = (rooms || []).find((r: any) => r.id === NOTICE_ROOM_ID) || { id: NOTICE_ROOM_ID, name: NOTICE_ROOM_NAME, type: 'notice' };
-    setChatRooms([noticeRoom, ...others]);
+    const list = [noticeRoom, ...others];
+    setChatRooms(list);
 
     // 읽음 수 집계
     if (msgs?.length) {
@@ -106,14 +146,20 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
       setPollVotes(vMap);
     } catch (_) { /* 테이블 없으면 무시 */ }
 
-    // 마지막 읽은 시점 업데이트
+    // 마지막 읽은 시점 업데이트 (현재 방만)
     lastReadAtRef.current = new Date().toISOString();
-    await supabase.from('room_read_cursors').upsert({
-      user_id: user?.id,
-      room_id: selectedRoomId,
-      last_read_at: lastReadAtRef.current
-    }, { onConflict: 'user_id,room_id' });
-  }, [selectedRoomId, user?.id]);
+    await supabase.from('room_read_cursors').upsert(
+      {
+        user_id: user?.id,
+        room_id: selectedRoomId,
+        last_read_at: lastReadAtRef.current,
+      },
+      { onConflict: 'user_id,room_id' }
+    );
+
+    // 모든 방에 대해 안읽은 개수 갱신
+    await updateUnreadForRooms(list);
+  }, [selectedRoomId, user?.id, updateUnreadForRooms]);
 
   const roomNotifyRef = useRef(true);
   useEffect(() => { roomNotifyRef.current = roomNotifyOn; }, [roomNotifyOn]);
@@ -126,13 +172,18 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
       );
       const { data: rooms } = await supabase.from('chat_rooms').select('*').order('created_at', { ascending: false });
       const others = (rooms || []).filter((r: any) => r.id !== NOTICE_ROOM_ID);
-      const noticeRoom = (rooms || []).find((r: any) => r.id === NOTICE_ROOM_ID) || { id: NOTICE_ROOM_ID, name: NOTICE_ROOM_NAME, type: 'notice' };
+      const noticeRoom = (rooms || []).find((r: any) => r.id === NOTICE_ROOM_ID) || {
+        id: NOTICE_ROOM_ID,
+        name: NOTICE_ROOM_NAME,
+        type: 'notice',
+      };
       const list = [noticeRoom, ...others];
       setChatRooms(list);
       if (selectedRoomId === null) setSelectedRoomId(NOTICE_ROOM_ID);
+      await updateUnreadForRooms(list);
     };
     loadRooms();
-  }, []);
+  }, [selectedRoomId, updateUnreadForRooms]);
 
   useEffect(() => {
     if (!selectedRoomId) return;
@@ -459,7 +510,7 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
     <div className="flex flex-1 overflow-hidden relative font-sans h-full bg-white">
       {/* 좌측 사이드바: 검색 및 목록 */}
       <aside className="w-80 border-r bg-gray-50 flex flex-col shrink-0">
-        <div className="p-6 space-y-4">
+        <div className="p-6 space-y-3">
           <div className="flex gap-1 bg-gray-100 p-1 rounded-[12px]">
             <button onClick={() => setViewMode('chat')} className={`flex-1 py-2 text-[10px] font-black rounded-[12px] transition-all ${viewMode === 'chat' ? 'bg-white shadow-md text-blue-600' : 'text-gray-400'}`}>채팅목록</button>
             <button onClick={() => setViewMode('org')} className={`flex-1 py-2 text-[10px] font-black rounded-[12px] transition-all ${viewMode === 'org' ? 'bg-white shadow-md text-blue-600' : 'text-gray-400'}`}>조직도검색</button>
@@ -473,13 +524,24 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
             aria-label="채팅방 또는 조직 검색"
           />
           {viewMode === 'chat' && (
-            <button
-              onClick={() => setShowSearchPanel(!showSearchPanel)}
-              className="w-full py-2 text-[10px] font-black text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
-              aria-label="메시지 검색 패널 열기"
-            >
-              🔍 메시지 검색
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowSearchPanel(!showSearchPanel)}
+                className="flex-1 py-2 text-[10px] font-black text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
+                aria-label="메시지 검색 패널 열기"
+              >
+                🔍 메시지 검색
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowUnreadOnly((v) => !v)}
+                className={`px-3 py-2 text-[10px] font-black rounded-xl border transition-colors ${
+                  showUnreadOnly ? 'bg-red-50 border-red-200 text-red-600' : 'bg-white border-gray-200 text-gray-400'
+                }`}
+              >
+                {showUnreadOnly ? '전체 보기' : '안읽은 방'}
+              </button>
+            </div>
           )}
         </div>
 
@@ -487,17 +549,35 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
           {viewMode === 'chat' ? (
             <>
               <button onClick={() => setShowGroupModal(true)} className="w-full p-4 bg-gray-900 text-white rounded-2xl text-[10px] font-black shadow-md hover:scale-[0.98] transition-all">+ 단체 채팅방 생성</button>
-              {visibleRooms
+              {[...visibleRooms]
                 .filter(r => r.id === NOTICE_ROOM_ID || (r.name && r.name.includes(searchTerm)))
-                .map(room => (
-                <div 
-                  key={room.id}
-                  onClick={() => setSelectedRoomId(room.id)}
-                  className={`p-4 rounded-2xl cursor-pointer transition-all ${selectedRoomId === room.id ? 'bg-blue-600 text-white shadow-lg' : 'bg-white border hover:border-blue-200'}`}
-                >
-                  <p className="text-xs font-black">{room.id === NOTICE_ROOM_ID ? '📢 ' : '👥 '}{room.id === NOTICE_ROOM_ID ? NOTICE_ROOM_NAME : room.name}</p>
-                </div>
-              ))}
+                .filter(room => !showUnreadOnly || room.id === NOTICE_ROOM_ID || (roomUnreadCounts[room.id] || 0) > 0)
+                .sort((a, b) => (roomUnreadCounts[b.id] || 0) - (roomUnreadCounts[a.id] || 0))
+                .map(room => {
+                  const unread = roomUnreadCounts[room.id] || 0;
+                  const isSelected = selectedRoomId === room.id;
+                  return (
+                    <div 
+                      key={room.id}
+                      onClick={() => setSelectedRoomId(room.id)}
+                      className={`p-4 rounded-2xl cursor-pointer transition-all flex items-center justify-between ${
+                        isSelected ? 'bg-blue-600 text-white shadow-lg' : 'bg-white border hover:border-blue-200'
+                      }`}
+                    >
+                      <p className="text-xs font-black truncate">
+                        {room.id === NOTICE_ROOM_ID ? '📢 ' : '👥 '}
+                        {room.id === NOTICE_ROOM_ID ? NOTICE_ROOM_NAME : room.name}
+                      </p>
+                      {unread > 0 && (
+                        <span className={`ml-2 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full text-[10px] font-black ${
+                          isSelected ? 'bg-white text-blue-600' : 'bg-red-500 text-white'
+                        }`}>
+                          {unread > 99 ? '99+' : unread}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
             </>
           ) : (
             <div className="space-y-1">
@@ -595,100 +675,167 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
               <p className="font-black text-sm">대화 내용이 없습니다.</p>
             </div>
           ) : (
-            filteredMessages.map((msg) => {
-              const isMine = msg.sender_id === user.id;
-              const msgReacts = reactions[msg.id] || {};
-              const hasReacts = Object.keys(msgReacts).some(e => (msgReacts[e] || 0) > 0);
-              const readCount = readCounts[msg.id] || 0;
-              const TOOLBAR_EMOJIS = ['👍', '👌', '😎', '😍', '😂', '😕', '😢', '😠'];
-              const showToolbar = toolbarMsgId === msg.id;
-              return (
-                <div
-                  key={msg.id}
-                  ref={el => { msgRefs.current[msg.id] = el; }}
-                  data-msg-toolbar-area
-                  className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}
-                  onMouseEnter={() => setToolbarMsgId(msg.id)}
-                  onMouseLeave={() => setToolbarMsgId(prev => prev === msg.id ? null : prev)}
-                >
-                  {!isMine && <span className="text-[10px] text-gray-400 px-2 mb-1 font-bold">{msg.staff?.name} {msg.staff?.position}</span>}
-                  <div 
-                    onClick={(e) => { e.stopPropagation(); setToolbarMsgId(msg.id); markMessageRead(msg); }}
-                    className={`group relative px-3 py-2 rounded-2xl text-sm shadow-sm cursor-pointer transition-all max-w-[70%] ${isMine ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white border rounded-tl-none hover:border-blue-200'}`}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => e.key === 'Enter' && (setToolbarMsgId(msg.id), markMessageRead(msg))}
-                    aria-label={`${msg.staff?.name || '알 수 없음'} 메시지`}
-                  >
-                    {msg.reply_to_id && (() => {
-                      const parent = messages.find((m: any) => m.id === msg.reply_to_id);
-                      return parent ? (
-                        <div className={`mb-2 p-2 rounded-lg text-[10px] border-l-2 ${
-                          isMine ? 'bg-white/10 border-white/30' : 'bg-gray-100 border-gray-300'
-                        }`}>
-                          <span className="font-bold opacity-80">↩️ {parent.staff?.name}: </span>
-                          <span className="truncate">{parent.content || '📎 파일'}</span>
-                        </div>
-                      ) : null;
-                    })()}
-                    {msg.content}
-                    {msg.file_url && (
-                      <div className="mt-2 space-y-1" onClick={(e) => e.stopPropagation()}>
-                        {isImageUrl(msg.file_url) ? (
-                          <a href={msg.file_url} target="_blank" rel="noopener noreferrer" className="block">
-                            <img src={msg.file_url} alt="첨부 이미지" className="max-w-[200px] max-h-[150px] rounded-lg object-cover border border-gray-200" />
-                          </a>
-                        ) : null}
-                        <a
-                          href={msg.file_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          download
-                          className={`block p-2 rounded-lg text-[10px] font-bold border flex items-center gap-2 hover:opacity-80 transition-opacity ${
-                            isMine ? 'bg-white/10 border-white/20' : 'bg-gray-50 border-gray-100 text-blue-600'
-                          }`}
+            (() => {
+              let lastDateLabel = '';
+              return filteredMessages.map((msg) => {
+                const isMine = msg.sender_id === user.id;
+                const msgReacts = reactions[msg.id] || {};
+                const hasReacts = Object.keys(msgReacts).some(e => (msgReacts[e] || 0) > 0);
+                const readCount = readCounts[msg.id] || 0;
+                const TOOLBAR_EMOJIS = ['👍', '👌', '😎', '😍', '😂', '😕', '😢', '😠'];
+                const showToolbar = toolbarMsgId === msg.id;
+
+                const created = new Date(msg.created_at);
+                const dateLabel = created.toLocaleDateString('ko-KR', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                  weekday: 'short',
+                });
+                const showDateDivider = dateLabel !== lastDateLabel;
+                if (showDateDivider) lastDateLabel = dateLabel;
+
+                return (
+                  <div key={msg.id} className="space-y-1">
+                    {showDateDivider && (
+                      <div className="flex justify-center my-2">
+                        <span className="px-3 py-1 rounded-full bg-gray-100 text-[10px] font-bold text-gray-500">
+                          {dateLabel}
+                        </span>
+                      </div>
+                    )}
+                    <div
+                      ref={el => { msgRefs.current[msg.id] = el; }}
+                      data-msg-toolbar-area
+                      className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}
+                      onMouseEnter={() => setToolbarMsgId(msg.id)}
+                      onMouseLeave={() => setToolbarMsgId(prev => prev === msg.id ? null : prev)}
+                    >
+                      {!isMine && (
+                        <span className="text-[10px] text-gray-400 px-2 mb-1 font-bold">
+                          {msg.staff?.name} {msg.staff?.position}
+                        </span>
+                      )}
+                      <div 
+                        onClick={(e) => { e.stopPropagation(); setToolbarMsgId(msg.id); markMessageRead(msg); }}
+                        className={`group relative px-3 py-2 rounded-2xl text-sm shadow-sm cursor-pointer transition-all max-w-[70%] ${
+                          isMine ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white border rounded-tl-none hover:border-blue-200'
+                        }`}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => e.key === 'Enter' && (setToolbarMsgId(msg.id), markMessageRead(msg))}
+                        aria-label={`${msg.staff?.name || '알 수 없음'} 메시지`}
+                      >
+                        {msg.reply_to_id && (() => {
+                          const parent = messages.find((m: any) => m.id === msg.reply_to_id);
+                          return parent ? (
+                            <div className={`mb-2 p-2 rounded-lg text-[10px] border-l-2 ${
+                              isMine ? 'bg-white/10 border-white/30' : 'bg-gray-100 border-gray-300'
+                            }`}>
+                              <span className="font-bold opacity-80">↩️ {parent.staff?.name}: </span>
+                              <span className="truncate">{parent.content || '📎 파일'}</span>
+                            </div>
+                          ) : null;
+                        })()}
+                        {msg.content}
+                        {msg.file_url && (
+                          <div className="mt-2 space-y-1" onClick={(e) => e.stopPropagation()}>
+                            {isImageUrl(msg.file_url) ? (
+                              <a href={msg.file_url} target="_blank" rel="noopener noreferrer" className="block">
+                                <img
+                                  src={msg.file_url}
+                                  alt="첨부 이미지"
+                                  className="max-w-[200px] max-h-[150px] rounded-lg object-cover border border-gray-200"
+                                />
+                              </a>
+                            ) : null}
+                            <a
+                              href={msg.file_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              download
+                              className={`block p-2 rounded-lg text-[10px] font-bold border flex items-center gap-2 hover:opacity-80 transition-opacity ${
+                                isMine ? 'bg-white/10 border-white/20' : 'bg-gray-50 border-gray-100 text-blue-600'
+                              }`}
+                            >
+                              📎 파일 첨부됨 — 다운로드
+                            </a>
+                          </div>
+                        )}
+
+                        {(hasReacts || (readCount > 0 && !isMine)) && (
+                          <div className="mt-2 flex items-center gap-2 text-[10px] flex-wrap">
+                            {hasReacts && (
+                              <span className="flex gap-1 flex-wrap">
+                                {Object.entries(msgReacts).map(([emoji, cnt]) =>
+                                  ((cnt as number) > 0 ? (
+                                    <span
+                                      key={emoji}
+                                      className={`px-1.5 py-0.5 rounded text-[9px] ${
+                                        isMine ? 'bg-white/20' : 'bg-gray-100'
+                                      }`}
+                                    >
+                                      {emoji} {cnt as number}
+                                    </span>
+                                  ) : null)
+                                )}
+                              </span>
+                            )}
+                            {readCount > 0 && !isMine && (
+                              <span className="text-gray-400 font-bold">{readCount}명이 읽음</span>
+                            )}
+                          </div>
+                        )}
+
+                        <span
+                          className={`absolute bottom-0 ${
+                            isMine ? 'right-full mr-2' : 'left-full ml-2'
+                          } text-[8px] font-bold text-gray-300 whitespace-nowrap`}
                         >
-                          📎 파일 첨부됨 — 다운로드
-                        </a>
+                          {created.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
                       </div>
-                    )}
-
-                    {(hasReacts || (readCount > 0 && !isMine)) && (
-                      <div className="mt-2 flex items-center gap-2 text-[10px] flex-wrap">
-                        {hasReacts && (
-                          <span className="flex gap-1 flex-wrap">
-                            {Object.entries(msgReacts).map(([emoji, cnt]) => ((cnt as number) > 0 ? (
-                              <span key={emoji} className={`px-1.5 py-0.5 rounded text-[9px] ${isMine ? 'bg-white/20' : 'bg-gray-100'}`}>{emoji} {cnt as number}</span>
-                            ) : null))}
-                          </span>
-                        )}
-                        {readCount > 0 && !isMine && (
-                          <span className="text-gray-400 font-bold">{readCount}명이 읽음</span>
-                        )}
-                      </div>
-                    )}
-
-                    <span
-                      className={`absolute bottom-0 ${isMine ? 'right-full mr-2' : 'left-full ml-2'} text-[8px] font-bold text-gray-300 whitespace-nowrap`}
-                    >
-                      {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </div>
-                  {showToolbar && (
-                    <div 
-                      className={`flex items-center gap-1 px-3 py-2 mt-1 rounded-2xl bg-white/95 backdrop-blur border border-gray-100 shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200 ${isMine ? 'flex-row-reverse' : ''}`}
-                      onClick={e => e.stopPropagation()}
-                    >
-                      <button type="button" onClick={() => { setReplyTo(msg); setToolbarMsgId(null); }} className="p-1.5 rounded-xl hover:bg-gray-100 text-gray-600 transition-colors" title="답글">↩️</button>
-                      {TOOLBAR_EMOJIS.map(emoji => (
-                        <button key={emoji} type="button" onClick={() => toggleReaction(msg.id, emoji)} className="p-1.5 rounded-xl hover:bg-gray-100 text-lg transition-colors" title={emoji}>{emoji}</button>
-                      ))}
-                      <button type="button" onClick={() => { setActiveActionMsg(msg); setToolbarMsgId(null); }} className="p-1.5 rounded-xl hover:bg-gray-100 text-gray-500 transition-colors ml-0.5" title="더보기">⋯</button>
+                      {showToolbar && (
+                        <div 
+                          className={`flex items-center gap-1 px-3 py-2 mt-1 rounded-2xl bg-white/95 backdrop-blur border border-gray-100 shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200 ${
+                            isMine ? 'flex-row-reverse' : ''
+                          }`}
+                          onClick={e => e.stopPropagation()}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => { setReplyTo(msg); setToolbarMsgId(null); }}
+                            className="p-1.5 rounded-xl hover:bg-gray-100 text-gray-600 transition-colors"
+                            title="답글"
+                          >
+                            ↩️
+                          </button>
+                          {TOOLBAR_EMOJIS.map(emoji => (
+                            <button
+                              key={emoji}
+                              type="button"
+                              onClick={() => toggleReaction(msg.id, emoji)}
+                              className="p-1.5 rounded-xl hover:bg-gray-100 text-lg transition-colors"
+                              title={emoji}
+                            >
+                              {emoji}
+                            </button>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => { setActiveActionMsg(msg); setToolbarMsgId(null); }}
+                            className="p-1.5 rounded-xl hover:bg-gray-100 text-gray-500 transition-colors ml-0.5"
+                            title="더보기"
+                          >
+                            ⋯
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              );
-            })
+                  </div>
+                );
+              });
+            })()
           )}
 
           {/* 투표 메시지들 (DEMO: 로컬 상태) */}

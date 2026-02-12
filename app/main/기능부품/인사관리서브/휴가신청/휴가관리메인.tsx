@@ -21,6 +21,7 @@ export default function LeaveManagement({ staffs = [], selectedCo, onRefresh }: 
   const [activeTab, setActiveTab] = useState('연차/휴가 신청내역');
   const [leaveConfig, setLeaveConfig] = useState<'입사일 기준' | '회계연도 기준'>('입사일 기준');
   const staffList = Array.isArray(staffs) ? staffs : [];
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   const fetchLeaves = async () => {
     setLoading(true);
@@ -50,6 +51,21 @@ export default function LeaveManagement({ staffs = [], selectedCo, onRefresh }: 
   useEffect(() => {
     fetchLeaves();
   }, [selectedCo, staffs]);
+
+  // 로컬 세션 기준 현재 사용자 찾기 (연차 대시보드 개인뷰용)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = localStorage.getItem('erp_user');
+      if (!raw) return;
+      const u = JSON.parse(raw || '{}');
+      if (!u?.id) return;
+      const found = staffList.find((s: any) => s.id === u.id);
+      setCurrentUser(found || u);
+    } catch {
+      // ignore
+    }
+  }, [staffList]);
 
   const handleStatusUpdate = async (id: string, status: '승인' | '반려') => {
     try {
@@ -259,7 +275,9 @@ export default function LeaveManagement({ staffs = [], selectedCo, onRefresh }: 
           </div>
         )}
 
-        {activeTab === '연차 대시보드' && <LeaveDashboard staffs={staffList} selectedCo={selectedCo} />}
+        {activeTab === '연차 대시보드' && (
+          <LeaveDashboard staffs={staffList} selectedCo={selectedCo} currentUser={currentUser} />
+        )}
         {activeTab === '연차사용촉진 자동화' && <AnnualLeavePromotion staffs={staffList} selectedCo={selectedCo} />}
         
         {activeTab === '연차 자동부여 설정' && (

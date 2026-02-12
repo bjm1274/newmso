@@ -57,6 +57,11 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
   const [selectedStaff, setSelectedStaff] = useState<any>(null);
   const [newPassword, setNewPassword] = useState('');
   const [passwordSaving, setPasswordSaving] = useState(false);
+  // 권한 복사: A → B
+  const [copySourceId, setCopySourceId] = useState<string>('');
+  const [copyTargetId, setCopyTargetId] = useState<string>('');
+  const [copyRoleToo, setCopyRoleToo] = useState(true);
+  const [copying, setCopying] = useState(false);
 
   const fetchStaffs = useCallback(async () => {
     setLoading(true);
@@ -118,6 +123,38 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
     } else alert('권한 변경 중 오류가 발생했습니다.');
   };
 
+  const copyPermissionsToStaff = async () => {
+    if (!copySourceId || !copyTargetId) {
+      alert('복사할 직원(A)과 붙여넣을 직원(B)을 모두 선택하세요.');
+      return;
+    }
+    if (copySourceId === copyTargetId) {
+      alert('복사할 직원과 붙여넣을 직원이 같을 수 없습니다.');
+      return;
+    }
+    const source = staffs.find(s => s.id === copySourceId);
+    const target = staffs.find(s => s.id === copyTargetId);
+    if (!source || !target) return;
+    setCopying(true);
+    const newPermissions = { ...(source.permissions || {}) };
+    const updates: { permissions: object; role?: string } = { permissions: newPermissions };
+    if (copyRoleToo && source.role) updates.role = source.role;
+    const { error } = await supabase
+      .from('staff_members')
+      .update(updates)
+      .eq('id', copyTargetId);
+    setCopying(false);
+    if (!error) {
+      setStaffs(staffs.map(s => s.id === copyTargetId ? { ...s, ...updates } : s));
+      if (selectedStaff?.id === copyTargetId) setSelectedStaff({ ...selectedStaff, ...updates });
+      onRefresh?.();
+      alert(`[${source.name}]님의 권한${copyRoleToo ? '과 역할' : ''}을 [${target.name}]님에게 적용했습니다.`);
+      setCopyTargetId('');
+    } else {
+      alert('권한 복사 중 오류가 발생했습니다.');
+    }
+  };
+
   if (loading) return <div className="p-8 text-center text-gray-400 font-bold">로딩 중...</div>;
 
   return (
@@ -147,6 +184,52 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
 
       {/* 역할 + 권한 설정 영역 */}
       <div className="flex-1 p-10 bg-gray-25/50 overflow-y-auto">
+        {/* A직원 → B직원 권한 한번에 복사 */}
+        <div className="mb-8 bg-white p-6 rounded-2xl shadow-sm border border-gray-100 border-l-4 border-l-[#3182F6]">
+          <p className="text-sm font-black text-gray-800 mb-3">📋 권한 한번에 복사 (A → B)</p>
+          <p className="text-[10px] text-gray-500 font-bold mb-4">한 직원의 권한·역할을 다른 직원에게 그대로 적용합니다.</p>
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="min-w-[140px]">
+              <label className="block text-[10px] font-bold text-gray-500 mb-1">복사할 직원 (A)</label>
+              <select
+                value={copySourceId}
+                onChange={(e) => setCopySourceId(e.target.value)}
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm font-bold bg-white"
+              >
+                <option value="">선택</option>
+                {staffs.map(s => (
+                  <option key={s.id} value={s.id}>{s.name} #{s.employee_no}</option>
+                ))}
+              </select>
+            </div>
+            <span className="text-gray-400 font-bold pb-2">→</span>
+            <div className="min-w-[140px]">
+              <label className="block text-[10px] font-bold text-gray-500 mb-1">붙여넣을 직원 (B)</label>
+              <select
+                value={copyTargetId}
+                onChange={(e) => setCopyTargetId(e.target.value)}
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm font-bold bg-white"
+              >
+                <option value="">선택</option>
+                {staffs.map(s => (
+                  <option key={s.id} value={s.id} disabled={s.id === copySourceId}>{s.name} #{s.employee_no}</option>
+                ))}
+              </select>
+            </div>
+            <label className="flex items-center gap-2 pb-2 cursor-pointer">
+              <input type="checkbox" checked={copyRoleToo} onChange={(e) => setCopyRoleToo(e.target.checked)} className="rounded border-gray-300" />
+              <span className="text-[11px] font-bold text-gray-600">역할도 함께 복사</span>
+            </label>
+            <button
+              onClick={copyPermissionsToStaff}
+              disabled={copying || !copySourceId || !copyTargetId}
+              className="px-5 py-2.5 bg-[#3182F6] text-white rounded-xl text-xs font-bold hover:bg-[#1B64DA] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {copying ? '적용 중…' : '복사 적용'}
+            </button>
+          </div>
+        </div>
+
         {selectedStaff ? (
           <div className="max-w-md space-y-8">
             <div className="border-b-4 border-gray-900 pb-4">

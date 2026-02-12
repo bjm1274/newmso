@@ -11,6 +11,7 @@ import { useInventoryAlertSystem, InventoryAlertBadge } from './재고관리서�
 
 export default function IntegratedInventoryManagement({ user, selectedCo, onRefresh }: any) {
   const [activeView, setActiveView] = useState('현황'); 
+  const [viewCompany, setViewCompany] = useState<string>('전체'); // 현황 탭용 회사 선택
   const [selectedDept, setSelectedDept] = useState('전체'); 
   const [inventory, setInventory] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
@@ -31,8 +32,26 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
     } catch (_) {}
   }, []);
 
+  // 현황 탭: 회사별 부서 선택용 목록
+  const companiesInInventory = useMemo(() =>
+    Array.from(new Set(inventory.map((i: any) => (i.company || '').trim()).filter(Boolean))).sort(),
+    [inventory]
+  );
+  const departmentsByViewCompany = useMemo(() => {
+    if (!viewCompany || viewCompany === '전체') return [];
+    return Array.from(new Set(
+      inventory
+        .filter((i: any) => (i.company || '').trim() === viewCompany)
+        .map((i: any) => (i.department || '').trim())
+        .filter(Boolean)
+    )).sort();
+  }, [inventory, viewCompany]);
+
   const filteredInventory = useMemo(() => {
     let list = inventory;
+    if (activeView === '현황' && viewCompany && viewCompany !== '전체') {
+      list = list.filter((i: any) => (i.company || '').trim() === viewCompany);
+    }
     if (searchKeyword.trim()) {
       const k = searchKeyword.toLowerCase();
       list = list.filter((i: any) =>
@@ -47,13 +66,14 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
       list = list.filter((i: any) => (i.department || '').trim() === selectedDept);
     }
     return list;
-  }, [inventory, searchKeyword, selectedDept]);
+  }, [inventory, searchKeyword, selectedDept, activeView, viewCompany]);
 
-  const fetchInventory = useCallback(async () => {
+  const fetchInventory = useCallback(async (companyFilter?: string) => {
     setLoading(true);
     try {
       let query = supabase.from('inventory').select('*').order('item_name', { ascending: true });
-      if (selectedCo && selectedCo !== '전체') query = query.eq('company', selectedCo);
+      const effectiveCo = companyFilter !== undefined ? companyFilter : selectedCo;
+      if (effectiveCo && effectiveCo !== '전체') query = query.eq('company', effectiveCo);
       const { data, error } = await query;
       if (error) throw error;
       if (data) setInventory(data);
@@ -75,9 +95,20 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
   }, []);
 
   useEffect(() => {
-    fetchInventory();
     fetchSuppliers();
-  }, [fetchInventory, fetchSuppliers, selectedCo]);
+  }, [fetchSuppliers]);
+
+  useEffect(() => {
+    if (activeView === '현황') {
+      fetchInventory('전체');
+    } else {
+      fetchInventory(selectedCo);
+    }
+  }, [activeView, selectedCo, fetchInventory]);
+
+  useEffect(() => {
+    setSelectedDept('전체');
+  }, [viewCompany]);
 
   const handleStockUpdate = async (item: any, type: 'in' | 'out', amount: number) => {
     if (amount <= 0) return alert("수량은 0보다 커야 합니다.");
@@ -162,45 +193,57 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
             ) : (
               <div className="space-y-6">
                 <div className="flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center">
-                  <div className="flex-1 flex flex-col sm:flex-row gap-2">
+                  <div className="flex-1 flex flex-wrap items-center gap-2">
+                    <select
+                      value={viewCompany}
+                      onChange={(e) => setViewCompany(e.target.value)}
+                      className="px-3 py-3 rounded-xl border border-gray-200 bg-white text-sm font-bold min-w-[140px]"
+                      title="회사 선택"
+                    >
+                      <option value="전체">전체 회사</option>
+                      {companiesInInventory.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={selectedDept}
+                      onChange={(e) => setSelectedDept(e.target.value)}
+                      className="px-3 py-3 rounded-xl border border-gray-200 bg-white text-sm font-bold min-w-[120px]"
+                      title="부서 선택 (선택한 회사 기준)"
+                    >
+                      <option value="전체">전체 부서</option>
+                      {departmentsByViewCompany.map((d) => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
                     <input
                       type="text"
                       placeholder="품목명·분류·LOT·회사 검색..."
                       value={searchKeyword}
                       onChange={(e) => setSearchKeyword(e.target.value)}
-                      className="flex-1 max-w-md px-4 py-3 rounded-xl border border-gray-200 bg-white text-sm font-bold focus:ring-2 focus:ring-blue-100 focus:border-blue-300 outline-none"
+                      className="flex-1 min-w-[160px] max-w-md px-4 py-3 rounded-xl border border-gray-200 bg-white text-sm font-bold focus:ring-2 focus:ring-blue-100 focus:border-blue-300 outline-none"
                     />
-                    <select
-                      value={selectedDept}
-                      onChange={(e) => setSelectedDept(e.target.value)}
-                      className="px-3 py-3 rounded-xl border border-gray-200 bg-white text-sm font-bold min-w-[120px]"
-                    >
-                      <option value="전체">전체 부서</option>
-                      {Array.from(new Set(inventory.map((i: any) => (i.department || '').trim()).filter(Boolean))).sort().map((d) => (
-                        <option key={d} value={d}>{d}</option>
-                      ))}
-                    </select>
                   </div>
-                  <button onClick={fetchInventory} className="px-4 py-3 rounded-xl bg-gray-100 text-gray-600 text-xs font-black hover:bg-gray-200 transition-all shrink-0">🔄 새로고침</button>
+                  <button onClick={() => activeView === '현황' ? fetchInventory('전체') : fetchInventory(selectedCo)} className="px-4 py-3 rounded-xl bg-gray-100 text-gray-600 text-xs font-black hover:bg-gray-200 transition-all shrink-0">🔄 새로고침</button>
                 </div>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm text-center">
-                    <p className="text-[9px] font-bold text-gray-400 uppercase">전체 품목</p>
-                    <p className="text-2xl font-black text-blue-600 mt-1">{inventory.length}</p>
+                    <p className="text-[9px] font-bold text-gray-400 uppercase">조회 품목</p>
+                    <p className="text-2xl font-black text-blue-600 mt-1">{filteredInventory.length}</p>
                   </div>
                   <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm text-center">
                     <p className="text-[9px] font-bold text-gray-400 uppercase">안전재고 미달</p>
-                    <p className="text-2xl font-black text-red-600 mt-1">{inventory.filter(i => i.quantity <= i.min_quantity).length}</p>
+                    <p className="text-2xl font-black text-red-600 mt-1">{filteredInventory.filter(i => (i.quantity ?? i.stock ?? 0) <= (i.min_quantity ?? i.min_stock ?? 0)).length}</p>
                   </div>
                   <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm text-center">
                     <p className="text-[9px] font-bold text-gray-400 uppercase">유효기간 임박</p>
                     <p className="text-2xl font-black text-orange-600 mt-1">
-                      {inventory.filter(i => i.expiry_date && new Date(i.expiry_date).getTime() < new Date().getTime() + 30 * 24 * 60 * 60 * 1000).length}
+                      {filteredInventory.filter(i => i.expiry_date && new Date(i.expiry_date).getTime() < new Date().getTime() + 30 * 24 * 60 * 60 * 1000).length}
                     </p>
                   </div>
                   <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm text-center">
-                    <p className="text-[9px] font-bold text-gray-400 uppercase">선택 회사</p>
-                    <p className="text-xs font-black text-gray-800 mt-1 truncate">{selectedCo}</p>
+                    <p className="text-[9px] font-bold text-gray-400 uppercase">조회 회사 / 부서</p>
+                    <p className="text-xs font-black text-gray-800 mt-1 truncate">{viewCompany === '전체' ? '전체' : viewCompany}{selectedDept !== '전체' ? ` · ${selectedDept}` : ''}</p>
                   </div>
                 </div>
 

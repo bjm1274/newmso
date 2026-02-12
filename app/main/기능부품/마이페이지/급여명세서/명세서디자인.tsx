@@ -84,13 +84,19 @@ export default function SalarySlipUI({ user, currentDate, salaryData, totalPayme
         </p>
       </div>
 
-      {/* 5. 하단 직인 */}
+      {/* 5. 하단 직인 – 회사명 옆에 직인 공통 배치 */}
       <div className="text-center mt-auto pb-4">
         <p className="text-sm font-bold text-gray-600 mb-6">위와 같이 급여가 정히 지급되었음을 통지합니다.</p>
-        <div className="relative inline-block">
-          <h2 className="text-3xl font-black text-gray-900 tracking-[0.4em] relative z-10">박철홍정형외과 대표원장</h2>
-          <div className="absolute top-1/2 -right-12 -translate-y-1/2 w-20 h-20 border-[5px] border-red-600 rounded-full flex items-center justify-center text-red-600 font-black text-base rotate-12 opacity-80 border-double">
-            (인)
+        <div className="relative inline-flex items-center gap-4 justify-center">
+          <h2 className="text-3xl font-black text-gray-900 tracking-[0.4em] relative z-10 whitespace-nowrap">
+            {user.company || '박철홍정형외과'} 대표원장
+          </h2>
+          <div className="relative w-20 h-20 border-[5px] border-red-600 rounded-full flex items-center justify-center text-red-600 font-black text-base rotate-12 opacity-80 border-double">
+            <span className="text-[10px] leading-tight text-center">
+              {user.company || '박철홍정형외과'}
+              <br />
+              (인)
+            </span>
           </div>
         </div>
       </div>

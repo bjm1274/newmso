@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 
 const PRIORITY_LABELS: Record<string, { label: string; color: string }> = {
@@ -9,35 +9,82 @@ const PRIORITY_LABELS: Record<string, { label: string; color: string }> = {
   low: { label: '낮음', color: 'bg-green-100 text-green-700 border-green-200' },
 };
 
+// 메인 화면의 '할일'은 Supabase tasks 테이블과 직접 연동해
+// 다른 메뉴로 이동했다 돌아와도 목록이 유지되도록 한다.
 export default function TaskView({ user, tasks, subView, setSubView, onRefresh }: any) {
   const [newTask, setNewTask] = useState('');
   const [newPriority, setNewPriority] = useState('medium');
+  const [taskList, setTaskList] = useState<any[]>(tasks || []);
+  const [loading, setLoading] = useState(false);
+
+  const fetchMyTasks = async () => {
+    if (!user?.id) return;
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('assignee_id', user.id)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setTaskList(data || []);
+    } catch (e) {
+      console.error('업무 목록 로딩 실패:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMyTasks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   const handleAddTask = async () => {
-    if (!newTask.trim()) return;
-    const { error } = await supabase.from('tasks').insert([{
-      assignee_id: user.id,
-      title: newTask,
-      status: 'pending',
-      priority: newPriority,
-    }]);
-    if (!error) {
+    if (!newTask.trim() || !user?.id) return;
+    try {
+      const { data, error } = await supabase
+        .from('tasks')
+        .insert([{
+          assignee_id: user.id,
+          title: newTask.trim(),
+          status: 'pending',
+          priority: newPriority,
+        }])
+        .select()
+        .single();
+      if (error) throw error;
       setNewTask('');
-      onRefresh();
+      setTaskList(prev => [data, ...prev]);
+      if (onRefresh) onRefresh();
+    } catch (e) {
+      console.error('업무 등록 실패:', e);
+      alert('업무 등록 중 오류가 발생했습니다.');
     }
   };
 
   const toggleStatus = async (task: any) => {
     const newStatus = task.status === 'pending' ? 'completed' : 'pending';
-    await supabase.from('tasks').update({ status: newStatus }).eq('id', task.id);
-    onRefresh();
+    try {
+      setTaskList(prev =>
+        prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t)
+      );
+      await supabase.from('tasks').update({ status: newStatus }).eq('id', task.id);
+    } catch (e) {
+      console.error('업무 상태 변경 실패:', e);
+      fetchMyTasks();
+    }
   };
 
-  const filteredTasks = (tasks || []).filter((t: any) => {
-    if (subView === '완료') return t.status === 'completed';
-    if (subView === '진행중') return t.status === 'pending';
-    return true;
-  });
+  const filteredTasks = useMemo(
+    () =>
+      (taskList || []).filter((t: any) => {
+        if (subView === '완료') return t.status === 'completed';
+        if (subView === '진행중') return t.status === 'pending';
+        return true;
+      }),
+    [taskList, subView]
+  );
 
   return (
     <div className="flex-1 flex flex-col bg-[#FDFDFD] h-full relative">
@@ -86,7 +133,9 @@ export default function TaskView({ user, tasks, subView, setSubView, onRefresh }
         </div>
 
         <div className="space-y-3">
-          {filteredTasks.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-20 text-gray-300 text-xs">업무를 불러오는 중입니다...</div>
+          ) : filteredTasks.length === 0 ? (
             <div className="text-center py-20 text-gray-300 text-xs">업무 내역이 없습니다.</div>
           ) : (
             filteredTasks.map((t: any) => {

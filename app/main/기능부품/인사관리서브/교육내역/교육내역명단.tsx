@@ -1,10 +1,27 @@
 'use client';
 
+type EduItem = { name: string; category: 'hospital' | 'company' | 'common' };
+
 export default function EducationList({ selectedCo, staffs, notifications = [] }: any) {
   const filtered = selectedCo === '전체' ? staffs : staffs.filter((s: any) => s.company === selectedCo);
   
-  // 교육 항목 리스트
-  const eduItems = ["성희롱예방", "개인정보보호", "장애인인식개선", "괴롭힘방지", "아동학대신고", "노인학대신고"];
+  // 법정 의무 교육 전체 목록 (병원 / 일반사업장 / 공통)
+  const eduItems: EduItem[] = [
+    // 공통 (일반 회사)
+    { name: '성희롱예방', category: 'common' },
+    { name: '개인정보보호', category: 'common' },
+    { name: '직장 내 장애인 인식개선', category: 'company' },
+    { name: '직장 내 괴롭힘 방지', category: 'company' },
+    { name: '산업안전보건(일반)', category: 'company' },
+    // 병원·의료기관 추가 의무
+    { name: '감염관리 교육', category: 'hospital' },
+    { name: '환자안전·의료사고 예방', category: 'hospital' },
+    { name: '의료법·의료윤리 교육', category: 'hospital' },
+    { name: '마약류 취급자 교육(해당자)', category: 'hospital' },
+    // 신고 의무
+    { name: '아동학대신고', category: 'hospital' },
+    { name: '노인학대신고', category: 'hospital' },
+  ];
 
   return (
     <div className="bg-white border border-gray-100 shadow-sm overflow-hidden">
@@ -31,7 +48,18 @@ export default function EducationList({ selectedCo, staffs, notifications = [] }
             <tr>
               <th className="p-4 sticky left-0 bg-white z-10 w-32 border-r border-gray-50">성명 / 소속</th>
               {eduItems.map(item => (
-                <th key={item} className="p-4 text-center">{item}</th>
+                <th key={item.name} className="p-4 text-center">
+                  <div className="flex flex-col items-center gap-1">
+                    <span>{item.name}</span>
+                    <span className="text-[8px] font-bold text-gray-400">
+                      {item.category === 'hospital'
+                        ? '병원'
+                        : item.category === 'company'
+                        ? '일반'
+                        : '공통'}
+                    </span>
+                  </div>
+                </th>
               ))}
             </tr>
           </thead>
@@ -47,7 +75,7 @@ export default function EducationList({ selectedCo, staffs, notifications = [] }
                     </div>
                   </td>
                   {eduItems.map((item, idx) => {
-                    const isUrgent = staffNotis.some((n: any) => n.education === item);
+                    const isUrgent = staffNotis.some((n: any) => n.education === item.name);
                     const isCompleted = idx < 3; // 시뮬레이션용 로직
 
                     return (

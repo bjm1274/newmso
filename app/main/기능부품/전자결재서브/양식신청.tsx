@@ -5,7 +5,6 @@ import { CERTIFICATE_TYPES } from '@/lib/certificate-types';
 
 export default function FormRequest({ user, staffs }: any) {
   const [selectedForm, setSelectedForm] = useState('재직증명서');
-  const [selectedStaff, setSelectedStaff] = useState('');
   const [purpose, setPurpose] = useState('');
   const [urgency, setUrgency] = useState('일반');
   const [submitting, setSubmitting] = useState(false);
@@ -13,13 +12,18 @@ export default function FormRequest({ user, staffs }: any) {
   const forms = CERTIFICATE_TYPES;
 
   const handleSubmit = async () => {
-    if (!selectedStaff || !purpose) return alert('필수 항목을 입력해주세요.');
+    if (!user?.id) {
+      alert('로그인 정보가 올바르지 않습니다. 다시 로그인 후 이용해주세요.');
+      return;
+    }
+    if (!purpose) return alert('신청 용도를 입력해주세요.');
     
     setSubmitting(true);
 
     try {
-      // 1. 결재 신청 생성
-      const targetStaffName = staffs?.find((s: any) => s.id === selectedStaff)?.name || selectedStaff;
+      // 1. 결재 신청 생성 (증명서 신청자는 항상 본인)
+      const targetStaffId = user.id;
+      const targetStaffName = user.name;
       const { data: approval, error: approvalError } = await supabase.from('approvals').insert([{
         sender_id: user.id,
         sender_name: user.name,
@@ -30,10 +34,12 @@ export default function FormRequest({ user, staffs }: any) {
         content: `신청자: ${targetStaffName}\n대상: ${targetStaffName}\n용도: ${purpose}\n긴급도: ${urgency}`,
         meta_data: {
           form_type: selectedForm,
-          target_staff: selectedStaff,
+          target_staff: targetStaffId,
           purpose: purpose,
           urgency: urgency,
-          auto_issue: true
+          auto_issue: true,
+          // 개인정보 보호: 증명서 발급은 행정팀만 참조
+          cc_departments: ['행정팀'],
         },
         status: '대기'
       }]).select().single();
@@ -41,7 +47,6 @@ export default function FormRequest({ user, staffs }: any) {
       if (approvalError) throw approvalError;
 
       alert('양식 신청이 완료되었습니다. 결재자의 승인을 기다려주세요.');
-      setSelectedStaff('');
       setPurpose('');
       setUrgency('일반');
     } catch (error) {
@@ -81,19 +86,12 @@ export default function FormRequest({ user, staffs }: any) {
           </div>
         </div>
 
-        {/* 신청 대상 */}
+        {/* 신청 대상 - 본인만 가능 (개인정보 보호) */}
         <div className="space-y-3">
           <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest">2. 신청 대상 직원</label>
-          <select
-            value={selectedStaff}
-            onChange={e => setSelectedStaff(e.target.value)}
-            className="w-full p-4 bg-gray-50 rounded-2xl border-none outline-none font-black text-sm focus:ring-2 focus:ring-blue-100"
-          >
-            <option value="">직원 선택...</option>
-            {staffs?.map((s: any) => (
-              <option key={s.id} value={s.id}>{s.name} ({s.position})</option>
-            ))}
-          </select>
+          <div className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 text-sm font-bold text-gray-800">
+            {user?.name} ({user?.position || '직원'}) – 본인 계정으로만 증명서를 신청할 수 있습니다.
+          </div>
         </div>
 
         {/* 신청 용도 */}
