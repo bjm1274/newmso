@@ -68,7 +68,7 @@ export default function AdminView({ user, staffs = [], depts = [], onRefresh }: 
       <header className="px-10 py-8 flex justify-between items-center bg-white border-b border-gray-100 shrink-0 shadow-sm flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-black text-gray-800 tracking-tighter">SY INC. MSO 관리자 센터</h1>
-          <p className="text-[10px] text-blue-600 font-bold mt-1 uppercase tracking-widest">Integrated Admin Hub</p>
+          <p className="text-[10px] text-blue-600 font-bold mt-1 tracking-widest">관리자 통합 센터</p>
         </div>
 
         <div className="flex gap-1 bg-gray-100 p-1 border border-gray-200 rounded-[12px] overflow-x-auto max-w-full">

@@ -171,7 +171,7 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-xl md:text-2xl font-black text-gray-800 tracking-tight italic">SY INC. 재고 통합 제어</h1>
-            <p className="text-[10px] md:text-xs text-blue-600 font-bold mt-1 uppercase tracking-widest">MSO Integrated Inventory Engine</p>
+            <p className="text-[10px] md:text-xs text-blue-600 font-bold mt-1 tracking-widest">재고 통합 관리 시스템</p>
           </div>
           <div className="flex gap-2 w-full md:w-auto overflow-x-auto no-scrollbar pb-1">
             <button onClick={() => setActiveView('UDI')} className={`px-4 py-2 rounded-xl text-[10px] font-black whitespace-nowrap transition-all ${activeView === 'UDI' ? 'bg-[#A11DFF] text-white shadow-lg' : 'bg-gray-100 text-gray-600'}`}>📡 UDI</button>

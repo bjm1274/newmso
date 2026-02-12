@@ -63,7 +63,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
   // 📍 [핵심 기능] 현재 위치 가져오기 및 거리 계산
   const getCurrentLocation = (): Promise<boolean> => {
     return new Promise((resolve) => {
-      if (!navigator.geolocation) {
+      if (typeof navigator === 'undefined' || !navigator.geolocation) {
         alert('이 브라우저는 위치 정보를 지원하지 않습니다.');
         resolve(false);
         return;
@@ -88,7 +88,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
           }
         },
         (error) => {
-          console.error("위치 확인 실패:", error);
+          console.warn('위치 확인 실패:', error && (error as any).message ? (error as any).message : error);
           alert('위치 정보를 가져올 수 없습니다. 브라우저의 위치 권한을 허용해 주세요.');
           resolve(false);
         },

@@ -136,7 +136,7 @@ export default function LeaveManagement({ staffs = [], selectedCo, onRefresh }: 
       <div className="p-4 md:p-8 border-b border-gray-100 bg-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
         <div>
           <h2 className="text-2xl font-black text-gray-900 tracking-tighter italic">전문 연차/휴가 통합 관리</h2>
-          <p className="text-[10px] text-blue-600 font-bold mt-1 uppercase tracking-widest">Professional Leave & Vacation System</p>
+          <p className="text-[10px] text-blue-600 font-bold mt-1 tracking-widest">연차·휴가 통합 관리 시스템</p>
         </div>
         <div className="flex gap-2 w-full md:w-auto overflow-x-auto no-scrollbar">
           {['연차/휴가 신청내역', '연차 대시보드', '연차사용촉진 자동화', '연차 자동부여 설정'].map(tab => (

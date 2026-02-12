@@ -68,7 +68,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh }: any) {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-xl md:text-2xl font-black text-gray-800 tracking-tight italic">SY INC. 인사 통합 제어</h1>
-            <p className="text-[10px] md:text-xs text-blue-600 font-bold mt-1 uppercase tracking-widest">MSO Integrated HR Engine</p>
+            <p className="text-[10px] md:text-xs text-blue-600 font-bold mt-1 tracking-widest">인사 통합 관리 패널</p>
           </div>
           
           <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">

@@ -26,45 +26,16 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
       
       {/* 상단 헤더 및 통합 탭 메뉴 */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 shrink-0">
-        <div className="text-left space-y-2">
-          <div>
-            <h1 className="text-2xl font-black text-gray-900 tracking-tight">반갑습니다, {user.name}님 👋</h1>
-            <p className="text-xs font-bold text-gray-400 mt-1">박철홍정형외과 시스템에 접속 중입니다.</p>
-          </div>
-          {/* 셀프서비스 빠른 메뉴 */}
-          <div className="flex flex-wrap gap-2 text-[11px]">
-            <button
-              type="button"
-              onClick={() => setActiveTab('profile')}
-              className="px-3 py-1.5 rounded-full bg-white/80 border border-gray-200 text-gray-700 font-black hover:bg-gray-900 hover:text-white transition-all"
-            >
-              내 정보 수정
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('certificates')}
-              className="px-3 py-1.5 rounded-full bg-white/80 border border-gray-200 text-gray-700 font-black hover:bg-gray-900 hover:text-white transition-all"
-            >
-              증명서 발급
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('commute')}
-              className="px-3 py-1.5 rounded-full bg-white/80 border border-gray-200 text-gray-700 font-black hover:bg-gray-900 hover:text-white transition-all"
-            >
-              출퇴근 정정 요청
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('salary')}
-              className="px-3 py-1.5 rounded-full bg-white/80 border border-gray-200 text-gray-700 font-black hover:bg-gray-900 hover:text-white transition-all"
-            >
-              급여명세서 확인
-            </button>
-          </div>
+        <div className="text-left space-y-1">
+          <h1 className="text-2xl font-black text-gray-900 tracking-tight">
+            반갑습니다, {user.name}님 👋
+          </h1>
+          <p className="text-xs font-bold text-gray-400 mt-1">
+            내 정보 · 출퇴근 · 할일 · 증명서 · 급여명세서를 한 곳에서 관리합니다.
+          </p>
         </div>
 
-        {/* 탭 네비게이션 (증명서 관리 추가) */}
+        {/* 통합 탭 네비게이션 */}
         <div className="flex bg-white p-1.5 rounded-full shadow-sm border border-gray-100 overflow-x-auto max-w-full">
           <TabButton 
             isActive={activeTab === 'profile'} 
