@@ -53,6 +53,13 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* 다크모드에서 입력창 글자가 안 보이지 않도록 (항상 진한 글자색) */
+:root.dark input,
+:root.dark textarea,
+:root.dark select {
+  color: #111827; /* text-gray-900 */
+}
+
 /* 모바일 안전 영역 (노치/홈 인디케이터) */
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
   .safe-area-pb {
