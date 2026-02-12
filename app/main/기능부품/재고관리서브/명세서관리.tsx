@@ -47,14 +47,18 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
     setLoading(true);
     try {
       const { error } = await supabase.from('suppliers').insert([supplierForm]);
-      if (!error) {
+      if (error) {
+        console.error('suppliers insert error', error);
+        alert(`거래처 등록에 실패했습니다.\n\n${error.message || ''}`);
+      } else {
         alert('거래처가 등록되었습니다.');
         setSupplierForm({ name: '', contact: '', address: '', phone: '', email: '', reg_num: '', ceo: '' });
         setShowNewSupplier(false);
         fetchSuppliers();
       }
-    } catch (err) {
-      alert('거래처 등록에 실패했습니다.');
+    } catch (err: any) {
+      console.error('handleAddSupplier error', err);
+      alert(`거래처 등록에 실패했습니다.\n\n${err?.message || ''}`);
     } finally {
       setLoading(false);
     }
