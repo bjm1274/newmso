@@ -8,6 +8,8 @@ const PRESET_HOSPITAL = {
   ceo: '박철홍', 
   addr: '전라남도 목포시', 
   phone: '061-000-0000', 
+  contact: '',
+  email: '',
   status: '보건업', 
   type: '정형외과' 
 };
@@ -32,7 +34,7 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
   const [invoiceData, setInvoiceData] = useState({
     date: new Date().toISOString().split('T')[0],
     supplier: { ...PRESET_HOSPITAL },
-    receiver: { reg_num: '', sangho: '', ceo: '', addr: '', phone: '' },
+    receiver: { reg_num: '', sangho: '', ceo: '', addr: '', phone: '', contact: '', email: '' },
     items: [] as any[]
   });
 
@@ -405,6 +407,8 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
                           ceo: s.ceo || s.contact || '',
                           addr: s.address,
                           phone: s.phone,
+                          contact: s.contact || '',
+                          email: s.email || '',
                         });
                     }
                   }}
@@ -422,7 +426,9 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
                   <p>상호: {invoiceData.supplier.sangho || '-'}</p>
                   <p>사업자등록번호: {invoiceData.supplier.reg_num || '-'}</p>
                   <p>대표자: {invoiceData.supplier.ceo || '-'}</p>
+                  <p>담당자: {invoiceData.supplier.contact || '-'}</p>
                   <p>전화: {invoiceData.supplier.phone || '-'}</p>
+                  <p>이메일: {invoiceData.supplier.email || '-'}</p>
                   <p>주소: {invoiceData.supplier.addr || '-'}</p>
                 </div>
               </div>
@@ -443,6 +449,8 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
                           ceo: s.ceo || s.contact || '',
                           addr: s.address,
                           phone: s.phone,
+                          contact: s.contact || '',
+                          email: s.email || '',
                         });
                     }
                   }}
@@ -460,7 +468,9 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
                   <p>상호: {invoiceData.receiver.sangho || '-'}</p>
                   <p>사업자등록번호: {invoiceData.receiver.reg_num || '-'}</p>
                   <p>대표자: {invoiceData.receiver.ceo || '-'}</p>
+                  <p>담당자: {invoiceData.receiver.contact || '-'}</p>
                   <p>전화: {invoiceData.receiver.phone || '-'}</p>
+                  <p>이메일: {invoiceData.receiver.email || '-'}</p>
                   <p>주소: {invoiceData.receiver.addr || '-'}</p>
                 </div>
               </div>

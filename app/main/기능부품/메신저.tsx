@@ -182,10 +182,15 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
     if (msgs) setMessages(msgs);
 
     const { data: rooms } = await supabase.from('chat_rooms').select('*').order('created_at', { ascending: false });
-    const noticeRoom = (rooms || []).find((r: any) => r.id === NOTICE_ROOM_ID) || { id: NOTICE_ROOM_ID, name: NOTICE_ROOM_NAME, type: 'notice' };
-    const noticeChannels = (rooms || []).filter((r: any) => r.notice_type);
-    const others = (rooms || []).filter((r: any) => r.id !== NOTICE_ROOM_ID && !r.notice_type);
-    const list = [...noticeChannels, noticeRoom, ...others];
+    const noticeRoom =
+      (rooms || []).find((r: any) => r.id === NOTICE_ROOM_ID) || {
+        id: NOTICE_ROOM_ID,
+        name: NOTICE_ROOM_NAME,
+        type: 'notice',
+      };
+    // 공지메시지 방 하나만 별도로 두고, 나머지는 일반 채팅방으로 취급
+    const others = (rooms || []).filter((r: any) => r.id !== NOTICE_ROOM_ID);
+    const list = [noticeRoom, ...others];
     setChatRooms(list);
 
     // 읽음 수 집계
@@ -390,11 +395,7 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
     () =>
       chatRooms.filter((room: any) => {
         if (room.id === NOTICE_ROOM_ID) return true;
-        // 공지 채널 정책:
-        // - 전사 공지/팀 공지/시스템 공지 등 notice_type 있는 방은
-        //   일반 사용자가 임의로 나갈 수 없도록 "강제 참여" 개념으로 유지
-        // - 시스템 공지 채널은 MSO/관리자만 접근
-        if (room.notice_type === 'system' && !isMso) return false;
+        // 공지메시지 방 하나만 특별 취급, 나머지는 일반 채팅방
         // members가 지정된 경우: 해당 멤버만
         if (Array.isArray(room.members) && room.members.length > 0) {
           return room.members.some((id: any) => String(id) === String(user?.id));
@@ -487,12 +488,11 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
 
   const handleBulkLeaveRooms = async () => {
     if (!user?.id) return;
-    const targets = chatRooms.filter((room: any) => {
-      if (!selectedRoomIdsForLeave.includes(room.id)) return false;
-      // 공지성 채널(NOTICE_ROOM_ID 및 notice_type 있는 방)은 강제 참여 대상으로 남겨두기
-      if (room.id === NOTICE_ROOM_ID || room.notice_type) return false;
-      return true;
-    });
+    const targets = chatRooms.filter(
+      (room: any) =>
+        selectedRoomIdsForLeave.includes(room.id) &&
+        room.id !== NOTICE_ROOM_ID
+    );
     if (!targets.length) {
       alert('나갈 수 있는 채팅방이 선택되지 않았습니다.');
       return;
@@ -568,7 +568,7 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
         return;
       }
     }
-    if (selectedRoomId === NOTICE_ROOM_ID || selectedRoom?.notice_type) {
+    if (selectedRoomId === NOTICE_ROOM_ID) {
       const canWrite = user?.position && CAN_WRITE_NOTICE_POSITIONS.includes(user.position);
       if (!canWrite) {
         alert('공지메시지 방에는 부서장 이상만 작성할 수 있습니다.');
@@ -762,9 +762,9 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
   };
 
   const deleteMessage = async (msg: any) => {
-    // 공지/시스템 채널은 일반 사용자가 삭제 불가
-    if ((selectedRoom?.id === NOTICE_ROOM_ID || selectedRoom?.notice_type === 'system') && !isMso) {
-      alert('공지/시스템 채널의 메시지는 삭제할 수 없습니다.');
+    // 공지메시지 방은 일반 사용자가 삭제 불가
+    if (selectedRoom?.id === NOTICE_ROOM_ID && !isMso) {
+      alert('공지 채널의 메시지는 삭제할 수 없습니다.');
       return;
     }
     if (msg.sender_id !== user.id && !isMso) return;
@@ -827,15 +827,33 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
   return (
     <div className="flex flex-1 overflow-hidden relative font-sans h-full bg-white">
       {/* 좌측 사이드바: 검색 및 목록 */}
-      <aside className="w-80 border-r bg-gray-50 flex flex-col shrink-0">
+      <aside className="w-80 border-r bg-slate-900 flex flex-col shrink-0 text-slate-50">
         <div className="p-6 space-y-3">
-          <div className="flex gap-1 bg-gray-100 p-1 rounded-[12px]">
-            <button onClick={() => setViewMode('chat')} className={`flex-1 py-2 text-[10px] font-black rounded-[12px] transition-all ${viewMode === 'chat' ? 'bg-white shadow-md text-blue-600' : 'text-gray-400'}`}>채팅목록</button>
-            <button onClick={() => setViewMode('org')} className={`flex-1 py-2 text-[10px] font-black rounded-[12px] transition-all ${viewMode === 'org' ? 'bg-white shadow-md text-blue-600' : 'text-gray-400'}`}>조직도검색</button>
+          <div className="flex gap-1 bg-slate-800 p-1 rounded-[12px]">
+            <button
+              onClick={() => setViewMode('chat')}
+              className={`flex-1 py-2 text-[10px] font-black rounded-[12px] transition-all ${
+                viewMode === 'chat'
+                  ? 'bg-slate-50 text-slate-900 shadow-md'
+                  : 'text-slate-300 hover:bg-slate-700/80'
+              }`}
+            >
+              채팅목록
+            </button>
+            <button
+              onClick={() => setViewMode('org')}
+              className={`flex-1 py-2 text-[10px] font-black rounded-[12px] transition-all ${
+                viewMode === 'org'
+                  ? 'bg-slate-50 text-slate-900 shadow-md'
+                  : 'text-slate-300 hover:bg-slate-700/80'
+              }`}
+            >
+              조직도검색
+            </button>
           </div>
           
           <input 
-            className="w-full p-4 bg-white border border-gray-100 rounded-2xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-100" 
+            className="w-full p-4 bg-slate-800 border border-slate-700 rounded-2xl text-xs font-bold outline-none text-slate-50 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-400" 
             placeholder={viewMode === 'chat' ? "채팅방 검색..." : "이름 또는 부서 검색..."}
             value={searchTerm} 
             onChange={e => setSearchTerm(e.target.value)}
@@ -846,7 +864,7 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowSearchPanel(!showSearchPanel)}
-                  className="flex-1 py-2 text-[10px] font-black text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
+                  className="flex-1 py-2 text-[10px] font-black text-blue-300 bg-slate-800 hover:bg-slate-700 rounded-xl transition-colors"
                   aria-label="메시지 검색 패널 열기"
                 >
                   🔍 메시지 검색
@@ -855,36 +873,31 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
                   type="button"
                   onClick={() => setShowUnreadOnly((v) => !v)}
                   className={`px-3 py-2 text-[10px] font-black rounded-xl border transition-colors ${
-                    showUnreadOnly ? 'bg-red-50 border-red-200 text-red-600' : 'bg-white border-gray-200 text-gray-400'
+                    showUnreadOnly
+                      ? 'bg-rose-500/20 border-rose-300 text-rose-200'
+                      : 'bg-slate-800 border-slate-700 text-slate-300'
                   }`}
                 >
                   {showUnreadOnly ? '전체 보기' : '안읽은 방'}
                 </button>
               </div>
               <div className="flex gap-2">
-                <label className="flex-1 flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-xl cursor-pointer">
+                <label className="flex-1 flex items-center gap-2 px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl cursor-pointer">
+                  {/* 일반 채팅방 전체 선택 */}
                   <input
                     type="checkbox"
                     checked={
                       selectedRoomIdsForLeave.length > 0 &&
                       visibleRooms.some(
                         (room: any) =>
-                          !(
-                            room.id === NOTICE_ROOM_ID ||
-                            room.notice_type
-                          ) && selectedRoomIdsForLeave.includes(room.id)
+                          room.id !== NOTICE_ROOM_ID &&
+                          selectedRoomIdsForLeave.includes(room.id)
                       )
                     }
                     onChange={(e) => {
                       if (e.target.checked) {
                         const ids = visibleRooms
-                          .filter(
-                            (room: any) =>
-                              !(
-                                room.id === NOTICE_ROOM_ID ||
-                                room.notice_type
-                              )
-                          )
+                          .filter((room: any) => room.id !== NOTICE_ROOM_ID)
                           .map((r: any) => r.id);
                         setSelectedRoomIdsForLeave(ids);
                       } else {
@@ -892,12 +905,12 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
                       }
                     }}
                   />
-                  <span className="text-[10px] font-black text-gray-500">일반 채팅방 전체 선택</span>
+                  <span className="text-[10px] font-black text-slate-200">일반 채팅방 전체 선택</span>
                 </label>
                 <button
                   type="button"
                   onClick={handleBulkLeaveRooms}
-                  className="px-3 py-2 text-[10px] font-black rounded-xl bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-40"
+                  className="px-3 py-2 text-[10px] font-black rounded-xl bg-rose-500/20 text-rose-100 hover:bg-rose-500/40 disabled:opacity-40"
                   disabled={selectedRoomIdsForLeave.length === 0}
                 >
                   선택 방 나가기
@@ -910,7 +923,12 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
         <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-2 custom-scrollbar">
           {viewMode === 'chat' ? (
             <>
-              <button onClick={() => setShowGroupModal(true)} className="w-full p-4 bg-gray-900 text-white rounded-2xl text-[10px] font-black shadow-md hover:scale-[0.98] transition-all">+ 단체 채팅방 생성</button>
+              <button
+                onClick={() => setShowGroupModal(true)}
+                className="w-full p-4 bg-emerald-500 text-white rounded-2xl text-[10px] font-black shadow-md hover:bg-emerald-400 hover:scale-[0.98] transition-all"
+              >
+                + 단체 채팅방 생성
+              </button>
               {[...visibleRooms]
                 .filter(r => {
                   const name = r.id === NOTICE_ROOM_ID ? NOTICE_ROOM_NAME : (r.name || '');
@@ -921,17 +939,8 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
                 .map(room => {
                   const unread = roomUnreadCounts[room.id] || 0;
                   const isSelected = selectedRoomId === room.id;
-                  const isNoticeChannel = room.id === NOTICE_ROOM_ID || !!room.notice_type;
-                  const label =
-                    room.id === NOTICE_ROOM_ID
-                      ? NOTICE_ROOM_NAME
-                      : room.notice_type === 'all'
-                      ? '전사 공지'
-                      : room.notice_type === 'team'
-                      ? '팀 공지'
-                      : room.notice_type === 'system'
-                      ? '시스템 공지'
-                      : room.name || '채팅방';
+                  const isNoticeChannel = room.id === NOTICE_ROOM_ID;
+                  const label = room.id === NOTICE_ROOM_ID ? NOTICE_ROOM_NAME : room.name || '채팅방';
                   const isBulkSelectable = !isNoticeChannel;
                   const checked = selectedRoomIdsForLeave.includes(room.id);
                   return (
@@ -939,7 +948,9 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
                       key={room.id}
                       onClick={() => setRoom(room.id)}
                       className={`p-4 rounded-2xl cursor-pointer transition-all flex items-center justify-between gap-2 ${
-                        isSelected ? 'bg-blue-600 text-white shadow-lg' : 'bg-white border hover:border-blue-200'
+                        isSelected
+                          ? 'bg-slate-100 text-slate-900 shadow-lg'
+                          : 'bg-slate-800/60 border border-slate-700 hover:border-emerald-400'
                       }`}
                     >
                       <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -956,18 +967,22 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
                                   : prev.filter((id) => id !== room.id)
                               );
                             }}
-                            className="w-3 h-3 rounded border-gray-300"
+                            className="w-3 h-3 rounded border-slate-400 bg-slate-900 text-emerald-400"
                           />
                         )}
-                        <p className="text-xs font-black truncate">
-                          {isNoticeChannel ? '📢 ' : '👥 '}
-                          {label}
-                        </p>
+                        <div className="flex flex-col min-w-0">
+                          <p className="text-xs font-black truncate text-slate-50">
+                            {isNoticeChannel ? '📢 ' : '👥 '}
+                            {label}
+                          </p>
+                        </div>
                       </div>
                       {unread > 0 && (
-                        <span className={`ml-2 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full text-[10px] font-black ${
-                          isSelected ? 'bg-white text-blue-600' : 'bg-red-500 text-white'
-                        }`}>
+                        <span
+                          className={`ml-2 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full text-[10px] font-black ${
+                            isSelected ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'
+                          }`}
+                        >
                           {unread > 99 ? '99+' : unread}
                         </span>
                       )}
@@ -1011,10 +1026,10 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
       </aside>
 
       {/* 우측: 채팅창 본문 */}
-      <main className="flex-1 flex flex-col bg-[#FDFDFD] h-full relative">
+      <main className="flex-1 flex flex-col bg-slate-100 h-full relative">
         {/* 선택된 채팅방 정보 및 액션 버튼들 */}
         {selectedRoomId && selectedRoom && (
-          <header className="px-6 pt-4 pb-3 flex items-center justify-between border-b border-gray-100 bg-white/70 backdrop-blur-sm shrink-0">
+          <header className="px-6 pt-4 pb-3 flex items-center justify-between border-b border-slate-200 bg-slate-50/90 backdrop-blur-sm shrink-0">
             <div>
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
                 현재 채팅방
@@ -1116,8 +1131,8 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
                         onClick={(e) => { e.stopPropagation(); setToolbarMsgId(msg.id); markMessageRead(msg); }}
                         className={`group relative px-3 py-2 rounded-2xl text-sm shadow-sm cursor-pointer transition-all max-w-[70%] ${
                           isMine
-                            ? 'bg-blue-600 text-white rounded-tr-none'
-                            : 'bg-gray-50 border border-gray-200 rounded-tl-none hover:border-blue-300 text-gray-800'
+                            ? 'bg-emerald-600 text-white rounded-tr-none'
+                            : 'bg-white border border-slate-200 rounded-tl-none hover:border-emerald-400 text-slate-900'
                         }`}
                         role="button"
                         tabIndex={0}
@@ -1643,7 +1658,7 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
                     </>
                   )}
                   <button onClick={()=>{handleAction('task'); setActiveActionMsg(null)}} className="w-full p-3 text-left hover:bg-gray-50 rounded-[12px] text-xs font-black transition-colors">✅ 할일로 등록</button>
-                  {(selectedRoom?.id === NOTICE_ROOM_ID || selectedRoom?.notice_type) && (
+                  {selectedRoom?.id === NOTICE_ROOM_ID && (
                     <button
                       onClick={() => {
                         loadUnreadUsersForMessage(activeActionMsg);
@@ -2204,7 +2219,7 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
                     className="w-full flex items-center justify-between px-4 py-3 rounded-2xl border border-gray-100 hover:bg-blue-50 text-left text-xs font-bold text-gray-700"
                   >
                     <span className="truncate">
-                      {room.id === NOTICE_ROOM_ID || room.notice_type ? '📢 ' : '👥 '}
+                      {room.id === NOTICE_ROOM_ID ? '📢 ' : '👥 '}
                       {room.name || '채팅방'}
                     </span>
                     <span className="text-[10px] text-gray-400">
