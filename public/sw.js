@@ -9,7 +9,7 @@ self.addEventListener('push', (event) => {
   const data = event.data.json();
   const options = {
     body: data.body || '새 알림이 있습니다.',
-    icon: '/icon-192x192.png',
+    icon: '/sy-logo.png',
     badge: '/badge-72x72.png',
     tag: data.tag || 'notification',
     requireInteraction: true,

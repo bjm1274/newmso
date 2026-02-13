@@ -19,6 +19,7 @@ export const metadata: Metadata = {
   description: "병원 경영 통합 관리 시스템",
   manifest: "/manifest.json",
   appleWebApp: { capable: true, statusBarStyle: "default", title: "MSO" },
+  icons: { icon: "/sy-logo.png", apple: "/sy-logo.png" },
 };
 
 export default function RootLayout({
