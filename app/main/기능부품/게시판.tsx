@@ -32,6 +32,9 @@ export default function BoardView({ user, setMainMenu }: any) {
   const [surgeryTemplates, setSurgeryTemplates] = useState<any[]>([]);
   const [mriTemplates, setMriTemplates] = useState<any[]>([]);
 
+  // 수술일정·MRI일정 달력 뷰용 현재 월
+  const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date());
+
   const boards = [
     { id: '공지사항', label: '📢 공지사항', icon: '📢' },
     { id: '자유게시판', label: '💬 자유게시판', icon: '💬' },
@@ -95,6 +98,10 @@ export default function BoardView({ user, setMainMenu }: any) {
 
   useEffect(() => {
     fetchPosts();
+    // 다른 게시판에서 다시 수술/MRI 일정으로 돌아올 때는 현재 월 기준으로 달력 리셋
+    if (activeBoard === '수술일정' || activeBoard === 'MRI일정') {
+      setCalendarMonth(new Date());
+    }
   }, [activeBoard]);
 
   useEffect(() => {
@@ -511,16 +518,162 @@ export default function BoardView({ user, setMainMenu }: any) {
         </div>
       )}
 
-      {/* 게시물 목록 - 반응형 그리드 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* 수술일정·MRI일정용 달력 뷰 */}
+      {(activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
+        <div className="bg-white border border-[#E5E8EB] rounded-[16px] shadow-sm p-4 md:p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-black text-[#8B95A1] uppercase tracking-widest">
+                {activeBoard === '수술일정' ? '수술 일정 캘린더' : 'MRI 일정 캘린더'}
+              </p>
+              <h3 className="text-lg md:text-xl font-black text-[#191F28] mt-1">
+                {calendarMonth.getFullYear()}년 {calendarMonth.getMonth() + 1}월
+              </h3>
+            </div>
+            <div className="flex items-center gap-2 text-xs font-bold">
+              <button
+                type="button"
+                onClick={() =>
+                  setCalendarMonth(
+                    new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1)
+                  )
+                }
+                className="px-3 py-1.5 rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50"
+              >
+                ← 이전달
+              </button>
+              <button
+                type="button"
+                onClick={() => setCalendarMonth(new Date())}
+                className="px-3 py-1.5 rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50"
+              >
+                오늘
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setCalendarMonth(
+                    new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1)
+                  )
+                }
+                className="px-3 py-1.5 rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50"
+              >
+                다음달 →
+              </button>
+            </div>
+          </div>
+
+          {posts.length === 0 ? (
+            <div className="py-10 text-center text-xs text-[#8B95A1] font-bold">
+              등록된 일정이 없습니다.
+            </div>
+          ) : (
+            (() => {
+              // 날짜별 일정 매핑 (YYYY-MM-DD → 배열)
+              const eventsByDate: Record<string, any[]> = {};
+              (posts || []).forEach((p: any) => {
+                const d = p.schedule_date;
+                if (!d) return;
+                eventsByDate[d] = eventsByDate[d] ? [...eventsByDate[d], p] : [p];
+              });
+
+              const year = calendarMonth.getFullYear();
+              const month = calendarMonth.getMonth();
+              const firstOfMonth = new Date(year, month, 1);
+              const startDay = firstOfMonth.getDay(); // 0:일 ~ 6:토
+              const startDate = new Date(year, month, 1 - startDay);
+              const days: Date[] = [];
+              for (let i = 0; i < 42; i += 1) {
+                days.push(new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + i));
+              }
+
+              const toKey = (d: Date) =>
+                `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
+                  d.getDate(),
+                  )
+                  .padStart(2, '0')}`;
+
+              return (
+                <div className="border border-[#E5E8EB] rounded-[16px] overflow-hidden">
+                  <div className="grid grid-cols-7 bg-[#F2F4F6] text-[10px] font-black text-[#8B95A1]">
+                    {['일', '월', '화', '수', '목', '금', '토'].map((d) => (
+                      <div key={d} className="px-2 py-2 text-center">
+                        {d}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-7 bg-white text-[11px]">
+                    {days.map((d, idx) => {
+                      const key = toKey(d);
+                      const inMonth = d.getMonth() === month;
+                      const events = eventsByDate[key] || [];
+                      return (
+                        <div
+                          key={key + idx}
+                          className={`min-h-[80px] border border-[#F1F3F5] p-1.5 align-top ${
+                            inMonth ? 'bg-white' : 'bg-[#F9FAFB]'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span
+                              className={`text-[10px] font-black ${
+                                !inMonth ? 'text-gray-300' : d.getDay() === 0
+                                ? 'text-red-500'
+                                : d.getDay() === 6
+                                  ? 'text-blue-500'
+                                  : 'text-gray-700'
+                              }`}
+                            >
+                              {d.getDate()}
+                            </span>
+                            {events.length > 0 && (
+                              <span className="text-[9px] font-black text-[#3182F6]">
+                                {events.length}건
+                              </span>
+                            )}
+                          </div>
+                          <div className="space-y-1">
+                            {events.slice(0, 3).map((ev: any) => (
+                              <button
+                                key={ev.id}
+                                type="button"
+                                onClick={() => openChatForSchedule(ev)}
+                                className="w-full text-left px-1 py-0.5 rounded-[6px] bg-[#E8F3FF] text-[9px] font-bold text-[#3182F6] truncate hover:bg-[#D6EBFF]"
+                              >
+                                {ev.schedule_time || ''} {ev.title}
+                              </button>
+                            ))}
+                            {events.length > 3 && (
+                              <p className="text-[9px] text-gray-400 font-bold">
+                                + {events.length - 3}건 더보기
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()
+          )}
+        </div>
+      )}
+
+      {/* 게시물 목록 */}
+      <div className="space-y-2">
         {posts.length > 0 ? (
           posts.map((post, idx) => (
             <div
               key={post.id || idx}
-              className="bg-white p-6 border border-[#E5E8EB] shadow-sm rounded-[16px] hover:border-[#3182F6]/30 hover:shadow-md transition-all group flex flex-col justify-between"
+              className={`bg-white border border-[#E5E8EB] shadow-sm rounded-[14px] px-4 md:px-6 py-3 md:py-4 hover:border-[#3182F6]/40 hover:shadow-md transition-all cursor-pointer ${
+                activeBoard === '수술일정' || activeBoard === 'MRI일정'
+                  ? 'flex flex-col md:flex-row md:items-center md:justify-between gap-3'
+                  : 'flex flex-col'
+              }`}
             >
               {(activeBoard === '수술일정' || activeBoard === 'MRI일정') ? (
-                <div className="space-y-4">
+                <div className="space-y-2 md:space-y-1">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <h3 className="font-bold text-[#191F28] text-base md:text-lg line-clamp-1">{post.title}</h3>
@@ -586,50 +739,71 @@ export default function BoardView({ user, setMainMenu }: any) {
                     <h3 className="font-black text-[#191F28] text-base md:text-lg group-hover:text-[#3182F6] transition-colors line-clamp-1">{post.title}</h3>
                     <p className="text-xs md:text-sm text-[#4E5968] mt-3 line-clamp-3 leading-relaxed">{post.content}</p>
                   </div>
-                  <div className="flex justify-between items-center mt-6 pt-4 border-t border-[#E5E8EB]">
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-1">
-                        <div className="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center text-[10px]">👤</div>
-                        <span className="text-[10px] font-bold text-[#8B95A1]">{post.author_name}</span>
-                      </div>
-                      <button onClick={() => handleLike(post)} className="flex items-center gap-1 text-[#4E5968] hover:text-red-500 text-[10px] font-bold">
+                    <div className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-[#E5E8EB]">
+                      <span className="text-[10px] font-bold text-[#8B95A1] flex items-center gap-1">
+                        👤 {post.author_name}
+                      </span>
+                      <button
+                        onClick={() => handleLike(post)}
+                        className="flex items-center gap-1 text-[#4E5968] hover:text-red-500 text-[10px] font-bold"
+                        type="button"
+                      >
                         👍 {post.likes_count ?? 0}
                       </button>
-                      <button onClick={() => handleExpandPost(post.id)} className="flex items-center gap-1 text-[#4E5968] hover:text-[#3182F6] text-[10px] font-bold">
+                      <button
+                        onClick={() => handleExpandPost(post.id)}
+                        className="flex items-center gap-1 text-[#4E5968] hover:text-[#3182F6] text-[10px] font-bold"
+                        type="button"
+                      >
                         💬 댓글
                       </button>
+                      <span className="ml-auto text-[10px] font-bold text-[#8B95A1]">
+                        {new Date(post.created_at).toLocaleDateString()}
+                      </span>
                     </div>
-                    <span className="text-[10px] font-bold text-[#8B95A1]">
-                      {new Date(post.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                  {(Array.isArray(post.tags) ? post.tags : []).length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {(Array.isArray(post.tags) ? post.tags : []).map((tag: string, i: number) => (
-                        <span key={i} className="px-2 py-0.5 bg-[#E8F3FF] text-[#3182F6] rounded text-[9px] font-bold">{tag}</span>
-                      ))}
-                    </div>
-                  )}
-                  {expandedPostId === post.id && (
-                    <div className="mt-4 pt-4 border-t border-[#E5E8EB] space-y-2">
-                      {(comments[post.id] || []).map((c: any) => (
-                        <div key={c.id} className="text-xs text-[#4E5968] flex gap-2">
-                          <span className="font-bold">{c.author_name}:</span>
-                          <span>{c.content}</span>
-                        </div>
-                      ))}
-                      <div className="flex gap-2">
-                        <input value={expandedPostId === post.id ? newComment : ''} onChange={(e) => setNewComment(e.target.value)} placeholder="댓글 입력" className="flex-1 px-3 py-2 border-[#E5E8EB] rounded-lg text-xs" />
-                        <button onClick={() => handleAddComment(post.id)} className="px-3 py-2 bg-[#3182F6] text-white rounded-[12px] text-xs font-bold hover:opacity-95">등록</button>
+                    {(Array.isArray(post.tags) ? post.tags : []).length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {(Array.isArray(post.tags) ? post.tags : []).map((tag: string, i: number) => (
+                          <span
+                            key={i}
+                            className="px-2 py-0.5 bg-[#E8F3FF] text-[#3182F6] rounded-full text-[9px] font-bold"
+                          >
+                            #{tag}
+                          </span>
+                        ))}
                       </div>
-                    </div>
-                  )}
-                </div>
+                    )}
+                    {expandedPostId === post.id && (
+                      <div className="mt-3 pt-3 border-t border-[#E5E8EB] space-y-2">
+                        {(comments[post.id] || []).map((c: any) => (
+                          <div key={c.id} className="text-xs text-[#4E5968] flex gap-2">
+                            <span className="font-bold">{c.author_name}:</span>
+                            <span>{c.content}</span>
+                          </div>
+                        ))}
+                        <div className="flex gap-2">
+                          <input
+                            value={expandedPostId === post.id ? newComment : ''}
+                            onChange={(e) => setNewComment(e.target.value)}
+                            placeholder="댓글 입력"
+                            className="flex-1 px-3 py-2 border-[#E5E8EB] rounded-lg text-xs"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleAddComment(post.id)}
+                            className="px-3 py-2 bg-[#3182F6] text-white rounded-[12px] text-xs font-bold hover:opacity-95"
+                          >
+                            등록
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
               )}
             </div>
           ))
         ) : (
-          <div className="col-span-full text-center py-20 text-[#8B95A1]">
+          <div className="text-center py-20 text-[#8B95A1]">
             <p className="font-black text-sm italic">게시물이 없습니다.</p>
           </div>
         )}
