@@ -210,6 +210,27 @@ export default function BoardView({ user, setMainMenu }: any) {
     [posts, selectedPostId]
   );
 
+  // 상세 보기 열릴 때 조회수 1 증가
+  useEffect(() => {
+    if (!selectedPostId) return;
+    const target = posts.find((p: any) => p.id === selectedPostId);
+    if (!target) return;
+    const currentViews = target.views ?? 0;
+    const nextViews = currentViews + 1;
+    supabase
+      .from('board_posts')
+      .update({ views: nextViews })
+      .eq('id', selectedPostId)
+      .then(() => {
+        setPosts((prev) =>
+          prev.map((p: any) =>
+            p.id === selectedPostId ? { ...p, views: nextViews } : p
+          )
+        );
+      })
+      .catch(() => {});
+  }, [selectedPostId]);
+
   const canDeletePost = (post: any) => {
     if (!user) return false;
     const isAuthor = post.author_id && String(post.author_id) === String(user.id);
@@ -701,14 +722,13 @@ export default function BoardView({ user, setMainMenu }: any) {
       {/* 게시물 목록 */}
       <div className="space-y-2">
         {posts.length > 0 ? (
-          posts.map((post, idx) => (
+          posts.map((post, idx) => {
+            const rowNumber = posts.length - idx;
+            const isSchedule = activeBoard === '수술일정' || activeBoard === 'MRI일정';
+            return (
             <div
               key={post.id || idx}
-              className={`bg-white border border-[#E5E8EB] shadow-sm rounded-[14px] px-4 md:px-6 py-3 md:py-4 hover:border-[#3182F6]/40 hover:shadow-md transition-all cursor-pointer ${
-                activeBoard === '수술일정' || activeBoard === 'MRI일정'
-                  ? 'flex flex-col md:flex-row md:items-center md:justify-between gap-3'
-                  : 'flex flex-col'
-              }`}
+              className={`bg-white border border-[#E5E8EB] shadow-sm rounded-[14px] px-3 md:px-4 py-2.5 md:py-3 hover:border-[#3182F6]/40 hover:shadow-md transition-all cursor-pointer`}
               onClick={() => setSelectedPostId(post.id)}
             >
               {(activeBoard === '수술일정' || activeBoard === 'MRI일정') ? (
@@ -773,49 +793,28 @@ export default function BoardView({ user, setMainMenu }: any) {
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-col h-full">
-                  <div className="flex-1">
-                    <h3 className="font-black text-[#191F28] text-base md:text-lg group-hover:text-[#3182F6] transition-colors line-clamp-1">{post.title}</h3>
-                    <p className="text-xs md:text-sm text-[#4E5968] mt-3 line-clamp-3 leading-relaxed">{post.content}</p>
+                <div className="flex items-center gap-3 text-[11px] md:text-xs">
+                  <div className="w-8 text-center text-[10px] font-bold text-[#8B95A1] shrink-0">
+                    {rowNumber}
                   </div>
-                    <div className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-[#E5E8EB]">
-                      <span className="text-[10px] font-bold text-[#8B95A1] flex items-center gap-1">
-                        👤 {post.author_name}
-                      </span>
-                      <button
-                        onClick={() => handleLike(post)}
-                        className="flex items-center gap-1 text-[#4E5968] hover:text-red-500 text-[10px] font-bold"
-                        type="button"
-                      >
-                        👍 {post.likes_count ?? 0}
-                      </button>
-                      <button
-                        onClick={() => handleExpandPost(post.id)}
-                        className="flex items-center gap-1 text-[#4E5968] hover:text-[#3182F6] text-[10px] font-bold"
-                        type="button"
-                      >
-                        💬 댓글
-                      </button>
-                      <span className="ml-auto text-[10px] font-bold text-[#8B95A1]">
-                        {new Date(post.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                    {(Array.isArray(post.tags) ? post.tags : []).length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {(Array.isArray(post.tags) ? post.tags : []).map((tag: string, i: number) => (
-                          <span
-                            key={i}
-                            className="px-2 py-0.5 bg-[#E8F3FF] text-[#3182F6] rounded-full text-[9px] font-bold"
-                          >
-                            #{tag}
-                          </span>
-                        ))}
-                      </div>
-                    )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-[#191F28] truncate group-hover:text-[#3182F6]">
+                      {post.title}
+                    </p>
                   </div>
+                  <div className="hidden md:flex w-32 text-[10px] font-bold text-[#8B95A1] justify-center shrink-0">
+                    {post.author_name || '익명'}
+                  </div>
+                  <div className="w-20 md:w-24 text-[10px] font-bold text-[#8B95A1] text-center shrink-0">
+                    {new Date(post.created_at).toLocaleDateString()}
+                  </div>
+                  <div className="w-14 text-[10px] font-bold text-[#8B95A1] text-center shrink-0">
+                    조회 {post.views ?? 0}
+                  </div>
+                </div>
               )}
             </div>
-          ))
+          )})
         ) : (
           <div className="text-center py-20 text-[#8B95A1]">
             <p className="font-black text-sm italic">게시물이 없습니다.</p>
