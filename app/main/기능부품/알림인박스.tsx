@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 const TYPE_ICONS: Record<string, { icon: string; color: string }> = {
@@ -13,6 +14,7 @@ const TYPE_ICONS: Record<string, { icon: string; color: string }> = {
 };
 
 export default function NotificationInbox({ user, onRefresh }: any) {
+  const router = useRouter();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [loading, setLoading] = useState(true);
@@ -68,6 +70,14 @@ export default function NotificationInbox({ user, onRefresh }: any) {
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
     );
+  };
+
+  const handleNotificationClick = (n: any) => {
+    if (!n.is_read) markAsRead(n.id);
+    const roomId = n.metadata?.room_id;
+    if ((n.type === 'message' || n.type === 'mention') && roomId) {
+      router.push('/main?open_chat_room=' + encodeURIComponent(roomId));
+    }
   };
 
   const markAllAsRead = async () => {
@@ -146,7 +156,7 @@ export default function NotificationInbox({ user, onRefresh }: any) {
               return (
                 <div
                   key={n.id}
-                  onClick={() => !n.is_read && markAsRead(n.id)}
+                  onClick={() => handleNotificationClick(n)}
                   className={`p-4 rounded-2xl border cursor-pointer transition-all ${
                     n.is_read
                       ? 'bg-white border-gray-100 opacity-70'

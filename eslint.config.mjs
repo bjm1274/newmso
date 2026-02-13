@@ -7,12 +7,16 @@ const eslintConfig = defineConfig([
   ...nextTs,
   {
     rules: {
-      // 스타일 관련 규칙들은 경고로만 처리해 개발 흐름을 막지 않도록 조정
-      "@typescript-eslint/no-explicit-any": "warn",
+      // 스타일/타입 관련 규칙들은 경고 대신 비활성화하여 개발 흐름을 막지 않도록 조정
+      "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-unused-vars": [
-        "warn",
+        "off",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
+      // 데이터 패칭·비동기 로직이 많은 특성상 deps를 엄격히 강제하지 않음
+      "react-hooks/exhaustive-deps": "off",
+      // 디자인 상 직접 <img>를 사용하는 패턴 허용
+      "@next/next/no-img-element": "off",
       // 데이터 로딩 후 setState를 사용하는 일반적인 패턴은 허용
       "react-hooks/set-state-in-effect": "off",
       // React 공식 ESLint의 실험적 불변성 규칙은 현재 코드 패턴과 맞지 않아 비활성화

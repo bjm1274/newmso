@@ -100,7 +100,7 @@ export default function LoginPage() {
         alert("비밀번호가 설정되었습니다. 다음 로그인부터 이 비밀번호를 사용해 주세요.");
       }
       router.push('/main');
-    } catch (err) {
+    } catch (_err) {
       setError("시스템 접속 중 오류가 발생했습니다.");
       setLoading(false);
     }

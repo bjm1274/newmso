@@ -74,7 +74,6 @@ export default function HRMainView({ user, staffs, depts, onRefresh }: any) {
     } catch {
       // ignore
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

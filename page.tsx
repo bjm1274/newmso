@@ -74,7 +74,7 @@ export default function LoginPage() {
       localStorage.setItem('erp_user', JSON.stringify(user));
       router.push('/main');
 
-    } catch (err) {
+    } catch (_err) {
       setError("시스템 접속 중 오류가 발생했습니다.");
       setLoading(false);
     }
