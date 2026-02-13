@@ -233,21 +233,21 @@ export default function MyProfileCard({ user: initialUser }: any) {
   if (!user) return <div className="p-10">로딩 중...</div>;
 
   return (
-    <div className="bg-white border border-gray-100 shadow-sm rounded-[2.5rem] p-12 flex flex-col h-full space-y-12">
+    <div className="bg-white border border-[#E5E8EB] shadow-sm rounded-[2.5rem] p-12 flex flex-col h-full space-y-12">
       
       {/* 프로필 헤더 */}
       <div className="flex items-center gap-10 pb-10 border-b border-gray-50">
         <div className="relative group">
-          <div className="w-32 h-32 rounded-full bg-gray-50 flex items-center justify-center overflow-hidden border-4 border-white shadow-2xl">
+          <div className="w-32 h-32 rounded-full bg-[#F2F4F6] flex items-center justify-center overflow-hidden border-4 border-white shadow-sm">
             {avatarUrl ? (
               <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
             ) : (
-              <span className="text-5xl font-black text-gray-200">👤</span>
+              <span className="text-5xl font-bold text-[#E5E8EB]">👤</span>
             )}
           </div>
           {user?.id ? (
             <>
-              <label className="absolute bottom-1 right-1 w-10 h-10 bg-gray-900 text-white rounded-full flex items-center justify-center cursor-pointer hover:bg-blue-600 transition-all shadow-lg z-10" htmlFor="profiles-upload">
+              <label className="absolute bottom-1 right-1 w-10 h-10 bg-[#191F28] text-white rounded-full flex items-center justify-center cursor-pointer hover:bg-[#3182F6] transition-all shadow-sm z-10" htmlFor="profiles-upload">
                 {uploading ? '⏳' : '📷'}
               </label>
               <input
@@ -260,36 +260,36 @@ export default function MyProfileCard({ user: initialUser }: any) {
               />
             </>
           ) : (
-            <span className="absolute bottom-1 right-1 text-[9px] font-bold text-gray-400 max-w-[100px] text-right">직원 계정 로그인 시 사진 등록 가능</span>
+            <span className="absolute bottom-1 right-1 text-[9px] font-bold text-[#8B95A1] max-w-[100px] text-right">직원 계정 로그인 시 사진 등록 가능</span>
           )}
         </div>
 
         <div className="flex-1">
           <div className="flex items-center justify-between mb-2">
-            <h2 className="text-4xl font-black text-gray-900 tracking-tighter">{user.name} {user.position}</h2>
+            <h2 className="text-4xl font-bold text-[#191F28] tracking-tighter">{user.name} {user.position}</h2>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => verifyPasswordAndRun(() => setShowSecret((v) => !v))}
-                className="text-[11px] font-black px-4 py-2 bg-gray-50 rounded-full text-gray-400 hover:text-blue-600 border border-transparent hover:border-blue-100"
+                className="text-[11px] font-bold px-4 py-2 bg-[#F2F4F6] rounded-full text-[#8B95A1] hover:text-[#3182F6] border border-transparent hover:border-[#E8F3FF]"
               >
                 {showSecret ? '민감 정보 숨기기 🔒' : '보안 정보 보기 👁️'}
               </button>
               <button
                 type="button"
                 onClick={() => verifyPasswordAndRun(() => setIsEditing((v) => !v))}
-                className={`text-[11px] font-black px-4 py-2 rounded-full border transition-all ${
+                className={`text-[11px] font-bold px-4 py-2 rounded-full border transition-all ${
                   isEditing
                     ? 'bg-red-50 text-red-500 border-red-100 hover:bg-red-100'
-                    : 'bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100'
+                    : 'bg-[#E8F3FF] text-[#3182F6] border-[#D6EBFF] hover:bg-[#D6EBFF]'
                 }`}
               >
                 {isEditing ? '수정 취소' : '내 정보 수정'}
               </button>
             </div>
           </div>
-          <p className="text-lg font-bold text-blue-600 underline decoration-blue-100 underline-offset-8">{user.department} 소속</p>
+          <p className="text-lg font-bold text-[#3182F6] underline decoration-[#E8F3FF] underline-offset-8">{user.department} 소속</p>
           {/* 디버깅용 메시지 (작게 표시, 문제 해결 후 삭제 가능) */}
-          {/* <p className="text-[10px] text-gray-300 mt-2">시스템 상태: {debugMsg || '정상'}</p> */}
+          {/* <p className="text-[10px] text-[#8B95A1] mt-2">시스템 상태: {debugMsg || '정상'}</p> */}
         </div>
       </div>
 
@@ -297,7 +297,7 @@ export default function MyProfileCard({ user: initialUser }: any) {
       <div className="flex-1 overflow-y-auto custom-scrollbar pr-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-10 gap-y-10">
           <div className="space-y-7 lg:col-span-2">
-            <h3 className="text-[11px] font-black text-gray-300 uppercase tracking-widest border-l-2 border-blue-500 pl-3">
+            <h3 className="text-[11px] font-bold text-[#8B95A1] uppercase tracking-widest border-l-2 border-[#3182F6] pl-3">
               인사 관리 정보
             </h3>
             <InfoItem label="사번" value={user.employee_no} />
@@ -325,13 +325,13 @@ export default function MyProfileCard({ user: initialUser }: any) {
             )}
           </div>
           <div className="space-y-7">
-            <h3 className="text-[11px] font-black text-gray-300 uppercase tracking-widest border-l-2 border-emerald-500 pl-3">
+            <h3 className="text-[11px] font-bold text-[#8B95A1] uppercase tracking-widest border-l-2 border-emerald-500 pl-3">
               나의 근태 · 연차
             </h3>
             <LeaveAndCommuteSummary user={user} />
           </div>
           <div className="space-y-7 lg:col-span-3">
-            <h3 className="text-[11px] font-black text-gray-300 uppercase tracking-widest border-l-2 border-red-500 pl-3">
+            <h3 className="text-[11px] font-bold text-[#8B95A1] uppercase tracking-widest border-l-2 border-red-500 pl-3">
               보안 및 급여
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-16 gap-y-6">
@@ -344,7 +344,7 @@ export default function MyProfileCard({ user: initialUser }: any) {
                     placeholder="도로명 주소를 입력하세요"
                   />
                   <div className="space-y-3">
-                    <span className="text-[12px] font-black text-gray-400">계좌정보</span>
+                    <span className="text-[12px] font-bold text-[#8B95A1]">계좌정보</span>
                     <div className="grid grid-cols-2 gap-2">
                       <input
                         type="text"
@@ -353,7 +353,7 @@ export default function MyProfileCard({ user: initialUser }: any) {
                           setEditForm((f) => ({ ...f, bank_name: e.target.value }))
                         }
                         placeholder="은행명"
-                        className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-[13px] font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                        className="w-full px-3 py-2.5 rounded-[12px] border border-[#E5E8EB] text-[13px] font-bold text-[#191F28] focus:outline-none focus:ring-2 focus:ring-[#3182F6]/20 focus:border-[#3182F6]"
                       />
                       <input
                         type="text"
@@ -362,10 +362,10 @@ export default function MyProfileCard({ user: initialUser }: any) {
                           setEditForm((f) => ({ ...f, account_no: e.target.value }))
                         }
                         placeholder="계좌번호"
-                        className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-[13px] font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                        className="w-full px-3 py-2.5 rounded-[12px] border border-[#E5E8EB] text-[13px] font-bold text-[#191F28] focus:outline-none focus:ring-2 focus:ring-[#3182F6]/20 focus:border-[#3182F6]"
                       />
                     </div>
-                    <p className="text-[11px] text-gray-400">
+                    <p className="text-[11px] text-[#8B95A1]">
                       급여 이체용 계좌 정보를 정확히 입력해 주세요.
                     </p>
                   </div>
@@ -425,8 +425,8 @@ export default function MyProfileCard({ user: initialUser }: any) {
 function InfoItem({ label, value, isMasked }: any) {
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-[12px] font-black text-gray-400">{label}</span>
-      <span className={`text-[16px] font-black ${isMasked ? 'text-gray-200 tracking-widest' : 'text-gray-800'}`}>
+      <span className="text-[12px] font-bold text-[#8B95A1]">{label}</span>
+      <span className={`text-[16px] font-bold ${isMasked ? 'text-[#E5E8EB] tracking-widest' : 'text-[#191F28]'}`}>
         {value || '-'}
       </span>
     </div>
@@ -436,13 +436,13 @@ function InfoItem({ label, value, isMasked }: any) {
 function EditableItem({ label, value, onChange, placeholder }: any) {
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-[12px] font-black text-gray-400">{label}</span>
+      <span className="text-[12px] font-bold text-[#8B95A1]">{label}</span>
       <input
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-[14px] font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+        className="w-full px-3 py-2.5 rounded-[12px] border border-[#E5E8EB] text-[14px] font-bold text-[#191F28] focus:outline-none focus:ring-2 focus:ring-[#3182F6]/20 focus:border-[#3182F6]"
       />
     </div>
   );
@@ -499,41 +499,41 @@ function LeaveAndCommuteSummary({ user }: any) {
 
   if (!summary) {
     return (
-      <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 text-[12px] text-gray-400 font-bold">
+      <div className="bg-[#F2F4F6] border border-[#E5E8EB] rounded-2xl p-4 text-[12px] text-[#8B95A1] font-bold">
         근태·연차 정보를 불러오는 중입니다...
       </div>
     );
   }
 
   return (
-    <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 space-y-4 text-[12px]">
+    <div className="bg-[#F2F4F6] border border-[#E5E8EB] rounded-2xl p-4 space-y-4 text-[12px]">
       <div className="flex justify-between items-end">
         <div>
-          <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">
+          <p className="text-[11px] font-bold text-[#8B95A1] uppercase tracking-widest">
             연차 현황
           </p>
-          <p className="mt-1 text-[13px] font-black text-gray-900">
+          <p className="mt-1 text-[13px] font-bold text-[#191F28]">
             잔여 연차{' '}
             <span className="text-emerald-600">
               {summary.remaining.toFixed(1)}일
             </span>
           </p>
-          <p className="mt-0.5 text-[11px] text-gray-500">
+          <p className="mt-0.5 text-[11px] text-[#4E5968]">
             총 {summary.total.toFixed(1)}일 중 {summary.used.toFixed(1)}일 사용
           </p>
         </div>
       </div>
 
-      <div className="mt-3 border-t border-gray-100 pt-3 space-y-2">
-        <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">
+      <div className="mt-3 border-t border-[#E5E8EB] pt-3 space-y-2">
+        <p className="text-[11px] font-bold text-[#8B95A1] uppercase tracking-widest">
           최근 지각
         </p>
         {summary.lateDays.length === 0 ? (
-          <p className="text-[11px] text-gray-500">
+          <p className="text-[11px] text-[#4E5968]">
             최근 60일 이내 지각 기록이 없습니다.
           </p>
         ) : (
-          <ul className="space-y-1 text-[11px] text-gray-700">
+          <ul className="space-y-1 text-[11px] text-[#4E5968]">
             {summary.lateDays.slice(0, 3).map((d) => (
               <li key={`${d.date}-${d.status}`}>
                 {new Date(d.date).toLocaleDateString('ko-KR')} · {d.status}
@@ -543,16 +543,16 @@ function LeaveAndCommuteSummary({ user }: any) {
         )}
       </div>
 
-      <div className="mt-2 border-t border-gray-100 pt-3 space-y-2">
-        <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">
+      <div className="mt-2 border-t border-[#E5E8EB] pt-3 space-y-2">
+        <p className="text-[11px] font-bold text-[#8B95A1] uppercase tracking-widest">
           최근 추가근무
         </p>
         {summary.overworkDays.length === 0 ? (
-          <p className="text-[11px] text-gray-500">
+          <p className="text-[11px] text-[#4E5968]">
             최근 60일 이내 추가근무 기록이 없습니다.
           </p>
         ) : (
-          <ul className="space-y-1 text-[11px] text-gray-700">
+          <ul className="space-y-1 text-[11px] text-[#4E5968]">
             {summary.overworkDays.slice(0, 3).map((d) => (
               <li key={`${d.date}-${d.status}`}>
                 {new Date(d.date).toLocaleDateString('ko-KR')} · {d.status}

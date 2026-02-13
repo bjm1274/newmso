@@ -208,7 +208,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   return (
     <div className="flex flex-col md:flex-row h-full bg-[#F8FAFC] overflow-hidden">
       {/* 좌측 메뉴 - 모바일 상단 탭 전환 */}
-      <aside className="w-full md:w-64 bg-white border-b md:border-r border-gray-100 shrink-0 z-10">
+      <aside className="w-full md:w-64 bg-white border-b md:border-r border-[#E5E8EB] shrink-0 z-10">
         <div className="p-4 md:p-8">
           <nav className="flex md:flex-col gap-2 overflow-x-auto no-scrollbar">
             {['기안함', '결재함', '작성하기'].map(m => (
@@ -220,7 +220,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                     window.localStorage.setItem(APPROVAL_VIEW_KEY, m);
                   }
                 }} 
-                className={`flex-1 md:w-full text-center md:text-left px-4 md:px-6 py-3 md:py-4 rounded-xl md:rounded-2xl text-[11px] md:text-xs font-black transition-all whitespace-nowrap ${viewMode === m ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-50 md:bg-transparent text-gray-400 hover:bg-white hover:shadow-sm'}`}
+                className={`flex-1 md:w-full text-center md:text-left px-4 md:px-6 py-3 md:py-4 rounded-[12px] md:rounded-[16px] text-[11px] md:text-xs font-bold transition-all whitespace-nowrap ${viewMode === m ? 'bg-[#3182F6] text-white shadow-sm' : 'bg-[#F2F4F6] md:bg-transparent text-[#8B95A1] hover:bg-white hover:shadow-sm'}`}
               >
                 {m === '기안함' && '📥 '}
                 {m === '결재함' && '📤 '}
@@ -236,20 +236,20 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       <main className="flex-1 overflow-y-auto p-4 md:p-10 bg-[#F8FAFC] custom-scrollbar">
         {viewMode === '작성하기' ? (
           <div className="max-w-4xl mx-auto space-y-6 md:space-y-8">
-            <div className="bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] border border-gray-100 shadow-xl space-y-8 md:space-y-10">
-              <div className="bg-blue-50 p-6 md:p-8 rounded-[1.5rem] md:rounded-[2rem] border border-blue-100 space-y-6">
+            <div className="bg-white p-6 md:p-10 rounded-[16px] md:rounded-[20px] border border-[#E5E8EB] shadow-sm space-y-8 md:space-y-10">
+              <div className="bg-[#E8F3FF] p-6 md:p-8 rounded-[16px] border border-[#E8F3FF] space-y-6">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-2">
-                  <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2">
-                    <span className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></span>
-                    ✍️ 결재선 지정
+                  <label className="text-[10px] font-bold text-[#3182F6] uppercase tracking-widest flex items-center gap-2">
+                    <span className="w-2 h-2 bg-[#3182F6] rounded-full animate-pulse"></span>
+                    결재선 지정
                   </label>
                   
-                  <div className="flex gap-1 bg-gray-100 p-1 rounded-[12px] w-full md:w-auto overflow-x-auto no-scrollbar">
+                  <div className="flex gap-1 bg-[#F2F4F6] p-1 rounded-[12px] w-full md:w-auto overflow-x-auto no-scrollbar">
                     {['전체', '박철홍정형외과', '수연의원', 'SY INC.'].map(co => (
-                      <button 
-                        key={co} 
+                      <button
+                        key={co}
                         onClick={() => setSelectedCo(co)}
-                        className={`flex-1 md:flex-none px-3 py-1.5 rounded-[12px] text-[9px] font-black transition-all whitespace-nowrap ${selectedCo === co ? 'bg-white shadow-md text-blue-600' : 'text-gray-400'}`}
+                        className={`flex-1 md:flex-none px-3 py-1.5 rounded-[12px] text-[9px] font-bold transition-all whitespace-nowrap ${selectedCo === co ? 'bg-white shadow-sm text-[#3182F6]' : 'text-[#8B95A1]'}`}
                       >
                         {co}
                       </button>
@@ -261,20 +261,20 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                     const s = approverCandidates.find((st: any) => st.id === e.target.value);
                     if (s && !approverLine.find(al => al.id === s.id)) setApproverLine([...approverLine, s]);
                     e.target.value = '';
-                }} className="w-full p-4 bg-white rounded-xl md:rounded-2xl text-xs font-bold border-none outline-none shadow-sm">
+                }} className="w-full p-4 bg-white rounded-[12px] text-xs font-bold border border-[#E5E8EB] outline-none shadow-sm">
                     <option value="">결재자 추가...</option>
                     {approverCandidates.map((s: any) => (
                       <option key={s.id} value={s.id}>{s.name} {s.position || ''} {s.company ? `(${s.company})` : ''}</option>
                     ))}
                 </select>
-                <div className="flex gap-2 flex-wrap">{approverLine.map((a, i) => <div key={i} className="bg-white px-4 py-3 rounded-xl border border-blue-100 text-[10px] font-black shadow-sm text-blue-600 flex items-center gap-2">{i+1}. {a.name} {a.position} <button onClick={() => setApproverLine(approverLine.filter((_,idx)=>idx!==i))} className="ml-1 text-gray-300 hover:text-red-500">✕</button></div>)}</div>
+                <div className="flex gap-2 flex-wrap">{approverLine.map((a, i) => <div key={i} className="bg-white px-4 py-3 rounded-[12px] border border-[#E5E8EB] text-[10px] font-bold shadow-sm text-[#3182F6] flex items-center gap-2">{i+1}. {a.name} {a.position} <button onClick={() => setApproverLine(approverLine.filter((_,idx)=>idx!==i))} className="ml-1 text-[#8B95A1] hover:text-red-500">✕</button></div>)}</div>
               </div>
 
-              <div className="flex gap-2 p-1.5 bg-gray-100 rounded-2xl md:rounded-[1.5rem] w-full overflow-x-auto no-scrollbar">
+              <div className="flex gap-2 p-1.5 bg-[#F2F4F6] rounded-[12px] w-full overflow-x-auto no-scrollbar">
                 {[...BUILTIN_FORM_TYPES, ...customFormTypes.map(c => c.slug)].map(t => {
                   const label = BUILTIN_FORM_TYPES.includes(t) ? t : (customFormTypes.find(c => c.slug === t)?.name ?? t);
                   return (
-                    <button key={t} onClick={()=>setFormType(t)} className={`flex-1 px-4 md:px-6 py-3 rounded-xl md:rounded-2xl text-[10px] font-black transition-all whitespace-nowrap ${formType===t ? 'bg-white text-blue-600 shadow-md' : 'text-gray-400 hover:text-gray-600'}`}>{label}</button>
+                    <button key={t} onClick={()=>setFormType(t)} className={`flex-1 px-4 md:px-6 py-3 rounded-[12px] text-[10px] font-bold transition-all whitespace-nowrap ${formType===t ? 'bg-white text-[#3182F6] shadow-sm' : 'text-[#8B95A1] hover:text-[#4E5968]'}`}>{label}</button>
                   );
                 })}
               </div>
@@ -311,22 +311,22 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
               </div>
 
               {formType !== '양식신청' && (
-                <div className="space-y-6 pt-8 md:pt-10 border-t border-gray-50">
+                <div className="space-y-6 pt-8 md:pt-10 border-t border-[#E5E8EB]">
                   <input
                     value={formTitle}
                     onChange={e => setFormTitle(e.target.value)}
-                    className="w-full p-4 md:p-5 bg-gray-50 rounded-xl md:rounded-2xl font-black outline-none text-lg md:text-xl focus:ring-4 focus:ring-blue-50 border-none transition-all"
+                    className="w-full p-4 md:p-5 bg-[#F2F4F6] rounded-[12px] font-bold outline-none text-lg md:text-xl focus:ring-2 focus:ring-[#3182F6]/20 border border-[#E5E8EB] transition-all"
                     placeholder="기안 제목을 입력하세요"
                   />
                   <textarea
                     value={formContent}
                     onChange={e => setFormContent(e.target.value)}
-                    className="w-full h-48 md:h-56 p-6 md:p-8 bg-gray-50 rounded-[1.5rem] md:rounded-[2rem] outline-none text-sm font-bold leading-relaxed border-none focus:ring-4 focus:ring-blue-50 transition-all"
+                    className="w-full h-48 md:h-56 p-6 md:p-8 bg-[#F2F4F6] rounded-[16px] outline-none text-sm font-bold leading-relaxed border border-[#E5E8EB] focus:ring-2 focus:ring-[#3182F6]/20 transition-all"
                     placeholder="상세 사유 및 내용을 입력하세요."
                   />
                   <button
                     onClick={handleSubmit}
-                    className="w-full py-4 md:py-5 bg-blue-600 text-white rounded-xl md:rounded-[2rem] font-black text-sm shadow-xl shadow-blue-100 hover:scale-[0.99] active:scale-95 transition-all"
+                    className="w-full py-4 md:py-5 bg-[#3182F6] text-white rounded-[12px] font-bold text-sm shadow-sm hover:opacity-95 active:scale-[0.99] transition-all"
                   >
                     결재 상신
                   </button>
@@ -337,7 +337,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
         ) : (
           <div className="space-y-4">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-lg font-black text-gray-800">{viewMode} 목록 <span className="text-blue-600 ml-2">{filteredApprovals.length}</span></h2>
+              <h2 className="text-lg font-bold text-[#191F28]">{viewMode} 목록 <span className="text-[#3182F6] ml-2">{filteredApprovals.length}</span></h2>
             </div>
             {filteredApprovals.length === 0 ? (
               <div className="h-96 flex flex-col items-center justify-center opacity-20">
@@ -347,7 +347,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {filteredApprovals.map((item: any) => (
-                  <div key={item.id} className="bg-white p-6 md:p-8 border border-gray-100 rounded-[2rem] md:rounded-[2.5rem] shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6 group hover:border-blue-300 hover:shadow-xl hover:shadow-blue-50 transition-all animate-in fade-in-up">
+                  <div key={item.id} className="bg-white p-6 md:p-8 border border-[#E5E8EB] rounded-[16px] shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6 group hover:border-[#3182F6]/30 hover:shadow-md transition-all animate-in fade-in-up">
                     <div className="flex gap-4 md:gap-6 items-center">
                         <div className="w-14 h-14 md:w-16 md:h-16 bg-gray-50 shrink-0 rounded-2xl flex items-center justify-center text-xl md:text-2xl shadow-inner group-hover:bg-blue-50 transition-colors">
                             {item.type === '물품신청' ? '📦' : item.type === '양식신청' ? '📄' : item.type === '인사명령' ? '🎖️' : item.type === '수리요청서' ? '🔧' : '📋'}
@@ -364,7 +364,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                     </div>
                     
                     {viewMode === '결재함' && item.status === '대기' && (user.permissions?.mso || user.role === 'admin') && (
-                      <button onClick={() => handleApproveAction(item)} className="w-full md:w-auto px-6 py-3 bg-blue-600 text-white rounded-xl text-[11px] font-black shadow-lg shadow-blue-100 hover:scale-105 active:scale-95 transition-all">승인하기</button>
+                      <button onClick={() => handleApproveAction(item)} className="w-full md:w-auto px-6 py-3 bg-[#3182F6] text-white rounded-[12px] text-[11px] font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all">승인하기</button>
                     )}
                   </div>
                 ))}

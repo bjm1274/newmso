@@ -166,14 +166,14 @@ export default function LoginPage() {
             >
               {loading ? '인증 진행 중...' : '로그인'}
             </button>
-            <p className="mt-4 text-[16px] text-gray-500 text-center font-bold tracking-wide">
+            <p className="mt-4 text-[16px] text-[#4E5968] text-center font-bold tracking-wide">
               Made by JM
             </p>
           </div>
         </div>
         
         <div className="mt-12 text-center">
-          <p className="text-[10px] text-gray-300 font-bold leading-relaxed">
+          <p className="text-[10px] text-[#8B95A1] font-bold leading-relaxed">
             © 2026 SY INC. Management Service Organization.
             <br />본 시스템은 인가된 사용자만 접근 가능합니다.
           </p>

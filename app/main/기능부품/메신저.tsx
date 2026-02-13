@@ -883,27 +883,27 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
   };
 
   return (
-    <div className="flex flex-1 overflow-hidden relative font-sans h-full bg-white">
-      {/* 좌측 사이드바: 검색 및 목록 */}
-      <aside className="w-80 border-r bg-slate-900 flex flex-col shrink-0 text-slate-50">
-        <div className="p-6 space-y-3">
-          <div className="flex gap-1 bg-slate-800 p-1 rounded-[12px]">
+    <div className="flex flex-1 min-h-0 overflow-hidden relative font-sans h-full bg-[#F9FAFB] md:bg-white">
+      {/* 좌측 사이드바: 모바일에서는 채팅방 미선택 시에만 전체 표시, 선택 시 숨김 */}
+      <aside className={`${selectedRoomId ? 'hidden md:flex' : 'flex'} w-full md:w-80 border-r border-[#E5E8EB] md:border-0 bg-white md:bg-[#191F28] flex-col shrink-0 text-[#4E5968] md:text-slate-50 shadow-sm md:shadow-none`}>
+        <div className="p-4 md:p-6 space-y-3 flex flex-col min-h-0">
+          <div className="flex gap-1 bg-[#F2F4F6] md:bg-slate-800 p-1 rounded-[12px]">
             <button
               onClick={() => setViewMode('chat')}
-              className={`flex-1 py-2 text-[10px] font-black rounded-[12px] transition-all ${
+              className={`flex-1 py-2 text-[10px] font-bold rounded-[12px] transition-all ${
                 viewMode === 'chat'
-                  ? 'bg-slate-50 text-slate-900 shadow-md'
-                  : 'text-slate-300 hover:bg-slate-700/80'
+                  ? 'bg-white text-[#3182F6] shadow-sm md:bg-slate-50 md:text-slate-900'
+                  : 'text-[#8B95A1] hover:bg-white/80 md:text-slate-300 md:hover:bg-slate-700/80'
               }`}
             >
               채팅목록
             </button>
             <button
               onClick={() => setViewMode('org')}
-              className={`flex-1 py-2 text-[10px] font-black rounded-[12px] transition-all ${
+              className={`flex-1 py-2 text-[10px] font-bold rounded-[12px] transition-all ${
                 viewMode === 'org'
-                  ? 'bg-slate-50 text-slate-900 shadow-md'
-                  : 'text-slate-300 hover:bg-slate-700/80'
+                  ? 'bg-white text-[#3182F6] shadow-sm md:bg-slate-50 md:text-slate-900'
+                  : 'text-[#8B95A1] hover:bg-white/80 md:text-slate-300 md:hover:bg-slate-700/80'
               }`}
             >
               조직도검색
@@ -911,7 +911,7 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
           </div>
           
           <input 
-            className="w-full p-4 bg-slate-800 border border-slate-700 rounded-2xl text-xs font-bold outline-none text-slate-50 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-400" 
+            className="w-full p-3 md:p-4 bg-[#F2F4F6] md:bg-slate-800 border border-[#E5E8EB] md:border-slate-700 rounded-[12px] text-xs font-medium outline-none text-[#191F28] placeholder:text-[#8B95A1] md:text-slate-50 md:placeholder:text-slate-400 focus:ring-2 focus:ring-[#3182F6]/30" 
             placeholder={viewMode === 'chat' ? "채팅방 검색..." : "이름 또는 부서 검색..."}
             value={searchTerm} 
             onChange={e => setSearchTerm(e.target.value)}
@@ -922,7 +922,7 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowSearchPanel(!showSearchPanel)}
-                  className="flex-1 py-2 text-[10px] font-black text-blue-300 bg-slate-800 hover:bg-slate-700 rounded-xl transition-colors"
+                  className="flex-1 py-2 text-[10px] font-bold text-[#3182F6] bg-[#E8F3FF] md:text-blue-300 md:bg-slate-800 md:hover:bg-slate-700 hover:bg-[#D6EBFF] rounded-[12px] transition-colors"
                   aria-label="메시지 검색 패널 열기"
                 >
                   🔍 메시지 검색
@@ -930,18 +930,17 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
                 <button
                   type="button"
                   onClick={() => setShowUnreadOnly((v) => !v)}
-                  className={`px-3 py-2 text-[10px] font-black rounded-xl border transition-colors ${
+                  className={`px-3 py-2 text-[10px] font-bold rounded-[12px] border transition-colors ${
                     showUnreadOnly
-                      ? 'bg-rose-500/20 border-rose-300 text-rose-200'
-                      : 'bg-slate-800 border-slate-700 text-slate-300'
+                      ? 'bg-rose-100 border-rose-200 text-rose-600 md:bg-rose-500/20 md:border-rose-300 md:text-rose-200'
+                      : 'bg-[#F2F4F6] border-[#E5E8EB] text-[#4E5968] md:bg-slate-800 md:border-slate-700 md:text-slate-300'
                   }`}
                 >
                   {showUnreadOnly ? '전체 보기' : '안읽은 방'}
                 </button>
               </div>
               <div className="flex gap-2">
-                <label className="flex-1 flex items-center gap-2 px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl cursor-pointer">
-                  {/* 일반 채팅방 전체 선택 */}
+                <label className="flex-1 flex items-center gap-2 px-3 py-2 bg-[#F2F4F6] md:bg-slate-800 border border-[#E5E8EB] md:border-slate-700 rounded-[12px] cursor-pointer">
                   <input
                     type="checkbox"
                     checked={
@@ -963,12 +962,12 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
                       }
                     }}
                   />
-                  <span className="text-[10px] font-black text-slate-200">일반 채팅방 전체 선택</span>
+                  <span className="text-[10px] font-bold text-[#4E5968] md:text-slate-200">일반 채팅방 전체 선택</span>
                 </label>
                 <button
                   type="button"
                   onClick={handleBulkLeaveRooms}
-                  className="px-3 py-2 text-[10px] font-black rounded-xl bg-rose-500/20 text-rose-100 hover:bg-rose-500/40 disabled:opacity-40"
+                  className="px-3 py-2 text-[10px] font-bold rounded-[12px] bg-rose-100 text-rose-600 hover:bg-rose-200 md:bg-rose-500/20 md:text-rose-100 md:hover:bg-rose-500/40 disabled:opacity-40"
                   disabled={selectedRoomIdsForLeave.length === 0}
                 >
                   선택 방 나가기
@@ -978,12 +977,12 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-2 custom-scrollbar">
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-6 space-y-2 custom-scrollbar">
           {viewMode === 'chat' ? (
             <>
               <button
                 onClick={() => setShowGroupModal(true)}
-                className="w-full p-4 bg-emerald-500 text-white rounded-2xl text-[10px] font-black shadow-md hover:bg-emerald-400 hover:scale-[0.98] transition-all"
+                className="w-full p-4 bg-[#3182F6] text-white rounded-[16px] text-[11px] font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all"
               >
                 + 단체 채팅방 생성
               </button>
@@ -1006,13 +1005,13 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
                   const isBulkSelectable = !isNoticeChannel;
                   const checked = selectedRoomIdsForLeave.includes(room.id);
                   return (
-                    <div 
+                    <div
                       key={room.id}
                       onClick={() => setRoom(room.id)}
-                      className={`p-4 rounded-2xl cursor-pointer transition-all flex items-center justify-between gap-2 ${
+                      className={`p-4 rounded-[16px] cursor-pointer transition-all flex items-center justify-between gap-2 ${
                         isSelected
-                          ? 'bg-slate-100 shadow-lg border border-slate-200'
-                          : 'bg-slate-800/60 border border-slate-700 hover:border-emerald-400'
+                          ? 'bg-[#E8F3FF] border border-[#3182F6] shadow-sm md:bg-slate-100 md:border-slate-200'
+                          : 'bg-white border border-[#E5E8EB] hover:border-[#3182F6]/50 md:bg-slate-800/60 md:border-slate-700 md:hover:border-emerald-400'
                       }`}
                     >
                       <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -1029,11 +1028,11 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
                                   : prev.filter((id) => id !== room.id)
                               );
                             }}
-                            className="w-3 h-3 rounded border-slate-400 bg-slate-900 text-emerald-400"
+                            className="w-3 h-3 rounded border-[#E5E8EB] md:border-slate-400 bg-white md:bg-slate-900 text-[#3182F6] md:text-emerald-400"
                           />
                         )}
                         <div className="flex flex-col min-w-0">
-                          <p className={`text-xs font-black truncate ${isSelected ? 'text-slate-900' : 'text-slate-50'}`}>
+                          <p className={`text-xs font-bold truncate ${isSelected ? 'text-[#191F28]' : 'text-[#4E5968] md:text-slate-50'}`}>
                             {isNoticeChannel ? '📢 ' : '👥 '}
                             {label}
                           </p>
@@ -1041,8 +1040,8 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
                       </div>
                       {unread > 0 && (
                         <span
-                          className={`ml-2 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full text-[10px] font-black ${
-                            isSelected ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'
+                          className={`ml-2 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full text-[10px] font-bold ${
+                            isSelected ? 'bg-[#3182F6] text-white' : 'bg-rose-500 text-white'
                           }`}
                         >
                           {unread > 99 ? '99+' : unread}
@@ -1079,7 +1078,7 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
                     }
                     setViewMode('chat');
                     fetchData();
-                  }} className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-[9px] font-black hover:bg-blue-600 hover:text-white transition-all">대화</button>
+                  }} className="px-3 py-1.5 bg-[#E8F3FF] text-[#3182F6] rounded-[12px] text-[10px] font-bold hover:bg-[#3182F6] hover:text-white transition-all">대화</button>
                 </div>
               ))}
             </div>
@@ -1087,32 +1086,38 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
         </div>
       </aside>
 
-      {/* 우측: 채팅창 본문 */}
-      <main className="flex-1 flex flex-col bg-slate-100 h-full relative">
+      {/* 우측: 채팅창 본문 — 모바일에서는 채팅방 선택 시에만 표시 */}
+      <main className={`${!selectedRoomId ? 'hidden md:flex' : 'flex'} flex-1 min-h-0 flex-col bg-[#F2F4F6] md:bg-slate-100 relative pb-20 md:pb-0`}>
         {/* 선택된 채팅방 정보 및 액션 버튼들 */}
         {selectedRoomId && selectedRoom && (
-          <header className="px-6 pt-4 pb-3 flex items-center justify-between border-b border-slate-200 bg-slate-50/90 backdrop-blur-sm shrink-0">
-            <div>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+          <header className="px-4 md:px-6 pt-3 md:pt-4 pb-3 flex items-center gap-3 border-b border-[#E5E8EB] bg-white shrink-0">
+            <button
+              type="button"
+              onClick={() => setRoom(null)}
+              className="md:hidden w-9 h-9 flex items-center justify-center rounded-[12px] text-[#4E5968] hover:bg-[#F2F4F6] -ml-1"
+              aria-label="채팅목록으로"
+            >
+              ←
+            </button>
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-bold text-[#8B95A1] uppercase tracking-wide">
                 현재 채팅방
               </p>
-              <p className="text-sm font-black text-gray-800 mt-0.5">
+              <p className="text-sm font-bold text-[#191F28] mt-0.5 truncate">
                 {selectedRoom.id === NOTICE_ROOM_ID
                   ? NOTICE_ROOM_NAME
                   : selectedRoom.name || '채팅방'}
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setShowMediaPanel(true)}
-                className="w-8 h-8 flex items-center justify-center text-gray-500 border border-gray-200 rounded-full hover:bg-gray-50 hover:text-blue-600 transition-colors text-lg"
-                aria-label="파일·사진·링크 메뉴 열기"
-                title="파일·사진·링크 보기"
-              >
-                ☰
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setShowMediaPanel(true)}
+              className="w-9 h-9 flex items-center justify-center text-[#4E5968] rounded-[12px] hover:bg-[#F2F4F6] hover:text-[#3182F6] transition-colors"
+              aria-label="파일·사진·링크 메뉴 열기"
+              title="파일·사진·링크 보기"
+            >
+              ☰
+            </button>
           </header>
         )}
         {showSearchPanel && (
@@ -1136,7 +1141,7 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-3 custom-scrollbar">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6 pb-24 md:pb-6 space-y-3 custom-scrollbar">
           {!selectedRoomId ? (
             <div className="h-full flex flex-col items-center justify-center text-gray-400">
               <span className="text-4xl mb-2">💬</span>
@@ -1356,8 +1361,8 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
           <div ref={scrollRef} />
         </div>
 
-        {/* 입력창 */}
-        <div className="p-6 bg-white border-t shrink-0">
+        {/* 입력창 — 모바일에서 하단 네비 위에 고정 */}
+        <div className="absolute left-0 right-0 bottom-0 md:relative p-4 md:p-6 bg-white border-t border-[#E5E8EB] shrink-0 safe-area-pb">
            {replyTo && (
              <div className="mb-3 flex items-center justify-between bg-blue-50 p-3 rounded-xl border border-blue-100 animate-in slide-in-from-bottom-2">
                <p className="text-[10px] font-bold text-blue-600">@{replyTo.staff?.name}님에게 답글 작성 중...</p>

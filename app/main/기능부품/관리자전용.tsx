@@ -57,9 +57,9 @@ export default function AdminView({ user, staffs = [], depts = [], onRefresh }: 
 
   if (!isMso) {
     return (
-      <div className="h-full flex flex-col items-center justify-center bg-gray-50">
+      <div className="h-full flex flex-col items-center justify-center bg-[#F2F4F6]">
         <div className="text-6xl mb-4">🚫</div>
-        <h2 className="text-xl font-black text-gray-800">접근 권한이 없습니다.</h2>
+        <h2 className="text-xl font-bold text-[#191F28]">접근 권한이 없습니다.</h2>
         <p className="text-sm text-gray-400 font-bold mt-2">이 메뉴는 MSO 소속 직원만 이용할 수 있습니다.</p>
       </div>
     );
@@ -68,14 +68,14 @@ export default function AdminView({ user, staffs = [], depts = [], onRefresh }: 
   return (
     <div className="flex-1 flex flex-col bg-[#FDFDFD] h-full relative animate-in fade-in duration-500">
       <header className="px-10 py-8 flex justify-end items-center bg-white border-b border-gray-100 shrink-0 shadow-sm flex-wrap gap-4">
-        <div className="flex gap-1 bg-gray-100 p-1 border border-gray-200 rounded-[12px] overflow-x-auto max-w-full">
+        <div className="flex gap-1 bg-[#F2F4F6] p-1 border border-[#E5E8EB] rounded-[12px] overflow-x-auto max-w-full">
           {adminTabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2 text-[10px] font-black whitespace-nowrap rounded-[12px] transition-all ${
+              className={`px-4 py-2 text-[10px] font-bold whitespace-nowrap rounded-[12px] transition-all ${
                 activeTab === tab.id
-                  ? 'bg-white text-blue-600 shadow-md'
+                  ? 'bg-white text-[#3182F6] shadow-sm'
                   : 'text-gray-400'
               }`}
             >
@@ -85,7 +85,7 @@ export default function AdminView({ user, staffs = [], depts = [], onRefresh }: 
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-10 custom-scrollbar bg-gray-50/30">
+      <main className="flex-1 overflow-y-auto p-10 custom-scrollbar bg-[#F2F4F6]/30">
         {activeTab === '경영대시보드' && (
           <BusinessDashboard staffs={staffs} inventory={inventory} />
         )}

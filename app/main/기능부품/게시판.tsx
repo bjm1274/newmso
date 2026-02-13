@@ -257,14 +257,14 @@ export default function BoardView({ user, setMainMenu }: any) {
     <div className="flex flex-col h-full bg-[#F8FAFC] overflow-y-auto custom-scrollbar p-4 md:p-8 space-y-6 md:space-y-8">
       <header className="flex justify-between items-end">
         <div>
-          <h2 className="text-xl md:text-2xl font-black text-gray-800 tracking-tighter italic">게시판</h2>
-          <p className="text-[10px] md:text-xs text-gray-400 font-bold uppercase mt-1">병원 공지 및 일정 관리</p>
+          <h2 className="text-xl md:text-2xl font-bold text-[#191F28] tracking-tight">게시판</h2>
+          <p className="text-[10px] md:text-xs text-[#8B95A1] font-bold uppercase mt-1">병원 공지 및 일정 관리</p>
         </div>
         
         {(activeBoard === '공지사항' || activeBoard === '자유게시판' || activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
           <button
             onClick={() => setShowNewPost(!showNewPost)}
-            className="px-4 md:px-6 py-2.5 md:py-3 bg-black text-white rounded-xl text-[11px] md:text-xs font-black shadow-lg hover:scale-[0.98] transition-all"
+            className="px-4 md:px-6 py-2.5 md:py-3 bg-[#191F28] text-white rounded-[12px] text-[11px] md:text-xs font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all"
           >
             {showNewPost ? '✕ 취소' : '+ 새 게시물'}
           </button>
@@ -272,15 +272,15 @@ export default function BoardView({ user, setMainMenu }: any) {
       </header>
 
       {/* 게시판 탭 - 모바일 가로 스크롤 */}
-      <div className="flex gap-2 overflow-x-auto no-scrollbar bg-white p-2 md:p-4 rounded-2xl border border-gray-100 shadow-sm shrink-0">
+      <div className="flex gap-2 overflow-x-auto no-scrollbar bg-white p-2 md:p-4 rounded-[16px] border border-[#E5E8EB] shadow-sm shrink-0">
         {boards.map(board => (
           <button
             key={board.id}
             onClick={() => setActiveBoard(board.id)}
-            className={`flex-1 min-w-[100px] md:min-w-0 px-4 md:px-6 py-2.5 md:py-3 rounded-xl text-[11px] md:text-xs font-black transition-all whitespace-nowrap ${
+            className={`flex-1 min-w-[100px] md:min-w-0 px-4 md:px-6 py-2.5 md:py-3 rounded-[12px] text-[11px] md:text-xs font-bold transition-all whitespace-nowrap ${
               activeBoard === board.id
-                ? 'bg-blue-600 text-white shadow-lg'
-                : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
+                ? 'bg-[#3182F6] text-white shadow-sm'
+                : 'bg-[#F2F4F6] text-[#8B95A1] hover:bg-[#E5E8EB]'
             }`}
           >
             {board.label}
@@ -290,12 +290,12 @@ export default function BoardView({ user, setMainMenu }: any) {
 
       {/* 새 게시물 작성 폼 */}
       {showNewPost && (
-        <div className="bg-white p-6 md:p-8 border border-gray-100 shadow-xl rounded-[2rem] space-y-6 animate-in fade-in slide-in-from-top-4 duration-300">
-          <h3 className="text-lg font-black text-gray-800">새 게시물 작성</h3>
+        <div className="bg-white p-6 md:p-8 border border-[#E5E8EB] shadow-sm rounded-[16px] space-y-6 animate-in fade-in slide-in-from-top-4 duration-300">
+          <h3 className="text-lg font-bold text-[#191F28]">새 게시물 작성</h3>
 
           <div className="space-y-4">
             <div>
-              <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2 block">
+              <label className="text-[10px] font-black text-[#4E5968] uppercase tracking-widest mb-2 block">
                 {activeBoard === '수술일정' ? '수술명' : activeBoard === 'MRI일정' ? '검사명' : '제목'}
               </label>
               {(activeBoard === '수술일정' || activeBoard === 'MRI일정') ? (
@@ -307,7 +307,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                       if (!v) return;
                       setTitle(v);
                     }}
-                    className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-xs font-bold focus:ring-2 focus:ring-blue-100"
+                    className="w-full p-3 bg-[#F2F4F6] rounded-[12px] border border-[#E5E8EB] border-[#E5E8EB] outline-none text-xs font-bold focus:ring-2 focus:ring-[#3182F6]/20"
                   >
                     <option value="">
                       {activeBoard === '수술일정'
@@ -328,7 +328,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                         ? '수술명을 입력하거나 위에서 선택하세요.'
                         : '검사명을 입력하거나 위에서 선택하세요.'
                     }
-                    className="w-full p-4 bg-gray-50 rounded-xl border-none outline-none text-sm font-bold focus:ring-2 focus:ring-blue-100"
+                    className="w-full p-4 bg-[#F2F4F6] rounded-[12px] border border-[#E5E8EB] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[#3182F6]/20"
                   />
                 </div>
               ) : (
@@ -336,7 +336,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                   value={title}
                   onChange={e => setTitle(e.target.value)}
                   placeholder="게시물 제목을 입력하세요."
-                  className="w-full p-4 bg-gray-50 rounded-xl border-none outline-none text-sm font-bold focus:ring-2 focus:ring-blue-100"
+                  className="w-full p-4 bg-[#F2F4F6] rounded-[12px] border border-[#E5E8EB] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[#3182F6]/20"
                 />
               )}
             </div>
@@ -345,7 +345,7 @@ export default function BoardView({ user, setMainMenu }: any) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2 block">날짜 (YYYY-MM-DD)</label>
+                    <label className="text-[10px] font-black text-[#4E5968] uppercase tracking-widest mb-2 block">날짜 (YYYY-MM-DD)</label>
                     <input
                       type="text"
                       value={scheduleDate}
@@ -362,11 +362,11 @@ export default function BoardView({ user, setMainMenu }: any) {
                         }
                         setScheduleDate(formatted);
                       }}
-                      className="w-full p-4 bg-gray-50 rounded-xl border-none outline-none text-sm font-bold focus:ring-2 focus:ring-blue-100"
+                      className="w-full p-4 bg-[#F2F4F6] rounded-[12px] border border-[#E5E8EB] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[#3182F6]/20"
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2 block">시간</label>
+                    <label className="text-[10px] font-black text-[#4E5968] uppercase tracking-widest mb-2 block">시간</label>
                     <div className="grid grid-cols-3 gap-2">
                       <select
                         value={schedulePeriod}
@@ -375,7 +375,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                           setSchedulePeriod(v);
                           updateScheduleTime(v, scheduleHour, scheduleMinute);
                         }}
-                        className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-xs font-bold focus:ring-2 focus:ring-blue-100"
+                        className="w-full p-3 bg-[#F2F4F6] rounded-[12px] border border-[#E5E8EB] border-[#E5E8EB] outline-none text-xs font-bold focus:ring-2 focus:ring-[#3182F6]/20"
                       >
                         <option value="">오전/오후</option>
                         <option value="오전">오전</option>
@@ -388,7 +388,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                           setScheduleHour(v);
                           updateScheduleTime(schedulePeriod, v, scheduleMinute);
                         }}
-                        className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-xs font-bold focus:ring-2 focus:ring-blue-100"
+                        className="w-full p-3 bg-[#F2F4F6] rounded-[12px] border border-[#E5E8EB] border-[#E5E8EB] outline-none text-xs font-bold focus:ring-2 focus:ring-[#3182F6]/20"
                       >
                         <option value="">시간</option>
                         {Array.from({ length: 12 }).map((_, idx) => {
@@ -406,7 +406,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                           setScheduleMinute(v);
                           updateScheduleTime(schedulePeriod, scheduleHour, v);
                         }}
-                        className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-xs font-bold focus:ring-2 focus:ring-blue-100"
+                        className="w-full p-3 bg-[#F2F4F6] rounded-[12px] border border-[#E5E8EB] border-[#E5E8EB] outline-none text-xs font-bold focus:ring-2 focus:ring-[#3182F6]/20"
                       >
                         <option value="">분</option>
                         <option value="00">00분</option>
@@ -417,26 +417,26 @@ export default function BoardView({ user, setMainMenu }: any) {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2 block">수술실/검사실</label>
-                    <input value={scheduleRoom} onChange={e => setScheduleRoom(e.target.value)} placeholder="예: 수술실 1" className="w-full p-4 bg-gray-50 rounded-xl border-none outline-none text-sm font-bold focus:ring-2 focus:ring-blue-100" />
+                    <label className="text-[10px] font-black text-[#4E5968] uppercase tracking-widest mb-2 block">수술실/검사실</label>
+                    <input value={scheduleRoom} onChange={e => setScheduleRoom(e.target.value)} placeholder="예: 수술실 1" className="w-full p-4 bg-[#F2F4F6] rounded-[12px] border border-[#E5E8EB] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[#3182F6]/20" />
                   </div>
                   <div>
-                    <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2 block">환자명</label>
-                    <input value={schedulePatient} onChange={e => setSchedulePatient(e.target.value)} placeholder="환자명 입력" className="w-full p-4 bg-gray-50 rounded-xl border-none outline-none text-sm font-bold focus:ring-2 focus:ring-blue-100" />
+                    <label className="text-[10px] font-black text-[#4E5968] uppercase tracking-widest mb-2 block">환자명</label>
+                    <input value={schedulePatient} onChange={e => setSchedulePatient(e.target.value)} placeholder="환자명 입력" className="w-full p-4 bg-[#F2F4F6] rounded-[12px] border border-[#E5E8EB] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[#3182F6]/20" />
                   </div>
                 </div>
                 {(activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-1 block">
+                    <label className="text-[10px] font-black text-[#4E5968] uppercase tracking-widest mb-1 block">
                       {activeBoard === '수술일정' ? '수술 관련 체크' : '촬영 관련 체크'}
                     </label>
-                    <div className="grid grid-cols-2 gap-2 text-[11px] font-bold text-gray-700">
+                    <div className="grid grid-cols-2 gap-2 text-[11px] font-bold text-[#4E5968]">
                       <label className="inline-flex items-center gap-2 cursor-pointer">
                         <input
                           type="checkbox"
                           checked={scheduleFasting}
                           onChange={(e) => setScheduleFasting(e.target.checked)}
-                          className="w-4 h-4 rounded border-gray-300"
+                          className="w-4 h-4 rounded border-[#E5E8EB]"
                         />
                         <span>금식 필요</span>
                       </label>
@@ -445,7 +445,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                           type="checkbox"
                           checked={scheduleInpatient}
                           onChange={(e) => setScheduleInpatient(e.target.checked)}
-                          className="w-4 h-4 rounded border-gray-300"
+                          className="w-4 h-4 rounded border-[#E5E8EB]"
                         />
                           <span>입원 예정</span>
                       </label>
@@ -454,7 +454,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                           type="checkbox"
                           checked={scheduleGuardian}
                           onChange={(e) => setScheduleGuardian(e.target.checked)}
-                          className="w-4 h-4 rounded border-gray-300"
+                          className="w-4 h-4 rounded border-[#E5E8EB]"
                         />
                         <span>보호자 동반</span>
                       </label>
@@ -463,7 +463,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                           type="checkbox"
                           checked={scheduleCaregiver}
                           onChange={(e) => setScheduleCaregiver(e.target.checked)}
-                          className="w-4 h-4 rounded border-gray-300"
+                          className="w-4 h-4 rounded border-[#E5E8EB]"
                         />
                         <span>간병인 배치</span>
                       </label>
@@ -474,21 +474,21 @@ export default function BoardView({ user, setMainMenu }: any) {
             ) : (
               <>
                 <div>
-                  <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2 block">태그 (쉼표로 구분)</label>
+                  <label className="text-[10px] font-black text-[#4E5968] uppercase tracking-widest mb-2 block">태그 (쉼표로 구분)</label>
                   <input
                     value={tagsInput}
                     onChange={(e) => setTagsInput(e.target.value)}
                     placeholder="예: 공지, 회의, 환영"
-                    className="w-full p-4 bg-gray-50 rounded-xl border-none outline-none text-sm font-bold focus:ring-2 focus:ring-blue-100 mb-4"
+                    className="w-full p-4 bg-[#F2F4F6] rounded-[12px] border border-[#E5E8EB] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[#3182F6]/20 mb-4"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2 block">내용</label>
+                  <label className="text-[10px] font-black text-[#4E5968] uppercase tracking-widest mb-2 block">내용</label>
                   <textarea
                   value={content}
                   onChange={e => setContent(e.target.value)}
                   placeholder="게시물 내용을 입력하세요."
-                  className="w-full h-32 md:h-48 p-4 bg-gray-50 rounded-xl border-none outline-none text-sm font-bold leading-relaxed focus:ring-2 focus:ring-blue-100 resize-none"
+                  className="w-full h-32 md:h-48 p-4 bg-[#F2F4F6] rounded-[12px] border border-[#E5E8EB] border-none outline-none text-sm font-bold leading-relaxed focus:ring-2 focus:ring-[#3182F6]/20 resize-none"
                 />
                 </div>
               </>
@@ -498,7 +498,7 @@ export default function BoardView({ user, setMainMenu }: any) {
           <button
             onClick={handleNewPost}
             disabled={loading}
-            className="w-full py-4 bg-blue-600 text-white rounded-xl font-black text-sm shadow-lg hover:scale-[0.98] transition-all disabled:opacity-50"
+            className="w-full py-4 bg-[#3182F6] text-white rounded-[12px] font-bold text-sm shadow-sm hover:opacity-95 active:scale-[0.99] transition-all disabled:opacity-50"
           >
             {loading ? '등록 중...' : '게시물 등록'}
           </button>
@@ -511,14 +511,14 @@ export default function BoardView({ user, setMainMenu }: any) {
           posts.map((post, idx) => (
             <div
               key={post.id || idx}
-              className="bg-white p-6 border border-gray-100 shadow-sm rounded-[1.5rem] md:rounded-[2rem] hover:border-blue-300 hover:shadow-xl hover:shadow-blue-50/50 transition-all group flex flex-col justify-between"
+              className="bg-white p-6 border border-[#E5E8EB] shadow-sm rounded-[16px] hover:border-[#3182F6]/30 hover:shadow-md transition-all group flex flex-col justify-between"
             >
               {(activeBoard === '수술일정' || activeBoard === 'MRI일정') ? (
                 <div className="space-y-4">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
-                      <h3 className="font-black text-gray-800 text-base md:text-lg line-clamp-1">{post.title}</h3>
-                      <p className="text-[11px] text-blue-600 font-black mt-1 uppercase tracking-widest">{post.patient_name || '환자명 미지정'}</p>
+                      <h3 className="font-bold text-[#191F28] text-base md:text-lg line-clamp-1">{post.title}</h3>
+                      <p className="text-[11px] text-[#3182F6] font-bold mt-1 uppercase tracking-widest">{post.patient_name || '환자명 미지정'}</p>
                     </div>
                     <span className={`px-2 py-1 rounded-lg text-[8px] font-black shrink-0 ${
                       activeBoard === '수술일정' ? 'bg-red-100 text-red-600' : 'bg-purple-100 text-purple-600'
@@ -526,18 +526,18 @@ export default function BoardView({ user, setMainMenu }: any) {
                       {activeBoard === '수술일정' ? '🏥 수술' : '🔬 MRI'}
                     </span>
                   </div>
-                  <div className="grid grid-cols-3 gap-2 pt-4 border-t border-gray-50">
+                  <div className="grid grid-cols-3 gap-2 pt-4 border-t border-[#E5E8EB]">
                     <div>
-                      <p className="text-[8px] font-bold text-gray-400 uppercase">날짜</p>
-                      <p className="text-[11px] font-black text-gray-800">{post.schedule_date}</p>
+                      <p className="text-[8px] font-bold text-[#8B95A1] uppercase">날짜</p>
+                      <p className="text-[11px] font-black text-[#191F28]">{post.schedule_date}</p>
                     </div>
                     <div>
-                      <p className="text-[8px] font-bold text-gray-400 uppercase">시간</p>
-                      <p className="text-[11px] font-black text-gray-800">{post.schedule_time}</p>
+                      <p className="text-[8px] font-bold text-[#8B95A1] uppercase">시간</p>
+                      <p className="text-[11px] font-black text-[#191F28]">{post.schedule_time}</p>
                     </div>
                     <div>
-                      <p className="text-[8px] font-bold text-gray-400 uppercase">위치</p>
-                      <p className="text-[11px] font-black text-gray-800 line-clamp-1">{post.schedule_room}</p>
+                      <p className="text-[8px] font-bold text-[#8B95A1] uppercase">위치</p>
+                      <p className="text-[11px] font-black text-[#191F28] line-clamp-1">{post.schedule_room}</p>
                     </div>
                   </div>
                   {(post.surgery_fasting || post.surgery_inpatient || post.surgery_guardian || post.surgery_caregiver) && (
@@ -548,7 +548,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                         </span>
                       )}
                       {post.surgery_inpatient && (
-                        <span className="px-2 py-1 rounded-full bg-blue-50 text-blue-600 text-[9px] font-black">
+                        <span className="px-2 py-1 rounded-full bg-[#E8F3FF] text-[#3182F6] text-[9px] font-black">
                           입원
                         </span>
                       )}
@@ -568,7 +568,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                     <button
                       type="button"
                       onClick={() => openChatForSchedule(post)}
-                      className="px-3 py-2 rounded-xl text-[10px] font-black bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                      className="px-3 py-2 rounded-xl text-[10px] font-black bg-[#E8F3FF] text-[#3182F6] hover:bg-[#D6EBFF] transition-colors"
                     >
                       💬 이 일정 관련 채팅 열기
                     </button>
@@ -577,44 +577,44 @@ export default function BoardView({ user, setMainMenu }: any) {
               ) : (
                 <div className="flex flex-col h-full">
                   <div className="flex-1">
-                    <h3 className="font-black text-gray-800 text-base md:text-lg group-hover:text-blue-600 transition-colors line-clamp-1">{post.title}</h3>
-                    <p className="text-xs md:text-sm text-gray-500 mt-3 line-clamp-3 leading-relaxed">{post.content}</p>
+                    <h3 className="font-black text-[#191F28] text-base md:text-lg group-hover:text-[#3182F6] transition-colors line-clamp-1">{post.title}</h3>
+                    <p className="text-xs md:text-sm text-[#4E5968] mt-3 line-clamp-3 leading-relaxed">{post.content}</p>
                   </div>
-                  <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-50">
+                  <div className="flex justify-between items-center mt-6 pt-4 border-t border-[#E5E8EB]">
                     <div className="flex items-center gap-3">
                       <div className="flex items-center gap-1">
                         <div className="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center text-[10px]">👤</div>
-                        <span className="text-[10px] font-bold text-gray-400">{post.author_name}</span>
+                        <span className="text-[10px] font-bold text-[#8B95A1]">{post.author_name}</span>
                       </div>
-                      <button onClick={() => handleLike(post)} className="flex items-center gap-1 text-gray-500 hover:text-red-500 text-[10px] font-bold">
+                      <button onClick={() => handleLike(post)} className="flex items-center gap-1 text-[#4E5968] hover:text-red-500 text-[10px] font-bold">
                         👍 {post.likes_count ?? 0}
                       </button>
-                      <button onClick={() => handleExpandPost(post.id)} className="flex items-center gap-1 text-gray-500 hover:text-blue-500 text-[10px] font-bold">
+                      <button onClick={() => handleExpandPost(post.id)} className="flex items-center gap-1 text-[#4E5968] hover:text-[#3182F6] text-[10px] font-bold">
                         💬 댓글
                       </button>
                     </div>
-                    <span className="text-[10px] font-bold text-gray-300">
+                    <span className="text-[10px] font-bold text-[#8B95A1]">
                       {new Date(post.created_at).toLocaleDateString()}
                     </span>
                   </div>
                   {(Array.isArray(post.tags) ? post.tags : []).length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-2">
                       {(Array.isArray(post.tags) ? post.tags : []).map((tag: string, i: number) => (
-                        <span key={i} className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[9px] font-bold">{tag}</span>
+                        <span key={i} className="px-2 py-0.5 bg-[#E8F3FF] text-[#3182F6] rounded text-[9px] font-bold">{tag}</span>
                       ))}
                     </div>
                   )}
                   {expandedPostId === post.id && (
-                    <div className="mt-4 pt-4 border-t border-gray-100 space-y-2">
+                    <div className="mt-4 pt-4 border-t border-[#E5E8EB] space-y-2">
                       {(comments[post.id] || []).map((c: any) => (
-                        <div key={c.id} className="text-xs text-gray-600 flex gap-2">
+                        <div key={c.id} className="text-xs text-[#4E5968] flex gap-2">
                           <span className="font-bold">{c.author_name}:</span>
                           <span>{c.content}</span>
                         </div>
                       ))}
                       <div className="flex gap-2">
-                        <input value={expandedPostId === post.id ? newComment : ''} onChange={(e) => setNewComment(e.target.value)} placeholder="댓글 입력" className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-xs" />
-                        <button onClick={() => handleAddComment(post.id)} className="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold">등록</button>
+                        <input value={expandedPostId === post.id ? newComment : ''} onChange={(e) => setNewComment(e.target.value)} placeholder="댓글 입력" className="flex-1 px-3 py-2 border-[#E5E8EB] rounded-lg text-xs" />
+                        <button onClick={() => handleAddComment(post.id)} className="px-3 py-2 bg-[#3182F6] text-white rounded-[12px] text-xs font-bold hover:opacity-95">등록</button>
                       </div>
                     </div>
                   )}
@@ -623,7 +623,7 @@ export default function BoardView({ user, setMainMenu }: any) {
             </div>
           ))
         ) : (
-          <div className="col-span-full text-center py-20 text-gray-300">
+          <div className="col-span-full text-center py-20 text-[#8B95A1]">
             <p className="font-black text-sm italic">게시물이 없습니다.</p>
           </div>
         )}
