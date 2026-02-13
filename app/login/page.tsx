@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import AppLogo from '@/app/components/AppLogo';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -119,9 +118,6 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen min-h-[100dvh] bg-[#F9FAFB] flex flex-col justify-center py-8 px-4 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-sm text-center">
-        <div className="mx-auto mb-6 animate-in zoom-in duration-500">
-          <AppLogo size={64} />
-        </div>
         <h2 className="text-2xl md:text-3xl font-bold text-[#191F28] tracking-tight">
           SY INC. 통합 시스템
         </h2>
