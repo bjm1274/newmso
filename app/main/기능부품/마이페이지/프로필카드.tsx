@@ -172,7 +172,13 @@ export default function MyProfileCard({ user: initialUser }: any) {
       alert('사진이 정상적으로 등록되었습니다!');
 
     } catch (error: any) {
-      alert('업로드 실패: ' + error.message);
+      console.error('프로필 사진 업로드 실패:', error);
+      const msg: string = error?.message || '';
+      if (msg.includes('The resource was not found') || msg.includes('bucket')) {
+        alert('업로드 실패: 프로필 이미지용 Supabase Storage 버킷 \"profiles\"가 존재하는지 확인해 주세요.\n\nSupabase 대시보드에서 이름이 profiles 인 Public 버킷을 만들어야 사진 업로드가 가능합니다.');
+      } else {
+        alert('업로드 실패: ' + msg);
+      }
     } finally {
       setUploading(false);
     }

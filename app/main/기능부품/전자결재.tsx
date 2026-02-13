@@ -93,6 +93,15 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     });
   }, [viewMode, formType, user?.id]);
 
+  // 양식(연차/휴가, 연장근무 등) 탭을 바꿀 때마다 제목/내용/추가데이터는 새로 작성하도록 초기화
+  // → 한 양식에서 쓰던 내용이 다른 탭으로 "따라가는" 현상 방지
+  useEffect(() => {
+    if (viewMode !== '작성하기') return;
+    setFormTitle('');
+    setFormContent('');
+    setExtraData({});
+  }, [formType, viewMode]);
+
   const loadLastDraft = () => {
     const last = lastDraftByType[formType];
     if (!last) return;
