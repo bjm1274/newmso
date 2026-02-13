@@ -1,10 +1,49 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 import SalarySlipUI from './명세서디자인';
 
 export default function SalarySlipContainer({ user }: any) {
+  const [unlocked, setUnlocked] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [verifyError, setVerifyError] = useState('');
+  const [verifying, setVerifying] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [salaryData, setSalaryData] = useState<any>(null);
+
+  const handlePasswordVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.id) {
+      setVerifyError('직원 계정으로 로그인한 상태에서만 이용할 수 있습니다.');
+      return;
+    }
+    const pwd = passwordInput.trim();
+    if (!pwd) {
+      setVerifyError('비밀번호를 입력해 주세요.');
+      return;
+    }
+    setVerifying(true);
+    setVerifyError('');
+    try {
+      const { data, error } = await supabase
+        .from('staff_members')
+        .select('id')
+        .eq('id', user.id)
+        .eq('password', pwd)
+        .single();
+      if (error || !data) {
+        setVerifyError('비밀번호가 일치하지 않습니다.');
+        setPasswordInput('');
+        setVerifying(false);
+        return;
+      }
+      setUnlocked(true);
+      setPasswordInput('');
+    } catch {
+      setVerifyError('본인 확인 중 오류가 발생했습니다.');
+    }
+    setVerifying(false);
+  };
 
   const changeMonth = (offset: number) => {
     const newDate = new Date(currentDate);
@@ -37,17 +76,46 @@ export default function SalarySlipContainer({ user }: any) {
 
   const handlePrint = () => { window.print(); };
 
+  /* 암호 미확인 시 비밀번호 입력 화면 */
+  if (!unlocked) {
+    return (
+      <div className="bg-white border border-[#E5E8EB] shadow-sm rounded-[2.5rem] overflow-hidden flex flex-col items-center justify-center min-h-[320px] p-10">
+        <h3 className="text-lg font-bold text-[#191F28] mb-2">급여 명세서 조회</h3>
+        <p className="text-[13px] text-[#4E5968] mb-6">본인 확인을 위해 비밀번호를 입력해 주세요.</p>
+        <form onSubmit={handlePasswordVerify} className="w-full max-w-sm space-y-4">
+          <input
+            type="password"
+            value={passwordInput}
+            onChange={(e) => { setPasswordInput(e.target.value); setVerifyError(''); }}
+            placeholder="비밀번호"
+            className="w-full px-4 py-3 rounded-[12px] border border-[#E5E8EB] text-[#191F28] placeholder:text-[#8B95A1] focus:outline-none focus:ring-2 focus:ring-[#3182F6]/20 focus:border-[#3182F6]"
+            autoComplete="current-password"
+            disabled={verifying}
+          />
+          {verifyError && <p className="text-[12px] text-red-500 font-medium">{verifyError}</p>}
+          <button
+            type="submit"
+            disabled={verifying}
+            className="w-full py-3 bg-[#3182F6] text-white font-semibold rounded-[12px] hover:bg-[#1B64DA] disabled:opacity-50 transition-all"
+          >
+            {verifying ? '확인 중...' : '확인'}
+          </button>
+        </form>
+      </div>
+    );
+  }
+
   if (!user?.base_salary || user.base_salary <= 0) {
     return (
-      <div className="p-10 text-sm font-black text-gray-500">
-        아직 <span className="text-blue-600">기본급여</span>가 등록되지 않아 급여명세서를 생성할 수 없습니다.
+      <div className="p-10 text-sm font-bold text-[#4E5968]">
+        아직 <span className="text-[#3182F6]">기본급여</span>가 등록되지 않아 급여명세서를 생성할 수 없습니다.
         <br />
         인사 담당자에게 직원 기본급을 먼저 등록해 달라고 요청해 주세요.
       </div>
     );
   }
 
-  if (!salaryData) return <div className="p-10 text-gray-400 font-black">데이터 로딩 중...</div>;
+  if (!salaryData) return <div className="p-10 text-[#8B95A1] font-bold">데이터 로딩 중...</div>;
 
   const totalPayment = salaryData.base_salary + salaryData.overtime_pay + 100000 + salaryData.bonus;
   const totalDeduction = salaryData.national_pension + salaryData.health_insurance + Math.floor(salaryData.health_insurance * 0.1281) + Math.floor(totalPayment * 0.009) + salaryData.income_tax + Math.floor(salaryData.income_tax * 0.1);
