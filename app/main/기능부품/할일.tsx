@@ -37,7 +37,6 @@ export default function TaskView({ user, tasks, subView, setSubView, onRefresh }
 
   useEffect(() => {
     fetchMyTasks();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
   const handleAddTask = async () => {

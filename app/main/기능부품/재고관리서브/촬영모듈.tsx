@@ -119,7 +119,11 @@ export default function PhotoModule({ user, inventory, fetchInventory }: any) {
           <div className="bg-white rounded-[2.5rem] p-8 md:p-12 max-w-2xl w-full shadow-2xl animate-in zoom-in-95 duration-300">
             <h3 className="text-2xl font-black text-gray-900 mb-8 tracking-tighter italic">인식 정보 확인</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-              <img src={recognizedData.image_url} className="rounded-2xl border-4 border-gray-50 shadow-lg" />
+              <img
+                src={recognizedData.image_url}
+                alt="인식된 재고 이미지"
+                className="rounded-2xl border-4 border-gray-50 shadow-lg"
+              />
               <div className="space-y-4">
                 <div>
                   <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">제품명</p>

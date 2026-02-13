@@ -1,13 +1,23 @@
 'use client';
 import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { sendNotification } from './알림시스템';
 
 const NOTICE_ROOM_ID = '00000000-0000-0000-0000-000000000000';
 const NOTICE_ROOM_NAME = '공지메시지';
 const CAN_WRITE_NOTICE_POSITIONS = ['팀장', '부장', '실장', '원장', '병원장', '대표이사'];
 const CHAT_ROOM_KEY = 'erp_chat_last_room';
 const CHAT_FOCUS_KEY = 'erp_chat_focus_keyword';
+
+/** 카카오워크 스타일: 마지막 메시지 시각 기준으로 채팅방 목록 정렬 (최신 대화가 위로) */
+function sortChatRoomsWithNoticeFirst(rooms: any[]): any[] {
+  const notice = rooms.find((r: any) => r.id === NOTICE_ROOM_ID);
+  const others = rooms.filter((r: any) => r.id !== NOTICE_ROOM_ID).sort((a: any, b: any) => {
+    const at = new Date(a.last_message_at || a.created_at || 0).getTime();
+    const bt = new Date(b.last_message_at || b.created_at || 0).getTime();
+    return bt - at;
+  });
+  return notice ? [notice, ...others] : others;
+}
 
 // 파일 URL이 이미지인지 확인
 function isImageUrl(url: string): boolean {
@@ -196,16 +206,8 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     const { data: msgs } = await query;
     if (msgs) setMessages(msgs);
 
-    const { data: rooms } = await supabase.from('chat_rooms').select('*').order('created_at', { ascending: false });
-    const noticeRoom =
-      (rooms || []).find((r: any) => r.id === NOTICE_ROOM_ID) || {
-        id: NOTICE_ROOM_ID,
-        name: NOTICE_ROOM_NAME,
-        type: 'notice',
-      };
-    // 공지메시지 방 하나만 별도로 두고, 나머지는 일반 채팅방으로 취급
-    const others = (rooms || []).filter((r: any) => r.id !== NOTICE_ROOM_ID);
-    const list = [noticeRoom, ...others];
+    const { data: rooms } = await supabase.from('chat_rooms').select('*');
+    const list = sortChatRoomsWithNoticeFirst(rooms || []);
     setChatRooms(list);
 
     // 읽음 수 집계
@@ -265,30 +267,23 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
         { id: NOTICE_ROOM_ID, name: NOTICE_ROOM_NAME, type: 'notice', members: [] },
         { onConflict: 'id' }
       );
-      const { data: rooms } = await supabase.from('chat_rooms').select('*').order('created_at', { ascending: false });
-      const others = (rooms || []).filter((r: any) => r.id !== NOTICE_ROOM_ID);
-      const noticeRoom = (rooms || []).find((r: any) => r.id === NOTICE_ROOM_ID) || {
-        id: NOTICE_ROOM_ID,
-        name: NOTICE_ROOM_NAME,
-        type: 'notice',
-      };
-      const list = [noticeRoom, ...others];
+      const { data: rooms } = await supabase.from('chat_rooms').select('*');
+      const list = sortChatRoomsWithNoticeFirst(rooms || []);
       setChatRooms(list);
       await updateUnreadForRooms(list);
     };
     loadRooms();
   }, [selectedRoomId, updateUnreadForRooms]);
 
-  // 채팅방 테이블 변경 시 항상 방 목록 갱신 (신규 개설 방 즉시 반영)
+  // 채팅방 테이블 변경 시 항상 방 목록 갱신 (신규 방 생성·새 메시지로 순서 변경 시 실시간 반영, 카카오워크 스타일)
   useEffect(() => {
     const channel = supabase.channel('chat-rooms-list')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_rooms' }, () => {
-        supabase.from('chat_rooms').select('*').order('created_at', { ascending: false }).then(({ data: rooms }) => {
+        supabase.from('chat_rooms').select('*').then(({ data: rooms }) => {
           if (!rooms) return;
-          const noticeRoom = rooms.find((r: any) => r.id === NOTICE_ROOM_ID) || { id: NOTICE_ROOM_ID, name: NOTICE_ROOM_NAME, type: 'notice' };
-          const others = rooms.filter((r: any) => r.id !== NOTICE_ROOM_ID);
-          setChatRooms([noticeRoom, ...others]);
-          updateUnreadForRooms([noticeRoom, ...others]);
+          const list = sortChatRoomsWithNoticeFirst(rooms);
+          setChatRooms(list);
+          updateUnreadForRooms(list);
         });
       })
       .subscribe();
@@ -310,7 +305,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     }
   }, []);
 
-  // 전역 신규 메시지 감지: 어떤 방이든 새 메시지가 오면 안 읽은 개수와 화면 데이터를 자동 갱신
+  // 전역 신규 메시지 감지: 어떤 방이든 새 메시지가 오면 안 읽은 개수·화면 갱신 + 다른 방이면 알림(클릭 시 해당 채팅방 이동)
   useEffect(() => {
     if (!user?.id) return;
     const channel = supabase
@@ -321,14 +316,13 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
         async (payload: any) => {
           const msg: any = payload.new;
           if (!msg || msg.sender_id === user.id) return;
-          // 방 목록이 준비된 경우 안 읽은 개수 재계산
           if (chatRoomsRef.current.length) {
             await updateUnreadForRooms(chatRoomsRef.current);
           }
-          // 현재 보고 있는 방에 온 메시지면 목록도 즉시 새로고침
           if (msg.room_id === selectedRoomId) {
             fetchData();
           }
+          // 푸시/알림은 알림시스템(messages-realtime-hub)에서만 발송 (중복 방지, 클릭 시 해당 채팅방 이동)
         }
       )
       .subscribe();
@@ -336,19 +330,15 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id, selectedRoomId, fetchData, updateUnreadForRooms]);
+  }, [user?.id, selectedRoomId, fetchData, updateUnreadForRooms, staffs]);
 
   useEffect(() => {
     if (!selectedRoomId) return;
     fetchData();
     const channel = supabase.channel(`chat-realtime-${selectedRoomId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `room_id=eq.${selectedRoomId}` }, (payload: any) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `room_id=eq.${selectedRoomId}` }, () => {
         fetchData();
-        const isOwnMessage = payload.new?.sender_id === user?.id;
-        if (!isOwnMessage && !isFocusedRef.current && roomNotifyRef.current) {
-          const senderName = staffs.find((s: any) => s.id === payload.new.sender_id)?.name || '알 수 없음';
-          sendNotification(`💬 ${senderName}`, { body: (payload.new.content || '📎 파일').slice(0, 50) });
-        }
+        // 푸시/알림은 알림시스템에서 통합 발송 (클릭 시 해당 채팅방 이동)
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_rooms' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, () => fetchData())
@@ -1091,7 +1081,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
               {filteredStaffs.map((s: any) => (
                 <div key={s.id} className="flex items-center gap-3 p-3 bg-white border border-gray-100 rounded-xl hover:border-blue-300 cursor-pointer transition-all">
                   <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center text-xs font-black text-gray-400 overflow-hidden">
-                    {s.photo_url ? <img src={s.photo_url} className="w-full h-full object-cover" /> : s.name[0]}
+                    {s.photo_url ? <img src={s.photo_url} alt={s.name ?? '직원 사진'} className="w-full h-full object-cover" /> : s.name[0]}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-black text-gray-800 truncate">{s.name}</p>

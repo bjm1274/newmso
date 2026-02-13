@@ -200,7 +200,15 @@ export default function OrgChart({ staffs = [], selectedCo, setSelectedCo }: any
           <div className="bg-white w-full max-w-sm rounded-t-[2.5rem] md:rounded-[3rem] p-8 md:p-10 shadow-2xl animate-in slide-in-from-bottom md:zoom-in-95 duration-300" onClick={e => e.stopPropagation()}>
             <div className="flex flex-col items-center text-center">
               <div className="w-24 h-24 md:w-28 md:h-28 bg-gray-50 rounded-[2rem] md:rounded-[2.5rem] mb-6 flex items-center justify-center text-5xl border-4 border-white shadow-lg overflow-hidden">
-                {selectedMember.photo_url ? <img src={selectedMember.photo_url} className="w-full h-full object-cover" /> : "👤"}
+                {selectedMember.photo_url ? (
+                  <img
+                    src={selectedMember.photo_url}
+                    alt={selectedMember.name ?? '구성원 사진'}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  "👤"
+                )}
               </div>
               <h4 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">{selectedMember.name}</h4>
               <p className="text-blue-600 text-sm font-bold mt-2">{selectedMember.company} · {selectedMember.position}</p>
@@ -239,7 +247,15 @@ function StaffCard({ staff, isDirector = false, label = '대표', onClick }: any
       `}
     >
       <div className={`w-12 h-12 md:w-14 md:h-14 rounded-xl md:rounded-2xl flex items-center justify-center text-lg md:text-xl mb-3 transition-colors ${isAdmin ? 'bg-red-50 text-red-400' : 'bg-gray-50 text-gray-300 group-hover:bg-blue-50 group-hover:text-blue-400'}`}>
-        {staff.photo_url ? <img src={staff.photo_url} className="w-full h-full object-cover rounded-xl md:rounded-2xl" /> : "印"}
+        {staff.photo_url ? (
+          <img
+            src={staff.photo_url}
+            alt={staff.name ?? '구성원 사진'}
+            className="w-full h-full object-cover rounded-xl md:rounded-2xl"
+          />
+        ) : (
+          "印"
+        )}
       </div>
       <div className="text-center w-full">
         <p className="font-black text-gray-900 text-xs md:text-sm mb-1 truncate">{staff.name}</p>

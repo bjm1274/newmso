@@ -209,26 +209,26 @@ export default function NotificationSystem({ user }: any) {
         )
         .subscribe();
 
-      // E. 메신저 새 메시지 (방 멤버인 경우 - 본인 제외)
+      // E. 메신저 새 메시지 (내가 속한 방에서만 알림, 카카오워크 스타일)
       const messagesChannel = supabase
         .channel('messages-realtime-hub')
         .on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'messages' },
-          (payload: any) => {
+          async (payload: any) => {
             if (payload.new.sender_id === user.id) return;
-            const content: string = payload.new.content || '';
+            const roomId = payload.new.room_id;
+            const { data: room } = await supabase.from('chat_rooms').select('members').eq('id', roomId).single();
+            const members: string[] = Array.isArray(room?.members) ? room.members.map((id: any) => String(id)) : [];
+            if (!members.includes(String(user.id))) return;
 
-            // 기본값: 일반 새 메시지
+            const content: string = payload.new.content || '';
             let notifType = 'message';
             let title = '💬 새 메시지';
-
-            // @멘션: 본인 이름이 '@이름' 형태로 포함된 경우 별도 알림
             if (user?.name && content.includes(`@${user.name}`)) {
               notifType = 'mention';
               title = `📣 @멘션 도착`;
             }
-
             const notif = {
               id: payload.new.id,
               title,
@@ -265,17 +265,21 @@ export default function NotificationSystem({ user }: any) {
     setNotifications(prev => [notif, ...prev].slice(0, 50));
     setUnreadCount(prev => prev + 1);
 
-    // 3. Supabase에 알림 기록 저장 (선택사항)
+    // 3. Supabase에 알림 기록 저장 (채팅 알림은 metadata.room_id로 클릭 시 해당 채팅방 이동)
     (async () => {
       try {
-        const { error } = await supabase.from('notifications').insert([{
+        const row: Record<string, unknown> = {
           user_id: user.id,
           title: notif.title,
           body: notif.body,
           type: notif.type,
           is_read: false,
-          created_at: new Date().toISOString()
-        }]);
+          created_at: new Date().toISOString(),
+        };
+        if ((notif.type === 'message' || notif.type === 'mention') && notif.data?.room_id) {
+          row.metadata = { room_id: notif.data.room_id };
+        }
+        const { error } = await supabase.from('notifications').insert([row]);
         if (error) console.error('알림 저장 실패:', error);
       } catch (err) {
         console.error('알림 저장 실패:', err);
