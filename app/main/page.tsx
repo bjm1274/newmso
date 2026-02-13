@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { setSelectedCompanyId as persistSelectedCompanyId, getSelectedCompanyId } from '@/lib/useCompany';
@@ -19,7 +19,20 @@ type ERPData = {
   mris: any[];
 };
 
-export default function MainPage() {
+function MainPageFallback() {
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#F9FAFB] p-6 text-center">
+      <div className="relative w-20 h-20 mb-8">
+        <div className="absolute inset-0 border-4 border-[#E8F3FF] rounded-full" />
+        <div className="absolute inset-0 border-4 border-[#3182F6] rounded-full border-t-transparent animate-spin" />
+      </div>
+      <h2 className="text-xl font-bold text-gray-900 mb-2">SY INC. 통합 시스템</h2>
+      <p className="text-xs font-medium text-gray-400 animate-pulse">접속 중...</p>
+    </div>
+  );
+}
+
+function MainPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [user, setUser] = useState<any>(null);
@@ -86,12 +99,12 @@ export default function MainPage() {
     setSelectedCompanyIdState(getSelectedCompanyId());
   }, []);
 
-  // 알림 클릭으로 진입 시 open_chat_room 쿼리 처리 → 채팅 메뉴 + 해당 방 연동
+  // 알림 클릭 시 open_chat_room 쿼리 처리 → 채팅 메뉴 + 해당 채팅방 연동 (웹/모바일 동일)
   useEffect(() => {
-    const roomId = searchParams.get('open_chat_room');
-    if (roomId && roomId.trim()) {
+    const roomId = searchParams.get('open_chat_room')?.trim();
+    if (roomId) {
       setMainMenu('채팅');
-      setInitialOpenChatRoomId(roomId.trim());
+      setInitialOpenChatRoomId(roomId);
       router.replace('/main', { scroll: false });
     }
   }, [searchParams, router]);
@@ -262,5 +275,13 @@ export default function MainPage() {
         />
       </div>
     </div>
+  );
+}
+
+export default function MainPage() {
+  return (
+    <Suspense fallback={<MainPageFallback />}>
+      <MainPageContent />
+    </Suspense>
   );
 }

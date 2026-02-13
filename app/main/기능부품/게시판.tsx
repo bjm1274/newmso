@@ -242,12 +242,18 @@ export default function BoardView({ user, setMainMenu }: any) {
         setShowNewPost(false);
         fetchPosts();
       } else {
-        alert(`게시물 등록에 실패했습니다.\n\n${error.message || ''}`);
+        const hint = (activeBoard === '수술일정' || activeBoard === 'MRI일정') && (error.message?.includes('column') || error.code === '42703')
+          ? '\n\n수술일정/MRI일정용 컬럼이 없을 수 있습니다. Supabase에 board_posts_schedule_columns.sql 마이그레이션을 적용해 주세요.'
+          : '';
+        alert(`게시물 등록에 실패했습니다.\n\n${error.message || ''}${hint}`);
       }
     } catch (error: any) {
       console.error('게시물 등록 실패:', error);
       const msg = typeof error?.message === 'string' ? error.message : '';
-      alert(`게시물 등록에 실패했습니다.\n\n${msg}`);
+      const hint = (activeBoard === '수술일정' || activeBoard === 'MRI일정') && (msg.includes('column') || error?.code === '42703')
+        ? '\n\n수술일정/MRI일정용 컬럼이 없을 수 있습니다. Supabase에 board_posts_schedule_columns.sql 마이그레이션을 적용해 주세요.'
+        : '';
+      alert(`게시물 등록에 실패했습니다.\n\n${msg}${hint}`);
     } finally {
       setLoading(false);
     }

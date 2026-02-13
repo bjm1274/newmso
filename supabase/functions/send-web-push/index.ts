@@ -208,7 +208,9 @@ serve(async (req: Request) => {
       }
     }
 
-    const toSend = Array.from(uniqueByEndpoint.values());
+    const toSend = Array.from(uniqueByEndpoint.values()).filter(
+      (sub) => sub.staff_id !== senderId && sub.staff_id !== null
+    );
 
     for (const sub of toSend) {
       try {
