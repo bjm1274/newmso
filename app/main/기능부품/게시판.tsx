@@ -34,10 +34,13 @@ export default function BoardView({ user, setMainMenu }: any) {
 
   // 수술일정·MRI일정 달력 뷰용 현재 월
   const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date());
+  // 상세보기용 선택된 게시물
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
 
   const boards = [
     { id: '공지사항', label: '📢 공지사항', icon: '📢' },
     { id: '자유게시판', label: '💬 자유게시판', icon: '💬' },
+    { id: '경조사', label: '🎉 경조사', icon: '🎉' },
     { id: '수술일정', label: '🏥 수술일정표', icon: '🏥' },
     { id: 'MRI일정', label: '🔬 MRI일정표', icon: '🔬' }
   ];
@@ -123,6 +126,13 @@ export default function BoardView({ user, setMainMenu }: any) {
     setComments((prev) => ({ ...prev, [postId]: data || [] }));
   };
 
+  // 상세 게시글이 변경될 때 자동으로 댓글 불러오기
+  useEffect(() => {
+    if (!selectedPostId) return;
+    if (comments[selectedPostId]) return;
+    fetchComments(selectedPostId);
+  }, [selectedPostId, comments]);
+
   // 수술·MRI 일정 카드 → 관련 채팅방 열기
   const openChatForSchedule = async (post: any) => {
     if (!user?.id) {
@@ -193,6 +203,34 @@ export default function BoardView({ user, setMainMenu }: any) {
   const handleExpandPost = (postId: string) => {
     setExpandedPostId((prev) => (prev === postId ? null : postId));
     if (expandedPostId !== postId) fetchComments(postId);
+  };
+
+  const selectedPost = useMemo(
+    () => posts.find((p: any) => p.id === selectedPostId) || null,
+    [posts, selectedPostId]
+  );
+
+  const canDeletePost = (post: any) => {
+    if (!user) return false;
+    const isAuthor = post.author_id && String(post.author_id) === String(user.id);
+    const isAdmin = user.permissions?.mso || user.role === 'admin';
+    return !!(isAuthor || isAdmin);
+  };
+
+  const handleDeletePost = async (post: any) => {
+    if (!canDeletePost(post)) {
+      alert('이 게시물을 삭제할 권한이 없습니다.');
+      return;
+    }
+    if (!confirm('이 게시물을 정말 삭제하시겠습니까?')) return;
+    const { error } = await supabase.from('board_posts').delete().eq('id', post.id);
+    if (error) {
+      alert('게시물 삭제 중 오류가 발생했습니다.');
+      return;
+    }
+    setPosts((prev) => prev.filter((p) => p.id !== post.id));
+    setSelectedPostId((prev) => (prev === post.id ? null : prev));
+    alert('게시물이 삭제되었습니다.');
   };
 
   const handleNewPost = async () => {
@@ -274,7 +312,7 @@ export default function BoardView({ user, setMainMenu }: any) {
           <p className="text-[10px] md:text-xs text-[#8B95A1] font-bold uppercase mt-1">병원 공지 및 일정 관리</p>
         </div>
         
-        {(activeBoard === '공지사항' || activeBoard === '자유게시판' || activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
+        {(activeBoard === '공지사항' || activeBoard === '자유게시판' || activeBoard === '경조사' || activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
           <button
             onClick={() => setShowNewPost(!showNewPost)}
             className="px-4 md:px-6 py-2.5 md:py-3 bg-[#191F28] text-white rounded-[12px] text-[11px] md:text-xs font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all"
@@ -637,7 +675,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                               <button
                                 key={ev.id}
                                 type="button"
-                                onClick={() => openChatForSchedule(ev)}
+                                onClick={() => setSelectedPostId(ev.id)}
                                 className="w-full text-left px-1 py-0.5 rounded-[6px] bg-[#E8F3FF] text-[9px] font-bold text-[#3182F6] truncate hover:bg-[#D6EBFF]"
                               >
                                 {ev.schedule_time || ''} {ev.title}
@@ -671,6 +709,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                   ? 'flex flex-col md:flex-row md:items-center md:justify-between gap-3'
                   : 'flex flex-col'
               }`}
+              onClick={() => setSelectedPostId(post.id)}
             >
               {(activeBoard === '수술일정' || activeBoard === 'MRI일정') ? (
                 <div className="space-y-2 md:space-y-1">
@@ -773,31 +812,6 @@ export default function BoardView({ user, setMainMenu }: any) {
                         ))}
                       </div>
                     )}
-                    {expandedPostId === post.id && (
-                      <div className="mt-3 pt-3 border-t border-[#E5E8EB] space-y-2">
-                        {(comments[post.id] || []).map((c: any) => (
-                          <div key={c.id} className="text-xs text-[#4E5968] flex gap-2">
-                            <span className="font-bold">{c.author_name}:</span>
-                            <span>{c.content}</span>
-                          </div>
-                        ))}
-                        <div className="flex gap-2">
-                          <input
-                            value={expandedPostId === post.id ? newComment : ''}
-                            onChange={(e) => setNewComment(e.target.value)}
-                            placeholder="댓글 입력"
-                            className="flex-1 px-3 py-2 border-[#E5E8EB] rounded-lg text-xs"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleAddComment(post.id)}
-                            className="px-3 py-2 bg-[#3182F6] text-white rounded-[12px] text-xs font-bold hover:opacity-95"
-                          >
-                            등록
-                          </button>
-                        </div>
-                      </div>
-                    )}
                   </div>
               )}
             </div>
@@ -808,6 +822,140 @@ export default function BoardView({ user, setMainMenu }: any) {
           </div>
         )}
       </div>
+
+      {/* 게시글 상세 보기 패널 */}
+      {selectedPost && (
+        <div className="bg-white border border-[#E5E8EB] rounded-[16px] shadow-sm p-5 md:p-7 space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <p className="text-[10px] font-black text-[#8B95A1] uppercase tracking-widest mb-1">
+                {selectedPost.board_type}
+              </p>
+              <h3 className="text-lg md:text-xl font-black text-[#191F28]">
+                {selectedPost.title}
+              </h3>
+              <p className="mt-2 text-[11px] text-[#8B95A1] font-bold">
+                👤 {selectedPost.author_name || '익명'} ·{' '}
+                {new Date(selectedPost.created_at).toLocaleString('ko-KR')}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {canDeletePost(selectedPost) && (
+                <button
+                  type="button"
+                  onClick={() => handleDeletePost(selectedPost)}
+                  className="px-3 py-1.5 rounded-full border border-red-100 text-[11px] font-bold text-red-600 hover:bg-red-50"
+                >
+                  삭제
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setSelectedPostId(null)}
+                className="px-3 py-1.5 rounded-full border border-gray-200 text-[11px] font-bold text-gray-500 hover:bg-gray-50"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+
+          {(selectedPost.board_type === '수술일정' || selectedPost.board_type === 'MRI일정') && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-[11px] font-bold text-[#4E5968] border-t border-[#E5E8EB] pt-4">
+              <div>
+                <p className="text-[9px] font-black text-[#8B95A1] uppercase">수술/검사명</p>
+                <p className="mt-1 text-sm font-black text-[#191F28]">{selectedPost.title}</p>
+              </div>
+              <div>
+                <p className="text-[9px] font-black text-[#8B95A1] uppercase">날짜·시간</p>
+                <p className="mt-1 text-sm font-black text-[#191F28]">
+                  {selectedPost.schedule_date} {selectedPost.schedule_time}
+                </p>
+              </div>
+              <div>
+                <p className="text-[9px] font-black text-[#8B95A1] uppercase">위치 / 환자명</p>
+                <p className="mt-1 text-sm font-black text-[#191F28]">
+                  {selectedPost.schedule_room || '-'} / {selectedPost.patient_name || '-'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {selectedPost.content && (
+            <div className="pt-4 border-t border-[#F1F3F5]">
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#4E5968]">
+                {selectedPost.content}
+              </p>
+            </div>
+          )}
+
+          {(Array.isArray(selectedPost.tags) ? selectedPost.tags : []).length > 0 && (
+            <div className="flex flex-wrap gap-1 pt-2">
+              {(Array.isArray(selectedPost.tags) ? selectedPost.tags : []).map(
+                (tag: string, i: number) => (
+                  <span
+                    key={i}
+                    className="px-2 py-0.5 bg-[#E8F3FF] text-[#3182F6] rounded-full text-[9px] font-bold"
+                  >
+                    #{tag}
+                  </span>
+                ),
+              )}
+            </div>
+          )}
+
+          {/* 댓글 */}
+          <div className="pt-4 border-t border-[#F1F3F5] space-y-3">
+            <p className="text-[11px] font-black text-[#4E5968] flex items-center gap-2">
+              💬 댓글
+              <span className="text-[10px] text-[#8B95A1] font-bold">
+                {(comments[selectedPost.id] || []).length}개
+              </span>
+            </p>
+            <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
+              {(comments[selectedPost.id] || []).map((c: any) => (
+                <div key={c.id} className="text-xs text-[#4E5968] flex gap-2">
+                  <span className="font-bold">{c.author_name}:</span>
+                  <span>{c.content}</span>
+                </div>
+              ))}
+              {(comments[selectedPost.id] || []).length === 0 && (
+                <p className="text-[11px] text-[#C1C5D0] font-bold">첫 댓글을 남겨보세요.</p>
+              )}
+            </div>
+            {user?.id && (
+              <div className="flex gap-2">
+                <input
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  placeholder="댓글을 입력하세요."
+                  className="flex-1 px-3 py-2 border-[#E5E8EB] rounded-lg text-xs"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleAddComment(selectedPost.id)}
+                  className="px-3 py-2 bg-[#3182F6] text-white rounded-[12px] text-xs font-bold hover:opacity-95"
+                >
+                  등록
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* 수술/MRI 일정은 상세에서 채팅 연동 버튼 제공 */}
+          {(selectedPost.board_type === '수술일정' ||
+            selectedPost.board_type === 'MRI일정') && (
+            <div className="pt-4 border-t border-[#F1F3F5] flex justify-end">
+              <button
+                type="button"
+                onClick={() => openChatForSchedule(selectedPost)}
+                className="px-4 py-2.5 rounded-[12px] bg-[#E8F3FF] text-[#3182F6] text-[11px] font-black hover:bg-[#D6EBFF] transition-colors"
+              >
+                💬 이 일정 관련 채팅 열기
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
