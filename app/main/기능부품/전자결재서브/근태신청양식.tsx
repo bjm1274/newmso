@@ -31,22 +31,22 @@ export default function AttendanceForms({ user, staffs, formType, setExtraData, 
     <div className="animate-in fade-in duration-300">
       {/* 🏖️ 연차/휴가: 원본 3열 레이아웃 */}
       {formType === '연차/휴가' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-blue-50/50 p-10 rounded-[2.5rem] border border-blue-100 shadow-inner">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-[#E8F3FF]/50 p-10 rounded-[2.5rem] border border-[#D6EBFF] shadow-inner">
           <div className="space-y-2">
-            <label className="text-[11px] font-black text-blue-400 ml-1 uppercase">휴가 종류</label>
-            <select className="w-full p-4 rounded-2xl bg-white font-black text-xs border-none shadow-sm focus:ring-2 focus:ring-blue-200" 
+            <label className="text-[11px] font-bold text-[#3182F6] ml-1 uppercase">휴가 종류</label>
+            <select className="w-full p-4 rounded-2xl bg-white font-bold text-xs border-none shadow-sm focus:ring-2 focus:ring-[#3182F6]/30" 
               onChange={e => setExtraData((prev:any)=>({...prev, vType: e.target.value}))}>
                 <option>연차 (1.0)</option><option>반차 (0.5)</option><option>병가</option>
             </select>
           </div>
           <div className="space-y-2">
-            <label className="text-[11px] font-black text-blue-400 ml-1 uppercase">시작 일자</label>
-            <input type="date" className="w-full p-4 rounded-2xl bg-white font-black text-xs shadow-sm border-none focus:ring-2 focus:ring-blue-200" 
+            <label className="text-[11px] font-bold text-[#3182F6] ml-1 uppercase">시작 일자</label>
+            <input type="date" className="w-full p-4 rounded-2xl bg-white font-bold text-xs shadow-sm border-none focus:ring-2 focus:ring-[#3182F6]/30" 
               onChange={e => setExtraData((prev:any)=>({...prev, startDate: e.target.value}))} />
           </div>
           <div className="space-y-2">
-            <label className="text-[11px] font-black text-blue-400 ml-1 uppercase">종료 일자</label>
-            <input type="date" className="w-full p-4 rounded-2xl bg-white font-black text-xs shadow-sm border-none focus:ring-2 focus:ring-blue-200" 
+            <label className="text-[11px] font-bold text-[#3182F6] ml-1 uppercase">종료 일자</label>
+            <input type="date" className="w-full p-4 rounded-2xl bg-white font-bold text-xs shadow-sm border-none focus:ring-2 focus:ring-[#3182F6]/30" 
               onChange={e => setExtraData((prev:any)=>({...prev, endDate: e.target.value}))} />
           </div>
         </div>
@@ -55,7 +55,7 @@ export default function AttendanceForms({ user, staffs, formType, setExtraData, 
       {/* ⏱️ 연장근무: 원본 연동 버튼 리스트 */}
       {formType === '연장근무' && (
         <div className="bg-orange-50/50 p-10 rounded-[2.5rem] border border-orange-100 space-y-6 shadow-inner">
-          <h4 className="text-xs font-black text-orange-600">📌 최근 초과 근무 내역 선택</h4>
+          <h4 className="text-xs font-bold text-orange-600">📌 최근 초과 근무 내역 선택</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
             {attData.map((a, i) => {
               const ot = calculateOT(a);
@@ -66,8 +66,8 @@ export default function AttendanceForms({ user, staffs, formType, setExtraData, 
                   setExtraData({date: a.date, hours: ot, amount: ot * 15000});
                   setFormTitle(`[추가수당청구] ${a.date} 연장근무 ${ot}시간`);
                 }} className={`p-5 rounded-[1.5rem] border-2 text-left transition-all flex justify-between items-center ${selectedDate === a.date ? 'border-orange-500 bg-white shadow-lg' : 'bg-white/50 border-white hover:bg-white'}`}>
-                  <div><span className="text-[10px] font-black text-gray-400">{a.date}</span><p className="text-xs font-black text-gray-800">퇴근: {a.check_out.slice(11,16)}</p></div>
-                  <span className="text-[10px] font-black text-orange-500 bg-orange-50 px-2 py-1 rounded-lg">+{ot}H</span>
+                  <div><span className="text-[10px] font-bold text-[#8B95A1]">{a.date}</span><p className="text-xs font-bold text-[#191F28]">퇴근: {a.check_out.slice(11,16)}</p></div>
+                  <span className="text-[10px] font-bold text-orange-500 bg-orange-50 px-2 py-1 rounded-lg">+{ot}H</span>
                 </button>
               );
             })}

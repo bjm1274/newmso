@@ -66,3 +66,42 @@ body {
     padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
   }
 }
+
+/* 토스 스타일 공통 — 버튼·카드·라운드 */
+.btn-toss-primary {
+  background: var(--toss-blue);
+  color: white;
+  font-weight: 700;
+  border-radius: 12px;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.btn-toss-primary:hover { opacity: 0.95; }
+.btn-toss-primary:active { transform: scale(0.98); }
+
+.btn-toss-secondary {
+  background: var(--toss-gray-1);
+  color: var(--foreground);
+  font-weight: 700;
+  border-radius: 12px;
+  border: none;
+  transition: background 0.15s;
+}
+.btn-toss-secondary:hover { background: var(--toss-gray-2); }
+
+.card-toss {
+  background: var(--toss-card);
+  border: 1px solid var(--toss-border);
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.radius-toss { border-radius: 12px; }
+.radius-toss-lg { border-radius: 16px; }
+.radius-toss-xl { border-radius: 20px; }
+
+.no-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+.no-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.no-scrollbar::-webkit-scrollbar-thumb { background: var(--toss-gray-2); border-radius: 3px; }
+.custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: var(--toss-gray-1); border-radius: 3px; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: var(--toss-gray-3); border-radius: 3px; }

@@ -67,28 +67,28 @@ export default function CompanyManager() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
-      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-gray-100">
-          <h2 className="text-lg font-black text-gray-800">회사(병원) 목록</h2>
+      <div className="bg-white border border-[#E5E8EB] rounded-2xl shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-[#E5E8EB]">
+          <h2 className="text-lg font-bold text-[#191F28]">회사(병원) 목록</h2>
           <p className="text-xs text-gray-500 mt-1">MSO가 관리하는 회사·병원을 등록·수정합니다. 인사·연차·급여는 각 회사별로 분리됩니다.</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-100">
+            <thead className="bg-[#F2F4F6] border-b border-[#E5E8EB]">
               <tr>
-                <th className="px-6 py-4 text-left font-black text-gray-600">회사명</th>
-                <th className="px-6 py-4 text-left font-black text-gray-600">유형</th>
-                <th className="px-6 py-4 text-left font-black text-gray-600">상태</th>
-                <th className="px-6 py-4 text-right font-black text-gray-600">관리</th>
+                <th className="px-6 py-4 text-left font-bold text-[#4E5968]">회사명</th>
+                <th className="px-6 py-4 text-left font-bold text-[#4E5968]">유형</th>
+                <th className="px-6 py-4 text-left font-bold text-[#4E5968]">상태</th>
+                <th className="px-6 py-4 text-right font-bold text-[#4E5968]">관리</th>
               </tr>
             </thead>
             <tbody>
               {companies.map((c) => (
-                <tr key={c.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                  <td className="px-6 py-4 font-bold text-gray-800">{c.name}</td>
+                <tr key={c.id} className="border-b border-[#E5E8EB] hover:bg-[#F2F4F6]/50">
+                  <td className="px-6 py-4 font-bold text-[#191F28]">{c.name}</td>
                   <td className="px-6 py-4">
                     <span className={`px-2 py-1 rounded-lg text-xs font-bold ${
-                      c.type === 'MSO' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
+                      c.type === 'MSO' ? 'bg-[#E8F3FF] text-[#1B64DA]' : 'bg-[#F2F4F6] text-[#4E5968]'
                     }`}>
                       {c.type === 'MSO' ? '경영지원(MSO)' : c.type === 'HOSPITAL' ? '병원' : '클리닉'}
                     </span>
@@ -97,7 +97,7 @@ export default function CompanyManager() {
                   <td className="px-6 py-4 text-right">
                     <button
                       onClick={() => handleEdit(c)}
-                      className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100"
+                      className="px-3 py-1.5 bg-[#E8F3FF] text-[#3182F6] rounded-[12px] text-xs font-bold hover:bg-[#D6EBFF]"
                     >
                       수정
                     </button>
@@ -109,15 +109,15 @@ export default function CompanyManager() {
         </div>
       </div>
 
-      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-6">
-        <h2 className="text-lg font-black text-gray-800 mb-4">{editing ? '회사 수정' : '회사 추가'}</h2>
+      <div className="bg-white border border-[#E5E8EB] rounded-2xl shadow-sm p-6">
+        <h2 className="text-lg font-bold text-[#191F28] mb-4">{editing ? '회사 수정' : '회사 추가'}</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-bold text-gray-500 mb-2">회사명</label>
             <input
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+              className="w-full px-4 py-3 border border-[#E5E8EB] rounded-[12px] focus:ring-2 focus:ring-[#3182F6]/20 focus:border-[#3182F6]"
               placeholder="예: OO정형외과"
             />
           </div>
@@ -126,7 +126,7 @@ export default function CompanyManager() {
             <select
               value={form.type}
               onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as CompanyType }))}
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-100"
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#3182F6]/20"
             >
               <option value="MSO">경영지원(MSO)</option>
               <option value="HOSPITAL">병원</option>
@@ -137,14 +137,14 @@ export default function CompanyManager() {
         <div className="flex gap-3 mt-6">
           <button
             onClick={handleSave}
-            className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700"
+            className="px-6 py-3 bg-[#3182F6] text-white rounded-[12px] font-bold text-sm hover:bg-[#1B64DA]"
           >
             {editing ? '저장' : '추가'}
           </button>
           {editing && (
             <button
               onClick={() => { setEditing(null); setForm({ name: '', type: 'HOSPITAL' }); }}
-              className="px-6 py-3 bg-gray-100 text-gray-600 rounded-xl font-bold text-sm hover:bg-gray-200"
+              className="px-6 py-3 bg-[#F2F4F6] text-[#4E5968] rounded-[12px] font-bold text-sm hover:bg-[#E5E8EB]"
             >
               취소
             </button>

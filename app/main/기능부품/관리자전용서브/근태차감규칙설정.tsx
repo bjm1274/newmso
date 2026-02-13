@@ -50,12 +50,12 @@ export default function AttendanceDeductionRules({ selectedCo = '전체' }: any)
 
   return (
     <div className="bg-white border border-gray-100 rounded-[2rem] p-8 shadow-xl max-w-2xl">
-      <h3 className="text-xl font-black text-gray-900 mb-2">근태 차감 규칙 설정</h3>
-      <p className="text-[10px] text-gray-500 font-bold mb-6">급여 정산 시 지각·조퇴·결근이 자동 반영됩니다. 기본급(직원 등록 시 설정) 기준으로 계산됩니다.</p>
+      <h3 className="text-xl font-bold text-[#191F28] mb-2">근태 차감 규칙 설정</h3>
+      <p className="text-[10px] text-[#4E5968] font-bold mb-6">급여 정산 시 지각·조퇴·결근이 자동 반영됩니다. 기본급(직원 등록 시 설정) 기준으로 계산됩니다.</p>
 
       <div className="space-y-6">
         <div>
-          <label className="text-[10px] font-black text-gray-400 uppercase">지각 차감 방식</label>
+          <label className="text-[10px] font-bold text-[#8B95A1] uppercase">지각 차감 방식</label>
           <div className="flex gap-4 mt-2">
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="radio" name="late" checked={rules.late_deduction_type === 'fixed'} onChange={() => setRules({ ...rules, late_deduction_type: 'fixed' })} />
@@ -68,14 +68,14 @@ export default function AttendanceDeductionRules({ selectedCo = '전체' }: any)
           </div>
           {rules.late_deduction_type === 'fixed' && (
             <div className="mt-2">
-              <input type="number" value={rules.late_deduction_amount || 0} onChange={e => setRules({ ...rules, late_deduction_amount: Number(e.target.value) })} className="w-32 p-3 border rounded-xl text-sm font-bold" />
-              <span className="ml-2 text-xs font-bold text-gray-500">원/회</span>
+              <input type="number" value={rules.late_deduction_amount || 0} onChange={e => setRules({ ...rules, late_deduction_amount: Number(e.target.value) })} className="w-32 p-3 border rounded-[12px] text-sm font-bold" />
+              <span className="ml-2 text-xs font-bold text-[#4E5968]">원/회</span>
             </div>
           )}
         </div>
 
         <div>
-          <label className="text-[10px] font-black text-gray-400 uppercase">조퇴 차감 방식</label>
+          <label className="text-[10px] font-bold text-[#8B95A1] uppercase">조퇴 차감 방식</label>
           <div className="flex gap-4 mt-2">
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="radio" name="early" checked={rules.early_leave_deduction_type === 'fixed'} onChange={() => setRules({ ...rules, early_leave_deduction_type: 'fixed' })} />
@@ -88,19 +88,19 @@ export default function AttendanceDeductionRules({ selectedCo = '전체' }: any)
           </div>
           {rules.early_leave_deduction_type === 'fixed' && (
             <div className="mt-2">
-              <input type="number" value={rules.early_leave_deduction_amount || 0} onChange={e => setRules({ ...rules, early_leave_deduction_amount: Number(e.target.value) })} className="w-32 p-3 border rounded-xl text-sm font-bold" />
-              <span className="ml-2 text-xs font-bold text-gray-500">원/회</span>
+              <input type="number" value={rules.early_leave_deduction_amount || 0} onChange={e => setRules({ ...rules, early_leave_deduction_amount: Number(e.target.value) })} className="w-32 p-3 border rounded-[12px] text-sm font-bold" />
+              <span className="ml-2 text-xs font-bold text-[#4E5968]">원/회</span>
             </div>
           )}
         </div>
 
         <div>
-          <label className="text-[10px] font-black text-gray-400 uppercase">결근</label>
-          <p className="text-xs font-bold text-gray-500 mt-1">기본급 ÷ 해당월 근로일수 = 일당, 결근 1일 = 일당 차감</p>
+          <label className="text-[10px] font-bold text-[#8B95A1] uppercase">결근</label>
+          <p className="text-xs font-bold text-[#4E5968] mt-1">기본급 ÷ 해당월 근로일수 = 일당, 결근 1일 = 일당 차감</p>
         </div>
       </div>
 
-      <button onClick={handleSave} disabled={saving} className="mt-8 w-full py-4 bg-blue-600 text-white font-black rounded-2xl text-sm hover:bg-blue-700 disabled:opacity-50">
+      <button onClick={handleSave} disabled={saving} className="mt-8 w-full py-4 bg-[#3182F6] text-white font-bold rounded-[16px] text-sm hover:bg-[#1B64DA] disabled:opacity-50">
         {saving ? '저장 중...' : '규칙 저장'}
       </button>
     </div>
