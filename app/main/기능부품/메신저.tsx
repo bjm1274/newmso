@@ -1131,39 +1131,13 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
               <p className="text-[10px] font-bold text-[#8B95A1] uppercase tracking-wide">
                 현재 채팅방
               </p>
-              {editingRoomName && selectedRoom.id !== NOTICE_ROOM_ID ? (
-                <div className="flex items-center gap-2 mt-0.5">
-                  <input
-                    value={roomNameDraft}
-                    onChange={(e) => setRoomNameDraft(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        const name = roomNameDraft.trim() || selectedRoom.name || '채팅방';
-                        supabase.from('chat_rooms').update({ name }).eq('id', selectedRoom.id).then(() => {
-                          setChatRooms((prev) => prev.map((r: any) => r.id === selectedRoom.id ? { ...r, name } : r));
-                          setEditingRoomName(false);
-                        });
-                      }
-                      if (e.key === 'Escape') setEditingRoomName(false);
-                    }}
-                    className="flex-1 min-w-0 px-2 py-1 text-sm font-bold text-[#191F28] border border-[#3182F6] rounded-[8px] outline-none"
-                    autoFocus
-                  />
-                  <button type="button" onClick={() => { const name = roomNameDraft.trim() || selectedRoom.name || '채팅방'; supabase.from('chat_rooms').update({ name }).eq('id', selectedRoom.id).then(() => { setChatRooms((prev) => prev.map((r: any) => r.id === selectedRoom.id ? { ...r, name } : r)); setEditingRoomName(false); }); }} className="text-[10px] font-bold text-[#3182F6]">저장</button>
-                  <button type="button" onClick={() => setEditingRoomName(false)} className="text-[10px] font-bold text-[#8B95A1]">취소</button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <p className="text-sm font-bold text-[#191F28] truncate flex-1 min-w-0">
-                    {selectedRoom.id === NOTICE_ROOM_ID
-                      ? NOTICE_ROOM_NAME
-                      : selectedRoom.name || '채팅방'}
-                  </p>
-                  {selectedRoom.id !== NOTICE_ROOM_ID && (
-                    <button type="button" onClick={() => { setRoomNameDraft(selectedRoom.name || '채팅방'); setEditingRoomName(true); }} className="shrink-0 w-7 h-7 flex items-center justify-center rounded-[8px] text-[#8B95A1] hover:bg-[#F2F4F6] hover:text-[#3182F6]" title="채팅방 이름 변경">✏️</button>
-                  )}
-                </div>
-              )}
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <p className="text-sm font-bold text-[#191F28] truncate flex-1 min-w-0">
+                  {selectedRoom.id === NOTICE_ROOM_ID
+                    ? NOTICE_ROOM_NAME
+                    : selectedRoom.name || '채팅방'}
+                </p>
+              </div>
             </div>
             <button
               type="button"
@@ -1536,11 +1510,11 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                   ✕
                 </button>
               </div>
-              <div className="p-3 border-b border-gray-100 flex items-center justify-between gap-2">
-                <span className="text-[11px] font-bold text-gray-500">
-                  총 {filteredMediaMessages.length}개
-                </span>
-                <div className="flex items-center gap-2">
+              <div className="p-3 border-b border-gray-100 flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-bold text-gray-500">
+                    총 {filteredMediaMessages.length}개
+                  </span>
                   <button
                     type="button"
                     onClick={toggleRoomNotify}
@@ -1548,32 +1522,42 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                   >
                     {roomNotifyOn ? '🔔 알림 on' : '🔕 알림 off'}
                   </button>
-                  {selectedRoom?.id !== NOTICE_ROOM_ID && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowAddMemberModal(true);
-                          setAddMemberSearch('');
-                          setAddMemberSelectingIds([]);
-                        }}
-                        className="px-3 py-1.5 text-[10px] font-black text-blue-600 border border-blue-100 rounded-xl hover:bg-blue-50 transition-colors"
-                      >
-                        대화상대 추가
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowMediaPanel(false);
-                          handleLeaveRoom();
-                        }}
-                        className="px-3 py-1.5 text-[10px] font-black text-red-600 border border-red-100 rounded-xl hover:bg-red-50 transition-colors"
-                      >
-                        채팅방 나가기
-                      </button>
-                    </>
-                  )}
                 </div>
+                {selectedRoom?.id !== NOTICE_ROOM_ID && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAddMemberModal(true);
+                        setAddMemberSearch('');
+                        setAddMemberSelectingIds([]);
+                      }}
+                      className="px-3 py-1.5 text-[10px] font-black text-blue-600 border border-blue-100 rounded-xl hover:bg-blue-50 transition-colors"
+                    >
+                      대화상대 추가
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRoomNameDraft(selectedRoom?.name || '채팅방');
+                        setEditingRoomName(true);
+                      }}
+                      className="px-3 py-1.5 text-[10px] font-black text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+                    >
+                      채팅방 이름 변경
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowMediaPanel(false);
+                        handleLeaveRoom();
+                      }}
+                      className="px-3 py-1.5 text-[10px] font-black text-red-600 border border-red-100 rounded-xl hover:bg-red-50 transition-colors"
+                    >
+                      채팅방 나가기
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="px-3 py-2 border-b border-gray-100 flex flex-wrap gap-2 text-[10px] font-black">
                 <button
@@ -1621,6 +1605,47 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                   링크
                 </button>
               </div>
+              {/* 채팅방 설정 (이름 변경) - 보기 좋게 사이드 패널 안에서 처리 */}
+              {editingRoomName && selectedRoom?.id !== NOTICE_ROOM_ID && (
+                <div className="px-3 pt-3 pb-1 border-b border-gray-100 space-y-2">
+                  <p className="text-[10px] font-bold text-gray-500">채팅방 이름 변경</p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={roomNameDraft}
+                      onChange={(e) => setRoomNameDraft(e.target.value)}
+                      className="flex-1 px-2 py-1 text-xs font-bold text-[#191F28] border border-[#3182F6] rounded-[8px] outline-none"
+                      placeholder="채팅방 이름"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const name = roomNameDraft.trim() || selectedRoom?.name || '채팅방';
+                        supabase
+                          .from('chat_rooms')
+                          .update({ name })
+                          .eq('id', selectedRoomId)
+                          .then(() => {
+                            setChatRooms((prev) =>
+                              prev.map((r: any) => (r.id === selectedRoomId ? { ...r, name } : r))
+                            );
+                            setEditingRoomName(false);
+                          });
+                      }}
+                      className="px-3 py-1.5 text-[10px] font-black text-[#3182F6] border border-[#3182F6]/40 rounded-xl hover:bg-[#3182F6]/5 transition-colors"
+                    >
+                      저장
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingRoomName(false)}
+                      className="px-3 py-1.5 text-[10px] font-black text-gray-400 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+                    >
+                      취소
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-4">
                 {filteredMediaMessages.length === 0 ? (
                   <p className="text-[11px] text-gray-400 font-bold text-center mt-4">
