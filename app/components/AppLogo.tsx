@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 
-/** 로그인·마이페이지·사이드바 등에서 동일하게 쓰는 상단 로고 (사각형) */
-const LOGO_SRC = '/icon-192x192.png';
+/** 로그인·마이페이지·사이드바 등에서 동일하게 쓰는 SY 로고 (사각형) */
+const LOGO_SRC = '/sy-logo.png';
 
 export default function AppLogo({
   size = 40,
@@ -17,7 +17,7 @@ export default function AppLogo({
 
   return (
     <div
-      className={`flex items-center justify-center overflow-hidden bg-[#3182F6] shrink-0 ${className}`}
+      className={`flex items-center justify-center overflow-hidden bg-white shrink-0 ${className}`}
       style={{ width: size, height: size, borderRadius: 0 }}
     >
       {!failed ? (
@@ -28,7 +28,7 @@ export default function AppLogo({
           onError={() => setFailed(true)}
         />
       ) : (
-        <span className={`text-white font-bold ${textSize}`}>SY</span>
+        <span className={`text-[#191F28] font-bold ${textSize}`}>SY</span>
       )}
     </div>
   );

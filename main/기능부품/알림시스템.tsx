@@ -38,7 +38,7 @@ export function sendNotification(title: string, options?: NotificationOptions) {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.ready.then(registration => {
         registration.showNotification(title, {
-          icon: '/icon-192x192.png',
+          icon: '/sy-logo.png',
           badge: '/badge-72x72.png',
           tag: 'notification',
           requireInteraction: true, // 사용자가 닫을 때까지 유지
