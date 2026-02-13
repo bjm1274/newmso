@@ -33,8 +33,9 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
-# vercel
+# vercel (use vercel.json only; vercel.ts causes "Multiple configuration files" error)
 .vercel
+vercel.ts
 
 # typescript
 *.tsbuildinfo
