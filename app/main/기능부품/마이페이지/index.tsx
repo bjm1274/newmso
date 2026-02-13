@@ -167,7 +167,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
   if (!user) return <div className="p-10 text-center font-bold">사용자 정보 로딩 중...</div>;
 
   return (
-    <div className="h-full flex flex-col bg-gray-50 p-6 rounded-[3rem] overflow-hidden">
+    <div className="h-full flex flex-col bg-gray-50 px-3 py-4 md:p-6 rounded-none md:rounded-[3rem] overflow-hidden">
       
       {/* 상단 로고 및 헤더 */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 shrink-0">
@@ -183,7 +183,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
           </p>
           {/* 자주 쓰는 기능 즐겨찾기 바로가기 */}
           <div className="flex flex-col gap-2 mt-2">
-            <div className="flex flex-wrap gap-2">
+            <div className="flex gap-2 overflow-x-auto md:flex-wrap md:overflow-visible no-scrollbar">
               {favorites.map((id) => {
                 const opt = FAVORITE_OPTIONS.find(o => o.id === id);
                 if (!opt) return null;
