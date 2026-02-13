@@ -21,7 +21,7 @@ function isVideoUrl(url: string): boolean {
   return /^(mp4|webm|mov|m4v|avi|mkv)$/.test(ext || '');
 }
 
-export default function ChatView({ user, onRefresh, staffs = [] }: any) {
+export default function ChatView({ user, onRefresh, staffs = [], initialOpenChatRoomId, onConsumeOpenChatRoomId }: any) {
   const [messages, setMessages] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [msgSearchKeyword, setMsgSearchKeyword] = useState(''); // 메시지 본문 검색
@@ -176,6 +176,14 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
       setSelectedRoomId(NOTICE_ROOM_ID);
     }
   }, []);
+
+  // 알림 클릭으로 진입 시 해당 채팅방 자동 선택
+  useEffect(() => {
+    if (initialOpenChatRoomId) {
+      setRoom(initialOpenChatRoomId);
+      onConsumeOpenChatRoomId?.();
+    }
+  }, [initialOpenChatRoomId]);
 
   const fetchData = useCallback(async () => {
     let query = supabase

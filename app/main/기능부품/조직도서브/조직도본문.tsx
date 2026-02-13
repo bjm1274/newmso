@@ -28,6 +28,8 @@ export default function MainContent({
   onRefresh,
   initialMyPageTab,
   onConsumeMyPageInitialTab,
+  initialOpenChatRoomId,
+  onConsumeOpenChatRoomId,
   setMainMenu,
 }: any) {
   const [pendingContract, setPendingContract] = useState<any>(null);
@@ -148,7 +150,7 @@ export default function MainContent({
         </div>
       )}
       {mainMenu === '조직도' && <div className="flex-1 overflow-hidden"><OrgChart staffs={data.staffs} selectedCo={selectedCo} setSelectedCo={setSelectedCo} /></div>}
-      {mainMenu === '채팅' && <div className="flex-1 overflow-hidden bg-white z-20"><ChatView user={user} onRefresh={onRefresh} staffs={data.staffs} /></div>}
+      {mainMenu === '채팅' && <div className="flex-1 overflow-hidden bg-white z-20"><ChatView user={user} onRefresh={onRefresh} staffs={data.staffs} initialOpenChatRoomId={initialOpenChatRoomId} onConsumeOpenChatRoomId={onConsumeOpenChatRoomId} /></div>}
       {mainMenu === '게시판' && (
         <div className="flex-1 overflow-hidden">
           <BoardView
