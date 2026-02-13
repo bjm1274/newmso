@@ -217,19 +217,23 @@ export default function BoardView({ user, setMainMenu }: any) {
     if (!target) return;
     const currentViews = target.views ?? 0;
     const nextViews = currentViews + 1;
-    supabase
-      .from('board_posts')
-      .update({ views: nextViews })
-      .eq('id', selectedPostId)
-      .then(() => {
+
+    (async () => {
+      try {
+        await supabase
+          .from('board_posts')
+          .update({ views: nextViews })
+          .eq('id', selectedPostId);
         setPosts((prev) =>
           prev.map((p: any) =>
             p.id === selectedPostId ? { ...p, views: nextViews } : p
           )
         );
-      })
-      .catch(() => {});
-  }, [selectedPostId]);
+      } catch {
+        // 조회수 업데이트 실패는 무시
+      }
+    })();
+  }, [selectedPostId, posts]);
 
   const canDeletePost = (post: any) => {
     if (!user) return false;
@@ -686,9 +690,13 @@ export default function BoardView({ user, setMainMenu }: any) {
                               {d.getDate()}
                             </span>
                             {events.length > 0 && (
-                              <span className="text-[9px] font-black text-[#3182F6]">
+                              <button
+                                type="button"
+                                onClick={() => events[0] && setSelectedPostId(events[0].id)}
+                                className="text-[9px] font-black text-[#3182F6] px-1 py-0.5 rounded-full hover:bg-[#E8F3FF]"
+                              >
                                 {events.length}건
-                              </span>
+                              </button>
                             )}
                           </div>
                           <div className="space-y-1">
@@ -782,15 +790,6 @@ export default function BoardView({ user, setMainMenu }: any) {
                       )}
                     </div>
                   )}
-                  <div className="pt-3 flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => openChatForSchedule(post)}
-                      className="px-3 py-2 rounded-xl text-[10px] font-black bg-[#E8F3FF] text-[#3182F6] hover:bg-[#D6EBFF] transition-colors"
-                    >
-                      💬 이 일정 관련 채팅 열기
-                    </button>
-                  </div>
                 </div>
               ) : (
                 <div className="flex items-center gap-3 text-[11px] md:text-xs">
@@ -822,9 +821,10 @@ export default function BoardView({ user, setMainMenu }: any) {
         )}
       </div>
 
-      {/* 게시글 상세 보기 패널 */}
+      {/* 게시글 상세 보기 모달 */}
       {selectedPost && (
-        <div className="bg-white border border-[#E5E8EB] rounded-[16px] shadow-sm p-5 md:p-7 space-y-4">
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-3 md:p-6">
+          <div className="w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-white border border-[#E5E8EB] rounded-[20px] shadow-2xl p-5 md:p-7 space-y-4">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
               <p className="text-[10px] font-black text-[#8B95A1] uppercase tracking-widest mb-1">
@@ -940,19 +940,7 @@ export default function BoardView({ user, setMainMenu }: any) {
             )}
           </div>
 
-          {/* 수술/MRI 일정은 상세에서 채팅 연동 버튼 제공 */}
-          {(selectedPost.board_type === '수술일정' ||
-            selectedPost.board_type === 'MRI일정') && (
-            <div className="pt-4 border-t border-[#F1F3F5] flex justify-end">
-              <button
-                type="button"
-                onClick={() => openChatForSchedule(selectedPost)}
-                className="px-4 py-2.5 rounded-[12px] bg-[#E8F3FF] text-[#3182F6] text-[11px] font-black hover:bg-[#D6EBFF] transition-colors"
-              >
-                💬 이 일정 관련 채팅 열기
-              </button>
-            </div>
-          )}
+        </div>
         </div>
       )}
     </div>
