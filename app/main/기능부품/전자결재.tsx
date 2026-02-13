@@ -23,25 +23,26 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
 
   const BUILTIN_FORM_TYPES = ['인사명령', '연차/휴가', '연장근무', '물품신청', '수리요청서', '업무기안', '업무협조', '양식신청', '출결정정'];
 
+  // 결재자 후보: 직위 우선, 없으면 전체 직원 표시 (staffs는 이미 메인에서 회사별로 불러옴)
+  const APPROVER_POSITIONS = ['팀장', '간호과장', '실장', '부장', '이사', '병원장', '원장', '대표이사'];
+  const approverCandidates = useMemo(() => {
+    if (!Array.isArray(staffs)) return [];
+    const byPosition = staffs.filter((s: any) => APPROVER_POSITIONS.includes(s.position));
+    return byPosition.length > 0 ? byPosition : staffs;
+  }, [staffs]);
+
   useEffect(() => {
     supabase.from('approval_form_types').select('name, slug').eq('is_active', true).order('sort_order').then(({ data }) => {
       setCustomFormTypes((data || []).map((r: any) => ({ name: r.name, slug: r.slug })));
     });
   }, []);
 
-  // 부서장 이상(팀장/부장/실장/원장/병원장/대표이사)은 기본 결재선에 자동 추가
+  // 부서장 이상(팀장/부장/실장/원장/병원장/대표이사)이 있으면 기본 결재선에 자동 추가 (staffs는 이미 회사별로 불러옴)
   useEffect(() => {
     if (!Array.isArray(staffs) || approverLine.length > 0 || viewMode !== '작성하기') return;
-    const approverPositions = ['팀장', '부장', '실장', '원장', '병원장', '대표이사'];
-    const defaultApprovers = staffs.filter((s: any) => {
-      const isApproverRole = approverPositions.includes(s.position);
-      const matchesCompany = selectedCo === '전체' || s.company === selectedCo;
-      return isApproverRole && matchesCompany;
-    });
-    if (defaultApprovers.length > 0) {
-      setApproverLine(defaultApprovers);
-    }
-  }, [staffs, selectedCo, viewMode, approverLine.length]);
+    const defaultApprovers = staffs.filter((s: any) => APPROVER_POSITIONS.includes(s.position));
+    if (defaultApprovers.length > 0) setApproverLine(defaultApprovers);
+  }, [staffs, viewMode, approverLine.length]);
 
   // 마지막으로 보던 탭(기안함/결재함/작성하기)을 복구
   useEffect(() => {
@@ -218,15 +219,14 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                 </div>
 
                 <select onChange={(e) => {
-                    const s = staffs?.find((st:any) => st.id === e.target.value);
-                    if(s && !approverLine.find(al => al.id === s.id)) setApproverLine([...approverLine, s]);
+                    const s = approverCandidates.find((st: any) => st.id === e.target.value);
+                    if (s && !approverLine.find(al => al.id === s.id)) setApproverLine([...approverLine, s]);
+                    e.target.value = '';
                 }} className="w-full p-4 bg-white rounded-xl md:rounded-2xl text-xs font-bold border-none outline-none shadow-sm">
-                    <option value="">결재자 선택...</option>
-                    {staffs?.filter((s:any) => {
-                      const isApproverRole = ['팀장', '부장', '원장', '병원장', '대표이사'].includes(s.position);
-                      const matchesCompany = selectedCo === '전체' || s.company === selectedCo;
-                      return isApproverRole && matchesCompany;
-                    }).map((s:any) => <option key={s.id} value={s.id}>{s.name} {s.position} ({s.company})</option>)}
+                    <option value="">결재자 추가...</option>
+                    {approverCandidates.map((s: any) => (
+                      <option key={s.id} value={s.id}>{s.name} {s.position || ''} {s.company ? `(${s.company})` : ''}</option>
+                    ))}
                 </select>
                 <div className="flex gap-2 flex-wrap">{approverLine.map((a, i) => <div key={i} className="bg-white px-4 py-3 rounded-xl border border-blue-100 text-[10px] font-black shadow-sm text-blue-600 flex items-center gap-2">{i+1}. {a.name} {a.position} <button onClick={() => setApproverLine(approverLine.filter((_,idx)=>idx!==i))} className="ml-1 text-gray-300 hover:text-red-500">✕</button></div>)}</div>
               </div>

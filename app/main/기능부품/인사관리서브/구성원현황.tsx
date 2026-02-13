@@ -335,7 +335,15 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-[9px] font-black text-gray-400">직함</label>
-                    <input type="text" value={신규직원.직함} onChange={e => 신규직원설정({...신규직원, 직함: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100" />
+                    <select value={신규직원.직함} onChange={e => 신규직원설정({...신규직원, 직함: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100">
+                      <option value="">선택</option>
+                      <option value="팀장">팀장</option>
+                      <option value="간호과장">간호과장</option>
+                      <option value="실장">실장</option>
+                      <option value="부장">부장</option>
+                      <option value="이사">이사</option>
+                      <option value="병원장">병원장</option>
+                    </select>
                   </div>
                   <div className="space-y-1">
                     <label className="text-[9px] font-black text-gray-400">입사일 *</label>
