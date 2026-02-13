@@ -1399,7 +1399,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
              <button onClick={()=>setShowPollModal(true)} className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-blue-600 transition-colors">📊</button>
              <div className="relative flex-1">
                <input 
-                 className="w-full bg-transparent p-2 outline-none text-sm font-bold" 
+                 className="w-full bg-transparent p-2 outline-none text-[16px] md:text-sm font-bold min-w-0"
                  placeholder={selectedRoomId === NOTICE_ROOM_ID && user?.position && !CAN_WRITE_NOTICE_POSITIONS.includes(user.position) ? "부서장 이상만 작성 가능" : "메시지를 입력하세요... (예: @홍길동 메모) "}
                  value={inputMsg} 
                  onChange={e=>{

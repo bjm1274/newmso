@@ -7,17 +7,30 @@ self.addEventListener('push', (event) => {
   if (!event.data) return;
   
   const data = event.data.json();
+  var tag = (data.tag || 'notification') + '-' + (data.data && data.data.message_id ? data.data.message_id : Date.now());
   const options = {
     body: data.body || '새 알림이 있습니다.',
     icon: '/sy-logo.png',
     badge: '/badge-72x72.png',
-    tag: data.tag || 'notification',
-    requireInteraction: true,
+    tag: tag,
+    requireInteraction: false,
     data: data.data || {}
   };
 
   event.waitUntil(
-    self.registration.showNotification(data.title || '알림', options)
+    self.registration.showNotification(data.title || '알림', options).then(function() {
+      // 일정 시간(5초) 후 해당 알림만 자동 닫힘
+      return new Promise(function(resolve) {
+        setTimeout(function() {
+          self.registration.getNotifications().then(function(notifications) {
+            notifications.forEach(function(n) {
+              if (n.tag === tag) n.close();
+            });
+            resolve();
+          }).catch(function() { resolve(); });
+        }, 5000);
+      });
+    })
   );
 });
 
