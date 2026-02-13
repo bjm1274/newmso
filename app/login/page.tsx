@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
@@ -9,6 +9,23 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
+  // 이미 로그인된 상태면(erp_user 있음) 메인으로 이동 — 로그아웃 누르기 전까지 유지
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const stored = localStorage.getItem('erp_user');
+    if (stored) {
+      try {
+        JSON.parse(stored);
+        router.replace('/main');
+        return;
+      } catch {
+        // 잘못된 저장값이면 무시
+      }
+    }
+    setCheckingAuth(false);
+  }, [router]);
 
   const handleLogin = async () => {
     if (!loginId || !password) {
@@ -54,9 +71,11 @@ export default function LoginPage() {
         return;
       }
 
-      // 1회차 로그인: DB에 비밀번호가 없으면, 처음 입력한 비밀번호를 바로 설정
-      let currentPassword = (user.password ?? '').toString().trim();
-      if (!currentPassword) {
+      // 직원 생성 시 비밀번호 없이 등록되므로, 처음 로그인할 때 입력한 값이 비밀번호로 설정됨
+      const savedPassword = (user.password ?? user.passwd ?? '').toString().trim();
+      const isFirstLogin = !savedPassword;
+
+      if (isFirstLogin) {
         const { error: pwErr } = await supabase
           .from('staff_members')
           .update({ password })
@@ -67,11 +86,8 @@ export default function LoginPage() {
           setLoading(false);
           return;
         }
-        currentPassword = password;
-        user = { ...user, password: currentPassword };
-      }
-
-      if (currentPassword !== password) {
+        user = { ...user, password };
+      } else if (savedPassword !== password) {
         setError("비밀번호가 일치하지 않습니다.");
         setLoading(false);
         return;
@@ -80,12 +96,24 @@ export default function LoginPage() {
       const toStore = { ...user, company_id: user.company_id ?? null };
       localStorage.setItem('erp_user', JSON.stringify(toStore));
       setLoading(false);
+      if (isFirstLogin) {
+        alert("비밀번호가 설정되었습니다. 다음 로그인부터 이 비밀번호를 사용해 주세요.");
+      }
       router.push('/main');
     } catch (err) {
       setError("시스템 접속 중 오류가 발생했습니다.");
       setLoading(false);
     }
   };
+
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen min-h-[100dvh] bg-[#F9FAFB] flex flex-col items-center justify-center">
+        <div className="w-8 h-8 border-2 border-[#3182F6] rounded-full border-t-transparent animate-spin" />
+        <p className="mt-4 text-xs font-medium text-[#8B95A1]">로그인 상태 확인 중...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen min-h-[100dvh] bg-[#F9FAFB] flex flex-col justify-center py-8 px-4 lg:px-8">
