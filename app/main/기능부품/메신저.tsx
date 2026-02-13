@@ -53,6 +53,8 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
 
   const [roomNotifyOn, setRoomNotifyOn] = useState(true);
+  const [editingRoomName, setEditingRoomName] = useState(false);
+  const [roomNameDraft, setRoomNameDraft] = useState('');
 
   // 다중 선택 나가기용 상태
   const [selectedRoomIdsForLeave, setSelectedRoomIdsForLeave] = useState<string[]>([]);
@@ -277,6 +279,22 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     loadRooms();
   }, [selectedRoomId, updateUnreadForRooms]);
 
+  // 채팅방 테이블 변경 시 항상 방 목록 갱신 (신규 개설 방 즉시 반영)
+  useEffect(() => {
+    const channel = supabase.channel('chat-rooms-list')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_rooms' }, () => {
+        supabase.from('chat_rooms').select('*').order('created_at', { ascending: false }).then(({ data: rooms }) => {
+          if (!rooms) return;
+          const noticeRoom = rooms.find((r: any) => r.id === NOTICE_ROOM_ID) || { id: NOTICE_ROOM_ID, name: NOTICE_ROOM_NAME, type: 'notice' };
+          const others = rooms.filter((r: any) => r.id !== NOTICE_ROOM_ID);
+          setChatRooms([noticeRoom, ...others]);
+          updateUnreadForRooms([noticeRoom, ...others]);
+        });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [updateUnreadForRooms]);
+
   // 다른 화면(수술·검사 일정 등)에서 설정한 검색 키워드 복원
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -326,7 +344,8 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     const channel = supabase.channel(`chat-realtime-${selectedRoomId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `room_id=eq.${selectedRoomId}` }, (payload: any) => {
         fetchData();
-        if (!isFocusedRef.current && payload.new?.sender_id !== user?.id && roomNotifyRef.current) {
+        const isOwnMessage = payload.new?.sender_id === user?.id;
+        if (!isOwnMessage && !isFocusedRef.current && roomNotifyRef.current) {
           const senderName = staffs.find((s: any) => s.id === payload.new.sender_id)?.name || '알 수 없음';
           sendNotification(`💬 ${senderName}`, { body: (payload.new.content || '📎 파일').slice(0, 50) });
         }
@@ -653,6 +672,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     if (mime.startsWith('video/')) return 'video';
     return 'file';
   };
+  const CHAT_BUCKET = 'pchos-files';
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -663,15 +683,21 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     }
     setFileUploading(true);
     try {
-      const path = `chat/${Date.now()}_${file.name}`;
-      const { error } = await supabase.storage.from('pchos-files').upload(path, file);
+      const path = `chat/${Date.now()}_${encodeURIComponent(file.name)}`;
+      const { error } = await supabase.storage.from(CHAT_BUCKET).upload(path, file, { upsert: false });
       if (error) throw error;
-      const publicUrl = supabase.storage.from('pchos-files').getPublicUrl(path).data.publicUrl;
+      const publicUrl = supabase.storage.from(CHAT_BUCKET).getPublicUrl(path).data.publicUrl;
       const fileKind = getFileKind(file.type || '');
       await handleSendMessage(publicUrl, file.size, fileKind);
-    } catch (err) {
+    } catch (err: any) {
       console.error('파일 업로드 실패:', err);
-      alert('파일 업로드에 실패했습니다. pchos-files 버킷이 생성되어 있는지 확인하세요.');
+      const msg = err?.message || String(err);
+      const hint = msg.includes('Bucket not found') || msg.includes('not found')
+        ? 'Supabase 대시보드에서 Storage > New bucket > 이름 "pchos-files" (Public) 생성 후 다시 시도해 주세요.'
+        : msg.includes('policy') || msg.includes('RLS')
+        ? 'Storage 버킷 pchos-files의 RLS 정책에서 INSERT를 허용해 주세요.'
+        : '버킷 생성 여부와 RLS 정책을 확인해 주세요.';
+      alert(`파일 업로드에 실패했습니다.\n\n${hint}`);
     } finally {
       setFileUploading(false);
       e.target.value = '';
@@ -706,6 +732,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       setShowGroupModal(false);
       setRoom(room.id);
       fetchData();
+      setTimeout(() => fetchData(), 300);
     }
   };
 
@@ -1082,7 +1109,10 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                     if (found) setRoom(found.id);
                     else {
                       const { data: room } = await supabase.from('chat_rooms').insert([{ name: `${s.name}`, type: 'direct', members: [user.id, otherId] }]).select('id').single();
-                      if (room) setRoom(room.id);
+                      if (room) {
+                        setRoom(room.id);
+                        setTimeout(() => fetchData(), 300);
+                      }
                     }
                     setViewMode('chat');
                     fetchData();
@@ -1111,11 +1141,39 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
               <p className="text-[10px] font-bold text-[#8B95A1] uppercase tracking-wide">
                 현재 채팅방
               </p>
-              <p className="text-sm font-bold text-[#191F28] mt-0.5 truncate">
-                {selectedRoom.id === NOTICE_ROOM_ID
-                  ? NOTICE_ROOM_NAME
-                  : selectedRoom.name || '채팅방'}
-              </p>
+              {editingRoomName && selectedRoom.id !== NOTICE_ROOM_ID ? (
+                <div className="flex items-center gap-2 mt-0.5">
+                  <input
+                    value={roomNameDraft}
+                    onChange={(e) => setRoomNameDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const name = roomNameDraft.trim() || selectedRoom.name || '채팅방';
+                        supabase.from('chat_rooms').update({ name }).eq('id', selectedRoom.id).then(() => {
+                          setChatRooms((prev) => prev.map((r: any) => r.id === selectedRoom.id ? { ...r, name } : r));
+                          setEditingRoomName(false);
+                        });
+                      }
+                      if (e.key === 'Escape') setEditingRoomName(false);
+                    }}
+                    className="flex-1 min-w-0 px-2 py-1 text-sm font-bold text-[#191F28] border border-[#3182F6] rounded-[8px] outline-none"
+                    autoFocus
+                  />
+                  <button type="button" onClick={() => { const name = roomNameDraft.trim() || selectedRoom.name || '채팅방'; supabase.from('chat_rooms').update({ name }).eq('id', selectedRoom.id).then(() => { setChatRooms((prev) => prev.map((r: any) => r.id === selectedRoom.id ? { ...r, name } : r)); setEditingRoomName(false); }); }} className="text-[10px] font-bold text-[#3182F6]">저장</button>
+                  <button type="button" onClick={() => setEditingRoomName(false)} className="text-[10px] font-bold text-[#8B95A1]">취소</button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <p className="text-sm font-bold text-[#191F28] truncate flex-1 min-w-0">
+                    {selectedRoom.id === NOTICE_ROOM_ID
+                      ? NOTICE_ROOM_NAME
+                      : selectedRoom.name || '채팅방'}
+                  </p>
+                  {selectedRoom.id !== NOTICE_ROOM_ID && (
+                    <button type="button" onClick={() => { setRoomNameDraft(selectedRoom.name || '채팅방'); setEditingRoomName(true); }} className="shrink-0 w-7 h-7 flex items-center justify-center rounded-[8px] text-[#8B95A1] hover:bg-[#F2F4F6] hover:text-[#3182F6]" title="채팅방 이름 변경">✏️</button>
+                  )}
+                </div>
+              )}
             </div>
             <button
               type="button"
@@ -1181,6 +1239,9 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                 const showDateDivider = dateLabel !== lastDateLabel;
                 if (showDateDivider) lastDateLabel = dateLabel;
 
+                const isSystemInvite = typeof msg.content === 'string' && msg.content.startsWith('[초대]');
+                const systemText = isSystemInvite ? (msg.content as string).replace(/^\[초대\]\s*/, '') : '';
+
                 return (
                   <div key={msg.id} className="space-y-1">
                     {showDateDivider && (
@@ -1190,6 +1251,13 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                         </span>
                       </div>
                     )}
+                    {isSystemInvite ? (
+                      <div className="flex justify-center my-2">
+                        <span className="px-3 py-1.5 rounded-full bg-[#E8F3FF] text-[11px] font-bold text-[#3182F6]">
+                          👥 {systemText}
+                        </span>
+                      </div>
+                    ) : (
                     <div
                       ref={el => { msgRefs.current[msg.id] = el; }}
                       data-msg-toolbar-area
@@ -1320,6 +1388,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                         </div>
                       )}
                     </div>
+                    )}
                   </div>
                 );
               });
@@ -2435,6 +2504,17 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                       .update({ members: newMembers })
                       .eq('id', selectedRoom.id);
 
+                    const invitedNames = addMemberSelectingIds
+                      .map((id) => staffs.find((s: any) => s.id === id)?.name || '알 수 없음')
+                      .join(', ');
+                    const inviterName = user?.name || '알 수 없음';
+                    const systemContent = `[초대] ${inviterName}님이 ${invitedNames}님을 초대했습니다.`;
+                    await supabase.from('messages').insert([{
+                      room_id: selectedRoom.id,
+                      sender_id: user.id,
+                      content: systemContent,
+                    }]);
+
                     setChatRooms((prev) =>
                       prev.map((room: any) =>
                         room.id === selectedRoom.id
@@ -2444,6 +2524,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                     );
                     setShowAddMemberModal(false);
                     setAddMemberSelectingIds([]);
+                    fetchData();
                     alert('대화상대가 추가되었습니다.');
                   } catch (e) {
                     console.error('add members error', e);
