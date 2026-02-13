@@ -117,6 +117,19 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     if (formType === '물품신청' && last.meta_data?.items?.length) setSuppliesLoadKey((k) => k + 1);
   };
 
+  // 물품신청은 같은 내용을 자주 쓰므로,
+  // 작성하기 탭에서 '물품신청'으로 들어왔을 때 마지막 기안을 자동으로 한번 불러와 주고 수정해서 상신할 수 있게 처리
+  useEffect(() => {
+    if (viewMode !== '작성하기' || formType !== '물품신청') return;
+    const last = lastDraftByType['물품신청'];
+    if (!last) return;
+    // 사용자가 이미 새로 입력을 시작했다면 자동 불러오지 않음
+    if (formTitle || formContent) return;
+    // 이미 한번 불러온 상태라면(품목 초기화용 키 사용) 다시 불러오지 않음
+    if (suppliesLoadKey > 0) return;
+    loadLastDraft();
+  }, [viewMode, formType, lastDraftByType, formTitle, formContent, suppliesLoadKey]);
+
   useEffect(() => {
     const channel = supabase
       .channel('approvals-realtime')
