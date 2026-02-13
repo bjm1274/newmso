@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { setSelectedCompanyId as persistSelectedCompanyId, getSelectedCompanyId } from '@/lib/useCompany';
 
@@ -21,6 +21,7 @@ type ERPData = {
 
 export default function MainPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [companies, setCompanies] = useState<{ id: string; name: string; type: string }[]>([]);
@@ -30,7 +31,8 @@ export default function MainPage() {
   const [mainMenu, setMainMenu] = useState('조직도');
   const [subView, setSubView] = useState('전체');
   const [selectedCo, setSelectedCo] = useState('전체');
-  const [initialMyPageTab, setInitialMyPageTab] = useState<string | null>(null); 
+  const [initialMyPageTab, setInitialMyPageTab] = useState<string | null>(null);
+  const [initialOpenChatRoomId, setInitialOpenChatRoomId] = useState<string | null>(null); 
 
   const [data, setData] = useState<ERPData>({
     staffs: [],
@@ -83,6 +85,16 @@ export default function MainPage() {
     }
     setSelectedCompanyIdState(getSelectedCompanyId());
   }, []);
+
+  // 알림 클릭으로 진입 시 open_chat_room 쿼리 처리 → 채팅 메뉴 + 해당 방 연동
+  useEffect(() => {
+    const roomId = searchParams.get('open_chat_room');
+    if (roomId && roomId.trim()) {
+      setMainMenu('채팅');
+      setInitialOpenChatRoomId(roomId.trim());
+      router.replace('/main', { scroll: false });
+    }
+  }, [searchParams, router]);
 
   // 온라인 상태(Presence) 업데이트: 일정 주기로 last_seen_at 갱신
   useEffect(() => {
@@ -244,6 +256,8 @@ export default function MainPage() {
           onRefresh={() => fetchERPData(user, selectedCompanyId)}
           initialMyPageTab={initialMyPageTab}
           onConsumeMyPageInitialTab={() => setInitialMyPageTab(null)}
+          initialOpenChatRoomId={initialOpenChatRoomId}
+          onConsumeOpenChatRoomId={() => setInitialOpenChatRoomId(null)}
           setMainMenu={setMainMenu}
         />
       </div>

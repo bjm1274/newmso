@@ -21,22 +21,28 @@ self.addEventListener('push', (event) => {
   );
 });
 
-// 2. 알림 클릭 처리
+// 2. 알림 클릭 처리 — 채팅 알림이면 해당 채팅방으로 이동
 self.addEventListener('notificationclick', (event) => {
-  console.log('알림 클릭:', event);
-  
   event.notification.close();
 
-  // 해당 페이지로 포커스 이동
+  var data = event.notification.data || {};
+  var roomId = data.room_id || '';
+  var baseUrl = self.registration.scope.replace(/\/$/, '');
+  var chatUrl = roomId ? baseUrl + '/main?open_chat_room=' + encodeURIComponent(roomId) : baseUrl + '/main';
+
   event.waitUntil(
-    clients.matchAll({ type: 'window' }).then((clientList) => {
-      for (let client of clientList) {
-        if (client.url === '/' && 'focus' in client) {
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
+      for (var i = 0; i < clientList.length; i++) {
+        var client = clientList[i];
+        if (client.url.indexOf(baseUrl) === 0 && 'focus' in client) {
+          if (roomId && 'navigate' in client) {
+            return client.navigate(chatUrl).then(function(c) { return c ? c.focus() : Promise.resolve(); });
+          }
           return client.focus();
         }
       }
       if (clients.openWindow) {
-        return clients.openWindow('/');
+        return clients.openWindow(chatUrl);
       }
     })
   );
