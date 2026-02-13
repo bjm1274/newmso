@@ -19,6 +19,8 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const [approverLine, setApproverLine] = useState<any[]>([]);
   const [extraData, setExtraData] = useState<any>({});
   const [customFormTypes, setCustomFormTypes] = useState<{ name: string; slug: string }[]>([]);
+  const [lastDraftByType, setLastDraftByType] = useState<Record<string, any>>({});
+  const [suppliesLoadKey, setSuppliesLoadKey] = useState(0);
   const isMso = user?.company === 'SY INC.' || user?.permissions?.mso === true;
 
   const BUILTIN_FORM_TYPES = ['인사명령', '연차/휴가', '연장근무', '물품신청', '수리요청서', '업무기안', '업무협조', '양식신청', '출결정정'];
@@ -68,6 +70,43 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   };
 
   useEffect(() => { fetchApprovals(); }, [selectedCompanyId, user?.id]);
+
+  // 작성하기에서 선택한 유형별로 내가 마지막 상신한 결재 조회 (이전 기안 불러오기용)
+  const fetchMyLastApproval = async (type: string) => {
+    if (!user?.id) return null;
+    const { data } = await supabase
+      .from('approvals')
+      .select('*')
+      .eq('sender_id', user.id)
+      .eq('type', type)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return data;
+  };
+
+  useEffect(() => {
+    if (viewMode !== '작성하기' || !user?.id || !formType) return;
+    fetchMyLastApproval(formType).then((row) => {
+      if (row) setLastDraftByType((p) => ({ ...p, [formType]: row }));
+      else setLastDraftByType((p) => ({ ...p, [formType]: null }));
+    });
+  }, [viewMode, formType, user?.id]);
+
+  const loadLastDraft = () => {
+    const last = lastDraftByType[formType];
+    if (!last) return;
+    setFormTitle(last.title || '');
+    setFormContent(last.content || '');
+    setExtraData(last.meta_data || {});
+    if (Array.isArray(last.approver_line) && last.approver_line.length > 0 && Array.isArray(staffs)) {
+      const line = last.approver_line
+        .map((id: string) => staffs.find((s: any) => s.id === id))
+        .filter(Boolean);
+      if (line.length > 0) setApproverLine(line);
+    }
+    if (formType === '물품신청' && last.meta_data?.items?.length) setSuppliesLoadKey((k) => k + 1);
+  };
 
   useEffect(() => {
     const channel = supabase
@@ -240,11 +279,26 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                 })}
               </div>
 
+              {formType !== '양식신청' && lastDraftByType[formType] && (
+                <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-100 rounded-xl">
+                  <span className="text-[10px] font-bold text-amber-700">
+                    마지막 상신: {lastDraftByType[formType].title || '(제목 없음)'} · {new Date(lastDraftByType[formType].created_at).toLocaleDateString()}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={loadLastDraft}
+                    className="shrink-0 px-4 py-2 rounded-xl bg-amber-500 text-white text-[11px] font-black hover:bg-amber-600 transition-all"
+                  >
+                    이전 기안 불러오기
+                  </button>
+                </div>
+              )}
+
               <div className="min-h-[200px] animate-in fade-in duration-500">
                 {['연차/휴가', '연장근무'].includes(formType) ? (
                   <AttendanceForms user={user} staffs={staffs} formType={formType} setExtraData={setExtraData} setFormTitle={setFormTitle} />
                 ) : formType === '물품신청' ? (
-                  <SuppliesForm setExtraData={setExtraData} />
+                  <SuppliesForm key={suppliesLoadKey} setExtraData={setExtraData} initialItems={suppliesLoadKey > 0 ? lastDraftByType['물품신청']?.meta_data?.items : undefined} />
                 ) : formType === '수리요청서' ? (
                   <RepairRequestForm setExtraData={setExtraData} />
                 ) : formType === '양식신청' ? (

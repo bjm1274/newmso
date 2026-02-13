@@ -2,10 +2,24 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
-export default function SuppliesForm({ setExtraData }: any) {
+const defaultRow = () => ({ name: '', qty: 1, currentStock: null as number | null, dept: '', purpose: '', suggestions: [] as any[] });
+
+export default function SuppliesForm({ setExtraData, initialItems }: any) {
   // MSO 삭제된 부서 목록
   const departments = ["병동팀", "수술팀", "외래팀", "검사팀", "총무팀", "원무팀", "진료부", "관리팀", "영양팀"];
-  const [items, setItems] = useState([{ name: '', qty: 1, currentStock: null as number | null, dept: '', purpose: '', suggestions: [] as any[] }]);
+  const [items, setItems] = useState(() => {
+    if (Array.isArray(initialItems) && initialItems.length > 0) {
+      return initialItems.map((r: any) => ({
+        name: r.name ?? '',
+        qty: Number(r.qty) || 1,
+        currentStock: r.currentStock ?? null,
+        dept: r.dept ?? '',
+        purpose: r.purpose ?? '',
+        suggestions: []
+      }));
+    }
+    return [defaultRow()];
+  });
   const [bulkDept, setBulkDept] = useState('');
   const [inventory, setInventory] = useState<any[]>([]);
 
