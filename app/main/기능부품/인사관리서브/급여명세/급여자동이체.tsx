@@ -61,7 +61,7 @@ export default function SalaryAutoTransfer() {
   const executeTransfer = async () => {
     setTransferStatus('진행중');
     
-    for (let item of transferData) {
+    for (const item of transferData) {
       // 실제 은행 API 연동 (예: 우리은행 API)
       const transferPayload = {
         bank_code: getBankCode(item.bank_name),
