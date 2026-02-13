@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import AppLogo from '@/app/components/AppLogo';
 
 const MYPAGE_TAB_KEY = 'erp_mypage_tab';
 
@@ -64,8 +65,8 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
     <>
       {/* PC 사이드바 — 토스 스타일 통일 */}
       <aside className="hidden md:flex w-[72px] bg-[var(--toss-card)] border-r border-[var(--toss-border)] flex-col items-center py-6 space-y-2 shrink-0 z-50 h-screen shadow-sm">
-        <div className="w-10 h-10 mb-4 flex items-center justify-center rounded-[12px] overflow-hidden shrink-0 bg-[var(--toss-gray-1)]">
-          <img src="/icon-192x192.png" alt="SY INC." className="w-full h-full object-contain" />
+        <div className="mb-4 shrink-0">
+          <AppLogo size={40} />
         </div>
         <div className="flex-1 flex flex-col space-y-1 overflow-y-auto no-scrollbar w-full px-2">
           {visibleMenus.map(m => (

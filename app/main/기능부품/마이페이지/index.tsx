@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 
 // 기능 컴포넌트 불러오기
+import AppLogo from '@/app/components/AppLogo';
 import MyProfileCard from './프로필카드';
 import SalarySlipContainer from './급여명세서';
 import MyTodoList from './나의할일';
@@ -172,7 +173,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 shrink-0">
         <div className="text-left space-y-2">
           <div className="flex items-center gap-3 mb-2">
-            <img src="/icon-192x192.png" alt="SY INC." className="h-10 w-10 object-contain shrink-0" />
+            <AppLogo size={40} />
             <h1 className="text-2xl font-black text-gray-900 tracking-tight">
               반갑습니다, {user.name}님 👋
             </h1>
