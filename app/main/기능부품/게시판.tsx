@@ -36,6 +36,8 @@ export default function BoardView({ user, setMainMenu }: any) {
   const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date());
   // 상세보기용 선택된 게시물
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  // 댓글 대댓글용 부모 댓글 ID
+  const [replyParentId, setReplyParentId] = useState<string | null>(null);
 
   const boards = [
     { id: '공지사항', label: '📢 공지사항', icon: '📢' },
@@ -187,11 +189,17 @@ export default function BoardView({ user, setMainMenu }: any) {
     setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, likes_count: likes } : p)));
   };
 
-  const handleAddComment = async (postId: string) => {
+  const handleAddComment = async (postId: string, parentCommentId?: string | null) => {
     if (!newComment.trim() || !user?.id) return;
     const { data } = await supabase
       .from('board_post_comments')
-      .insert([{ post_id: postId, author_id: user.id, author_name: user.name, content: newComment.trim() }])
+      .insert([{
+        post_id: postId,
+        author_id: user.id,
+        author_name: user.name,
+        content: newComment.trim(),
+        parent_comment_id: parentCommentId ?? null,
+      }])
       .select()
       .single();
     if (data) {
@@ -727,7 +735,8 @@ export default function BoardView({ user, setMainMenu }: any) {
         </div>
       )}
 
-      {/* 게시물 목록 */}
+      {/* 게시물 목록 (수술일정·MRI일정은 달력으로만 표시) */}
+      {(activeBoard !== '수술일정' && activeBoard !== 'MRI일정') && (
       <div className="space-y-2">
         {posts.length > 0 ? (
           posts.map((post, idx) => {
@@ -820,6 +829,7 @@ export default function BoardView({ user, setMainMenu }: any) {
           </div>
         )}
       </div>
+      )}
 
       {/* 게시글 상세 보기 모달 */}
       {selectedPost && (
@@ -859,22 +869,59 @@ export default function BoardView({ user, setMainMenu }: any) {
           </div>
 
           {(selectedPost.board_type === '수술일정' || selectedPost.board_type === 'MRI일정') && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-[11px] font-bold text-[#4E5968] border-t border-[#E5E8EB] pt-4">
-              <div>
-                <p className="text-[9px] font-black text-[#8B95A1] uppercase">수술/검사명</p>
-                <p className="mt-1 text-sm font-black text-[#191F28]">{selectedPost.title}</p>
+            <div className="space-y-4 border-t border-[#E5E8EB] pt-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-[11px] font-bold text-[#4E5968]">
+                <div>
+                  <p className="text-[9px] font-black text-[#8B95A1] uppercase">수술/검사명</p>
+                  <p className="mt-1 text-sm font-black text-[#191F28]">{selectedPost.title}</p>
+                </div>
+                <div>
+                  <p className="text-[9px] font-black text-[#8B95A1] uppercase">날짜·시간</p>
+                  <p className="mt-1 text-sm font-black text-[#191F28]">
+                    {selectedPost.schedule_date} {selectedPost.schedule_time}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[9px] font-black text-[#8B95A1] uppercase">위치 / 환자명</p>
+                  <p className="mt-1 text-sm font-black text-[#191F28]">
+                    {selectedPost.schedule_room || '-'} / {selectedPost.patient_name || '-'}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-[9px] font-black text-[#8B95A1] uppercase">날짜·시간</p>
-                <p className="mt-1 text-sm font-black text-[#191F28]">
-                  {selectedPost.schedule_date} {selectedPost.schedule_time}
+
+              {/* 같은 날짜의 전체 일정 목록 */}
+              <div className="bg-[#F8FAFC] border border-[#E5E8EB] rounded-[12px] p-3 space-y-2">
+                <p className="text-[10px] font-black text-[#4E5968] flex items-center gap-2">
+                  📅 {selectedPost.schedule_date || '날짜 미지정'} 의 전체 일정
                 </p>
-              </div>
-              <div>
-                <p className="text-[9px] font-black text-[#8B95A1] uppercase">위치 / 환자명</p>
-                <p className="mt-1 text-sm font-black text-[#191F28]">
-                  {selectedPost.schedule_room || '-'} / {selectedPost.patient_name || '-'}
-                </p>
+                <div className="max-h-40 overflow-y-auto custom-scrollbar space-y-1 text-[11px]">
+                  {posts
+                    .filter(
+                      (p: any) =>
+                        p.board_type === selectedPost.board_type &&
+                        p.schedule_date === selectedPost.schedule_date
+                    )
+                    .map((p: any) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setSelectedPostId(p.id)}
+                        className={`w-full flex items-center gap-2 px-2 py-1 rounded-[8px] text-left hover:bg-white ${
+                          p.id === selectedPost.id ? 'bg-white shadow-sm border border-[#E5E8EB]' : ''
+                        }`}
+                      >
+                        <span className="text-[10px] font-bold text-[#8B95A1] w-14 shrink-0">
+                          {p.schedule_time || ''}
+                        </span>
+                        <span className="flex-1 truncate font-bold text-[#191F28]">
+                          {p.title}
+                        </span>
+                        <span className="text-[10px] font-bold text-[#3182F6] shrink-0">
+                          {p.patient_name || ''}
+                        </span>
+                      </button>
+                    ))}
+                </div>
               </div>
             </div>
           )}
@@ -902,7 +949,7 @@ export default function BoardView({ user, setMainMenu }: any) {
             </div>
           )}
 
-          {/* 댓글 */}
+          {/* 댓글 + 대댓글 */}
           <div className="pt-4 border-t border-[#F1F3F5] space-y-3">
             <p className="text-[11px] font-black text-[#4E5968] flex items-center gap-2">
               💬 댓글
@@ -910,17 +957,50 @@ export default function BoardView({ user, setMainMenu }: any) {
                 {(comments[selectedPost.id] || []).length}개
               </span>
             </p>
-            <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
-              {(comments[selectedPost.id] || []).map((c: any) => (
-                <div key={c.id} className="text-xs text-[#4E5968] flex gap-2">
-                  <span className="font-bold">{c.author_name}:</span>
-                  <span>{c.content}</span>
+            {(() => {
+              const list = comments[selectedPost.id] || [];
+              const roots = list.filter((c: any) => !c.parent_comment_id);
+              const repliesByParent: Record<string, any[]> = {};
+              list.forEach((c: any) => {
+                if (!c.parent_comment_id) return;
+                const key = String(c.parent_comment_id);
+                if (!repliesByParent[key]) repliesByParent[key] = [];
+                repliesByParent[key].push(c);
+              });
+              return (
+                <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
+                  {roots.map((c: any) => (
+                    <div key={c.id} className="space-y-1">
+                      <div className="text-xs text-[#4E5968] flex gap-2">
+                        <span className="font-bold">{c.author_name}:</span>
+                        <span>{c.content}</span>
+                        {user?.id && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setReplyParentId(c.id);
+                              setNewComment('');
+                            }}
+                            className="ml-auto text-[10px] text-[#8B95A1] hover:text-[#3182F6]"
+                          >
+                            답글
+                          </button>
+                        )}
+                      </div>
+                      {(repliesByParent[String(c.id)] || []).map((r: any) => (
+                        <div key={r.id} className="ml-6 text-xs text-[#4E5968] flex gap-2">
+                          <span className="font-bold">{r.author_name}:</span>
+                          <span>{r.content}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                  {roots.length === 0 && (
+                    <p className="text-[11px] text-[#C1C5D0] font-bold">첫 댓글을 남겨보세요.</p>
+                  )}
                 </div>
-              ))}
-              {(comments[selectedPost.id] || []).length === 0 && (
-                <p className="text-[11px] text-[#C1C5D0] font-bold">첫 댓글을 남겨보세요.</p>
-              )}
-            </div>
+              );
+            })()}
             {user?.id && (
               <div className="flex gap-2">
                 <input
@@ -931,7 +1011,10 @@ export default function BoardView({ user, setMainMenu }: any) {
                 />
                 <button
                   type="button"
-                  onClick={() => handleAddComment(selectedPost.id)}
+                  onClick={() => {
+                    handleAddComment(selectedPost.id, replyParentId);
+                    setReplyParentId(null);
+                  }}
                   className="px-3 py-2 bg-[#3182F6] text-white rounded-[12px] text-xs font-bold hover:opacity-95"
                 >
                   등록
