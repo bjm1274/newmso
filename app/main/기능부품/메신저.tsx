@@ -188,7 +188,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   }, [initialOpenChatRoomId]);
 
   const fetchData = useCallback(async () => {
-    let query = supabase
+    const query = supabase
       .from('messages')
       .select('*, staff:staff_members(name, photo_url)')
       .eq('room_id', selectedRoomId)

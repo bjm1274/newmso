@@ -86,7 +86,7 @@ export default function ApprovalSystemImproved({ user, onRefresh }: any) {
     };
 
     const required = requiredFields[selectedFormType] || [];
-    for (let field of required) {
+    for (const field of required) {
       if (!formData[field]) {
         alert(`${field}을(를) 입력해주세요.`);
         return;
