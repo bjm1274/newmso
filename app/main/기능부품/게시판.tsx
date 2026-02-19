@@ -654,9 +654,9 @@ export default function BoardView({ user, setMainMenu }: any) {
 
       {/* 수술/MRI용 사람 모형 선택 모달 - 사람 이미지 + 부위 하이라이트 */}
       {showBodyPicker && (activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-3 md:p-6" onClick={() => setShowBodyPicker(false)}>
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4 md:p-10" onClick={() => setShowBodyPicker(false)}>
           <div
-            className="w-full max-w-3xl max-h-[90vh] bg-white rounded-[20px] shadow-2xl border border-[#E5E8EB] p-5 md:p-7 flex flex-col md:flex-row gap-5"
+            className="w-full max-w-5xl max-h-[90vh] bg-white rounded-[24px] shadow-2xl border border-[#E5E8EB] p-6 md:p-10 flex flex-col md:flex-row gap-6"
             onClick={(e) => e.stopPropagation()}
           >
             {/* 왼쪽: 사람 모형 이미지 + 부위 클릭 (사용자 제공 이미지의 사람 부분만 보이도록 중앙 크롭) */}
