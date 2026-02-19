@@ -163,6 +163,63 @@ export default function DocumentRepository({
     setForm({ title: '', category: '규정', content: '' });
   };
 
+  const handleOpenPdf = async () => {
+    if (!selected) return;
+    // 이미 PDF URL이 있으면 바로 새 창으로 열기
+    if (selected.file_url) {
+      window.open(selected.file_url, '_blank');
+      return;
+    }
+    // 없으면 선택된 문서 내용을 기반으로 즉시 PDF 생성 후 저장·열기
+    try {
+      const jsPDFModule: any = await import('jspdf');
+      const jsPDF = jsPDFModule.jsPDF || jsPDFModule.default;
+      const doc = new jsPDF('p', 'mm', 'a4');
+
+      const title = selected.title || '문서';
+      const content = selected.content || '';
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.text(title, 20, 20);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(11);
+      const lines = doc.splitTextToSize(content, 170);
+      doc.text(lines, 20, 32);
+
+      const blob = doc.output('blob') as Blob;
+      const safeCompany =
+        (selected.company_name && selected.company_name !== '전체'
+          ? selected.company_name
+          : selectedCo).replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || 'company';
+      const safeTitle = title.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || 'document';
+      const filePath = `${safeCompany}/${safeTitle}_${Date.now()}.pdf`;
+
+      const { error: upErr } = await supabase.storage
+        .from('document-pdfs')
+        .upload(filePath, blob, { contentType: 'application/pdf', upsert: true });
+      if (upErr) {
+        console.warn('document pdf upload error', upErr);
+        alert('PDF 생성 또는 업로드 중 오류가 발생했습니다.');
+        return;
+      }
+      const { data: urlData } = supabase.storage.from('document-pdfs').getPublicUrl(filePath);
+      const url = urlData.publicUrl as string;
+
+      await supabase
+        .from('document_repository')
+        .update({ file_url: url, updated_at: new Date().toISOString() })
+        .eq('id', selected.id);
+
+      setSelected({ ...selected, file_url: url });
+      window.open(url, '_blank');
+    } catch (e) {
+      console.warn('handleOpenPdf error', e);
+      alert('PDF를 여는 중 오류가 발생했습니다.');
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-[#F8FAFC] p-4 md:p-8">
       <div className="flex justify-between items-center mb-6 gap-3 flex-wrap">
@@ -268,17 +325,13 @@ export default function DocumentRepository({
             </h3>
             {selected && (
               <div className="flex items-center gap-2">
-                {selected.file_url && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      window.open(selected.file_url, '_blank');
-                    }}
-                    className="px-3 py-1.5 text-[11px] font-semibold rounded-[10px] border border-[#E5E8EB] text-[#3182F6] hover:bg-[#E8F3FF]"
-                  >
-                    PDF 열기/인쇄
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={handleOpenPdf}
+                  className="px-3 py-1.5 text-[11px] font-semibold rounded-[10px] border border-[#E5E8EB] text-[#3182F6] hover:bg-[#E8F3FF]"
+                >
+                  PDF 열기/인쇄
+                </button>
                 <button
                   type="button"
                   onClick={() => handleDelete(selected)}
