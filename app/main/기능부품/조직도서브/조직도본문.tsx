@@ -66,6 +66,17 @@ export default function MainContent({
           shift = shiftData;
         }
 
+        // 회사 기본정보(대표자, 사업자번호, 주소, 전화 등) 조회
+        let companyInfo: any = null;
+        if (companyName && companyName !== '전체') {
+          const { data: companyRow } = await supabase
+            .from('companies')
+            .select('*')
+            .eq('name', companyName)
+            .maybeSingle();
+          companyInfo = companyRow;
+        }
+
         // 계약서 템플릿 조회
         const { data: tmpl } = await supabase
           .from('contract_templates')
@@ -83,8 +94,8 @@ export default function MainContent({
           templateText = fallback?.template_content || '';
         }
 
-        // 직원 정보·급여·근무형태를 이용해 템플릿 변수 치환
-        const filled = fillContractTemplate(templateText, user, contract, shift);
+        // 직원 정보·회사 정보·급여·근무형태를 이용해 템플릿 변수 치환
+        const filled = fillContractTemplate(templateText, user, contract, shift, companyInfo);
         setContractTemplate(filled);
       }
 
@@ -106,7 +117,13 @@ export default function MainContent({
   }, [user]);
 
   // 근로계약서 템플릿 변수 치환 유틸
-  const fillContractTemplate = (template: string, user: any, contract: any, shift: any) => {
+  const fillContractTemplate = (
+    template: string,
+    user: any,
+    contract: any,
+    shift: any,
+    company: any,
+  ) => {
     if (!template) return '';
 
     const formatDate = (value?: string | null) => {
@@ -150,7 +167,14 @@ export default function MainContent({
     const vars: Record<string, string> = {
       employee_name: user?.name || '',
       employee_no: String(user?.employee_no ?? ''),
-      company_name: user?.company || '',
+
+      // 회사 기본정보 (회사/조직 → 회사관리에서 입력한 값 우선 사용)
+      company_name: company?.name || user?.company || '',
+      company_ceo: company?.ceo_name || '',
+      company_business_no: company?.business_no || '',
+      company_address: company?.address || '',
+      company_phone: company?.phone || '',
+
       department: user?.department || '',
       position: user?.position || '',
       join_date: formatDate(user?.joined_at || salarySource?.join_date),
