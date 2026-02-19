@@ -53,12 +53,39 @@ export default function MainContent({
       if (contract) {
         setPendingContract(contract);
         const companyName = user.company || '전체';
-        const { data: tmpl } = await supabase.from('contract_templates').select('template_content').eq('company_name', companyName).single();
-        if (tmpl?.template_content) setContractTemplate(tmpl.template_content);
-        else {
-          const { data: fallback } = await supabase.from('contract_templates').select('template_content').eq('company_name', '전체').single();
-          setContractTemplate(fallback?.template_content || '');
+
+        // 근무형태(근로시간·휴게) 조회
+        let shift: any = null;
+        const shiftId = (contract as any).shift_id ?? (user as any).shift_id;
+        if (shiftId) {
+          const { data: shiftData } = await supabase
+            .from('work_shifts')
+            .select('*')
+            .eq('id', shiftId)
+            .single();
+          shift = shiftData;
         }
+
+        // 계약서 템플릿 조회
+        const { data: tmpl } = await supabase
+          .from('contract_templates')
+          .select('template_content')
+          .eq('company_name', companyName)
+          .single();
+
+        let templateText = tmpl?.template_content || '';
+        if (!templateText) {
+          const { data: fallback } = await supabase
+            .from('contract_templates')
+            .select('template_content')
+            .eq('company_name', '전체')
+            .single();
+          templateText = fallback?.template_content || '';
+        }
+
+        // 직원 정보·급여·근무형태를 이용해 템플릿 변수 치환
+        const filled = fillContractTemplate(templateText, user, contract, shift);
+        setContractTemplate(filled);
       }
 
       const { data: staff } = await supabase
@@ -77,6 +104,86 @@ export default function MainContent({
     };
     checkNotifications();
   }, [user]);
+
+  // 근로계약서 템플릿 변수 치환 유틸
+  const fillContractTemplate = (template: string, user: any, contract: any, shift: any) => {
+    if (!template) return '';
+
+    const formatDate = (value?: string | null) => {
+      if (!value) return '';
+      // YYYY-MM-DD 또는 ISO 문자열 가정
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return value;
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}년 ${m}월 ${day}일`;
+    };
+
+    const formatWon = (n?: number | null) => {
+      if (!n || Number.isNaN(n)) return '';
+      try {
+        return n.toLocaleString('ko-KR');
+      } catch {
+        return String(n);
+      }
+    };
+
+    const parseBirthFromResident = (resident?: string | null) => {
+      if (!resident) return '';
+      const raw = resident.replace(/[^0-9]/g, '');
+      if (raw.length < 7) return '';
+      const yy = raw.slice(0, 2);
+      const mm = raw.slice(2, 4);
+      const dd = raw.slice(4, 6);
+      const genderCode = raw[6];
+      const century =
+        genderCode === '1' || genderCode === '2' || genderCode === '5' || genderCode === '6'
+          ? '19'
+          : '20';
+      const year = `${century}${yy}`;
+      return `${year}년 ${mm}월 ${dd}일`;
+    };
+
+    const salarySource = contract || user || {};
+
+    const vars: Record<string, string> = {
+      employee_name: user?.name || '',
+      employee_no: String(user?.employee_no ?? ''),
+      company_name: user?.company || '',
+      department: user?.department || '',
+      position: user?.position || '',
+      join_date: formatDate(user?.joined_at || salarySource?.join_date),
+      phone: user?.phone || '',
+      address: user?.address || '',
+      birth_date: parseBirthFromResident(user?.resident_no),
+
+      base_salary: formatWon(salarySource.base_salary),
+      position_allowance: formatWon(salarySource.position_allowance),
+      meal_allowance: formatWon(salarySource.meal_allowance),
+      vehicle_allowance: formatWon(salarySource.vehicle_allowance),
+      childcare_allowance: formatWon(salarySource.childcare_allowance),
+      research_allowance: formatWon(salarySource.research_allowance),
+      other_taxfree: formatWon(salarySource.other_taxfree),
+
+      shift_start: shift?.start_time ? String(shift.start_time).slice(0, 5) : '',
+      shift_end: shift?.end_time ? String(shift.end_time).slice(0, 5) : '',
+      break_start: shift?.break_start_time ? String(shift.break_start_time).slice(0, 5) : '',
+      break_end: shift?.break_end_time ? String(shift.break_end_time).slice(0, 5) : '',
+
+      today: formatDate(new Date().toISOString()),
+    };
+
+    let result = template;
+    Object.entries(vars).forEach(([key, value]) => {
+      const token = `{{${key}}}`;
+      if (result.includes(token)) {
+        result = result.split(token).join(value || '');
+      }
+    });
+
+    return result;
+  };
 
   const handleSignContract = async () => {
     const sigData = signature?.trim();
