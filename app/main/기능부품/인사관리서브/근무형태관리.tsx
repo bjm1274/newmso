@@ -9,6 +9,11 @@ type Shift = {
   end_time: string;
   description?: string;
   company_name?: string;
+  break_start_time?: string | null;
+  break_end_time?: string | null;
+  shift_type?: string | null;
+  weekly_work_days?: number | null;
+  is_weekend_work?: boolean | null;
 };
 
 export default function ShiftManagement({ selectedCo }: any) {
@@ -21,7 +26,12 @@ export default function ShiftManagement({ selectedCo }: any) {
     start_time: '09:00',
     end_time: '18:00',
     description: '',
-    company_name: '박철홍정형외과'
+    company_name: '박철홍정형외과',
+    break_start_time: '',
+    break_end_time: '',
+    shift_type: '',
+    weekly_work_days: 5,
+    is_weekend_work: false,
   });
 
   const fetchShifts = async () => {
@@ -41,6 +51,11 @@ export default function ShiftManagement({ selectedCo }: any) {
         end_time: s.end_time?.slice(0, 5) || '18:00',
         description: s.description,
         company_name: s.company_name,
+        break_start_time: s.break_start_time?.slice(0, 5) || null,
+        break_end_time: s.break_end_time?.slice(0, 5) || null,
+        shift_type: s.shift_type || null,
+        weekly_work_days: s.weekly_work_days ?? null,
+        is_weekend_work: s.is_weekend_work ?? null,
       }));
       if (selectedCo && selectedCo !== '전체') {
         list = list.filter((s: any) => s.company_name === selectedCo);
@@ -70,6 +85,11 @@ export default function ShiftManagement({ selectedCo }: any) {
             end_time: newShift.end_time,
             description: newShift.description || null,
             company_name: newShift.company_name,
+            break_start_time: newShift.break_start_time || null,
+            break_end_time: newShift.break_end_time || null,
+            shift_type: newShift.shift_type || null,
+            weekly_work_days: newShift.weekly_work_days ?? null,
+            is_weekend_work: newShift.is_weekend_work ?? null,
           })
           .eq('id', editingShiftId);
         if (error) throw error;
@@ -81,13 +101,29 @@ export default function ShiftManagement({ selectedCo }: any) {
           end_time: newShift.end_time,
           description: newShift.description || null,
           company_name: newShift.company_name,
+          break_start_time: newShift.break_start_time || null,
+          break_end_time: newShift.break_end_time || null,
+          shift_type: newShift.shift_type || null,
+          weekly_work_days: newShift.weekly_work_days ?? null,
+          is_weekend_work: newShift.is_weekend_work ?? null,
         }]);
         if (error) throw error;
         alert('근무 형태가 등록되었습니다.');
       }
       setShowAddModal(false);
       setEditingShiftId(null);
-      setNewShift({ name: '', start_time: '09:00', end_time: '18:00', description: '', company_name: '박철홍정형외과' });
+      setNewShift({
+        name: '',
+        start_time: '09:00',
+        end_time: '18:00',
+        description: '',
+        company_name: '박철홍정형외과',
+        break_start_time: '',
+        break_end_time: '',
+        shift_type: '',
+        weekly_work_days: 5,
+        is_weekend_work: false,
+      });
       fetchShifts();
     } catch (err) {
       alert('저장에 실패했습니다.');
@@ -121,6 +157,11 @@ export default function ShiftManagement({ selectedCo }: any) {
               end_time: '18:00',
               description: '',
               company_name: selectedCo && selectedCo !== '전체' ? selectedCo : '박철홍정형외과',
+              break_start_time: '',
+              break_end_time: '',
+              shift_type: '',
+              weekly_work_days: 5,
+              is_weekend_work: false,
             });
             setShowAddModal(true);
           }}
@@ -167,7 +208,30 @@ export default function ShiftManagement({ selectedCo }: any) {
                 <p className="text-[9px] font-black text-gray-300 uppercase">퇴근</p>
                 <p className="text-sm font-black text-gray-700">{shift.end_time}</p>
               </div>
+              {shift.break_start_time && shift.break_end_time && (
+                <div className="ml-auto text-right">
+                  <p className="text-[9px] font-black text-gray-300 uppercase">휴게/점심</p>
+                  <p className="text-sm font-black text-gray-700">
+                    {shift.break_start_time} ~ {shift.break_end_time}
+                  </p>
+                </div>
+              )}
             </div>
+            {(shift.shift_type || shift.weekly_work_days || shift.is_weekend_work) && (
+              <div className="mt-2 text-[10px] font-bold text-gray-500 flex flex-wrap gap-2">
+                {shift.shift_type && <span className="px-2 py-0.5 rounded-full bg-gray-50 border border-gray-100">{shift.shift_type}</span>}
+                {shift.weekly_work_days && (
+                  <span className="px-2 py-0.5 rounded-full bg-gray-50 border border-gray-100">
+                    주 {shift.weekly_work_days}일 근무
+                  </span>
+                )}
+                {shift.is_weekend_work && (
+                  <span className="px-2 py-0.5 rounded-full bg-gray-50 border border-gray-100">
+                    주말 포함
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         ))}
         {shifts.length === 0 && (
@@ -213,6 +277,65 @@ export default function ShiftManagement({ selectedCo }: any) {
               <div>
                 <label className="text-[10px] font-black text-gray-400 uppercase">설명</label>
                 <textarea value={newShift.description} onChange={e => setNewShift({...newShift, description: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 font-black text-xs h-20" placeholder="근무 형태에 대한 설명을 입력하세요" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase">휴게/점심 시작</label>
+                  <input
+                    type="time"
+                    value={newShift.break_start_time}
+                    onChange={e => setNewShift({ ...newShift, break_start_time: e.target.value })}
+                    className="w-full p-3 bg-gray-50 border border-gray-200 font-black text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase">휴게/점심 종료</label>
+                  <input
+                    type="time"
+                    value={newShift.break_end_time}
+                    onChange={e => setNewShift({ ...newShift, break_end_time: e.target.value })}
+                    className="w-full p-3 bg-gray-50 border border-gray-200 font-black text-xs"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase">근무 패턴</label>
+                  <select
+                    value={newShift.shift_type}
+                    onChange={e => setNewShift({ ...newShift, shift_type: e.target.value })}
+                    className="w-full p-3 bg-gray-50 border border-gray-200 font-black text-xs"
+                  >
+                    <option value="">선택</option>
+                    <option value="상근">상근 (주간)</option>
+                    <option value="2교대">2교대</option>
+                    <option value="3교대">3교대</option>
+                    <option value="1일근무1일휴무">1일 근무 · 1일 휴무</option>
+                    <option value="야간전담">야간 전담</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase">주 근무일수 / 주말</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={1}
+                      max={7}
+                      value={newShift.weekly_work_days}
+                      onChange={e => setNewShift({ ...newShift, weekly_work_days: Number(e.target.value) || 0 })}
+                      className="w-16 p-2 bg-gray-50 border border-gray-200 font-black text-xs text-center"
+                    />
+                    <span className="text-[11px] font-bold text-gray-600">일 / 주</span>
+                    <label className="ml-2 text-[10px] font-bold text-gray-600 flex items-center gap-1">
+                      <input
+                        type="checkbox"
+                        checked={newShift.is_weekend_work}
+                        onChange={e => setNewShift({ ...newShift, is_weekend_work: e.target.checked })}
+                      />
+                      주말 포함
+                    </label>
+                  </div>
+                </div>
               </div>
             </div>
             <div className="flex gap-2 pt-4">

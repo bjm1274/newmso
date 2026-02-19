@@ -109,16 +109,19 @@ export default function PayrollSlipPDF({ staff, record, yearMonth }: any) {
   const base = record?.base_salary ?? staff?.base_salary ?? staff?.base ?? 0;
   const net = record?.net_pay ?? 0;
 
-  const title = design?.title || '급여명세서';
-  const subtitle = design?.subtitle || '월별 급여 내역서';
-  const companyLabel = design?.companyLabel || '박철홍정형외과';
+  const companyName = staff?.company || (design?.companyLabel || '박철홍정형외과');
+  const ym = String(yearMonth || new Date().toISOString().slice(0, 7));
+  const [y, m] = ym.split('-');
+  const monthLabel = `${y}-${Number(m || '1')}월`;
+  const title = `${companyName} ${monthLabel} 급여명세서`;
+  const footerText = design?.footerText || '';
   const footerText = design?.footerText || '';
   const showSignArea = design?.showSignArea ?? true;
 
   return (
     <div className="p-6 bg-white border border-gray-200 rounded-2xl">
       <div ref={printRef} className="relative min-h-[220px]">
-        {/* 제목 – 관리화면에서 지정한 위치를 그대로 사용 (기본값 상단 좌측) */}
+        {/* 제목 – 회사명 + 해당 월 급여명세서 (위치는 디자인 설정 사용) */}
         <div
           className="absolute font-extrabold text-lg text-gray-900"
           style={{
@@ -130,7 +133,7 @@ export default function PayrollSlipPDF({ staff, record, yearMonth }: any) {
           {title}
         </div>
 
-        {/* 부제 + 회사명 라벨 */}
+        {/* 부제: 직원/월 정보만 간단히 표시 */}
         <div
           className="absolute text-[11px] text-gray-600 font-bold"
           style={{
@@ -139,10 +142,9 @@ export default function PayrollSlipPDF({ staff, record, yearMonth }: any) {
             transform: 'translate(-0%, -0%)',
           }}
         >
-          <span className="mr-1">{yearMonth}</span>
+          <span className="mr-1">{ym}</span>
           <span className="mr-1">· {staff?.name}</span>
-          <span>· {companyLabel}</span>
-          <div className="mt-1 text-gray-400">{subtitle}</div>
+          <span>· {companyName}</span>
         </div>
 
         {/* 급여 표 영역 (고정) */}

@@ -21,6 +21,7 @@ export default function DocumentRepository({
   const [form, setForm] = useState({ title: '', category: '규정', content: '' });
   const [saving, setSaving] = useState(false);
   const [staffFilterName, setStaffFilterName] = useState<string | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<string>('전체');
 
   const fetchDocs = async () => {
     setLoading(true);
@@ -42,12 +43,14 @@ export default function DocumentRepository({
     }
   }, [linkedTarget?.name]);
 
-  const visibleDocs = staffFilterName
-    ? docs.filter((d) => {
-        const text = `${d.title || ''} ${d.content || ''}`;
-        return text.includes(staffFilterName);
-      })
-    : docs;
+  const visibleDocs = docs.filter((d) => {
+    const matchStaff = staffFilterName
+      ? (`${d.title || ''} ${d.content || ''}`).includes(staffFilterName)
+      : true;
+    const matchCategory =
+      categoryFilter === '전체' ? true : (d.category || '규정') === categoryFilter;
+    return matchStaff && matchCategory;
+  });
 
   const handleSave = async () => {
     if (!form.title.trim()) return alert('제목을 입력하세요.');
@@ -99,9 +102,35 @@ export default function DocumentRepository({
 
   return (
     <div className="flex flex-col h-full bg-[#F8FAFC] p-4 md:p-8">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-center mb-6 gap-3 flex-wrap">
         <h2 className="text-xl font-bold text-[#191F28]">문서 보관함</h2>
-        <button onClick={handleNew} className="px-4 py-2 bg-[#3182F6] text-white text-sm font-semibold rounded-[12px] hover:bg-[#1B64DA]">+ 새 문서</button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="px-3 py-1.5 rounded-[10px] border border-[#E5E8EB] text-[11px] font-bold text-[#4E5968]"
+          >
+            <option value="전체">전체 폴더</option>
+            {CATEGORIES.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+          <input
+            type="text"
+            value={staffFilterName || ''}
+            onChange={(e) => setStaffFilterName(e.target.value || null)}
+            placeholder="직원 이름으로 검색"
+            className="px-3 py-1.5 rounded-[10px] border border-[#E5E8EB] text-[11px] font-bold text-[#191F28] min-w-[140px]"
+          />
+          <button
+            onClick={handleNew}
+            className="px-4 py-2 bg-[#3182F6] text-white text-sm font-semibold rounded-[12px] hover:bg-[#1B64DA]"
+          >
+            + 새 문서
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

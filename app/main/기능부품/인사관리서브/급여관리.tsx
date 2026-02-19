@@ -38,9 +38,41 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
   const [activeTab, setActiveTab] = useState('대장');
   const [selectedStaffId, setSelectedStaffId] = useState(1);
   const [checkedIds, setCheckedIds] = useState<number[]>([]);
+  const [yearMonth] = useState<string>(() => new Date().toISOString().slice(0, 7));
+  const [payrollRecords, setPayrollRecords] = useState<any[]>([]);
   
   const filtered: Staff[] = selectedCo === '전체' ? staffs : staffs.filter((s: Staff) => s.company === selectedCo);
   const current = filtered.find((s) => s.id === selectedStaffId) || filtered[0];
+
+  // 선택된 월·회사에 대한 급여 정산 결과 불러오기
+  useEffect(() => {
+    (async () => {
+      if (!filtered.length) {
+        setPayrollRecords([]);
+        return;
+      }
+      try {
+        const { data, error } = await supabase
+          .from('payroll_records')
+          .select('*')
+          .eq('year_month', yearMonth)
+          .not('record_type', 'eq', 'interim');
+        if (error) {
+          console.warn('payroll_records 조회 실패:', error.message);
+          setPayrollRecords([]);
+        } else {
+          setPayrollRecords(data || []);
+        }
+      } catch (e) {
+        console.warn('payroll_records 조회 중 예외:', e);
+        setPayrollRecords([]);
+      }
+    })();
+  }, [yearMonth, filtered.map(s => s.id).join(',')]);
+
+  const currentRecord = current
+    ? payrollRecords.find((r: any) => String(r.staff_id) === String(current.id))
+    : null;
 
   return (
     <div className="flex flex-col h-full animate-in fade-in duration-500">
@@ -72,7 +104,7 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
             {activeTab === '대장' && (
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
                 <div className="xl:col-span-2 space-y-8">
-                  {current && <SalaryDetail staff={current} />}
+                  {current && <SalaryDetail staff={current} record={currentRecord || null} />}
                   <PayrollTable staffs={filtered} checkedIds={checkedIds} setCheckedIds={setCheckedIds} onSelect={setSelectedStaffId} />
                 </div>
                 <aside className="space-y-6">
@@ -83,7 +115,7 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
                   <CompliancePanel staffs={filtered.filter((s: Staff) => checkedIds.includes(s.id))} companyName={selectedCo} />
                   {current && <BenefitSummary staff={current} />}
                   {current && <SalarySimulationSummary staff={current} />}
-                  {current && <PayrollSlipPDF staff={current} record={null} yearMonth={new Date().toISOString().slice(0, 7)} />}
+                  {current && <PayrollSlipPDF staff={current} record={currentRecord || null} yearMonth={yearMonth} />}
                   {current && <SalaryChangeHistory staffId={String(current.id)} staffName={current.name} />}
                 </aside>
               </div>
