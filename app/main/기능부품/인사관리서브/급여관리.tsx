@@ -1,5 +1,6 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 import SalaryDetail from './급여명세/급여상세';
 import PayrollTable from './급여명세/급여대장표';
 import PayrollMonthlySummary from './급여명세/급여대장월별요약';

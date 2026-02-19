@@ -223,7 +223,7 @@ export default function ContractManager() {
                   <label className="text-[11px] font-semibold text-gray-600 mb-1.5 block">
                     계약서 본문
                     <span className="ml-2 text-[10px] text-gray-400">
-                      ({{ }} 안의 토큰은 직원/급여/근무형태 데이터로 자동 채워집니다.)
+                      {'{{...}} 형태의 토큰은 직원/급여/근무형태 데이터로 자동 채워집니다.'}
                     </span>
                   </label>
                   <textarea
