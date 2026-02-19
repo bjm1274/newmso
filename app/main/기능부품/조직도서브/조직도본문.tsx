@@ -209,11 +209,29 @@ export default function MainContent({
     };
 
     let result = template;
+    // 1차: {{token}} 치환
     Object.entries(vars).forEach(([key, value]) => {
       const token = `{{${key}}}`;
       if (result.includes(token)) {
         result = result.split(token).join(value || '');
       }
+    });
+
+    // 2차: 예전 양식처럼 "회사명 : ______" 식으로 되어 있는 경우에도 회사 정보 강제 주입
+    const companyLineValues: Record<string, string | undefined> = {
+      회사명: vars.company_name,
+      대표자: vars.company_ceo,
+      대표자명: vars.company_ceo,
+      사업자등록번호: vars.company_business_no,
+      주소: vars.company_address,
+      전화번호: vars.company_phone,
+      '대표 전화번호': vars.company_phone,
+    };
+
+    Object.entries(companyLineValues).forEach(([label, value]) => {
+      if (!value) return;
+      const re = new RegExp(`(${label}\\s*:\\s*)([_\\s]*)`, 'g');
+      result = result.replace(re, `$1${value}`);
     });
 
     return result;
