@@ -9,12 +9,19 @@ export default function ContractManager() {
   const [template, setTemplate] = useState('');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [sealUrl, setSealUrl] = useState<string | null>(null);
+  const [uploadingSeal, setUploadingSeal] = useState(false);
 
   useEffect(() => {
     const fetchTemplate = async () => {
       setLoading(true);
-      const { data } = await supabase.from('contract_templates').select('template_content').eq('company_name', selectedCo).single();
+      const { data } = await supabase
+        .from('contract_templates')
+        .select('template_content, seal_url')
+        .eq('company_name', selectedCo)
+        .single();
       if (data?.template_content) setTemplate(data.template_content);
+      setSealUrl(data?.seal_url || null);
       else {
         const { data: fallback } = await supabase
           .from('contract_templates')
@@ -86,7 +93,12 @@ export default function ContractManager() {
   const handleSave = async () => {
     setSaving(true);
     const { error } = await supabase.from('contract_templates').upsert(
-      { company_name: selectedCo, template_content: template, updated_at: new Date().toISOString() },
+      {
+        company_name: selectedCo,
+        template_content: template,
+        seal_url: sealUrl,
+        updated_at: new Date().toISOString()
+      },
       { onConflict: 'company_name', ignoreDuplicates: false }
     );
     setSaving(false);
@@ -128,14 +140,56 @@ export default function ContractManager() {
         <div className="col-span-3 space-y-6">
           <div className="space-y-3">
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">사업자 공식 직인</p>
-            <div className="aspect-square w-full border-2 border-dashed border-gray-100 flex flex-col items-center justify-center bg-gray-50 group hover:border-red-100 transition-all cursor-pointer">
-              <span className="text-4xl opacity-10 font-serif text-red-600 mb-2">印</span>
-              <span className="text-[9px] font-black text-gray-400">파일 선택</span>
-            </div>
+            <label className="aspect-square w-full border-2 border-dashed border-gray-100 flex flex-col items-center justify-center bg-gray-50 group hover:border-red-100 transition-all cursor-pointer relative overflow-hidden">
+              {sealUrl ? (
+                <>
+                  <img src={sealUrl} alt="사업자 직인" className="w-full h-full object-contain" />
+                  <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 flex items-center justify-center text-[10px] font-black text-white">
+                    변경하려면 클릭
+                  </div>
+                </>
+              ) : (
+                <>
+                  <span className="text-4xl opacity-10 font-serif text-red-600 mb-2">印</span>
+                  <span className="text-[9px] font-black text-gray-400">파일 선택</span>
+                </>
+              )}
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setUploadingSeal(true);
+                  try {
+                    const ext = file.name.split('.').pop() || 'png';
+                    const fileName = `${selectedCo.replace(/\\s+/g, '_')}/seal_${Date.now()}.${ext}`;
+                    const { error: upErr } = await supabase.storage.from('company-seals').upload(fileName, file, { upsert: true });
+                    if (upErr) {
+                      alert('직인 파일 업로드에 실패했습니다. Supabase Storage 설정을 확인해주세요.');
+                    } else {
+                      const { data: urlData } = supabase.storage.from('company-seals').getPublicUrl(fileName);
+                      setSealUrl(urlData.publicUrl);
+                      alert('사업자 직인이 등록되었습니다. 저장 버튼을 눌러 계약서에 적용하세요.');
+                    }
+                  } catch (err) {
+                    alert('직인 업로드 중 오류가 발생했습니다.');
+                  } finally {
+                    setUploadingSeal(false);
+                    e.target.value = '';
+                  }
+                }}
+              />
+            </label>
             <p className="text-[9px] text-gray-400 font-bold leading-tight bg-gray-50 p-3 border border-gray-100">
                 * PNG(투명배경) 권장<br/>
+                * Supabase Storage의 <code>company-seals</code> 버킷에 저장됩니다.<br/>
                 * 저장 시 모든 사원 계약서에 적용
             </p>
+            {uploadingSeal && (
+              <p className="text-[9px] text-blue-500 font-bold">직인 업로드 중...</p>
+            )}
           </div>
           
           <button onClick={handleSave} disabled={saving || loading} className="w-full py-5 bg-[#3182F6] text-white text-xs font-semibold shadow-xl hover:bg-[#1B64DA] transition-all disabled:opacity-50">
