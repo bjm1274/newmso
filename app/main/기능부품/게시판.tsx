@@ -659,7 +659,7 @@ export default function BoardView({ user, setMainMenu }: any) {
             className="w-full max-w-3xl max-h-[90vh] bg-white rounded-[20px] shadow-2xl border border-[#E5E8EB] p-5 md:p-7 flex flex-col md:flex-row gap-5"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* 왼쪽: 사람 모형 이미지 + 부위 클릭 (첨부 이미지 스타일) */}
+            {/* 왼쪽: 사람 모형 이미지 + 부위 클릭 (첨부 이미지 스타일, 호버 반응형) */}
             <div className="flex-1 relative min-h-[260px] bg-slate-950/90 rounded-[18px] border border-slate-800 overflow-hidden flex items-center justify-center">
               <div className="pointer-events-none absolute inset-[-20%] bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.24),_transparent_55%),radial-gradient(circle_at_bottom,_rgba(59,130,246,0.35),_transparent_55%)] opacity-80" />
               <div className="relative w-[190px] h-[300px] md:w-[220px] md:h-[340px] flex items-center justify-center">
@@ -692,13 +692,28 @@ export default function BoardView({ user, setMainMenu }: any) {
                       className={`
                         group absolute -translate-x-1/2 -translate-y-1/2
                         flex items-center justify-center
-                        w-7 h-7 md:w-8 md:h-8 rounded-full border
-                        ${isActive
-                          ? 'bg-sky-400 border-white shadow-[0_0_25px_rgba(56,189,248,0.95)] animate-pulse'
-                          : 'bg-sky-500/30 border-cyan-100/70 hover:bg-sky-400/70 hover:shadow-[0_0_18px_rgba(56,189,248,0.9)]'}
+                        w-10 h-10 md:w-11 md:h-11 rounded-full border border-transparent
+                        ${isActive ? '' : 'hover:border-sky-300/70'}
                       `}
                     >
-                      <span className="w-2 h-2 rounded-full bg-white/90" />
+                      {/* 호버 시 부위 전체가 은은하게 빛나는 하이라이트 */}
+                      <span
+                        className={`
+                          absolute inset-0 rounded-full bg-sky-400/35 blur-xl opacity-0
+                          transition-opacity duration-200
+                          group-hover:opacity-90
+                          ${isActive ? 'opacity-90' : ''}
+                        `}
+                      />
+                      {/* 중심 포인트 */}
+                      <span
+                        className={`
+                          relative w-2.5 h-2.5 rounded-full
+                          ${isActive
+                            ? 'bg-white shadow-[0_0_16px_rgba(56,189,248,1)]'
+                            : 'bg-sky-100 shadow-[0_0_10px_rgba(56,189,248,0.7)] group-hover:bg-white'}
+                        `}
+                      />
                     </button>
                   );
                 })}
