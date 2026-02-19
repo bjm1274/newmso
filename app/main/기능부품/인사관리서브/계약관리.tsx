@@ -40,37 +40,53 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: any) {
         : activeTab === '신규/변경계약서' ? (contractSubType === '신규' ? '신규계약서' : '변경계약서')
         : '표준근로계약서';
 
-      const requests = checkedIds.map(staffId => ({
-        staff_id: staffId,
-        status: '서명대기',
-        requested_at: new Date().toISOString(),
-        contract_type: contractType,
-        ...(includeTaxFree && {
-          base_salary: salaryInfo.base_salary,
-          meal_allowance: salaryInfo.meal_allowance,
-          vehicle_allowance: salaryInfo.vehicle_allowance,
-          childcare_allowance: salaryInfo.childcare_allowance,
-          position_allowance: salaryInfo.position_allowance,
-          research_allowance: salaryInfo.research_allowance,
-          other_taxfree: salaryInfo.other_taxfree,
-          effective_date: salaryInfo.effective_date
-        })
-      }));
+      const requests = checkedIds.map((staffId: string) => {
+        const s = staffs?.find((x: any) => x.id === staffId);
+        const pay = includeTaxFree
+          ? {
+              base_salary: salaryInfo.base_salary ?? s?.base_salary ?? 0,
+              meal_allowance: salaryInfo.meal_allowance ?? s?.meal_allowance ?? 0,
+              vehicle_allowance: salaryInfo.vehicle_allowance ?? s?.vehicle_allowance ?? 0,
+              childcare_allowance: salaryInfo.childcare_allowance ?? s?.childcare_allowance ?? 0,
+              position_allowance: salaryInfo.position_allowance ?? s?.position_allowance ?? 0,
+              research_allowance: salaryInfo.research_allowance ?? s?.research_allowance ?? 0,
+              other_taxfree: salaryInfo.other_taxfree ?? s?.other_taxfree ?? 0,
+              effective_date: salaryInfo.effective_date
+            }
+          : {
+              base_salary: s?.base_salary ?? 0,
+              meal_allowance: s?.meal_allowance ?? 0,
+              vehicle_allowance: s?.vehicle_allowance ?? 0,
+              childcare_allowance: s?.childcare_allowance ?? 0,
+              position_allowance: s?.position_allowance ?? 0,
+              research_allowance: s?.research_allowance ?? 0,
+              other_taxfree: s?.other_taxfree ?? 0,
+              effective_date: salaryInfo.effective_date
+            };
+        return {
+          staff_id: staffId,
+          status: '서명대기',
+          requested_at: new Date().toISOString(),
+          contract_type: contractType,
+          ...pay
+        };
+      });
 
       await supabase.from('employment_contracts').upsert(requests, { onConflict: 'staff_id' });
 
       if (includeTaxFree) {
-        await Promise.all(checkedIds.map(id => 
-          supabase.from('staff_members').update({
-            base_salary: salaryInfo.base_salary,
-            meal_allowance: salaryInfo.meal_allowance,
-            vehicle_allowance: salaryInfo.vehicle_allowance,
-            childcare_allowance: salaryInfo.childcare_allowance,
-            position_allowance: salaryInfo.position_allowance,
-            research_allowance: salaryInfo.research_allowance,
-            other_taxfree: salaryInfo.other_taxfree
-          }).eq('id', id)
-        ));
+        await Promise.all(checkedIds.map((id: string) => {
+          const s = staffs?.find((x: any) => x.id === id);
+          return supabase.from('staff_members').update({
+            base_salary: salaryInfo.base_salary ?? s?.base_salary ?? 0,
+            meal_allowance: salaryInfo.meal_allowance ?? s?.meal_allowance ?? 0,
+            vehicle_allowance: salaryInfo.vehicle_allowance ?? s?.vehicle_allowance ?? 0,
+            childcare_allowance: salaryInfo.childcare_allowance ?? s?.childcare_allowance ?? 0,
+            position_allowance: salaryInfo.position_allowance ?? s?.position_allowance ?? 0,
+            research_allowance: salaryInfo.research_allowance ?? s?.research_allowance ?? 0,
+            other_taxfree: salaryInfo.other_taxfree ?? s?.other_taxfree ?? 0
+          }).eq('id', id);
+        }));
       }
       
       alert("계약서가 발송되었습니다. 직원이 로그인 시 즉시 서명 화면이 표시됩니다.");

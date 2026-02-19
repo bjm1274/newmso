@@ -16,9 +16,9 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   const [신규직원, 신규직원설정] = useState({
     성명: '', 전화번호: '', 사업체: '박철홍정형외과', 팀: '원무팀', 직함: '', 입사일: '', 퇴사일: '',
     주민번호: '', 이메일: '', 주소: '', 면허사항: '', 계좌정보: '', 임금정보: '', 상태: '재직',
-    // 신규 입사 시 잔여 연차(총개수)를 0에서 시작하도록 설정
     연차총개수: 0, 연차사용개수: 0, 근무형태ID: '',
-    base_salary: 0
+    base_salary: 0,
+    meal_allowance: 0, vehicle_allowance: 0, childcare_allowance: 0, research_allowance: 0, other_taxfree: 0, position_allowance: 0
   });
 
   useEffect(() => {
@@ -57,11 +57,13 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         position: 신규직원.직함, resident_no: 신규직원.주민번호, email: 신규직원.이메일, address: 신규직원.주소,
         license: 신규직원.면허사항, bank_account: 신규직원.계좌정보, salary_info: 신규직원.임금정보,
         joined_at: 신규직원.입사일, resigned_at: 신규직원.퇴사일 || null, status: 신규직원.상태,
-        // 신규 입사 시 연차는 무조건 0에서 시작
         annual_leave_total: 0,
         annual_leave_used: 0,
         shift_id: 신규직원.근무형태ID || null,
-        base_salary: 신규직원.base_salary
+        base_salary: 신규직원.base_salary,
+        meal_allowance: 신규직원.meal_allowance ?? 0, vehicle_allowance: 신규직원.vehicle_allowance ?? 0,
+        childcare_allowance: 신규직원.childcare_allowance ?? 0, research_allowance: 신규직원.research_allowance ?? 0,
+        other_taxfree: 신규직원.other_taxfree ?? 0, position_allowance: 신규직원.position_allowance ?? 0
       };
 
       if (편집모드 && 선택된직원ID) {
@@ -92,7 +94,10 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       임금정보: 직원.salary_info || '', 상태: 직원.status || '재직',
       연차총개수: typeof 직원.annual_leave_total === 'number' ? 직원.annual_leave_total : 0,
       연차사용개수: 직원.annual_leave_used || 0, 근무형태ID: 직원.shift_id || '',
-      base_salary: 직원.base_salary || 0
+      base_salary: 직원.base_salary || 0,
+      meal_allowance: 직원.meal_allowance ?? 0, vehicle_allowance: 직원.vehicle_allowance ?? 0,
+      childcare_allowance: 직원.childcare_allowance ?? 0, research_allowance: 직원.research_allowance ?? 0,
+      other_taxfree: 직원.other_taxfree ?? 0, position_allowance: 직원.position_allowance ?? 0
     });
     편집모드설정(true);
   };
@@ -103,7 +108,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       성명: '', 전화번호: '', 사업체: '박철홍정형외과', 팀: '원무팀', 직함: '', 입사일: '', 퇴사일: '',
       주민번호: '', 이메일: '', 주소: '', 면허사항: '', 계좌정보: '', 임금정보: '', 상태: '재직',
       연차총개수: 0, 연차사용개수: 0, 근무형태ID: '',
-      base_salary: 0
+      base_salary: 0,
+      meal_allowance: 0, vehicle_allowance: 0, childcare_allowance: 0, research_allowance: 0, other_taxfree: 0, position_allowance: 0
     });
     창닫기();
   };
@@ -351,25 +357,51 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-gray-400">근무 형태</label>
+                  <label className="text-[9px] font-black text-gray-400">근무 형태 (근무·휴게시간)</label>
                   <select value={신규직원.근무형태ID} onChange={e => 신규직원설정({...신규직원, 근무형태ID: e.target.value})} className="w-full p-3 bg-blue-50 rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100">
-                    <option value="">기본 근무 (09:00 - 18:00)</option>
-                    {근무형태목록.filter(s => s.company === 신규직원.사업체).map(s => (
-                      <option key={s.id} value={s.id}>{s.name} ({s.start_time}-{s.end_time})</option>
+                    <option value="">기본 근무 (09:00–18:00, 휴게 60분)</option>
+                    {근무형태목록.filter((s: any) => s.company_name === 신규직원.사업체 || s.company === 신규직원.사업체).map((s: any) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} · {s.start_time}~{s.end_time}{s.break_minutes != null ? `, 휴게 ${s.break_minutes}분` : ''}
+                      </option>
                     ))}
                   </select>
                 </div>
               </div>
 
               <div className="space-y-4 bg-gray-50 p-6 rounded-[2rem]">
-                <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest">기초 급여 설정 (정산 연동)</h4>
-                <div className="space-y-4">
+                <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest">급여·비과세 (근로계약서/통상임금 연동)</h4>
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-[9px] font-black text-gray-400">기본급 (월)</label>
                     <input type="number" value={신규직원.base_salary} onChange={e => 신규직원설정({...신규직원, base_salary: Number(e.target.value)})} className="w-full p-3 bg-white rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100" placeholder="0" />
                   </div>
-                  <p className="text-[8px] font-bold text-gray-400 leading-tight">* 비과세 항목은 인사관리 → 계약관리에서 근로계약서/변경계약서 발송 시 등록합니다.</p>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-gray-400">직책수당 (월)</label>
+                    <input type="number" value={신규직원.position_allowance ?? 0} onChange={e => 신규직원설정({...신규직원, position_allowance: Number(e.target.value)})} className="w-full p-3 bg-white rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100" placeholder="0" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-gray-400">식대 (비과세 한도 20만)</label>
+                    <input type="number" value={신규직원.meal_allowance ?? 0} onChange={e => 신규직원설정({...신규직원, meal_allowance: Number(e.target.value)})} className="w-full p-3 bg-white rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100" placeholder="0" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-gray-400">자가운전 (비과세 한도 20만)</label>
+                    <input type="number" value={신규직원.vehicle_allowance ?? 0} onChange={e => 신규직원설정({...신규직원, vehicle_allowance: Number(e.target.value)})} className="w-full p-3 bg-white rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100" placeholder="0" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-gray-400">보육수당 (비과세)</label>
+                    <input type="number" value={신규직원.childcare_allowance ?? 0} onChange={e => 신규직원설정({...신규직원, childcare_allowance: Number(e.target.value)})} className="w-full p-3 bg-white rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100" placeholder="0" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-gray-400">연구활동비 (비과세 한도 20만)</label>
+                    <input type="number" value={신규직원.research_allowance ?? 0} onChange={e => 신규직원설정({...신규직원, research_allowance: Number(e.target.value)})} className="w-full p-3 bg-white rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100" placeholder="0" />
+                  </div>
+                  <div className="space-y-1 col-span-2">
+                    <label className="text-[9px] font-black text-gray-400">기타 비과세</label>
+                    <input type="number" value={신규직원.other_taxfree ?? 0} onChange={e => 신규직원설정({...신규직원, other_taxfree: Number(e.target.value)})} className="w-full p-3 bg-white rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100" placeholder="0" />
+                  </div>
                 </div>
+                <p className="text-[8px] font-bold text-gray-400 leading-tight">* 등록 후 인사관리 → 계약관리에서 근로계약서 발송 시 통상임금 표가 자동으로 포함됩니다.</p>
               </div>
             </div>
 
