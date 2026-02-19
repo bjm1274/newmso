@@ -370,6 +370,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                     <label className="text-[9px] font-black text-gray-400">직함</label>
                     <select value={신규직원.직함} onChange={e => 신규직원설정({...신규직원, 직함: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100">
                       <option value="">선택</option>
+                      <option value="사원">사원</option>
                       <option value="주임">주임</option>
                       <option value="대리">대리</option>
                       <option value="팀장">팀장</option>

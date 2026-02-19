@@ -114,6 +114,10 @@ export default function ApprovalFormTypesManager() {
     const name = addName.trim();
     if (!name) return alert('양식 이름을 입력하세요.');
     const slug = (addSlug.trim() || slugFromName(name)).slice(0, 50);
+    if (slug === 'payroll_slip' || name.includes('급여명세')) {
+      alert('급여명세서는 기본 서식으로 고정되어 있어, 별도로 추가할 수 없습니다.');
+      return;
+    }
     const { error } = await supabase.from('approval_form_types').insert({
       name,
       slug,

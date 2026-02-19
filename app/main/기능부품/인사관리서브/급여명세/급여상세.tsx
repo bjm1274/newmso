@@ -59,9 +59,19 @@ export default function SalaryDetail({ record, staff }: any) {
         <div>
           <div className="flex items-center gap-3 mb-2">
             <span className="px-3 py-1 bg-blue-600 text-white text-[10px] font-black rounded-lg uppercase tracking-widest">{staff?.company || 'SY INC.'}</span>
-            <h3 className="text-2xl font-black tracking-tighter italic">급여 명세서</h3>
+            {(() => {
+              const ym = String(data.year_month || new Date().toISOString().slice(0, 7));
+              const [y, m] = ym.split('-');
+              const monthLabel = `${y}-${Number(m || '1')}월`;
+              return (
+                <h3 className="text-2xl font-black tracking-tighter italic">
+                  {monthLabel} 급여명세서
+                </h3>
+              );
+            })()}
           </div>
-          <p className="text-xs font-bold text-gray-400">{data.year_month}분 (Salary Statement)</p>
+          {/* 보조 설명 문구는 간단히 한국어만 표기 */}
+          <p className="text-xs font-bold text-gray-400">해당 월 급여 내역</p>
         </div>
         <div className="text-left md:text-right">
           <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">실 수령액 (Net Pay)</p>

@@ -194,6 +194,22 @@ export default function MainContent({
         .update({ status: '서명완료', signed_at: new Date().toISOString(), signature_data: sigData })
         .eq('id', pendingContract.id);
       if (error) throw error;
+
+      // 서명 완료된 근로계약서를 문서보관함에 자동 보관
+      try {
+        const title = `${user?.company || ''} ${user?.name || ''} 근로계약서 (${new Date().toISOString().slice(0, 10)})`;
+        await supabase.from('document_repository').insert({
+          title,
+          category: '계약서',
+          content: contractTemplate || '',
+          version: 1,
+          company_name: user?.company || '전체',
+          created_by: user?.id,
+        });
+      } catch (e) {
+        console.warn('문서보관함 저장 실패(계약서 자동 보관):', e);
+      }
+
       alert("근로계약서 서명이 완료되었습니다.");
       setPendingContract(null);
       setSignature('');
