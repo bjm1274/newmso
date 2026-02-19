@@ -33,15 +33,18 @@ export default function BoardView({ user, setMainMenu }: any) {
   const [surgeryTemplates, setSurgeryTemplates] = useState<any[]>([]);
   const [mriTemplates, setMriTemplates] = useState<any[]>([]);
 
-  // 수술/MRI 부위 필터 (사람 모형 버튼용)
+  // 수술/MRI 부위 필터 (사람 모형 버튼용) - 세분화
   const BODY_PARTS = [
     { id: 'all', label: '전체', emoji: '👤' },
     { id: 'cervical', label: '경추/목', emoji: '🧠' },
+    { id: 'chest', label: '흉부/가슴', emoji: '❤️' },
     { id: 'lumbar', label: '요추/허리', emoji: '🦴' },
     { id: 'shoulder', label: '어깨', emoji: '🏋️' },
-    { id: 'elbow', label: '팔꿈치', emoji: '💪' },
-    { id: 'wrist', label: '손목/손', emoji: '✋' },
-    { id: 'hip', label: '고관절', emoji: '🦵' },
+    { id: 'upper_arm', label: '위팔', emoji: '💪' },
+    { id: 'elbow', label: '팔꿈치', emoji: '🦾' },
+    { id: 'forearm', label: '아래팔', emoji: '🤚' },
+    { id: 'hand', label: '손/손가락', emoji: '✋' },
+    { id: 'hip', label: '고관절/골반', emoji: '🦵' },
     { id: 'knee', label: '무릎', emoji: '🦿' },
     { id: 'ankle', label: '발목/발', emoji: '🦶' },
     { id: 'other', label: '기타', emoji: '➕' },
@@ -124,11 +127,14 @@ export default function BoardView({ user, setMainMenu }: any) {
 
     const keywordMap: Record<string, string[]> = {
       cervical: ['경추', '목', '경추부'],
+      chest: ['흉부', '가슴', '흉곽', '흉추'],
       lumbar: ['요추', '허리', '요추부', '요추부 MRI'],
       shoulder: ['어깨', '견', '견관절'],
+      upper_arm: ['상완', '위팔'],
       elbow: ['팔꿈치', '주관절'],
-      wrist: ['손목', '수근', '손'],
-      hip: ['고관절', '둔부', '고관절'],
+      forearm: ['전완', '아래팔'],
+      hand: ['손', '수지', '수부', '손목', '수근'],
+      hip: ['고관절', '둔부', '골반'],
       knee: ['무릎', '슬관절', '무릎관절'],
       ankle: ['발목', '족관절', '발'],
       other: [],
@@ -660,7 +666,7 @@ export default function BoardView({ user, setMainMenu }: any) {
             onClick={(e) => e.stopPropagation()}
           >
             {/* 왼쪽: 사람 모형 이미지 + 부위 클릭 (사용자 제공 이미지의 사람 부분만 보이도록 중앙 크롭) */}
-            <div className="flex-1 relative min-h-[260px] max-h-[420px] bg-[#020617] rounded-[18px] border border-slate-800 overflow-hidden flex items-center justify-center">
+            <div className="flex-1 relative min-h-[360px] max-h-[520px] bg-[#020617] rounded-[18px] border border-slate-800 overflow-hidden flex items-center justify-center">
               <div className="absolute inset-0">
                 {/* 실제 사람 모형 이미지는 /public/human-body-mri.png 로 배치해서 사용 (브라우저 UI가 포함된 스크린샷이어도 중앙 사람만 보이도록 object-cover 처리) */}
                 <img
@@ -673,15 +679,25 @@ export default function BoardView({ user, setMainMenu }: any) {
               {/* 각 부위 클릭 영역 (이미지 위에 투명 오버레이) */}
               <div className="relative w-full h-full flex items-center justify-center">
                 {[
-                  { id: 'cervical', top: '15%', left: '50%' },
-                  { id: 'lumbar', top: '43%', left: '50%' },
-                  { id: 'shoulder', top: '21%', left: '31%' },
-                  { id: 'shoulder', top: '21%', left: '69%' },
-                  { id: 'wrist', top: '40%', left: '18%' },
-                  { id: 'wrist', top: '40%', left: '82%' },
-                  { id: 'hip', top: '56%', left: '50%' },
-                  { id: 'knee', top: '73%', left: '50%' },
-                  { id: 'ankle', top: '90%', left: '50%' },
+                  // 상체 정중앙
+                  { id: 'cervical', top: '13%', left: '50%' },    // 목/경추
+                  { id: 'chest', top: '25%', left: '50%' },       // 흉부
+                  { id: 'lumbar', top: '40%', left: '50%' },      // 요추/허리
+                  { id: 'hip', top: '55%', left: '50%' },         // 골반/고관절
+                  // 어깨/팔
+                  { id: 'shoulder', top: '22%', left: '30%' },    // 좌 어깨
+                  { id: 'shoulder', top: '22%', left: '70%' },    // 우 어깨
+                  { id: 'upper_arm', top: '32%', left: '25%' },   // 좌 위팔
+                  { id: 'upper_arm', top: '32%', left: '75%' },   // 우 위팔
+                  { id: 'elbow', top: '42%', left: '22%' },       // 좌 팔꿈치
+                  { id: 'elbow', top: '42%', left: '78%' },       // 우 팔꿈치
+                  { id: 'forearm', top: '50%', left: '20%' },     // 좌 아래팔
+                  { id: 'forearm', top: '50%', left: '80%' },     // 우 아래팔
+                  { id: 'hand', top: '58%', left: '18%' },        // 좌 손/손목
+                  { id: 'hand', top: '58%', left: '82%' },        // 우 손/손목
+                  // 다리
+                  { id: 'knee', top: '73%', left: '50%' },        // 무릎
+                  { id: 'ankle', top: '90%', left: '50%' },       // 발목/발
                 ].map((spot, idx) => {
                   const isActive = selectedBodyPart === spot.id;
                   return (
