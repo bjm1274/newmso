@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import SignaturePad from '@/app/components/SignaturePad';
+import { getOrdinaryWageTable } from '@/lib/ordinary-wage';
 
 import OrgChart from './조직도그림'; 
 import MyPage from '../마이페이지'; 
@@ -181,6 +182,49 @@ export default function MainContent({
               <p className="text-xs text-[#3182F6] font-semibold mt-1 uppercase tracking-wider">본 계약서는 법적 효력을 갖는 전자 문서입니다.</p>
             </div>
             <div className="p-8 md:p-10 space-y-8">
+              {/* 통상임금 산출 표 (근로자가 확인 후 서명) */}
+              {(() => {
+                const breakdown = {
+                  base_salary: pendingContract.base_salary ?? user?.base_salary,
+                  meal_allowance: pendingContract.meal_allowance ?? user?.meal_allowance,
+                  vehicle_allowance: pendingContract.vehicle_allowance ?? user?.vehicle_allowance,
+                  childcare_allowance: pendingContract.childcare_allowance ?? user?.childcare_allowance,
+                  research_allowance: pendingContract.research_allowance ?? user?.research_allowance,
+                  other_taxfree: pendingContract.other_taxfree ?? user?.other_taxfree,
+                  position_allowance: pendingContract.position_allowance ?? user?.position_allowance,
+                };
+                const { rows, totalMonthly, hourlyWage } = getOrdinaryWageTable(breakdown);
+                if (rows.length === 0) return null;
+                return (
+                  <div className="bg-white p-6 rounded-[16px] border-2 border-[#3182F6]/20">
+                    <h4 className="text-xs font-black text-[#191F28] mb-3 uppercase tracking-wider">통상임금 산출 (월 소정근로시간 209시간 기준)</h4>
+                    <table className="w-full text-[11px] border-collapse">
+                      <thead>
+                        <tr className="border-b border-gray-200">
+                          <th className="text-left py-2 font-black text-gray-500">항목</th>
+                          <th className="text-right py-2 font-black text-gray-500">금액 (원/월)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rows.map((r, i) => (
+                          <tr key={i} className="border-b border-gray-100">
+                            <td className="py-2 font-semibold text-gray-700">{r.label}</td>
+                            <td className="py-2 text-right font-bold text-gray-900">{r.amount.toLocaleString()}</td>
+                          </tr>
+                        ))}
+                        <tr className="bg-[#F2F4F6] font-black">
+                          <td className="py-2 text-gray-800">월 통상급여 합계</td>
+                          <td className="py-2 text-right text-[#3182F6]">{totalMonthly.toLocaleString()}</td>
+                        </tr>
+                        <tr className="font-black">
+                          <td className="py-2 text-gray-800">시 통상임금 (원/시간)</td>
+                          <td className="py-2 text-right text-[#3182F6]">{hourlyWage.toLocaleString()}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
               <div className="bg-[#F2F4F6] p-6 md:p-8 rounded-[16px] border border-[#E5E8EB] text-xs leading-relaxed text-[#4E5968] font-medium max-h-[40vh] overflow-y-auto custom-scrollbar">
                 <h3 className="text-sm font-bold text-[#191F28] mb-4 text-center underline underline-offset-8">{pendingContract.contract_type || '표준 근로계약서'}</h3>
                 <div className="whitespace-pre-wrap">{contractTemplate || '제1조(계약의 목적)\n본 계약은 근로기준법에 따라 사용자와 근로자 간의 근로조건을 정함을 목적으로 한다.\n\n제2조(근로계약기간) 입사일로부터 정함이 없는 기간\n\n제3조(근무장소) 소속 병원 내 지정 장소\n\n제4조(업무내용) 채용 시 결정된 직무 및 부수 업무\n\n제5조(소정근로시간) 주 40시간 (운영 스케줄에 따름)\n\n제6조(임금) 연봉계약서 및 급여 규정에 따름\n\n[상기 내용을 확인하였으며 이에 동의합니다]'}</div>
