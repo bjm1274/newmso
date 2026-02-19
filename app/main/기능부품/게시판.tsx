@@ -428,27 +428,12 @@ export default function BoardView({ user, setMainMenu }: any) {
               </label>
               {(activeBoard === '수술일정' || activeBoard === 'MRI일정') ? (
                 <div className="space-y-3">
-                  {/* 사람 모형 느낌의 부위 선택 버튼들 */}
-                  <div className="flex flex-wrap gap-1.5 mb-1">
-                    {BODY_PARTS.map((bp) => (
-                      <button
-                        key={bp.id}
-                        type="button"
-                        onClick={() => setSelectedBodyPart(bp.id)}
-                        className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
-                          selectedBodyPart === bp.id
-                            ? 'bg-[#3182F6] text-white border-[#3182F6]'
-                            : 'bg-[#F2F4F6] text-[#4E5968] border-[#E5E8EB]'
-                        }`}
-                      >
-                        <span className="mr-1">{bp.emoji}</span>
-                        {bp.label}
-                      </button>
-                    ))}
+                  {/* 사람 모형 선택 버튼만 노출 (상단 부위 버튼 제거) */}
+                  <div className="flex justify-end mb-1">
                     <button
                       type="button"
                       onClick={() => setShowBodyPicker(true)}
-                      className="ml-auto px-3 py-1.5 rounded-full bg-white border border-[#E5E8EB] text-[10px] font-bold text-[#3182F6] hover:bg-[#E8F3FF]"
+                      className="px-3 py-1.5 rounded-full bg-white border border-[#E5E8EB] text-[10px] font-bold text-[#3182F6] hover:bg-[#E8F3FF]"
                     >
                       👤 사람 모형으로 선택
                     </button>
@@ -674,17 +659,18 @@ export default function BoardView({ user, setMainMenu }: any) {
             className="w-full max-w-3xl max-h-[90vh] bg-white rounded-[20px] shadow-2xl border border-[#E5E8EB] p-5 md:p-7 flex flex-col md:flex-row gap-5"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* 왼쪽: 사람 실루엣 + 부위 클릭 (두 번째 예시 이미지 느낌) */}
+            {/* 왼쪽: 사람 모형 이미지 + 부위 클릭 (첨부 이미지 스타일) */}
             <div className="flex-1 relative min-h-[260px] bg-slate-950/90 rounded-[18px] border border-slate-800 overflow-hidden flex items-center justify-center">
               <div className="pointer-events-none absolute inset-[-20%] bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.24),_transparent_55%),radial-gradient(circle_at_bottom,_rgba(59,130,246,0.35),_transparent_55%)] opacity-80" />
-              <div className="relative w-[170px] h-[280px] md:w-[200px] md:h-[320px]">
-                {/* 중앙 사람 형상 (간단한 실루엣) */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-[70px] md:w-[80px] h-[220px] md:h-[250px] bg-gradient-to-b from-slate-200 via-sky-200 to-slate-400 rounded-[40px] opacity-80 shadow-[0_0_40px_rgba(56,189,248,0.55)]" />
-                  <div className="absolute -top-8 w-14 h-14 md:w-16 md:h-16 rounded-full bg-gradient-to-b from-slate-50 to-sky-200 shadow-[0_0_25px_rgba(56,189,248,0.6)]" />
-                </div>
+              <div className="relative w-[190px] h-[300px] md:w-[220px] md:h-[340px] flex items-center justify-center">
+                {/* 실제 사람 모형 이미지는 /public 폴더에 human-body-mri.png 로 배치해서 사용 */}
+                <img
+                  src="/human-body-mri.png"
+                  alt="사람 전신 모형"
+                  className="max-h-full max-w-full object-contain pointer-events-none select-none"
+                />
 
-                {/* 각 부위 클릭 영역 */}
+                {/* 각 부위 클릭 영역 (이미지 위에 오버레이) */}
                 {[
                   { id: 'cervical', top: '15%', left: '50%' },
                   { id: 'lumbar', top: '43%', left: '50%' },
