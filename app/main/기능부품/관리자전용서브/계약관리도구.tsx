@@ -177,6 +177,7 @@ export default function ContractManager() {
 
   return (
     <div className="space-y-6 animate-in fade-in">
+      {/* 회사 선택 탭 */}
       <div className="flex gap-1 border-b border-gray-100 pb-4">
         {COMPANIES.filter(c => c !== '전체').map(co => (
           <button key={co} onClick={() => setSelectedCo(co)} 
@@ -186,51 +187,117 @@ export default function ContractManager() {
         ))}
       </div>
 
-      {/* [변경] 9:3 비율로 계약서 창은 크게, 직인은 작게 배치 */}
+      {/* 9:3 비율로 계약서 편집 / 직인 관리 배치 */}
       <div className="grid grid-cols-12 gap-6 items-start">
-        {/* 왼쪽: 대형 계약서 편집기 (전체 75%) */}
-        <div className="col-span-9 space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-              <span className="w-1 h-3 bg-blue-600"></span> 계약서 표준 양식 편집기
-            </p>
+        {/* 왼쪽: 계약서 표준 틀 편집기 */}
+        <div className="col-span-9 space-y-4">
+          <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-2xl text-white p-4 flex items-center justify-between shadow-md">
+            <div>
+              <p className="text-[10px] font-black tracking-[0.18em] uppercase opacity-70">Contract Template</p>
+              <p className="mt-1 text-sm md:text-base font-semibold">
+                {selectedCo} 표준 근로계약서 틀
+              </p>
+            </div>
             <button
               type="button"
               onClick={() => {
-                if (window.confirm('현재 내용을 지우고 표준 근로계약서 틀로 다시 불러올까요?')) {
+                if (window.confirm('현재 내용을 지우고 기본 표준 근로계약서 틀로 다시 불러올까요?')) {
                   setTemplate(DEFAULT_CONTRACT_TEMPLATE);
                 }
               }}
-              className="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-[10px] font-bold text-gray-500 hover:bg-gray-50 hover:border-gray-300 transition-all"
+              className="px-3 py-1.5 rounded-full bg-white/10 border border-white/30 text-[10px] font-bold hover:bg-white/20 transition-all"
             >
-              표준 틀 불러오기
+              표준 틀로 되돌리기
             </button>
           </div>
+
           {loading ? (
-            <div className="w-full h-[650px] flex items-center justify-center bg-gray-50 rounded-xl border border-gray-100">로딩 중...</div>
+            <div className="w-full h-[520px] flex items-center justify-center bg-gray-50 rounded-2xl border border-gray-100">
+              로딩 중...
+            </div>
           ) : (
             <>
-              <textarea 
-                className="w-full h-[350px] p-6 bg-white border border-gray-100 text-sm font-medium leading-relaxed outline-none focus:border-blue-600 shadow-inner custom-scrollbar" 
-                value={template} 
-                onChange={e => setTemplate(e.target.value)} 
-                placeholder="계약서 본문을 입력하세요. 인사관리 → 계약에서 직원에게 발송 시 이 양식이 사용됩니다."
-              />
-              <div className="mt-4">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-                  <span className="w-1 h-3 bg-gray-400"></span> 실시간 미리보기 (근로자 서명 화면과 동일)
-                </p>
-                <div className="bg-[#F2F4F6] border border-[#E5E8EB] rounded-[16px] overflow-hidden shadow-inner">
-                  <div className="p-6 md:p-8 text-xs leading-relaxed text-[#4E5968] font-medium max-h-[320px] overflow-y-auto custom-scrollbar">
-                    <h3 className="text-sm font-bold text-[#191F28] mb-4 text-center underline underline-offset-8">표준 근로계약서</h3>
-                    <div className="whitespace-pre-wrap">
-                      {template || '여기에 입력한 계약서 본문이 근로자 서명 화면에 그대로 표시됩니다.'}
+              {/* 편집기 + 토큰 안내 */}
+              <div className="grid grid-cols-12 gap-4">
+                <div className="col-span-8">
+                  <label className="text-[11px] font-semibold text-gray-600 mb-1.5 block">
+                    계약서 본문
+                    <span className="ml-2 text-[10px] text-gray-400">
+                      ({{ }} 안의 토큰은 직원/급여/근무형태 데이터로 자동 채워집니다.)
+                    </span>
+                  </label>
+                  <textarea
+                    className="w-full h-[320px] p-5 bg-white border border-gray-200 rounded-2xl text-[13px] leading-relaxed outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-inner custom-scrollbar"
+                    value={template}
+                    onChange={e => setTemplate(e.target.value)}
+                    placeholder="계약서 본문을 입력하세요. 인사관리 → 계약에서 직원에게 발송 시 이 양식이 사용됩니다."
+                  />
+                </div>
+                <div className="col-span-4">
+                  <div className="h-full rounded-2xl border border-dashed border-gray-200 bg-slate-50 px-4 py-3 text-[11px] text-gray-600 flex flex-col gap-2">
+                    <p className="font-bold text-gray-700 text-xs mb-1">사용 가능한 자동입력 토큰</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        '{{company_name}}',
+                        '{{employee_name}}',
+                        '{{employee_no}}',
+                        '{{address}}',
+                        '{{join_date}}',
+                        '{{shift_start}}',
+                        '{{shift_end}}',
+                        '{{break_start}}',
+                        '{{break_end}}',
+                        '{{base_salary}}',
+                        '{{meal_allowance}}',
+                        '{{position_allowance}}',
+                        '{{other_taxfree}}',
+                      ].map((tkn) => (
+                        <span
+                          key={tkn}
+                          className="px-2 py-0.5 rounded-full bg-white border border-gray-200 font-mono text-[10px] text-gray-700"
+                        >
+                          {tkn}
+                        </span>
+                      ))}
                     </div>
-                    {sealUrl && (
-                      <div className="mt-6 pt-4 border-t border-[#E5E8EB] flex justify-end">
-                        <img src={sealUrl} alt="사업자 직인" className="h-14 w-14 object-contain opacity-90" />
+                    <p className="mt-auto text-[10px] text-gray-400">
+                      위 토큰들은 조직도·급여·근무형태에 등록된 데이터를 기준으로 전자서명 화면에서 자동 채워집니다.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 미리보기: 실제 근로자 서명 화면과 동일한 레이아웃 */}
+              <div className="mt-5">
+                <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.18em] mb-2 flex items-center gap-2">
+                  <span className="w-1 h-3 bg-gray-400" />
+                  실시간 미리보기 (근로자 서명 화면)
+                </p>
+                <div className="w-full bg-slate-100 rounded-2xl border border-slate-200 py-6 px-3">
+                  <div className="max-w-[760px] mx-auto bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
+                    <div className="px-6 md:px-8 pt-6 pb-4 border-b border-slate-100 flex items-center justify-between">
+                      <div>
+                        <p className="text-[11px] font-semibold text-slate-500">전자 근로계약서</p>
+                        <h3 className="mt-1 text-base md:text-lg font-bold text-slate-900">
+                          표준 근로계약서
+                        </h3>
                       </div>
-                    )}
+                      {sealUrl && (
+                        <div className="flex flex-col items-center text-[10px] text-slate-500">
+                          <span className="mb-1">사업자 직인</span>
+                          <img
+                            src={sealUrl}
+                            alt="사업자 직인"
+                            className="h-14 w-14 object-contain opacity-90 drop-shadow-sm"
+                          />
+                        </div>
+                      )}
+                    </div>
+                    <div className="px-6 md:px-8 py-5 max-h-[260px] overflow-y-auto custom-scrollbar text-[12px] leading-relaxed text-slate-700">
+                      <div className="whitespace-pre-wrap">
+                        {template || '여기에 입력한 계약서 본문이 근로자 서명 화면에 그대로 표시됩니다.'}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -238,7 +305,7 @@ export default function ContractManager() {
           )}
         </div>
 
-        {/* 오른쪽: 소형 직인 관리 (전체 25%) */}
+        {/* 오른쪽: 소형 직인 관리 카드 */}
         <div className="col-span-3 space-y-6">
           <div className="space-y-3">
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">사업자 공식 직인</p>
