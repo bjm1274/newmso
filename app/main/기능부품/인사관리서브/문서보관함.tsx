@@ -100,6 +100,23 @@ export default function DocumentRepository({
     setForm({ title: '', category: '규정', content: '' });
   };
 
+  const handleDelete = async (doc: any) => {
+    if (!confirm(`'${doc.title}' 문서를 완전히 삭제하시겠습니까?`)) return;
+    try {
+      await supabase.from('document_repository').delete().eq('id', doc.id);
+      // 버전 이력까지 함께 정리 (선택)
+      await supabase.from('document_versions').delete().eq('document_id', doc.id);
+      if (selected?.id === doc.id) {
+        setSelected(null);
+        setForm({ title: '', category: '규정', content: '' });
+      }
+      fetchDocs();
+      alert('문서가 삭제되었습니다.');
+    } catch (e) {
+      alert('문서 삭제 중 오류가 발생했습니다.');
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-[#F8FAFC] p-4 md:p-8">
       <div className="flex justify-between items-center mb-6 gap-3 flex-wrap">
@@ -163,10 +180,32 @@ export default function DocumentRepository({
                       <p className="px-4 py-2 text-[10px] text-[#8B95A1]">문서 없음</p>
                     ) : (
                       folderDocs.map((d) => (
-                        <button key={d.id} onClick={() => handleEdit(d)} className={`w-full text-left pl-6 pr-4 py-3 border-b border-[#F2F4F6] hover:bg-[#F2F4F6] ${selected?.id === d.id ? 'bg-[#E8F3FF]' : ''}`}>
-                          <p className="font-semibold text-[#191F28] truncate text-sm">{d.title}</p>
-                          <p className="text-[10px] text-[#8B95A1] mt-0.5">v{d.version} · {new Date(d.updated_at).toLocaleDateString('ko-KR')}</p>
-                        </button>
+                        <div
+                          key={d.id}
+                          className={`flex items-center border-b border-[#F2F4F6] ${
+                            selected?.id === d.id ? 'bg-[#E8F3FF]' : 'hover:bg-[#F2F4F6]'
+                          }`}
+                        >
+                          <button
+                            onClick={() => handleEdit(d)}
+                            className="flex-1 text-left pl-6 pr-2 py-3"
+                          >
+                            <p className="font-semibold text-[#191F28] truncate text-sm">
+                              {d.title}
+                            </p>
+                            <p className="text-[10px] text-[#8B95A1] mt-0.5">
+                              v{d.version} ·{' '}
+                              {new Date(d.updated_at).toLocaleDateString('ko-KR')}
+                            </p>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(d)}
+                            className="px-2 pr-4 text-[11px] text-[#D14343] hover:text-[#B91C1C]"
+                          >
+                            삭제
+                          </button>
+                        </div>
                       ))
                     )}
                   </div>
