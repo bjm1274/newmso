@@ -12,7 +12,6 @@ import BusinessDashboard from './관리자전용서브/경영대시보드';
 import CompanyManager from './관리자전용서브/회사관리';
 import ExcelBulkUpload from './관리자전용서브/엑셀일괄등록';
 import NotificationAutomation from './관리자전용서브/알림자동화설정';
-import ApprovalFormTypesManager from './관리자전용서브/전자결재양식관리';
 import 연차수동부여 from './관리자전용서브/연차수동부여';
 import SurgeryExamTemplateManager from './관리자전용서브/수술검사템플릿관리';
 
@@ -41,7 +40,6 @@ export default function AdminView({ user, staffs = [], depts = [], onRefresh }: 
     { id: '근태차감규칙', label: '⏰ 근태 규칙' },
     { id: '회사관리', label: '🏢 회사/조직' },
     { id: '직원권한', label: '직원·권한' },
-    { id: '전자결재양식', label: '서식양식' },
     { id: '수술검사템플릿', label: '수술·검사명' },
     { id: '팝업관리', label: '팝업' },
     { id: '감사로그', label: '감사 로그' },
@@ -91,7 +89,6 @@ export default function AdminView({ user, staffs = [], depts = [], onRefresh }: 
         {activeTab === '근태차감규칙' && <AttendanceDeductionRules />}
         {activeTab === '회사관리' && <CompanyManager staffs={staffs} onRefresh={onRefresh} />}
         {activeTab === '직원권한' && <직원권한통합 onRefresh={onRefresh} />}
-        {activeTab === '전자결재양식' && <ApprovalFormTypesManager />}
         {activeTab === '수술검사템플릿' && <SurgeryExamTemplateManager />}
         {activeTab === '팝업관리' && <PopupManager />}
         {activeTab === '감사로그' && <AuditLogViewer />}

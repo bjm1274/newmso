@@ -5,6 +5,7 @@ import type { Company, CompanyType } from '@/lib/company';
 import TeamManager from './팀관리';
 import ContractManager from './계약관리도구';
 import CorporateCardTransactions from '../인사관리서브/법인카드사용내역';
+import ApprovalFormTypesManager from './전자결재양식관리';
 
 type Props = {
   staffs?: any[];
@@ -25,7 +26,7 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
     memo: '',
   });
   const [msoId, setMsoId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'company' | 'team' | 'card' | 'contract'>('company');
+  const [activeTab, setActiveTab] = useState<'company' | 'team' | 'card' | 'contract' | 'forms'>('company');
 
   const fetchCompanies = async () => {
     const { data, error } = await supabase
@@ -172,6 +173,12 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
             onClick={() => setActiveTab('contract')}
           >
             계약 설정
+          </button>
+          <button
+            className={`px-3 py-1.5 rounded-[10px] ${activeTab === 'forms' ? 'bg-white text-[#3182F6] shadow-sm' : 'text-gray-500'}`}
+            onClick={() => setActiveTab('forms')}
+          >
+            전자결재 서식
           </button>
         </div>
       </div>
@@ -330,6 +337,12 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
       {activeTab === 'card' && <CorporateCardTransactions staffs={staffs} />}
 
       {activeTab === 'contract' && <ContractManager />}
+
+      {activeTab === 'forms' && (
+        <div className="bg-white border border-[#E5E8EB] rounded-2xl shadow-sm p-6">
+          <ApprovalFormTypesManager />
+        </div>
+      )}
     </div>
   );
 }
