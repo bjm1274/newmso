@@ -49,34 +49,24 @@ export default function SalaryDetail({ record, staff }: any) {
     employment: record.employment_insurance || Math.floor(record.total_taxable * 0.009),
     incomeTax: record.income_tax || Math.floor(record.total_taxable * 0.03),
     localTax: record.local_tax || 0,
-    net: record.net_pay
+      net: record.net_pay
   } : calculateTotals();
+
+  const companyName = staff?.company || 'SY INC.';
+  const ym = String(data.year_month || new Date().toISOString().slice(0, 7));
+  const [y, m] = ym.split('-');
+  const monthLabel = `${y}-${Number(m || '1')}월`;
 
   return (
     <div className="bg-white border border-gray-100 shadow-2xl rounded-[2.5rem] overflow-hidden animate-in fade-in zoom-in duration-700">
-      {/* 명세서 헤더 (마이페이지 스타일) */}
-      <div className="p-8 md:p-10 bg-gray-900 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <span className="px-3 py-1 bg-blue-600 text-white text-[10px] font-black rounded-lg uppercase tracking-widest">{staff?.company || 'SY INC.'}</span>
-            {(() => {
-              const ym = String(data.year_month || new Date().toISOString().slice(0, 7));
-              const [y, m] = ym.split('-');
-              const monthLabel = `${y}-${Number(m || '1')}월`;
-              return (
-                <h3 className="text-2xl font-black tracking-tighter italic">
-                  {monthLabel} 급여명세서
-                </h3>
-              );
-            })()}
-          </div>
-          {/* 보조 설명 문구는 간단히 한국어만 표기 */}
-          <p className="text-xs font-bold text-gray-400">해당 월 급여 내역</p>
-        </div>
-        <div className="text-left md:text-right">
-          <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">실 수령액 (Net Pay)</p>
-          <p className="text-4xl font-black text-blue-400 tracking-tighter">₩ {calc.net.toLocaleString()}</p>
-        </div>
+      {/* 명세서 헤더 – 회사명 + 월을 중앙 정렬로 표시 */}
+      <div className="p-8 md:p-10 bg-gray-900 text-white flex flex-col items-center justify-center gap-3 text-center">
+        <span className="px-3 py-1 bg-blue-600 text-white text-[10px] font-black rounded-lg uppercase tracking-widest">
+          {companyName}
+        </span>
+        <h3 className="text-2xl md:text-3xl font-black tracking-tighter italic">
+          {companyName} {monthLabel} 급여명세서
+        </h3>
       </div>
 
       <div className="p-8 md:p-10 space-y-10">
@@ -137,8 +127,16 @@ export default function SalaryDetail({ record, staff }: any) {
           </div>
         </div>
 
+        {/* 실수령액 요약 – 지급/공제 아래 중앙 표시 */}
+        <div className="pt-8 border-t border-gray-100 text-center">
+          <p className="text-xs font-bold text-gray-500 mb-1">실수령액</p>
+          <p className="text-2xl font-black text-blue-500">
+            = ₩ {calc.net.toLocaleString()}
+          </p>
+        </div>
+
         {/* 하단 안내 및 직인 */}
-        <div className="pt-10 border-t border-gray-100 flex flex-col md:flex-row justify-between items-center gap-6">
+        <div className="pt-10 flex flex-col md:flex-row justify-between items-center gap-6">
           <p className="text-[11px] font-bold text-gray-400 leading-relaxed text-center md:text-left">
             * 본 명세서는 법적 효력을 갖는 전자 문서입니다.<br/>
             * 급여 관련 문의는 SY INC. 경영지원팀으로 연락 바랍니다.

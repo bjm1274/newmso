@@ -47,6 +47,7 @@ export default function BoardView({ user, setMainMenu }: any) {
     { id: 'other', label: '기타', emoji: '➕' },
   ];
   const [selectedBodyPart, setSelectedBodyPart] = useState<string>('all');
+  const [showBodyPicker, setShowBodyPicker] = useState(false);
 
   // 수술일정·MRI일정 달력 뷰용 현재 월
   const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date());
@@ -426,7 +427,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                 {activeBoard === '수술일정' ? '수술명' : activeBoard === 'MRI일정' ? '검사명' : '제목'}
               </label>
               {(activeBoard === '수술일정' || activeBoard === 'MRI일정') ? (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {/* 사람 모형 느낌의 부위 선택 버튼들 */}
                   <div className="flex flex-wrap gap-1.5 mb-1">
                     {BODY_PARTS.map((bp) => (
@@ -444,6 +445,13 @@ export default function BoardView({ user, setMainMenu }: any) {
                         {bp.label}
                       </button>
                     ))}
+                    <button
+                      type="button"
+                      onClick={() => setShowBodyPicker(true)}
+                      className="ml-auto px-3 py-1.5 rounded-full bg-white border border-[#E5E8EB] text-[10px] font-bold text-[#3182F6] hover:bg-[#E8F3FF]"
+                    >
+                      👤 사람 모형으로 선택
+                    </button>
                   </div>
                   <select
                     value=""
@@ -456,8 +464,8 @@ export default function BoardView({ user, setMainMenu }: any) {
                   >
                     <option value="">
                       {activeBoard === '수술일정'
-                        ? '자주 쓰는 수술명 선택 (위의 부위를 먼저 선택하면 필터링 됩니다)'
-                        : '자주 쓰는 검사명 선택 (부위 필터 가능)'}
+                        ? '자주 쓰는 수술명 선택 (부위 선택 또는 사람 모형에서 선택 가능)'
+                        : '자주 쓰는 검사명 선택 (부위 선택 또는 사람 모형에서 선택 가능)'}
                     </option>
                     {filteredTemplates.map((t: any) => (
                       <option key={t.id} value={t.name}>
@@ -656,6 +664,95 @@ export default function BoardView({ user, setMainMenu }: any) {
           >
             {loading ? '등록 중...' : '게시물 등록'}
           </button>
+        </div>
+      )}
+
+      {/* 수술/MRI용 사람 모형 선택 모달 */}
+      {showBodyPicker && (activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-3 md:p-6" onClick={() => setShowBodyPicker(false)}>
+          <div
+            className="w-full max-w-3xl max-h-[90vh] bg-white rounded-[20px] shadow-2xl border border-[#E5E8EB] p-5 md:p-7 flex flex-col md:flex-row gap-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 왼쪽: 사람 실루엣 + 부위 클릭 */}
+            <div className="flex-1 relative min-h-[260px] bg-gradient-to-b from-slate-50 to-slate-100 rounded-[16px] border border-[#E5E8EB] overflow-hidden flex items-center justify-center">
+              <div className="relative w-[160px] h-[260px] md:w-[190px] md:h-[300px]">
+                {/* 사람 실루엣 단색 그림 (간단한 placeholder) */}
+                <div className="absolute inset-0 bg-gradient-to-b from-slate-300 to-slate-500 rounded-full opacity-60" />
+                {/* 각 부위 클릭 영역 */}
+                {[
+                  { id: 'cervical', top: '10%', left: '50%' },
+                  { id: 'lumbar', top: '40%', left: '50%' },
+                  { id: 'shoulder', top: '18%', left: '32%' },
+                  { id: 'shoulder', top: '18%', left: '68%' },
+                  { id: 'wrist', top: '38%', left: '18%' },
+                  { id: 'wrist', top: '38%', left: '82%' },
+                  { id: 'hip', top: '52%', left: '50%' },
+                  { id: 'knee', top: '70%', left: '50%' },
+                  { id: 'ankle', top: '88%', left: '50%' },
+                ].map((spot, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setSelectedBodyPart(spot.id)}
+                    style={{ top: spot.top, left: spot.left }}
+                    className={`absolute -translate-x-1/2 -translate-y-1/2 w-6 h-6 rounded-full border-2 ${
+                      selectedBodyPart === spot.id
+                        ? 'bg-blue-500/80 border-white shadow-lg'
+                        : 'bg-blue-300/60 border-white/80 hover:bg-blue-400/80'
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* 오른쪽: 선택된 부위에 해당하는 수술/검사명 목록 */}
+            <div className="flex-1 flex flex-col">
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <p className="text-[10px] font-black text-[#8B95A1] uppercase tracking-widest">
+                    {activeBoard === '수술일정' ? '수술명 선택' : '검사명 선택'}
+                  </p>
+                  <p className="text-xs font-bold text-[#4E5968] mt-1">
+                    {BODY_PARTS.find((b) => b.id === selectedBodyPart)?.label || '전체'} 기준 추천 목록
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowBodyPicker(false)}
+                  className="px-3 py-1.5 rounded-full border border-gray-200 text-[10px] font-bold text-gray-500 hover:bg-gray-50"
+                >
+                  닫기
+                </button>
+              </div>
+              <div className="flex-1 mt-2 bg-[#F8FAFC] border border-[#E5E8EB] rounded-[12px] p-2 overflow-y-auto custom-scrollbar">
+                {filteredTemplates.length === 0 ? (
+                  <p className="text-[11px] text-[#8B95A1] font-bold py-4 text-center">
+                    선택한 부위에 해당하는 등록된 수술·검사명이 없습니다.<br />
+                    관리자 메뉴의 “수술·검사명”에서 템플릿을 추가해주세요.
+                  </p>
+                ) : (
+                  <ul className="space-y-1">
+                    {filteredTemplates.map((t: any) => (
+                      <li key={t.id}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTitle(t.name);
+                            setShowBodyPicker(false);
+                          }}
+                          className="w-full text-left px-3 py-2 rounded-[8px] text-[12px] font-bold text-[#191F28] hover:bg-white hover:shadow-sm flex items-center gap-2"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#3182F6]" />
+                          <span className="flex-1 truncate">{t.name}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
