@@ -222,7 +222,7 @@ export default function ContractManager() {
                     </span>
                   </label>
                   <textarea
-                    className="w-full h-[320px] p-5 bg-white border border-gray-200 rounded-2xl text-[13px] leading-relaxed outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-inner custom-scrollbar"
+                    className="w-full h-[320px] p-5 bg-white border border-gray-200 rounded-2xl text-[13px] leading-relaxed outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-inner custom-scrollbar font-mono"
                     value={template}
                     onChange={e => setTemplate(e.target.value)}
                     placeholder="계약서 본문을 입력하세요. 인사관리 → 계약에서 직원에게 발송 시 이 양식이 사용됩니다."
@@ -289,7 +289,7 @@ export default function ContractManager() {
                       )}
                     </div>
                     <div className="px-6 md:px-8 py-5 max-h-[260px] overflow-y-auto custom-scrollbar text-[12px] leading-relaxed text-slate-700">
-                      <div className="whitespace-pre-wrap">
+                    <div className="whitespace-pre-wrap font-mono text-[12px]">
                         {template || '여기에 입력한 계약서 본문이 근로자 서명 화면에 그대로 표시됩니다.'}
                       </div>
                     </div>
