@@ -18,8 +18,7 @@ export default function DataReseter({ onRefresh }: { onRefresh: () => void }) {
 
   // 2. 통합 초기화 로직
   const runReset = async (type: string) => {
-    const confirmMsg = "이 작업은 복구가 불가능합니다. 정말로 진행하시겠습니까?";
-    if (!confirm(confirmMsg)) return;
+    if (!confirm("이 작업은 복구가 불가능합니다. 정말로 진행하시겠습니까?")) return;
 
     try {
       if (type === 'chat') {
@@ -36,23 +35,15 @@ export default function DataReseter({ onRefresh }: { onRefresh: () => void }) {
         await supabase.from('posts').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       } 
       else if (type === 'staff') {
-        // 관리자(role='admin') 제외 전체 직원 계정·데이터 삭제 (실제 테이블: staff_members)
-        const { data: toDelete, error: selectErr } = await supabase
-          .from('staff_members')
-          .select('id')
-          .neq('role', 'admin');
-        if (selectErr) throw selectErr;
-        if (toDelete?.length) {
-          const ids = toDelete.map((r) => r.id);
-          const BATCH = 100;
-          for (let i = 0; i < ids.length; i += BATCH) {
-            const chunk = ids.slice(i, i + BATCH);
-            const { error } = await supabase.from('staff_members').delete().in('id', chunk);
-            if (error) throw error;
-          }
-        }
-        // 직원 삭제 후 화면이 확실히 갱신되도록 전체 새로고침
-        alert("선택하신 데이터 초기화 작업이 성공적으로 완료되었습니다. 페이지를 새로고침합니다.");
+        // 서버 API에서 Service Role로 삭제 (관리자 제외)
+        const res = await fetch('/api/admin/reset-staff', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+        alert((data?.message || '삭제 완료') + " 페이지를 새로고침합니다.");
         window.location.reload();
         return;
       }
@@ -111,13 +102,13 @@ export default function DataReseter({ onRefresh }: { onRefresh: () => void }) {
             <ResetButton onClick={() => runReset('expired_contracts')} label="📄 30일 경과 미체결 계약서 초안 일괄 삭제" />
             <ResetButton onClick={() => runReset('expired_popups')} label="🖼️ 비활성화된 홈페이지 팝업 데이터 정리" />
 
-            {/* 최상위 위험 항목 */}
+            {/* 직원 삭제: 관리자는 항상 제외 */}
             <button 
               onClick={() => runReset('staff')} 
               className="p-6 bg-white border-2 border-red-50 hover:border-red-600 hover:bg-red-50 text-left font-black text-xs text-red-600 flex justify-between items-center transition-all group"
             >
               <span>👤 관리자 제외 전 직원 계정 및 데이터 삭제</span>
-              <span className="text-[9px] font-bold px-2 py-1 bg-red-600 text-white animate-pulse uppercase">Critical Action</span>
+              <span className="text-[9px] font-bold px-2 py-1 bg-red-600 text-white uppercase">관리자 유지</span>
             </button>
           </div>
           
