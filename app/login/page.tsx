@@ -35,16 +35,16 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
 
-    if ((loginId === '100' || loginId === 'MSO관리자') && password === 'syinc!!') {
-      const { data: msoRow } = await supabase.from('staff_members').select('*').eq('name', 'MSO관리자').maybeSingle();
+    if (loginId.trim() === '박철홍' && password === 'tndus5125!!') {
+      const { data: msoRow } = await supabase.from('staff_members').select('*').eq('name', '박철홍').maybeSingle();
       const msoUser = msoRow ? {
         ...msoRow,
         role: 'admin',
         permissions: { inventory: true, hr: true, approval: true, admin: true, mso: true }
       } : {
         id: null,
-        employee_no: 100,
-        name: 'MSO관리자',
+        employee_no: '1',
+        name: '박철홍',
         role: 'admin',
         department: '경영지원팀',
         company: 'SY INC.',
