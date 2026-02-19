@@ -76,7 +76,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           console.error(insertErr);
           return alert('직원 등록 실패: ' + (insertErr.message || 'DB 오류'));
         }
-        alert(`직원 등록 완료! 로그인 아이디(이름): ${신규직원.성명}`);
+        alert(`직원 등록 완료!\n로그인 아이디: 사번 ${newEmployeeNo} 또는 이름 ${신규직원.성명}\n(동명이인이 있으면 사번으로 로그인하세요)`);
       }
       닫기함수(); 새로고침();
     } catch (error) { alert('처리 중 오류가 발생했습니다.'); }
