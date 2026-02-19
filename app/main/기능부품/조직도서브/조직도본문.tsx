@@ -195,9 +195,77 @@ export default function MainContent({
         .eq('id', pendingContract.id);
       if (error) throw error;
 
-      // 서명 완료된 근로계약서를 문서보관함에 자동 보관
+      // 서명 완료된 근로계약서를 문서보관함에 자동 보관 (PDF 업로드 포함)
       try {
         const title = `${user?.company || ''} ${user?.name || ''} 근로계약서 (${new Date().toISOString().slice(0, 10)})`;
+
+        // 1) 근로계약서 내용을 기반으로 PDF 생성 후 Supabase Storage에 업로드
+        const pdfUrl = await (async () => {
+          try {
+            const jsPDFModule: any = await import('jspdf');
+            const jsPDF = jsPDFModule.jsPDF || jsPDFModule.default;
+            const doc = new jsPDF('p', 'mm', 'a4');
+
+            const marginLeft = 20;
+            const marginTop = 20;
+            const maxWidth = 170;
+
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(12);
+
+            const lines = doc.splitTextToSize(contractTemplate || '', maxWidth);
+            doc.text(lines, marginLeft, marginTop);
+
+            let cursorY = marginTop + lines.length * 6;
+            if (cursorY > 260) {
+              doc.addPage();
+              cursorY = marginTop;
+            }
+
+            doc.setFontSize(11);
+            if (sigData.startsWith('data:image')) {
+              doc.text('전자 서명:', marginLeft, cursorY + 10);
+              doc.addImage(sigData, 'PNG', marginLeft + 25, cursorY, 35, 18);
+              cursorY += 32;
+            } else {
+              doc.text(`전자 서명: ${sigData}`, marginLeft, cursorY + 10);
+              cursorY += 24;
+            }
+
+            const blob = doc.output('blob') as Blob;
+
+            const safeCompany =
+              user?.company === '박철홍정형외과'
+                ? 'pch_ortho'
+                : user?.company === '수연의원'
+                ? 'suyeon_clinic'
+                : user?.company === 'SY INC.'
+                ? 'sy_inc'
+                : (user?.company || 'company').replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || 'company';
+
+            const safeStaff =
+              (user?.name || 'staff').replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || 'staff';
+
+            const filePath = `${safeCompany}/${safeStaff}_contract_${Date.now()}.pdf`;
+
+            const { error: upErr } = await supabase.storage
+              .from('contract-pdfs')
+              .upload(filePath, blob, { contentType: 'application/pdf', upsert: true });
+
+            if (upErr) {
+              console.warn('contract pdf upload error', upErr);
+              return null;
+            }
+
+            const { data: urlData } = supabase.storage.from('contract-pdfs').getPublicUrl(filePath);
+            return urlData.publicUrl as string;
+          } catch (e) {
+            console.warn('contract pdf generate/upload failed', e);
+            return null;
+          }
+        })();
+
+        // 2) 문서보관함에 계약서 텍스트 + PDF 링크 함께 저장
         await supabase.from('document_repository').insert({
           title,
           category: '계약서',
@@ -205,6 +273,7 @@ export default function MainContent({
           version: 1,
           company_name: user?.company || '전체',
           created_by: user?.id,
+          file_url: pdfUrl || null,
         });
       } catch (e) {
         console.warn('문서보관함 저장 실패(계약서 자동 보관):', e);
@@ -296,13 +365,29 @@ export default function MainContent({
       {mainMenu === '추가기능' && <div className="flex-1 overflow-hidden"><추가기능 user={user} /></div>}
       {mainMenu === '관리자' && <div className="flex-1 overflow-hidden"><AdminView user={user} staffs={data.staffs} depts={data.depts} onRefresh={onRefresh} /></div>}
 
-      {/* 근로계약서 서명 팝업 - 모바일/PC 서명 지원 */}
+      {/* 근로계약서 서명 팝업 - 모바일/PC 서명 지원 (창 닫기 허용) */}
       {pendingContract && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-md z-[9999] flex items-end md:items-center justify-center p-0 md:p-4">
           <div className="bg-white w-full max-w-2xl rounded-t-[24px] md:rounded-[24px] shadow-2xl border-t-4 border-[#3182F6] flex flex-col animate-in slide-in-from-bottom duration-300 max-h-[90vh] overflow-y-auto">
-            <div className="p-8 md:p-10 border-b border-[#E5E8EB]">
-              <h2 className="text-2xl font-bold text-[#191F28] tracking-tight">근로계약서 서명 요청</h2>
-              <p className="text-xs text-[#3182F6] font-semibold mt-1 uppercase tracking-wider">본 계약서는 법적 효력을 갖는 전자 문서입니다.</p>
+            <div className="p-8 md:p-10 border-b border-[#E5E8EB] flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-bold text-[#191F28] tracking-tight">근로계약서 서명 요청</h2>
+                <p className="text-xs text-[#3182F6] font-semibold mt-1 uppercase tracking-wider">
+                  본 계약서는 법적 효력을 갖는 전자 문서입니다.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingContract(null);
+                  setSignature('');
+                  setSignatureMode('none');
+                }}
+                className="text-[#8B95A1] hover:text-[#191F28] text-xl md:text-2xl leading-none"
+                aria-label="근로계약서 창 닫기"
+              >
+                ✕
+              </button>
             </div>
             <div className="p-8 md:p-10 space-y-8">
               {/* 통상임금 산출 표 (근로자가 확인 후 서명) */}
@@ -372,7 +457,26 @@ export default function MainContent({
                   </div>
                 )}
               </div>
-              <button onClick={handleSignContract} disabled={!signature?.trim()} className="w-full py-5 bg-[#3182F6] text-white font-semibold rounded-[16px] text-[15px] hover:bg-[#1B64DA] active:scale-[0.99] transition-all disabled:opacity-50 disabled:cursor-not-allowed">확인 및 전자서명 완료</button>
+              <div className="space-y-3">
+                <button
+                  onClick={handleSignContract}
+                  disabled={!signature?.trim()}
+                  className="w-full py-5 bg-[#3182F6] text-white font-semibold rounded-[16px] text-[15px] hover:bg-[#1B64DA] active:scale-[0.99] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  확인 및 전자서명 완료
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPendingContract(null);
+                    setSignature('');
+                    setSignatureMode('none');
+                  }}
+                  className="w-full py-3 text-[13px] font-semibold text-[#4E5968] bg-[#F5F7FA] rounded-[14px] hover:bg-[#E5E8EB] transition-all"
+                >
+                  나중에 서명할게요
+                </button>
+              </div>
             </div>
           </div>
         </div>
