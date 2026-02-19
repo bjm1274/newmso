@@ -40,7 +40,7 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: any) {
         : activeTab === '신규/변경계약서' ? (contractSubType === '신규' ? '신규계약서' : '변경계약서')
         : '표준근로계약서';
 
-      const requests = checkedIds.map((staffId: string) => {
+      const requests = checkedIds.map((staffId: number) => {
         const s = staffs?.find((x: any) => x.id === staffId);
         const pay = includeTaxFree
           ? {
@@ -75,7 +75,7 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: any) {
       await supabase.from('employment_contracts').upsert(requests, { onConflict: 'staff_id' });
 
       if (includeTaxFree) {
-        await Promise.all(checkedIds.map((id: string) => {
+        await Promise.all(checkedIds.map((id: number) => {
           const s = staffs?.find((x: any) => x.id === id);
           return supabase.from('staff_members').update({
             base_salary: salaryInfo.base_salary ?? s?.base_salary ?? 0,
