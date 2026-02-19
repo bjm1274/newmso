@@ -95,26 +95,26 @@ export default function DocumentRepository({
     setForm({ title: d.title, category: d.category || '규정', content: d.content || '' });
   };
 
-  const handleNew = () => {
-    setSelected(null);
-    setForm({ title: '', category: '규정', content: '' });
-  };
-
   const handleDelete = async (doc: any) => {
-    if (!confirm(`'${doc.title}' 문서를 완전히 삭제하시겠습니까?`)) return;
+    if (!doc?.id) return;
+    if (!window.confirm('해당 문서를 완전히 삭제하시겠습니까?\n삭제 후에는 되돌릴 수 없습니다.')) return;
     try {
-      await supabase.from('document_repository').delete().eq('id', doc.id);
-      // 버전 이력까지 함께 정리 (선택)
-      await supabase.from('document_versions').delete().eq('document_id', doc.id);
+      const { error } = await supabase.from('document_repository').delete().eq('id', doc.id);
+      if (error) throw error;
       if (selected?.id === doc.id) {
         setSelected(null);
         setForm({ title: '', category: '규정', content: '' });
       }
-      fetchDocs();
+      await fetchDocs();
       alert('문서가 삭제되었습니다.');
     } catch (e) {
       alert('문서 삭제 중 오류가 발생했습니다.');
     }
+  };
+
+  const handleNew = () => {
+    setSelected(null);
+    setForm({ title: '', category: '규정', content: '' });
   };
 
   return (
@@ -182,8 +182,8 @@ export default function DocumentRepository({
                       folderDocs.map((d) => (
                         <div
                           key={d.id}
-                          className={`flex items-center border-b border-[#F2F4F6] ${
-                            selected?.id === d.id ? 'bg-[#E8F3FF]' : 'hover:bg-[#F2F4F6]'
+                          className={`flex items-center border-b border-[#F2F4F6] hover:bg-[#F2F4F6] ${
+                            selected?.id === d.id ? 'bg-[#E8F3FF]' : ''
                           }`}
                         >
                           <button
@@ -201,7 +201,7 @@ export default function DocumentRepository({
                           <button
                             type="button"
                             onClick={() => handleDelete(d)}
-                            className="px-2 pr-4 text-[11px] text-[#D14343] hover:text-[#B91C1C]"
+                            className="px-2 pr-4 text-[10px] text-[#B0B8C1] hover:text-red-500 font-bold"
                           >
                             삭제
                           </button>
@@ -223,7 +223,20 @@ export default function DocumentRepository({
         </div>
 
         <div className="lg:col-span-2 bg-white rounded-[16px] border border-[#E5E8EB] p-6">
-          <h3 className="text-lg font-bold text-[#191F28] mb-4">{selected ? '문서 수정 (버전 관리)' : '새 문서 등록'}</h3>
+          <div className="flex items-center justify-between mb-4 gap-2">
+            <h3 className="text-lg font-bold text-[#191F28]">
+              {selected ? '문서 수정 (버전 관리)' : '새 문서 등록'}
+            </h3>
+            {selected && (
+              <button
+                type="button"
+                onClick={() => handleDelete(selected)}
+                className="px-3 py-1.5 text-[11px] font-semibold rounded-[10px] border border-red-100 text-red-600 hover:bg-red-50"
+              >
+                선택 문서 삭제
+              </button>
+            )}
+          </div>
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-semibold text-[#4E5968] mb-2">제목</label>
