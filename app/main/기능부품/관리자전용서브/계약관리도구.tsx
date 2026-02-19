@@ -20,9 +20,11 @@ export default function ContractManager() {
         .select('template_content, seal_url')
         .eq('company_name', selectedCo)
         .single();
-      if (data?.template_content) setTemplate(data.template_content);
-      setSealUrl(data?.seal_url || null);
-      else {
+      if (data?.template_content) {
+        setTemplate(data.template_content);
+        setSealUrl(data?.seal_url || null);
+      } else {
+        setSealUrl(data?.seal_url || null);
         const { data: fallback } = await supabase
           .from('contract_templates')
           .select('template_content')
@@ -127,12 +129,22 @@ export default function ContractManager() {
           {loading ? (
             <div className="w-full h-[650px] flex items-center justify-center bg-gray-50 rounded-xl border border-gray-100">로딩 중...</div>
           ) : (
-            <textarea 
-              className="w-full h-[650px] p-10 bg-white border border-gray-100 text-sm font-medium leading-relaxed outline-none focus:border-blue-600 shadow-inner custom-scrollbar" 
-              value={template} 
-              onChange={e => setTemplate(e.target.value)} 
-              placeholder="계약서 본문을 입력하세요. 인사관리 → 계약에서 직원에게 발송 시 이 양식이 사용됩니다."
-            />
+            <>
+              <textarea 
+                className="w-full h-[350px] p-6 bg-white border border-gray-100 text-sm font-medium leading-relaxed outline-none focus:border-blue-600 shadow-inner custom-scrollbar" 
+                value={template} 
+                onChange={e => setTemplate(e.target.value)} 
+                placeholder="계약서 본문을 입력하세요. 인사관리 → 계약에서 직원에게 발송 시 이 양식이 사용됩니다."
+              />
+              <div className="mt-4">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                  <span className="w-1 h-3 bg-gray-400"></span> 실시간 미리보기 (근로자 서명 화면 기준)
+                </p>
+                <div className="bg-white border border-gray-200 shadow-sm rounded-xl p-6 h-[260px] overflow-y-auto custom-scrollbar text-[11px] leading-relaxed text-gray-800 whitespace-pre-wrap">
+                  {template || '여기에 입력한 계약서 본문이 근로자 서명 화면에 그대로 표시됩니다.'}
+                </div>
+              </div>
+            </>
           )}
         </div>
 
