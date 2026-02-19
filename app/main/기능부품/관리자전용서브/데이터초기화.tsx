@@ -37,10 +37,11 @@ export default function DataReseter({ onRefresh }: { onRefresh: () => void }) {
       } 
       else if (type === 'staff') {
         // 관리자(role='admin') 제외 전체 직원 계정·데이터 삭제 (실제 테이블: staff_members)
-        const { data: toDelete } = await supabase
+        const { data: toDelete, error: selectErr } = await supabase
           .from('staff_members')
           .select('id')
           .neq('role', 'admin');
+        if (selectErr) throw selectErr;
         if (toDelete?.length) {
           const ids = toDelete.map((r) => r.id);
           const BATCH = 100;
@@ -50,6 +51,10 @@ export default function DataReseter({ onRefresh }: { onRefresh: () => void }) {
             if (error) throw error;
           }
         }
+        // 직원 삭제 후 화면이 확실히 갱신되도록 전체 새로고침
+        alert("선택하신 데이터 초기화 작업이 성공적으로 완료되었습니다. 페이지를 새로고침합니다.");
+        window.location.reload();
+        return;
       }
       else if (type === 'system_logs') {
         // [추천] 시스템 활동 로그 삭제 (접속 기록 등)
@@ -67,8 +72,9 @@ export default function DataReseter({ onRefresh }: { onRefresh: () => void }) {
       
       alert("선택하신 데이터 초기화 작업이 성공적으로 완료되었습니다.");
       onRefresh();
-    } catch (e) {
-      alert("데이터 삭제 중 오류가 발생했습니다. 권한을 확인해 주세요.");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      alert("데이터 삭제 중 오류가 발생했습니다.\n\n" + msg + "\n\nSupabase 대시보드에서 RLS 정책 또는 API 권한을 확인해 주세요.");
     }
   };
 
