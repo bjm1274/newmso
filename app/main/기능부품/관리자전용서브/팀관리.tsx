@@ -103,7 +103,7 @@ export default function TeamManager({ onRefresh }: { onRefresh?: () => void }) {
           <div className="bg-white p-8 rounded-2xl max-w-sm w-full space-y-4" onClick={(e) => e.stopPropagation()}>
             <h4 className="font-black">팀 추가</h4>
             <select value={newTeam.division} onChange={(e) => setNewTeam({ ...newTeam, division: e.target.value })} className="w-full p-3 border rounded-xl">
-              {DIVISIONS.map((d) => (
+              {currentDivisions.map((d) => (
                 <option key={d} value={d}>{d}</option>
               ))}
             </select>
