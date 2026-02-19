@@ -186,6 +186,11 @@ export default function ShiftManagement({ selectedCo }: any) {
                       end_time: shift.end_time,
                       description: shift.description || '',
                       company_name: shift.company_name || selectedCo || '박철홍정형외과',
+                      break_start_time: shift.break_start_time || '',
+                      break_end_time: shift.break_end_time || '',
+                      shift_type: shift.shift_type || '',
+                      weekly_work_days: shift.weekly_work_days ?? 5,
+                      is_weekend_work: !!shift.is_weekend_work,
                     });
                     setShowAddModal(true);
                   }}

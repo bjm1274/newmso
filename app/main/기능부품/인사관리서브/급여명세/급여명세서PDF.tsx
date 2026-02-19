@@ -115,7 +115,6 @@ export default function PayrollSlipPDF({ staff, record, yearMonth }: any) {
   const monthLabel = `${y}-${Number(m || '1')}월`;
   const title = `${companyName} ${monthLabel} 급여명세서`;
   const footerText = design?.footerText || '';
-  const footerText = design?.footerText || '';
   const showSignArea = design?.showSignArea ?? true;
 
   return (
