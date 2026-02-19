@@ -20,6 +20,7 @@ export default function BoardView({ user, setMainMenu }: any) {
   const [scheduleInpatient, setScheduleInpatient] = useState(false);
   const [scheduleGuardian, setScheduleGuardian] = useState(false);
   const [scheduleCaregiver, setScheduleCaregiver] = useState(false);
+  const [scheduleTransfusion, setScheduleTransfusion] = useState(false);
   const [schedulePeriod, setSchedulePeriod] = useState('');
   const [scheduleHour, setScheduleHour] = useState('');
   const [scheduleMinute, setScheduleMinute] = useState('');
@@ -298,6 +299,7 @@ export default function BoardView({ user, setMainMenu }: any) {
         postData.surgery_inpatient = scheduleInpatient;
         postData.surgery_guardian = scheduleGuardian;
         postData.surgery_caregiver = scheduleCaregiver;
+        postData.surgery_transfusion = scheduleTransfusion;
       }
 
       const { error } = await supabase.from('board_posts').insert([postData]);
@@ -316,6 +318,7 @@ export default function BoardView({ user, setMainMenu }: any) {
         setScheduleInpatient(false);
         setScheduleGuardian(false);
         setScheduleCaregiver(false);
+        setScheduleTransfusion(false);
         setTagsInput('');
         setShowNewPost(false);
         fetchPosts();
@@ -551,6 +554,15 @@ export default function BoardView({ user, setMainMenu }: any) {
                         />
                         <span>간병인 배치</span>
                       </label>
+                      <label className="inline-flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={scheduleTransfusion}
+                          onChange={(e) => setScheduleTransfusion(e.target.checked)}
+                          className="w-4 h-4 rounded border-[#E5E8EB]"
+                        />
+                        <span>수혈 필요</span>
+                      </label>
                     </div>
                   </div>
                 )}
@@ -775,7 +787,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                       <p className="text-[11px] font-black text-[#191F28] line-clamp-1">{post.schedule_room}</p>
                     </div>
                   </div>
-                  {(post.surgery_fasting || post.surgery_inpatient || post.surgery_guardian || post.surgery_caregiver) && (
+                  {(post.surgery_fasting || post.surgery_inpatient || post.surgery_guardian || post.surgery_caregiver || post.surgery_transfusion) && (
                     <div className="pt-2 flex flex-wrap gap-1">
                       {post.surgery_fasting && (
                         <span className="px-2 py-1 rounded-full bg-red-50 text-red-600 text-[9px] font-black">
@@ -795,6 +807,11 @@ export default function BoardView({ user, setMainMenu }: any) {
                       {post.surgery_caregiver && (
                         <span className="px-2 py-1 rounded-full bg-purple-50 text-purple-600 text-[9px] font-black">
                           간병인
+                        </span>
+                      )}
+                      {post.surgery_transfusion && (
+                        <span className="px-2 py-1 rounded-full bg-red-50 text-red-700 text-[9px] font-black">
+                          수혈
                         </span>
                       )}
                     </div>
@@ -888,6 +905,43 @@ export default function BoardView({ user, setMainMenu }: any) {
                   </p>
                 </div>
               </div>
+
+              {(selectedPost.surgery_fasting ||
+                selectedPost.surgery_inpatient ||
+                selectedPost.surgery_guardian ||
+                selectedPost.surgery_caregiver ||
+                selectedPost.surgery_transfusion) && (
+                <div className="bg-[#F8FAFC] border border-[#E5E8EB] rounded-[12px] p-3 space-y-1 text-[11px] font-bold text-[#4E5968]">
+                  <p className="text-[10px] font-black text-[#8B95A1] uppercase">수술/검사 준비 상태</p>
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    {selectedPost.surgery_fasting && (
+                      <span className="px-2 py-1 rounded-full bg-red-50 text-red-600 text-[9px] font-black">
+                        금식
+                      </span>
+                    )}
+                    {selectedPost.surgery_inpatient && (
+                      <span className="px-2 py-1 rounded-full bg-[#E8F3FF] text-[#3182F6] text-[9px] font-black">
+                        입원
+                      </span>
+                    )}
+                    {selectedPost.surgery_guardian && (
+                      <span className="px-2 py-1 rounded-full bg-emerald-50 text-emerald-600 text-[9px] font-black">
+                        보호자 동반
+                      </span>
+                    )}
+                    {selectedPost.surgery_caregiver && (
+                      <span className="px-2 py-1 rounded-full bg-purple-50 text-purple-600 text-[9px] font-black">
+                        간병인
+                      </span>
+                    )}
+                    {selectedPost.surgery_transfusion && (
+                      <span className="px-2 py-1 rounded-full bg-red-100 text-red-700 text-[9px] font-black">
+                        수혈 필요
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* 같은 날짜의 전체 일정 목록 */}
               <div className="bg-[#F8FAFC] border border-[#E5E8EB] rounded-[12px] p-3 space-y-2">
