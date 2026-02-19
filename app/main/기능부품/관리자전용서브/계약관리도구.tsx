@@ -8,13 +8,14 @@ const DEFAULT_CONTRACT_TEMPLATE = `근 로 계 약 서 ( 월 급 제 )
 
 [사용자 기본정보]
 회사명 : {{company_name}}
-대표자 : {{company_ceo}}          전화번호 : {{company_phone}}
+대표자 : {{company_ceo}}           전화번호 : {{company_phone}}
 주소   : {{company_address}}
+사업자등록번호 : {{business_no}}
 
 [근로자 기본정보]
-성명   : {{employee_name}} (사번 {{employee_no}})    생년월일 : {{birth_date}}
+성명   : {{employee_name}} (사번 {{employee_no}})   생년월일 : {{birth_date}}
 주소   : {{address}}
-입사일 : {{join_date}}    연락처 : {{phone}}
+입사일 : {{join_date}}      연락처 : {{phone}}
 
 ────────────────────────────────────────────────────
 제1조 [담당업무 및 근무장소]
