@@ -412,33 +412,45 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
               <div className="space-y-4 bg-gray-50 p-6 rounded-[2rem]">
                 <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest">급여·비과세 (근로계약서/통상임금 연동)</h4>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-gray-400">기본급 (월)</label>
-                    <input type="number" value={신규직원.base_salary} onChange={e => 신규직원설정({...신규직원, base_salary: Number(e.target.value)})} className="w-full p-3 bg-white rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100" placeholder="0" />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-gray-400">직책수당 (월)</label>
-                    <input type="number" value={신규직원.position_allowance ?? 0} onChange={e => 신규직원설정({...신규직원, position_allowance: Number(e.target.value)})} className="w-full p-3 bg-white rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100" placeholder="0" />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-gray-400">식대 (비과세 한도 20만)</label>
-                    <input type="number" value={신규직원.meal_allowance ?? 0} onChange={e => 신규직원설정({...신규직원, meal_allowance: Number(e.target.value)})} className="w-full p-3 bg-white rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100" placeholder="0" />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-gray-400">자가운전 (비과세 한도 20만)</label>
-                    <input type="number" value={신규직원.vehicle_allowance ?? 0} onChange={e => 신규직원설정({...신규직원, vehicle_allowance: Number(e.target.value)})} className="w-full p-3 bg-white rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100" placeholder="0" />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-gray-400">보육수당 (비과세)</label>
-                    <input type="number" value={신규직원.childcare_allowance ?? 0} onChange={e => 신규직원설정({...신규직원, childcare_allowance: Number(e.target.value)})} className="w-full p-3 bg-white rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100" placeholder="0" />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-gray-400">연구활동비 (비과세 한도 20만)</label>
-                    <input type="number" value={신규직원.research_allowance ?? 0} onChange={e => 신규직원설정({...신규직원, research_allowance: Number(e.target.value)})} className="w-full p-3 bg-white rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100" placeholder="0" />
-                  </div>
+                  {[
+                    { key: 'base_salary', label: '기본급 (월)', placeholder: '0' },
+                    { key: 'position_allowance', label: '직책수당 (월)', placeholder: '0' },
+                    { key: 'meal_allowance', label: '식대 (비과세 한도 20만)', placeholder: '0' },
+                    { key: 'vehicle_allowance', label: '자가운전 (비과세 한도 20만)', placeholder: '0' },
+                    { key: 'childcare_allowance', label: '보육수당 (비과세)', placeholder: '0' },
+                    { key: 'research_allowance', label: '연구활동비 (비과세 한도 20만)', placeholder: '0' },
+                  ].map(({ key, label, placeholder }) => {
+                    const val = Number(신규직원[key as keyof typeof 신규직원] ?? 0);
+                    return (
+                      <div key={key} className="space-y-1">
+                        <label className="text-[9px] font-black text-gray-400">{label}</label>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={val ? val.toLocaleString() : ''}
+                          onChange={e => {
+                            const n = parseInt(e.target.value.replace(/,/g, ''), 10) || 0;
+                            신규직원설정({ ...신규직원, [key]: n });
+                          }}
+                          placeholder={placeholder}
+                          className="w-full p-3 bg-white rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100"
+                        />
+                      </div>
+                    );
+                  })}
                   <div className="space-y-1 col-span-2">
                     <label className="text-[9px] font-black text-gray-400">기타 비과세</label>
-                    <input type="number" value={신규직원.other_taxfree ?? 0} onChange={e => 신규직원설정({...신규직원, other_taxfree: Number(e.target.value)})} className="w-full p-3 bg-white rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100" placeholder="0" />
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={(신규직원.other_taxfree ?? 0) ? Number(신규직원.other_taxfree).toLocaleString() : ''}
+                      onChange={e => {
+                        const n = parseInt(e.target.value.replace(/,/g, ''), 10) || 0;
+                        신규직원설정({ ...신규직원, other_taxfree: n });
+                      }}
+                      placeholder="0"
+                      className="w-full p-3 bg-white rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100"
+                    />
                   </div>
                 </div>
                 <p className="text-[8px] font-bold text-gray-400 leading-tight">* 등록 후 인사관리 → 계약관리에서 근로계약서 발송 시 통상임금 표가 자동으로 포함됩니다.</p>
