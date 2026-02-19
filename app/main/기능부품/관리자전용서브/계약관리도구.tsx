@@ -6,16 +6,11 @@ const COMPANIES = ['전체', '박철홍정형외과', '수연의원', 'SY INC.']
 
 const DEFAULT_CONTRACT_TEMPLATE = `근 로 계 약 서 ( 월 급 제 )
 
-[사용자 기본정보]
-회사명 : {{company_name}}
-대표자 : ________________________________    전화번호 : __________________________
-주소   : _________________________________________________
-
-[근로자 기본정보]
-성명   : {{employee_name}} (사번 {{employee_no}})
-생년월일 : {{birth_date}}
-주소   : {{address}}
-입사일 : {{join_date}}    연락처 : {{phone}}
+[기본정보]
+회사명         : {{company_name}}              성명       : {{employee_name}} (사번 {{employee_no}})
+대표자         : {{company_ceo}}              생년월일   : {{birth_date}}
+사업자등록번호 : {{business_no}}              주소       : {{address}}
+주소           : {{company_address}}           입사일     : {{join_date}}    연락처 : {{phone}}
 
 ────────────────────────────────────────────────────
 제1조 [담당업무 및 근무장소]
