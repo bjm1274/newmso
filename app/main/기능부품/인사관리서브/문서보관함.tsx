@@ -56,6 +56,50 @@ export default function DocumentRepository({
     if (!form.title.trim()) return alert('제목을 입력하세요.');
     setSaving(true);
     try {
+      // 모든 문서는 PDF로도 보관: 내용 기반으로 PDF 생성 후 Storage 업로드
+      const generatePdf = async () => {
+        try {
+          const jsPDFModule: any = await import('jspdf');
+          const jsPDF = jsPDFModule.jsPDF || jsPDFModule.default;
+          const doc = new jsPDF('p', 'mm', 'a4');
+
+          const title = form.title.trim() || '문서';
+          const content = form.content || '';
+
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(14);
+          doc.text(title, 20, 20);
+
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(11);
+          const lines = doc.splitTextToSize(content, 170);
+          doc.text(lines, 20, 32);
+
+          const blob = doc.output('blob') as Blob;
+          const safeCompany =
+            selectedCo && selectedCo !== '전체'
+              ? selectedCo.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || 'company'
+              : 'all';
+          const safeTitle = title.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || 'document';
+          const filePath = `${safeCompany}/${safeTitle}_${Date.now()}.pdf`;
+
+          const { error: upErr } = await supabase.storage
+            .from('document-pdfs')
+            .upload(filePath, blob, { contentType: 'application/pdf', upsert: true });
+          if (upErr) {
+            console.warn('document pdf upload error', upErr);
+            return null;
+          }
+          const { data: urlData } = supabase.storage.from('document-pdfs').getPublicUrl(filePath);
+          return urlData.publicUrl as string;
+        } catch (e) {
+          console.warn('document pdf generate/upload failed', e);
+          return null;
+        }
+      };
+
+      const pdfUrl = await generatePdf();
+
       if (selected) {
         const newVersion = (selected.version || 1) + 1;
         await supabase.from('document_versions').insert({
@@ -69,6 +113,7 @@ export default function DocumentRepository({
           title: form.title,
           category: form.category,
           content: form.content,
+          file_url: pdfUrl || selected.file_url || null,
           version: newVersion,
           updated_at: new Date().toISOString(),
           company_name: selectedCo === '전체' ? '전체' : selectedCo
@@ -78,6 +123,7 @@ export default function DocumentRepository({
           title: form.title,
           category: form.category,
           content: form.content,
+          file_url: pdfUrl || null,
           version: 1,
           company_name: selectedCo === '전체' ? '전체' : selectedCo,
           created_by: user?.id
@@ -188,7 +234,7 @@ export default function DocumentRepository({
                         >
                           <button
                             onClick={() => handleEdit(d)}
-                            className="flex-1 text-left pl-6 pr-2 py-3"
+                            className="flex-1 text-left pl-6 pr-4 py-3"
                           >
                             <p className="font-semibold text-[#191F28] truncate text-sm">
                               {d.title}
@@ -197,13 +243,6 @@ export default function DocumentRepository({
                               v{d.version} ·{' '}
                               {new Date(d.updated_at).toLocaleDateString('ko-KR')}
                             </p>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(d)}
-                            className="px-2 pr-4 text-[10px] text-[#B0B8C1] hover:text-red-500 font-bold"
-                          >
-                            삭제
                           </button>
                         </div>
                       ))
@@ -228,13 +267,26 @@ export default function DocumentRepository({
               {selected ? '문서 수정 (버전 관리)' : '새 문서 등록'}
             </h3>
             {selected && (
-              <button
-                type="button"
-                onClick={() => handleDelete(selected)}
-                className="px-3 py-1.5 text-[11px] font-semibold rounded-[10px] border border-red-100 text-red-600 hover:bg-red-50"
-              >
-                선택 문서 삭제
-              </button>
+              <div className="flex items-center gap-2">
+                {selected.file_url && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.open(selected.file_url, '_blank');
+                    }}
+                    className="px-3 py-1.5 text-[11px] font-semibold rounded-[10px] border border-[#E5E8EB] text-[#3182F6] hover:bg-[#E8F3FF]"
+                  >
+                    PDF 열기/인쇄
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleDelete(selected)}
+                  className="px-3 py-1.5 text-[11px] font-semibold rounded-[10px] border border-red-100 text-red-600 hover:bg-red-50"
+                >
+                  선택 문서 삭제
+                </button>
+              </div>
             )}
           </div>
           <div className="space-y-4">
