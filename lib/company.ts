@@ -13,6 +13,11 @@ export interface Company {
   type: CompanyType;
   mso_id: string | null;
   is_active: boolean;
+  ceo_name?: string | null;
+  business_no?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  memo?: string | null;
   created_at?: string;
 }
 

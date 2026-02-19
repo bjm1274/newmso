@@ -15,7 +15,15 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Company | null>(null);
-  const [form, setForm] = useState({ name: '', type: 'HOSPITAL' as CompanyType });
+  const [form, setForm] = useState({
+    name: '',
+    type: 'HOSPITAL' as CompanyType,
+    ceo_name: '',
+    business_no: '',
+    address: '',
+    phone: '',
+    memo: '',
+  });
   const [msoId, setMsoId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'company' | 'team' | 'card' | 'contract'>('company');
 
@@ -32,7 +40,7 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
         const seed = [
           { name: 'SY INC.', type: 'MSO', is_active: true },
           { name: '박철홍정형외과', type: 'HOSPITAL', is_active: true },
-          { name: '수연의원', type: 'CLINIC', is_active: true },
+          { name: '수연의원', type: 'HOSPITAL', is_active: true },
         ];
         await supabase.from('companies').insert(seed);
         const { data: seeded } = await supabase
@@ -61,11 +69,28 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
     if (editing) {
       const { error } = await supabase
         .from('companies')
-        .update({ name: form.name.trim(), type: form.type, is_active: true })
+        .update({
+          name: form.name.trim(),
+          type: form.type,
+          is_active: true,
+          ceo_name: form.ceo_name || null,
+          business_no: form.business_no || null,
+          address: form.address || null,
+          phone: form.phone || null,
+          memo: form.memo || null,
+        })
         .eq('id', editing.id);
       if (!error) {
         setEditing(null);
-        setForm({ name: '', type: 'HOSPITAL' });
+        setForm({
+          name: '',
+          type: 'HOSPITAL',
+          ceo_name: '',
+          business_no: '',
+          address: '',
+          phone: '',
+          memo: '',
+        });
         fetchCompanies();
       }
     } else {
@@ -74,9 +99,22 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
         type: form.type,
         mso_id: form.type !== 'MSO' ? msoId : null,
         is_active: true,
+        ceo_name: form.ceo_name || null,
+        business_no: form.business_no || null,
+        address: form.address || null,
+        phone: form.phone || null,
+        memo: form.memo || null,
       });
       if (!error) {
-        setForm({ name: '', type: 'HOSPITAL' });
+        setForm({
+          name: '',
+          type: 'HOSPITAL',
+          ceo_name: '',
+          business_no: '',
+          address: '',
+          phone: '',
+          memo: '',
+        });
         fetchCompanies();
       }
     }
@@ -84,7 +122,15 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
 
   const handleEdit = (c: Company) => {
     setEditing(c);
-    setForm({ name: c.name, type: c.type as CompanyType });
+    setForm({
+      name: c.name,
+      type: c.type as CompanyType,
+      ceo_name: c.ceo_name || '',
+      business_no: c.business_no || '',
+      address: c.address || '',
+      phone: c.phone || '',
+      memo: c.memo || '',
+    });
   };
 
   if (loading) {
@@ -202,6 +248,51 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
                   <option value="CLINIC">클리닉</option>
                 </select>
               </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 mb-2">대표자명</label>
+                <input
+                  value={form.ceo_name}
+                  onChange={(e) => setForm((f) => ({ ...f, ceo_name: e.target.value }))}
+                  className="w-full px-4 py-3 border border-[#E5E8EB] rounded-[12px] text-sm"
+                  placeholder="예: 박철홍"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 mb-2">사업자등록번호</label>
+                <input
+                  value={form.business_no}
+                  onChange={(e) => setForm((f) => ({ ...f, business_no: e.target.value }))}
+                  className="w-full px-4 py-3 border border-[#E5E8EB] rounded-[12px] text-sm"
+                  placeholder="예: 123-45-67890"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold text-gray-500 mb-2">주소</label>
+                <input
+                  value={form.address}
+                  onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
+                  className="w-full px-4 py-3 border border-[#E5E8EB] rounded-[12px] text-sm"
+                  placeholder="예: 전라남도 목포시 ..."
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 mb-2">대표 전화번호</label>
+                <input
+                  value={form.phone}
+                  onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                  className="w-full px-4 py-3 border border-[#E5E8EB] rounded-[12px] text-sm"
+                  placeholder="예: 061-000-0000"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 mb-2">기타 메모</label>
+                <textarea
+                  value={form.memo}
+                  onChange={(e) => setForm((f) => ({ ...f, memo: e.target.value }))}
+                  className="w-full px-4 py-3 border border-[#E5E8EB] rounded-[12px] text-sm min-h-[72px]"
+                  placeholder="특이사항, 청구/정산 담당자 등"
+                />
+              </div>
             </div>
             <div className="flex gap-3 mt-6">
               <button
@@ -214,7 +305,15 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
                 <button
                   onClick={() => {
                     setEditing(null);
-                    setForm({ name: '', type: 'HOSPITAL' });
+                    setForm({
+                      name: '',
+                      type: 'HOSPITAL',
+                      ceo_name: '',
+                      business_no: '',
+                      address: '',
+                      phone: '',
+                      memo: '',
+                    });
                   }}
                   className="px-6 py-3 bg-[#F2F4F6] text-[#4E5968] rounded-[12px] font-bold text-sm hover:bg-[#E5E8EB]"
                 >

@@ -1,0 +1,7 @@
+-- 회사(사업자) 상세 정보 컬럼 확장
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS ceo_name TEXT;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS business_no TEXT;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS address TEXT;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS phone TEXT;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS memo TEXT;
+
