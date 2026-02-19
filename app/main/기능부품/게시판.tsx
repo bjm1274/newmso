@@ -33,6 +33,21 @@ export default function BoardView({ user, setMainMenu }: any) {
   const [surgeryTemplates, setSurgeryTemplates] = useState<any[]>([]);
   const [mriTemplates, setMriTemplates] = useState<any[]>([]);
 
+  // 수술/MRI 부위 필터 (사람 모형 버튼용)
+  const BODY_PARTS = [
+    { id: 'all', label: '전체', emoji: '👤' },
+    { id: 'cervical', label: '경추/목', emoji: '🧠' },
+    { id: 'lumbar', label: '요추/허리', emoji: '🦴' },
+    { id: 'shoulder', label: '어깨', emoji: '🏋️' },
+    { id: 'elbow', label: '팔꿈치', emoji: '💪' },
+    { id: 'wrist', label: '손목/손', emoji: '✋' },
+    { id: 'hip', label: '고관절', emoji: '🦵' },
+    { id: 'knee', label: '무릎', emoji: '🦿' },
+    { id: 'ankle', label: '발목/발', emoji: '🦶' },
+    { id: 'other', label: '기타', emoji: '➕' },
+  ];
+  const [selectedBodyPart, setSelectedBodyPart] = useState<string>('all');
+
   // 수술일정·MRI일정 달력 뷰용 현재 월
   const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date());
   // 상세보기용 선택된 게시물
@@ -101,6 +116,31 @@ export default function BoardView({ user, setMainMenu }: any) {
         : [],
     [activeBoard, surgeryTemplates, mriTemplates]
   );
+
+  // 부위 선택에 따른 템플릿 필터링
+  const filteredTemplates = useMemo(() => {
+    if (selectedBodyPart === 'all' || !currentTemplates.length) return currentTemplates;
+
+    const keywordMap: Record<string, string[]> = {
+      cervical: ['경추', '목', '경추부'],
+      lumbar: ['요추', '허리', '요추부', '요추부 MRI'],
+      shoulder: ['어깨', '견', '견관절'],
+      elbow: ['팔꿈치', '주관절'],
+      wrist: ['손목', '수근', '손'],
+      hip: ['고관절', '둔부', '고관절'],
+      knee: ['무릎', '슬관절', '무릎관절'],
+      ankle: ['발목', '족관절', '발'],
+      other: [],
+    };
+
+    const keywords = keywordMap[selectedBodyPart] || [];
+    if (keywords.length === 0) return currentTemplates;
+
+    return currentTemplates.filter((t: any) => {
+      const name = (t.name || '') as string;
+      return keywords.some((k) => name.includes(k));
+    });
+  }, [currentTemplates, selectedBodyPart]);
 
   useEffect(() => {
     fetchPosts();
@@ -387,6 +427,24 @@ export default function BoardView({ user, setMainMenu }: any) {
               </label>
               {(activeBoard === '수술일정' || activeBoard === 'MRI일정') ? (
                 <div className="space-y-2">
+                  {/* 사람 모형 느낌의 부위 선택 버튼들 */}
+                  <div className="flex flex-wrap gap-1.5 mb-1">
+                    {BODY_PARTS.map((bp) => (
+                      <button
+                        key={bp.id}
+                        type="button"
+                        onClick={() => setSelectedBodyPart(bp.id)}
+                        className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                          selectedBodyPart === bp.id
+                            ? 'bg-[#3182F6] text-white border-[#3182F6]'
+                            : 'bg-[#F2F4F6] text-[#4E5968] border-[#E5E8EB]'
+                        }`}
+                      >
+                        <span className="mr-1">{bp.emoji}</span>
+                        {bp.label}
+                      </button>
+                    ))}
+                  </div>
                   <select
                     value=""
                     onChange={(e) => {
@@ -394,14 +452,14 @@ export default function BoardView({ user, setMainMenu }: any) {
                       if (!v) return;
                       setTitle(v);
                     }}
-                    className="w-full p-3 bg-[#F2F4F6] rounded-[12px] border border-[#E5E8EB] border-[#E5E8EB] outline-none text-xs font-bold focus:ring-2 focus:ring-[#3182F6]/20"
+                    className="w-full p-3 bg-[#F2F4F6] rounded-[12px] border border-[#E5E8EB] outline-none text-xs font-bold focus:ring-2 focus:ring-[#3182F6]/20"
                   >
                     <option value="">
                       {activeBoard === '수술일정'
-                        ? '자주 쓰는 수술명 선택'
-                        : '자주 쓰는 검사명 선택'}
+                        ? '자주 쓰는 수술명 선택 (위의 부위를 먼저 선택하면 필터링 됩니다)'
+                        : '자주 쓰는 검사명 선택 (부위 필터 가능)'}
                     </option>
-                    {currentTemplates.map((t: any) => (
+                    {filteredTemplates.map((t: any) => (
                       <option key={t.id} value={t.name}>
                         {t.name}
                       </option>
@@ -788,7 +846,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                     </div>
                   </div>
                   {(post.surgery_fasting || post.surgery_inpatient || post.surgery_guardian || post.surgery_caregiver || post.surgery_transfusion) && (
-                    <div className="pt-2 flex flex-wrap gap-1">
+                    <div className="pt-2 flex flex-wrap gap-1 items-center">
                       {post.surgery_fasting && (
                         <span className="px-2 py-1 rounded-full bg-red-50 text-red-600 text-[9px] font-black">
                           금식
@@ -810,7 +868,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                         </span>
                       )}
                       {post.surgery_transfusion && (
-                        <span className="px-2 py-1 rounded-full bg-red-50 text-red-700 text-[9px] font-black">
+                        <span className="px-2 py-1 rounded-full bg-red-50 text-red-700 text-[9px] font-black ml-auto">
                           수혈
                         </span>
                       )}

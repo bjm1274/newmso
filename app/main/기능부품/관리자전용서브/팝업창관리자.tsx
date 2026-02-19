@@ -4,7 +4,6 @@ import { supabase } from '@/lib/supabase';
 
 export default function PopupManager() {
   const [popups, setPopups] = useState<any[]>([]);
-  const [inputType, setInputType] = useState<'link' | 'file'>('link'); 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [newPopup, setNewPopup] = useState({ 
@@ -19,26 +18,33 @@ export default function PopupManager() {
   useEffect(() => { loadPopups(); }, []);
 
   const getPreviewUrl = () => {
-    if (inputType === 'file' && selectedFile) return URL.createObjectURL(selectedFile);
+    if (selectedFile) return URL.createObjectURL(selectedFile);
     return newPopup.media_url;
   };
 
   const handleAddPopup = async () => {
     if (!newPopup.title) return alert("팝업 제목을 입력해주세요.");
+    if (!selectedFile && !newPopup.media_url) {
+      return alert("팝업에 사용할 파일을 선택해주세요.");
+    }
+
     let finalUrl = newPopup.media_url;
 
-    if (inputType === 'file' && selectedFile) {
-        const fileName = `${Date.now()}_${selectedFile.name}`;
-        const { error } = await supabase.storage.from('popups').upload(fileName, selectedFile);
-        if (error) return alert("파일 업로드에 실패했습니다.");
-        const { data: urlData } = supabase.storage.from('popups').getPublicUrl(fileName);
-        finalUrl = urlData.publicUrl;
+    if (selectedFile) {
+      const ext = selectedFile.name.split('.').pop() || (newPopup.media_type === 'video' ? 'mp4' : 'png');
+      const fileName = `popup_${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from('popups').upload(fileName, selectedFile, { upsert: true });
+      if (error) return alert("파일 업로드에 실패했습니다.");
+      const { data: urlData } = supabase.storage.from('popups').getPublicUrl(fileName);
+      finalUrl = urlData.publicUrl;
     }
 
     const { error } = await supabase.from('popups').insert([{ ...newPopup, media_url: finalUrl, is_active: true }]);
     if (!error) {
-        alert("새 팝업이 생성되었습니다.");
-        loadPopups();
+      alert("새 팝업이 생성되었습니다.");
+      setSelectedFile(null);
+      setNewPopup({ title: '', media_url: '', media_type: 'image', width: 400, height: 500 });
+      loadPopups();
     }
   };
 
@@ -47,10 +53,6 @@ export default function PopupManager() {
       <div className="bg-white p-10 border border-gray-100 shadow-sm space-y-8">
         <div className="flex justify-between items-center border-b border-gray-50 pb-6">
           <h3 className="font-black text-xl text-gray-800 tracking-tighter">홈페이지 팝업 설정</h3>
-          <div className="flex bg-gray-100 p-1 border border-gray-200">
-            <button onClick={() => setInputType('link')} className={`px-5 py-2 text-[10px] font-black transition-all ${inputType==='link' ? 'bg-white shadow text-black' : 'text-gray-400'}`}>🔗 링크 입력</button>
-            <button onClick={() => setInputType('file')} className={`px-5 py-2 text-[10px] font-black transition-all ${inputType==='file' ? 'bg-white shadow text-black' : 'text-gray-400'}`}>📁 파일 업로드</button>
-          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-6">
@@ -65,6 +67,21 @@ export default function PopupManager() {
                 <option value="video">동영상 (MP4)</option>
             </select>
           </div>
+        </div>
+
+        <div className="mt-4 space-y-2">
+          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+            {newPopup.media_type === 'video' ? '동영상 파일 선택 (MP4)' : '이미지 파일 선택 (JPG, PNG)'}
+          </label>
+          <input
+            type="file"
+            accept={newPopup.media_type === 'video' ? 'video/mp4' : 'image/png,image/jpeg,image/jpg'}
+            className="w-full text-xs"
+            onChange={(e) => {
+              const file = e.target.files?.[0] || null;
+              setSelectedFile(file);
+            }}
+          />
         </div>
 
         <div className="grid grid-cols-2 gap-2 mt-4">
