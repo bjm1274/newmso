@@ -659,18 +659,17 @@ export default function BoardView({ user, setMainMenu }: any) {
             className="w-full max-w-3xl max-h-[90vh] bg-white rounded-[20px] shadow-2xl border border-[#E5E8EB] p-5 md:p-7 flex flex-col md:flex-row gap-5"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* 왼쪽: 사람 모형 이미지 + 부위 클릭 (첨부 이미지 스타일, 호버 반응형) */}
-            <div className="flex-1 relative min-h-[260px] bg-slate-950/90 rounded-[18px] border border-slate-800 overflow-hidden flex items-center justify-center">
-              <div className="pointer-events-none absolute inset-[-20%] bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.24),_transparent_55%),radial-gradient(circle_at_bottom,_rgba(59,130,246,0.35),_transparent_55%)] opacity-80" />
-              <div className="relative w-[190px] h-[300px] md:w-[220px] md:h-[340px] flex items-center justify-center">
-                {/* 실제 사람 모형 이미지는 /public 폴더에 human-body-mri.png 로 배치해서 사용 */}
+            {/* 왼쪽: 사람 모형 이미지 + 부위 클릭 (사용자가 준 사람 사진 그대로, 핫스팟은 보이지 않고 호버 시만 하이라이트) */}
+            <div className="flex-1 relative min-h-[260px] bg-[#020617] rounded-[18px] border border-slate-800 overflow-hidden flex items-center justify-center">
+              <div className="relative w-full h-full flex items-center justify-center">
+                {/* 실제 사람 모형 이미지는 /public/human-body-mri.png 로 배치해서 사용 (사용자 제공 이미지) */}
                 <img
                   src="/human-body-mri.png"
                   alt="사람 전신 모형"
-                  className="max-h-full max-w-full object-contain pointer-events-none select-none"
+                  className="max-h-[380px] max-w-full object-contain pointer-events-none select-none"
                 />
 
-                {/* 각 부위 클릭 영역 (이미지 위에 오버레이) */}
+                {/* 각 부위 클릭 영역 (이미지 위에 투명 오버레이) */}
                 {[
                   { id: 'cervical', top: '15%', left: '50%' },
                   { id: 'lumbar', top: '43%', left: '50%' },
@@ -692,26 +691,16 @@ export default function BoardView({ user, setMainMenu }: any) {
                       className={`
                         group absolute -translate-x-1/2 -translate-y-1/2
                         flex items-center justify-center
-                        w-10 h-10 md:w-11 md:h-11 rounded-full border border-transparent
-                        ${isActive ? '' : 'hover:border-sky-300/70'}
+                        w-16 h-16 md:w-20 md:h-20 rounded-full border-none bg-transparent
                       `}
                     >
-                      {/* 호버 시 부위 전체가 은은하게 빛나는 하이라이트 */}
+                      {/* 호버/선택 시에만 부위 전체가 은은하게 빛나는 하이라이트 (기본 상태에서는 사람 사진만 보임) */}
                       <span
                         className={`
                           absolute inset-0 rounded-full bg-sky-400/35 blur-xl opacity-0
                           transition-opacity duration-200
                           group-hover:opacity-90
                           ${isActive ? 'opacity-90' : ''}
-                        `}
-                      />
-                      {/* 중심 포인트 */}
-                      <span
-                        className={`
-                          relative w-2.5 h-2.5 rounded-full
-                          ${isActive
-                            ? 'bg-white shadow-[0_0_16px_rgba(56,189,248,1)]'
-                            : 'bg-sky-100 shadow-[0_0_10px_rgba(56,189,248,0.7)] group-hover:bg-white'}
                         `}
                       />
                     </button>
