@@ -667,42 +667,55 @@ export default function BoardView({ user, setMainMenu }: any) {
         </div>
       )}
 
-      {/* 수술/MRI용 사람 모형 선택 모달 */}
+      {/* 수술/MRI용 사람 모형 선택 모달 - 사람 이미지 + 부위 하이라이트 */}
       {showBodyPicker && (activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-3 md:p-6" onClick={() => setShowBodyPicker(false)}>
           <div
             className="w-full max-w-3xl max-h-[90vh] bg-white rounded-[20px] shadow-2xl border border-[#E5E8EB] p-5 md:p-7 flex flex-col md:flex-row gap-5"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* 왼쪽: 사람 실루엣 + 부위 클릭 */}
-            <div className="flex-1 relative min-h-[260px] bg-gradient-to-b from-slate-50 to-slate-100 rounded-[16px] border border-[#E5E8EB] overflow-hidden flex items-center justify-center">
-              <div className="relative w-[160px] h-[260px] md:w-[190px] md:h-[300px]">
-                {/* 사람 실루엣 단색 그림 (간단한 placeholder) */}
-                <div className="absolute inset-0 bg-gradient-to-b from-slate-300 to-slate-500 rounded-full opacity-60" />
+            {/* 왼쪽: 사람 실루엣 + 부위 클릭 (두 번째 예시 이미지 느낌) */}
+            <div className="flex-1 relative min-h-[260px] bg-slate-950/90 rounded-[18px] border border-slate-800 overflow-hidden flex items-center justify-center">
+              <div className="pointer-events-none absolute inset-[-20%] bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.24),_transparent_55%),radial-gradient(circle_at_bottom,_rgba(59,130,246,0.35),_transparent_55%)] opacity-80" />
+              <div className="relative w-[170px] h-[280px] md:w-[200px] md:h-[320px]">
+                {/* 중앙 사람 형상 (간단한 실루엣) */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-[70px] md:w-[80px] h-[220px] md:h-[250px] bg-gradient-to-b from-slate-200 via-sky-200 to-slate-400 rounded-[40px] opacity-80 shadow-[0_0_40px_rgba(56,189,248,0.55)]" />
+                  <div className="absolute -top-8 w-14 h-14 md:w-16 md:h-16 rounded-full bg-gradient-to-b from-slate-50 to-sky-200 shadow-[0_0_25px_rgba(56,189,248,0.6)]" />
+                </div>
+
                 {/* 각 부위 클릭 영역 */}
                 {[
-                  { id: 'cervical', top: '10%', left: '50%' },
-                  { id: 'lumbar', top: '40%', left: '50%' },
-                  { id: 'shoulder', top: '18%', left: '32%' },
-                  { id: 'shoulder', top: '18%', left: '68%' },
-                  { id: 'wrist', top: '38%', left: '18%' },
-                  { id: 'wrist', top: '38%', left: '82%' },
-                  { id: 'hip', top: '52%', left: '50%' },
-                  { id: 'knee', top: '70%', left: '50%' },
-                  { id: 'ankle', top: '88%', left: '50%' },
-                ].map((spot, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => setSelectedBodyPart(spot.id)}
-                    style={{ top: spot.top, left: spot.left }}
-                    className={`absolute -translate-x-1/2 -translate-y-1/2 w-6 h-6 rounded-full border-2 ${
-                      selectedBodyPart === spot.id
-                        ? 'bg-blue-500/80 border-white shadow-lg'
-                        : 'bg-blue-300/60 border-white/80 hover:bg-blue-400/80'
-                    }`}
-                  />
-                ))}
+                  { id: 'cervical', top: '15%', left: '50%' },
+                  { id: 'lumbar', top: '43%', left: '50%' },
+                  { id: 'shoulder', top: '21%', left: '31%' },
+                  { id: 'shoulder', top: '21%', left: '69%' },
+                  { id: 'wrist', top: '40%', left: '18%' },
+                  { id: 'wrist', top: '40%', left: '82%' },
+                  { id: 'hip', top: '56%', left: '50%' },
+                  { id: 'knee', top: '73%', left: '50%' },
+                  { id: 'ankle', top: '90%', left: '50%' },
+                ].map((spot, idx) => {
+                  const isActive = selectedBodyPart === spot.id;
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setSelectedBodyPart(spot.id)}
+                      style={{ top: spot.top, left: spot.left }}
+                      className={`
+                        group absolute -translate-x-1/2 -translate-y-1/2
+                        flex items-center justify-center
+                        w-7 h-7 md:w-8 md:h-8 rounded-full border
+                        ${isActive
+                          ? 'bg-sky-400 border-white shadow-[0_0_25px_rgba(56,189,248,0.95)] animate-pulse'
+                          : 'bg-sky-500/30 border-cyan-100/70 hover:bg-sky-400/70 hover:shadow-[0_0_18px_rgba(56,189,248,0.9)]'}
+                      `}
+                    >
+                      <span className="w-2 h-2 rounded-full bg-white/90" />
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
