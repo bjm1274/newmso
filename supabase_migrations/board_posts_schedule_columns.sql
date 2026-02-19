@@ -7,3 +7,4 @@ ALTER TABLE board_posts ADD COLUMN IF NOT EXISTS surgery_fasting BOOLEAN DEFAULT
 ALTER TABLE board_posts ADD COLUMN IF NOT EXISTS surgery_inpatient BOOLEAN DEFAULT false;
 ALTER TABLE board_posts ADD COLUMN IF NOT EXISTS surgery_guardian BOOLEAN DEFAULT false;
 ALTER TABLE board_posts ADD COLUMN IF NOT EXISTS surgery_caregiver BOOLEAN DEFAULT false;
+ALTER TABLE board_posts ADD COLUMN IF NOT EXISTS surgery_transfusion BOOLEAN DEFAULT false;
