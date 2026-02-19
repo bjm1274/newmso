@@ -5,7 +5,7 @@ export default function StaffManager({ staffs, onRefresh }: any) {
   // [기능 변경] 기존 직원의 역할(Role)을 변경합니다.
   const handleRoleChange = async (staffId: string, newRole: string) => {
     const { error } = await supabase
-      .from('staff')
+      .from('staff_members')
       .update({ role: newRole })
       .eq('id', staffId);
 
@@ -34,7 +34,7 @@ export default function StaffManager({ staffs, onRefresh }: any) {
         <tbody className="divide-y divide-gray-50">
           {staffs?.map((s: any) => (
             <tr key={s.id} className="hover:bg-gray-25 transition-colors">
-              <td className="p-4 text-xs font-mono font-bold text-gray-400 border-r">{s.staff_number}</td>
+              <td className="p-4 text-xs font-mono font-bold text-gray-400 border-r">{s.employee_no}</td>
               <td className="p-4 text-xs font-black text-gray-800 border-r">{s.name}</td>
               <td className="p-4 text-[10px] font-bold text-gray-400 border-r">{s.company || '박철홍정형외과'}</td>
               <td className="p-4">

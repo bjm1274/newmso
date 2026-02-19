@@ -36,8 +36,20 @@ export default function DataReseter({ onRefresh }: { onRefresh: () => void }) {
         await supabase.from('posts').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       } 
       else if (type === 'staff') {
-        // [기존] 관리자(사번 1~10번) 제외 전체 직원 계정 삭제
-        await supabase.from('staff').delete().gt('staff_number', 10);
+        // 관리자(role='admin') 제외 전체 직원 계정·데이터 삭제 (실제 테이블: staff_members)
+        const { data: toDelete } = await supabase
+          .from('staff_members')
+          .select('id')
+          .neq('role', 'admin');
+        if (toDelete?.length) {
+          const ids = toDelete.map((r) => r.id);
+          const BATCH = 100;
+          for (let i = 0; i < ids.length; i += BATCH) {
+            const chunk = ids.slice(i, i + BATCH);
+            const { error } = await supabase.from('staff_members').delete().in('id', chunk);
+            if (error) throw error;
+          }
+        }
       }
       else if (type === 'system_logs') {
         // [추천] 시스템 활동 로그 삭제 (접속 기록 등)
