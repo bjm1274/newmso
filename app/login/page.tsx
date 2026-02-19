@@ -58,18 +58,58 @@ export default function LoginPage() {
     }
 
     try {
+      const idTrim = loginId.trim();
+      // 1) 사번(employee_no)으로 조회 — 고유하므로 동명이인 구분 가능
+      const { data: byNo } = await supabase
+        .from('staff_members')
+        .select('*')
+        .eq('employee_no', idTrim)
+        .maybeSingle();
+      if (byNo) {
+        const user = byNo;
+        const savedPassword = (user.password ?? user.passwd ?? '').toString().trim();
+        const isFirstLogin = !savedPassword;
+        if (isFirstLogin) {
+          const { error: pwErr } = await supabase.from('staff_members').update({ password }).eq('id', user.id);
+          if (pwErr) {
+            setError("비밀번호 설정 중 오류가 발생했습니다.");
+            setLoading(false);
+            return;
+          }
+        } else if (savedPassword !== password) {
+          setError("비밀번호가 일치하지 않습니다.");
+          setLoading(false);
+          return;
+        }
+        const toStore = { ...user, password: isFirstLogin ? password : user.password, company_id: user.company_id ?? null };
+        localStorage.setItem('erp_user', JSON.stringify(toStore));
+        setLoading(false);
+        if (isFirstLogin) alert("비밀번호가 설정되었습니다. 다음 로그인부터 이 비밀번호를 사용해 주세요.");
+        router.push('/main');
+        return;
+      }
+
+      // 2) 이름으로 조회 — 동명이인 있으면 사번 입력 유도
       const { data: rows, error: dbError } = await supabase
         .from('staff_members')
         .select('*')
-        .eq('name', loginId.trim())
-        .limit(1);
-      let user = rows?.[0];
-
-      if (dbError || !user) {
-        setError("등록된 이름(아이디)이 없습니다. 확인 후 다시 시도하세요.");
+        .eq('name', idTrim);
+      if (dbError) {
+        setError("등록된 아이디가 없습니다. 확인 후 다시 시도하세요.");
         setLoading(false);
         return;
       }
+      if (!rows?.length) {
+        setError("등록된 사번 또는 이름이 없습니다. 확인 후 다시 시도하세요.");
+        setLoading(false);
+        return;
+      }
+      if (rows.length > 1) {
+        setError("동명이인이 있습니다. 로그인 아이디에 사번을 입력해 주세요.");
+        setLoading(false);
+        return;
+      }
+      let user = rows[0];
 
       // 직원 생성 시 비밀번호 없이 등록되므로, 처음 로그인할 때 입력한 값이 비밀번호로 설정됨
       const savedPassword = (user.password ?? user.passwd ?? '').toString().trim();
@@ -130,13 +170,13 @@ export default function LoginPage() {
         <div className="bg-white py-8 px-6 rounded-[20px] shadow-sm border border-[#E5E8EB] animate-in slide-in-from-bottom-10 duration-500">
           <div className="space-y-6">
             <div>
-              <label className="block text-[11px] font-semibold text-[#8B95A1] mb-2 ml-1">아이디 (이름)</label>
+              <label className="block text-[11px] font-semibold text-[#8B95A1] mb-2 ml-1">아이디 (사번 또는 이름)</label>
               <input 
                 type="text" 
                 value={loginId}
                 onChange={(e) => setLoginId(e.target.value)}
                 className="w-full p-4 bg-[#F2F4F6] rounded-[12px] text-sm font-medium outline-none focus:ring-2 ring-[#3182F6]/30 border border-transparent focus:border-[#3182F6] transition-all text-[#191F28]"
-                placeholder="이름 입력"
+                placeholder="사번 또는 이름 (동명이인은 사번 입력)"
                 onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
               />
             </div>
