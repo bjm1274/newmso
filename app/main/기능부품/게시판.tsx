@@ -665,19 +665,17 @@ export default function BoardView({ user, setMainMenu }: any) {
             className="w-full max-w-5xl max-h-[90vh] bg-white rounded-[24px] shadow-2xl border border-[#E5E8EB] p-6 md:p-10 flex flex-col md:flex-row gap-6"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* 왼쪽: 사람 모형 이미지 + 부위 클릭 (사용자 제공 이미지의 사람 부분만 보이도록 중앙 크롭) */}
+            {/* 왼쪽: 사람 모형 이미지 + 부위 클릭 (전체 전신이 잘리지 않도록 contain 처리) */}
             <div className="flex-1 relative min-h-[360px] max-h-[520px] bg-[#020617] rounded-[18px] border border-slate-800 overflow-hidden flex items-center justify-center">
-              <div className="absolute inset-0">
-                {/* 실제 사람 모형 이미지는 /public/human-body-mri.png 로 배치해서 사용 (브라우저 UI가 포함된 스크린샷이어도 중앙 사람만 보이도록 object-cover 처리) */}
-                <img
-                  src="/human-body-mri.png"
-                  alt="사람 전신 모형"
-                  className="w-full h-full object-cover object-center pointer-events-none select-none"
-                />
-              </div>
+              {/* 실제 사람 모형 이미지는 /public/human-body-mri.png 로 배치해서 사용 */}
+              <img
+                src="/human-body-mri.png"
+                alt="사람 전신 모형"
+                className="max-h-[480px] w-auto object-contain pointer-events-none select-none"
+              />
 
               {/* 각 부위 클릭 영역 (이미지 위에 투명 오버레이) */}
-              <div className="relative w-full h-full flex items-center justify-center">
+              <div className="absolute inset-0 flex items-center justify-center">
                 {[
                   // 상체 정중앙
                   { id: 'cervical', top: '13%', left: '50%' },    // 목/경추

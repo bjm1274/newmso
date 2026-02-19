@@ -88,6 +88,7 @@ export default function DocumentRepository({
             .upload(filePath, blob, { contentType: 'application/pdf', upsert: true });
           if (upErr) {
             console.warn('document pdf upload error', upErr);
+            alert(`PDF 생성 또는 업로드 중 오류가 발생했습니다.\n\n${upErr.message || ''}\n\nSupabase Storage에 document-pdfs 버킷이 있고, anon 역할에 INSERT/SELECT 권한이 있는지 확인해주세요.`);
             return null;
           }
           const { data: urlData } = supabase.storage.from('document-pdfs').getPublicUrl(filePath);
@@ -201,7 +202,7 @@ export default function DocumentRepository({
         .upload(filePath, blob, { contentType: 'application/pdf', upsert: true });
       if (upErr) {
         console.warn('document pdf upload error', upErr);
-        alert('PDF 생성 또는 업로드 중 오류가 발생했습니다.');
+        alert(`PDF 생성 또는 업로드 중 오류가 발생했습니다.\n\n${upErr.message || ''}\n\nSupabase Storage에 document-pdfs 버킷이 있고, anon 역할에 INSERT/SELECT 권한이 있는지 확인해주세요.`);
         return;
       }
       const { data: urlData } = supabase.storage.from('document-pdfs').getPublicUrl(filePath);
