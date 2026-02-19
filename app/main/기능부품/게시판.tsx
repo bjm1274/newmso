@@ -659,17 +659,19 @@ export default function BoardView({ user, setMainMenu }: any) {
             className="w-full max-w-3xl max-h-[90vh] bg-white rounded-[20px] shadow-2xl border border-[#E5E8EB] p-5 md:p-7 flex flex-col md:flex-row gap-5"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* 왼쪽: 사람 모형 이미지 + 부위 클릭 (사용자가 준 사람 사진 그대로, 핫스팟은 보이지 않고 호버 시만 하이라이트) */}
-            <div className="flex-1 relative min-h-[260px] bg-[#020617] rounded-[18px] border border-slate-800 overflow-hidden flex items-center justify-center">
-              <div className="relative w-full h-full flex items-center justify-center">
-                {/* 실제 사람 모형 이미지는 /public/human-body-mri.png 로 배치해서 사용 (사용자 제공 이미지) */}
+            {/* 왼쪽: 사람 모형 이미지 + 부위 클릭 (사용자 제공 이미지의 사람 부분만 보이도록 중앙 크롭) */}
+            <div className="flex-1 relative min-h-[260px] max-h-[420px] bg-[#020617] rounded-[18px] border border-slate-800 overflow-hidden flex items-center justify-center">
+              <div className="absolute inset-0">
+                {/* 실제 사람 모형 이미지는 /public/human-body-mri.png 로 배치해서 사용 (브라우저 UI가 포함된 스크린샷이어도 중앙 사람만 보이도록 object-cover 처리) */}
                 <img
                   src="/human-body-mri.png"
                   alt="사람 전신 모형"
-                  className="max-h-[380px] max-w-full object-contain pointer-events-none select-none"
+                  className="w-full h-full object-cover object-center pointer-events-none select-none"
                 />
+              </div>
 
-                {/* 각 부위 클릭 영역 (이미지 위에 투명 오버레이) */}
+              {/* 각 부위 클릭 영역 (이미지 위에 투명 오버레이) */}
+              <div className="relative w-full h-full flex items-center justify-center">
                 {[
                   { id: 'cervical', top: '15%', left: '50%' },
                   { id: 'lumbar', top: '43%', left: '50%' },
