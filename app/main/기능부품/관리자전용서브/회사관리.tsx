@@ -16,9 +16,30 @@ export default function CompanyManager() {
       .select('*')
       .order('type', { ascending: false })
       .order('name');
-    if (!error) setCompanies(data || []);
-    const mso = (data || []).find((c: Company) => c.type === 'MSO');
-    if (mso) setMsoId(mso.id);
+
+    if (!error) {
+      if (!data || data.length === 0) {
+        // 초기 상태: 기본 회사 3개 자동 등록
+        const seed = [
+          { name: 'SY INC.', type: 'MSO', is_active: true },
+          { name: '박철홍정형외과', type: 'HOSPITAL', is_active: true },
+          { name: '수연의원', type: 'CLINIC', is_active: true },
+        ];
+        await supabase.from('companies').insert(seed);
+        const { data: seeded } = await supabase
+          .from('companies')
+          .select('*')
+          .order('type', { ascending: false })
+          .order('name');
+        setCompanies(seeded || []);
+        const mso = (seeded || []).find((c: Company) => c.type === 'MSO');
+        if (mso) setMsoId(mso.id);
+      } else {
+        setCompanies(data || []);
+        const mso = (data || []).find((c: Company) => c.type === 'MSO');
+        if (mso) setMsoId(mso.id);
+      }
+    }
     setLoading(false);
   };
 

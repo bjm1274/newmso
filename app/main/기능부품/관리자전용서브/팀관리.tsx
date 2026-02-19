@@ -2,7 +2,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 
-const DIVISIONS = ['진료부', '간호부', '총무부'];
+const HOSPITAL_DIVISIONS = ['진료부', '간호부', '총무부'];
+const MSO_DIVISIONS = ['경영지원본부'];
 const COMPANIES = ['박철홍정형외과', '수연의원', 'SY INC.'];
 
 export default function TeamManager({ onRefresh }: { onRefresh?: () => void }) {
@@ -10,6 +11,9 @@ export default function TeamManager({ onRefresh }: { onRefresh?: () => void }) {
   const [company, setCompany] = useState('박철홍정형외과');
   const [adding, setAdding] = useState(false);
   const [newTeam, setNewTeam] = useState({ division: '진료부', team_name: '' });
+
+  const currentDivisions =
+    company === 'SY INC.' ? MSO_DIVISIONS : HOSPITAL_DIVISIONS;
 
   const fetchTeams = useCallback(async () => {
     const { data } = await supabase
@@ -22,8 +26,13 @@ export default function TeamManager({ onRefresh }: { onRefresh?: () => void }) {
   }, [company]);
 
   useEffect(() => {
+    // 회사 변경 시 Division 기본값도 회사 유형에 맞게 변경
+    setNewTeam((prev) => ({
+      division: company === 'SY INC.' ? MSO_DIVISIONS[0] : HOSPITAL_DIVISIONS[0],
+      team_name: prev.team_name,
+    }));
     fetchTeams();
-  }, [fetchTeams]);
+  }, [company, fetchTeams]);
 
   const handleAdd = async () => {
     if (!newTeam.team_name.trim()) return alert('팀명을 입력하세요.');
@@ -34,7 +43,7 @@ export default function TeamManager({ onRefresh }: { onRefresh?: () => void }) {
       sort_order: teams.filter((t: any) => t.division === newTeam.division).length + 1,
     });
     if (!error) {
-      setNewTeam({ division: '진료부', team_name: '' });
+      setNewTeam({ division: currentDivisions[0], team_name: '' });
       setAdding(false);
       fetchTeams();
       onRefresh?.();
@@ -50,7 +59,7 @@ export default function TeamManager({ onRefresh }: { onRefresh?: () => void }) {
     onRefresh?.();
   };
 
-  const byDivision = DIVISIONS.map((d) => ({
+  const byDivision = currentDivisions.map((d) => ({
     name: d,
     teams: teams.filter((t: any) => t.division === d),
   }));

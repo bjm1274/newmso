@@ -850,17 +850,17 @@ export default function BoardView({ user, setMainMenu }: any) {
 
       {/* 게시글 상세 보기 모달 */}
       {selectedPost && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-3 md:p-6">
-          <div className="w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-white border border-[#E5E8EB] rounded-[20px] shadow-2xl p-5 md:p-7 space-y-4">
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-2 md:p-8">
+          <div className="w-full max-w-4xl max-h-[92vh] overflow-y-auto bg-white border border-[#E5E8EB] rounded-[24px] shadow-2xl p-5 md:p-8 space-y-5 text-[13px] md:text-[14px]">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
-              <p className="text-[10px] font-black text-[#8B95A1] uppercase tracking-widest mb-1">
+              <p className="text-[11px] md:text-[12px] font-black text-[#8B95A1] uppercase tracking-widest mb-1">
                 {selectedPost.board_type}
               </p>
-              <h3 className="text-lg md:text-xl font-black text-[#191F28]">
+              <h3 className="text-lg md:text-2xl font-black text-[#191F28]">
                 {selectedPost.title}
               </h3>
-              <p className="mt-2 text-[11px] text-[#8B95A1] font-bold">
+              <p className="mt-2 text-[11px] md:text-[12px] text-[#8B95A1] font-bold">
                 👤 {selectedPost.author_name || '익명'} ·{' '}
                 {new Date(selectedPost.created_at).toLocaleString('ko-KR')}
               </p>
