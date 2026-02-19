@@ -3,9 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
 import 직원권한통합 from './관리자전용서브/직원권한통합';
-import TeamManager from './관리자전용서브/팀관리';
 import AttendanceDeductionRules from './관리자전용서브/근태차감규칙설정';
-import ContractManager from './관리자전용서브/계약관리도구';
 import PopupManager from './관리자전용서브/팝업창관리자';
 import DataReseter from './관리자전용서브/데이터초기화';
 import DataBackup from './관리자전용서브/데이터백업';
@@ -14,7 +12,6 @@ import BusinessDashboard from './관리자전용서브/경영대시보드';
 import CompanyManager from './관리자전용서브/회사관리';
 import ExcelBulkUpload from './관리자전용서브/엑셀일괄등록';
 import NotificationAutomation from './관리자전용서브/알림자동화설정';
-import CorporateCardTransactions from './인사관리서브/법인카드사용내역';
 import ApprovalFormTypesManager from './관리자전용서브/전자결재양식관리';
 import 연차수동부여 from './관리자전용서브/연차수동부여';
 import SurgeryExamTemplateManager from './관리자전용서브/수술검사템플릿관리';
@@ -42,8 +39,7 @@ export default function AdminView({ user, staffs = [], depts = [], onRefresh }: 
     { id: '알림자동화', label: '🔔 알림 자동화' },
     { id: '연차부여', label: '🏖️ 연차 부여' },
     { id: '근태차감규칙', label: '⏰ 근태 규칙' },
-    { id: '회사관리', label: '🏢 회사' },
-    { id: '팀관리', label: '팀' },
+    { id: '회사관리', label: '🏢 회사/조직' },
     { id: '직원권한', label: '직원·권한' },
     { id: '법인카드', label: '법인카드' },
     { id: '전자결재양식', label: '서식양식' },
@@ -95,15 +91,10 @@ export default function AdminView({ user, staffs = [], depts = [], onRefresh }: 
           <연차수동부여 staffs={staffs} onRefresh={onRefresh} />
         )}
         {activeTab === '근태차감규칙' && <AttendanceDeductionRules />}
-        {activeTab === '회사관리' && <CompanyManager />}
-        {activeTab === '팀관리' && <TeamManager onRefresh={onRefresh} />}
+        {activeTab === '회사관리' && <CompanyManager staffs={staffs} onRefresh={onRefresh} />}
         {activeTab === '직원권한' && <직원권한통합 onRefresh={onRefresh} />}
         {activeTab === '전자결재양식' && <ApprovalFormTypesManager />}
         {activeTab === '수술검사템플릿' && <SurgeryExamTemplateManager />}
-        {activeTab === '전자계약설정' && <ContractManager />}
-        {activeTab === '법인카드' && (
-          <CorporateCardTransactions staffs={staffs} />
-        )}
         {activeTab === '팝업관리' && <PopupManager />}
         {activeTab === '감사로그' && <AuditLogViewer />}
         {activeTab === '데이터백업' && <DataBackup />}
