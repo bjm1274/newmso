@@ -485,7 +485,7 @@ export default function MainContent({
                   </div>
                 );
               })()}
-              <div className="bg-[#F2F4F6] p-6 md:p-8 rounded-[16px] border border-[#E5E8EB] text-xs leading-relaxed text-[#4E5968] font-medium max-h-[40vh] overflow-y-auto custom-scrollbar">
+              <div className="bg-[#F2F4F6] p-6 md:p-8 rounded-[16px] border border-[#E5E8EB] text-xs leading-relaxed text-[#4E5968] font-medium max-h-[40vh] overflow-y-auto custom-scrollbar font-mono">
                 <h3 className="text-sm font-bold text-[#191F28] mb-4 text-center underline underline-offset-8">{pendingContract.contract_type || '표준 근로계약서'}</h3>
                 <div className="whitespace-pre-wrap">{contractTemplate || '제1조(계약의 목적)\n본 계약은 근로기준법에 따라 사용자와 근로자 간의 근로조건을 정함을 목적으로 한다.\n\n제2조(근로계약기간) 입사일로부터 정함이 없는 기간\n\n제3조(근무장소) 소속 병원 내 지정 장소\n\n제4조(업무내용) 채용 시 결정된 직무 및 부수 업무\n\n제5조(소정근로시간) 주 40시간 (운영 스케줄에 따름)\n\n제6조(임금) 연봉계약서 및 급여 규정에 따름\n\n[상기 내용을 확인하였으며 이에 동의합니다]'}</div>
               </div>
