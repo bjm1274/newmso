@@ -266,7 +266,16 @@ export default function ContractManager() {
                   setUploadingSeal(true);
                   try {
                     const ext = file.name.split('.').pop() || 'png';
-                    const fileName = `${selectedCo.replace(/\s+/g, '_')}/seal_${Date.now()}.${ext}`;
+                    // Supabase Storage object key는 ASCII만 허용하므로 회사명은 안전한 슬러그로 변환
+                    const safeFolder =
+                      selectedCo === '박철홍정형외과'
+                        ? 'pch_ortho'
+                        : selectedCo === '수연의원'
+                        ? 'suyeon_clinic'
+                        : selectedCo === 'SY INC.'
+                        ? 'sy_inc'
+                        : selectedCo.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || 'company';
+                    const fileName = `${safeFolder}/seal_${Date.now()}.${ext}`;
                     const { error: upErr } = await supabase.storage.from('company-seals').upload(fileName, file, { upsert: true });
                     if (upErr) {
                       console.error('seal upload error', upErr);
