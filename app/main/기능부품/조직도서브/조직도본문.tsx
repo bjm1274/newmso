@@ -170,10 +170,20 @@ export default function MainContent({
 
       // 회사 기본정보 (회사/조직 → 회사관리에서 입력한 값 우선 사용)
       company_name: company?.name || user?.company || '',
+
+      // 대표자/사업자/주소/전화 – 여러 토큰 이름을 모두 채워줌
       company_ceo: company?.ceo_name || '',
+      ceo_name: company?.ceo_name || '',
+      company_representative: company?.ceo_name || '',
+
       company_business_no: company?.business_no || '',
+      business_no: company?.business_no || '',
+
       company_address: company?.address || '',
+      address_company: company?.address || '',
+
       company_phone: company?.phone || '',
+      phone_company: company?.phone || '',
 
       department: user?.department || '',
       position: user?.position || '',
