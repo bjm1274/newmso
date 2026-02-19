@@ -312,7 +312,34 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                 </div>
                 <div className="space-y-1">
                   <label className="text-[9px] font-black text-gray-400">연락처</label>
-                  <input type="text" value={신규직원.전화번호} onChange={e => 신규직원설정({...신규직원, 전화번호: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100" />
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={신규직원.전화번호}
+                    onChange={e => {
+                      let raw = e.target.value.replace(/[^0-9]/g, '');
+                      let formatted = '';
+                      if (raw.startsWith('010')) {
+                        raw = raw.slice(0, 11);
+                        if (raw.length <= 3) formatted = raw;
+                        else if (raw.length <= 7) formatted = raw.slice(0, 3) + '-' + raw.slice(3);
+                        else formatted = raw.slice(0, 3) + '-' + raw.slice(3, 7) + '-' + raw.slice(7);
+                      } else if (raw.startsWith('02')) {
+                        raw = raw.slice(0, 9);
+                        if (raw.length <= 2) formatted = raw;
+                        else if (raw.length <= 5) formatted = raw.slice(0, 2) + '-' + raw.slice(2);
+                        else formatted = raw.slice(0, 2) + '-' + raw.slice(2, 5) + '-' + raw.slice(5);
+                      } else {
+                        raw = raw.slice(0, 10);
+                        if (raw.length <= 3) formatted = raw;
+                        else if (raw.length <= 6) formatted = raw.slice(0, 3) + '-' + raw.slice(3);
+                        else formatted = raw.slice(0, 3) + '-' + raw.slice(3, 6) + '-' + raw.slice(6);
+                      }
+                      신규직원설정({ ...신규직원, 전화번호: formatted });
+                    }}
+                    placeholder="010-1234-5678"
+                    className="w-full p-3 bg-gray-50 rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100"
+                  />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[9px] font-black text-gray-400">주소</label>
@@ -343,6 +370,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                     <label className="text-[9px] font-black text-gray-400">직함</label>
                     <select value={신규직원.직함} onChange={e => 신규직원설정({...신규직원, 직함: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100">
                       <option value="">선택</option>
+                      <option value="주임">주임</option>
+                      <option value="대리">대리</option>
                       <option value="팀장">팀장</option>
                       <option value="간호과장">간호과장</option>
                       <option value="실장">실장</option>
@@ -353,7 +382,18 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                   </div>
                   <div className="space-y-1">
                     <label className="text-[9px] font-black text-gray-400">입사일 *</label>
-                    <input type="date" value={신규직원.입사일} onChange={e => 신규직원설정({...신규직원, 입사일: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100" />
+                    <input
+                      type="date"
+                      value={신규직원.입사일}
+                      onChange={e => {
+                        let v = e.target.value || '';
+                        if (v.length > 10 && v.match(/^\d{5,}/)) {
+                          v = v.replace(/^(\d{4})\d+(-\d{2}-\d{2})?/, (_m: string, y: string, rest: string) => rest ? y + rest : y);
+                        }
+                        신규직원설정({ ...신규직원, 입사일: v });
+                      }}
+                      className="w-full p-3 bg-gray-50 rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100"
+                    />
                   </div>
                 </div>
                 <div className="space-y-1">
