@@ -665,37 +665,33 @@ export default function BoardView({ user, setMainMenu }: any) {
             className="w-full max-w-5xl max-h-[90vh] bg-white rounded-[24px] shadow-2xl border border-[#E5E8EB] p-6 md:p-10 flex flex-col md:flex-row gap-6"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* 왼쪽: 사람 모형 이미지 + 부위 클릭 (전체 전신이 잘리지 않도록 contain 처리) */}
-            <div className="flex-1 relative min-h-[360px] max-h-[520px] bg-[#020617] rounded-[18px] border border-slate-800 overflow-hidden flex items-center justify-center">
-              {/* 실제 사람 모형 이미지는 /public/human-body-mri.png 로 배치해서 사용 */}
-              <img
-                src="/human-body-mri.png"
-                alt="사람 전신 모형"
-                className="max-h-[480px] w-auto object-contain pointer-events-none select-none"
-              />
-
-              {/* 각 부위 클릭 영역 (이미지 위에 투명 오버레이) */}
-              <div className="absolute inset-0 flex items-center justify-center">
+            {/* 왼쪽: 생성된 전신 이미지 + 부위 클릭 (이미지와 동일 비율 박스 안에서 좌표 고정) */}
+            <div className="flex-1 flex items-center justify-center min-h-[360px] max-h-[520px] bg-[#020617] rounded-[18px] border border-slate-800 overflow-hidden p-2">
+              <div className="relative w-full max-w-[320px] aspect-[2/3] max-h-[480px] shrink-0">
+                <img
+                  src="/human-body-mri.png"
+                  alt="사람 전신 모형"
+                  className="w-full h-full object-contain object-center pointer-events-none select-none"
+                />
+                {/* 부위 클릭 영역: 아래 좌표는 위 이미지(2:3 비율)에 맞춰 고정됨 */}
+                <div className="absolute inset-0">
                 {[
-                  // 상체 정중앙
                   { id: 'cervical', top: '13%', left: '50%' },    // 목/경추
-                  { id: 'chest', top: '25%', left: '50%' },       // 흉부
-                  { id: 'lumbar', top: '40%', left: '50%' },      // 요추/허리
-                  { id: 'hip', top: '55%', left: '50%' },         // 골반/고관절
-                  // 어깨/팔
-                  { id: 'shoulder', top: '22%', left: '30%' },    // 좌 어깨
-                  { id: 'shoulder', top: '22%', left: '70%' },    // 우 어깨
-                  { id: 'upper_arm', top: '32%', left: '25%' },   // 좌 위팔
-                  { id: 'upper_arm', top: '32%', left: '75%' },   // 우 위팔
-                  { id: 'elbow', top: '42%', left: '22%' },       // 좌 팔꿈치
-                  { id: 'elbow', top: '42%', left: '78%' },       // 우 팔꿈치
+                  { id: 'chest', top: '24%', left: '50%' },       // 흉부
+                  { id: 'lumbar', top: '38%', left: '50%' },      // 요추/허리
+                  { id: 'hip', top: '52%', left: '50%' },         // 골반/고관절
+                  { id: 'shoulder', top: '20%', left: '30%' },    // 좌 어깨
+                  { id: 'shoulder', top: '20%', left: '70%' },    // 우 어깨
+                  { id: 'upper_arm', top: '30%', left: '26%' },   // 좌 위팔
+                  { id: 'upper_arm', top: '30%', left: '74%' },   // 우 위팔
+                  { id: 'elbow', top: '40%', left: '24%' },       // 좌 팔꿈치
+                  { id: 'elbow', top: '40%', left: '76%' },       // 우 팔꿈치
                   { id: 'forearm', top: '50%', left: '22%' },     // 좌 아래팔
                   { id: 'forearm', top: '50%', left: '78%' },     // 우 아래팔
-                  { id: 'hand', top: '62%', left: '24%' },        // 좌 손/손가락 (이미지 내 손 위치에 맞춤)
-                  { id: 'hand', top: '62%', left: '76%' },        // 우 손/손가락 (이미지 내 손 위치에 맞춤)
-                  // 다리
-                  { id: 'knee', top: '73%', left: '50%' },        // 무릎
-                  { id: 'ankle', top: '90%', left: '50%' },       // 발목/발
+                  { id: 'hand', top: '60%', left: '20%' },        // 좌 손/손가락
+                  { id: 'hand', top: '60%', left: '80%' },        // 우 손/손가락
+                  { id: 'knee', top: '74%', left: '50%' },        // 무릎
+                  { id: 'ankle', top: '92%', left: '50%' },       // 발목/발
                 ].map((spot, idx) => {
                   const isActive = selectedBodyPart === spot.id;
                   return (
@@ -722,6 +718,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                     </button>
                   );
                 })}
+                </div>
               </div>
             </div>
 
