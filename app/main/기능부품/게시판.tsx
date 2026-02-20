@@ -660,14 +660,14 @@ export default function BoardView({ user, setMainMenu }: any) {
 
       {/* 수술/MRI용 사람 모형 선택 모달 - 사람 이미지 + 부위 하이라이트 */}
       {showBodyPicker && (activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4 md:p-10" onClick={() => setShowBodyPicker(false)}>
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-3 md:p-6" onClick={() => setShowBodyPicker(false)}>
           <div
-            className="w-full max-w-5xl max-h-[90vh] bg-white rounded-[24px] shadow-2xl border border-[#E5E8EB] p-6 md:p-10 flex flex-col md:flex-row gap-6"
+            className="w-full max-w-7xl max-h-[94vh] bg-white rounded-[24px] shadow-2xl border border-[#E5E8EB] p-5 md:p-8 flex flex-col md:flex-row gap-5 md:gap-8"
             onClick={(e) => e.stopPropagation()}
           >
             {/* 왼쪽: 생성된 전신 이미지 + 부위 클릭 (이미지와 동일 비율 박스 안에서 좌표 고정) */}
-            <div className="flex-1 flex items-center justify-center min-h-[360px] max-h-[520px] bg-[#020617] rounded-[18px] border border-slate-800 overflow-hidden p-2">
-              <div className="relative w-full max-w-[320px] aspect-[2/3] max-h-[480px] shrink-0">
+            <div className="flex-1 flex items-center justify-center min-h-[400px] max-h-[640px] bg-[#020617] rounded-[18px] border border-slate-800 overflow-hidden p-2">
+              <div className="relative w-full max-w-[400px] aspect-[2/3] max-h-[600px] shrink-0">
                 <img
                   src="/human-body-mri.png"
                   alt="사람 전신 모형"
