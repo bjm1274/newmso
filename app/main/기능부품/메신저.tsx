@@ -1444,7 +1444,6 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
              >
                {fileUploading ? <span className="animate-pulse text-xs">...</span> : '📎'}
              </button>
-             <button onClick={()=>setShowPollModal(true)} className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-blue-600 transition-colors">📊</button>
              <div className="relative flex-1">
                <input 
                  className="w-full bg-transparent p-2 outline-none text-[16px] md:text-sm font-bold min-w-0"
@@ -1560,6 +1559,16 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                       className="px-3 py-1.5 text-[10px] font-black text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
                     >
                       채팅방 이름 변경
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowMediaPanel(false);
+                        setShowPollModal(true);
+                      }}
+                      className="px-3 py-1.5 text-[10px] font-black text-blue-600 border border-blue-100 rounded-xl hover:bg-blue-50 transition-colors"
+                    >
+                      📊 투표 만들기
                     </button>
                     <button
                       type="button"
