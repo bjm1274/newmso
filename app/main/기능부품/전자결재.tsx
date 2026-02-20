@@ -482,7 +482,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                             {steps.length > 0 && (
                               <div className="mt-2 flex flex-wrap gap-1.5">
                                 <span className="text-[9px] font-black text-gray-400 uppercase">결재선</span>
-                                {steps.map((s) => (
+                                {steps.map((s: { step: number; name: string; isCurrent: boolean }) => (
                                   <span key={s.step} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-bold ${item.status === '승인' ? 'bg-green-50 text-green-600' : s.isCurrent ? 'bg-amber-100 text-amber-700' : 'bg-gray-50 text-gray-400'}`}>
                                     {s.step}. {s.name} {item.status === '승인' ? '(승인)' : s.isCurrent ? '(결재대기)' : '(대기)'}
                                   </span>
