@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
 import 직원권한통합 from './관리자전용서브/직원권한통합';
-import AttendanceDeductionRules from './관리자전용서브/근태차감규칙설정';
 import PopupManager from './관리자전용서브/팝업창관리자';
 import DataReseter from './관리자전용서브/데이터초기화';
 import DataBackup from './관리자전용서브/데이터백업';
@@ -37,7 +36,6 @@ export default function AdminView({ user, staffs = [], depts = [], onRefresh }: 
     { id: '엑셀등록', label: '📁 엑셀 일괄' },
     { id: '알림자동화', label: '🔔 알림 자동화' },
     { id: '연차부여', label: '🏖️ 연차 부여' },
-    { id: '근태차감규칙', label: '⏰ 근태 규칙' },
     { id: '회사관리', label: '🏢 회사/조직' },
     { id: '직원권한', label: '직원·권한' },
     { id: '수술검사템플릿', label: '수술·검사명' },
@@ -86,7 +84,6 @@ export default function AdminView({ user, staffs = [], depts = [], onRefresh }: 
         {activeTab === '연차부여' && (
           <연차수동부여 staffs={staffs} onRefresh={onRefresh} />
         )}
-        {activeTab === '근태차감규칙' && <AttendanceDeductionRules />}
         {activeTab === '회사관리' && <CompanyManager staffs={staffs} onRefresh={onRefresh} />}
         {activeTab === '직원권한' && <직원권한통합 onRefresh={onRefresh} />}
         {activeTab === '수술검사템플릿' && <SurgeryExamTemplateManager />}
