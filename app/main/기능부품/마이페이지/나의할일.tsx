@@ -15,6 +15,7 @@ export default function MyTodoList({ user: initialUser }: any) {
     return krTime.toISOString().split('T')[0];
   };
   const [selectedDate, setSelectedDate] = useState(getToday());
+  const [viewRange, setViewRange] = useState<'day' | 'week' | 'month'>('day');
   const [loading, setLoading] = useState(false);
 
   // 1. 유저 ID 확인 및 자동 복구 로직
@@ -52,6 +53,10 @@ export default function MyTodoList({ user: initialUser }: any) {
   }, [initialUser, selectedDate]);
 
   useEffect(() => {
+    if (user?.id) fetchTasks(user.id);
+  }, [viewRange]);
+
+  useEffect(() => {
     if (!user?.id) return;
     const channel = supabase
       .channel(`todos-realtime-${user.id}`)
@@ -60,21 +65,49 @@ export default function MyTodoList({ user: initialUser }: any) {
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [user?.id, selectedDate]);
+  }, [user?.id, selectedDate, viewRange]);
 
-  // 할일 목록 불러오기 (ID를 인자로 받음)
+  // 일별: 해당일 포함 이전 할일. 주간별: 그 주 범위. 월별: 그 달 범위
+  const getDateRange = () => {
+    const d = new Date(selectedDate + 'T12:00:00');
+    if (viewRange === 'day') {
+      return { start: selectedDate, end: selectedDate };
+    }
+    if (viewRange === 'week') {
+      const day = d.getDay();
+      const sun = new Date(d);
+      sun.setDate(d.getDate() - (day === 0 ? 7 : day));
+      const sat = new Date(sun);
+      sat.setDate(sun.getDate() + 6);
+      return {
+        start: sun.toISOString().slice(0, 10),
+        end: sat.toISOString().slice(0, 10),
+      };
+    }
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const lastDay = new Date(y, d.getMonth() + 1, 0).getDate();
+    return {
+      start: `${y}-${m}-01`,
+      end: `${y}-${m}-${String(lastDay).padStart(2, '0')}`,
+    };
+  };
+
   const fetchTasks = async (userId: string) => {
     if (!userId) return;
-    
+    const { start, end } = getDateRange();
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      let query = supabase
         .from('todos')
         .select('*')
-        .eq('user_id', userId) // 복구된 ID 사용
-        // 선택한 날짜까지의 모든 할일을 불러와서
-        // 완료되지 않은 것은 "carry-over" 되도록 한다.
-        .lte('task_date', selectedDate)
+        .eq('user_id', userId);
+      if (viewRange === 'day') {
+        query = query.lte('task_date', selectedDate);
+      } else {
+        query = query.gte('task_date', start).lte('task_date', end);
+      }
+      const { data, error } = await query
         .order('task_date', { ascending: false })
         .order('created_at', { ascending: false });
 
@@ -148,22 +181,47 @@ export default function MyTodoList({ user: initialUser }: any) {
     }
   };
 
-  // 렌더링
-  // - 진행중: 선택한 날짜 이전에 생성되었더라도 완료되지 않았다면 모두 표시
-  // - 완료: 선택한 날짜의 완료된 내역만 표시
+  // 렌더링: 일별은 기존 로직, 주/월은 해당 기간 전체
   const inProgressTasks = tasks.filter(t => !t.is_complete);
-  const completedTasks = tasks.filter(t => t.is_complete && t.task_date === selectedDate);
+  const completedTasks = viewRange === 'day'
+    ? tasks.filter(t => t.is_complete && t.task_date === selectedDate)
+    : tasks.filter(t => t.is_complete);
 
   return (
     <div className="bg-white border border-gray-100 shadow-sm rounded-[2.5rem] p-8 h-full flex flex-col space-y-6">
-      <div className="flex justify-between items-center">
-        <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">나의 할일 관리</h3>
-        <input 
-          type="date" 
-          value={selectedDate}
-          onChange={(e) => setSelectedDate(e.target.value)}
-          className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-xs font-black text-gray-700 outline-none focus:border-blue-500 cursor-pointer"
-        />
+      <div className="flex flex-col gap-3">
+        <div className="flex justify-between items-center flex-wrap gap-2">
+          <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">나의 할일 관리</h3>
+          <div className="flex items-center gap-2">
+            <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
+              {(['day', 'week', 'month'] as const).map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setViewRange(r)}
+                  className={`px-3 py-1.5 rounded-md text-[10px] font-bold ${viewRange === r ? 'bg-white text-[#3182F6] shadow-sm' : 'text-gray-500'}`}
+                >
+                  {r === 'day' ? '일별' : r === 'week' ? '주간별' : '월별'}
+                </button>
+              ))}
+            </div>
+            <input
+              type={viewRange === 'month' ? 'month' : 'date'}
+              value={viewRange === 'month' ? selectedDate.slice(0, 7) : selectedDate}
+              onChange={(e) => setSelectedDate(viewRange === 'month' ? e.target.value + '-01' : e.target.value)}
+              className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-xs font-black text-gray-700 outline-none focus:border-blue-500 cursor-pointer"
+            />
+          </div>
+        </div>
+        {viewRange !== 'day' && (
+          <p className="text-[10px] text-gray-400 font-bold">
+            {viewRange === 'week' && (() => {
+              const { start, end } = getDateRange();
+              return `${start} ~ ${end}`;
+            })()}
+            {viewRange === 'month' && `${selectedDate.slice(0, 7)} 전체`}
+          </p>
+        )}
       </div>
 
       <div className="flex gap-2">

@@ -368,28 +368,47 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
               </div>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {filteredApprovals.map((item: any) => (
+                {filteredApprovals.map((item: any) => {
+                  const lineIds = Array.isArray(item.approver_line) ? item.approver_line : [];
+                  const steps = lineIds.map((id: string, i: number) => {
+                    const staff = Array.isArray(staffs) ? staffs.find((s: any) => s.id === id) : null;
+                    const name = staff?.name || '?';
+                    const isCurrent = id === item.approver_id;
+                    return { step: i + 1, name, isCurrent };
+                  });
+                  return (
                   <div key={item.id} className="bg-white p-6 md:p-8 border border-[#E5E8EB] rounded-[16px] shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6 group hover:border-[#3182F6]/30 hover:shadow-md transition-all animate-in fade-in-up">
-                    <div className="flex gap-4 md:gap-6 items-center">
+                    <div className="flex gap-4 md:gap-6 items-center flex-1 min-w-0">
                         <div className="w-14 h-14 md:w-16 md:h-16 bg-gray-50 shrink-0 rounded-2xl flex items-center justify-center text-xl md:text-2xl shadow-inner group-hover:bg-blue-50 transition-colors">
                             {item.type === '물품신청' ? '📦' : item.type === '양식신청' ? '📄' : item.type === '인사명령' ? '🎖️' : item.type === '수리요청서' ? '🔧' : '📋'}
                         </div>
-                        <div>
+                        <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap gap-2 mb-2 items-center">
                                 <span className="px-2 py-0.5 bg-gray-100 rounded-md text-[8px] md:text-[9px] font-black text-gray-400">{item.type}</span>
-                                <span className={`px-2 py-0.5 rounded-md text-[8px] md:text-[9px] font-black ${item.status === '승인' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-500'}`}>{item.status}</span>
+                                <span className={`px-2 py-0.5 rounded-md text-[8px] md:text-[9px] font-black ${item.status === '승인' ? 'bg-green-100 text-green-600' : item.status === '반려' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-500'}`}>{item.status}</span>
                                 <span className="px-2 py-0.5 bg-blue-50 rounded-md text-[8px] md:text-[9px] font-black text-blue-400">{item.sender_company}</span>
                             </div>
                             <h3 className="font-black text-gray-800 text-sm md:text-base tracking-tight line-clamp-1">{item.title}</h3>
                             <p className="text-[9px] md:text-[10px] text-gray-400 font-bold mt-1">기안자: {item.sender_name || '사용자'} | {new Date(item.created_at).toLocaleDateString()}</p>
+                            {steps.length > 0 && (
+                              <div className="mt-2 flex flex-wrap gap-1.5">
+                                <span className="text-[9px] font-black text-gray-400 uppercase">결재선</span>
+                                {steps.map((s) => (
+                                  <span key={s.step} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-bold ${item.status === '승인' ? 'bg-green-50 text-green-600' : s.isCurrent ? 'bg-amber-100 text-amber-700' : 'bg-gray-50 text-gray-400'}`}>
+                                    {s.step}. {s.name} {item.status === '승인' ? '(승인)' : s.isCurrent ? '(결재대기)' : '(대기)'}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                         </div>
                     </div>
                     
-                    {viewMode === '결재함' && item.status === '대기' && (user.permissions?.mso || user.role === 'admin') && (
-                      <button onClick={() => handleApproveAction(item)} className="w-full md:w-auto px-6 py-3 bg-[#3182F6] text-white rounded-[12px] text-[11px] font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all">승인하기</button>
+                    {viewMode === '결재함' && item.status === '대기' && (user.permissions?.mso || user.role === 'admin') && item.approver_id === user?.id && (
+                      <button onClick={() => handleApproveAction(item)} className="w-full md:w-auto shrink-0 px-6 py-3 bg-[#3182F6] text-white rounded-[12px] text-[11px] font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all">승인하기</button>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
