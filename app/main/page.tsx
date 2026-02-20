@@ -9,6 +9,7 @@ import MainContent from './기능부품/조직도서브/조직도본문';
 import GlobalSearch from '@/app/components/GlobalSearch';
 import GlobalNotificationBell from '@/app/components/GlobalNotificationBell';
 import NotificationSystem from './기능부품/알림시스템';
+import PermissionPromptModal from './기능부품/권한요청모달';
 
 type ERPData = {
   staffs: any[];
@@ -224,6 +225,8 @@ function MainPageContent() {
       />
 
       <div className="flex-1 flex flex-col overflow-hidden pb-[58px] md:pb-0 relative">
+        {/* 접속 시 한 번 알림·GPS 권한 요청 모달 */}
+        <PermissionPromptModal />
         {/* 전역 알림 및 푸시 처리 (채팅 탭을 열지 않아도 작동) */}
         <NotificationSystem user={user} />
 

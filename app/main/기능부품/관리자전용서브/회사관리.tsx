@@ -6,6 +6,8 @@ import TeamManager from './팀관리';
 import ContractManager from './계약관리도구';
 import CorporateCardTransactions from '../인사관리서브/법인카드사용내역';
 import ApprovalFormTypesManager from './전자결재양식관리';
+import ShiftManagement from '../인사관리서브/근무형태관리';
+import AttendanceDeductionRules from './근태차감규칙설정';
 
 type Props = {
   staffs?: any[];
@@ -26,7 +28,7 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
     memo: '',
   });
   const [msoId, setMsoId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'company' | 'team' | 'card' | 'contract' | 'forms'>('company');
+  const [activeTab, setActiveTab] = useState<'company' | 'team' | 'shift' | 'attendanceRules' | 'card' | 'contract' | 'forms'>('company');
 
   const fetchCompanies = async () => {
     const { data, error } = await supabase
@@ -161,6 +163,18 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
             onClick={() => setActiveTab('team')}
           >
             팀
+          </button>
+          <button
+            className={`px-3 py-1.5 rounded-[10px] ${activeTab === 'shift' ? 'bg-white text-[#3182F6] shadow-sm' : 'text-gray-500'}`}
+            onClick={() => setActiveTab('shift')}
+          >
+            근무형태
+          </button>
+          <button
+            className={`px-3 py-1.5 rounded-[10px] ${activeTab === 'attendanceRules' ? 'bg-white text-[#3182F6] shadow-sm' : 'text-gray-500'}`}
+            onClick={() => setActiveTab('attendanceRules')}
+          >
+            근태 규칙
           </button>
           <button
             className={`px-3 py-1.5 rounded-[10px] ${activeTab === 'card' ? 'bg-white text-[#3182F6] shadow-sm' : 'text-gray-500'}`}
@@ -333,6 +347,10 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
       )}
 
       {activeTab === 'team' && <TeamManager onRefresh={onRefresh} />}
+
+      {activeTab === 'shift' && <ShiftManagement selectedCo="전체" />}
+
+      {activeTab === 'attendanceRules' && <AttendanceDeductionRules />}
 
       {activeTab === 'card' && <CorporateCardTransactions staffs={staffs} />}
 

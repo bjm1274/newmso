@@ -8,7 +8,6 @@ import AttendanceMain from './인사관리서브/근태기록/근태관리메인
 import LeaveManagement from './인사관리서브/휴가신청/휴가관리메인';
 import SharedCalendarView from './공유캘린더';
 import CalendarSync from './캘린더동기화';
-import ShiftManagement from './인사관리서브/근무형태관리';
 import AssetLoanManager from './인사관리서브/비품장비대여관리';
 import ContractMain from './인사관리서브/계약관리';
 import 문서보관함 from './인사관리서브/문서보관함';
@@ -39,7 +38,6 @@ export default function HRMainView({ user, staffs, depts, onRefresh }: any) {
     { id: '계약', perm: 'hr_계약' },
     { id: '문서보관함', perm: 'hr_문서보관함' },
     { id: '교육', perm: 'hr_교육' },
-    { id: '근무형태', perm: 'hr_근무형태' },
     { id: '근태', perm: 'hr_근태' },
     { id: '급여', perm: 'hr_급여' },
     { id: '연차/휴가', perm: 'hr_연차휴가' },
@@ -201,7 +199,6 @@ export default function HRMainView({ user, staffs, depts, onRefresh }: any) {
               <EducationMain staffs={staffs} selectedCo={선택사업체} />
             </div>
           )}
-          {activeMenu === '근무형태' && <ShiftManagement selectedCo={선택사업체} />}
           {activeMenu === '근태' && (
             <div className="flex flex-col h-full">
               <div className="flex gap-1 bg-gray-100 p-1 rounded-[12px] w-fit mb-4">
