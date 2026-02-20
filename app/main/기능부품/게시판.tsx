@@ -47,8 +47,11 @@ export default function BoardView({ user, setMainMenu }: any) {
     { id: 'ankle', label: '발목/발', emoji: '🦶' },
     { id: 'other', label: '기타', emoji: '➕' },
   ];
+  const VALID_BODY_IDS = new Set(BODY_PARTS.map((b) => b.id));
   const [selectedBodyPart, setSelectedBodyPart] = useState<string>('all');
   const [showBodyPicker, setShowBodyPicker] = useState(false);
+  // 제거된 부위(손/손가락, 팔꿈치)가 선택돼 있으면 '전체'로 보정
+  const resolvedBodyPart = VALID_BODY_IDS.has(selectedBodyPart) ? selectedBodyPart : 'all';
 
   // 수술일정·MRI일정 달력 뷰용 현재 월
   const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date());
@@ -119,9 +122,9 @@ export default function BoardView({ user, setMainMenu }: any) {
     [activeBoard, surgeryTemplates, mriTemplates]
   );
 
-  // 부위 선택에 따른 템플릿 필터링
+  // 부위 선택에 따른 템플릿 필터링 (제거된 부위 hand/elbow면 전체로 처리)
   const filteredTemplates = useMemo(() => {
-    if (selectedBodyPart === 'all' || !currentTemplates.length) return currentTemplates;
+    if (resolvedBodyPart === 'all' || !currentTemplates.length) return currentTemplates;
 
     const keywordMap: Record<string, string[]> = {
       cervical: ['경추', '목', '경추부'],
@@ -136,15 +139,15 @@ export default function BoardView({ user, setMainMenu }: any) {
       other: [],
     };
 
-    const keywords = keywordMap[selectedBodyPart] || [];
+    const keywords = keywordMap[resolvedBodyPart] || [];
     if (keywords.length === 0) return currentTemplates;
 
     return currentTemplates.filter((t: any) => {
-      if (t.body_part) return t.body_part === selectedBodyPart;
+      if (t.body_part) return t.body_part === resolvedBodyPart;
       const name = (t.name || '') as string;
       return keywords.some((k) => name.includes(k));
     });
-  }, [currentTemplates, selectedBodyPart]);
+  }, [currentTemplates, resolvedBodyPart]);
 
   useEffect(() => {
     fetchPosts();
@@ -435,7 +438,10 @@ export default function BoardView({ user, setMainMenu }: any) {
                   <div className="flex justify-end mb-1">
                     <button
                       type="button"
-                      onClick={() => setShowBodyPicker(true)}
+                      onClick={() => {
+                        if (!VALID_BODY_IDS.has(selectedBodyPart)) setSelectedBodyPart('all');
+                        setShowBodyPicker(true);
+                      }}
                       className="px-3 py-1.5 rounded-full bg-white border border-[#E5E8EB] text-[10px] font-bold text-[#3182F6] hover:bg-[#E8F3FF]"
                     >
                       👤 사람 모형으로 선택
@@ -571,7 +577,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                     <label className="text-[10px] font-black text-[#4E5968] uppercase tracking-widest mb-1 block">
                       {activeBoard === '수술일정' ? '수술 관련 체크' : '촬영 관련 체크'}
                     </label>
-                    <div className="flex flex-wrap items-center gap-4 md:gap-6 text-[11px] font-bold text-[#4E5968]">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] font-bold text-[#4E5968]">
                       <label className="inline-flex items-center gap-2 cursor-pointer shrink-0">
                         <input
                           type="checkbox"
@@ -581,24 +587,26 @@ export default function BoardView({ user, setMainMenu }: any) {
                         />
                         <span>금식 필요</span>
                       </label>
-                      <label className="inline-flex items-center gap-2 cursor-pointer shrink-0">
-                        <input
-                          type="checkbox"
-                          checked={scheduleInpatient}
-                          onChange={(e) => setScheduleInpatient(e.target.checked)}
-                          className="w-4 h-4 rounded border-[#E5E8EB]"
-                        />
-                        <span>입원 예정</span>
-                      </label>
-                      <label className="inline-flex items-center gap-2 cursor-pointer shrink-0">
-                        <input
-                          type="checkbox"
-                          checked={scheduleGuardian}
-                          onChange={(e) => setScheduleGuardian(e.target.checked)}
-                          className="w-4 h-4 rounded border-[#E5E8EB]"
-                        />
-                        <span>보호자 동반</span>
-                      </label>
+                      <span className="inline-flex items-center gap-x-4 shrink-0 flex-nowrap">
+                        <label className="inline-flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={scheduleInpatient}
+                            onChange={(e) => setScheduleInpatient(e.target.checked)}
+                            className="w-4 h-4 rounded border-[#E5E8EB]"
+                          />
+                          <span>입원 예정</span>
+                        </label>
+                        <label className="inline-flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={scheduleGuardian}
+                            onChange={(e) => setScheduleGuardian(e.target.checked)}
+                            className="w-4 h-4 rounded border-[#E5E8EB]"
+                          />
+                          <span>보호자 동반</span>
+                        </label>
+                      </span>
                       <label className="inline-flex items-center gap-2 cursor-pointer shrink-0">
                         <input
                           type="checkbox"
@@ -657,7 +665,13 @@ export default function BoardView({ user, setMainMenu }: any) {
 
       {/* 수술/MRI용 사람 모형 선택 모달 - 사람 이미지 + 부위 하이라이트 */}
       {showBodyPicker && (activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-3 md:p-6" onClick={() => setShowBodyPicker(false)}>
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-3 md:p-6"
+          onClick={() => {
+            setShowBodyPicker(false);
+            if (!VALID_BODY_IDS.has(selectedBodyPart)) setSelectedBodyPart('all');
+          }}
+        >
           <div
             className="w-full max-w-7xl max-h-[94vh] bg-white rounded-[24px] shadow-2xl border border-[#E5E8EB] p-5 md:p-8 flex flex-col md:flex-row gap-5 md:gap-8"
             onClick={(e) => e.stopPropagation()}
@@ -686,7 +700,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                   { id: 'knee', top: '74%', left: '50%' },        // 무릎
                   { id: 'ankle', top: '92%', left: '50%' },       // 발목/발
                 ].map((spot, idx) => {
-                  const isActive = selectedBodyPart === spot.id;
+                  const isActive = resolvedBodyPart === spot.id;
                   return (
                     <button
                       key={idx}
@@ -723,7 +737,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                     {activeBoard === '수술일정' ? '수술명 선택' : '검사명 선택'}
                   </p>
                   <p className="text-xs font-bold text-[#4E5968] mt-1">
-                    {BODY_PARTS.find((b) => b.id === selectedBodyPart)?.label || '전체'} 기준 추천 목록
+                    {BODY_PARTS.find((b) => b.id === resolvedBodyPart)?.label || '전체'} 기준 추천 목록
                   </p>
                 </div>
                 <button
