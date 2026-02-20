@@ -33,7 +33,7 @@ export default function BoardView({ user, setMainMenu }: any) {
   const [surgeryTemplates, setSurgeryTemplates] = useState<any[]>([]);
   const [mriTemplates, setMriTemplates] = useState<any[]>([]);
 
-  // 수술/MRI 부위 필터 (사람 모형 버튼용) - 세분화
+  // 수술/MRI 부위 필터 (사람 모형: 아래팔/위팔 기준만, 손·손가락·팔꿈치 제외)
   const BODY_PARTS = [
     { id: 'all', label: '전체', emoji: '👤' },
     { id: 'cervical', label: '경추/목', emoji: '🧠' },
@@ -41,9 +41,7 @@ export default function BoardView({ user, setMainMenu }: any) {
     { id: 'lumbar', label: '요추/허리', emoji: '🦴' },
     { id: 'shoulder', label: '어깨', emoji: '🏋️' },
     { id: 'upper_arm', label: '위팔', emoji: '💪' },
-    { id: 'elbow', label: '팔꿈치', emoji: '🦾' },
     { id: 'forearm', label: '아래팔', emoji: '🤚' },
-    { id: 'hand', label: '손/손가락', emoji: '✋' },
     { id: 'hip', label: '고관절/골반', emoji: '🦵' },
     { id: 'knee', label: '무릎', emoji: '🦿' },
     { id: 'ankle', label: '발목/발', emoji: '🦶' },
@@ -131,9 +129,7 @@ export default function BoardView({ user, setMainMenu }: any) {
       lumbar: ['요추', '허리', '요추부', '요추부 MRI'],
       shoulder: ['어깨', '견', '견관절'],
       upper_arm: ['상완', '위팔'],
-      elbow: ['팔꿈치', '주관절'],
       forearm: ['전완', '아래팔'],
-      hand: ['손', '수지', '수부', '손목', '수근'],
       hip: ['고관절', '둔부', '골반'],
       knee: ['무릎', '슬관절', '무릎관절'],
       ankle: ['발목', '족관절', '발'],
@@ -144,6 +140,7 @@ export default function BoardView({ user, setMainMenu }: any) {
     if (keywords.length === 0) return currentTemplates;
 
     return currentTemplates.filter((t: any) => {
+      if (t.body_part) return t.body_part === selectedBodyPart;
       const name = (t.name || '') as string;
       return keywords.some((k) => name.includes(k));
     });
@@ -684,12 +681,8 @@ export default function BoardView({ user, setMainMenu }: any) {
                   { id: 'shoulder', top: '20%', left: '70%' },    // 우 어깨
                   { id: 'upper_arm', top: '30%', left: '26%' },   // 좌 위팔
                   { id: 'upper_arm', top: '30%', left: '74%' },   // 우 위팔
-                  { id: 'elbow', top: '40%', left: '24%' },       // 좌 팔꿈치
-                  { id: 'elbow', top: '40%', left: '76%' },       // 우 팔꿈치
                   { id: 'forearm', top: '50%', left: '22%' },     // 좌 아래팔
                   { id: 'forearm', top: '50%', left: '78%' },     // 우 아래팔
-                  { id: 'hand', top: '60%', left: '20%' },        // 좌 손/손가락
-                  { id: 'hand', top: '60%', left: '80%' },        // 우 손/손가락
                   { id: 'knee', top: '74%', left: '50%' },        // 무릎
                   { id: 'ankle', top: '92%', left: '50%' },       // 발목/발
                 ].map((spot, idx) => {
