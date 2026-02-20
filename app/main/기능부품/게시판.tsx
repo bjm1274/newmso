@@ -571,8 +571,8 @@ export default function BoardView({ user, setMainMenu }: any) {
                     <label className="text-[10px] font-black text-[#4E5968] uppercase tracking-widest mb-1 block">
                       {activeBoard === '수술일정' ? '수술 관련 체크' : '촬영 관련 체크'}
                     </label>
-                    <div className="grid grid-cols-2 gap-2 text-[11px] font-bold text-[#4E5968]">
-                      <label className="inline-flex items-center gap-2 cursor-pointer">
+                    <div className="flex flex-wrap items-center gap-4 md:gap-6 text-[11px] font-bold text-[#4E5968]">
+                      <label className="inline-flex items-center gap-2 cursor-pointer shrink-0">
                         <input
                           type="checkbox"
                           checked={scheduleFasting}
@@ -581,16 +581,16 @@ export default function BoardView({ user, setMainMenu }: any) {
                         />
                         <span>금식 필요</span>
                       </label>
-                      <label className="inline-flex items-center gap-2 cursor-pointer">
+                      <label className="inline-flex items-center gap-2 cursor-pointer shrink-0">
                         <input
                           type="checkbox"
                           checked={scheduleInpatient}
                           onChange={(e) => setScheduleInpatient(e.target.checked)}
                           className="w-4 h-4 rounded border-[#E5E8EB]"
                         />
-                          <span>입원 예정</span>
+                        <span>입원 예정</span>
                       </label>
-                      <label className="inline-flex items-center gap-2 cursor-pointer">
+                      <label className="inline-flex items-center gap-2 cursor-pointer shrink-0">
                         <input
                           type="checkbox"
                           checked={scheduleGuardian}
@@ -599,7 +599,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                         />
                         <span>보호자 동반</span>
                       </label>
-                      <label className="inline-flex items-center gap-2 cursor-pointer">
+                      <label className="inline-flex items-center gap-2 cursor-pointer shrink-0">
                         <input
                           type="checkbox"
                           checked={scheduleCaregiver}
@@ -608,7 +608,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                         />
                         <span>간병인 배치</span>
                       </label>
-                      <label className="inline-flex items-center gap-2 cursor-pointer">
+                      <label className="inline-flex items-center gap-2 cursor-pointer shrink-0">
                         <input
                           type="checkbox"
                           checked={scheduleTransfusion}
