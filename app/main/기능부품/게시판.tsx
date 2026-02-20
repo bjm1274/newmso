@@ -340,7 +340,7 @@ export default function BoardView({ user, setMainMenu }: any) {
             p.id === selectedPostId ? { ...p, views: nextViews } : p
           )
         );
-        setSelectedPostDetail((prev) =>
+        setSelectedPostDetail((prev: any) =>
           prev && prev.id === selectedPostId ? { ...prev, views: nextViews } : prev
         );
       } catch {
