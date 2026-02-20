@@ -75,18 +75,24 @@ export default function StatusPanel({ user, tasks, surgeries, mris, attStatus, o
 
     try {
       if (type === 'in') {
-        await supabase.from('attendance').insert([{ staff_id: user.id, check_in: now }]);
+        const { error } = await supabase.from('attendance').upsert(
+          [{ staff_id: user.id, date: today, check_in: now, status: '정상' }],
+          { onConflict: 'staff_id,date' }
+        );
+        if (error) throw error;
       } else {
-        await supabase.from('attendance').update({ check_out: now }).eq('staff_id', user.id).gte('check_in', `${today}T00:00:00`);
+        const { error } = await supabase
+          .from('attendance')
+          .update({ check_out: now })
+          .eq('staff_id', user.id)
+          .eq('date', today)
+          .is('check_out', null);
+        if (error) throw error;
       }
-      if (type === 'out') {
-        const attendanceData = JSON.parse(localStorage.getItem('attendance_records') || '[]');
-        attendanceData.push({ staff_id: user.id, date: today, check_in: now, check_out: now });
-        localStorage.setItem('attendance_records', JSON.stringify(attendanceData));
-      }
-      await onRefresh();
-    } catch (e) {
-      console.error("근태 오류", e);
+      if (typeof onRefresh === 'function') await onRefresh();
+    } catch (e: any) {
+      console.error('근태 오류', e);
+      alert('출퇴근 처리 실패: ' + (e?.message || '잠시 후 다시 시도해 주세요.'));
     } finally {
       setLoading(false);
     }

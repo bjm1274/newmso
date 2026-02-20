@@ -472,17 +472,17 @@ function LeaveAndCommuteSummary({ user }: any) {
       const remaining = Math.max(0, total - used);
 
       const { data: commute } = await supabase
-        .from('commute_logs')
-        .select('work_date,status')
-        .eq('user_id', user.id)
-        .order('work_date', { ascending: false })
+        .from('attendance')
+        .select('date,status')
+        .eq('staff_id', user.id)
+        .order('date', { ascending: false })
         .limit(60);
 
       const lateDays =
         commute
           ?.filter((c: any) => c.status === '지각')
           .map((c: any) => ({
-            date: c.work_date,
+            date: c.date,
             status: c.status,
           })) ?? [];
 
@@ -493,7 +493,7 @@ function LeaveAndCommuteSummary({ user }: any) {
               c.status === '추가근무' || c.status === '연장근로' || c.status === '야근'
           )
           .map((c: any) => ({
-            date: c.work_date,
+            date: c.date,
             status: c.status,
           })) ?? [];
 

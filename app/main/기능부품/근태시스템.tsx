@@ -144,8 +144,8 @@ export default function AttendanceSystem({ user, staffs, selectedCo, isAdminView
 
   const fetchTodayAttendance = async () => {
     const today = new Date().toISOString().split('T')[0];
-    const { data } = await supabase.from('attendance').select('*').eq('staff_id', user.id).eq('date', today).single();
-    if (data) setTodayAttendance(data as any);
+    const { data } = await supabase.from('attendance').select('*').eq('staff_id', user.id).eq('date', today).maybeSingle();
+    setTodayAttendance(data || null);
   };
 
   const fetchAllAttendance = async () => {

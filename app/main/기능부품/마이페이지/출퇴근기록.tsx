@@ -37,25 +37,25 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
   const fetchTodayLog = async () => {
     const today = new Date().toLocaleDateString('en-CA');
     const { data } = await supabase
-      .from('commute_logs')
+      .from('attendance')
       .select('*')
-      .eq('user_id', user.id)
-      .eq('work_date', today)
+      .eq('staff_id', user.id)
+      .eq('date', today)
       .maybeSingle();
     setTodayLog(data || null);
   };
 
   const fetchMonthlyLogs = async () => {
-    const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).toISOString();
-    const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).toISOString();
+    const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).toLocaleDateString('en-CA');
+    const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).toLocaleDateString('en-CA');
 
     const { data } = await supabase
-      .from('commute_logs')
+      .from('attendance')
       .select('*')
-      .eq('user_id', user.id)
-      .gte('work_date', startOfMonth)
-      .lte('work_date', endOfMonth)
-      .order('work_date', { ascending: false });
+      .eq('staff_id', user.id)
+      .gte('date', startOfMonth)
+      .lte('date', endOfMonth)
+      .order('date', { ascending: false });
 
     setLogs(data || []);
   };
@@ -132,12 +132,12 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
 
         const isLate = now.getHours() > lateThreshold || (now.getHours() === lateThreshold && now.getMinutes() > lateMinute);
         
-        const { data, error } = await supabase.from('commute_logs').insert([{
-          user_id: user.id,
-          work_date: today,
-          check_in_time: timeString,
+        const { data, error } = await supabase.from('attendance').upsert([{
+          staff_id: user.id,
+          date: today,
+          check_in: timeString,
           status: isLate ? '지각' : '정상'
-        }]).select().single();
+        }], { onConflict: 'staff_id,date' }).select().single();
         
         if (error) throw error;
         setTodayLog(data);
@@ -146,9 +146,11 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
       } else {
         if (!todayLog) return;
         const { data, error } = await supabase
-          .from('commute_logs')
-          .update({ check_out_time: timeString })
-          .eq('id', todayLog.id)
+          .from('attendance')
+          .update({ check_out: timeString })
+          .eq('staff_id', user.id)
+          .eq('date', today)
+          .is('check_out', null)
           .select()
           .single();
 
@@ -187,9 +189,9 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
           </p>
           <h2 className="text-4xl font-black tracking-tighter">{currentTime.toLocaleTimeString('ko-KR')}</h2>
           <div className="flex items-center gap-2 mt-2">
-            <span className={`w-2 h-2 rounded-full animate-pulse ${todayLog ? (todayLog.check_out_time ? 'bg-gray-500' : 'bg-green-500') : 'bg-red-500'}`}></span>
+            <span className={`w-2 h-2 rounded-full animate-pulse ${todayLog ? (todayLog.check_out ? 'bg-gray-500' : 'bg-green-500') : 'bg-red-500'}`}></span>
             <span className="text-sm font-bold">
-              {todayLog ? (todayLog.check_out_time ? '퇴근 완료' : '근무 중') : '출근 전'}
+              {todayLog ? (todayLog.check_out ? '퇴근 완료' : '근무 중') : '출근 전'}
             </span>
           </div>
         </div>
@@ -201,7 +203,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
               <span className="text-[10px] font-normal opacity-70">GPS 인증 필요</span>
             </button>
           )}
-          {todayLog && !todayLog.check_out_time && (
+          {todayLog && !todayLog.check_out && (
             <button onClick={() => handleCommute('out')} className="px-10 py-5 bg-red-600 hover:bg-red-500 rounded-2xl font-black text-lg shadow-lg active:scale-95 transition-all flex flex-col items-center leading-none gap-1">
               <span>퇴근하기 🌙</span>
               <span className="text-[10px] font-normal opacity-70">GPS 인증 필요</span>
@@ -230,7 +232,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
 
         <div className="space-y-4">
           {logs.map((log) => {
-            const workDate = new Date(log.work_date);
+            const workDate = new Date(log.date);
             return (
               <div
                 key={log.id}
@@ -254,8 +256,8 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
                 </div>
                 <div className="flex items-center gap-6 md:gap-10 justify-between md:justify-end w-full">
                   <div className="flex gap-6">
-                    <TimeBox label="출근" time={formatTime(log.check_in_time)} />
-                    <TimeBox label="퇴근" time={formatTime(log.check_out_time)} />
+                    <TimeBox label="출근" time={formatTime(log.check_in)} />
+                    <TimeBox label="퇴근" time={formatTime(log.check_out)} />
                   </div>
                   {onRequestCorrection && (
                     <button
