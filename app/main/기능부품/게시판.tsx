@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 
 const CHAT_ROOM_KEY = 'erp_chat_last_room';
@@ -21,6 +21,8 @@ export default function BoardView({ user, setMainMenu }: any) {
   const [scheduleGuardian, setScheduleGuardian] = useState(false);
   const [scheduleCaregiver, setScheduleCaregiver] = useState(false);
   const [scheduleTransfusion, setScheduleTransfusion] = useState(false);
+  const [scheduleSide, setScheduleSide] = useState<'좌' | '우' | ''>('');
+  const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
   const [schedulePeriod, setSchedulePeriod] = useState('');
   const [scheduleHour, setScheduleHour] = useState('');
   const [scheduleMinute, setScheduleMinute] = useState('');
@@ -57,6 +59,8 @@ export default function BoardView({ user, setMainMenu }: any) {
   const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date());
   // 상세보기용 선택된 게시물
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  // 조회수: 같은 글을 연 때 한 번만 증가 (effect 재실행 방지)
+  const viewedPostIdRef = useRef<string | null>(null);
   // 댓글 대댓글용 부모 댓글 ID
   const [replyParentId, setReplyParentId] = useState<string | null>(null);
 
@@ -238,22 +242,58 @@ export default function BoardView({ user, setMainMenu }: any) {
   };
 
   const handleAddComment = async (postId: string, parentCommentId?: string | null) => {
-    if (!newComment.trim() || !user?.id) return;
-    const { data } = await supabase
+    if (!newComment.trim()) return;
+    if (!user?.id) {
+      alert('로그인한 후 댓글을 등록할 수 있습니다.');
+      return;
+    }
+    const { data, error } = await supabase
       .from('board_post_comments')
       .insert([{
         post_id: postId,
         author_id: user.id,
-        author_name: user.name,
+        author_name: user.name ?? '익명',
         content: newComment.trim(),
         parent_comment_id: parentCommentId ?? null,
       }])
       .select()
-      .single();
+      .maybeSingle();
+    if (error) {
+      console.error('댓글 등록 실패:', error);
+      alert(`댓글 등록에 실패했습니다.\n\n${error.message || ''}`);
+      return;
+    }
     if (data) {
       setComments((prev) => ({ ...prev, [postId]: [...(prev[postId] || []), data] }));
       setNewComment('');
+      setReplyParentId(null);
+    } else {
+      alert('댓글 등록 후 응답을 받지 못했습니다. 다시 시도해 주세요.');
     }
+  };
+
+  const handleDeleteComment = async (postId: string, commentId: string) => {
+    if (!user?.id) return;
+    const list = comments[postId] || [];
+    const comment = list.find((c: any) => c.id === commentId);
+    if (!comment) return;
+    if (String(comment.author_id) !== String(user.id)) {
+      alert('본인이 작성한 댓글만 삭제할 수 있습니다.');
+      return;
+    }
+    if (!confirm('이 댓글을 삭제할까요?')) return;
+    const { error } = await supabase.from('board_post_comments').delete().eq('id', commentId);
+    if (error) {
+      console.error('댓글 삭제 실패:', error);
+      alert(`댓글 삭제에 실패했습니다.\n\n${error.message || ''}`);
+      return;
+    }
+    setComments((prev) => {
+      const postComments = (prev[postId] || []).filter(
+        (c: any) => c.id !== commentId && String(c.parent_comment_id) !== String(commentId)
+      );
+      return { ...prev, [postId]: postComments };
+    });
   };
 
   const handleExpandPost = (postId: string) => {
@@ -261,35 +301,53 @@ export default function BoardView({ user, setMainMenu }: any) {
     if (expandedPostId !== postId) fetchComments(postId);
   };
 
-  const selectedPost = useMemo(
+  const selectedPostFromList = useMemo(
     () => posts.find((p: any) => p.id === selectedPostId) || null,
     [posts, selectedPostId]
   );
+  const [selectedPostDetail, setSelectedPostDetail] = useState<any>(null);
+  const selectedPost = selectedPostDetail || selectedPostFromList;
 
-  // 상세 보기 열릴 때 조회수 1 증가
   useEffect(() => {
-    if (!selectedPostId) return;
-    const target = posts.find((p: any) => p.id === selectedPostId);
-    if (!target) return;
-    const currentViews = target.views ?? 0;
-    const nextViews = currentViews + 1;
+    if (!selectedPostId) {
+      setSelectedPostDetail(null);
+      return;
+    }
+    (async () => {
+      const { data } = await supabase.from('board_posts').select('*').eq('id', selectedPostId).maybeSingle();
+      if (data) setSelectedPostDetail(data);
+      else setSelectedPostDetail(null);
+    })();
+  }, [selectedPostId]);
+
+  // 상세 보기 열릴 때 조회수 1회만 증가 (selectedPostId 변경 시에만 실행, posts 제외해 중복 방지)
+  useEffect(() => {
+    if (!selectedPostId) {
+      viewedPostIdRef.current = null;
+      return;
+    }
+    if (viewedPostIdRef.current === selectedPostId) return;
+    viewedPostIdRef.current = selectedPostId;
 
     (async () => {
       try {
-        await supabase
-          .from('board_posts')
-          .update({ views: nextViews })
-          .eq('id', selectedPostId);
+        const { data: row } = await supabase.from('board_posts').select('views').eq('id', selectedPostId).maybeSingle();
+        const currentViews = (row?.views ?? 0) as number;
+        const nextViews = currentViews + 1;
+        await supabase.from('board_posts').update({ views: nextViews }).eq('id', selectedPostId);
         setPosts((prev) =>
           prev.map((p: any) =>
             p.id === selectedPostId ? { ...p, views: nextViews } : p
           )
         );
+        setSelectedPostDetail((prev) =>
+          prev && prev.id === selectedPostId ? { ...prev, views: nextViews } : prev
+        );
       } catch {
         // 조회수 업데이트 실패는 무시
       }
     })();
-  }, [selectedPostId, posts]);
+  }, [selectedPostId]);
 
   const canDeletePost = (post: any) => {
     if (!user) return false;
@@ -347,10 +405,59 @@ export default function BoardView({ user, setMainMenu }: any) {
         postData.surgery_guardian = scheduleGuardian;
         postData.surgery_caregiver = scheduleCaregiver;
         postData.surgery_transfusion = scheduleTransfusion;
+        const sidePrefix = scheduleSide === '좌' ? '좌측 ' : scheduleSide === '우' ? '우측 ' : '';
+        postData.title = sidePrefix + (postData.title || '');
       }
 
-      const { error } = await supabase.from('board_posts').insert([postData]);
+      // 공지/자유/경조사: 사진·동영상·파일 첨부 업로드 (Storage 키는 영문/숫자만 사용, 한글 파일명은 Invalid key 방지)
+      const boardWithAttach = ['공지사항', '자유게시판', '경조사'];
+      if (boardWithAttach.includes(activeBoard) && attachmentFiles.length > 0) {
+        const BUCKET = 'board-attachments';
+        const safeExt = (name: string) => {
+          const i = name.lastIndexOf('.');
+          const ext = i >= 0 ? name.slice(i).replace(/[^a-zA-Z0-9.]/g, '') || '.bin' : '.bin';
+          return ext.startsWith('.') ? ext : `.${ext}`;
+        };
+        const uploaded: { url: string; name: string; type: string }[] = [];
+        let lastUploadError: string | null = null;
+        for (let i = 0; i < attachmentFiles.length; i++) {
+          const file = attachmentFiles[i];
+          const ext = safeExt(file.name);
+          const path = `${user?.id || 'anon'}_${Date.now()}_${i}${ext}`;
+          const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: true });
+          if (upErr) {
+            lastUploadError = upErr.message || String(upErr);
+            console.error('[게시판 첨부 업로드 실패]', upErr);
+          } else {
+            const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+            const type = file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : 'file';
+            uploaded.push({
+              url: `${data.publicUrl}?t=${Date.now()}`,
+              name: file.name,
+              type,
+            });
+          }
+        }
+        if (uploaded.length === 0 && attachmentFiles.length > 0) {
+          alert(
+            '첨부파일 업로드에 실패했습니다.\n\n' +
+            (lastUploadError ? `원인: ${lastUploadError}\n\n` : '') +
+            'Supabase 대시보드 → SQL Editor에서 storage_board_attachments.sql 내용을 실행했는지 확인해 주세요.'
+          );
+          setLoading(false);
+          return;
+        }
+        if (uploaded.length < attachmentFiles.length) {
+          console.warn('일부 첨부만 업로드됨.', lastUploadError);
+        }
+        postData.attachments = uploaded;
+      }
+
+      const { data: insertedPost, error } = await supabase.from('board_posts').insert([postData]).select().single();
       if (!error) {
+        if (attachmentFiles.length > 0 && (!insertedPost.attachments || (Array.isArray(insertedPost.attachments) && insertedPost.attachments.length === 0))) {
+          console.warn('첨부파일이 저장되지 않았을 수 있습니다. Supabase에 board_posts_attachments.sql 적용 및 board-attachments 버킷 생성 여부를 확인하세요.');
+        }
         alert('게시물이 등록되었습니다.');
         setTitle('');
         setContent('');
@@ -366,9 +473,12 @@ export default function BoardView({ user, setMainMenu }: any) {
         setScheduleGuardian(false);
         setScheduleCaregiver(false);
         setScheduleTransfusion(false);
+        setScheduleSide('');
+        setAttachmentFiles([]);
         setTagsInput('');
         setShowNewPost(false);
-        fetchPosts();
+        setPosts((prev) => [insertedPost, ...prev]);
+        setSelectedPostId(insertedPost.id);
       } else {
         const hint = (activeBoard === '수술일정' || activeBoard === 'MRI일정') && (error.message?.includes('column') || error.code === '42703')
           ? '\n\n수술일정/MRI일정용 컬럼이 없을 수 있습니다. Supabase에 board_posts_schedule_columns.sql 마이그레이션을 적용해 주세요.'
@@ -425,28 +535,26 @@ export default function BoardView({ user, setMainMenu }: any) {
       {/* 새 게시물 작성 폼 */}
       {showNewPost && (
         <div className="bg-white p-6 md:p-8 border border-[#E5E8EB] shadow-sm rounded-[16px] space-y-6 animate-in fade-in slide-in-from-top-4 duration-300">
-          <h3 className="text-lg font-bold text-[#191F28]">새 게시물 작성</h3>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h3 className="text-lg font-bold text-[#191F28]">새 게시물 작성</h3>
+            {(activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (!VALID_BODY_IDS.has(selectedBodyPart)) setSelectedBodyPart('all');
+                  setShowBodyPicker(true);
+                }}
+                className="px-6 py-3 rounded-full bg-white border border-[#E5E8EB] text-base font-bold text-[#3182F6] hover:bg-[#E8F3FF] shrink-0"
+              >
+                👤 사람 모형으로 선택
+              </button>
+            )}
+          </div>
 
           <div className="space-y-4">
             <div>
-              <label className="text-[10px] font-black text-[#4E5968] uppercase tracking-widest mb-2 block">
-                {activeBoard === '수술일정' ? '수술명' : activeBoard === 'MRI일정' ? '검사명' : '제목'}
-              </label>
               {(activeBoard === '수술일정' || activeBoard === 'MRI일정') ? (
                 <div className="space-y-3">
-                  {/* 사람 모형 선택 버튼만 노출 (상단 부위 버튼 제거) */}
-                  <div className="flex justify-end mb-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!VALID_BODY_IDS.has(selectedBodyPart)) setSelectedBodyPart('all');
-                        setShowBodyPicker(true);
-                      }}
-                      className="px-3 py-1.5 rounded-full bg-white border border-[#E5E8EB] text-[10px] font-bold text-[#3182F6] hover:bg-[#E8F3FF]"
-                    >
-                      👤 사람 모형으로 선택
-                    </button>
-                  </div>
                   <select
                     value=""
                     onChange={(e) => {
@@ -467,24 +575,45 @@ export default function BoardView({ user, setMainMenu }: any) {
                       </option>
                     ))}
                   </select>
-                  <input
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder={
-                      activeBoard === '수술일정'
-                        ? '수술명을 입력하거나 위에서 선택하세요.'
-                        : '검사명을 입력하거나 위에서 선택하세요.'
-                    }
-                    className="w-full p-4 bg-[#F2F4F6] rounded-[12px] border border-[#E5E8EB] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[#3182F6]/20"
-                  />
+                  <div className="flex gap-2 items-stretch">
+                    <input
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder={
+                        activeBoard === '수술일정'
+                          ? '수술명을 입력하거나 위에서 선택하세요.'
+                          : '검사명을 입력하거나 위에서 선택하세요.'
+                      }
+                      className="flex-1 min-w-0 p-4 bg-[#F2F4F6] rounded-[12px] border border-[#E5E8EB] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[#3182F6]/20"
+                    />
+                    <div className="flex rounded-[12px] border border-[#E5E8EB] overflow-hidden bg-[#F2F4F6] shrink-0 min-w-[120px]">
+                      <button
+                        type="button"
+                        onClick={() => setScheduleSide(scheduleSide === '좌' ? '' : '좌')}
+                        className={`flex-1 min-w-[56px] px-6 py-3 text-sm font-bold transition-colors ${scheduleSide === '좌' ? 'bg-[#3182F6] text-white' : 'text-[#4E5968] hover:bg-[#E5E8EB]'}`}
+                      >
+                        좌
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setScheduleSide(scheduleSide === '우' ? '' : '우')}
+                        className={`flex-1 min-w-[56px] px-6 py-3 text-sm font-bold transition-colors ${scheduleSide === '우' ? 'bg-[#3182F6] text-white' : 'text-[#4E5968] hover:bg-[#E5E8EB]'}`}
+                      >
+                        우
+                      </button>
+                    </div>
+                  </div>
                 </div>
               ) : (
-                <input
-                  value={title}
-                  onChange={e => setTitle(e.target.value)}
-                  placeholder="게시물 제목을 입력하세요."
-                  className="w-full p-4 bg-[#F2F4F6] rounded-[12px] border border-[#E5E8EB] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[#3182F6]/20"
-                />
+                <>
+                  <label className="text-[10px] font-black text-[#4E5968] uppercase tracking-widest mb-2 block">제목</label>
+                  <input
+                    value={title}
+                    onChange={e => setTitle(e.target.value)}
+                    placeholder="게시물 제목을 입력하세요."
+                    className="w-full p-4 bg-[#F2F4F6] rounded-[12px] border border-[#E5E8EB] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[#3182F6]/20"
+                  />
+                </>
               )}
             </div>
 
@@ -573,55 +702,55 @@ export default function BoardView({ user, setMainMenu }: any) {
                   </div>
                 </div>
                 {(activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-[#4E5968] uppercase tracking-widest mb-1 block">
+                  <div className="space-y-3">
+                    <label className="text-[15px] font-black text-[#4E5968] uppercase tracking-widest mb-1.5 block">
                       {activeBoard === '수술일정' ? '수술 관련 체크' : '촬영 관련 체크'}
                     </label>
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] font-bold text-[#4E5968]">
-                      <label className="inline-flex items-center gap-2 cursor-pointer shrink-0">
+                    <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-base font-bold text-[#4E5968]">
+                      <label className="inline-flex items-center gap-3 cursor-pointer shrink-0">
                         <input
                           type="checkbox"
                           checked={scheduleFasting}
                           onChange={(e) => setScheduleFasting(e.target.checked)}
-                          className="w-4 h-4 rounded border-[#E5E8EB]"
+                          className="w-6 h-6 rounded border-[#E5E8EB]"
                         />
                         <span>금식 필요</span>
                       </label>
-                      <span className="inline-flex items-center gap-x-4 shrink-0 flex-nowrap">
-                        <label className="inline-flex items-center gap-2 cursor-pointer">
+                      <span className="inline-flex items-center gap-x-6 shrink-0 flex-nowrap">
+                        <label className="inline-flex items-center gap-3 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={scheduleInpatient}
                             onChange={(e) => setScheduleInpatient(e.target.checked)}
-                            className="w-4 h-4 rounded border-[#E5E8EB]"
+                            className="w-6 h-6 rounded border-[#E5E8EB]"
                           />
                           <span>입원 예정</span>
                         </label>
-                        <label className="inline-flex items-center gap-2 cursor-pointer">
+                        <label className="inline-flex items-center gap-3 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={scheduleGuardian}
                             onChange={(e) => setScheduleGuardian(e.target.checked)}
-                            className="w-4 h-4 rounded border-[#E5E8EB]"
+                            className="w-6 h-6 rounded border-[#E5E8EB]"
                           />
                           <span>보호자 동반</span>
                         </label>
                       </span>
-                      <label className="inline-flex items-center gap-2 cursor-pointer shrink-0">
+                      <label className="inline-flex items-center gap-3 cursor-pointer shrink-0">
                         <input
                           type="checkbox"
                           checked={scheduleCaregiver}
                           onChange={(e) => setScheduleCaregiver(e.target.checked)}
-                          className="w-4 h-4 rounded border-[#E5E8EB]"
+                          className="w-6 h-6 rounded border-[#E5E8EB]"
                         />
                         <span>간병인 배치</span>
                       </label>
-                      <label className="inline-flex items-center gap-2 cursor-pointer shrink-0">
+                      <label className="inline-flex items-center gap-3 cursor-pointer shrink-0">
                         <input
                           type="checkbox"
                           checked={scheduleTransfusion}
                           onChange={(e) => setScheduleTransfusion(e.target.checked)}
-                          className="w-4 h-4 rounded border-[#E5E8EB]"
+                          className="w-6 h-6 rounded border-[#E5E8EB]"
                         />
                         <span>수혈 필요</span>
                       </label>
@@ -648,6 +777,67 @@ export default function BoardView({ user, setMainMenu }: any) {
                   placeholder="게시물 내용을 입력하세요."
                   className="w-full h-32 md:h-48 p-4 bg-[#F2F4F6] rounded-[12px] border border-[#E5E8EB] border-none outline-none text-sm font-bold leading-relaxed focus:ring-2 focus:ring-[#3182F6]/20 resize-none"
                 />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-[#4E5968] uppercase tracking-widest mb-2 block">사진·동영상·파일 첨부</label>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.hwp,.zip"
+                    onChange={(e) => {
+                      const files = e.target.files ? Array.from(e.target.files) : [];
+                      setAttachmentFiles((prev) => [...prev, ...files].slice(0, 10));
+                      e.target.value = '';
+                    }}
+                    className="w-full text-sm font-bold text-[#4E5968] file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-[#E8F3FF] file:text-[#3182F6] file:font-bold"
+                  />
+                  {attachmentFiles.length > 0 && (
+                    <div className="mt-3 space-y-3">
+                      <div className="flex flex-wrap gap-3">
+                        {attachmentFiles.map((f, i) => {
+                          const isImg = f.type.startsWith('image/');
+                          const isVideo = f.type.startsWith('video/');
+                          const url = typeof URL !== 'undefined' ? URL.createObjectURL(f) : '';
+                          return (
+                            <div key={i} className="relative group">
+                              {isImg && (
+                                <img src={url} alt={f.name} className="w-24 h-24 object-cover rounded-xl border border-[#E5E8EB]" />
+                              )}
+                              {isVideo && (
+                                <video src={url} className="w-40 h-24 object-cover rounded-xl border border-[#E5E8EB]" muted playsInline />
+                              )}
+                              {!isImg && !isVideo && (
+                                <div className="w-24 h-24 rounded-xl border border-[#E5E8EB] bg-[#F2F4F6] flex items-center justify-center text-[10px] font-bold text-[#4E5968] truncate px-1">
+                                  📎 {f.name}
+                                </div>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setAttachmentFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                                className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-red-500 text-white text-xs font-black flex items-center justify-center shadow hover:bg-red-600"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <ul className="space-y-1">
+                        {attachmentFiles.map((f, i) => (
+                          <li key={i} className="flex items-center gap-2 text-xs font-bold text-[#4E5968]">
+                            <span className="truncate flex-1">{f.name}</span>
+                            <button
+                              type="button"
+                              onClick={() => setAttachmentFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                              className="shrink-0 px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 text-[10px]"
+                            >
+                              삭제
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               </>
             )}
@@ -1000,10 +1190,13 @@ export default function BoardView({ user, setMainMenu }: any) {
                   <div className="w-8 text-center text-[10px] font-bold text-[#8B95A1] shrink-0">
                     {rowNumber}
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 flex items-center gap-1.5">
                     <p className="font-bold text-[#191F28] truncate group-hover:text-[#3182F6]">
                       {post.title}
                     </p>
+                    {(Array.isArray(post.attachments) ? post.attachments : []).length > 0 && (
+                      <span className="shrink-0 text-[#8B95A1]" title="첨부파일 있음">📎</span>
+                    )}
                   </div>
                   <div className="hidden md:flex w-32 text-[10px] font-bold text-[#8B95A1] justify-center shrink-0">
                     {post.author_name || '익명'}
@@ -1166,6 +1359,42 @@ export default function BoardView({ user, setMainMenu }: any) {
             </div>
           )}
 
+          {(Array.isArray(selectedPost.attachments) ? selectedPost.attachments : []).length > 0 && (
+            <div className="pt-4 border-t border-[#F1F3F5]">
+              <p className="text-[10px] font-black text-[#8B95A1] uppercase tracking-widest mb-2">첨부파일 ({(Array.isArray(selectedPost.attachments) ? selectedPost.attachments : []).length}개)</p>
+              <div className="flex flex-wrap gap-4">
+                {(Array.isArray(selectedPost.attachments) ? selectedPost.attachments : []).map((att: any, i: number) =>
+                  att.type === 'image' ? (
+                    <a key={i} href={att.url} target="_blank" rel="noopener noreferrer" className="block">
+                      <img
+                        src={att.url}
+                        alt={att.name}
+                        loading="eager"
+                        decoding="async"
+                        referrerPolicy="no-referrer"
+                        className="max-w-[280px] max-h-[280px] rounded-xl border border-[#E5E8EB] object-cover shadow-sm bg-[#F2F4F6]"
+                        onError={(e) => {
+                          const el = e.target as HTMLImageElement;
+                          el.alt = '이미지를 불러올 수 없습니다.';
+                          el.classList.add('bg-red-50', 'border-red-200');
+                        }}
+                      />
+                    </a>
+                  ) : att.type === 'video' ? (
+                    <div key={i} className="rounded-xl border border-[#E5E8EB] overflow-hidden bg-black max-w-[320px]">
+                      <video src={att.url} controls className="w-full max-h-[240px]" preload="metadata" />
+                      <p className="text-[11px] font-bold text-[#4E5968] p-2 bg-[#F8FAFC] truncate">{att.name}</p>
+                    </div>
+                  ) : (
+                    <a key={i} href={att.url} target="_blank" rel="noopener noreferrer" download={att.name} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-[#F2F4F6] border border-[#E5E8EB] text-sm font-bold text-[#3182F6] hover:bg-[#E8F3FF]">
+                      📎 {att.name}
+                    </a>
+                  )
+                )}
+              </div>
+            </div>
+          )}
+
           {(Array.isArray(selectedPost.tags) ? selectedPost.tags : []).length > 0 && (
             <div className="flex flex-wrap gap-1 pt-2">
               {(Array.isArray(selectedPost.tags) ? selectedPost.tags : []).map(
@@ -1203,26 +1432,46 @@ export default function BoardView({ user, setMainMenu }: any) {
                 <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
                   {roots.map((c: any) => (
                     <div key={c.id} className="space-y-1">
-                      <div className="text-xs text-[#4E5968] flex gap-2">
+                      <div className="text-xs text-[#4E5968] flex gap-2 items-center flex-wrap">
                         <span className="font-bold">{c.author_name}:</span>
-                        <span>{c.content}</span>
-                        {user?.id && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setReplyParentId(c.id);
-                              setNewComment('');
-                            }}
-                            className="ml-auto text-[10px] text-[#8B95A1] hover:text-[#3182F6]"
-                          >
-                            답글
-                          </button>
-                        )}
+                        <span className="flex-1 min-w-0">{c.content}</span>
+                        <span className="flex gap-1 shrink-0">
+                          {user?.id && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setReplyParentId(c.id);
+                                setNewComment('');
+                              }}
+                              className="text-[10px] text-[#8B95A1] hover:text-[#3182F6]"
+                            >
+                              답글
+                            </button>
+                          )}
+                          {user?.id && String(c.author_id) === String(user.id) && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteComment(selectedPost.id, c.id)}
+                              className="text-[10px] text-[#8B95A1] hover:text-[#F04452]"
+                            >
+                              삭제
+                            </button>
+                          )}
+                        </span>
                       </div>
                       {(repliesByParent[String(c.id)] || []).map((r: any) => (
-                        <div key={r.id} className="ml-6 text-xs text-[#4E5968] flex gap-2">
+                        <div key={r.id} className="ml-6 text-xs text-[#4E5968] flex gap-2 items-center flex-wrap">
                           <span className="font-bold">{r.author_name}:</span>
-                          <span>{r.content}</span>
+                          <span className="flex-1 min-w-0">{r.content}</span>
+                          {user?.id && String(r.author_id) === String(user.id) && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteComment(selectedPost.id, r.id)}
+                              className="text-[10px] text-[#8B95A1] hover:text-[#F04452] shrink-0"
+                            >
+                              삭제
+                            </button>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -1233,26 +1482,23 @@ export default function BoardView({ user, setMainMenu }: any) {
                 </div>
               );
             })()}
-            {user?.id && (
-              <div className="flex gap-2">
-                <input
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  placeholder="댓글을 입력하세요."
-                  className="flex-1 px-3 py-2 border-[#E5E8EB] rounded-lg text-xs"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleAddComment(selectedPost.id, replyParentId);
-                    setReplyParentId(null);
-                  }}
-                  className="px-3 py-2 bg-[#3182F6] text-white rounded-[12px] text-xs font-bold hover:opacity-95"
-                >
-                  등록
-                </button>
-              </div>
-            )}
+            <div className="flex gap-2">
+              <input
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                placeholder={user?.id ? '댓글을 입력하세요.' : '로그인한 후 댓글을 입력할 수 있습니다.'}
+                disabled={!user?.id}
+                className="flex-1 px-3 py-2 border border-[#E5E8EB] rounded-lg text-xs disabled:bg-[#F8FAFC] disabled:text-[#94A3B8]"
+              />
+              <button
+                type="button"
+                onClick={() => handleAddComment(selectedPost.id, replyParentId)}
+                disabled={!user?.id}
+                className="px-3 py-2 bg-[#3182F6] text-white rounded-[12px] text-xs font-bold hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                등록
+              </button>
+            </div>
           </div>
 
         </div>
