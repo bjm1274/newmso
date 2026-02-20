@@ -689,10 +689,10 @@ export default function BoardView({ user, setMainMenu }: any) {
                   { id: 'upper_arm', top: '32%', left: '75%' },   // 우 위팔
                   { id: 'elbow', top: '42%', left: '22%' },       // 좌 팔꿈치
                   { id: 'elbow', top: '42%', left: '78%' },       // 우 팔꿈치
-                  { id: 'forearm', top: '50%', left: '20%' },     // 좌 아래팔
-                  { id: 'forearm', top: '50%', left: '80%' },     // 우 아래팔
-                  { id: 'hand', top: '58%', left: '18%' },        // 좌 손/손목
-                  { id: 'hand', top: '58%', left: '82%' },        // 우 손/손목
+                  { id: 'forearm', top: '50%', left: '22%' },     // 좌 아래팔
+                  { id: 'forearm', top: '50%', left: '78%' },     // 우 아래팔
+                  { id: 'hand', top: '62%', left: '24%' },        // 좌 손/손가락 (이미지 내 손 위치에 맞춤)
+                  { id: 'hand', top: '62%', left: '76%' },        // 우 손/손가락 (이미지 내 손 위치에 맞춤)
                   // 다리
                   { id: 'knee', top: '73%', left: '50%' },        // 무릎
                   { id: 'ankle', top: '90%', left: '50%' },       // 발목/발
