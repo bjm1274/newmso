@@ -97,12 +97,16 @@ serve(async (req: Request) => {
       });
     }
 
-    // 2) 채팅방 조회 (멤버 목록)
-    const { data: room, error: roomError } = await supabase
-      .from<ChatRoomRow>('chat_rooms')
-      .select('id, name, members')
-      .eq('id', room_id)
-      .single();
+    // 2) 채팅방 + 발신자 이름 병렬 조회 (모바일 푸시에 "누가 보냈는지" 바로 표시)
+    const [roomRes, senderRes] = await Promise.all([
+      supabase.from<ChatRoomRow>('chat_rooms').select('id, name, members').eq('id', room_id).single(),
+      message.sender_id
+        ? supabase.from('staff_members').select('name').eq('id', message.sender_id).maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
+    const room = roomRes.data;
+    const roomError = roomRes.error;
+    const senderName = (senderRes.data as { name?: string } | null)?.name ?? '알 수 없음';
 
     if (roomError || !room) {
       console.error('채팅방 조회 실패:', roomError);
@@ -178,13 +182,12 @@ serve(async (req: Request) => {
     // VAPID 설정
     webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
-    const title =
-      (room.name ? `💬 ${room.name}` : '💬 새 메시지') ??
-      '💬 새 메시지';
-    const body =
+    const bodyText =
       (message.content && message.content.trim().length > 0
         ? message.content.trim().slice(0, 80)
-        : '새 메시지가 도착했습니다.') ?? '새 메시지가 도착했습니다.';
+        : '📎 파일') ?? '새 메시지가 도착했습니다.';
+    const title = `💬 ${senderName}`;
+    const body = bodyText;
 
     const payload = JSON.stringify({
       title,

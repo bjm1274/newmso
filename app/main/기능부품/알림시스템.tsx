@@ -237,32 +237,38 @@ export default function NotificationSystem({ user, onOpenChatRoom }: { user: any
         )
         .subscribe();
 
-      // E. 메신저 새 메시지 (내가 속한 방에서만 알림, 카카오워크 스타일)
+      // E. 메신저 새 메시지 — 실시간, 발신자 이름 바로 표시 (room·sender 병렬 조회로 지연 최소화)
       const messagesChannel = supabase
         .channel('messages-realtime-hub')
         .on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'messages' },
           async (payload: any) => {
-            if (payload.new.sender_id === user.id) return;
-            const roomId = payload.new.room_id;
-            const { data: room } = await supabase.from('chat_rooms').select('members').eq('id', roomId).single();
-            const members: string[] = Array.isArray(room?.members) ? room.members.map((id: any) => String(id)) : [];
+            const msg = payload.new;
+            if (msg.sender_id === user.id) return;
+            const roomId = msg.room_id;
+            const [roomRes, senderRes] = await Promise.all([
+              supabase.from('chat_rooms').select('members').eq('id', roomId).single(),
+              msg.sender_id ? supabase.from('staff_members').select('name').eq('id', msg.sender_id).maybeSingle() : Promise.resolve({ data: null }),
+            ]);
+            const members: string[] = Array.isArray(roomRes.data?.members) ? roomRes.data.members.map((id: any) => String(id)) : [];
             if (!members.includes(String(user.id))) return;
 
-            const content: string = payload.new.content || '';
+            const senderName = (senderRes.data as any)?.name || '알 수 없음';
+            const content: string = msg.content || '';
             let notifType = 'message';
-            let title = '💬 새 메시지';
+            let title = `💬 ${senderName}`;
             if (user?.name && content.includes(`@${user.name}`)) {
               notifType = 'mention';
-              title = `📣 @멘션 도착`;
+              title = `📣 ${senderName}님이 멘션`;
             }
+            const bodyText = (content || '📎 파일').trim().slice(0, 50);
             const notif = {
-              id: payload.new.id,
+              id: msg.id,
               title,
-              body: (content || '📎 파일').slice(0, 50),
+              body: bodyText,
               type: notifType,
-              data: payload.new
+              data: msg,
             };
             handleNotification(notif);
           }
