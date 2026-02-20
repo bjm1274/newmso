@@ -79,10 +79,8 @@ export default function SurgeryExamTemplateManager() {
       if (error) throw error;
       if (type === 'surgery') {
         setNewSurgeryName('');
-        setNewSurgeryPart(BODY_PARTS[0].id);
       } else {
         setNewMriName('');
-        setNewMriPart(BODY_PARTS[0].id);
       }
       await loadAll();
     } catch (e) {

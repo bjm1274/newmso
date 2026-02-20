@@ -678,7 +678,7 @@ export default function BoardView({ user, setMainMenu }: any) {
           >
             {/* 왼쪽: 생성된 전신 이미지 + 부위 클릭 (이미지와 동일 비율 박스 안에서 좌표 고정) */}
             <div className="flex-1 flex items-center justify-center min-h-[400px] max-h-[640px] bg-[#020617] rounded-[18px] border border-slate-800 overflow-hidden p-2">
-              <div className="relative w-full max-w-[400px] aspect-[2/3] max-h-[600px] shrink-0">
+              <div className="relative w-full max-w-[400px] aspect-[2/3] max-h-[600px] shrink-0 -translate-y-6">
                 <img
                   src="/human-body-mri.png"
                   alt="사람 전신 모형"
