@@ -9,6 +9,7 @@ import MainContent from './기능부품/조직도서브/조직도본문';
 import GlobalSearch from '@/app/components/GlobalSearch';
 import GlobalNotificationBell from '@/app/components/GlobalNotificationBell';
 import NotificationSystem from './기능부품/알림시스템';
+import ChatAlertBanner from './기능부품/채팅알림배너';
 import PermissionPromptModal from './기능부품/권한요청모달';
 
 type ERPData = {
@@ -224,11 +225,13 @@ function MainPageContent() {
         }} 
       />
 
-      <div className="flex-1 flex flex-col overflow-hidden pb-[58px] md:pb-0 relative">
+      <div className="flex-1 flex flex-col overflow-hidden min-h-0 pb-[72px] md:pb-0 relative">
         {/* 접속 시 한 번 알림·GPS 권한 요청 모달 */}
         <PermissionPromptModal />
+        {/* 채팅 실시간 알림 인앱 배너 (웹·모바일, 푸시 없어도 표시) */}
+        <ChatAlertBanner onOpenChat={(roomId) => { setMainMenu('채팅'); setInitialOpenChatRoomId(roomId); }} />
         {/* 전역 알림 및 푸시 처리 (채팅 탭을 열지 않아도 작동) */}
-        <NotificationSystem user={user} />
+        <NotificationSystem user={user} onOpenChatRoom={(roomId) => { setMainMenu('채팅'); setInitialOpenChatRoomId(roomId); }} />
 
         <div className="hidden md:flex shrink-0 px-4 py-2 bg-white border-b border-[#E5E8EB] items-center gap-2 justify-end">
           <GlobalSearch

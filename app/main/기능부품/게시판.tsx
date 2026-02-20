@@ -498,7 +498,7 @@ export default function BoardView({ user, setMainMenu }: any) {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#F8FAFC] overflow-y-auto custom-scrollbar p-4 md:p-8 space-y-6 md:space-y-8">
+    <div className="flex flex-col h-full min-h-0 bg-[#F8FAFC] overflow-y-auto custom-scrollbar p-4 md:p-8 space-y-6 md:space-y-8 pb-24 md:pb-8">
       <header className="flex justify-between items-end">
         <div>
           <h2 className="text-xl md:text-2xl font-bold text-[#191F28] tracking-tight">게시판</h2>
@@ -508,7 +508,7 @@ export default function BoardView({ user, setMainMenu }: any) {
         {(activeBoard === '공지사항' || activeBoard === '자유게시판' || activeBoard === '경조사' || activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
           <button
             onClick={() => setShowNewPost(!showNewPost)}
-            className="px-4 md:px-6 py-2.5 md:py-3 bg-[#191F28] text-white rounded-[12px] text-[11px] md:text-xs font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all"
+            className="px-4 md:px-6 py-2.5 md:py-3 bg-[var(--toss-blue)] text-white rounded-[12px] text-[11px] md:text-xs font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all"
           >
             {showNewPost ? '✕ 취소' : '+ 새 게시물'}
           </button>
@@ -1221,8 +1221,8 @@ export default function BoardView({ user, setMainMenu }: any) {
 
       {/* 게시글 상세 보기 모달 */}
       {selectedPost && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-2 md:p-8">
-          <div className="w-full max-w-4xl max-h-[92vh] overflow-y-auto bg-white border border-[#E5E8EB] rounded-[24px] shadow-2xl p-5 md:p-8 space-y-5 text-[13px] md:text-[14px]">
+        <div className="fixed inset-0 z-40 flex items-end md:items-center justify-center bg-black/40 p-0 md:p-8">
+          <div className="w-full max-w-4xl max-h-[90dvh] overflow-y-auto bg-white border-0 md:border border-[#E5E8EB] rounded-t-[24px] md:rounded-[24px] shadow-2xl p-4 md:p-8 pb-8 space-y-5 text-[13px] md:text-[14px] safe-area-pb">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
               <p className="text-[11px] md:text-[12px] font-black text-[#8B95A1] uppercase tracking-widest mb-1">

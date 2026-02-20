@@ -56,8 +56,8 @@ export default function AdminView({ user, staffs = [], depts = [], onRefresh }: 
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-[#FDFDFD] h-full relative animate-in fade-in duration-500">
-      <header className="px-10 py-8 flex justify-end items-center bg-white border-b border-gray-100 shrink-0 shadow-sm flex-wrap gap-4">
+    <div className="flex-1 flex flex-col min-h-0 bg-[#FDFDFD] h-full relative animate-in fade-in duration-500">
+      <header className="px-4 md:px-10 py-4 md:py-8 flex justify-end items-center bg-white border-b border-gray-100 shrink-0 shadow-sm flex-wrap gap-4">
         <div className="flex gap-1 bg-[#F2F4F6] p-1 border border-[#E5E8EB] rounded-[12px] overflow-x-auto max-w-full">
           {adminTabs.map((tab) => (
             <button
@@ -75,7 +75,7 @@ export default function AdminView({ user, staffs = [], depts = [], onRefresh }: 
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-10 custom-scrollbar bg-[#F2F4F6]/30">
+      <main className="flex-1 min-h-0 overflow-y-auto p-4 md:p-10 custom-scrollbar bg-[#F2F4F6]/30">
         {activeTab === '경영대시보드' && (
           <BusinessDashboard staffs={staffs} inventory={inventory} />
         )}

@@ -83,8 +83,8 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                   onClick={() => setViewMode(mode.id as any)}
                   className={`px-6 py-2.5 rounded-[12px] text-[11px] font-bold transition-all ${
                     viewMode === mode.id 
-                      ? 'bg-[#191F28] text-white shadow-sm' 
-                      : 'bg-white text-[#8B95A1] border border-[#E5E8EB] hover:bg-gray-50'
+                      ? 'bg-[var(--toss-blue)] text-white shadow-sm' 
+                      : 'bg-white text-[var(--toss-gray-3)] border border-[var(--toss-border)] hover:bg-[var(--toss-gray-1)]'
                   }`}
                 >
                   {mode.label}

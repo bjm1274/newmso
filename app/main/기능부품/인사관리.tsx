@@ -103,12 +103,12 @@ export default function HRMainView({ user, staffs, depts, onRefresh }: any) {
   }
 
   return (
-    <div className="flex flex-col h-full bg-[#F8FAFC] overflow-hidden">
+    <div className="flex flex-col h-full min-h-0 bg-[#F8FAFC] overflow-hidden">
       {/* 헤더 - 모바일 대응 */}
       <header className="bg-white border-b border-[#E5E8EB] p-4 md:p-8 shrink-0 z-20 shadow-sm">
         <div className="flex flex-col md:flex-row justify-end items-center gap-3">
           <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
-            <button onClick={() => 창상태설정(true)} className="w-full md:w-auto bg-[#191F28] text-white px-6 py-2.5 text-[11px] font-bold rounded-[12px] shadow-sm hover:opacity-95 transition-all">신규 직원 등록</button>
+            <button onClick={() => 창상태설정(true)} className="w-full md:w-auto bg-[var(--toss-blue)] text-white px-6 py-2.5 text-[11px] font-bold rounded-[12px] shadow-sm hover:opacity-95 transition-all">신규 직원 등록</button>
             
             <div className="flex gap-1 bg-[#F2F4F6] p-1 rounded-[12px] border border-[#E5E8EB] overflow-x-auto no-scrollbar">
               {visibleHrTabs.map(({ id }) => (
@@ -119,7 +119,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh }: any) {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col md:flex-row overflow-hidden">
+      <main className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
         <aside className="w-full md:w-64 bg-white border-b md:border-r border-gray-100 flex flex-col shrink-0">
           <div className="p-4 md:p-8 space-y-6">
             <div>

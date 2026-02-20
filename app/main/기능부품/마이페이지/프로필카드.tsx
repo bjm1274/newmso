@@ -253,7 +253,7 @@ export default function MyProfileCard({ user: initialUser }: any) {
           </div>
           {user?.id ? (
             <>
-              <label className="absolute bottom-1 right-1 w-10 h-10 bg-[#191F28] text-white rounded-full flex items-center justify-center cursor-pointer hover:bg-[#3182F6] transition-all shadow-sm z-10" htmlFor="profiles-upload">
+              <label className="absolute bottom-1 right-1 w-10 h-10 bg-[var(--toss-blue)] text-white rounded-full flex items-center justify-center cursor-pointer hover:opacity-90 transition-all shadow-sm z-10" htmlFor="profiles-upload">
                 {uploading ? '⏳' : '📷'}
               </label>
               <input
@@ -480,24 +480,40 @@ function LeaveAndCommuteSummary({ user }: any) {
 
   useEffect(() => {
     const load = async () => {
-      if (!user?.id) return;
+      if (!user?.id && !user?.name) return;
 
-      const { data: staff } = await supabase
-        .from('staff_members')
-        .select('annual_leave_total, annual_leave_used')
-        .eq('id', user.id)
-        .maybeSingle();
+      let staff: { id?: string; annual_leave_total?: number; annual_leave_used?: number } | null = null;
+      if (user?.id) {
+        const res = await supabase
+          .from('staff_members')
+          .select('id, annual_leave_total, annual_leave_used')
+          .eq('id', user.id)
+          .maybeSingle();
+        staff = res.data;
+      }
+      if (!staff && user?.name) {
+        const res = await supabase
+          .from('staff_members')
+          .select('*')
+          .eq('name', user.name)
+          .maybeSingle();
+        const row = res.data as any;
+        if (row) staff = { id: row.id, annual_leave_total: row.annual_leave_total, annual_leave_used: row.annual_leave_used };
+      }
 
-      const total = Number(staff?.annual_leave_total ?? user.annual_leave_total ?? 0);
-      const used = Number(staff?.annual_leave_used ?? user.annual_leave_used ?? 0);
+      const total = Number(staff?.annual_leave_total ?? user?.annual_leave_total ?? 0);
+      const used = Number(staff?.annual_leave_used ?? user?.annual_leave_used ?? 0);
       const remaining = Math.max(0, total - used);
+      const staffId = staff?.id ?? user?.id;
 
-      const { data: commute } = await supabase
-        .from('attendance')
-        .select('date,status')
-        .eq('staff_id', user.id)
-        .order('date', { ascending: false })
-        .limit(60);
+      const { data: commute } = staffId
+        ? await supabase
+            .from('attendance')
+            .select('date,status')
+            .eq('staff_id', staffId)
+            .order('date', { ascending: false })
+            .limit(60)
+        : { data: null as any };
 
       const lateDays =
         commute
@@ -522,7 +538,7 @@ function LeaveAndCommuteSummary({ user }: any) {
     };
 
     load();
-  }, [user?.id]);
+  }, [user?.id, user?.name]);
 
   if (!summary) {
     return (
