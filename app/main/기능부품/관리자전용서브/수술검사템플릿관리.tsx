@@ -7,13 +7,30 @@ type Template = {
   name: string;
   sort_order: number;
   is_active: boolean;
+  body_part?: string | null;
 };
+
+// 부위 목록 (게시판 사람 모형·필터와 동일: 아래팔/위팔만, 손·손가락·팔꿈치 제외)
+const BODY_PARTS = [
+  { id: 'cervical', label: '경추/목' },
+  { id: 'chest', label: '흉부/가슴' },
+  { id: 'lumbar', label: '요추/허리' },
+  { id: 'shoulder', label: '어깨' },
+  { id: 'upper_arm', label: '위팔' },
+  { id: 'forearm', label: '아래팔' },
+  { id: 'hip', label: '고관절/골반' },
+  { id: 'knee', label: '무릎' },
+  { id: 'ankle', label: '발목/발' },
+  { id: 'other', label: '기타' },
+];
 
 export default function SurgeryExamTemplateManager() {
   const [surgeryTemplates, setSurgeryTemplates] = useState<Template[]>([]);
   const [mriTemplates, setMriTemplates] = useState<Template[]>([]);
   const [newSurgeryName, setNewSurgeryName] = useState('');
   const [newMriName, setNewMriName] = useState('');
+  const [newSurgeryPart, setNewSurgeryPart] = useState<string>(BODY_PARTS[0].id);
+  const [newMriPart, setNewMriPart] = useState<string>(BODY_PARTS[0].id);
   const [loading, setLoading] = useState(false);
 
   const loadAll = async () => {
@@ -48,6 +65,7 @@ export default function SurgeryExamTemplateManager() {
     try {
       const table = type === 'surgery' ? 'surgery_templates' : 'mri_templates';
       const list = type === 'surgery' ? surgeryTemplates : mriTemplates;
+      const bodyPart = type === 'surgery' ? newSurgeryPart : newMriPart;
       const maxSort =
         list.length > 0 ? Math.max(...list.map((t) => t.sort_order || 0)) : 0;
       const { error } = await supabase.from(table).insert([
@@ -55,11 +73,17 @@ export default function SurgeryExamTemplateManager() {
           name,
           sort_order: maxSort + 1,
           is_active: true,
+          body_part: bodyPart || null,
         },
       ]);
       if (error) throw error;
-      if (type === 'surgery') setNewSurgeryName('');
-      else setNewMriName('');
+      if (type === 'surgery') {
+        setNewSurgeryName('');
+        setNewSurgeryPart(BODY_PARTS[0].id);
+      } else {
+        setNewMriName('');
+        setNewMriPart(BODY_PARTS[0].id);
+      }
       await loadAll();
     } catch (e) {
       console.error('템플릿 추가 실패', e);
@@ -118,21 +142,35 @@ export default function SurgeryExamTemplateManager() {
             <span className="text-lg">🏥</span>
             수술명 템플릿
           </h3>
-          <div className="flex gap-2">
-            <input
-              value={newSurgeryName}
-              onChange={(e) => setNewSurgeryName(e.target.value)}
-              placeholder="예: 전방십자인대 재건술"
-              className="flex-1 px-3 py-2 rounded-xl border border-gray-200 text-xs font-bold"
-            />
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => addTemplate('surgery')}
-              className="px-4 py-2 rounded-xl bg-blue-600 text-white text-[11px] font-black disabled:opacity-50"
-            >
-              추가
-            </button>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider shrink-0">부위</label>
+              <select
+                value={newSurgeryPart}
+                onChange={(e) => setNewSurgeryPart(e.target.value)}
+                className="px-3 py-2 rounded-xl border border-gray-200 text-xs font-bold bg-white min-w-[140px]"
+              >
+                {BODY_PARTS.map((p) => (
+                  <option key={p.id} value={p.id}>{p.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex gap-2">
+              <input
+                value={newSurgeryName}
+                onChange={(e) => setNewSurgeryName(e.target.value)}
+                placeholder="예: 전방십자인대 재건술"
+                className="flex-1 px-3 py-2 rounded-xl border border-gray-200 text-xs font-bold"
+              />
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => addTemplate('surgery')}
+                className="px-4 py-2 rounded-xl bg-blue-600 text-white text-[11px] font-black disabled:opacity-50"
+              >
+                추가
+              </button>
+            </div>
           </div>
           <div className="border border-gray-100 rounded-2xl p-3 max-h-64 overflow-y-auto custom-scrollbar space-y-1 bg-gray-50/40">
             {surgeryTemplates.length === 0 ? (
@@ -151,6 +189,11 @@ export default function SurgeryExamTemplateManager() {
                     }`}
                   >
                     {t.name}
+                    {t.body_part && (
+                      <span className="ml-1.5 text-[9px] font-normal text-gray-400">
+                        ({BODY_PARTS.find((p) => p.id === t.body_part)?.label ?? t.body_part})
+                      </span>
+                    )}
                   </span>
                   <button
                     type="button"
@@ -178,21 +221,35 @@ export default function SurgeryExamTemplateManager() {
             <span className="text-lg">🔬</span>
             MRI 검사명 템플릿
           </h3>
-          <div className="flex gap-2">
-            <input
-              value={newMriName}
-              onChange={(e) => setNewMriName(e.target.value)}
-              placeholder="예: 요추부 MRI"
-              className="flex-1 px-3 py-2 rounded-xl border border-gray-200 text-xs font-bold"
-            />
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => addTemplate('mri')}
-              className="px-4 py-2 rounded-xl bg-blue-600 text-white text-[11px] font-black disabled:opacity-50"
-            >
-              추가
-            </button>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider shrink-0">부위</label>
+              <select
+                value={newMriPart}
+                onChange={(e) => setNewMriPart(e.target.value)}
+                className="px-3 py-2 rounded-xl border border-gray-200 text-xs font-bold bg-white min-w-[140px]"
+              >
+                {BODY_PARTS.map((p) => (
+                  <option key={p.id} value={p.id}>{p.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex gap-2">
+              <input
+                value={newMriName}
+                onChange={(e) => setNewMriName(e.target.value)}
+                placeholder="예: 요추부 MRI"
+                className="flex-1 px-3 py-2 rounded-xl border border-gray-200 text-xs font-bold"
+              />
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => addTemplate('mri')}
+                className="px-4 py-2 rounded-xl bg-blue-600 text-white text-[11px] font-black disabled:opacity-50"
+              >
+                추가
+              </button>
+            </div>
           </div>
           <div className="border border-gray-100 rounded-2xl p-3 max-h-64 overflow-y-auto custom-scrollbar space-y-1 bg-gray-50/40">
             {mriTemplates.length === 0 ? (
@@ -211,6 +268,11 @@ export default function SurgeryExamTemplateManager() {
                     }`}
                   >
                     {t.name}
+                    {t.body_part && (
+                      <span className="ml-1.5 text-[9px] font-normal text-gray-400">
+                        ({BODY_PARTS.find((p) => p.id === t.body_part)?.label ?? t.body_part})
+                      </span>
+                    )}
                   </span>
                   <button
                     type="button"
