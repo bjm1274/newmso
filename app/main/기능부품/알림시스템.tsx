@@ -124,7 +124,11 @@ export function sendNotification(title: string, options?: NotificationOptions) {
 }
 
 // [핵심] 실시간 데이터 변경 감지 및 알림 발송
-export default function NotificationSystem({ user, onOpenChatRoom }: { user: any; onOpenChatRoom?: (roomId: string) => void }) {
+export default function NotificationSystem({
+  user,
+  onOpenChatRoom,
+  onOpenApproval,
+}: { user: any; onOpenChatRoom?: (roomId: string) => void; onOpenApproval?: () => void }) {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -275,12 +279,61 @@ export default function NotificationSystem({ user, onOpenChatRoom }: { user: any
         )
         .subscribe();
 
+      // F. 서버 발송 알림 실시간 수신 (연차촉진, 알림자동화 등 — DB에 insert되면 즉시 표시)
+      const notificationsTableChannel = supabase
+        .channel(`notifications-realtime-${user.id}`)
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+          (payload: any) => {
+            const row = payload.new;
+            handleNotificationFromServer({
+              id: row.id,
+              title: row.title || '알림',
+              body: row.body || '',
+              type: row.type || 'notification',
+              data: row.metadata || {},
+            });
+          }
+        )
+        .subscribe();
+
+      // G. 출퇴근 실시간 알림 (내 기록 INSERT/UPDATE 시 즉시)
+      const attendanceChannel = supabase
+        .channel('attendance-realtime')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'attendance' },
+          (payload: any) => {
+            if (payload.new?.staff_id !== user.id) return;
+            const s = payload.new.status;
+            const isCheckOut = payload.new.check_out != null;
+            let title = '⏰ 출퇴근';
+            let body = '기록이 반영되었습니다.';
+            if (s === '지각') {
+              title = '⏰ 지각 등록';
+              body = '오늘 출근이 지각으로 기록되었습니다.';
+            } else if (isCheckOut) {
+              title = '⏰ 퇴근 처리됨';
+              body = '퇴근이 기록되었습니다.';
+            } else {
+              title = '⏰ 출근 처리됨';
+              body = s === '정상' ? '정상 출근이 기록되었습니다.' : '출근이 기록되었습니다.';
+            }
+            const notif = { id: payload.new.id || payload.new.date, title, body, type: 'attendance' as const, data: payload.new };
+            handleNotification(notif);
+          }
+        )
+        .subscribe();
+
       return () => {
         supabase.removeChannel(approvalsChannel);
         supabase.removeChannel(inventoryChannel);
         supabase.removeChannel(payrollChannel);
         supabase.removeChannel(educationChannel);
         supabase.removeChannel(messagesChannel);
+        supabase.removeChannel(notificationsTableChannel);
+        supabase.removeChannel(attendanceChannel);
       };
     };
 
@@ -294,6 +347,19 @@ export default function NotificationSystem({ user, onOpenChatRoom }: { user: any
     document.title = unreadCount > 0 ? `(${unreadCount}) ${baseTitle}` : baseTitle;
   }, [unreadCount]);
 
+  // 서버에서 notifications 테이블에 insert된 알림(연차촉진 등) 수신 시 — DB 저장 없이 즉시 표시
+  const handleNotificationFromServer = (notif: any) => {
+    sendNotification(notif.title, { body: notif.body, tag: notif.type, data: notif.data });
+    setNotifications(prev => [notif, ...prev].slice(0, 50));
+    setUnreadCount(prev => prev + 1);
+    if (typeof document !== 'undefined' && document.hidden) playNotificationSound();
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('erp-alert', {
+        detail: { title: notif.title, body: notif.body, type: notif.type, data: notif.data },
+      }));
+    }
+  };
+
   const handleNotification = (notif: any) => {
     // 1. 브라우저 푸시 알림 (권한 허용 시)
     sendNotification(notif.title, {
@@ -302,17 +368,22 @@ export default function NotificationSystem({ user, onOpenChatRoom }: { user: any
       data: { ...(notif.data || {}), room_id: notif.data?.room_id },
     });
 
-    // 2. 채팅/멘션 시 인앱 이벤트 발송 (웹·모바일 공통, 푸시 권한 없어도 토스트/배너 표시)
+    // 2. 채팅/멘션 시 인앱 이벤트 발송 (웹·모바일 공통)
     if (notif.type === 'message' || notif.type === 'mention') {
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('erp-chat-notification', {
           detail: { title: notif.title, body: notif.body, room_id: notif.data?.room_id },
         }));
       }
-      // 탭이 백그라운드일 때 짧은 알림음 (Android/iOS 브라우저 호환)
-      if (typeof document !== 'undefined' && document.hidden) {
-        playNotificationSound();
+      if (typeof document !== 'undefined' && document.hidden) playNotificationSound();
+    } else if (notif.type === 'approval' || notif.type === 'attendance') {
+      // 전자결재·출퇴근도 인앱 배너로 즉시 표시
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('erp-alert', {
+          detail: { title: notif.title, body: notif.body, type: notif.type, data: notif.data },
+        }));
       }
+      if (typeof document !== 'undefined' && document.hidden) playNotificationSound();
     }
 
     // 3. 시스템 내 알림 리스트에 추가
@@ -373,6 +444,7 @@ export default function NotificationSystem({ user, onOpenChatRoom }: { user: any
             if ((notif.type === 'message' || notif.type === 'mention') && notif.data?.room_id && onOpenChatRoom) {
               onOpenChatRoom(notif.data.room_id);
             }
+            if (notif.type === 'approval' && onOpenApproval) onOpenApproval();
           }}
         >
           <h4 className="font-black text-sm mb-1">{notif.title}</h4>

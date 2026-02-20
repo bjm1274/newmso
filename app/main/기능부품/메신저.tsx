@@ -305,7 +305,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     }
   }, []);
 
-  // 전역 신규 메시지 감지: 어떤 방이든 새 메시지가 오면 안 읽은 개수·화면 갱신 + 다른 방이면 알림(클릭 시 해당 채팅방 이동)
+  // 전역 신규 메시지 감지: 안 읽은 개수 갱신 (현재 방 메시지는 위 room 채널에서 즉시 반영하므로 fetchData 생략)
   useEffect(() => {
     if (!user?.id) return;
     const channel = supabase
@@ -319,10 +319,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
           if (chatRoomsRef.current.length) {
             await updateUnreadForRooms(chatRoomsRef.current);
           }
-          if (msg.room_id === selectedRoomId) {
-            fetchData();
-          }
-          // 푸시/알림은 알림시스템(messages-realtime-hub)에서만 발송 (중복 방지, 클릭 시 해당 채팅방 이동)
+          // 현재 방 메시지는 chat-realtime-${selectedRoomId}에서 이미 즉시 추가함 — fetchData 중복 호출 방지
         }
       )
       .subscribe();
@@ -330,16 +327,28 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id, selectedRoomId, fetchData, updateUnreadForRooms, staffs]);
+  }, [user?.id, selectedRoomId, updateUnreadForRooms]);
 
   useEffect(() => {
     if (!selectedRoomId) return;
     fetchData();
     const channel = supabase.channel(`chat-realtime-${selectedRoomId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `room_id=eq.${selectedRoomId}` }, () => {
-        fetchData();
-        // 푸시/알림은 알림시스템에서 통합 발송 (클릭 시 해당 채팅방 이동)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${selectedRoomId}` }, (payload: any) => {
+        const row = payload.new;
+        if (!row?.id) return;
+        // 카카오톡처럼 상대 메시지 실시간 즉시 반영 (fetch 없이 목록에 바로 추가)
+        setMessages((prev) => {
+          if (prev.some((m: any) => m.id === row.id)) return prev;
+          const sender = Array.isArray(staffs) ? staffs.find((s: any) => String(s.id) === String(row.sender_id)) : null;
+          const newMsg = {
+            ...row,
+            staff: sender ? { name: sender.name, photo_url: sender.avatar_url || sender.photo_url || null } : { name: '알 수 없음', photo_url: null },
+          };
+          return [...prev, newMsg];
+        });
       })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `room_id=eq.${selectedRoomId}` }, () => fetchData())
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages', filter: `room_id=eq.${selectedRoomId}` }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_rooms' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pinned_messages' }, () => fetchData())
@@ -638,7 +647,13 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     if (!error && inserted) {
       setInputMsg(''); 
       setReplyTo(null);
-      fetchData();
+      // 카카오톡처럼 내 메시지 즉시 표시 (낙관적 업데이트)
+      const optimisticMsg = {
+        ...inserted,
+        staff: { name: user.name, photo_url: user.avatar_url || null },
+      };
+      setMessages((prev) => [...prev, optimisticMsg]);
+      fetchData(); // 읽음/고정 등 서버 상태 동기화
       // 백엔드 Edge Function을 통해 Web Push 발송 (앱이 닫혀 있어도 푸시)
       try {
         await supabase.functions.invoke('send-web-push', {
