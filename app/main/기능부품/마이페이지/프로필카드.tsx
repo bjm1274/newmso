@@ -239,12 +239,12 @@ export default function MyProfileCard({ user: initialUser }: any) {
   if (!user) return <div className="p-10">로딩 중...</div>;
 
   return (
-    <div className="bg-white border border-[#E5E8EB] shadow-sm rounded-[2.5rem] p-12 flex flex-col h-full space-y-12">
+    <div className="bg-white border border-[#E5E8EB] shadow-sm rounded-2xl sm:rounded-[2rem] lg:rounded-[2.5rem] p-4 sm:p-6 lg:p-10 flex flex-col h-full space-y-6 sm:space-y-8 lg:space-y-10">
       
       {/* 프로필 헤더 */}
-      <div className="flex items-center gap-10 pb-10 border-b border-gray-50">
-        <div className="relative group">
-          <div className="w-32 h-32 rounded-full bg-[#F2F4F6] flex items-center justify-center overflow-hidden border-4 border-white shadow-sm">
+      <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 lg:gap-10 pb-6 sm:pb-8 border-b border-gray-100">
+        <div className="relative group shrink-0">
+          <div className="w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-full bg-[#F2F4F6] flex items-center justify-center overflow-hidden border-2 sm:border-4 border-white shadow-sm">
             {avatarUrl ? (
               <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
             ) : (
@@ -270,20 +270,20 @@ export default function MyProfileCard({ user: initialUser }: any) {
           )}
         </div>
 
-        <div className="flex-1">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-4xl font-bold text-[#191F28] tracking-tighter">{user.name} {user.position}</h2>
-            <div className="flex items-center gap-2">
+        <div className="flex-1 w-full sm:w-auto text-center sm:text-left">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-2">
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-[#191F28] tracking-tighter">{user.name} {user.position}</h2>
+            <div className="flex flex-wrap items-center justify-center sm:justify-end gap-2">
               <button
                 onClick={() => verifyPasswordAndRun(() => setShowSecret((v) => !v))}
-                className="text-[11px] font-bold px-4 py-2 bg-[#F2F4F6] rounded-full text-[#8B95A1] hover:text-[#3182F6] border border-transparent hover:border-[#E8F3FF]"
+                className="text-[10px] sm:text-[11px] font-bold px-3 py-1.5 sm:px-4 sm:py-2 bg-[#F2F4F6] rounded-full text-[#8B95A1] hover:text-[#3182F6] border border-transparent hover:border-[#E8F3FF]"
               >
                 {showSecret ? '민감 정보 숨기기 🔒' : '보안 정보 보기 👁️'}
               </button>
               <button
                 type="button"
                 onClick={() => verifyPasswordAndRun(() => setIsEditing((v) => !v))}
-                className={`text-[11px] font-bold px-4 py-2 rounded-full border transition-all ${
+                className={`text-[10px] sm:text-[11px] font-bold px-3 py-1.5 sm:px-4 sm:py-2 rounded-full border transition-all ${
                   isEditing
                     ? 'bg-red-50 text-red-500 border-red-100 hover:bg-red-100'
                     : 'bg-[#E8F3FF] text-[#3182F6] border-[#D6EBFF] hover:bg-[#D6EBFF]'
@@ -293,23 +293,25 @@ export default function MyProfileCard({ user: initialUser }: any) {
               </button>
             </div>
           </div>
-          <p className="text-lg font-bold text-[#3182F6] underline decoration-[#E8F3FF] underline-offset-8">{user.department} 소속</p>
+          <p className="text-sm sm:text-base lg:text-lg font-bold text-[#3182F6] underline decoration-[#E8F3FF] underline-offset-4">{user.department} 소속</p>
           {/* 디버깅용 메시지 (작게 표시, 문제 해결 후 삭제 가능) */}
           {/* <p className="text-[10px] text-[#8B95A1] mt-2">시스템 상태: {debugMsg || '정상'}</p> */}
         </div>
       </div>
 
       {/* 상세 정보 + 나의 근태/연차 요약 */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar pr-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-10 gap-y-10">
-          <div className="space-y-7 lg:col-span-2">
-            <h3 className="text-[11px] font-bold text-[#8B95A1] uppercase tracking-widest border-l-2 border-[#3182F6] pl-3">
+      <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 sm:pr-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8 lg:gap-10">
+          <div className="space-y-5 sm:space-y-6 lg:col-span-2">
+            <h3 className="text-[10px] sm:text-[11px] font-bold text-[#8B95A1] uppercase tracking-widest border-l-2 border-[#3182F6] pl-3">
               인사 관리 정보
             </h3>
-            <InfoItem label="사번" value={user.employee_no} />
-            <InfoItem label="입사일" value={user.join_date} />
+            <div className="grid grid-cols-1 min-[480px]:grid-cols-2 gap-4 sm:gap-5">
+              <InfoItem label="사번" value={user.employee_no} />
+              <InfoItem label="입사일" value={user.join_date} />
+            </div>
             {isEditing ? (
-              <>
+              <div className="grid grid-cols-1 min-[480px]:grid-cols-2 gap-4 sm:gap-5">
                 <EditableItem
                   label="이메일"
                   value={editForm.email}
@@ -322,25 +324,25 @@ export default function MyProfileCard({ user: initialUser }: any) {
                   onChange={(v: string) => setEditForm((f) => ({ ...f, phone: v }))}
                   placeholder="'-' 없이 숫자만 입력"
                 />
-              </>
+              </div>
             ) : (
-              <>
+              <div className="grid grid-cols-1 min-[480px]:grid-cols-2 gap-4 sm:gap-5">
                 <InfoItem label="이메일" value={user.email} />
                 <InfoItem label="연락처" value={user.phone} />
-              </>
+              </div>
             )}
           </div>
-          <div className="space-y-7">
-            <h3 className="text-[11px] font-bold text-[#8B95A1] uppercase tracking-widest border-l-2 border-emerald-500 pl-3">
+          <div className="space-y-5 sm:space-y-6">
+            <h3 className="text-[10px] sm:text-[11px] font-bold text-[#8B95A1] uppercase tracking-widest border-l-2 border-emerald-500 pl-3">
               나의 근태 · 연차
             </h3>
             <LeaveAndCommuteSummary user={user} />
           </div>
-          <div className="space-y-7 lg:col-span-3">
-            <h3 className="text-[11px] font-bold text-[#8B95A1] uppercase tracking-widest border-l-2 border-red-500 pl-3">
+          <div className="space-y-5 sm:space-y-6 lg:col-span-3">
+            <h3 className="text-[10px] sm:text-[11px] font-bold text-[#8B95A1] uppercase tracking-widest border-l-2 border-red-500 pl-3">
               보안 및 급여
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-16 gap-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 lg:gap-x-12 gap-y-5">
               {isEditing ? (
                 <>
                   <EditableItem
@@ -388,6 +390,19 @@ export default function MyProfileCard({ user: initialUser }: any) {
                     }
                     isMasked={!showSecret}
                   />
+                  {showSecret && [
+                    { key: 'meal_allowance', label: '식대 (비과세)' },
+                    { key: 'vehicle_allowance', label: '자가운전 (비과세)' },
+                    { key: 'childcare_allowance', label: '보육수당 (비과세)' },
+                    { key: 'research_allowance', label: '연구활동비 (비과세)' },
+                    { key: 'other_taxfree', label: '기타 비과세' },
+                  ].filter(({ key }) => Number(user[key as keyof typeof user] ?? 0) > 0).map(({ key, label }) => (
+                    <InfoItem
+                      key={key}
+                      label={label}
+                      value={`₩ ${(Number(user[key as keyof typeof user]) || 0).toLocaleString()}`}
+                    />
+                  ))}
                   <InfoItem
                     label="계좌정보"
                     value={
@@ -405,22 +420,22 @@ export default function MyProfileCard({ user: initialUser }: any) {
       </div>
 
       {/* 로그아웃 버튼 */}
-      <div className="pt-6 border-t border-gray-50 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+      <div className="pt-4 sm:pt-6 border-t border-gray-100 flex flex-col-reverse sm:flex-row gap-3 sm:items-center sm:justify-between">
         {isEditing && (
           <button
             type="button"
             onClick={handleSaveProfile}
-            className="w-full md:w-auto px-6 py-2.5 rounded-[12px] bg-emerald-500 text-white text-[12px] font-semibold hover:bg-emerald-600 transition-all shadow-sm flex items-center justify-center gap-2"
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-500 text-white text-[11px] sm:text-[12px] font-semibold hover:bg-emerald-600 transition-all shadow-sm flex items-center justify-center gap-2"
           >
-            <span className="text-base">💾</span>
+            <span className="text-sm">💾</span>
             <span className="tracking-tight">내 정보 저장</span>
           </button>
         )}
         <button
           onClick={handleLogout}
-          className="w-full md:w-auto py-2.5 rounded-[12px] bg-[#3182F6] text-white text-[12px] font-semibold hover:bg-[#1B64DA] transition-all shadow-sm flex items-center justify-center gap-2"
+          className="w-full sm:w-auto py-2.5 rounded-xl bg-[#3182F6] text-white text-[11px] sm:text-[12px] font-semibold hover:bg-[#1B64DA] transition-all shadow-sm flex items-center justify-center gap-2"
         >
-          <span className="text-base">🚪</span>
+          <span className="text-sm">🚪</span>
           <span className="tracking-tight">시스템 안전 로그아웃</span>
         </button>
       </div>
@@ -467,8 +482,14 @@ function LeaveAndCommuteSummary({ user }: any) {
     const load = async () => {
       if (!user?.id) return;
 
-      const total = Number(user.annual_leave_total ?? 0);
-      const used = Number(user.annual_leave_used ?? 0);
+      const { data: staff } = await supabase
+        .from('staff_members')
+        .select('annual_leave_total, annual_leave_used')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      const total = Number(staff?.annual_leave_total ?? user.annual_leave_total ?? 0);
+      const used = Number(staff?.annual_leave_used ?? user.annual_leave_used ?? 0);
       const remaining = Math.max(0, total - used);
 
       const { data: commute } = await supabase
@@ -501,45 +522,45 @@ function LeaveAndCommuteSummary({ user }: any) {
     };
 
     load();
-  }, [user?.id, user?.annual_leave_total, user?.annual_leave_used]);
+  }, [user?.id]);
 
   if (!summary) {
     return (
-      <div className="bg-[#F2F4F6] border border-[#E5E8EB] rounded-2xl p-4 text-[12px] text-[#8B95A1] font-bold">
+      <div className="bg-[#F2F4F6] border border-[#E5E8EB] rounded-xl sm:rounded-2xl p-3 sm:p-4 text-[11px] sm:text-[12px] text-[#8B95A1] font-bold">
         근태·연차 정보를 불러오는 중입니다...
       </div>
     );
   }
 
   return (
-    <div className="bg-[#F2F4F6] border border-[#E5E8EB] rounded-2xl p-4 space-y-4 text-[12px]">
+    <div className="bg-[#F2F4F6] border border-[#E5E8EB] rounded-xl sm:rounded-2xl p-3 sm:p-4 space-y-3 sm:space-y-4 text-[11px] sm:text-[12px]">
       <div className="flex justify-between items-end">
         <div>
-          <p className="text-[11px] font-bold text-[#8B95A1] uppercase tracking-widest">
+          <p className="text-[10px] sm:text-[11px] font-bold text-[#8B95A1] uppercase tracking-widest">
             연차 현황
           </p>
-          <p className="mt-1 text-[13px] font-bold text-[#191F28]">
+          <p className="mt-1 text-[12px] sm:text-[13px] font-bold text-[#191F28]">
             잔여 연차{' '}
             <span className="text-emerald-600">
               {summary.remaining.toFixed(1)}일
             </span>
           </p>
-          <p className="mt-0.5 text-[11px] text-[#4E5968]">
+          <p className="mt-0.5 text-[10px] sm:text-[11px] text-[#4E5968]">
             총 {summary.total.toFixed(1)}일 중 {summary.used.toFixed(1)}일 사용
           </p>
         </div>
       </div>
 
-      <div className="mt-3 border-t border-[#E5E8EB] pt-3 space-y-2">
-        <p className="text-[11px] font-bold text-[#8B95A1] uppercase tracking-widest">
+      <div className="mt-2 sm:mt-3 border-t border-[#E5E8EB] pt-2 sm:pt-3 space-y-1.5">
+        <p className="text-[10px] sm:text-[11px] font-bold text-[#8B95A1] uppercase tracking-widest">
           최근 지각
         </p>
         {summary.lateDays.length === 0 ? (
-          <p className="text-[11px] text-[#4E5968]">
+          <p className="text-[10px] sm:text-[11px] text-[#4E5968]">
             최근 60일 이내 지각 기록이 없습니다.
           </p>
         ) : (
-          <ul className="space-y-1 text-[11px] text-[#4E5968]">
+          <ul className="space-y-0.5 text-[10px] sm:text-[11px] text-[#4E5968]">
             {summary.lateDays.slice(0, 3).map((d) => (
               <li key={`${d.date}-${d.status}`}>
                 {new Date(d.date).toLocaleDateString('ko-KR')} · {d.status}
@@ -549,16 +570,16 @@ function LeaveAndCommuteSummary({ user }: any) {
         )}
       </div>
 
-      <div className="mt-2 border-t border-[#E5E8EB] pt-3 space-y-2">
-        <p className="text-[11px] font-bold text-[#8B95A1] uppercase tracking-widest">
+      <div className="mt-2 border-t border-[#E5E8EB] pt-2 sm:pt-3 space-y-1.5">
+        <p className="text-[10px] sm:text-[11px] font-bold text-[#8B95A1] uppercase tracking-widest">
           최근 추가근무
         </p>
         {summary.overworkDays.length === 0 ? (
-          <p className="text-[11px] text-[#4E5968]">
+          <p className="text-[10px] sm:text-[11px] text-[#4E5968]">
             최근 60일 이내 추가근무 기록이 없습니다.
           </p>
         ) : (
-          <ul className="space-y-1 text-[11px] text-[#4E5968]">
+          <ul className="space-y-0.5 text-[10px] sm:text-[11px] text-[#4E5968]">
             {summary.overworkDays.slice(0, 3).map((d) => (
               <li key={`${d.date}-${d.status}`}>
                 {new Date(d.date).toLocaleDateString('ko-KR')} · {d.status}

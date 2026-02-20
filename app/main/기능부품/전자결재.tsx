@@ -21,16 +21,21 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const [customFormTypes, setCustomFormTypes] = useState<{ name: string; slug: string }[]>([]);
   const [lastDraftByType, setLastDraftByType] = useState<Record<string, any>>({});
   const [suppliesLoadKey, setSuppliesLoadKey] = useState(0);
+  const [selectedApprovalId, setSelectedApprovalId] = useState<string | null>(null);
+  const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대기' | '승인' | '반려'>('전체');
   const isMso = user?.company === 'SY INC.' || user?.permissions?.mso === true;
 
   const BUILTIN_FORM_TYPES = ['인사명령', '연차/휴가', '연장근무', '물품신청', '수리요청서', '업무기안', '업무협조', '양식신청', '출결정정'];
 
-  // 결재자 후보: 직위 우선, 없으면 전체 직원 표시 (staffs는 이미 메인에서 회사별로 불러옴)
+  // 결재자 후보: 부서장 이상(팀장·부장·병원장 등)을 목록 상단에, 그 다음 나머지 직원 (staffs는 이미 메인에서 회사별로 불러옴)
   const APPROVER_POSITIONS = ['팀장', '간호과장', '실장', '부장', '이사', '병원장', '원장', '대표이사'];
   const approverCandidates = useMemo(() => {
     if (!Array.isArray(staffs)) return [];
-    const byPosition = staffs.filter((s: any) => APPROVER_POSITIONS.includes(s.position));
-    return byPosition.length > 0 ? byPosition : staffs;
+    const order = (s: any) => {
+      const i = APPROVER_POSITIONS.indexOf(s.position);
+      return i >= 0 ? i : 999;
+    };
+    return [...staffs].sort((a: any, b: any) => order(a) - order(b) || (a.name || '').localeCompare(b.name || ''));
   }, [staffs]);
 
   useEffect(() => {
@@ -39,11 +44,11 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     });
   }, []);
 
-  // 부서장 이상(팀장/부장/실장/원장/병원장/대표이사)이 있으면 기본 결재선에 자동 추가 (staffs는 이미 회사별로 불러옴)
+  // 기본 결재선: 백정민 부장만 기본값으로 설정 (해당 직원이 있을 때만)
   useEffect(() => {
     if (!Array.isArray(staffs) || approverLine.length > 0 || viewMode !== '작성하기') return;
-    const defaultApprovers = staffs.filter((s: any) => APPROVER_POSITIONS.includes(s.position));
-    if (defaultApprovers.length > 0) setApproverLine(defaultApprovers);
+    const defaultApprover = staffs.find((s: any) => s.name === '백정민' && s.position === '부장');
+    if (defaultApprover) setApproverLine([defaultApprover]);
   }, [staffs, viewMode, approverLine.length]);
 
   // 마지막으로 보던 탭(기안함/결재함/작성하기)을 복구
@@ -192,8 +197,25 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
           } catch (_) {}
         }
 
-        alert("최종 승인 처리가 완료되었습니다."); 
+        alert("승인 처리가 완료되었습니다.");
         fetchApprovals();
+    } else {
+      alert("승인 처리에 실패했습니다. " + (appError?.message || ""));
+    }
+  };
+
+  const handleRejectAction = async (item: any) => {
+    const reason = window.prompt("반려 사유를 입력해 주세요. (선택)");
+    if (reason === null) return;
+    const { error } = await supabase
+      .from('approvals')
+      .update({ status: '반려', meta_data: { ...(item.meta_data || {}), reject_reason: reason } })
+      .eq('id', item.id);
+    if (!error) {
+      alert("반려 처리되었습니다.");
+      fetchApprovals();
+    } else {
+      alert("반려 처리에 실패했습니다. " + (error?.message || ""));
     }
   };
 
@@ -222,10 +244,25 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     if (!error) { alert("상신 완료!"); setViewMode('기안함'); fetchApprovals(); if (onRefresh) onRefresh(); }
   };
 
-  const filteredApprovals = useMemo(() => {
+  const byCompany = useMemo(() => {
     if (selectedCo === '전체') return approvals;
     return approvals.filter((a: any) => a.sender_company === selectedCo);
   }, [approvals, selectedCo]);
+
+  const draftBoxList = useMemo(() => {
+    const mine = byCompany.filter((a: any) => a.sender_id === user?.id);
+    if (approvalStatusFilter === '전체') return mine;
+    return mine.filter((a: any) => a.status === approvalStatusFilter);
+  }, [byCompany, user?.id, approvalStatusFilter]);
+
+  const approvalBoxList = useMemo(() => {
+    const lineIds = (a: any) => Array.isArray(a.approver_line) ? a.approver_line : [];
+    const mine = byCompany.filter((a: any) => lineIds(a).includes(user?.id));
+    if (approvalStatusFilter === '전체') return mine;
+    return mine.filter((a: any) => a.status === approvalStatusFilter);
+  }, [byCompany, user?.id, approvalStatusFilter]);
+
+  const listForView = viewMode === '기안함' ? draftBoxList : approvalBoxList;
 
   return (
     <div className="flex flex-col md:flex-row h-full bg-[#F8FAFC] overflow-hidden">
@@ -234,14 +271,15 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
         <div className="p-4 md:p-8">
           <nav className="flex md:flex-col gap-2 overflow-x-auto no-scrollbar">
             {['기안함', '결재함', '작성하기'].map(m => (
-              <button 
-                key={m} 
+              <button
+                type="button"
+                key={m}
                 onClick={() => {
                   setViewMode(m);
                   if (typeof window !== 'undefined') {
                     window.localStorage.setItem(APPROVAL_VIEW_KEY, m);
                   }
-                }} 
+                }}
                 className={`flex-1 md:w-full text-center md:text-left px-4 md:px-6 py-3 md:py-4 rounded-[12px] md:rounded-[16px] text-[11px] md:text-xs font-bold transition-all whitespace-nowrap ${viewMode === m ? 'bg-[#3182F6] text-white shadow-sm' : 'bg-[#F2F4F6] md:bg-transparent text-[#8B95A1] hover:bg-white hover:shadow-sm'}`}
               >
                 {m === '기안함' && '📥 '}
@@ -293,10 +331,17 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
               </div>
 
               <div className="flex gap-2 p-1.5 bg-[#F2F4F6] rounded-[12px] w-full overflow-x-auto no-scrollbar">
-                {[...BUILTIN_FORM_TYPES, ...customFormTypes.map(c => c.slug)].map(t => {
+                {[...BUILTIN_FORM_TYPES, ...customFormTypes.map(c => c.slug)].map((t, idx) => {
                   const label = BUILTIN_FORM_TYPES.includes(t) ? t : (customFormTypes.find(c => c.slug === t)?.name ?? t);
                   return (
-                    <button key={t} onClick={()=>setFormType(t)} className={`flex-1 px-4 md:px-6 py-3 rounded-[12px] text-[10px] font-bold transition-all whitespace-nowrap ${formType===t ? 'bg-white text-[#3182F6] shadow-sm' : 'text-[#8B95A1] hover:text-[#4E5968]'}`}>{label}</button>
+                    <button
+                      type="button"
+                      key={`${t}-${idx}`}
+                      onClick={() => setFormType(t)}
+                      className={`flex-1 min-w-0 shrink-0 px-4 md:px-6 py-3 rounded-[12px] text-[10px] font-bold transition-all whitespace-nowrap cursor-pointer touch-manipulation ${formType === t ? 'bg-white text-[#3182F6] shadow-sm' : 'text-[#8B95A1] hover:text-[#4E5968]'}`}
+                    >
+                      {label}
+                    </button>
                   );
                 })}
               </div>
@@ -358,17 +403,36 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-lg font-bold text-[#191F28]">{viewMode} 목록 <span className="text-[#3182F6] ml-2">{filteredApprovals.length}</span></h2>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+              <h2 className="text-lg font-bold text-[#191F28]">{viewMode} <span className="text-[#3182F6] ml-2">{listForView.length}건</span></h2>
+              <div className="flex gap-1.5 p-1.5 bg-[#F2F4F6] rounded-xl w-full sm:w-auto overflow-x-auto no-scrollbar">
+                {[
+                  { value: '전체' as const, label: '전체' },
+                  { value: '대기' as const, label: '대기중' },
+                  { value: '승인' as const, label: '승인됨' },
+                  ...(viewMode === '기안함' ? [{ value: '반려' as const, label: '반려' }] : []),
+                ].map(({ value, label }) => (
+                  <button
+                    type="button"
+                    key={value}
+                    onClick={() => setApprovalStatusFilter(value)}
+                    className={`shrink-0 px-4 py-2 rounded-lg text-[10px] font-bold transition-all whitespace-nowrap ${approvalStatusFilter === value ? 'bg-white text-[#3182F6] shadow-sm' : 'text-[#8B95A1] hover:text-[#4E5968]'}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
-            {filteredApprovals.length === 0 ? (
+            {listForView.length === 0 ? (
               <div className="h-96 flex flex-col items-center justify-center opacity-20">
                 <span className="text-6xl mb-4">📄</span>
-                <p className="font-black text-sm">결재 내역이 없습니다.</p>
+                <p className="font-black text-sm">
+                  {approvalStatusFilter === '전체' ? '결재 내역이 없습니다.' : `${approvalStatusFilter === '대기' ? '대기중' : approvalStatusFilter === '승인' ? '승인된' : '반려된'} 건이 없습니다.`}
+                </p>
               </div>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {filteredApprovals.map((item: any) => {
+                {listForView.map((item: any) => {
                   const lineIds = Array.isArray(item.approver_line) ? item.approver_line : [];
                   const steps = lineIds.map((id: string, i: number) => {
                     const staff = Array.isArray(staffs) ? staffs.find((s: any) => s.id === id) : null;
@@ -377,7 +441,14 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                     return { step: i + 1, name, isCurrent };
                   });
                   return (
-                  <div key={item.id} className="bg-white p-6 md:p-8 border border-[#E5E8EB] rounded-[16px] shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6 group hover:border-[#3182F6]/30 hover:shadow-md transition-all animate-in fade-in-up">
+                  <div
+                    key={item.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setSelectedApprovalId(item.id)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedApprovalId(item.id); } }}
+                    className="bg-white p-6 md:p-8 border border-[#E5E8EB] rounded-[16px] shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6 group hover:border-[#3182F6]/30 hover:shadow-md transition-all animate-in fade-in-up cursor-pointer"
+                  >
                     <div className="flex gap-4 md:gap-6 items-center flex-1 min-w-0">
                         <div className="w-14 h-14 md:w-16 md:h-16 bg-gray-50 shrink-0 rounded-2xl flex items-center justify-center text-xl md:text-2xl shadow-inner group-hover:bg-blue-50 transition-colors">
                             {item.type === '물품신청' ? '📦' : item.type === '양식신청' ? '📄' : item.type === '인사명령' ? '🎖️' : item.type === '수리요청서' ? '🔧' : '📋'}
@@ -403,8 +474,11 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                         </div>
                     </div>
                     
-                    {viewMode === '결재함' && item.status === '대기' && (user.permissions?.mso || user.role === 'admin') && item.approver_id === user?.id && (
-                      <button onClick={() => handleApproveAction(item)} className="w-full md:w-auto shrink-0 px-6 py-3 bg-[#3182F6] text-white rounded-[12px] text-[11px] font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all">승인하기</button>
+                    {viewMode === '결재함' && item.status === '대기' && item.approver_id === user?.id && (
+                      <div className="flex gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <button type="button" onClick={() => handleApproveAction(item)} className="px-5 py-3 bg-[#3182F6] text-white rounded-[12px] text-[11px] font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all">승인</button>
+                        <button type="button" onClick={() => handleRejectAction(item)} className="px-5 py-3 bg-[#F04452] text-white rounded-[12px] text-[11px] font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all">반려</button>
+                      </div>
                     )}
                   </div>
                   );
@@ -414,6 +488,39 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
           </div>
         )}
       </main>
+
+      {/* 결재 상세 모달 */}
+      {selectedApprovalId && (() => {
+        const item = approvals.find((a: any) => a.id === selectedApprovalId);
+        if (!item) return null;
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+            onClick={() => setSelectedApprovalId(null)}
+          >
+            <div
+              className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[85vh] overflow-hidden flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-4 md:p-6 border-b border-[#E5E8EB] flex items-center justify-between">
+                <span className="px-2 py-0.5 bg-gray-100 rounded-md text-[9px] font-black text-gray-500">{item.type}</span>
+                <button type="button" onClick={() => setSelectedApprovalId(null)} className="p-2 rounded-lg text-[#8B95A1] hover:bg-[#F2F4F6]">✕</button>
+              </div>
+              <div className="p-4 md:p-6 overflow-y-auto flex-1">
+                <h3 className="font-bold text-[#191F28] text-lg mb-2">{item.title || '(제목 없음)'}</h3>
+                <p className="text-[10px] text-[#8B95A1] mb-4">기안자: {item.sender_name} · {new Date(item.created_at).toLocaleString('ko-KR')}</p>
+                <div className="text-sm text-[#4E5968] whitespace-pre-wrap border-t border-[#E5E8EB] pt-4">{item.content || '-'}</div>
+              </div>
+              {item.status === '대기' && item.approver_id === user?.id && (
+                <div className="p-4 md:p-6 border-t border-[#E5E8EB] flex gap-3">
+                  <button type="button" onClick={async () => { await handleApproveAction(item); setSelectedApprovalId(null); }} className="flex-1 py-3 bg-[#3182F6] text-white rounded-xl text-sm font-bold">승인</button>
+                  <button type="button" onClick={async () => { await handleRejectAction(item); setSelectedApprovalId(null); }} className="flex-1 py-3 bg-[#F04452] text-white rounded-xl text-sm font-bold">반려</button>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
