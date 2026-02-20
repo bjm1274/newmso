@@ -180,7 +180,7 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#F8FAFC] overflow-hidden relative">
+    <div className="flex flex-col h-full min-h-0 bg-[#F8FAFC] overflow-hidden relative">
       <InventoryAlertBadge lowCount={lowStockItems.length} expiryCount={expiryImminentItems.length} />
       <header className="bg-white border-b border-gray-100 p-4 md:p-8 shrink-0 z-20 shadow-sm">
         <div className="flex justify-end items-center gap-4">
@@ -190,7 +190,7 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
             <button onClick={() => { setActiveView('발주'); if (typeof window !== 'undefined') window.localStorage.setItem(INV_VIEW_KEY, '발주'); }} className={`px-4 py-2 rounded-[12px] text-[10px] font-black whitespace-nowrap transition-all ${activeView === '발주' ? 'bg-[#FF6B00] text-white shadow-lg' : 'bg-[#F2F4F6] text-[#4E5968]'}`}>📝 발주</button>
             <button onClick={() => { setActiveView('스캔'); if (typeof window !== 'undefined') window.localStorage.setItem(INV_VIEW_KEY, '스캔'); }} className={`px-4 py-2 rounded-[12px] text-[10px] font-black whitespace-nowrap transition-all ${activeView === '스캔' ? 'bg-[#3182F6] text-white shadow-sm' : 'bg-[#F2F4F6] text-[#4E5968]'}`}>🔍 스캔</button>
             <button onClick={() => { setActiveView('등록'); if (typeof window !== 'undefined') window.localStorage.setItem(INV_VIEW_KEY, '등록'); }} className={`px-4 py-2 rounded-[12px] text-[10px] font-black whitespace-nowrap transition-all ${activeView === '등록' ? 'bg-[#3182F6] text-white shadow-sm' : 'bg-[#F2F4F6] text-[#4E5968]'}`}>+ 등록</button>
-            <button onClick={() => { setActiveView('현황'); if (typeof window !== 'undefined') window.localStorage.setItem(INV_VIEW_KEY, '현황'); }} className={`px-4 py-2 rounded-[12px] text-[10px] font-black whitespace-nowrap transition-all ${activeView === '현황' ? 'bg-[#191F28] text-white shadow-sm' : 'bg-[#F2F4F6] text-[#4E5968]'}`}>📊 현황</button>
+            <button onClick={() => { setActiveView('현황'); if (typeof window !== 'undefined') window.localStorage.setItem(INV_VIEW_KEY, '현황'); }} className={`px-4 py-2 rounded-[12px] text-[10px] font-black whitespace-nowrap transition-all ${activeView === '현황' ? 'bg-[var(--toss-blue)] text-white shadow-sm' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'}`}>📊 현황</button>
             <button onClick={() => { setShowLogs(true); fetchLogs(); }} className="px-4 py-2 rounded-[12px] text-[10px] font-black whitespace-nowrap transition-all bg-[#F2F4F6] text-[#4E5968] hover:bg-[#E5E8EB]">📋 이력</button>
           </div>
         </div>

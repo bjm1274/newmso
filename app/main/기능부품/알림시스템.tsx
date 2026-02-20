@@ -2,6 +2,9 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
+// [채팅 실시간 알림] 웹·Android·iOS 공통
+// - 인앱: 실시간 구독 + 배너(채팅알림배너) + 알림음 + 탭 제목 배지 → 권한 없어도 동작
+// - 푸시: VAPID 설정 시 브라우저/홈화면 앱에서 백그라운드 푸시 (iOS 16.4+ Safari는 홈에 추가 후 지원)
 // [핵심] 웹 푸시 알림 서비스 워커 등록 및 관리 + 푸시 구독 저장
 export async function initNotificationService(staffId?: string) {
   if (!('serviceWorker' in navigator) || !('Notification' in window)) {
@@ -20,47 +23,72 @@ export async function initNotificationService(staffId?: string) {
       console.log('알림 권한:', permission);
     }
 
-    // 3. 푸시 구독 토큰 생성 및 Supabase에 저장
-    if (registration.pushManager && Notification.permission === 'granted') {
+    // 3. 푸시 구독: VAPID가 있을 때만 구독 (없으면 스킵해 등록 실패 방지, Android/iOS 호환)
+    const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    if (registration.pushManager && Notification.permission === 'granted' && vapidPublicKey) {
       let subscription = await registration.pushManager.getSubscription();
       if (!subscription) {
-        // VAPID 공개키 (환경변수로 주입: NEXT_PUBLIC_VAPID_PUBLIC_KEY)
-        const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-        const options: PushSubscriptionOptionsInit = {
-          userVisibleOnly: true,
-          applicationServerKey: vapidPublicKey
-            ? urlBase64ToUint8Array(vapidPublicKey)
-            : undefined,
-        };
-        subscription = await registration.pushManager.subscribe(options);
-      }
-
-      try {
-        const json: any = subscription.toJSON();
-        const endpoint: string = json.endpoint;
-        const p256dh: string = json.keys?.p256dh || '';
-        const auth: string = json.keys?.auth || '';
-
-        if (endpoint && p256dh && auth) {
-          await supabase
-            .from('push_subscriptions')
-            .upsert(
-              {
-                staff_id: staffId || null,
-                endpoint,
-                p256dh,
-                auth,
-              },
-              { onConflict: 'staff_id,endpoint' }
-            );
-          console.log('✅ 푸시 구독 정보 저장 완료');
+        try {
+          subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+          });
+        } catch (e) {
+          console.warn('푸시 구독 실패(권한/환경 확인):', e);
         }
-      } catch (e) {
-        console.error('푸시 구독 정보 저장 실패:', e);
       }
+
+      if (subscription) {
+        try {
+          const json: any = subscription.toJSON();
+          const endpoint: string = json.endpoint;
+          const p256dh: string = json.keys?.p256dh || '';
+          const auth: string = json.keys?.auth || '';
+
+          if (endpoint && p256dh && auth) {
+            await supabase
+              .from('push_subscriptions')
+              .upsert(
+                {
+                  staff_id: staffId || null,
+                  endpoint,
+                  p256dh,
+                  auth,
+                },
+                { onConflict: 'staff_id,endpoint' }
+              );
+            console.log('✅ 푸시 구독 정보 저장 완료');
+          }
+        } catch (e) {
+          console.error('푸시 구독 정보 저장 실패:', e);
+        }
+      }
+    } else if (!vapidPublicKey) {
+      console.log('ℹ️ VAPID 키 미설정 — 인앱·실시간 알림만 사용 (푸시는 환경변수 설정 시 활성화)');
     }
   } catch (error) {
     console.error('Service Worker 등록 실패:', error);
+  }
+}
+
+// 짧은 알림음 (Web Audio API, 외부 파일 없이 Android/iOS 지원)
+function playNotificationSound() {
+  try {
+    if (typeof window === 'undefined' || !window.AudioContext && !(window as any).webkitAudioContext) return;
+    const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+    const ctx = new Ctx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 800;
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.15);
+  } catch {
+    // ignore
   }
 }
 
@@ -96,7 +124,7 @@ export function sendNotification(title: string, options?: NotificationOptions) {
 }
 
 // [핵심] 실시간 데이터 변경 감지 및 알림 발송
-export default function NotificationSystem({ user }: any) {
+export default function NotificationSystem({ user, onOpenChatRoom }: { user: any; onOpenChatRoom?: (roomId: string) => void }) {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -253,19 +281,39 @@ export default function NotificationSystem({ user }: any) {
     setupRealtimeListeners();
   }, [user]);
 
+  // 탭 제목에 읽지 않은 알림 개수 표시 (웹·모바일 공통)
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const baseTitle = document.title.replace(/^\(\d+\)\s*/, '') || 'SY INC. ERP';
+    document.title = unreadCount > 0 ? `(${unreadCount}) ${baseTitle}` : baseTitle;
+  }, [unreadCount]);
+
   const handleNotification = (notif: any) => {
-    // 1. 시스템 푸시 알림 발송
+    // 1. 브라우저 푸시 알림 (권한 허용 시)
     sendNotification(notif.title, {
       body: notif.body,
       tag: notif.type,
-      data: notif.data
+      data: { ...(notif.data || {}), room_id: notif.data?.room_id },
     });
 
-    // 2. 시스템 내 알림 리스트에 추가
+    // 2. 채팅/멘션 시 인앱 이벤트 발송 (웹·모바일 공통, 푸시 권한 없어도 토스트/배너 표시)
+    if (notif.type === 'message' || notif.type === 'mention') {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('erp-chat-notification', {
+          detail: { title: notif.title, body: notif.body, room_id: notif.data?.room_id },
+        }));
+      }
+      // 탭이 백그라운드일 때 짧은 알림음 (Android/iOS 브라우저 호환)
+      if (typeof document !== 'undefined' && document.hidden) {
+        playNotificationSound();
+      }
+    }
+
+    // 3. 시스템 내 알림 리스트에 추가
     setNotifications(prev => [notif, ...prev].slice(0, 50));
     setUnreadCount(prev => prev + 1);
 
-    // 3. Supabase에 알림 기록 저장 (채팅 알림은 metadata.room_id로 클릭 시 해당 채팅방 이동)
+    // 4. Supabase에 알림 기록 저장 (채팅 알림은 metadata.room_id로 클릭 시 해당 채팅방 이동)
     (async () => {
       try {
         const row: Record<string, unknown> = {
@@ -305,6 +353,8 @@ export default function NotificationSystem({ user }: any) {
       {notifications.slice(0, 3).map((notif, idx) => (
         <div
           key={notif.id}
+          role="button"
+          tabIndex={0}
           className={`p-4 rounded-2xl shadow-2xl border-l-4 animate-in slide-in-from-right duration-300 cursor-pointer ${
             notif.type === 'approval' ? 'bg-blue-50 border-blue-600 dark:bg-blue-950/30 dark:border-blue-500' :
             notif.type === 'inventory' ? 'bg-orange-50 border-orange-600 dark:bg-orange-950/30 dark:border-orange-500' :
@@ -312,7 +362,12 @@ export default function NotificationSystem({ user }: any) {
             notif.type === 'message' ? 'bg-indigo-50 border-indigo-600 dark:bg-indigo-950/30 dark:border-indigo-500' :
             'bg-purple-50 border-purple-600 dark:bg-purple-950/30 dark:border-purple-500'
           }`}
-          onClick={() => markAsRead(notif.id)}
+          onClick={() => {
+            markAsRead(notif.id);
+            if ((notif.type === 'message' || notif.type === 'mention') && notif.data?.room_id && onOpenChatRoom) {
+              onOpenChatRoom(notif.data.room_id);
+            }
+          }}
         >
           <h4 className="font-black text-sm mb-1">{notif.title}</h4>
           <p className="text-xs text-gray-600">{notif.body}</p>

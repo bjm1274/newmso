@@ -12,7 +12,7 @@ const APPROVAL_VIEW_KEY = 'erp_approval_view';
 
 export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, selectedCompanyId, onRefresh }: any) {
   const [viewMode, setViewMode] = useState('기안함');
-  const [approvals, setApprovals] = useState([]);
+  const [approvals, setApprovals] = useState<any[]>([]);
   const [formType, setFormType] = useState('연차/휴가');
   const [formTitle, setFormTitle] = useState('');
   const [formContent, setFormContent] = useState('');
@@ -43,13 +43,6 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       setCustomFormTypes((data || []).map((r: any) => ({ name: r.name, slug: r.slug })));
     });
   }, []);
-
-  // 기본 결재선: 백정민 부장만 기본값으로 설정 (해당 직원이 있을 때만)
-  useEffect(() => {
-    if (!Array.isArray(staffs) || approverLine.length > 0 || viewMode !== '작성하기') return;
-    const defaultApprover = staffs.find((s: any) => s.name === '백정민' && s.position === '부장');
-    if (defaultApprover) setApproverLine([defaultApprover]);
-  }, [staffs, viewMode, approverLine.length]);
 
   // 마지막으로 보던 탭(기안함/결재함/작성하기)을 복구
   useEffect(() => {
@@ -283,9 +276,9 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const listForView = viewMode === '기안함' ? draftBoxList : approvalBoxList;
 
   return (
-    <div className="flex flex-col md:flex-row h-full bg-[#F8FAFC] overflow-hidden">
+    <div className="flex flex-col md:flex-row h-full min-h-0 bg-[#F8FAFC] overflow-hidden">
       {/* 좌측 메뉴 - 모바일 상단 탭 전환 */}
-      <aside className="w-full md:w-64 bg-white border-b md:border-r border-[#E5E8EB] shrink-0 z-10">
+      <aside className="w-full md:w-64 bg-white border-b md:border-r border-[#E5E8EB] shrink-0 z-10 flex-shrink-0">
         <div className="p-4 md:p-8">
           <nav className="flex md:flex-col gap-2 overflow-x-auto no-scrollbar">
             {['기안함', '결재함', '작성하기'].map(m => (
@@ -311,7 +304,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       </aside>
 
       {/* 메인 콘텐츠 */}
-      <main className="flex-1 overflow-y-auto p-4 md:p-10 bg-[#F8FAFC] custom-scrollbar">
+      <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 md:p-10 bg-[#F8FAFC] custom-scrollbar">
         {viewMode === '작성하기' ? (
           <div className="max-w-4xl mx-auto space-y-6 md:space-y-8">
             <div className="bg-white p-6 md:p-10 rounded-[16px] md:rounded-[20px] border border-[#E5E8EB] shadow-sm space-y-8 md:space-y-10">
@@ -422,7 +415,12 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
         ) : (
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-              <h2 className="text-lg font-bold text-[#191F28]">{viewMode} <span className="text-[#3182F6] ml-2">{listForView.length}건</span></h2>
+              <div>
+                <h2 className="text-lg font-bold text-[#191F28]">{viewMode} <span className="text-[#3182F6] ml-2">{listForView.length}건</span></h2>
+                {viewMode === '기안함' && approvalStatusFilter === '대기' && listForView.length > 0 && (
+                  <p className="text-[10px] text-[#8B95A1] mt-1">대기중인 문서는 결재자가 <strong className="text-[#3182F6]">결재함</strong>에서 승인·반려합니다. 내가 결재자이면 카드에 버튼이 표시됩니다.</p>
+                )}
+              </div>
               <div className="flex gap-1.5 p-1.5 bg-[#F2F4F6] rounded-xl w-full sm:w-auto overflow-x-auto no-scrollbar">
                 {[
                   { value: '전체' as const, label: '전체' },
@@ -492,10 +490,10 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                         </div>
                     </div>
                     
-                    {viewMode === '결재함' && item.status === '대기' && String(item.approver_id) === String(user?.id) && (
+                    {(viewMode === '결재함' || (viewMode === '기안함' && item.status === '대기')) && item.status === '대기' && String(item.approver_id) === String(user?.id) && (
                       <div className="flex gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                         <button type="button" onClick={() => handleApproveAction(item)} className="px-5 py-3 bg-[#3182F6] text-white rounded-[12px] text-[11px] font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all">승인</button>
-                        <button type="button" onClick={() => handleRejectAction(item)} className="px-5 py-3 bg-[#F04452] text-white rounded-[12px] text-[11px] font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all">반려</button>
+                        <button type="button" onClick={() => handleRejectAction(item)} className="px-5 py-3 bg-[var(--toss-danger)] text-white rounded-[12px] text-[11px] font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all">반려</button>
                       </div>
                     )}
                   </div>
@@ -513,11 +511,11 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
         if (!item) return null;
         return (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+            className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-black/50"
             onClick={() => setSelectedApprovalId(null)}
           >
             <div
-              className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[85vh] overflow-hidden flex flex-col"
+              className="bg-white rounded-t-2xl md:rounded-2xl shadow-xl max-w-lg w-full max-h-[90dvh] overflow-hidden flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="p-4 md:p-6 border-b border-[#E5E8EB] flex items-center justify-between">
@@ -529,10 +527,16 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                 <p className="text-[10px] text-[#8B95A1] mb-4">기안자: {item.sender_name} · {new Date(item.created_at).toLocaleString('ko-KR')}</p>
                 <div className="text-sm text-[#4E5968] whitespace-pre-wrap border-t border-[#E5E8EB] pt-4">{item.content || '-'}</div>
               </div>
-              {item.status === '대기' && String(item.approver_id) === String(user?.id) && (
-                <div className="p-4 md:p-6 border-t border-[#E5E8EB] flex gap-3">
-                  <button type="button" onClick={async () => { await handleApproveAction(item); setSelectedApprovalId(null); }} className="flex-1 py-3 bg-[#3182F6] text-white rounded-xl text-sm font-bold">승인</button>
-                  <button type="button" onClick={async () => { await handleRejectAction(item); setSelectedApprovalId(null); }} className="flex-1 py-3 bg-[#F04452] text-white rounded-xl text-sm font-bold">반려</button>
+              {item.status === '대기' && (
+                <div className="p-4 md:p-6 border-t border-[#E5E8EB] safe-area-pb">
+                  {String(item.approver_id) === String(user?.id) ? (
+                    <div className="flex gap-3">
+                      <button type="button" onClick={async () => { await handleApproveAction(item); setSelectedApprovalId(null); }} className="flex-1 py-3 bg-[#3182F6] text-white rounded-xl text-sm font-bold">승인</button>
+                      <button type="button" onClick={async () => { await handleRejectAction(item); setSelectedApprovalId(null); }} className="flex-1 py-3 bg-[var(--toss-danger)] text-white rounded-xl text-sm font-bold">반려</button>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-[#8B95A1] text-center py-2">승인·반려는 <strong className="text-[#3182F6]">결재함</strong>에서 결재자 계정으로만 할 수 있습니다. 왼쪽 메뉴에서 <strong>결재함</strong>을 눌러 주세요.</p>
+                  )}
                 </div>
               )}
             </div>

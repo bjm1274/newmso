@@ -202,7 +202,7 @@ export default function AttendanceSystem({ user, staffs, selectedCo, isAdminView
           <div className={`p-8 rounded-2xl border-2 shadow-sm ${isWithinRange ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'}`}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-[#191F28]">📍 위치 정보</h3>
-              <button onClick={getLocation} className="px-4 py-2 bg-[#191F28] text-white rounded-[12px] text-xs font-bold shadow-sm">위치 새로고침</button>
+              <button onClick={getLocation} className="px-4 py-2 bg-[var(--toss-blue)] text-white rounded-[12px] text-xs font-bold shadow-sm">위치 새로고침</button>
             </div>
             {currentLocation ? (
               <div className="space-y-3">

@@ -167,7 +167,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
   if (!user) return <div className="p-10 text-center font-bold">사용자 정보 로딩 중...</div>;
 
   return (
-    <div className="h-full flex flex-col bg-gray-50 px-3 py-4 md:p-6 rounded-none md:rounded-[3rem] overflow-hidden">
+    <div className="h-full min-h-0 flex flex-col bg-gray-50 px-3 py-4 md:p-6 rounded-none md:rounded-[3rem] overflow-hidden">
       
       {/* 상단 로고 및 헤더 */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 shrink-0">
@@ -276,8 +276,8 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
       </div>
 
       {/* 메인 콘텐츠 영역 */}
-      <div className="flex-1 overflow-hidden relative">
-        <div className="absolute inset-0 transition-all duration-300">
+      <div className="flex-1 min-h-0 overflow-hidden relative">
+        <div className="absolute inset-0 overflow-y-auto overflow-x-hidden transition-all duration-300">
           {activeTab === 'profile' && <MyProfileCard user={user} />}
           {activeTab === 'commute' && (
             <CommuteRecord
@@ -307,7 +307,7 @@ function TabButton({ isActive, onClick, label, icon }: any) {
     <button
       onClick={onClick}
       className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-black transition-all duration-200 whitespace-nowrap
-        ${isActive ? 'bg-gray-900 text-white shadow-md transform scale-105' : 'bg-transparent text-gray-400 hover:bg-gray-50'}
+        ${isActive ? 'bg-[var(--toss-blue)] text-white shadow-md' : 'bg-transparent text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]'}
       `}
     >
       <span>{icon}</span>
@@ -321,7 +321,7 @@ function QuickFavoriteButton({ label, icon, onClick, active, onRemove }: any) {
     <button
       onClick={onClick}
       className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-black border transition-all
-        ${active ? 'bg-gray-900 text-white border-gray-900 shadow-sm' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}
+        ${active ? 'bg-[var(--toss-blue)] text-white border-[var(--toss-blue)] shadow-sm' : 'bg-white text-[var(--toss-gray-4)] border-[var(--toss-border)] hover:bg-[var(--toss-gray-1)]'}
       `}
     >
       <span>{icon}</span>

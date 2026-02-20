@@ -12,6 +12,7 @@
   --toss-gray-4: #4E5968;
   --toss-card: #FFFFFF;
   --toss-border: #E5E8EB;
+  --toss-danger: #F04452;
 }
 
 /* ThemeContext에서 html 요소에 .dark 클래스를 붙였을 때 사용할 다크 모드 값 */
@@ -67,7 +68,20 @@ body {
   }
 }
 
-/* 토스 스타일 공통 — 버튼·카드·라운드 */
+/* 모바일에서 스크롤 영역이 자연스럽게 스크롤되도록 */
+.overflow-y-auto, .overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ========== 디자인·UX 통일 기준 (토스 스타일) ==========
+ * - 메인 액션(등록/상신/저장): --toss-blue (#3182F6)
+ * - 보조/비활성: --toss-gray-1~4
+ * - 위험(반려/삭제): --toss-danger (#F04452)
+ * - 카드: border 1px --toss-border, rounded 16px
+ * - 버튼/입력: rounded 12px
+ * - 제목/본문: --foreground (#191F28), 보조문구 --toss-gray-3/4
+ * ======================================================== */
+
 .btn-toss-primary {
   background: var(--toss-blue);
   color: white;
@@ -87,6 +101,17 @@ body {
   transition: background 0.15s;
 }
 .btn-toss-secondary:hover { background: var(--toss-gray-2); }
+
+.btn-toss-danger {
+  background: var(--toss-danger);
+  color: white;
+  font-weight: 700;
+  border-radius: 12px;
+  border: none;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.btn-toss-danger:hover { opacity: 0.95; }
+.btn-toss-danger:active { transform: scale(0.98); }
 
 .card-toss {
   background: var(--toss-card);

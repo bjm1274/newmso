@@ -158,9 +158,9 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
   if (loading) return <div className="p-8 text-center text-gray-400 font-bold">로딩 중...</div>;
 
   return (
-    <div className="flex h-full bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+    <div className="flex flex-col md:flex-row h-full min-h-0 bg-white rounded-2xl md:rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
       {/* 직원 목록 */}
-      <div className="w-1/3 border-r border-gray-50 flex flex-col min-w-[240px]">
+      <div className="w-full md:w-1/3 md:border-r border-gray-50 flex flex-col md:min-w-[240px] max-h-[40vh] md:max-h-none shrink-0">
         <div className="p-6 border-b border-gray-50 bg-gray-25">
           <h3 className="text-sm font-black text-gray-800">직원 명단</h3>
           <p className="text-[10px] text-gray-400 font-bold">직원 선택 시 역할·권한 설정</p>
@@ -183,7 +183,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
       </div>
 
       {/* 역할 + 권한 설정 영역 */}
-      <div className="flex-1 p-10 bg-gray-25/50 overflow-y-auto">
+      <div className="flex-1 min-h-0 p-4 md:p-10 bg-gray-25/50 overflow-y-auto">
         {/* A직원 → B직원 권한 한번에 복사 */}
         <div className="mb-8 bg-white p-6 rounded-2xl shadow-sm border border-gray-100 border-l-4 border-l-[#3182F6]">
           <p className="text-sm font-black text-gray-800 mb-3">📋 권한 한번에 복사 (A → B)</p>

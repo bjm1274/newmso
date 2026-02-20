@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { initNotificationService } from './알림시스템';
 
 const STORAGE_KEY = 'erp_permission_prompt_shown';
 
@@ -33,8 +34,16 @@ export default function PermissionPromptModal() {
     setNotifying(true);
     try {
       const permission = await Notification.requestPermission();
-      if (permission === 'granted') alert('알림이 허용되었습니다. 푸시 알림을 받을 수 있습니다.');
-      else if (permission === 'denied') alert('알림이 거부되었습니다. 브라우저 설정에서 변경할 수 있습니다.');
+      if (permission === 'granted') {
+        try {
+          const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('erp_user') : null;
+          const u = raw ? JSON.parse(raw) : null;
+          await initNotificationService(u?.id);
+        } catch (_) {}
+        alert('알림이 허용되었습니다. 채팅·결재 등 푸시 알림을 받을 수 있습니다.');
+      } else if (permission === 'denied') {
+        alert('알림이 거부되었습니다. 채팅 알림은 앱 내 배너로만 표시됩니다. 브라우저 설정에서 변경할 수 있습니다.');
+      }
     } catch (e) {
       console.error(e);
     } finally {
