@@ -143,12 +143,12 @@ export default function SurgeryExamTemplateManager() {
             수술명 템플릿
           </h3>
           <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider shrink-0">부위</label>
+            <div className="flex items-center gap-3 p-2 bg-gray-50 rounded-xl border border-gray-100">
+              <span className="text-[11px] font-black text-gray-600 shrink-0">부위 선택</span>
               <select
                 value={newSurgeryPart}
                 onChange={(e) => setNewSurgeryPart(e.target.value)}
-                className="px-3 py-2 rounded-xl border border-gray-200 text-xs font-bold bg-white min-w-[140px]"
+                className="px-3 py-2 rounded-lg border border-gray-200 text-xs font-bold bg-white min-w-[160px]"
               >
                 {BODY_PARTS.map((p) => (
                   <option key={p.id} value={p.id}>{p.label}</option>
@@ -222,12 +222,12 @@ export default function SurgeryExamTemplateManager() {
             MRI 검사명 템플릿
           </h3>
           <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider shrink-0">부위</label>
+            <div className="flex items-center gap-3 p-2 bg-gray-50 rounded-xl border border-gray-100">
+              <span className="text-[11px] font-black text-gray-600 shrink-0">부위 선택</span>
               <select
                 value={newMriPart}
                 onChange={(e) => setNewMriPart(e.target.value)}
-                className="px-3 py-2 rounded-xl border border-gray-200 text-xs font-bold bg-white min-w-[140px]"
+                className="px-3 py-2 rounded-lg border border-gray-200 text-xs font-bold bg-white min-w-[160px]"
               >
                 {BODY_PARTS.map((p) => (
                   <option key={p.id} value={p.id}>{p.label}</option>
