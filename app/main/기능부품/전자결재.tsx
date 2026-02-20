@@ -28,7 +28,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const BUILTIN_FORM_TYPES = ['인사명령', '연차/휴가', '연장근무', '물품신청', '수리요청서', '업무기안', '업무협조', '양식신청', '출결정정'];
 
   // 결재자 후보: 부서장 이상(팀장·부장·병원장 등)을 목록 상단에, 그 다음 나머지 직원 (staffs는 이미 메인에서 회사별로 불러옴)
-  const APPROVER_POSITIONS = ['팀장', '간호과장', '실장', '부장', '이사', '병원장', '원장', '대표이사'];
+  const APPROVER_POSITIONS = ['팀장', '간호과장', '실장', '부장', '이사', '병원장'];
   const approverCandidates = useMemo(() => {
     if (!Array.isArray(staffs)) return [];
     const order = (s: any) => {
@@ -220,28 +220,45 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   };
 
   const handleSubmit = async () => {
-    if (!formTitle || approverLine.length === 0) return alert("제목과 결재선을 지정해주세요.");
-    
-    // 결재 유형별 참조 부서 설정 (알림/조회용 메타데이터)
+    if (!user?.id) {
+      alert("로그인한 직원 계정으로만 기안할 수 있습니다.");
+      return;
+    }
+    if (!formTitle || approverLine.length === 0) {
+      alert("제목과 결재선을 지정해주세요.");
+      return;
+    }
+
     const requiredCc = formType === '물품신청' ? ['관리팀', '행정팀'] : ['행정팀'];
     const extraCc = Array.isArray((extraData as any)?.cc_departments) ? (extraData as any).cc_departments : [];
     const cc_departments = Array.from(new Set([...extraCc, ...requiredCc]));
 
-    const { error } = await supabase.from('approvals').insert([{
+    const row: any = {
       sender_id: user.id,
-      sender_name: user.name,
-      sender_company: user.company,
-      company_id: user.company_id ?? undefined,
+      sender_name: user.name || '이름 없음',
+      sender_company: user.company || '',
       approver_id: approverLine[0].id,
-      approver_line: approverLine.map(a => a.id),
+      approver_line: approverLine.map((a: any) => a.id),
       type: formType,
       title: formTitle,
-      content: formContent,
+      content: formContent || '',
       meta_data: { ...extraData, cc_departments },
-      status: '대기'
-    }]);
+      status: '대기',
+    };
+    const companyId = user.company_id ?? selectedCompanyId ?? null;
+    if (companyId != null) row.company_id = companyId;
 
-    if (!error) { alert("상신 완료!"); setViewMode('기안함'); fetchApprovals(); if (onRefresh) onRefresh(); }
+    const { error } = await supabase.from('approvals').insert([row]);
+
+    if (error) {
+      console.error('기안 상신 실패:', error);
+      alert("기안이 올라가지 않았습니다.\n\n" + (error.message || ""));
+      return;
+    }
+    alert("상신 완료!");
+    setViewMode('기안함');
+    fetchApprovals();
+    if (onRefresh) onRefresh();
   };
 
   const byCompany = useMemo(() => {
@@ -256,8 +273,9 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   }, [byCompany, user?.id, approvalStatusFilter]);
 
   const approvalBoxList = useMemo(() => {
+    const uid = user?.id != null ? String(user.id) : '';
     const lineIds = (a: any) => Array.isArray(a.approver_line) ? a.approver_line : [];
-    const mine = byCompany.filter((a: any) => lineIds(a).includes(user?.id));
+    const mine = byCompany.filter((a: any) => lineIds(a).some((id: any) => String(id) === uid));
     if (approvalStatusFilter === '전체') return mine;
     return mine.filter((a: any) => a.status === approvalStatusFilter);
   }, [byCompany, user?.id, approvalStatusFilter]);
@@ -474,7 +492,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                         </div>
                     </div>
                     
-                    {viewMode === '결재함' && item.status === '대기' && item.approver_id === user?.id && (
+                    {viewMode === '결재함' && item.status === '대기' && String(item.approver_id) === String(user?.id) && (
                       <div className="flex gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                         <button type="button" onClick={() => handleApproveAction(item)} className="px-5 py-3 bg-[#3182F6] text-white rounded-[12px] text-[11px] font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all">승인</button>
                         <button type="button" onClick={() => handleRejectAction(item)} className="px-5 py-3 bg-[#F04452] text-white rounded-[12px] text-[11px] font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all">반려</button>
@@ -511,7 +529,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                 <p className="text-[10px] text-[#8B95A1] mb-4">기안자: {item.sender_name} · {new Date(item.created_at).toLocaleString('ko-KR')}</p>
                 <div className="text-sm text-[#4E5968] whitespace-pre-wrap border-t border-[#E5E8EB] pt-4">{item.content || '-'}</div>
               </div>
-              {item.status === '대기' && item.approver_id === user?.id && (
+              {item.status === '대기' && String(item.approver_id) === String(user?.id) && (
                 <div className="p-4 md:p-6 border-t border-[#E5E8EB] flex gap-3">
                   <button type="button" onClick={async () => { await handleApproveAction(item); setSelectedApprovalId(null); }} className="flex-1 py-3 bg-[#3182F6] text-white rounded-xl text-sm font-bold">승인</button>
                   <button type="button" onClick={async () => { await handleRejectAction(item); setSelectedApprovalId(null); }} className="flex-1 py-3 bg-[#F04452] text-white rounded-xl text-sm font-bold">반려</button>
