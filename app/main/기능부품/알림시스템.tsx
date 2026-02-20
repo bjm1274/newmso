@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 
 // [채팅 실시간 알림] 웹·Android·iOS 공통
@@ -131,12 +131,13 @@ export default function NotificationSystem({
 }: { user: any; onOpenChatRoom?: (roomId: string) => void; onOpenApproval?: () => void }) {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const shownNotifIdsRef = useRef<Set<string>>(new Set());
+  const lastHiddenAtRef = useRef<number>(0);
 
   useEffect(() => {
-    // 1. 서비스 워커 초기화
-    initNotificationService(user?.id);
+    if (!user?.id) return;
+    initNotificationService(user.id);
 
-    // 2. Supabase 실시간 구독 설정
     const setupRealtimeListeners = async () => {
       // A. 결재 승인 알림 (user가 결재자인 경우)
       const approvalsChannel = supabase
@@ -146,7 +147,7 @@ export default function NotificationSystem({
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'approvals' },
           (payload: any) => {
-            if (payload.new.approver_id === user.id && payload.new.status === '대기') {
+            if (String(payload.new.approver_id) === String(user.id) && payload.new.status === '대기') {
               const notif = {
                 id: payload.new.id,
                 title: `📋 새 결재 요청: ${payload.new.title}`,
@@ -163,7 +164,7 @@ export default function NotificationSystem({
           'postgres_changes',
           { event: 'UPDATE', schema: 'public', table: 'approvals' },
           (payload: any) => {
-            if (payload.new.approver_id === user.id && payload.new.status === '대기') {
+            if (String(payload.new.approver_id) === String(user.id) && payload.new.status === '대기') {
               const notif = {
                 id: payload.new.id,
                 title: `📋 결재 차례 도착: ${payload.new.title}`,
@@ -205,7 +206,7 @@ export default function NotificationSystem({
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'payroll' },
           (payload: any) => {
-            if (payload.new.staff_id === user.id) {
+            if (String(payload.new.staff_id) === String(user.id)) {
               const notif = {
                 id: payload.new.id,
                 title: `💰 급여 정산 완료`,
@@ -227,7 +228,7 @@ export default function NotificationSystem({
           { event: 'UPDATE', schema: 'public', table: 'education_records' },
           (payload: any) => {
             const daysLeft = Math.ceil((new Date(payload.new.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-            if (daysLeft <= 7 && daysLeft > 0 && payload.new.staff_id === user.id) {
+            if (daysLeft <= 7 && daysLeft > 0 && String(payload.new.staff_id) === String(user.id)) {
               const notif = {
                 id: payload.new.id,
                 title: `📚 교육 이수 기한 임박`,
@@ -249,7 +250,7 @@ export default function NotificationSystem({
           { event: 'INSERT', schema: 'public', table: 'messages' },
           async (payload: any) => {
             const msg = payload.new;
-            if (msg.sender_id === user.id) return;
+            if (String(msg.sender_id) === String(user.id)) return;
             const roomId = msg.room_id;
             const [roomRes, senderRes] = await Promise.all([
               supabase.from('chat_rooms').select('members').eq('id', roomId).single(),
@@ -279,12 +280,13 @@ export default function NotificationSystem({
         )
         .subscribe();
 
-      // F. 서버 발송 알림 실시간 수신 (연차촉진, 알림자동화 등 — DB에 insert되면 즉시 표시)
+      // F. 서버 발송 알림 실시간 수신 (연차촉진 등) — 모바일에서 filter는 문자열로 통일
+      const userIdStr = String(user.id);
       const notificationsTableChannel = supabase
-        .channel(`notifications-realtime-${user.id}`)
+        .channel(`notifications-realtime-${userIdStr}`)
         .on(
           'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+          { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userIdStr}` },
           (payload: any) => {
             const row = payload.new;
             handleNotificationFromServer({
@@ -305,7 +307,7 @@ export default function NotificationSystem({
           'postgres_changes',
           { event: '*', schema: 'public', table: 'attendance' },
           (payload: any) => {
-            if (payload.new?.staff_id !== user.id) return;
+            if (String(payload.new?.staff_id) !== String(user.id)) return;
             const s = payload.new.status;
             const isCheckOut = payload.new.check_out != null;
             let title = '⏰ 출퇴근';
@@ -340,6 +342,44 @@ export default function NotificationSystem({
     setupRealtimeListeners();
   }, [user]);
 
+  // 모바일: 앱이 백그라운드였다가 다시 보이면 놓친 알림 보충 (Realtime 연결 끊김 대비)
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        lastHiddenAtRef.current = Date.now();
+        return;
+      }
+      if (document.visibilityState !== 'visible' || !user?.id) return;
+      const hiddenDuration = Date.now() - lastHiddenAtRef.current;
+      if (hiddenDuration < 2000) return; // 2초 미만이면 스킵
+
+      const since = new Date(Date.now() - 60 * 1000).toISOString(); // 최근 1분
+      supabase
+        .from('notifications')
+        .select('id, title, body, type, metadata, created_at')
+        .eq('user_id', user.id)
+        .gte('created_at', since)
+        .order('created_at', { ascending: false })
+        .limit(20)
+        .then(({ data: rows }) => {
+          if (!rows?.length) return;
+          rows.forEach((row: any) => {
+            if (shownNotifIdsRef.current.has(row.id)) return;
+            shownNotifIdsRef.current.add(row.id);
+            handleNotificationFromServer({
+              id: row.id,
+              title: row.title || '알림',
+              body: row.body || '',
+              type: row.type || 'notification',
+              data: row.metadata || {},
+            });
+          });
+        });
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [user?.id]);
+
   // 탭 제목에 읽지 않은 알림 개수 표시 (웹·모바일 공통)
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -349,6 +389,7 @@ export default function NotificationSystem({
 
   // 서버에서 notifications 테이블에 insert된 알림(연차촉진 등) 수신 시 — DB 저장 없이 즉시 표시
   const handleNotificationFromServer = (notif: any) => {
+    if (notif.id) shownNotifIdsRef.current.add(String(notif.id));
     sendNotification(notif.title, { body: notif.body, tag: notif.type, data: notif.data });
     setNotifications(prev => [notif, ...prev].slice(0, 50));
     setUnreadCount(prev => prev + 1);
