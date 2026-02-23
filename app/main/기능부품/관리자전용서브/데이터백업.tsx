@@ -61,20 +61,20 @@ export default function DataBackup() {
   };
 
   return (
-    <div className="bg-white border border-gray-100 rounded-2xl p-8 shadow-xl max-w-lg">
-      <h3 className="text-xl font-black text-gray-900 mb-2">데이터 백업</h3>
+    <div className="bg-white border border-gray-100 rounded-lg p-8 shadow-xl max-w-lg">
+      <h3 className="text-xl font-semibold text-gray-900 mb-2">데이터 백업</h3>
       <p className="text-xs text-gray-500 font-bold mb-6">직원, 급여, 휴가, 근태, 결재, 감사로그를 JSON 파일로 내보냅니다.</p>
-      <button onClick={exportData} disabled={loading} className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl text-sm hover:bg-blue-700 disabled:opacity-50">
+      <button onClick={exportData} disabled={loading} className="w-full py-4 bg-blue-600 text-white font-semibold rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50">
         {loading ? '내보내는 중...' : '📥 백업 파일 내보내기'}
       </button>
       {lastExport && <p className="text-[10px] text-gray-400 mt-2">마지막 내보내기: {lastExport}</p>}
 
       <div className="mt-8 pt-8 border-t border-gray-100">
-        <h4 className="text-sm font-black text-gray-800 mb-2">데이터 복원</h4>
+        <h4 className="text-sm font-semibold text-gray-800 mb-2">데이터 복원</h4>
         <input ref={fileRef} type="file" accept=".json" onChange={handleRestoreFile} className="hidden" />
         <button onClick={() => fileRef.current?.click()} className="w-full py-3 bg-gray-100 text-gray-700 font-bold rounded-xl text-sm mb-2">복원할 JSON 파일 선택</button>
         {restoreFile && <p className="text-[10px] text-gray-500 mb-2">{restoreFile.name}</p>}
-        <button onClick={restoreData} disabled={!restoreFile || loading} className="w-full py-3 bg-orange-600 text-white font-black rounded-xl text-sm disabled:opacity-50">복원 실행</button>
+        <button onClick={restoreData} disabled={!restoreFile || loading} className="w-full py-3 bg-orange-600 text-white font-semibold rounded-xl text-sm disabled:opacity-50">복원 실행</button>
       </div>
     </div>
   );

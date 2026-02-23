@@ -208,7 +208,7 @@ export default function ChatMessenger({ user, staffs }: any) {
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`flex-1 py-2 font-black text-sm rounded-[12px] transition-all ${
+              className={`flex-1 py-2 font-semibold text-sm rounded-[12px] transition-all ${
                 activeTab === tab
                   ? 'bg-white shadow-md text-blue-600'
                   : 'text-gray-400'
@@ -227,7 +227,7 @@ export default function ChatMessenger({ user, staffs }: any) {
             <div className="p-4">
               <button
                 onClick={() => setShowNewGroupModal(true)}
-                className="w-full mb-4 px-4 py-2 bg-blue-600 text-white rounded-lg font-black text-sm hover:bg-blue-700 transition-all"
+                className="w-full mb-4 px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700 transition-all"
               >
                 ➕ 단체채팅방 만들기
               </button>
@@ -259,11 +259,11 @@ export default function ChatMessenger({ user, staffs }: any) {
         {activeTab === '공지' && (
           <div className="flex-1 overflow-y-auto">
             <div className="p-4 space-y-2">
-              <div className="p-4 mb-4 bg-blue-600 rounded-2xl shadow-lg border-2 border-blue-400">
+              <div className="p-4 mb-4 bg-blue-600 rounded-lg shadow-lg border-2 border-blue-400">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-xl">📢</div>
                   <div>
-                    <p className="text-white font-black text-sm">전직원 공지방</p>
+                    <p className="text-white font-semibold text-sm">전직원 공지방</p>
                     <p className="text-blue-100 text-[10px] font-bold">필독 사항 및 주요 공지</p>
                   </div>
                 </div>
@@ -281,7 +281,7 @@ export default function ChatMessenger({ user, staffs }: any) {
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <p className="font-black text-red-800">📢 {announce.name}</p>
+                      <p className="font-semibold text-red-800">📢 {announce.name}</p>
                       <p className="text-xs text-red-600 mt-1">
                         {new Date(announce.created_at).toLocaleDateString('ko-KR')}
                       </p>
@@ -292,7 +292,7 @@ export default function ChatMessenger({ user, staffs }: any) {
                           e.stopPropagation();
                           deleteAnnouncement(announce.id);
                         }}
-                        className="opacity-0 group-hover:opacity-100 text-red-600 hover:text-red-800 font-black"
+                        className="opacity-0 group-hover:opacity-100 text-red-600 hover:text-red-800 font-semibold"
                       >
                         ✕
                       </button>
@@ -324,7 +324,7 @@ export default function ChatMessenger({ user, staffs }: any) {
                   className="p-3 rounded-lg bg-gray-50 hover:bg-blue-50 cursor-pointer transition-all mb-2 border border-gray-200 hover:border-blue-300"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-black text-xs">
+                    <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold text-xs">
                       {staff.name?.charAt(0)}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -344,11 +344,11 @@ export default function ChatMessenger({ user, staffs }: any) {
         {selectedRoom ? (
           <>
             <div className="p-4 bg-white border-b border-gray-200 flex justify-between items-center shrink-0">
-              <h3 className="font-black text-lg text-gray-800">{selectedRoom.name}</h3>
+              <h3 className="font-semibold text-lg text-gray-800">{selectedRoom.name}</h3>
               {selectedRoom.is_announcement && user.role === 'admin' && (
                 <button
                   onClick={() => deleteAnnouncement(selectedRoom.id)}
-                  className="px-3 py-1 bg-red-100 text-red-600 rounded text-sm font-black hover:bg-red-200"
+                  className="px-3 py-1 bg-red-100 text-red-600 rounded text-sm font-semibold hover:bg-red-200"
                 >
                   공지 내리기
                 </button>
@@ -363,7 +363,7 @@ export default function ChatMessenger({ user, staffs }: any) {
                 return (
                   <div key={msg.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
                     <div className={`max-w-[70%] ${isOwn ? 'bg-blue-600 text-white rounded-l-2xl rounded-tr-2xl' : 'bg-white text-gray-800 rounded-r-2xl rounded-tl-2xl shadow-sm'} p-4`}>
-                      {!isOwn && <p className="text-[10px] font-black text-blue-600 mb-1">{sender?.name || '알 수 없음'}</p>}
+                      {!isOwn && <p className="text-[10px] font-semibold text-blue-600 mb-1">{sender?.name || '알 수 없음'}</p>}
                       <p className="text-sm font-medium leading-relaxed">{msg.content}</p>
                       <p className={`text-[9px] mt-2 ${isOwn ? 'text-blue-100' : 'text-gray-400'} font-bold`}>
                         {new Date(msg.created_at).toLocaleTimeString('ko-KR', {
@@ -389,7 +389,7 @@ export default function ChatMessenger({ user, staffs }: any) {
               />
               <button
                 onClick={sendMessage}
-                className="px-6 py-3 bg-blue-600 text-white rounded-xl font-black text-sm hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
+                className="px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
               >
                 전송
               </button>
@@ -398,7 +398,7 @@ export default function ChatMessenger({ user, staffs }: any) {
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-gray-300 space-y-4">
             <p className="text-6xl">💬</p>
-            <p className="font-black text-xl italic">대화를 시작할 채팅방을 선택하세요</p>
+            <p className="font-semibold text-xl italic">대화를 시작할 채팅방을 선택하세요</p>
           </div>
         )}
       </div>
@@ -406,11 +406,11 @@ export default function ChatMessenger({ user, staffs }: any) {
       {showNewGroupModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[2rem] p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-300">
-            <h3 className="text-2xl font-black text-gray-900 mb-6 tracking-tighter italic">단체채팅방 만들기</h3>
+            <h3 className="text-2xl font-semibold text-gray-900 mb-6 tracking-tighter italic">단체채팅방 만들기</h3>
 
             <div className="space-y-6">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">채팅방 이름</label>
+                <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">채팅방 이름</label>
                 <input
                   type="text"
                   placeholder="예: 행정팀 주간회의"
@@ -421,7 +421,7 @@ export default function ChatMessenger({ user, staffs }: any) {
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">멤버 선택</label>
+                <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">멤버 선택</label>
                 <div className="max-h-48 overflow-y-auto space-y-2 bg-gray-50 rounded-xl p-4 custom-scrollbar">
                   {staffs.map((staff: any) => (
                     <label key={staff.id} className="flex items-center gap-3 cursor-pointer group">
@@ -450,13 +450,13 @@ export default function ChatMessenger({ user, staffs }: any) {
                     setGroupName('');
                     setSelectedMembers([]);
                   }}
-                  className="flex-1 px-4 py-4 bg-gray-100 text-gray-500 rounded-2xl font-black text-sm hover:bg-gray-200 transition-all"
+                  className="flex-1 px-4 py-4 bg-gray-100 text-gray-500 rounded-lg font-semibold text-sm hover:bg-gray-200 transition-all"
                 >
                   취소
                 </button>
                 <button
                   onClick={createGroupChat}
-                  className="flex-1 px-4 py-4 bg-blue-600 text-white rounded-2xl font-black text-sm hover:bg-blue-700 transition-all shadow-xl shadow-blue-100"
+                  className="flex-1 px-4 py-4 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700 transition-all shadow-xl shadow-blue-100"
                 >
                   생성하기
                 </button>

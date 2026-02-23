@@ -12,10 +12,10 @@ export default function HRDashboardIntegrated({ staffs = [], selectedCo, checked
   const [ym, setYm] = useState(yearMonth || new Date().toISOString().slice(0, 7));
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
-      <div className="flex flex-wrap gap-4 items-center">
-        <h2 className="text-xl font-black text-gray-800">인사/급여 통합 대시보드</h2>
-        <input type="month" value={ym} onChange={(e) => setYm(e.target.value)} className="p-2 border rounded-xl text-sm font-bold" />
+    <div className="space-y-6 animate-in fade-in duration-300">
+      <div className="flex flex-wrap gap-3 items-center">
+        <h2 className="text-lg font-bold text-gray-800">인사/급여 통합 대시보드</h2>
+        <input type="month" value={ym} onChange={(e) => setYm(e.target.value)} className="h-9 px-3 border border-gray-300 rounded-md text-sm font-medium" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">

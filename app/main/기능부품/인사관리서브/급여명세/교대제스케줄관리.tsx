@@ -15,20 +15,22 @@ export default function ShiftPatternManager({ selectedCo }: { selectedCo?: strin
   }, [selectedCo]);
 
   return (
-    <div className="border border-gray-200 p-6 bg-white rounded-[1.75rem] shadow-sm">
-      <h3 className="text-[11px] font-black text-gray-600 uppercase tracking-widest mb-4">교대제 스케줄</h3>
-      <div className="space-y-3">
+    <div className="border border-gray-200 p-4 bg-white rounded-lg shadow-sm">
+      <div className="pb-2 border-b border-gray-100 mb-3">
+        <h3 className="text-sm font-semibold text-gray-800">교대제 스케줄</h3>
+      </div>
+      <div className="space-y-2">
         {shifts.map((s) => (
-          <div key={s.id} className="p-4 bg-gray-50 rounded-xl flex justify-between items-center">
+          <div key={s.id} className="p-3 bg-[#f8fafc] rounded-lg border border-gray-200 flex justify-between items-center">
             <div>
-              <p className="text-sm font-black text-gray-800">{s.name}</p>
+              <p className="text-sm font-semibold text-gray-800">{s.name}</p>
               <p className="text-[10px] text-gray-500">{s.start_time} ~ {s.end_time}</p>
             </div>
-            {s.shift_type && <span className="text-[10px] font-bold text-blue-600">{s.shift_type}</span>}
+            {s.shift_type && <span className="text-xs font-medium text-blue-600">{s.shift_type}</span>}
           </div>
         ))}
       </div>
-      <p className="mt-4 text-[10px] text-gray-400">* 근무형태 관리에서 교대 유형(day/swing/night)을 설정할 수 있습니다.</p>
+      <p className="mt-3 text-[10px] text-gray-400">* 근무형태 관리에서 교대 유형(day/swing/night)을 설정할 수 있습니다.</p>
     </div>
   );
 }

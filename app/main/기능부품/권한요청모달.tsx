@@ -74,9 +74,9 @@ export default function PermissionPromptModal() {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 border border-[#E5E8EB]">
-        <h3 className="text-lg font-black text-[#191F28] mb-2">권한 안내</h3>
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-sm w-full p-6 border border-[#E5E8EB]">
+        <h3 className="text-lg font-semibold text-[#191F28] mb-2">권한 안내</h3>
         <p className="text-sm text-[#4E5968] mb-5">
           서비스 이용을 위해 아래 권한 허용을 권장합니다.
         </p>

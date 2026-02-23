@@ -96,7 +96,7 @@ export default function NotificationInbox({ user, onRefresh }: any) {
   return (
     <div className="flex flex-col h-full bg-[#F8FAFC] overflow-hidden">
       <header className="p-6 md:p-8 border-b border-gray-100 bg-white shrink-0">
-        <h2 className="text-xl md:text-2xl font-black text-gray-800 tracking-tighter italic">
+        <h2 className="text-xl md:text-2xl font-semibold text-gray-800 tracking-tighter italic">
           알림 센터
         </h2>
         <p className="text-[10px] md:text-xs text-gray-400 font-bold uppercase mt-1 tracking-widest">
@@ -157,7 +157,7 @@ export default function NotificationInbox({ user, onRefresh }: any) {
                 <div
                   key={n.id}
                   onClick={() => handleNotificationClick(n)}
-                  className={`p-4 rounded-2xl border cursor-pointer transition-all ${
+                  className={`p-4 rounded-lg border cursor-pointer transition-all ${
                     n.is_read
                       ? 'bg-white border-gray-100 opacity-70'
                       : `border-l-4 ${style.color}`

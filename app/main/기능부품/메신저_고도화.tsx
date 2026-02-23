@@ -114,7 +114,7 @@ export default function ChatMessengerAdvanced({ user }: any) {
       {/* 채팅방 목록 */}
       <div className="w-80 bg-white border border-gray-100 rounded-xl shadow-sm flex flex-col">
         <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-          <h3 className="font-black text-gray-800">💬 채팅</h3>
+          <h3 className="font-semibold text-gray-800">💬 채팅</h3>
           <button
             onClick={() => setShowCreateModal(true)}
             className="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-all"
@@ -158,7 +158,7 @@ export default function ChatMessengerAdvanced({ user }: any) {
           {/* 헤더 */}
           <div className="p-6 border-b border-gray-100 flex justify-between items-center">
             <div>
-              <h2 className="font-black text-lg text-gray-800">{selectedRoom.name}</h2>
+              <h2 className="font-semibold text-lg text-gray-800">{selectedRoom.name}</h2>
               <p className="text-xs text-gray-400">
                 {selectedRoom.type === '1:1' ? '1:1 채팅' : `그룹 채팅 (${selectedRoom.members?.length || 0}명)`}
               </p>
@@ -234,7 +234,7 @@ export default function ChatMessengerAdvanced({ user }: any) {
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-8 w-96 shadow-2xl">
-            <h3 className="text-xl font-black text-gray-800 mb-6">새 채팅방 만들기</h3>
+            <h3 className="text-xl font-semibold text-gray-800 mb-6">새 채팅방 만들기</h3>
 
             {/* 채팅 유형 선택 */}
             <div className="mb-6">
@@ -342,7 +342,7 @@ export default function ChatMessengerAdvanced({ user }: any) {
       {showDeleteConfirm && deleteTarget && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-8 w-80 shadow-2xl">
-            <h3 className="text-lg font-black text-gray-800 mb-4">메시지 삭제</h3>
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">메시지 삭제</h3>
             <p className="text-sm text-gray-600 mb-6">
               {selectedRoom.is_announcement
                 ? '이 공지사항을 삭제하시겠습니까?'

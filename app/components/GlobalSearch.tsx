@@ -128,7 +128,7 @@ export default function GlobalSearch({
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 200)}
         onKeyDown={handleKeyDown}
-        className="w-full max-w-[240px] px-4 py-2 rounded-[12px] bg-[#F2F4F6] text-sm text-[#191F28] placeholder:text-[#8B95A1] outline-none focus:ring-2 focus:ring-[#3182F6]/30"
+        className="w-full max-w-[240px] min-h-[44px] px-4 py-2 rounded-[12px] bg-[#F2F4F6] text-sm text-[#191F28] placeholder:text-[#8B95A1] outline-none focus:ring-2 focus:ring-[#3182F6]/30 touch-manipulation"
       />
       {open && (query.length >= 2 || results.length > 0) && (
         <div
@@ -145,7 +145,7 @@ export default function GlobalSearch({
                 key={`${r.type}-${r.id}`}
                 type="button"
                 onMouseDown={(e) => { e.preventDefault(); onSelect(r.type, r.id); setOpen(false); setQuery(''); }}
-                className={`w-full text-left px-4 py-3 flex gap-3 items-start hover:bg-[#F2F4F6] transition-colors ${i === activeIdx ? 'bg-[#E8F3FF]' : ''}`}
+                className={`w-full text-left min-h-[44px] px-4 py-3 flex gap-3 items-start hover:bg-[#F2F4F6] transition-colors touch-manipulation ${i === activeIdx ? 'bg-[#E8F3FF]' : ''}`}
               >
                 <span className="text-[10px] font-semibold text-[#8B95A1] shrink-0">{typeLabel[r.type]}</span>
                 <div className="flex-1 min-w-0">

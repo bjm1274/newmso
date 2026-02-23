@@ -181,7 +181,7 @@ export default function ContractManager() {
       <div className="flex gap-1 border-b border-gray-100 pb-4">
         {COMPANIES.filter(c => c !== '전체').map(co => (
           <button key={co} onClick={() => setSelectedCo(co)} 
-            className={`px-6 py-2 text-[10px] font-black border ${selectedCo === co ? 'bg-blue-600 border-blue-600 text-white shadow-lg' : 'bg-white text-gray-400 border-gray-100'}`}>
+            className={`px-6 py-2 text-[10px] font-semibold border ${selectedCo === co ? 'bg-blue-600 border-blue-600 text-white shadow-lg' : 'bg-white text-gray-400 border-gray-100'}`}>
             {co}
           </button>
         ))}
@@ -191,9 +191,9 @@ export default function ContractManager() {
       <div className="grid grid-cols-12 gap-6 items-start">
         {/* 왼쪽: 계약서 표준 틀 편집기 */}
         <div className="col-span-9 space-y-4">
-          <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-2xl text-white p-4 flex items-center justify-between shadow-md">
+          <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-lg text-white p-4 flex items-center justify-between shadow-md">
             <div>
-              <p className="text-[10px] font-black tracking-[0.18em] uppercase opacity-70">Contract Template</p>
+              <p className="text-[10px] font-semibold tracking-[0.18em] uppercase opacity-70">Contract Template</p>
               <p className="mt-1 text-sm md:text-base font-semibold">
                 {selectedCo} 표준 근로계약서 틀
               </p>
@@ -212,7 +212,7 @@ export default function ContractManager() {
           </div>
 
           {loading ? (
-            <div className="w-full h-[520px] flex items-center justify-center bg-gray-50 rounded-2xl border border-gray-100">
+            <div className="w-full h-[520px] flex items-center justify-center bg-gray-50 rounded-lg border border-gray-100">
               로딩 중...
             </div>
           ) : (
@@ -227,14 +227,14 @@ export default function ContractManager() {
                     </span>
                   </label>
                   <textarea
-                    className="w-full h-[320px] p-5 bg-white border border-gray-200 rounded-2xl text-[13px] leading-relaxed outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-inner custom-scrollbar font-mono"
+                    className="w-full h-[320px] p-5 bg-white border border-gray-200 rounded-lg text-[13px] leading-relaxed outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-inner custom-scrollbar font-mono"
                     value={template}
                     onChange={e => setTemplate(e.target.value)}
                     placeholder="계약서 본문을 입력하세요. 인사관리 → 계약에서 직원에게 발송 시 이 양식이 사용됩니다."
                   />
                 </div>
                 <div className="col-span-4">
-                  <div className="h-full rounded-2xl border border-dashed border-gray-200 bg-slate-50 px-4 py-3 text-[11px] text-gray-600 flex flex-col gap-2">
+                  <div className="h-full rounded-lg border border-dashed border-gray-200 bg-slate-50 px-4 py-3 text-[11px] text-gray-600 flex flex-col gap-2">
                     <p className="font-bold text-gray-700 text-xs mb-1">사용 가능한 자동입력 토큰</p>
                     <div className="flex flex-wrap gap-1.5">
                       {[
@@ -269,12 +269,12 @@ export default function ContractManager() {
 
               {/* 미리보기: 실제 근로자 서명 화면과 동일한 레이아웃 */}
               <div className="mt-5">
-                <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.18em] mb-2 flex items-center gap-2">
+                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-[0.18em] mb-2 flex items-center gap-2">
                   <span className="w-1 h-3 bg-gray-400" />
                   실시간 미리보기 (근로자 서명 화면)
                 </p>
-                <div className="w-full bg-slate-100 rounded-2xl border border-slate-200 py-6 px-3">
-                  <div className="max-w-[760px] mx-auto bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
+                <div className="w-full bg-slate-100 rounded-lg border border-slate-200 py-6 px-3">
+                  <div className="max-w-[760px] mx-auto bg-white rounded-lg shadow-lg border border-slate-200 overflow-hidden">
                     <div className="px-6 md:px-8 pt-6 pb-4 border-b border-slate-100 flex items-center justify-between">
                       <div>
                         <p className="text-[11px] font-semibold text-slate-500">전자 근로계약서</p>
@@ -308,19 +308,19 @@ export default function ContractManager() {
         {/* 오른쪽: 소형 직인 관리 카드 */}
         <div className="col-span-3 space-y-6">
           <div className="space-y-3">
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">사업자 공식 직인</p>
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">사업자 공식 직인</p>
             <label className="aspect-square w-full border-2 border-dashed border-gray-100 flex flex-col items-center justify-center bg-gray-50 group hover:border-red-100 transition-all cursor-pointer relative overflow-hidden">
               {sealUrl ? (
                 <>
                   <img src={sealUrl} alt="사업자 직인" className="w-full h-full object-contain" />
-                  <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 flex items-center justify-center text-[10px] font-black text-white">
+                  <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 flex items-center justify-center text-[10px] font-semibold text-white">
                     변경하려면 클릭
                   </div>
                 </>
               ) : (
                 <>
                   <span className="text-4xl opacity-10 font-serif text-red-600 mb-2">印</span>
-                  <span className="text-[9px] font-black text-gray-400">파일 선택</span>
+                  <span className="text-[9px] font-semibold text-gray-400">파일 선택</span>
                 </>
               )}
               <input

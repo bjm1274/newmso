@@ -192,17 +192,17 @@ export default function AdvancedInventoryManagement({ user }: any) {
   return (
     <div className="flex flex-col h-full bg-gray-50/30 overflow-y-auto custom-scrollbar space-y-8 p-8">
       <header>
-        <h2 className="text-2xl font-black text-gray-800 tracking-tighter italic">고급 재고 관리</h2>
+        <h2 className="text-2xl font-semibold text-gray-800 tracking-tighter italic">고급 재고 관리</h2>
         <p className="text-xs text-gray-400 font-bold uppercase mt-1">UDI, 명세서, 발주, 스캔 통합 시스템</p>
       </header>
 
       {/* 탭 */}
-      <div className="flex gap-2 flex-wrap bg-white p-4 rounded-2xl border border-gray-100 shadow-sm overflow-x-auto">
+      <div className="flex gap-2 flex-wrap bg-white p-4 rounded-lg border border-gray-100 shadow-sm overflow-x-auto">
         {['현황', 'UDI보고', '명세서', '발주', '물품등록', '스캔입고'].map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-6 py-3 rounded-xl text-xs font-black whitespace-nowrap transition-all ${
+            className={`px-6 py-3 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
               activeTab === tab
                 ? 'bg-blue-600 text-white shadow-lg'
                 : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
@@ -217,33 +217,33 @@ export default function AdvancedInventoryManagement({ user }: any) {
       {activeTab === '현황' && (
         <div className="space-y-6">
           <div className="grid grid-cols-4 gap-4">
-            <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm text-center">
+            <div className="bg-white p-6 rounded-lg border border-gray-100 shadow-sm text-center">
               <p className="text-[10px] font-bold text-gray-400 uppercase">전체 품목</p>
-              <p className="text-3xl font-black text-blue-600 mt-2">{inventory.length}</p>
+              <p className="text-3xl font-semibold text-blue-600 mt-2">{inventory.length}</p>
             </div>
-            <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm text-center">
+            <div className="bg-white p-6 rounded-lg border border-gray-100 shadow-sm text-center">
               <p className="text-[10px] font-bold text-gray-400 uppercase">UDI 대상</p>
-              <p className="text-3xl font-black text-red-600 mt-2">{udiItems.length}</p>
+              <p className="text-3xl font-semibold text-red-600 mt-2">{udiItems.length}</p>
             </div>
-            <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm text-center">
+            <div className="bg-white p-6 rounded-lg border border-gray-100 shadow-sm text-center">
               <p className="text-[10px] font-bold text-gray-400 uppercase">안전재고 미달</p>
-              <p className="text-3xl font-black text-orange-600 mt-2">
+              <p className="text-3xl font-semibold text-orange-600 mt-2">
                 {inventory.filter(i => i.stock <= i.min_stock).length}
               </p>
             </div>
-            <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm text-center">
+            <div className="bg-white p-6 rounded-lg border border-gray-100 shadow-sm text-center">
               <p className="text-[10px] font-bold text-gray-400 uppercase">거래처</p>
-              <p className="text-3xl font-black text-green-600 mt-2">{suppliers.length}</p>
+              <p className="text-3xl font-semibold text-green-600 mt-2">{suppliers.length}</p>
             </div>
           </div>
 
           {/* 안전재고 미달 품목 */}
-          <div className="bg-white p-8 border border-gray-100 shadow-sm rounded-2xl space-y-4">
+          <div className="bg-white p-8 border border-gray-100 shadow-sm rounded-lg space-y-4">
             <div className="flex justify-between items-center">
-              <h3 className="text-lg font-black text-gray-800">⚠️ 안전재고 미달 품목</h3>
+              <h3 className="text-lg font-semibold text-gray-800">⚠️ 안전재고 미달 품목</h3>
               <button
                 onClick={handleAutoGeneratePurchaseOrder}
-                className="px-6 py-3 bg-red-600 text-white rounded-xl text-xs font-black shadow-lg hover:scale-[0.98] transition-all"
+                className="px-6 py-3 bg-red-600 text-white rounded-xl text-xs font-semibold shadow-lg hover:scale-[0.98] transition-all"
               >
                 자동 발주 생성
               </button>
@@ -253,10 +253,10 @@ export default function AdvancedInventoryManagement({ user }: any) {
               {inventory.filter(i => i.stock <= i.min_stock).map((item, idx) => (
                 <div key={item.id || idx} className="p-4 bg-red-50 border border-red-200 rounded-xl flex justify-between items-center">
                   <div>
-                    <p className="font-black text-gray-800">{item.name}</p>
+                    <p className="font-semibold text-gray-800">{item.name}</p>
                     <p className="text-xs text-gray-500 font-bold">현재: {item.stock}개 | 최소: {item.min_stock}개</p>
                   </div>
-                  <span className="px-3 py-1 bg-red-600 text-white rounded-lg text-xs font-black">부족</span>
+                  <span className="px-3 py-1 bg-red-600 text-white rounded-lg text-xs font-semibold">부족</span>
                 </div>
               ))}
             </div>
@@ -266,12 +266,12 @@ export default function AdvancedInventoryManagement({ user }: any) {
 
       {/* UDI 보고 탭 */}
       {activeTab === 'UDI보고' && (
-        <div className="bg-white p-8 border border-gray-100 shadow-sm rounded-2xl space-y-6">
+        <div className="bg-white p-8 border border-gray-100 shadow-sm rounded-lg space-y-6">
           <div className="flex justify-between items-center">
-            <h3 className="text-lg font-black text-gray-800">의료기기 공급내역 보고</h3>
+            <h3 className="text-lg font-semibold text-gray-800">의료기기 공급내역 보고</h3>
             <button
               onClick={() => setShowUDIReport(!showUDIReport)}
-              className="px-6 py-3 bg-blue-600 text-white rounded-xl text-xs font-black shadow-lg"
+              className="px-6 py-3 bg-blue-600 text-white rounded-xl text-xs font-semibold shadow-lg"
             >
               보고서 생성
             </button>
@@ -279,23 +279,23 @@ export default function AdvancedInventoryManagement({ user }: any) {
 
           <div className="space-y-3">
             {udiItems.map((item, idx) => (
-              <div key={item.id || idx} className="p-6 bg-blue-50 border border-blue-200 rounded-2xl">
+              <div key={item.id || idx} className="p-6 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="grid grid-cols-4 gap-4">
                   <div>
                     <p className="text-[10px] font-bold text-gray-500 uppercase">제품명</p>
-                    <p className="font-black text-gray-800 mt-1">{item.name}</p>
+                    <p className="font-semibold text-gray-800 mt-1">{item.name}</p>
                   </div>
                   <div>
                     <p className="text-[10px] font-bold text-gray-500 uppercase">수량</p>
-                    <p className="font-black text-gray-800 mt-1">{item.stock}개</p>
+                    <p className="font-semibold text-gray-800 mt-1">{item.stock}개</p>
                   </div>
                   <div>
                     <p className="text-[10px] font-bold text-gray-500 uppercase">LOT번호</p>
-                    <p className="font-black text-gray-800 mt-1">{item.lot_number || '-'}</p>
+                    <p className="font-semibold text-gray-800 mt-1">{item.lot_number || '-'}</p>
                   </div>
                   <div>
                     <p className="text-[10px] font-bold text-gray-500 uppercase">유효기간</p>
-                    <p className="font-black text-gray-800 mt-1">{item.expiry_date || '-'}</p>
+                    <p className="font-semibold text-gray-800 mt-1">{item.expiry_date || '-'}</p>
                   </div>
                 </div>
               </div>
@@ -309,13 +309,13 @@ export default function AdvancedInventoryManagement({ user }: any) {
         <div className="space-y-6">
           <button
             onClick={() => setShowNewSupplier(!showNewSupplier)}
-            className="px-6 py-3 bg-black text-white rounded-xl text-xs font-black shadow-lg"
+            className="px-6 py-3 bg-black text-white rounded-xl text-xs font-semibold shadow-lg"
           >
             {showNewSupplier ? '✕ 취소' : '+ 거래처 추가'}
           </button>
 
           {showNewSupplier && (
-            <div className="bg-white p-8 border border-gray-100 shadow-sm rounded-2xl space-y-4">
+            <div className="bg-white p-8 border border-gray-100 shadow-sm rounded-lg space-y-4">
               <input
                 value={supplierForm.name}
                 onChange={e => setSupplierForm({...supplierForm, name: e.target.value})}
@@ -343,7 +343,7 @@ export default function AdvancedInventoryManagement({ user }: any) {
               <button
                 onClick={handleAddSupplier}
                 disabled={loading}
-                className="w-full py-4 bg-blue-600 text-white rounded-xl font-black text-sm shadow-lg disabled:opacity-50"
+                className="w-full py-4 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow-lg disabled:opacity-50"
               >
                 거래처 등록
               </button>
@@ -353,14 +353,14 @@ export default function AdvancedInventoryManagement({ user }: any) {
           {/* 거래처 목록 */}
           <div className="space-y-3">
             {suppliers.map((supplier, idx) => (
-              <div key={supplier.id || idx} className="bg-white p-6 border border-gray-100 shadow-sm rounded-2xl">
+              <div key={supplier.id || idx} className="bg-white p-6 border border-gray-100 shadow-sm rounded-lg">
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="font-black text-gray-800">{supplier.name}</p>
+                    <p className="font-semibold text-gray-800">{supplier.name}</p>
                     <p className="text-xs text-gray-500 font-bold mt-1">{supplier.contact} | {supplier.phone}</p>
                     <p className="text-xs text-gray-400 font-bold mt-1">{supplier.address}</p>
                   </div>
-                  <button className="px-4 py-2 bg-blue-100 text-blue-600 rounded-lg text-xs font-black">
+                  <button className="px-4 py-2 bg-blue-100 text-blue-600 rounded-lg text-xs font-semibold">
                     명세서 생성
                   </button>
                 </div>
@@ -374,10 +374,10 @@ export default function AdvancedInventoryManagement({ user }: any) {
       {activeTab === '발주' && (
         <div className="space-y-4">
           {purchaseOrders.map((order, idx) => (
-            <div key={order.id || idx} className="bg-white p-6 border border-gray-100 shadow-sm rounded-2xl">
+            <div key={order.id || idx} className="bg-white p-6 border border-gray-100 shadow-sm rounded-lg">
               <div className="flex justify-between items-center mb-4">
-                <p className="font-black text-gray-800">발주 #{order.id?.slice(0, 8)}</p>
-                <span className={`px-3 py-1 rounded-lg text-xs font-black ${
+                <p className="font-semibold text-gray-800">발주 #{order.id?.slice(0, 8)}</p>
+                <span className={`px-3 py-1 rounded-lg text-xs font-semibold ${
                   order.status === '승인' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-500'
                 }`}>
                   {order.status}
@@ -394,13 +394,13 @@ export default function AdvancedInventoryManagement({ user }: any) {
         <div className="space-y-6">
           <button
             onClick={() => setShowNewProduct(!showNewProduct)}
-            className="px-6 py-3 bg-black text-white rounded-xl text-xs font-black shadow-lg"
+            className="px-6 py-3 bg-black text-white rounded-xl text-xs font-semibold shadow-lg"
           >
             {showNewProduct ? '✕ 취소' : '+ 새 물품 등록'}
           </button>
 
           {showNewProduct && (
-            <div className="bg-white p-8 border border-gray-100 shadow-sm rounded-2xl space-y-4">
+            <div className="bg-white p-8 border border-gray-100 shadow-sm rounded-lg space-y-4">
               <input
                 value={productForm.name}
                 onChange={e => setProductForm({...productForm, name: e.target.value})}
@@ -451,12 +451,12 @@ export default function AdvancedInventoryManagement({ user }: any) {
                   onChange={e => setProductForm({...productForm, is_udi_reportable: e.target.checked})}
                   className="w-4 h-4"
                 />
-                <label className="text-sm font-black text-gray-700">공급내역 보고 대상</label>
+                <label className="text-sm font-semibold text-gray-700">공급내역 보고 대상</label>
               </div>
               <button
                 onClick={handleAddProduct}
                 disabled={loading}
-                className="w-full py-4 bg-blue-600 text-white rounded-xl font-black text-sm shadow-lg disabled:opacity-50"
+                className="w-full py-4 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow-lg disabled:opacity-50"
               >
                 물품 등록
               </button>
@@ -470,13 +470,13 @@ export default function AdvancedInventoryManagement({ user }: any) {
         <div className="space-y-6">
           <button
             onClick={() => setShowScanDialog(!showScanDialog)}
-            className="px-6 py-3 bg-black text-white rounded-xl text-xs font-black shadow-lg"
+            className="px-6 py-3 bg-black text-white rounded-xl text-xs font-semibold shadow-lg"
           >
             {showScanDialog ? '✕ 취소' : '📸 스캔 입고'}
           </button>
 
           {showScanDialog && (
-            <div className="bg-white p-8 border border-gray-100 shadow-sm rounded-2xl space-y-4">
+            <div className="bg-white p-8 border border-gray-100 shadow-sm rounded-lg space-y-4">
               <p className="text-sm font-bold text-gray-600">명세서 스캔 또는 바코드 촬영 후 정보를 확인하세요.</p>
               <input
                 value={scanData.product_name}
@@ -516,7 +516,7 @@ export default function AdvancedInventoryManagement({ user }: any) {
               <button
                 onClick={handleProcessScanData}
                 disabled={loading}
-                className="w-full py-4 bg-blue-600 text-white rounded-xl font-black text-sm shadow-lg disabled:opacity-50"
+                className="w-full py-4 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow-lg disabled:opacity-50"
               >
                 입고 처리
               </button>

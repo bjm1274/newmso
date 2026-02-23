@@ -18,7 +18,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     주민번호: '', 이메일: '', 주소: '', 면허사항: '', 계좌정보: '', 임금정보: '', 상태: '재직',
     연차총개수: 0, 연차사용개수: 0, 근무형태ID: '',
     base_salary: 0,
-    meal_allowance: 0, vehicle_allowance: 0, childcare_allowance: 0, research_allowance: 0, other_taxfree: 0, position_allowance: 0
+    meal_allowance: 0, night_duty_allowance: 0, vehicle_allowance: 0, childcare_allowance: 0, research_allowance: 0, other_taxfree: 0, position_allowance: 0
   });
 
   useEffect(() => {
@@ -61,8 +61,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         annual_leave_used: 0,
         shift_id: 신규직원.근무형태ID || null,
         base_salary: 신규직원.base_salary,
-        meal_allowance: 신규직원.meal_allowance ?? 0, vehicle_allowance: 신규직원.vehicle_allowance ?? 0,
-        childcare_allowance: 신규직원.childcare_allowance ?? 0, research_allowance: 신규직원.research_allowance ?? 0,
+        meal_allowance: 신규직원.meal_allowance ?? 0, night_duty_allowance: 신규직원.night_duty_allowance ?? 0,
+        vehicle_allowance: 신규직원.vehicle_allowance ?? 0, childcare_allowance: 신규직원.childcare_allowance ?? 0, research_allowance: 신규직원.research_allowance ?? 0,
         other_taxfree: 신규직원.other_taxfree ?? 0, position_allowance: 신규직원.position_allowance ?? 0
       };
 
@@ -95,8 +95,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       연차총개수: typeof 직원.annual_leave_total === 'number' ? 직원.annual_leave_total : 0,
       연차사용개수: 직원.annual_leave_used || 0, 근무형태ID: 직원.shift_id || '',
       base_salary: 직원.base_salary || 0,
-      meal_allowance: 직원.meal_allowance ?? 0, vehicle_allowance: 직원.vehicle_allowance ?? 0,
-      childcare_allowance: 직원.childcare_allowance ?? 0, research_allowance: 직원.research_allowance ?? 0,
+      meal_allowance: 직원.meal_allowance ?? 0, night_duty_allowance: 직원.night_duty_allowance ?? 0,
+      vehicle_allowance: 직원.vehicle_allowance ?? 0, childcare_allowance: 직원.childcare_allowance ?? 0, research_allowance: 직원.research_allowance ?? 0,
       other_taxfree: 직원.other_taxfree ?? 0, position_allowance: 직원.position_allowance ?? 0
     });
     편집모드설정(true);
@@ -109,7 +109,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       주민번호: '', 이메일: '', 주소: '', 면허사항: '', 계좌정보: '', 임금정보: '', 상태: '재직',
       연차총개수: 0, 연차사용개수: 0, 근무형태ID: '',
       base_salary: 0,
-      meal_allowance: 0, vehicle_allowance: 0, childcare_allowance: 0, research_allowance: 0, other_taxfree: 0, position_allowance: 0
+      meal_allowance: 0, night_duty_allowance: 0, vehicle_allowance: 0, childcare_allowance: 0, research_allowance: 0, other_taxfree: 0, position_allowance: 0
     });
     창닫기();
   };
@@ -148,7 +148,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   return (
     <div className="flex flex-col h-full bg-[#F8FAFC]">
       <header className="p-6 md:p-8 border-b border-gray-100 bg-white shrink-0 flex items-center justify-between">
-        <h2 className="text-xl font-black text-gray-800 tracking-tighter italic">
+        <h2 className="text-lg font-bold text-gray-800 tracking-tighter italic">
           {보기상태 === '퇴사' ? '퇴사자 현황' : '실시간 구성원 현황'}{' '}
           <span className="text-sm text-blue-600">[{선택사업체}]</span>
         </h2>
@@ -175,46 +175,46 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         {/* PC 버전 테이블 */}
         <div className="hidden md:block bg-white border border-gray-100 rounded-[2rem] overflow-hidden shadow-xl">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-gray-50 text-[10px] font-black text-gray-400 border-b border-gray-100 uppercase tracking-widest">
+            <thead className="bg-gray-50 text-[10px] font-semibold text-gray-400 border-b border-gray-100 uppercase tracking-widest">
               <tr><th className="p-6">사번</th><th className="p-6">성명/직함</th><th className="p-6">소속</th><th className="p-6">부서/팀</th><th className="p-6">근무형태</th><th className="p-6">상태</th><th className="p-6 text-right">관리</th></tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {필터목록.map((직원: any) => (
                 <tr key={직원.id} className="hover:bg-blue-50/30 transition-all">
-                  <td className="p-6 font-black text-blue-600 text-xs">{직원.employee_no}</td>
+                  <td className="p-6 font-semibold text-blue-600 text-xs">{직원.employee_no}</td>
                   <td className="p-6">
-                    <p className="text-sm font-black text-gray-800">{직원.name}</p>
+                    <p className="text-sm font-semibold text-gray-800">{직원.name}</p>
                     <p className="text-[10px] font-bold text-gray-400">{직원.position || '-'}</p>
                   </td>
-                  <td className="p-6 text-[10px] font-black text-gray-400 uppercase">{직원.company}</td>
+                  <td className="p-6 text-[10px] font-semibold text-gray-400 uppercase">{직원.company}</td>
                   <td className="p-6 text-xs font-bold text-gray-500">{직원.department}</td>
                   <td className="p-6">
-                    <span className="px-3 py-1 bg-gray-100 text-gray-600 text-[9px] font-black rounded-full">
+                    <span className="px-3 py-1 bg-gray-100 text-gray-600 text-[9px] font-semibold rounded-full">
                       {근무형태목록.find(s => s.id === 직원.shift_id)?.name || '기본(09-18)'}
                     </span>
                   </td>
                   <td className="p-6">
-                    <span className={`px-3 py-1 text-[9px] font-black rounded-full ${직원.status === '퇴사' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+                    <span className={`px-3 py-1 text-[9px] font-semibold rounded-full ${직원.status === '퇴사' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
                       {직원.status || '재직중'}
                     </span>
                   </td>
                   <td className="p-6 text-right space-x-2">
                     <button
                       onClick={() => 수정시작(직원)}
-                      className="px-4 py-2 bg-gray-800 text-white text-[10px] font-black rounded-xl hover:bg-black transition-all"
+                      className="px-4 py-2 bg-gray-800 text-white text-[10px] font-semibold rounded-lg hover:bg-black transition-all"
                     >
                       수정
                     </button>
                     <button
                       onClick={() => 직원삭제(직원)}
-                      className="px-3 py-2 bg-red-50 text-red-600 text-[10px] font-black rounded-xl hover:bg-red-100 transition-all"
+                      className="px-3 py-2 bg-red-50 text-red-600 text-[10px] font-semibold rounded-lg hover:bg-red-100 transition-all"
                     >
                       삭제
                     </button>
                     {onOpenDocumentRepoForStaff && (
                       <button
                         onClick={() => onOpenDocumentRepoForStaff(직원)}
-                        className="px-3 py-2 bg-blue-50 text-blue-600 text-[10px] font-black rounded-xl hover:bg-blue-100 transition-all"
+                        className="px-3 py-2 bg-blue-50 text-blue-600 text-[10px] font-semibold rounded-lg hover:bg-blue-100 transition-all"
                       >
                         문서
                       </button>
@@ -232,41 +232,41 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
             <div key={직원.id} className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col gap-4">
               <div className="flex justify-between items-start">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 font-black text-xs">#{직원.employee_no}</div>
+                  <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600 font-semibold text-xs">#{직원.employee_no}</div>
                   <div>
-                    <h4 className="text-base font-black text-gray-900">{직원.name}</h4>
+                    <h4 className="text-base font-semibold text-gray-900">{직원.name}</h4>
                     <p className="text-[10px] font-bold text-gray-400">{직원.company} · {직원.position}</p>
                   </div>
                 </div>
-                <span className={`px-3 py-1 text-[9px] font-black rounded-full ${직원.status === '퇴사' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>{직원.status || '재직중'}</span>
+                <span className={`px-3 py-1 text-[9px] font-semibold rounded-full ${직원.status === '퇴사' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>{직원.status || '재직중'}</span>
               </div>
               <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-50">
                 <div>
-                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">부서</p>
+                  <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-widest mb-1">부서</p>
                   <p className="text-xs font-bold text-gray-700">{직원.department}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">근무형태</p>
+                  <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-widest mb-1">근무형태</p>
                   <p className="text-xs font-bold text-gray-700">{근무형태목록.find(s => s.id === 직원.shift_id)?.name || '기본'}</p>
                 </div>
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={() => 수정시작(직원)}
-                  className="flex-1 py-3 bg-gray-50 text-gray-800 text-[11px] font-black rounded-xl hover:bg-gray-100 transition-all"
+                  className="flex-1 py-3 bg-gray-50 text-gray-800 text-[11px] font-semibold rounded-lg hover:bg-gray-100 transition-all"
                 >
                   정보 수정하기
                 </button>
                 <button
                   onClick={() => 직원삭제(직원)}
-                  className="px-3 py-3 bg-red-50 text-red-600 text-[11px] font-black rounded-xl hover:bg-red-100 transition-all"
+                  className="px-3 py-3 bg-red-50 text-red-600 text-[11px] font-semibold rounded-lg hover:bg-red-100 transition-all"
                 >
                   삭제
                 </button>
                 {onOpenDocumentRepoForStaff && (
                   <button
                     onClick={() => onOpenDocumentRepoForStaff(직원)}
-                    className="px-3 py-3 bg-blue-50 text-blue-600 text-[11px] font-black rounded-xl hover:bg-blue-100 transition-all"
+                    className="px-3 py-3 bg-blue-50 text-blue-600 text-[11px] font-semibold rounded-lg hover:bg-blue-100 transition-all"
                   >
                     문서
                   </button>
@@ -279,23 +279,23 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
       {/* 등록/수정 모달 - 모바일 최적화 */}
       {(창상태 || 편집모드) && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[100] flex items-end md:items-center justify-center p-0 md:p-4" onClick={닫기함수}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[110] flex items-end md:items-center justify-center p-0 md:p-4" onClick={닫기함수}>
           <div className="bg-white w-full max-w-5xl rounded-t-[2.5rem] md:rounded-[3rem] p-6 md:p-10 shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-8 border-b-4 border-gray-900 pb-4">
-              <h3 className="text-xl md:text-2xl font-black text-gray-900 tracking-tighter italic">{편집모드 ? '구성원 정보 수정' : '신규 직원 등록'}</h3>
+              <h3 className="text-xl md:text-2xl font-semibold text-gray-900 tracking-tighter italic">{편집모드 ? '구성원 정보 수정' : '신규 직원 등록'}</h3>
               <button onClick={닫기함수} className="text-gray-300 hover:text-red-500 text-2xl">✕</button>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <div className="space-y-4">
-                <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest">기본 인적 사항</h4>
+                <h4 className="text-[10px] font-semibold text-blue-600 uppercase tracking-widest">기본 인적 사항</h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-[9px] font-black text-gray-400">성명 *</label>
-                    <input type="text" value={신규직원.성명} onChange={e => 신규직원설정({...신규직원, 성명: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100" />
+                    <label className="text-[9px] font-semibold text-gray-400">성명 *</label>
+                    <input type="text" value={신규직원.성명} onChange={e => 신규직원설정({...신규직원, 성명: e.target.value})} className="w-full p-3 bg-gray-50 rounded-lg border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-blue-100" />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[9px] font-black text-gray-400">주민번호</label>
+                    <label className="text-[9px] font-semibold text-gray-400">주민번호</label>
                     <input
                       type="text"
                       value={신규직원.주민번호}
@@ -305,13 +305,13 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                         const formatted = raw.length > 6 ? `${raw.slice(0, 6)}-${raw.slice(6)}` : raw;
                         신규직원설정({ ...신규직원, 주민번호: formatted });
                       }}
-                      className="w-full p-3 bg-gray-50 rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100"
+                      className="w-full p-3 bg-gray-50 rounded-lg border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-blue-100"
                       placeholder="000000-0000000"
                     />
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-gray-400">연락처</label>
+                  <label className="text-[9px] font-semibold text-gray-400">연락처</label>
                   <input
                     type="text"
                     inputMode="numeric"
@@ -338,37 +338,37 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                       신규직원설정({ ...신규직원, 전화번호: formatted });
                     }}
                     placeholder="010-1234-5678"
-                    className="w-full p-3 bg-gray-50 rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100"
+                    className="w-full p-3 bg-gray-50 rounded-lg border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-blue-100"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-gray-400">주소</label>
-                  <input type="text" value={신규직원.주소} onChange={e => 신규직원설정({...신규직원, 주소: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100" />
+                  <label className="text-[9px] font-semibold text-gray-400">주소</label>
+                  <input type="text" value={신규직원.주소} onChange={e => 신규직원설정({...신규직원, 주소: e.target.value})} className="w-full p-3 bg-gray-50 rounded-lg border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-blue-100" />
                 </div>
               </div>
 
               <div className="space-y-4">
-                <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest">소속 및 인사 정보</h4>
+                <h4 className="text-[10px] font-semibold text-blue-600 uppercase tracking-widest">소속 및 인사 정보</h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-[9px] font-black text-gray-400">사업체</label>
-                    <select value={신규직원.사업체} onChange={e => 신규직원설정({...신규직원, 사업체: e.target.value, 팀: 팀목록가져오기(e.target.value)[0]})} className="w-full p-3 bg-gray-50 rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100">
+                    <label className="text-[9px] font-semibold text-gray-400">사업체</label>
+                    <select value={신규직원.사업체} onChange={e => 신규직원설정({...신규직원, 사업체: e.target.value, 팀: 팀목록가져오기(e.target.value)[0]})} className="w-full p-3 bg-gray-50 rounded-lg border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-blue-100">
                       <option value="박철홍정형외과">박철홍정형외과</option>
                       <option value="수연의원">수연의원</option>
                       <option value="SY INC.">SY INC.</option>
                     </select>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[9px] font-black text-gray-400">부서/팀</label>
-                    <select value={신규직원.팀} onChange={e => 신규직원설정({...신규직원, 팀: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100">
+                    <label className="text-[9px] font-semibold text-gray-400">부서/팀</label>
+                    <select value={신규직원.팀} onChange={e => 신규직원설정({...신규직원, 팀: e.target.value})} className="w-full p-3 bg-gray-50 rounded-lg border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-blue-100">
                       {팀목록가져오기(신규직원.사업체).map(팀 => <option key={팀} value={팀}>{팀}</option>)}
                     </select>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-[9px] font-black text-gray-400">직함</label>
-                    <select value={신규직원.직함} onChange={e => 신규직원설정({...신규직원, 직함: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100">
+                    <label className="text-[9px] font-semibold text-gray-400">직함</label>
+                    <select value={신규직원.직함} onChange={e => 신규직원설정({...신규직원, 직함: e.target.value})} className="w-full p-3 bg-gray-50 rounded-lg border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-blue-100">
                       <option value="">선택</option>
                       <option value="사원">사원</option>
                       <option value="주임">주임</option>
@@ -382,7 +382,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                     </select>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[9px] font-black text-gray-400">입사일 *</label>
+                    <label className="text-[9px] font-semibold text-gray-400">입사일 *</label>
                     <input
                       type="date"
                       value={신규직원.입사일}
@@ -393,13 +393,13 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                         }
                         신규직원설정({ ...신규직원, 입사일: v });
                       }}
-                      className="w-full p-3 bg-gray-50 rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100"
+                      className="w-full p-3 bg-gray-50 rounded-lg border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-blue-100"
                     />
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] font-black text-gray-400">근무 형태 (근무·휴게시간)</label>
-                  <select value={신규직원.근무형태ID} onChange={e => 신규직원설정({...신규직원, 근무형태ID: e.target.value})} className="w-full p-3 bg-blue-50 rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100">
+                  <label className="text-[9px] font-semibold text-gray-400">근무 형태 (근무·휴게시간)</label>
+                  <select value={신규직원.근무형태ID} onChange={e => 신규직원설정({...신규직원, 근무형태ID: e.target.value})} className="w-full p-3 bg-blue-50 rounded-lg border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-blue-100">
                     <option value="">기본 근무 (09:00–18:00, 휴게 60분)</option>
                     {근무형태목록.filter((s: any) => s.company_name === 신규직원.사업체 || s.company === 신규직원.사업체).map((s: any) => (
                       <option key={s.id} value={s.id}>
@@ -411,7 +411,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
               </div>
 
               <div className="space-y-4 bg-gray-50 p-6 rounded-[2rem]">
-                <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest">급여·비과세 (근로계약서/통상임금 연동)</h4>
+                <h4 className="text-[10px] font-semibold text-blue-600 uppercase tracking-widest">급여·비과세 (근로계약서/통상임금 연동)</h4>
                 <div className="grid grid-cols-2 gap-4">
                   {[
                     { key: 'base_salary', label: '기본급 (월)', placeholder: '0' },
@@ -424,7 +424,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                     const val = Number(신규직원[key as keyof typeof 신규직원] ?? 0);
                     return (
                       <div key={key} className="space-y-1">
-                        <label className="text-[9px] font-black text-gray-400">{label}</label>
+                        <label className="text-[9px] font-semibold text-gray-400">{label}</label>
                         <input
                           type="text"
                           inputMode="numeric"
@@ -434,13 +434,13 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                             신규직원설정({ ...신규직원, [key]: n });
                           }}
                           placeholder={placeholder}
-                          className="w-full p-3 bg-white rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100"
+                          className="w-full p-3 bg-white rounded-lg border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-blue-100"
                         />
                       </div>
                     );
                   })}
                   <div className="space-y-1 col-span-2">
-                    <label className="text-[9px] font-black text-gray-400">기타 비과세</label>
+                    <label className="text-[9px] font-semibold text-gray-400">기타 비과세</label>
                     <input
                       type="text"
                       inputMode="numeric"
@@ -450,7 +450,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                         신규직원설정({ ...신규직원, other_taxfree: n });
                       }}
                       placeholder="0"
-                      className="w-full p-3 bg-white rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100"
+                      className="w-full p-3 bg-white rounded-lg border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-blue-100"
                     />
                   </div>
                 </div>
@@ -459,8 +459,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
             </div>
 
             <div className="mt-10 flex gap-3">
-              <button onClick={닫기함수} className="flex-1 py-4 bg-gray-100 text-gray-500 rounded-2xl font-black text-sm hover:bg-gray-200 transition-all">취소</button>
-              <button onClick={정보저장} className="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-black text-sm shadow-xl shadow-blue-100 hover:scale-[0.99] active:scale-95 transition-all">정보 저장하기</button>
+              <button onClick={닫기함수} className="flex-1 py-4 bg-gray-100 text-gray-500 rounded-lg font-semibold text-sm hover:bg-gray-200 transition-all">취소</button>
+              <button onClick={정보저장} className="flex-[2] py-4 bg-blue-600 text-white rounded-lg font-semibold text-sm shadow-xl shadow-blue-100 hover:scale-[0.99] active:scale-95 transition-all">정보 저장하기</button>
             </div>
           </div>
         </div>

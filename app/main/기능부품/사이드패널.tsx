@@ -101,33 +101,33 @@ export default function StatusPanel({ user, tasks, surgeries, mris, attStatus, o
   return (
     <aside className="w-80 bg-white border-l border-gray-50 p-8 flex flex-col shadow-sm overflow-y-auto">
       {/* 탭 */}
-      <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-[12px]">
+      <div className="flex gap-0.5 mb-6 p-1 bg-[#eef2f7] rounded-lg">
         <button
           onClick={() => setActiveTab('알림')}
-          className={`flex-1 px-3 py-2 rounded-[12px] text-[10px] font-black transition-all ${
+          className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-all ${
             activeTab === '알림'
-              ? 'bg-white shadow-md text-blue-600'
-              : 'text-gray-400'
+              ? 'bg-white shadow-sm text-blue-600'
+              : 'text-gray-500 hover:bg-white/60'
           }`}
         >
           🔔 {unreadCount > 0 && <span className="text-red-400">{unreadCount}</span>}
         </button>
         <button
           onClick={() => setActiveTab('일정')}
-          className={`flex-1 px-3 py-2 rounded-[12px] text-[10px] font-black transition-all ${
+          className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-all ${
             activeTab === '일정'
-              ? 'bg-white shadow-md text-blue-600'
-              : 'text-gray-400'
+              ? 'bg-white shadow-sm text-blue-600'
+              : 'text-gray-500 hover:bg-white/60'
           }`}
         >
           📅
         </button>
         <button
           onClick={() => setActiveTab('근태')}
-          className={`flex-1 px-3 py-2 rounded-[12px] text-[10px] font-black transition-all ${
+          className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-all ${
             activeTab === '근태'
-              ? 'bg-white shadow-md text-blue-600'
-              : 'text-gray-400'
+              ? 'bg-white shadow-sm text-blue-600'
+              : 'text-gray-500 hover:bg-white/60'
           }`}
         >
           ⏰
@@ -142,14 +142,14 @@ export default function StatusPanel({ user, tasks, surgeries, mris, attStatus, o
               <div
                 key={notif.id || idx}
                 onClick={() => markAsRead(notif.id)}
-                className={`p-3 rounded-2xl border-2 cursor-pointer transition-all hover:shadow-md ${getNotificationColor(
+                className={`p-3 rounded-lg border-2 cursor-pointer transition-all hover:shadow-md ${getNotificationColor(
                   notif.type
                 )} ${notif.is_read ? 'opacity-60' : 'opacity-100'}`}
               >
                 <div className="flex items-start gap-2">
                   <span className="text-lg">{getNotificationIcon(notif.type)}</span>
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-black text-xs text-gray-800 line-clamp-2">{notif.title}</h4>
+                    <h4 className="font-semibold text-xs text-gray-800 line-clamp-2">{notif.title}</h4>
                     <p className="text-[9px] text-gray-600 font-bold mt-0.5 line-clamp-2">{notif.body}</p>
                     <p className="text-[8px] text-gray-400 font-bold mt-1">
                       {new Date(notif.created_at).toLocaleTimeString()}
@@ -173,13 +173,13 @@ export default function StatusPanel({ user, tasks, surgeries, mris, attStatus, o
       {activeTab === '일정' && (
         <div className="space-y-4 flex-1 overflow-y-auto">
           <div className="space-y-3">
-            <p className="px-2 text-[10px] font-black text-gray-400 uppercase">오늘 수술</p>
-            <div className="bg-gray-50 rounded-2xl p-4 space-y-3 shadow-inner">
+            <p className="px-2 text-[10px] font-semibold text-gray-400 uppercase">오늘 수술</p>
+            <div className="bg-gray-50 rounded-lg p-4 space-y-3 shadow-inner">
               {surgeries && surgeries.length > 0 ? (
                 surgeries.map((s: any, i: number) => (
                   <div key={i} className="flex flex-col border-b border-gray-200/50 pb-2">
-                    <span className="text-[10px] font-black text-orange-600">{s.surgery_time?.slice(0, 5)}</span>
-                    <span className="text-[11px] font-black text-gray-800">{s.patient_name} ({s.surgery_name})</span>
+                    <span className="text-[10px] font-semibold text-orange-600">{s.surgery_time?.slice(0, 5)}</span>
+                    <span className="text-[11px] font-semibold text-gray-800">{s.patient_name} ({s.surgery_name})</span>
                   </div>
                 ))
               ) : (
@@ -189,18 +189,18 @@ export default function StatusPanel({ user, tasks, surgeries, mris, attStatus, o
           </div>
 
           <div className="space-y-3">
-            <p className="px-2 text-[10px] font-black text-gray-400 uppercase">오늘 MRI</p>
-            <div className="bg-gray-50 rounded-2xl p-4 space-y-3 shadow-inner">
+            <p className="px-2 text-[10px] font-semibold text-gray-400 uppercase">오늘 MRI</p>
+            <div className="bg-gray-50 rounded-lg p-4 space-y-3 shadow-inner">
               {mris && mris.length > 0 ? (
                 mris.map((m: any, i: number) => (
                   <div
                     key={i}
-                    className={`p-3 rounded-2xl border ${
+                    className={`p-3 rounded-lg border ${
                       m.is_fasting ? 'border-blue-100 bg-blue-50/50' : 'bg-white border-gray-100'
                     }`}
                   >
-                    <span className="text-[10px] font-black text-blue-600">{m.mri_time?.slice(0, 5)}</span>
-                    <p className="text-[11px] font-black text-gray-700">
+                    <span className="text-[10px] font-semibold text-blue-600">{m.mri_time?.slice(0, 5)}</span>
+                    <p className="text-[11px] font-semibold text-gray-700">
                       {m.patient_name} {m.is_fasting && '(금식)'}
                     </p>
                   </div>
@@ -216,12 +216,12 @@ export default function StatusPanel({ user, tasks, surgeries, mris, attStatus, o
       {/* 근태 탭 */}
       {activeTab === '근태' && (
         <div className="space-y-4 flex-1">
-          <p className="px-2 text-[10px] font-black text-gray-400 uppercase">실시간 근태 현황</p>
+          <p className="px-2 text-[10px] font-semibold text-gray-400 uppercase">실시간 근태 현황</p>
           <div className="grid grid-cols-2 gap-2">
             <button
               disabled={attStatus !== 'none' || loading}
               onClick={() => handleAttendance('in')}
-              className={`py-5 rounded-3xl font-black text-xs transition-all ${
+              className={`py-5 rounded-3xl font-semibold text-xs transition-all ${
                 attStatus === 'none'
                   ? 'bg-green-600 text-white shadow-lg'
                   : 'bg-gray-100 text-gray-400'
@@ -232,7 +232,7 @@ export default function StatusPanel({ user, tasks, surgeries, mris, attStatus, o
             <button
               disabled={attStatus !== 'checked_in' || loading}
               onClick={() => handleAttendance('out')}
-              className={`py-5 rounded-3xl font-black text-xs transition-all ${
+              className={`py-5 rounded-3xl font-semibold text-xs transition-all ${
                 attStatus === 'checked_in'
                   ? 'bg-orange-500 text-white shadow-lg'
                   : 'bg-gray-100 text-gray-400'

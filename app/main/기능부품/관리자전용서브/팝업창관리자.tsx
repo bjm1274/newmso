@@ -52,16 +52,16 @@ export default function PopupManager() {
     <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
       <div className="bg-white p-10 border border-gray-100 shadow-sm space-y-8">
         <div className="flex justify-between items-center border-b border-gray-50 pb-6">
-          <h3 className="font-black text-xl text-gray-800 tracking-tighter">홈페이지 팝업 설정</h3>
+          <h3 className="font-semibold text-xl text-gray-800 tracking-tighter">홈페이지 팝업 설정</h3>
         </div>
 
         <div className="grid grid-cols-2 gap-6">
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">팝업 제목</label>
+            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">팝업 제목</label>
             <input className="w-full p-4 bg-gray-50 border border-gray-100 text-xs font-bold outline-none" placeholder="예: 박철홍정형외과 설날 진료 안내" value={newPopup.title} onChange={e=>setNewPopup({...newPopup, title:e.target.value})} />
           </div>
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">미디어 타입</label>
+            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">미디어 타입</label>
             <select className="w-full p-4 bg-gray-50 border border-gray-100 text-xs font-bold outline-none" value={newPopup.media_type} onChange={e=>setNewPopup({...newPopup, media_type:e.target.value})}>
                 <option value="image">이미지 (JPG, PNG)</option>
                 <option value="video">동영상 (MP4)</option>
@@ -70,7 +70,7 @@ export default function PopupManager() {
         </div>
 
         <div className="mt-4 space-y-2">
-          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+          <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
             {newPopup.media_type === 'video' ? '동영상 파일 선택 (MP4)' : '이미지 파일 선택 (JPG, PNG)'}
           </label>
           <input
@@ -85,8 +85,8 @@ export default function PopupManager() {
         </div>
 
         <div className="grid grid-cols-2 gap-2 mt-4">
-          <button onClick={() => setShowPreview(true)} className="w-full py-5 bg-orange-50 text-orange-600 border border-orange-100 text-[11px] font-black shadow-sm uppercase tracking-widest">👁️ 홈페이지 실시간 시뮬레이션</button>
-          <button onClick={handleAddPopup} className="w-full py-5 bg-gray-900 text-white text-[11px] font-black shadow-xl uppercase tracking-widest">팝업 즉시 생성</button>
+          <button onClick={() => setShowPreview(true)} className="w-full py-5 bg-orange-50 text-orange-600 border border-orange-100 text-[11px] font-semibold shadow-sm uppercase tracking-widest">👁️ 홈페이지 실시간 시뮬레이션</button>
+          <button onClick={handleAddPopup} className="w-full py-5 bg-gray-900 text-white text-[11px] font-semibold shadow-xl uppercase tracking-widest">팝업 즉시 생성</button>
         </div>
       </div>
 
@@ -97,14 +97,14 @@ export default function PopupManager() {
                 <div className="bg-gray-100 p-2 border-b flex justify-between items-center px-4">
                     <div className="flex gap-1.5"><span className="w-3 h-3 bg-red-400"/><span className="w-3 h-3 bg-yellow-400"/><span className="w-3 h-3 bg-green-400"/></div>
                     <div className="text-[10px] font-bold text-gray-400 tracking-widest">사이트 미리보기: https://www.pchos.kr</div>
-                    <button onClick={() => setShowPreview(false)} className="px-5 py-1.5 bg-black text-white text-[10px] font-black">닫기 X</button>
+                    <button onClick={() => setShowPreview(false)} className="px-5 py-1.5 bg-black text-white text-[10px] font-semibold">닫기 X</button>
                 </div>
                 <div className="flex-1 relative bg-gray-50 overflow-hidden">
                     <iframe src="https://www.pchos.kr" className="w-full h-full border-0 pointer-events-none opacity-40" />
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white shadow-2xl border border-gray-900"
                          style={{ width: `${newPopup.width}px`, height: `${newPopup.height}px` }}>
                         <img src={getPreviewUrl()} alt="Popup" className="w-full h-full object-fill" />
-                        <div className="absolute bottom-0 w-full h-8 bg-black text-white flex justify-between items-center px-3 text-[10px] font-black">
+                        <div className="absolute bottom-0 w-full h-8 bg-black text-white flex justify-between items-center px-3 text-[10px] font-semibold">
                             <span>오늘 하루 열지 않기</span><span>닫기 X</span>
                         </div>
                     </div>

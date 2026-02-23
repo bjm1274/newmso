@@ -176,13 +176,13 @@ export default function ContractPreview({ staff, contract }: Props) {
   const sig = contract?.signature_data as string | undefined;
 
   return (
-    <div className="bg-white border border-gray-200 shadow-2xl p-10 flex flex-col h-[800px] overflow-y-auto rounded-none relative custom-scrollbar print:shadow-none">
+    <div className="bg-white border border-gray-200 shadow-2xl p-10 flex flex-col h-[800px] overflow-y-auto rounded-lg relative custom-scrollbar print:shadow-none">
       <div className="flex items-start justify-between mb-6">
         <div>
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
             근로계약서 미리보기
           </p>
-          <h1 className="text-xl font-black text-gray-900 mt-1">표준 근로계약서</h1>
+          <h1 className="text-lg font-bold text-gray-900 mt-1">표준 근로계약서</h1>
           <p className="mt-1 text-[11px] text-gray-500">
             {staff.company} / {staff.name}
           </p>
@@ -190,7 +190,7 @@ export default function ContractPreview({ staff, contract }: Props) {
         <div className="flex flex-col items-end gap-2">
           {contract?.status && (
             <span
-              className={`px-3 py-1 text-[10px] font-black rounded-full border ${
+              className={`px-3 py-1 text-[10px] font-semibold rounded-full border ${
                 contract.status === '서명완료'
                   ? 'bg-green-50 text-green-600 border-green-100'
                   : 'bg-orange-50 text-orange-600 border-orange-100'

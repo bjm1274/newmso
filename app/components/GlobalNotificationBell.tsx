@@ -35,7 +35,7 @@ export default function GlobalNotificationBell({ user, onOpenFull }: { user: any
     fetchList();
     const channel = supabase
       .channel('global-notifications')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, () => fetchList())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${String(user.id)}` }, () => fetchList())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [user?.id]);
@@ -59,7 +59,7 @@ export default function GlobalNotificationBell({ user, onOpenFull }: { user: any
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="relative p-2 rounded-[12px] text-[#8B95A1] hover:bg-[#F2F4F6] hover:text-[#191F28] transition-all"
+        className="relative min-h-[44px] min-w-[44px] flex items-center justify-center p-2 rounded-[12px] text-[#8B95A1] hover:bg-[#F2F4F6] hover:text-[#191F28] transition-all touch-manipulation"
         aria-label="알림"
       >
         <span className="text-xl">🔔</span>

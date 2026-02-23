@@ -173,12 +173,12 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
       <div className="bg-white p-6 md:p-10 border border-gray-100 shadow-xl rounded-[2.5rem]">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
-            <h2 className="text-2xl font-black text-gray-900 tracking-tighter italic">거래처 및 명세서 관리</h2>
+            <h2 className="text-2xl font-semibold text-gray-900 tracking-tighter italic">거래처 및 명세서 관리</h2>
             <p className="text-[10px] text-green-600 font-bold mt-1 uppercase tracking-widest">Supplier & Invoice Control</p>
           </div>
           <div className="flex gap-2 w-full md:w-auto">
-            <button onClick={() => setShowNewSupplier(!showNewSupplier)} className="flex-1 md:flex-none px-6 py-3 bg-green-600 text-white rounded-xl text-xs font-black shadow-lg hover:scale-[0.98] transition-all">+ 거래처 추가</button>
-            <button onClick={() => setShowInvoiceForm(!showInvoiceForm)} className="flex-1 md:flex-none px-6 py-3 bg-blue-600 text-white rounded-xl text-xs font-black shadow-lg hover:scale-[0.98] transition-all">📄 명세서 작성</button>
+            <button onClick={() => setShowNewSupplier(!showNewSupplier)} className="flex-1 md:flex-none px-6 py-3 bg-green-600 text-white rounded-xl text-xs font-semibold shadow-lg hover:scale-[0.98] transition-all">+ 거래처 추가</button>
+            <button onClick={() => setShowInvoiceForm(!showInvoiceForm)} className="flex-1 md:flex-none px-6 py-3 bg-blue-600 text-white rounded-xl text-xs font-semibold shadow-lg hover:scale-[0.98] transition-all">📄 명세서 작성</button>
           </div>
         </div>
 
@@ -189,49 +189,49 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
                 value={supplierForm.name}
                 onChange={e => setSupplierForm({ ...supplierForm, name: e.target.value })}
                 placeholder="거래처명 *"
-                className="p-4 bg-white rounded-xl border border-gray-100 outline-none text-sm font-black focus:ring-2 focus:ring-green-100"
+                className="p-4 bg-white rounded-xl border border-gray-100 outline-none text-sm font-semibold focus:ring-2 focus:ring-green-100"
               />
               <input
                 value={supplierForm.ceo}
                 onChange={e => setSupplierForm({ ...supplierForm, ceo: e.target.value })}
                 placeholder="대표자 이름"
-                className="p-4 bg-white rounded-xl border border-gray-100 outline-none text-sm font-black focus:ring-2 focus:ring-green-100"
+                className="p-4 bg-white rounded-xl border border-gray-100 outline-none text-sm font-semibold focus:ring-2 focus:ring-green-100"
               />
               <input
                 value={supplierForm.reg_num}
                 onChange={e => setSupplierForm({ ...supplierForm, reg_num: e.target.value })}
                 placeholder="사업자등록번호 (예: 000-00-00000)"
-                className="p-4 bg-white rounded-xl border border-gray-100 outline-none text-sm font-black focus:ring-2 focus:ring-green-100"
+                className="p-4 bg-white rounded-xl border border-gray-100 outline-none text-sm font-semibold focus:ring-2 focus:ring-green-100"
               />
               <input
                 value={supplierForm.contact}
                 onChange={e => setSupplierForm({ ...supplierForm, contact: e.target.value })}
                 placeholder="담당자"
-                className="p-4 bg-white rounded-xl border border-gray-100 outline-none text-sm font-black focus:ring-2 focus:ring-green-100"
+                className="p-4 bg-white rounded-xl border border-gray-100 outline-none text-sm font-semibold focus:ring-2 focus:ring-green-100"
               />
               <input
                 value={supplierForm.phone}
                 onChange={e => setSupplierForm({ ...supplierForm, phone: e.target.value })}
                 placeholder="전화번호"
-                className="p-4 bg-white rounded-xl border border-gray-100 outline-none text-sm font-black focus:ring-2 focus:ring-green-100"
+                className="p-4 bg-white rounded-xl border border-gray-100 outline-none text-sm font-semibold focus:ring-2 focus:ring-green-100"
               />
               <input
                 value={supplierForm.email}
                 onChange={e => setSupplierForm({ ...supplierForm, email: e.target.value })}
                 placeholder="이메일"
-                className="p-4 bg-white rounded-xl border border-gray-100 outline-none text-sm font-black focus:ring-2 focus:ring-green-100"
+                className="p-4 bg-white rounded-xl border border-gray-100 outline-none text-sm font-semibold focus:ring-2 focus:ring-green-100"
               />
             </div>
             <input
               value={supplierForm.address}
               onChange={e => setSupplierForm({ ...supplierForm, address: e.target.value })}
               placeholder="주소"
-              className="w-full p-4 bg-white rounded-xl border border-gray-100 outline-none text-sm font-black focus:ring-2 focus:ring-green-100"
+              className="w-full p-4 bg-white rounded-xl border border-gray-100 outline-none text-sm font-semibold focus:ring-2 focus:ring-green-100"
             />
             <button
               onClick={handleAddSupplier}
               disabled={loading}
-              className="w-full py-4 bg-green-600 text-white rounded-xl font-black text-sm shadow-lg disabled:opacity-50"
+              className="w-full py-4 bg-green-600 text-white rounded-xl font-semibold text-sm shadow-lg disabled:opacity-50"
             >
               거래처 등록하기
             </button>
@@ -242,10 +242,10 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
           {suppliers.map((supplier: any) => (
             <div
               key={supplier.id}
-              className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
+              className="bg-white p-6 rounded-lg border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
             >
               <div>
-                <p className="font-black text-gray-900 text-sm">{supplier.name}</p>
+                <p className="font-semibold text-gray-900 text-sm">{supplier.name}</p>
                 <div className="mt-3 space-y-1">
                   <p className="text-[10px] text-gray-400 font-bold flex items-center gap-2">
                     🧾 사업자번호: {supplier.reg_num || '-'}
@@ -264,13 +264,13 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
               <div className="mt-4 flex justify-end gap-2">
                 <button
                   onClick={() => startEditSupplier(supplier)}
-                  className="px-3 py-1.5 rounded-lg text-[10px] font-black bg-blue-50 text-blue-600 hover:bg-blue-100"
+                  className="px-3 py-1.5 rounded-lg text-[10px] font-semibold bg-blue-50 text-blue-600 hover:bg-blue-100"
                 >
                   수정
                 </button>
                 <button
                   onClick={() => handleDeleteSupplier(supplier.id)}
-                  className="px-3 py-1.5 rounded-lg text-[10px] font-black bg-red-50 text-red-600 hover:bg-red-100"
+                  className="px-3 py-1.5 rounded-lg text-[10px] font-semibold bg-red-50 text-red-600 hover:bg-red-100"
                 >
                   삭제
                 </button>
@@ -284,7 +284,7 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
         <div className="bg-white p-6 md:p-8 border border-blue-100 shadow-xl rounded-[2rem]">
           <div className="flex justify-between items-center mb-4">
             <div>
-              <h3 className="text-lg font-black text-gray-900">거래처 정보 수정</h3>
+              <h3 className="text-lg font-semibold text-gray-900">거래처 정보 수정</h3>
               <p className="text-[10px] text-gray-400 font-bold mt-1 uppercase tracking-widest">
                 선택한 거래처의 정보를 수정합니다
               </p>
@@ -301,56 +301,56 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
               value={editingSupplier.name}
               onChange={(e) => setEditingSupplier({ ...editingSupplier, name: e.target.value })}
               placeholder="거래처명 *"
-              className="p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm font-black focus:bg-white focus:ring-2 focus:ring-blue-100"
+              className="p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm font-semibold focus:bg-white focus:ring-2 focus:ring-blue-100"
             />
             <input
               value={editingSupplier.ceo}
               onChange={(e) => setEditingSupplier({ ...editingSupplier, ceo: e.target.value })}
               placeholder="대표자 이름"
-              className="p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm font-black focus:bg-white focus:ring-2 focus:ring-blue-100"
+              className="p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm font-semibold focus:bg-white focus:ring-2 focus:ring-blue-100"
             />
             <input
               value={editingSupplier.reg_num}
               onChange={(e) => setEditingSupplier({ ...editingSupplier, reg_num: e.target.value })}
               placeholder="사업자등록번호 (예: 000-00-00000)"
-              className="p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm font-black focus:bg-white focus:ring-2 focus:ring-blue-100"
+              className="p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm font-semibold focus:bg-white focus:ring-2 focus:ring-blue-100"
             />
             <input
               value={editingSupplier.contact}
               onChange={(e) => setEditingSupplier({ ...editingSupplier, contact: e.target.value })}
               placeholder="담당자"
-              className="p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm font-black focus:bg-white focus:ring-2 focus:ring-blue-100"
+              className="p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm font-semibold focus:bg-white focus:ring-2 focus:ring-blue-100"
             />
             <input
               value={editingSupplier.phone}
               onChange={(e) => setEditingSupplier({ ...editingSupplier, phone: e.target.value })}
               placeholder="전화번호"
-              className="p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm font-black focus:bg-white focus:ring-2 focus:ring-blue-100"
+              className="p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm font-semibold focus:bg-white focus:ring-2 focus:ring-blue-100"
             />
             <input
               value={editingSupplier.email}
               onChange={(e) => setEditingSupplier({ ...editingSupplier, email: e.target.value })}
               placeholder="이메일"
-              className="p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm font-black focus:bg-white focus:ring-2 focus:ring-blue-100"
+              className="p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm font-semibold focus:bg-white focus:ring-2 focus:ring-blue-100"
             />
           </div>
           <input
             value={editingSupplier.address}
             onChange={(e) => setEditingSupplier({ ...editingSupplier, address: e.target.value })}
             placeholder="주소"
-            className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm font-black focus:bg-white focus:ring-2 focus:ring-blue-100 mb-4"
+            className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none text-sm font-semibold focus:bg-white focus:ring-2 focus:ring-blue-100 mb-4"
           />
           <div className="flex justify-end gap-2">
             <button
               onClick={() => setEditingSupplier(null)}
-              className="px-4 py-2 rounded-xl text-[11px] font-black bg-gray-100 text-gray-500 hover:bg-gray-200"
+              className="px-4 py-2 rounded-xl text-[11px] font-semibold bg-gray-100 text-gray-500 hover:bg-gray-200"
             >
               취소
             </button>
             <button
               onClick={handleUpdateSupplier}
               disabled={editLoading}
-              className="px-5 py-2 rounded-xl text-[11px] font-black bg-blue-600 text-white shadow-lg hover:bg-blue-700 disabled:opacity-50"
+              className="px-5 py-2 rounded-xl text-[11px] font-semibold bg-blue-600 text-white shadow-lg hover:bg-blue-700 disabled:opacity-50"
             >
               {editLoading ? '저장 중...' : '변경 사항 저장'}
             </button>
@@ -362,7 +362,7 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
         <div className="bg-white p-6 md:p-10 border border-gray-100 shadow-2xl rounded-[2.5rem] animate-in slide-in-from-bottom-10">
           <div className="flex justify-between items-center mb-6 border-b border-gray-50 pb-4">
             <div>
-              <h3 className="text-xl font-black text-gray-900 tracking-tighter italic">거래명세서 작성 엔진</h3>
+              <h3 className="text-xl font-semibold text-gray-900 tracking-tighter italic">거래명세서 작성 엔진</h3>
               <p className="text-[10px] text-gray-400 font-bold mt-1 uppercase tracking-widest">
                 발행일자 및 공급자/공급받는자 정보를 선택하세요
               </p>
@@ -385,13 +385,13 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
                     date: e.target.value,
                   }))
                 }
-                className="w-full md:w-48 p-3 bg-gray-50 rounded-xl border border-gray-100 outline-none text-xs font-black text-gray-800 focus:ring-2 focus:ring-blue-100"
+                className="w-full md:w-48 p-3 bg-gray-50 rounded-xl border border-gray-100 outline-none text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-100"
               />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="p-6 bg-blue-50/50 rounded-2xl border border-blue-100">
-                <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-4">공급자 정보 (업체 선택)</p>
+              <div className="p-6 bg-blue-50/50 rounded-lg border border-blue-100">
+                <p className="text-[10px] font-semibold text-blue-500 uppercase tracking-widest mb-4">공급자 정보 (업체 선택)</p>
                 <select
                   value={invoiceData.supplier.sangho || ''}
                   onChange={(e) => {
@@ -412,7 +412,7 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
                         });
                     }
                   }}
-                  className="w-full p-3 bg-white rounded-xl border border-blue-100 outline-none font-black text-xs mb-4"
+                  className="w-full p-3 bg-white rounded-xl border border-blue-100 outline-none font-semibold text-xs mb-4"
                 >
                   <option value="">공급자 선택</option>
                   <option value="__HOSPITAL__">본원 (박철홍정형외과)</option>
@@ -432,8 +432,8 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
                   <p>주소: {invoiceData.supplier.addr || '-'}</p>
                 </div>
               </div>
-              <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">공급받는자 정보 (업체 선택)</p>
+              <div className="p-6 bg-gray-50 rounded-lg border border-gray-100">
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-4">공급받는자 정보 (업체 선택)</p>
                 <select
                   value={invoiceData.receiver.sangho || ''}
                   onChange={(e) => {
@@ -454,7 +454,7 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
                         });
                     }
                   }}
-                  className="w-full p-3 bg-white rounded-xl border border-gray-100 outline-none font-black text-xs mb-4"
+                  className="w-full p-3 bg-white rounded-xl border border-gray-100 outline-none font-semibold text-xs mb-4"
                 >
                   <option value="">거래처 선택</option>
                   <option value="__HOSPITAL__">본원 (박철홍정형외과)</option>
@@ -478,8 +478,8 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
 
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">품목 리스트</p>
-                  <button onClick={addRow} className="text-[10px] font-black text-blue-600 hover:underline">
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">품목 리스트</p>
+                  <button onClick={addRow} className="text-[10px] font-semibold text-blue-600 hover:underline">
                     + 품목 추가
                   </button>
                 </div>
@@ -487,10 +487,10 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
                   <table className="w-full text-left border-collapse min-w-[600px]">
                     <thead>
                       <tr className="bg-gray-50/50 border-b border-gray-100">
-                        <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase">품목명</th>
-                        <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase text-center">수량</th>
-                        <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase text-right">단가</th>
-                        <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase text-right">공급가액</th>
+                        <th className="px-4 py-3 text-[10px] font-semibold text-gray-400 uppercase">품목명</th>
+                        <th className="px-4 py-3 text-[10px] font-semibold text-gray-400 uppercase text-center">수량</th>
+                        <th className="px-4 py-3 text-[10px] font-semibold text-gray-400 uppercase text-right">단가</th>
+                        <th className="px-4 py-3 text-[10px] font-semibold text-gray-400 uppercase text-right">공급가액</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
@@ -502,7 +502,7 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
                               onChange={(e) => updateItem(idx, 'name', e.target.value)}
                               onFocus={() => setFocusedRow(idx)}
                               placeholder="품목 선택/입력"
-                              className="w-full px-3 py-2 bg-gray-50 rounded-lg border border-gray-200 outline-none text-xs font-black text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                              className="w-full px-3 py-2 bg-gray-50 rounded-lg border border-gray-200 outline-none text-xs font-semibold text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-100"
                             />
                             {focusedRow === idx && (
                               <div className="absolute left-0 top-full w-full bg-white border border-gray-100 shadow-2xl z-50 rounded-xl max-h-40 overflow-y-auto">
@@ -525,7 +525,7 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
                               type="number"
                               value={item.qty}
                               onChange={(e) => updateItem(idx, 'qty', e.target.value)}
-                              className="w-20 px-2 py-2 bg-gray-50 rounded-lg border border-gray-200 outline-none text-xs font-black text-center text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                              className="w-20 px-2 py-2 bg-gray-50 rounded-lg border border-gray-200 outline-none text-xs font-semibold text-center text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-100"
                             />
                           </td>
                           <td className="px-4 py-3 text-right">
@@ -533,10 +533,10 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
                               type="number"
                               value={item.price}
                               onChange={(e) => updateItem(idx, 'price', e.target.value)}
-                              className="w-24 px-2 py-2 bg-gray-50 rounded-lg border border-gray-200 outline-none text-xs font-black text-right text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                              className="w-24 px-2 py-2 bg-gray-50 rounded-lg border border-gray-200 outline-none text-xs font-semibold text-right text-gray-800 focus:bg-white focus:ring-2 focus:ring-blue-100"
                             />
                           </td>
-                          <td className="px-4 py-3 text-right text-xs font-black text-gray-900">
+                          <td className="px-4 py-3 text-right text-xs font-semibold text-gray-900">
                             {(item.supply_price || 0).toLocaleString()}원
                           </td>
                         </tr>
@@ -548,14 +548,14 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
 
             <div className="flex justify-end pt-6 border-t border-gray-50">
               <div className="text-right">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">최종 합계액</p>
-                <p className="text-2xl font-black text-blue-600 tracking-tighter">
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1">최종 합계액</p>
+                <p className="text-2xl font-semibold text-blue-600 tracking-tighter">
                   {invoiceData.items.reduce((sum, item) => sum + (item.supply_price || 0), 0).toLocaleString()}원
                 </p>
               </div>
             </div>
 
-            <button onClick={() => window.print()} className="w-full py-5 bg-gray-900 text-white rounded-2xl font-black text-sm shadow-xl hover:bg-black transition-all">🖨️ 명세서 인쇄 및 발행</button>
+            <button onClick={() => window.print()} className="w-full py-5 bg-gray-900 text-white rounded-lg font-semibold text-sm shadow-xl hover:bg-black transition-all">🖨️ 명세서 인쇄 및 발행</button>
           </div>
         </div>
       )}

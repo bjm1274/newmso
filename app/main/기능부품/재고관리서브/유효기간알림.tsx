@@ -112,22 +112,22 @@ export default function ExpirationAlert() {
       <div className="grid grid-cols-4 gap-4">
         <div className="bg-yellow-50 p-6 rounded-xl border border-yellow-200">
           <p className="text-xs font-bold text-yellow-600 mb-2">⚠️ 임박 제품</p>
-          <p className="text-2xl font-black text-yellow-800">{expiringItems.length}개</p>
+          <p className="text-2xl font-semibold text-yellow-800">{expiringItems.length}개</p>
           <p className="text-xs text-yellow-600 mt-2">6개월 이내 만료</p>
         </div>
         <div className="bg-red-50 p-6 rounded-xl border border-red-200">
           <p className="text-xs font-bold text-red-600 mb-2">🚨 만료됨</p>
-          <p className="text-2xl font-black text-red-800">{expiredItems.length}개</p>
+          <p className="text-2xl font-semibold text-red-800">{expiredItems.length}개</p>
           <p className="text-xs text-red-600 mt-2">즉시 폐기 필요</p>
         </div>
         <div className="bg-blue-50 p-6 rounded-xl border border-blue-200">
           <p className="text-xs font-bold text-blue-600 mb-2">📢 알림 발송</p>
-          <p className="text-2xl font-black text-blue-800">{alertsSent}건</p>
+          <p className="text-2xl font-semibold text-blue-800">{alertsSent}건</p>
           <p className="text-xs text-blue-600 mt-2">행정팀에 알림 완료</p>
         </div>
         <div className="bg-green-50 p-6 rounded-xl border border-green-200">
           <p className="text-xs font-bold text-green-600 mb-2">🔄 마지막 확인</p>
-          <p className="text-sm font-black text-green-800">{lastCheckTime || '확인 대기중'}</p>
+          <p className="text-sm font-semibold text-green-800">{lastCheckTime || '확인 대기중'}</p>
           <p className="text-xs text-green-600 mt-2">24시간마다 자동 확인</p>
         </div>
       </div>
@@ -135,10 +135,10 @@ export default function ExpirationAlert() {
       {/* 유효기간 임박 제품 */}
       <div className="bg-white border border-gray-100 shadow-sm rounded-xl overflow-hidden">
         <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-          <h3 className="text-lg font-black text-gray-800">⏰ 유효기간 6개월 이내 제품</h3>
+          <h3 className="text-lg font-semibold text-gray-800">⏰ 유효기간 6개월 이내 제품</h3>
           <button
             onClick={downloadExpirationReport}
-            className="px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-black hover:bg-gray-700 transition-all"
+            className="px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-semibold hover:bg-gray-700 transition-all"
           >
             📥 보고서 다운로드
           </button>
@@ -149,13 +149,13 @@ export default function ExpirationAlert() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-6 py-3 text-left font-black text-gray-700">품목명</th>
-                  <th className="px-6 py-3 text-center font-black text-gray-700">현재고</th>
-                  <th className="px-6 py-3 text-center font-black text-gray-700">유효기간</th>
-                  <th className="px-6 py-3 text-center font-black text-gray-700">남은 일수</th>
-                  <th className="px-6 py-3 text-center font-black text-gray-700">상태</th>
-                  <th className="px-6 py-3 text-left font-black text-gray-700">공급처</th>
-                  <th className="px-6 py-3 text-center font-black text-gray-700">조치</th>
+                  <th className="px-6 py-3 text-left font-semibold text-gray-700">품목명</th>
+                  <th className="px-6 py-3 text-center font-semibold text-gray-700">현재고</th>
+                  <th className="px-6 py-3 text-center font-semibold text-gray-700">유효기간</th>
+                  <th className="px-6 py-3 text-center font-semibold text-gray-700">남은 일수</th>
+                  <th className="px-6 py-3 text-center font-semibold text-gray-700">상태</th>
+                  <th className="px-6 py-3 text-left font-semibold text-gray-700">공급처</th>
+                  <th className="px-6 py-3 text-center font-semibold text-gray-700">조치</th>
                 </tr>
               </thead>
               <tbody>
@@ -169,17 +169,17 @@ export default function ExpirationAlert() {
                       <td className="px-6 py-4 text-center font-bold text-gray-800">
                         {new Date(item.expiration_date).toLocaleDateString('ko-KR')}
                       </td>
-                      <td className="px-6 py-4 text-center font-black text-red-600">
+                      <td className="px-6 py-4 text-center font-semibold text-red-600">
                         {daysLeft < 0 ? '만료' : `${daysLeft}일`}
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <span className={`px-3 py-1 rounded-full text-xs font-black ${badge.color}`}>
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${badge.color}`}>
                           {badge.text}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-left text-gray-600">{item.supplier}</td>
                       <td className="px-6 py-4 text-center">
-                        <button className="px-3 py-1 bg-red-100 text-red-600 rounded text-xs font-black hover:bg-red-200">
+                        <button className="px-3 py-1 bg-red-100 text-red-600 rounded text-xs font-semibold hover:bg-red-200">
                           폐기
                         </button>
                       </td>
@@ -200,19 +200,19 @@ export default function ExpirationAlert() {
       {expiredItems.length > 0 && (
         <div className="bg-white border border-red-200 shadow-sm rounded-xl overflow-hidden">
           <div className="p-6 border-b border-red-200 bg-red-50">
-            <h3 className="text-lg font-black text-red-800">🚨 유효기간 만료 제품 (즉시 폐기)</h3>
+            <h3 className="text-lg font-semibold text-red-800">🚨 유효기간 만료 제품 (즉시 폐기)</h3>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-red-50 border-b border-red-200">
                 <tr>
-                  <th className="px-6 py-3 text-left font-black text-red-700">품목명</th>
-                  <th className="px-6 py-3 text-center font-black text-red-700">현재고</th>
-                  <th className="px-6 py-3 text-center font-black text-red-700">만료일</th>
-                  <th className="px-6 py-3 text-center font-black text-red-700">경과일</th>
-                  <th className="px-6 py-3 text-left font-black text-red-700">공급처</th>
-                  <th className="px-6 py-3 text-center font-black text-red-700">폐기</th>
+                  <th className="px-6 py-3 text-left font-semibold text-red-700">품목명</th>
+                  <th className="px-6 py-3 text-center font-semibold text-red-700">현재고</th>
+                  <th className="px-6 py-3 text-center font-semibold text-red-700">만료일</th>
+                  <th className="px-6 py-3 text-center font-semibold text-red-700">경과일</th>
+                  <th className="px-6 py-3 text-left font-semibold text-red-700">공급처</th>
+                  <th className="px-6 py-3 text-center font-semibold text-red-700">폐기</th>
                 </tr>
               </thead>
               <tbody>
@@ -225,10 +225,10 @@ export default function ExpirationAlert() {
                       <td className="px-6 py-4 text-center font-bold text-red-800">
                         {new Date(item.expiration_date).toLocaleDateString('ko-KR')}
                       </td>
-                      <td className="px-6 py-4 text-center font-black text-red-600">{daysExpired}일 경과</td>
+                      <td className="px-6 py-4 text-center font-semibold text-red-600">{daysExpired}일 경과</td>
                       <td className="px-6 py-4 text-left text-red-600">{item.supplier}</td>
                       <td className="px-6 py-4 text-center">
-                        <button className="px-3 py-1 bg-red-600 text-white rounded text-xs font-black hover:bg-red-700">
+                        <button className="px-3 py-1 bg-red-600 text-white rounded text-xs font-semibold hover:bg-red-700">
                           폐기 처리
                         </button>
                       </td>
@@ -243,7 +243,7 @@ export default function ExpirationAlert() {
 
       {/* 알림 설정 */}
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
-        <h4 className="font-black text-blue-800 mb-4">🔔 알림 설정</h4>
+        <h4 className="font-semibold text-blue-800 mb-4">🔔 알림 설정</h4>
         <div className="space-y-3">
           <label className="flex items-center gap-3 cursor-pointer">
             <input type="checkbox" defaultChecked className="w-5 h-5" />

@@ -41,24 +41,24 @@ export default function EducationMain({ staffs, selectedCo }: any) {
       {/* 상단 알림 배너 (기한 임박 직원 존재 시) */}
       {notifications.length > 0 && (
         <div className="bg-red-600 text-white px-8 py-2 flex justify-between items-center animate-pulse">
-          <p className="text-[11px] font-black">⚠️ 법정 의무 교육 이수 기한이 7일 이내인 직원이 {notifications.filter(n => n.type === 'URGENT').length}명 있습니다. 즉시 독려가 필요합니다.</p>
-          <button onClick={() => setShowNoti(!showNoti)} className="text-[10px] font-black underline">상세보기</button>
+          <p className="text-[11px] font-semibold">⚠️ 법정 의무 교육 이수 기한이 7일 이내인 직원이 {notifications.filter(n => n.type === 'URGENT').length}명 있습니다. 즉시 독려가 필요합니다.</p>
+          <button onClick={() => setShowNoti(!showNoti)} className="text-[10px] font-semibold underline">상세보기</button>
         </div>
       )}
 
       {/* 상단 액션 헤더 */}
       <header className="p-8 border-b border-gray-100 bg-white flex justify-between items-center shrink-0">
         <div>
-          <h2 className="text-xl font-black text-gray-800 tracking-tighter">
+          <h2 className="text-xl font-semibold text-gray-800 tracking-tighter">
             법정 의무 교육 관리 <span className="text-sm text-blue-600 ml-2">[{selectedCo}]</span>
           </h2>
           <p className="text-[10px] text-gray-400 font-bold mt-1 uppercase tracking-widest">Mandatory Compliance Training Dashboard</p>
         </div>
         <div className="flex gap-2">
-          <button className="px-6 py-3 bg-white border border-gray-200 text-gray-600 text-[11px] font-black shadow-sm hover:bg-gray-50 transition-all">
+          <button className="px-6 py-3 bg-white border border-gray-200 text-gray-600 text-[11px] font-semibold shadow-sm hover:bg-gray-50 transition-all">
             교육 일정 자동 알림 설정
           </button>
-          <button className="px-6 py-3 bg-[#2563EB] text-white text-[11px] font-black shadow-xl hover:scale-105 transition-all">
+          <button className="px-6 py-3 bg-[#2563EB] text-white text-[11px] font-semibold shadow-xl hover:scale-105 transition-all">
             + 교육 이수 등록
           </button>
         </div>
@@ -68,15 +68,15 @@ export default function EducationMain({ staffs, selectedCo }: any) {
       {showNoti && (
         <div className="absolute top-32 right-8 w-80 bg-white border border-gray-200 shadow-2xl z-50 p-6 rounded-none animate-in slide-in-from-top-4">
           <div className="flex justify-between items-center mb-4 border-b pb-2">
-            <h4 className="text-xs font-black text-gray-800">교육 이수 독려 대상</h4>
+            <h4 className="text-xs font-semibold text-gray-800">교육 이수 독려 대상</h4>
             <button onClick={() => setShowNoti(false)} className="text-gray-400 text-lg">×</button>
           </div>
           <div className="space-y-3 max-h-60 overflow-y-auto custom-scrollbar">
             {notifications.map((n, i) => (
               <div key={i} className={`p-3 border-l-4 ${n.type === 'URGENT' ? 'border-red-500 bg-red-50' : 'border-orange-400 bg-orange-50'}`}>
-                <p className="text-[11px] font-black text-gray-800">{n.name} ({n.education})</p>
+                <p className="text-[11px] font-semibold text-gray-800">{n.name} ({n.education})</p>
                 <p className="text-[10px] font-bold text-gray-500 mt-1">만료까지 {n.daysLeft}일 남음</p>
-                <button className="mt-2 text-[9px] font-black text-blue-600 uppercase tracking-tighter">알림톡 발송 →</button>
+                <button className="mt-2 text-[9px] font-semibold text-blue-600 uppercase tracking-tighter">알림톡 발송 →</button>
               </div>
             ))}
           </div>

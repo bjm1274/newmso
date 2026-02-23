@@ -85,8 +85,10 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
         total_taxable: calc.proRatedBase + calc.severance,
         total_taxfree: calc.meal,
         total_deduction: 0,
+        deduction_detail: {},
         net_pay: calc.total,
         attendance_deduction: 0,
+        advance_pay: 0,
         status: '확정',
         record_type: 'interim',
         settlement_reason: reason,
@@ -111,10 +113,10 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
   };
 
   return (
-    <div className="bg-white p-6 md:p-10 rounded-[2.5rem] border border-gray-100 shadow-xl animate-in fade-in duration-500">
-      <div className="mb-8 border-b border-gray-50 pb-6">
-        <h3 className="text-xl font-black text-gray-900 tracking-tighter italic">급여 중간정산 엔진</h3>
-        <p className="text-[10px] text-blue-600 font-bold mt-1 tracking-widest">퇴직자 포함 급여 중간정산</p>
+    <div className="bg-white p-6 md:p-8 rounded-lg border border-gray-200 shadow-sm animate-in fade-in duration-300">
+      <div className="mb-6 pb-4 border-b border-gray-200">
+        <h2 className="text-lg font-bold text-gray-900">중간정산</h2>
+        <p className="text-xs text-gray-500 mt-0.5">퇴직·중도 퇴사자 급여 일할 계산</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -127,16 +129,16 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
                 onChange={(e) => setFilterRetirees(e.target.checked)}
                 className="w-4 h-4 rounded border-gray-300 text-blue-600"
               />
-              <span className="text-[11px] font-black text-gray-600">퇴직자만 보기</span>
+              <span className="text-xs font-medium text-gray-600">퇴직자만 보기</span>
             </label>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">정산 대상자 선택</label>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-gray-600">정산 대상자</label>
             <select
               value={selectedStaff?.id ?? ''}
               onChange={(e) => setSelectedStaff(candidates.find((s: any) => s.id === parseInt(e.target.value)) || null)}
-              className="w-full p-4 bg-gray-50 rounded-2xl border-none outline-none font-black text-sm focus:ring-2 focus:ring-blue-100"
+              className="w-full h-10 px-3 bg-[#f8fafc] border border-gray-300 rounded-md text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">직원을 선택하세요</option>
               {candidates.map((s: any) => (
@@ -151,21 +153,13 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">정산 기준일</label>
-              <input
-                type="date"
-                value={settlementDate}
-                onChange={(e) => setSettlementDate(e.target.value)}
-                className="w-full p-4 bg-gray-50 rounded-2xl border-none outline-none font-black text-sm focus:ring-2 focus:ring-blue-100"
-              />
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-gray-600">정산 기준일</label>
+              <input type="date" value={settlementDate} onChange={(e) => setSettlementDate(e.target.value)} className="w-full h-10 px-3 bg-[#f8fafc] border border-gray-300 rounded-md text-sm font-medium focus:ring-2 focus:ring-blue-500" />
             </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">정산 사유</label>
-              <select
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                className="w-full p-4 bg-gray-50 rounded-2xl border-none outline-none font-black text-sm focus:ring-2 focus:ring-blue-100"
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-gray-600">정산 사유</label>
+              <select value={reason} onChange={(e) => setReason(e.target.value)} className="w-full h-10 px-3 bg-[#f8fafc] border border-gray-300 rounded-md text-sm font-medium focus:ring-2 focus:ring-blue-500"
               >
                 <option value="퇴사">중도 퇴사</option>
                 <option value="휴직">휴직 시작</option>
@@ -183,54 +177,48 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
                   onChange={(e) => setIncludeSeverance(e.target.checked)}
                   className="w-4 h-4 rounded border-gray-300 text-blue-600"
                 />
-                <span className="text-[11px] font-black text-gray-600">퇴직금 포함</span>
+                <span className="text-xs font-medium text-gray-600">퇴직금 포함</span>
               </label>
             </div>
           )}
         </div>
 
-        <div className="bg-blue-50/50 p-8 rounded-[2rem] border border-blue-100 flex flex-col justify-center">
+        <div className="bg-[#eef2f7] p-6 rounded-lg border border-gray-200 flex flex-col justify-center">
           {result ? (
-            <div className="space-y-6">
+            <div className="space-y-4">
               <div className="flex justify-between items-end">
                 <div>
-                  <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">정산 총액 (세전)</p>
-                  <p className="text-3xl font-black text-blue-600 tracking-tighter">{result.total.toLocaleString()}원</p>
+                  <p className="text-xs font-medium text-gray-500 mb-1">정산 총액 (세전)</p>
+                  <p className="text-2xl font-bold text-blue-600">{result.total.toLocaleString()}원</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">근무 일수</p>
-                  <p className="text-lg font-black text-gray-700">{result.workedDays} / {result.lastDay}일</p>
+                  <p className="text-xs font-medium text-gray-500 mb-1">근무 일수</p>
+                  <p className="text-sm font-semibold text-gray-700">{result.workedDays} / {result.lastDay}일</p>
                 </div>
               </div>
-              <div className="space-y-2 pt-4 border-t border-blue-100">
-                <div className="flex justify-between text-xs font-bold text-gray-600">
+              <div className="space-y-1.5 pt-3 border-t border-gray-200">
+                <div className="flex justify-between text-xs font-medium text-gray-600">
                   <span>기본급 (일할)</span>
                   <span>{result.proRatedBase.toLocaleString()}원</span>
                 </div>
-                <div className="flex justify-between text-xs font-bold text-gray-600">
+                <div className="flex justify-between text-xs font-medium text-gray-600">
                   <span>식대 (일할)</span>
                   <span>{result.meal.toLocaleString()}원</span>
                 </div>
                 {result.severance > 0 && (
-                  <>
-                    <div className="flex justify-between text-xs font-bold text-emerald-700">
-                      <span>퇴직금 (재직 {formatWorkPeriod(result.workDays)})</span>
-                      <span>{result.severance.toLocaleString()}원</span>
-                    </div>
-                  </>
+                  <div className="flex justify-between text-xs font-medium text-emerald-700">
+                    <span>퇴직금 (재직 {formatWorkPeriod(result.workDays)})</span>
+                    <span>{result.severance.toLocaleString()}원</span>
+                  </div>
                 )}
               </div>
-              <button
-                onClick={handleConfirm}
-                disabled={loading}
-                className="w-full py-4 bg-blue-600 text-white rounded-xl font-black text-xs shadow-lg shadow-blue-100 hover:scale-[0.98] transition-all disabled:opacity-50"
-              >
-                {loading ? '저장 중...' : '정산 내역 확정 및 저장'}
+              <button onClick={handleConfirm} disabled={loading} className="w-full py-3 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                {loading ? '저장 중...' : '저장하기'}
               </button>
             </div>
           ) : (
-            <div className="text-center py-10">
-              <p className="text-xs font-black text-blue-300">정산 대상을 선택하면<br />실시간 계산 결과가 표시됩니다.</p>
+            <div className="text-center py-8">
+              <p className="text-xs font-medium text-gray-500">정산 대상을 선택하면 실시간 계산 결과가 표시됩니다.</p>
             </div>
           )}
         </div>

@@ -158,11 +158,11 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
   if (loading) return <div className="p-8 text-center text-gray-400 font-bold">로딩 중...</div>;
 
   return (
-    <div className="flex flex-col md:flex-row h-full min-h-0 bg-white rounded-2xl md:rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+    <div className="flex flex-col md:flex-row h-full min-h-0 bg-white rounded-lg md:rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
       {/* 직원 목록 */}
       <div className="w-full md:w-1/3 md:border-r border-gray-50 flex flex-col md:min-w-[240px] max-h-[40vh] md:max-h-none shrink-0">
         <div className="p-6 border-b border-gray-50 bg-gray-25">
-          <h3 className="text-sm font-black text-gray-800">직원 명단</h3>
+          <h3 className="text-sm font-semibold text-gray-800">직원 명단</h3>
           <p className="text-[10px] text-gray-400 font-bold">직원 선택 시 역할·권한 설정</p>
         </div>
         <div className="flex-1 overflow-y-auto">
@@ -173,7 +173,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
               className={`w-full text-left p-4 border-b border-gray-50 hover:bg-blue-50 transition-all ${selectedStaff?.id === staff.id ? 'bg-blue-50 border-l-4 border-l-blue-600' : ''}`}
             >
               <div className="flex justify-between items-center">
-                <span className="text-xs font-black text-gray-700">{staff.name}</span>
+                <span className="text-xs font-semibold text-gray-700">{staff.name}</span>
                 <span className="text-[10px] font-bold text-gray-400">#{staff.employee_no}</span>
               </div>
               <p className="text-[10px] text-gray-400 mt-1">{staff.department} / {staff.position}</p>
@@ -185,8 +185,8 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
       {/* 역할 + 권한 설정 영역 */}
       <div className="flex-1 min-h-0 p-4 md:p-10 bg-gray-25/50 overflow-y-auto">
         {/* A직원 → B직원 권한 한번에 복사 */}
-        <div className="mb-8 bg-white p-6 rounded-2xl shadow-sm border border-gray-100 border-l-4 border-l-[#3182F6]">
-          <p className="text-sm font-black text-gray-800 mb-3">📋 권한 한번에 복사 (A → B)</p>
+        <div className="mb-8 bg-white p-6 rounded-lg shadow-sm border border-gray-100 border-l-4 border-l-[#3182F6]">
+          <p className="text-sm font-semibold text-gray-800 mb-3">📋 권한 한번에 복사 (A → B)</p>
           <p className="text-[10px] text-gray-500 font-bold mb-4">한 직원의 권한·역할을 다른 직원에게 그대로 적용합니다.</p>
           <div className="flex flex-wrap items-end gap-3">
             <div className="min-w-[140px]">
@@ -233,12 +233,12 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
         {selectedStaff ? (
           <div className="max-w-md space-y-8">
             <div className="border-b-4 border-gray-900 pb-4">
-              <h3 className="text-2xl font-black text-gray-900 italic tracking-tighter">[{selectedStaff.name}] 직원·권한 설정</h3>
+              <h3 className="text-2xl font-semibold text-gray-900 italic tracking-tighter">[{selectedStaff.name}] 직원·권한 설정</h3>
               <p className="text-xs font-bold text-blue-600 mt-1">사번 {selectedStaff.employee_no} | {selectedStaff.department} {selectedStaff.position}</p>
             </div>
 
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-              <p className="text-sm font-black text-gray-800 mb-2">👤 역할(Role)</p>
+            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
+              <p className="text-sm font-semibold text-gray-800 mb-2">👤 역할(Role)</p>
               <select
                 value={selectedStaff.role || 'staff'}
                 onChange={(e) => handleRoleChange(selectedStaff.id, e.target.value)}
@@ -252,8 +252,8 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
               </select>
             </div>
 
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-              <p className="text-sm font-black text-gray-800 mb-2">🔑 비밀번호 설정</p>
+            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
+              <p className="text-sm font-semibold text-gray-800 mb-2">🔑 비밀번호 설정</p>
               <div className="flex gap-2">
                 <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="새 비밀번호" className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm" />
                 <button onClick={setPassword} disabled={passwordSaving || !newPassword.trim()} className="px-4 py-2.5 bg-gray-900 text-white rounded-xl text-xs font-bold hover:bg-black disabled:opacity-50">
@@ -263,7 +263,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
             </div>
 
             <div className="space-y-6">
-              <p className="text-sm font-black text-gray-800">🔐 세부 권한 (메뉴별 설정)</p>
+              <p className="text-sm font-semibold text-gray-800">🔐 세부 권한 (메뉴별 설정)</p>
               {PERM_GROUPS.map((group, gi) => (
                 <div key={gi} className="space-y-3">
                   <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">{group.label}</p>
@@ -284,14 +284,14 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
               ))}
             </div>
 
-            <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100">
-              <p className="text-[10px] font-black text-amber-800">📌 메인 메뉴: 사이드바에 표시 여부 | 인사 세부: 인사관리 내 탭 접근 | MSO/관리자: 별도 조건 필요</p>
+            <div className="bg-amber-50 p-4 rounded-lg border border-amber-100">
+              <p className="text-[10px] font-semibold text-amber-800">📌 메인 메뉴: 사이드바에 표시 여부 | 인사 세부: 인사관리 내 탭 접근 | MSO/관리자: 별도 조건 필요</p>
             </div>
           </div>
         ) : (
           <div className="h-full flex flex-col items-center justify-center text-gray-300">
             <span className="text-5xl mb-4">👤</span>
-            <p className="text-sm font-black">왼쪽에서 직원을 선택하여 역할·권한을 설정하세요</p>
+            <p className="text-sm font-semibold">왼쪽에서 직원을 선택하여 역할·권한을 설정하세요</p>
           </div>
         )}
       </div>

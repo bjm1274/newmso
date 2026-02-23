@@ -2,7 +2,10 @@
  * 근태 차감 계산 유틸
  * - 기본급/근로일수 → 일당, 시급
  * - 지각/조퇴/결근 → 차감액
+ * - 시급 산정: 일당 / 소정근로시간(미입력 시 일 8h 기본값 적용)
  */
+
+import { DAILY_STANDARD_HOURS } from './tax-free-limits';
 
 export type DeductionRule = {
   late_deduction_type: 'hourly' | 'fixed';
@@ -46,10 +49,10 @@ export function getDailyRate(baseSalary: number, yearMonth: string): number {
   return days > 0 ? Math.floor(baseSalary / days) : 0;
 }
 
-/** 시급 = 일당 / 8 (소정근로시간) */
+/** 시급 = 일당 / 일 소정근로시간 (미입력 시 8시간 기본값) */
 export function getHourlyRate(baseSalary: number, yearMonth: string): number {
   const daily = getDailyRate(baseSalary, yearMonth);
-  return Math.floor(daily / 8);
+  return Math.floor(daily / DAILY_STANDARD_HOURS);
 }
 
 export function calculateAttendanceDeduction(

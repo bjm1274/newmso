@@ -17,9 +17,9 @@ export default function AuditLogViewer() {
   }, []);
 
   return (
-    <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-xl">
+    <div className="bg-white border border-gray-100 rounded-lg overflow-hidden shadow-xl">
       <div className="p-6 border-b border-gray-100">
-        <h3 className="text-xl font-black text-gray-900">감사 로그</h3>
+        <h3 className="text-xl font-semibold text-gray-900">감사 로그</h3>
         <p className="text-[10px] text-gray-500 font-bold mt-1">급여·결재·인사 등 주요 변경 이력</p>
       </div>
       <div className="max-h-[500px] overflow-y-auto">
@@ -29,7 +29,7 @@ export default function AuditLogViewer() {
           <div className="p-8 text-center text-gray-400">기록이 없습니다.</div>
         ) : (
           <table className="w-full text-left text-xs">
-            <thead className="bg-gray-50 text-[10px] font-black text-gray-400 uppercase">
+            <thead className="bg-gray-50 text-[10px] font-semibold text-gray-400 uppercase">
               <tr>
                 <th className="p-4">시간</th>
                 <th className="p-4">작업</th>

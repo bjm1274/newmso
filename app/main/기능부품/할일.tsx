@@ -88,13 +88,13 @@ export default function TaskView({ user, tasks, subView, setSubView, onRefresh }
   return (
     <div className="flex-1 flex flex-col bg-[#FDFDFD] h-full relative">
       <header className="px-10 py-8 flex justify-between items-center bg-white border-b border-gray-50 shrink-0">
-        <h1 className="text-2xl font-black text-gray-800">나의 업무</h1>
+        <h1 className="text-2xl font-semibold text-gray-800">나의 업무</h1>
         <div className="flex gap-2">
           {['전체', '진행중', '완료'].map((menu) => (
             <button
               key={menu}
               onClick={() => setSubView(menu)}
-              className={`px-5 py-2 rounded-2xl text-xs font-bold transition-all ${
+              className={`px-5 py-2 rounded-lg text-xs font-bold transition-all ${
                 subView === menu ? 'bg-black text-white shadow-lg' : 'bg-gray-50 text-gray-400'
               }`}
             >

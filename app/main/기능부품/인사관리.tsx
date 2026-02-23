@@ -96,7 +96,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh }: any) {
     return (
       <div className="h-full flex flex-col items-center justify-center bg-[#F2F4F6] p-6">
         <div className="text-5xl mb-4">🔒</div>
-        <h2 className="text-lg font-black text-[#191F28]">인사관리 접근 권한이 없습니다.</h2>
+        <h2 className="text-lg font-semibold text-[#191F28]">인사관리 접근 권한이 없습니다.</h2>
         <p className="text-sm text-[#4E5968] font-bold mt-2">MSO 직원이거나 인사 조회 권한이 부여된 직원만 이용할 수 있습니다. 관리자에게 문의하세요.</p>
       </div>
     );
@@ -110,9 +110,9 @@ export default function HRMainView({ user, staffs, depts, onRefresh }: any) {
           <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
             <button onClick={() => 창상태설정(true)} className="w-full md:w-auto bg-[var(--toss-blue)] text-white px-6 py-2.5 text-[11px] font-bold rounded-[12px] shadow-sm hover:opacity-95 transition-all">신규 직원 등록</button>
             
-            <div className="flex gap-1 bg-[#F2F4F6] p-1 rounded-[12px] border border-[#E5E8EB] overflow-x-auto no-scrollbar">
+            <div className="flex gap-0.5 p-1 bg-[#eef2f7] rounded-lg border border-gray-200 overflow-x-auto no-scrollbar w-full md:w-auto">
               {visibleHrTabs.map(({ id }) => (
-                <button key={id} onClick={() => 메뉴설정(id)} className={`flex-1 px-4 py-2 text-[10px] font-black transition-all rounded-[12px] whitespace-nowrap ${activeMenu === id ? 'bg-white shadow-sm text-[#3182F6]' : 'text-[#8B95A1]'}`}>{id}</button>
+                <button key={id} onClick={() => 메뉴설정(id)} className={`min-h-[44px] touch-manipulation flex-1 px-4 py-2 text-xs font-medium transition-all rounded-md whitespace-nowrap ${activeMenu === id ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700 hover:bg-white/60'}`}>{id}</button>
               ))}
             </div>
           </div>
@@ -123,18 +123,18 @@ export default function HRMainView({ user, staffs, depts, onRefresh }: any) {
         <aside className="w-full md:w-64 bg-white border-b md:border-r border-gray-100 flex flex-col shrink-0">
           <div className="p-4 md:p-8 space-y-6">
             <div>
-              <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-3 md:mb-4 italic tracking-widest">
+              <p className="text-[9px] md:text-[10px] font-semibold text-gray-400 uppercase mb-3 md:mb-4 italic tracking-widest">
                 사업자 필터
               </p>
-              <div className="flex gap-1 bg-gray-100 p-1 rounded-[12px] md:flex-col overflow-x-auto no-scrollbar">
+              <div className="flex gap-0.5 p-1 bg-[#eef2f7] rounded-lg md:flex-col overflow-x-auto no-scrollbar">
                 {사업체목록.map(회사 => (
                   <button
                     key={회사}
                     onClick={() => 사업체설정(회사)}
-                    className={`flex-1 md:w-full text-center md:text-left px-4 py-2 text-[10px] md:text-xs font-black rounded-[12px] transition-all whitespace-nowrap ${
+                    className={`flex-1 md:w-full text-center md:text-left px-4 py-2 text-xs font-medium rounded-md transition-all whitespace-nowrap ${
                       선택사업체 === 회사
-                        ? 'bg-white shadow-md text-blue-600'
-                        : 'text-gray-400 hover:bg-gray-50'
+                        ? 'bg-white shadow-sm text-blue-600'
+                        : 'text-gray-500 hover:text-gray-700 hover:bg-white/60'
                     }`}
                   >
                     {회사}
@@ -144,26 +144,26 @@ export default function HRMainView({ user, staffs, depts, onRefresh }: any) {
             </div>
 
             <div>
-              <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-3 italic tracking-widest">
+              <p className="text-[9px] md:text-[10px] font-semibold text-gray-400 uppercase mb-3 italic tracking-widest">
                 직원 상태
               </p>
-              <div className="flex gap-1 bg-gray-100 p-1 rounded-[12px] md:flex-col">
+              <div className="flex gap-0.5 p-1 bg-[#eef2f7] rounded-lg md:flex-col">
                 <button
                   onClick={() => 직원상태필터설정('재직')}
-                  className={`flex-1 md:w-full px-4 py-2 text-[10px] md:text-xs font-black rounded-[12px] transition-all whitespace-nowrap ${
+                  className={`flex-1 md:w-full px-4 py-2 text-xs font-medium rounded-md transition-all whitespace-nowrap ${
                     직원상태필터 === '재직'
-                      ? 'bg-white shadow-md text-emerald-600'
-                      : 'text-gray-400 hover:bg-gray-50'
+                      ? 'bg-white shadow-sm text-emerald-600'
+                      : 'text-gray-500 hover:bg-white/60'
                   }`}
                 >
                   재직자
                 </button>
                 <button
                   onClick={() => 직원상태필터설정('퇴사')}
-                  className={`flex-1 md:w-full px-4 py-2 text-[10px] md:text-xs font-black rounded-[12px] transition-all whitespace-nowrap ${
+                  className={`flex-1 md:w-full px-4 py-2 text-xs font-medium rounded-md transition-all whitespace-nowrap ${
                     직원상태필터 === '퇴사'
-                      ? 'bg-white shadow-md text-red-600'
-                      : 'text-gray-400 hover:bg-gray-50'
+                      ? 'bg-white shadow-sm text-red-600'
+                      : 'text-gray-500 hover:bg-white/60'
                   }`}
                 >
                   퇴사자
@@ -201,9 +201,9 @@ export default function HRMainView({ user, staffs, depts, onRefresh }: any) {
           )}
           {activeMenu === '근태' && (
             <div className="flex flex-col h-full">
-              <div className="flex gap-1 bg-gray-100 p-1 rounded-[12px] w-fit mb-4">
-                <button onClick={() => 근태뷰설정('실시간')} className={`px-4 py-2 text-xs font-black rounded-[12px] transition-all ${근태뷰 === '실시간' ? 'bg-white shadow-md text-blue-600' : 'text-[#4E5968]'}`}>실시간 출퇴근</button>
-                <button onClick={() => 근태뷰설정('월별')} className={`px-4 py-2 text-xs font-black rounded-[12px] transition-all ${근태뷰 === '월별' ? 'bg-white shadow-md text-blue-600' : 'text-[#4E5968]'}`}>월별/일별 대장</button>
+              <div className="flex gap-0.5 p-1 bg-[#eef2f7] rounded-lg w-fit mb-4">
+                <button onClick={() => 근태뷰설정('실시간')} className={`px-4 py-2 text-xs font-medium rounded-md transition-all ${근태뷰 === '실시간' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:bg-white/60'}`}>실시간 출퇴근</button>
+                <button onClick={() => 근태뷰설정('월별')} className={`px-4 py-2 text-xs font-medium rounded-md transition-all ${근태뷰 === '월별' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:bg-white/60'}`}>월별/일별 대장</button>
               </div>
               {근태뷰 === '실시간' ? <AttendanceSystem user={user} staffs={staffs} selectedCo={선택사업체} isAdminView={true} /> : <AttendanceMain staffs={staffs} selectedCo={선택사업체} />}
             </div>

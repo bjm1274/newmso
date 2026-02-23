@@ -116,7 +116,7 @@ export default function ExcelBulkUpload({ onRefresh }: any) {
   const isEcount = mode === 'inventory_ecount';
 
   return (
-    <div className="bg-white border border-[#E5E8EB] rounded-2xl p-8 shadow-sm max-w-2xl">
+    <div className="bg-white border border-[#E5E8EB] rounded-lg p-8 shadow-sm max-w-2xl">
       <h3 className="text-xl font-bold text-[#191F28] mb-2">엑셀 일괄 등록</h3>
       <p className="text-xs text-gray-500 font-bold mb-6">
         {mode === 'staff' && '엑셀: 사번, 이름, 회사, 부서, 직급, 기본급, 입사일'}
@@ -139,7 +139,7 @@ export default function ExcelBulkUpload({ onRefresh }: any) {
         </div>
       )}
       <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} className="hidden" />
-      <button onClick={() => fileRef.current?.click()} disabled={loading} className="w-full py-4 bg-[#3182F6] text-white font-bold rounded-2xl text-sm hover:bg-[#1B64DA] disabled:opacity-50">
+      <button onClick={() => fileRef.current?.click()} disabled={loading} className="w-full py-4 bg-[#3182F6] text-white font-bold rounded-lg text-sm hover:bg-[#1B64DA] disabled:opacity-50">
         {loading ? '처리 중...' : '📁 엑셀 파일 선택'}
       </button>
       {preview.length > 0 && (

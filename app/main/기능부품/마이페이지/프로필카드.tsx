@@ -239,7 +239,7 @@ export default function MyProfileCard({ user: initialUser }: any) {
   if (!user) return <div className="p-10">로딩 중...</div>;
 
   return (
-    <div className="bg-white border border-[#E5E8EB] shadow-sm rounded-2xl sm:rounded-[2rem] lg:rounded-[2.5rem] p-4 sm:p-6 lg:p-10 flex flex-col h-full space-y-6 sm:space-y-8 lg:space-y-10">
+    <div className="bg-white border border-[#E5E8EB] shadow-sm rounded-lg p-4 sm:p-6 lg:p-10 flex flex-col h-full space-y-6 sm:space-y-8 lg:space-y-10">
       
       {/* 프로필 헤더 */}
       <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 lg:gap-10 pb-6 sm:pb-8 border-b border-gray-100">
@@ -542,14 +542,14 @@ function LeaveAndCommuteSummary({ user }: any) {
 
   if (!summary) {
     return (
-      <div className="bg-[#F2F4F6] border border-[#E5E8EB] rounded-xl sm:rounded-2xl p-3 sm:p-4 text-[11px] sm:text-[12px] text-[#8B95A1] font-bold">
+      <div className="bg-[#F2F4F6] border border-[#E5E8EB] rounded-lg p-3 sm:p-4 text-[11px] sm:text-[12px] text-[#8B95A1] font-bold">
         근태·연차 정보를 불러오는 중입니다...
       </div>
     );
   }
 
   return (
-    <div className="bg-[#F2F4F6] border border-[#E5E8EB] rounded-xl sm:rounded-2xl p-3 sm:p-4 space-y-3 sm:space-y-4 text-[11px] sm:text-[12px]">
+    <div className="bg-[#F2F4F6] border border-[#E5E8EB] rounded-lg p-3 sm:p-4 space-y-3 sm:space-y-4 text-[11px] sm:text-[12px]">
       <div className="flex justify-between items-end">
         <div>
           <p className="text-[10px] sm:text-[11px] font-bold text-[#8B95A1] uppercase tracking-widest">

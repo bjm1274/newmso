@@ -70,52 +70,42 @@ export default function TaxFreeSettingsPanel({ companyName, onSaved }: { company
 
   if (loading) {
     return (
-      <div className="border border-gray-200 p-6 bg-white rounded-[1.75rem]">
-        <p className="text-sm font-bold text-gray-500">로딩 중...</p>
+      <div className="border border-gray-200 p-5 bg-white rounded-lg">
+        <p className="text-sm font-medium text-gray-500">로딩 중...</p>
       </div>
     );
   }
 
   return (
-    <div className="border border-gray-200 p-6 bg-white rounded-[1.75rem] shadow-sm">
-      <h3 className="text-[11px] font-black text-emerald-600 uppercase tracking-widest mb-4">비과세 항목 설정</h3>
-      <p className="text-[10px] text-gray-500 mb-4">법정 한도 내에서 회사별 비과세 한도를 조정할 수 있습니다. [{co}]</p>
-      <div className="flex gap-2 mb-6">
-        <select
-          value={year}
-          onChange={(e) => setYear(parseInt(e.target.value))}
-          className="p-2 border rounded-lg text-sm font-bold"
+    <div className="border border-gray-200 p-5 bg-white rounded-lg shadow-sm">
+      <div className="pb-3 border-b border-gray-100 mb-4">
+        <h3 className="text-sm font-semibold text-gray-800">비과세 항목 설정</h3>
+        <p className="text-xs text-gray-500 mt-0.5">법정 한도 내 회사별 한도 조정 [{co}]</p>
+      </div>
+      <div className="flex gap-2 mb-4">
+        <select value={year} onChange={(e) => setYear(parseInt(e.target.value))} className="h-9 px-3 border border-gray-300 rounded-md text-sm font-medium"
         >
           {[2024, 2025, 2026].map((y) => (
             <option key={y} value={y}>{y}년</option>
           ))}
         </select>
-        <button onClick={resetToLegal} className="px-3 py-2 border border-gray-200 rounded-lg text-[10px] font-black text-gray-600 hover:bg-gray-50">
-          법정 기준으로 초기화
+        <button onClick={resetToLegal} className="px-3 py-2 border border-gray-300 rounded-md text-xs font-medium text-gray-600 hover:bg-gray-50">
+          법정 기준 초기화
         </button>
       </div>
-      <div className="space-y-3 max-h-[320px] overflow-y-auto custom-scrollbar">
+      <div className="space-y-2 max-h-[320px] overflow-y-auto custom-scrollbar">
         {ITEMS.map(({ key, label, basis }) => (
-          <div key={key} className="flex items-center justify-between gap-4 py-2 border-b border-gray-50 last:border-0">
+          <div key={key} className="flex items-center justify-between gap-4 py-2 border-b border-gray-100 last:border-0">
             <div>
-              <p className="text-xs font-black text-gray-800">{label}</p>
-              <p className="text-[9px] text-gray-400">{basis}</p>
+              <p className="text-xs font-medium text-gray-800">{label}</p>
+              <p className="text-[10px] text-gray-400">{basis}</p>
             </div>
-            <input
-              type="number"
-              value={settings[key]}
-              onChange={(e) => update(key, parseInt(e.target.value) || 0)}
-              className="w-28 p-2 border rounded-lg text-sm font-black text-right"
-            />
+            <input type="number" value={settings[key]} onChange={(e) => update(key, parseInt(e.target.value) || 0)} className="w-24 h-9 px-2 border border-gray-300 rounded-md text-sm font-medium text-right" />
           </div>
         ))}
       </div>
-      <button
-        onClick={handleSave}
-        disabled={saving}
-        className="w-full mt-4 py-3 bg-emerald-600 text-white text-[10px] font-black rounded-xl hover:bg-emerald-700 disabled:opacity-50"
-      >
-        {saving ? '저장 중...' : '설정 저장'}
+      <button onClick={handleSave} disabled={saving} className="w-full mt-4 py-3 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50">
+        {saving ? '저장 중...' : '저장하기'}
       </button>
     </div>
   );

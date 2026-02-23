@@ -62,10 +62,10 @@ export default function SuppliesForm({ setExtraData, initialItems }: any) {
   return (
     <div className="border-t-2 border-b border-gray-200 overflow-hidden bg-white rounded-none">
       <div className="p-4 bg-blue-50/50 border-b border-blue-100 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2">
+        <p className="text-[10px] font-semibold text-blue-600 uppercase tracking-widest flex items-center gap-2">
           <span className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></span> 실시간 재고 연동 모드 활성화
         </p>
-        <div className="flex items-center gap-2 text-[10px] font-black text-gray-500">
+        <div className="flex items-center gap-2 text-[10px] font-semibold text-gray-500">
           <span>수령부서 일괄 적용</span>
           <select
             value={bulkDept}
@@ -81,14 +81,14 @@ export default function SuppliesForm({ setExtraData, initialItems }: any) {
             type="button"
             onClick={applyBulkDept}
             disabled={!bulkDept}
-            className="px-3 py-1 rounded-lg bg-gray-900 text-white text-[10px] font-black disabled:opacity-40"
+            className="px-3 py-1 rounded-lg bg-gray-900 text-white text-[10px] font-semibold disabled:opacity-40"
           >
             전체 적용
           </button>
         </div>
       </div>
       <table className="w-full text-left border-collapse">
-        <thead className="bg-gray-50 text-[10px] font-black text-gray-400 border-b border-gray-200">
+        <thead className="bg-gray-50 text-[10px] font-semibold text-gray-400 border-b border-gray-200">
           <tr>
             <th className="p-4">품목명 (재고 검색)</th>
             <th className="p-4 w-24 text-center">현재고</th>
@@ -116,7 +116,7 @@ export default function SuppliesForm({ setExtraData, initialItems }: any) {
                         className="p-3 text-[11px] font-bold hover:bg-blue-50 cursor-pointer border-b last:border-none flex justify-between items-center"
                       >
                         <span>{s.name}</span>
-                        <span className={`px-2 py-0.5 text-[9px] font-black rounded ${s.stock <= s.min_stock ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+                        <span className={`px-2 py-0.5 text-[9px] font-semibold rounded ${s.stock <= s.min_stock ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
                           재고: {s.stock}
                         </span>
                       </div>
@@ -124,7 +124,7 @@ export default function SuppliesForm({ setExtraData, initialItems }: any) {
                   </div>
                 )}
               </td>
-              <td className={`p-2 text-center text-xs font-black ${item.currentStock !== null && item.currentStock <= 5 ? 'text-red-600 animate-pulse' : 'text-blue-600'}`}>
+              <td className={`p-2 text-center text-xs font-semibold ${item.currentStock !== null && item.currentStock <= 5 ? 'text-red-600 animate-pulse' : 'text-blue-600'}`}>
                 {item.currentStock ?? '-'}
               </td>
               <td className="p-2">
@@ -137,7 +137,7 @@ export default function SuppliesForm({ setExtraData, initialItems }: any) {
                     nl[idx].qty = Number(e.target.value); 
                     setItems(nl);
                   }} 
-                  className="w-full p-3 bg-blue-50 text-xs font-black text-center text-blue-600 outline-none rounded-none border-none" 
+                  className="w-full p-3 bg-blue-50 text-xs font-semibold text-center text-blue-600 outline-none rounded-none border-none" 
                 />
               </td>
               <td className="p-2">
@@ -170,7 +170,7 @@ export default function SuppliesForm({ setExtraData, initialItems }: any) {
       </table>
       <button 
         onClick={() => setItems([...items, { name: '', qty: 1, currentStock: null, dept: '', purpose: '', suggestions: [] }])} 
-        className="m-4 text-[11px] font-black text-blue-500 hover:underline flex items-center gap-1"
+        className="m-4 text-[11px] font-semibold text-blue-500 hover:underline flex items-center gap-1"
       >
         + 품목 추가하기
       </button>

@@ -10,7 +10,7 @@ export default function SalarySlipUI({ user, currentDate, salaryData, totalPayme
       
       {/* 1. 헤더 */}
       <div className="text-center border-b-4 border-double border-gray-900 pb-5 mb-8">
-        <h1 className="text-4xl font-black tracking-[0.5em] text-gray-900 mb-2">급 여 명 세 서</h1>
+        <h1 className="text-4xl font-semibold tracking-[0.5em] text-gray-900 mb-2">급 여 명 세 서</h1>
         <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">
           {currentDate.getFullYear()}년 {String(currentDate.getMonth() + 1).padStart(2, '0')}월분 (Salary Statement)
         </p>
@@ -21,11 +21,11 @@ export default function SalarySlipUI({ user, currentDate, salaryData, totalPayme
         <table className="w-full text-sm border-collapse border-2 border-gray-800">
           <tbody>
             <tr className="bg-gray-50">
-              <th className="p-3 border border-gray-400 w-[10%] font-black text-center text-gray-700">성 명</th>
+              <th className="p-3 border border-gray-400 w-[10%] font-semibold text-center text-gray-700">성 명</th>
               <td className="p-3 border border-gray-400 w-[23%] text-center font-bold text-base bg-white">{user.name}</td>
-              <th className="p-3 border border-gray-400 w-[10%] font-black text-center text-gray-700">소 속</th>
+              <th className="p-3 border border-gray-400 w-[10%] font-semibold text-center text-gray-700">소 속</th>
               <td className="p-3 border border-gray-300 w-[23%] text-center font-bold text-base bg-white">{user.department}</td>
-              <th className="p-3 border border-gray-300 w-[10%] font-black text-center text-gray-700">직 위</th>
+              <th className="p-3 border border-gray-300 w-[10%] font-semibold text-center text-gray-700">직 위</th>
               <td className="p-3 border border-gray-300 w-[24%] text-center font-bold text-base bg-white">{user.position}</td>
             </tr>
           </tbody>
@@ -36,7 +36,7 @@ export default function SalarySlipUI({ user, currentDate, salaryData, totalPayme
       <div className="flex gap-6 mb-8 flex-1">
         {/* 지급 내역 */}
         <div className="flex-1 border-2 border-blue-900 rounded-lg overflow-hidden flex flex-col">
-          <div className="bg-blue-900 p-2.5 text-center text-white font-black text-sm">지급 내역 (EARNINGS)</div>
+          <div className="bg-blue-900 p-2.5 text-center text-white font-semibold text-sm">지급 내역 (EARNINGS)</div>
           <div className="flex-1 p-4 bg-white">
             <table className="w-full text-sm">
               <tbody className="divide-y divide-gray-100">
@@ -47,7 +47,7 @@ export default function SalarySlipUI({ user, currentDate, salaryData, totalPayme
               </tbody>
             </table>
           </div>
-          <div className="bg-blue-50 p-3 border-t-2 border-blue-900 flex justify-between items-center font-black text-blue-900">
+          <div className="bg-blue-50 p-3 border-t-2 border-blue-900 flex justify-between items-center font-semibold text-blue-900">
             <span className="text-xs">지급 합계</span>
             <span className="text-lg">₩ {totalPayment.toLocaleString()}</span>
           </div>
@@ -55,7 +55,7 @@ export default function SalarySlipUI({ user, currentDate, salaryData, totalPayme
 
         {/* 공제 내역 */}
         <div className="flex-1 border-2 border-red-900 rounded-lg overflow-hidden flex flex-col">
-          <div className="bg-red-900 p-2.5 text-center text-white font-black text-sm">공제 내역 (DEDUCTIONS)</div>
+          <div className="bg-red-900 p-2.5 text-center text-white font-semibold text-sm">공제 내역 (DEDUCTIONS)</div>
           <div className="flex-1 p-4 bg-white">
             <table className="w-full text-sm">
               <tbody className="divide-y divide-gray-100">
@@ -66,7 +66,7 @@ export default function SalarySlipUI({ user, currentDate, salaryData, totalPayme
               </tbody>
             </table>
           </div>
-          <div className="bg-red-50 p-3 border-t-2 border-red-900 flex justify-between items-center font-black text-red-900">
+          <div className="bg-red-50 p-3 border-t-2 border-red-900 flex justify-between items-center font-semibold text-red-900">
             <span className="text-xs">공제 합계</span>
             <span className="text-lg">₩ {totalDeduction.toLocaleString()}</span>
           </div>
@@ -77,9 +77,9 @@ export default function SalarySlipUI({ user, currentDate, salaryData, totalPayme
       <div className="mb-10 p-6 bg-gray-900 text-white rounded-xl flex justify-between items-center shadow-lg border-l-[12px] border-blue-500">
         <div>
           <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Total Net Pay</p>
-          <p className="text-sm font-black text-gray-100">차인 지급액 (실 수령액)</p>
+          <p className="text-sm font-semibold text-gray-100">차인 지급액 (실 수령액)</p>
         </div>
-        <p className="text-4xl font-black tracking-tighter">
+        <p className="text-4xl font-semibold tracking-tighter">
           ₩ {realPayment.toLocaleString()}
         </p>
       </div>
@@ -88,10 +88,10 @@ export default function SalarySlipUI({ user, currentDate, salaryData, totalPayme
       <div className="text-center mt-auto pb-4">
         <p className="text-sm font-bold text-gray-600 mb-6">위와 같이 급여가 정히 지급되었음을 통지합니다.</p>
         <div className="relative inline-flex items-center gap-4 justify-center">
-          <h2 className="text-3xl font-black text-gray-900 tracking-[0.4em] relative z-10 whitespace-nowrap">
+          <h2 className="text-3xl font-semibold text-gray-900 tracking-[0.4em] relative z-10 whitespace-nowrap">
             {user.company || '박철홍정형외과'} 대표원장
           </h2>
-          <div className="relative w-20 h-20 border-[5px] border-red-600 rounded-full flex items-center justify-center text-red-600 font-black text-base rotate-12 opacity-80 border-double">
+          <div className="relative w-20 h-20 border-[5px] border-red-600 rounded-full flex items-center justify-center text-red-600 font-semibold text-base rotate-12 opacity-80 border-double">
             <span className="text-[10px] leading-tight text-center">
               {user.company || '박철홍정형외과'}
               <br />
@@ -108,7 +108,7 @@ function TableRow({ label, value }: any) {
   return (
     <tr>
       <td className="py-2.5 text-gray-600 font-bold">{label}</td>
-      <td className="py-2.5 text-right text-gray-900 font-black text-base">₩{value.toLocaleString()}</td>
+      <td className="py-2.5 text-right text-gray-900 font-semibold text-base">₩{value.toLocaleString()}</td>
     </tr>
   );
 }

@@ -215,24 +215,24 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
         {viewMode === 'dashboard' && (
           <div className="space-y-8">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-white border border-[#E5E8EB] rounded-2xl p-6 shadow-sm">
+              <div className="bg-white border border-[#E5E8EB] rounded-lg p-6 shadow-sm">
                 <p className="text-[9px] font-bold text-[#8B95A1] uppercase">출근률</p>
                 <p className="text-3xl font-bold text-[#3182F6] mt-1">{stats.rate}%</p>
               </div>
-              <div className="bg-white border border-[#E5E8EB] rounded-2xl p-6 shadow-sm">
+              <div className="bg-white border border-[#E5E8EB] rounded-lg p-6 shadow-sm">
                 <p className="text-[9px] font-bold text-[#8B95A1] uppercase">정상 출근</p>
                 <p className="text-3xl font-bold text-green-600 mt-1">{stats.present}건</p>
               </div>
-              <div className="bg-white border border-[#E5E8EB] rounded-2xl p-6 shadow-sm">
+              <div className="bg-white border border-[#E5E8EB] rounded-lg p-6 shadow-sm">
                 <p className="text-[9px] font-bold text-[#8B95A1] uppercase">지각</p>
                 <p className="text-3xl font-bold text-orange-600 mt-1">{stats.late}건</p>
               </div>
-              <div className="bg-white border border-[#E5E8EB] rounded-2xl p-6 shadow-sm">
+              <div className="bg-white border border-[#E5E8EB] rounded-lg p-6 shadow-sm">
                 <p className="text-[9px] font-bold text-[#8B95A1] uppercase">조퇴</p>
                 <p className="text-3xl font-bold text-amber-600 mt-1">{stats.earlyLeave}건</p>
               </div>
             </div>
-            <div className="bg-white border border-[#E5E8EB] rounded-2xl p-8 shadow-sm">
+            <div className="bg-white border border-[#E5E8EB] rounded-lg p-8 shadow-sm">
               <h3 className="text-sm font-bold text-[#4E5968] mb-4">상태별 비율</h3>
               <div className="space-y-4">
                 <div>
@@ -261,7 +261,7 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
               {Array.from({ length: 35 }).map((_, i) => {
                 const day = i - 1; // 데모용 날짜 오프셋
                 return (
-                  <div key={i} className={`min-h-[120px] p-4 border border-[#E5E8EB] rounded-2xl transition-all hover:shadow-lg ${day > 0 && day <= 28 ? 'bg-white' : 'bg-gray-50/50 opacity-30'}`}>
+                  <div key={i} className={`min-h-[120px] p-4 border border-[#E5E8EB] rounded-lg transition-all hover:shadow-lg ${day > 0 && day <= 28 ? 'bg-white' : 'bg-gray-50/50 opacity-30'}`}>
                     {day > 0 && day <= 28 && (
                       <>
                         <span className="text-xs font-bold text-[#191F28]">{day}</span>

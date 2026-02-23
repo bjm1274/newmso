@@ -83,10 +83,10 @@ export default function TaxInsuranceRatesPanel({ companyName }: { companyName?: 
   const toPercent = (v: number) => (v * 100).toFixed(2);
 
   return (
-    <div className="border border-gray-200 p-6 bg-white rounded-[1.75rem] shadow-sm">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-[11px] font-black text-gray-600 uppercase tracking-widest">세율·보험요율 (연도별)</h3>
-        <button onClick={openAdd} className="px-3 py-1.5 bg-blue-600 text-white text-[10px] font-bold rounded-lg hover:bg-blue-700">
+    <div className="border border-gray-200 p-4 bg-white rounded-lg shadow-sm">
+      <div className="flex justify-between items-center pb-2 border-b border-gray-100 mb-3">
+        <h3 className="text-sm font-semibold text-gray-800">세율·보험요율 (연도별)</h3>
+        <button onClick={openAdd} className="px-2.5 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700">
           + 연도 추가
         </button>
       </div>
@@ -95,19 +95,19 @@ export default function TaxInsuranceRatesPanel({ companyName }: { companyName?: 
         <p className="text-xs text-gray-500">로딩 중...</p>
       ) : (
         <>
-          <div className="space-y-3 mb-6">
+          <div className="space-y-2 mb-4">
             {list.map((r) => (
-              <div key={r.id} className="p-4 bg-gray-50 rounded-xl flex justify-between items-start gap-4">
+              <div key={r.id} className="p-3 bg-[#f8fafc] rounded-lg border border-gray-200 flex justify-between items-start gap-3">
                 <div>
-                  <p className="text-sm font-black text-gray-800">{r.effective_year}년</p>
-                  <div className="grid grid-cols-2 gap-2 text-[10px] mt-2">
+                  <p className="text-sm font-semibold text-gray-800">{r.effective_year}년</p>
+                  <div className="grid grid-cols-2 gap-1 text-[10px] mt-1.5 text-gray-600">
                     <span>국민연금 {toPercent(Number(r.national_pension_rate))}%</span>
                     <span>건강 {toPercent(Number(r.health_insurance_rate))}%</span>
                     <span>장기요양 {toPercent(Number(r.long_term_care_rate))}%</span>
                     <span>고용 {toPercent(Number(r.employment_insurance_rate))}%</span>
                   </div>
                 </div>
-                <button onClick={() => openEdit(r)} className="text-[10px] font-bold text-blue-600 hover:text-blue-700 shrink-0">수정</button>
+                <button onClick={() => openEdit(r)} className="text-xs font-medium text-blue-600 hover:text-blue-700 shrink-0">수정</button>
               </div>
             ))}
             {list.length === 0 && !editing && (
@@ -115,35 +115,35 @@ export default function TaxInsuranceRatesPanel({ companyName }: { companyName?: 
             )}
           </div>
 
-          <div className="border-t border-gray-100 pt-4 space-y-3">
-            <p className="text-[10px] font-black text-gray-500 uppercase">{editing ? `${editing.effective_year}년 수정` : '연도별 요율 추가/수정'}</p>
+          <div className="border-t border-gray-200 pt-4 space-y-3">
+            <p className="text-xs font-medium text-gray-600">{editing ? `${editing.effective_year}년 수정` : '연도별 요율 추가/수정'}</p>
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 mb-1">적용 연도</label>
-                <input type="number" min={2020} max={2030} value={form.effective_year} onChange={(e) => setForm({ ...form, effective_year: parseInt(e.target.value) || new Date().getFullYear() })} className="w-full p-2 border border-gray-200 rounded-lg text-sm font-bold" />
+              <div className="space-y-1">
+                <label className="block text-xs font-medium text-gray-600">적용 연도</label>
+                <input type="number" min={2020} max={2030} value={form.effective_year} onChange={(e) => setForm({ ...form, effective_year: parseInt(e.target.value) || new Date().getFullYear() })} className="w-full h-9 px-3 border border-gray-300 rounded-md text-sm font-medium" />
               </div>
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 mb-1">국민연금 (%)</label>
-                <input type="number" step={0.001} min={0} max={20} value={(form.national_pension_rate * 100).toFixed(2)} onChange={(e) => setForm({ ...form, national_pension_rate: (parseFloat(e.target.value) || 0) / 100 })} className="w-full p-2 border border-gray-200 rounded-lg text-sm font-bold" />
+              <div className="space-y-1">
+                <label className="block text-xs font-medium text-gray-600">국민연금 (%)</label>
+                <input type="number" step={0.001} min={0} max={20} value={(form.national_pension_rate * 100).toFixed(2)} onChange={(e) => setForm({ ...form, national_pension_rate: (parseFloat(e.target.value) || 0) / 100 })} className="w-full h-9 px-3 border border-gray-300 rounded-md text-sm font-medium" />
               </div>
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 mb-1">건강보험 (%)</label>
-                <input type="number" step={0.001} min={0} max={20} value={(form.health_insurance_rate * 100).toFixed(2)} onChange={(e) => setForm({ ...form, health_insurance_rate: (parseFloat(e.target.value) || 0) / 100 })} className="w-full p-2 border border-gray-200 rounded-lg text-sm font-bold" />
+              <div className="space-y-1">
+                <label className="block text-xs font-medium text-gray-600">건강보험 (%)</label>
+                <input type="number" step={0.001} min={0} max={20} value={(form.health_insurance_rate * 100).toFixed(2)} onChange={(e) => setForm({ ...form, health_insurance_rate: (parseFloat(e.target.value) || 0) / 100 })} className="w-full h-9 px-3 border border-gray-300 rounded-md text-sm font-medium" />
               </div>
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 mb-1">장기요양 (%)</label>
-                <input type="number" step={0.001} min={0} max={20} value={(form.long_term_care_rate * 100).toFixed(2)} onChange={(e) => setForm({ ...form, long_term_care_rate: (parseFloat(e.target.value) || 0) / 100 })} className="w-full p-2 border border-gray-200 rounded-lg text-sm font-bold" />
+              <div className="space-y-1">
+                <label className="block text-xs font-medium text-gray-600">장기요양 (%)</label>
+                <input type="number" step={0.001} min={0} max={20} value={(form.long_term_care_rate * 100).toFixed(2)} onChange={(e) => setForm({ ...form, long_term_care_rate: (parseFloat(e.target.value) || 0) / 100 })} className="w-full h-9 px-3 border border-gray-300 rounded-md text-sm font-medium" />
               </div>
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 mb-1">고용보험 (%)</label>
-                <input type="number" step={0.001} min={0} max={20} value={(form.employment_insurance_rate * 100).toFixed(2)} onChange={(e) => setForm({ ...form, employment_insurance_rate: (parseFloat(e.target.value) || 0) / 100 })} className="w-full p-2 border border-gray-200 rounded-lg text-sm font-bold" />
+              <div className="space-y-1">
+                <label className="block text-xs font-medium text-gray-600">고용보험 (%)</label>
+                <input type="number" step={0.001} min={0} max={20} value={(form.employment_insurance_rate * 100).toFixed(2)} onChange={(e) => setForm({ ...form, employment_insurance_rate: (parseFloat(e.target.value) || 0) / 100 })} className="w-full h-9 px-3 border border-gray-300 rounded-md text-sm font-medium" />
               </div>
             </div>
             <div className="flex gap-2">
-              <button onClick={handleSave} disabled={saving} className="px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 disabled:opacity-50">
+              <button onClick={handleSave} disabled={saving} className="px-3 py-2 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50">
                 {saving ? '저장 중...' : editing ? '수정 저장' : '연도 추가'}
               </button>
-              {editing && <button onClick={() => setEditing(null)} className="px-4 py-2 bg-gray-100 text-gray-600 text-xs font-bold rounded-lg">취소</button>}
+              {editing && <button onClick={() => setEditing(null)} className="px-3 py-2 bg-gray-100 text-gray-600 text-xs font-medium rounded-lg hover:bg-gray-200">취소</button>}
             </div>
           </div>
         </>

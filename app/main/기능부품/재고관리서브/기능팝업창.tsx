@@ -13,7 +13,7 @@ export function POModal({ isOpen, onClose, inventory }: any) {
   return (
     <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-8" onClick={onClose}>
       <div className="bg-white w-full max-w-2xl rounded-[1rem] p-10 shadow-2xl overflow-y-auto max-h-full" onClick={e => e.stopPropagation()}>
-        <div className="flex justify-between items-center border-b-2 border-black pb-4 mb-6"><h1 className="text-3xl font-black text-black">발 주 서</h1><div className="text-right"><p className="text-sm font-bold">발행일: {new Date().toISOString().split('T')[0]}</p><p className="text-sm font-bold">발신: 박철홍정형외과</p></div></div>
+        <div className="flex justify-between items-center border-b-2 border-black pb-4 mb-6"><h1 className="text-3xl font-semibold text-black">발 주 서</h1><div className="text-right"><p className="text-sm font-bold">발행일: {new Date().toISOString().split('T')[0]}</p><p className="text-sm font-bold">발신: 박철홍정형외과</p></div></div>
         {lowStockItems.length > 0 ? (
           <table className="w-full text-sm border-collapse border border-black mb-8">
             <thead><tr className="bg-gray-100"><th className="border p-2">품목</th><th className="border p-2">현재고</th><th className="border p-2">최소유지</th><th className="border p-2">권장량</th><th className="border p-2">공급사</th></tr></thead>
@@ -75,7 +75,7 @@ export function BillModal({ isOpen, onClose, inventory }: any) {
         {isRegisterMode && (
           <div className="absolute inset-0 bg-white/95 z-50 flex flex-col items-center justify-center p-10 backdrop-blur-md rounded-[1rem]">
             <div className="w-full max-w-md space-y-4">
-              <h2 className="text-2xl font-black text-gray-800 border-b pb-4 mb-6">🏢 신규 업체 등록</h2>
+              <h2 className="text-2xl font-semibold text-gray-800 border-b pb-4 mb-6">🏢 신규 업체 등록</h2>
               <div><label className="text-xs font-bold text-blue-600 ml-1">별칭</label><input className="w-full p-3 bg-blue-50 border border-blue-100 rounded-xl font-bold" placeholder="예: 거래처A" value={newPartner.alias} onChange={e=>setNewPartner({...newPartner, alias: e.target.value})} /></div>
               <div className="grid grid-cols-2 gap-3">
                 <div><label className="text-xs font-bold text-gray-400 ml-1">등록번호</label><input className="w-full p-3 bg-gray-50 rounded-xl text-sm" value={newPartner.reg_num} onChange={e=>setNewPartner({...newPartner, reg_num: e.target.value})} /></div>
@@ -221,10 +221,10 @@ export function UDIModal({ isOpen, onClose, inventory, user, onRefresh }: any) {
   return (
     <div className="absolute inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white w-full max-w-4xl rounded-[2rem] p-8 shadow-2xl h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
-        <div className="flex justify-between items-center border-b pb-4"><h2 className="text-2xl font-black text-purple-700">📡 공급내역보고</h2><p className="font-bold">대상: {udiItems.length}건</p></div>
+        <div className="flex justify-between items-center border-b pb-4"><h2 className="text-2xl font-semibold text-purple-700">📡 공급내역보고</h2><p className="font-bold">대상: {udiItems.length}건</p></div>
         <div className="bg-gray-100 p-4 rounded-xl mt-4 flex gap-4 items-center"><span className="text-2xl">🔫</span><input ref={inputRef} value={barcodeInput} onChange={e=>setBarcodeInput(e.target.value)} onKeyDown={handleScan} className="flex-1 p-3 rounded-xl font-bold" placeholder="바코드 스캔..." autoFocus /></div>
-        <div className="flex-1 overflow-y-auto mt-4 border rounded-2xl p-4">{udiItems.map((item, i) => <div key={i} className="border-b p-2 flex justify-between"><span>{item.name}</span><span className="text-blue-600">{item.lot_number}</span><span className="font-bold">{item.report_qty}</span></div>)}</div>
-        <div className="mt-4 pt-4 border-t flex justify-end gap-3"><button onClick={submit} className="px-8 py-4 bg-purple-600 text-white rounded-2xl font-bold shadow-lg">NIDS 전송</button></div>
+        <div className="flex-1 overflow-y-auto mt-4 border rounded-lg p-4">{udiItems.map((item, i) => <div key={i} className="border-b p-2 flex justify-between"><span>{item.name}</span><span className="text-blue-600">{item.lot_number}</span><span className="font-bold">{item.report_qty}</span></div>)}</div>
+        <div className="mt-4 pt-4 border-t flex justify-end gap-3"><button onClick={submit} className="px-8 py-4 bg-purple-600 text-white rounded-lg font-bold shadow-lg">NIDS 전송</button></div>
       </div>
     </div>
   );

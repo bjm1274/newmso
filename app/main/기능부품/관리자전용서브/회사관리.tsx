@@ -151,45 +151,45 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
           <h2 className="text-lg font-bold text-[#191F28]">회사 관리</h2>
           <p className="text-xs text-gray-500 mt-1">MSO가 관리하는 회사·팀·법인카드·계약 설정을 한 곳에서 관리합니다.</p>
         </div>
-        <div className="flex gap-1 bg-[#F2F4F6] p-1 border border-[#E5E8EB] rounded-[12px] text-[11px] font-bold">
+        <div className="flex gap-0.5 p-1 bg-[#eef2f7] rounded-lg flex-wrap">
           <button
-            className={`px-3 py-1.5 rounded-[10px] ${activeTab === 'company' ? 'bg-white text-[#3182F6] shadow-sm' : 'text-gray-500'}`}
+            className={`px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'company' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:bg-white/60'}`}
             onClick={() => setActiveTab('company')}
           >
             회사 기본정보
           </button>
           <button
-            className={`px-3 py-1.5 rounded-[10px] ${activeTab === 'team' ? 'bg-white text-[#3182F6] shadow-sm' : 'text-gray-500'}`}
+            className={`px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'team' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:bg-white/60'}`}
             onClick={() => setActiveTab('team')}
           >
             팀
           </button>
           <button
-            className={`px-3 py-1.5 rounded-[10px] ${activeTab === 'shift' ? 'bg-white text-[#3182F6] shadow-sm' : 'text-gray-500'}`}
+            className={`px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'shift' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:bg-white/60'}`}
             onClick={() => setActiveTab('shift')}
           >
             근무형태
           </button>
           <button
-            className={`px-3 py-1.5 rounded-[10px] ${activeTab === 'attendanceRules' ? 'bg-white text-[#3182F6] shadow-sm' : 'text-gray-500'}`}
+            className={`px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'attendanceRules' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:bg-white/60'}`}
             onClick={() => setActiveTab('attendanceRules')}
           >
             근태 규칙
           </button>
           <button
-            className={`px-3 py-1.5 rounded-[10px] ${activeTab === 'card' ? 'bg-white text-[#3182F6] shadow-sm' : 'text-gray-500'}`}
+            className={`px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'card' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:bg-white/60'}`}
             onClick={() => setActiveTab('card')}
           >
             법인카드
           </button>
           <button
-            className={`px-3 py-1.5 rounded-[10px] ${activeTab === 'contract' ? 'bg-white text-[#3182F6] shadow-sm' : 'text-gray-500'}`}
+            className={`px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'contract' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:bg-white/60'}`}
             onClick={() => setActiveTab('contract')}
           >
             계약 설정
           </button>
           <button
-            className={`px-3 py-1.5 rounded-[10px] ${activeTab === 'forms' ? 'bg-white text-[#3182F6] shadow-sm' : 'text-gray-500'}`}
+            className={`px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'forms' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:bg-white/60'}`}
             onClick={() => setActiveTab('forms')}
           >
             전자결재 서식
@@ -199,7 +199,7 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
 
       {activeTab === 'company' && (
         <div className="space-y-8">
-          <div className="bg-white border border-[#E5E8EB] rounded-2xl shadow-sm overflow-hidden">
+          <div className="bg-white border border-[#E5E8EB] rounded-lg shadow-sm overflow-hidden">
             <div className="p-6 border-b border-[#E5E8EB]">
               <h3 className="text-base font-bold text-[#191F28]">회사(병원) 목록</h3>
               <p className="text-xs text-gray-500 mt-1">
@@ -245,7 +245,7 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
             </div>
           </div>
 
-          <div className="bg-white border border-[#E5E8EB] rounded-2xl shadow-sm p-6">
+          <div className="bg-white border border-[#E5E8EB] rounded-lg shadow-sm p-6">
             <h3 className="text-base font-bold text-[#191F28] mb-4">{editing ? '회사 수정' : '회사 추가'}</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -357,7 +357,7 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
       {activeTab === 'contract' && <ContractManager />}
 
       {activeTab === 'forms' && (
-        <div className="bg-white border border-[#E5E8EB] rounded-2xl shadow-sm p-6">
+        <div className="bg-white border border-[#E5E8EB] rounded-lg shadow-sm p-6">
           <ApprovalFormTypesManager />
         </div>
       )}

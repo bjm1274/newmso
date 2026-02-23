@@ -50,7 +50,7 @@ export default function OrgChart({ user, staffs, depts, selectedCo, setSelectedC
     <div className="flex-1 flex flex-col overflow-hidden bg-white">
       {/* 헤더 */}
       <div className="p-6 border-b border-gray-200">
-        <h2 className="text-2xl font-black text-gray-800 mb-4">🏢 조직도</h2>
+        <h2 className="text-2xl font-semibold text-gray-800 mb-4">🏢 조직도</h2>
         
         {/* 검색 */}
         <div className="relative">
@@ -77,7 +77,7 @@ export default function OrgChart({ user, staffs, depts, selectedCo, setSelectedC
         {searchTerm ? (
           // 검색 결과
           <div className="p-6">
-            <h3 className="font-black text-gray-800 mb-4">
+            <h3 className="font-semibold text-gray-800 mb-4">
               검색 결과: {filteredStaffs.length}명
             </h3>
             <div className="space-y-2">
@@ -92,16 +92,16 @@ export default function OrgChart({ user, staffs, depts, selectedCo, setSelectedC
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-black text-sm">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold text-sm">
                       {staff.name?.charAt(0)}
                     </div>
                     <div className="flex-1">
-                      <p className="font-black text-gray-800">{staff.name}</p>
+                      <p className="font-semibold text-gray-800">{staff.name}</p>
                       <p className="text-xs text-gray-500">
                         {staff.position} · {staff.department}
                       </p>
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-black ${getPositionColor(staff.position)}`}>
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getPositionColor(staff.position)}`}>
                       {staff.position}
                     </span>
                   </div>
@@ -122,7 +122,7 @@ export default function OrgChart({ user, staffs, depts, selectedCo, setSelectedC
                   <span className={`text-lg transition-transform ${expandedDepts.includes(dept.id) ? 'rotate-90' : ''}`}>
                     ▶
                   </span>
-                  <span className="font-black text-lg text-gray-800">📋 {dept.name}</span>
+                  <span className="font-semibold text-lg text-gray-800">📋 {dept.name}</span>
                   <span className="text-xs font-bold text-gray-500 ml-auto">
                     ({getDeptStaffs(dept.id).length}명)
                   </span>
@@ -142,14 +142,14 @@ export default function OrgChart({ user, staffs, depts, selectedCo, setSelectedC
                         }`}
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white font-black text-xs">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white font-semibold text-xs">
                             {staff.name?.charAt(0)}
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="font-bold text-gray-800 truncate">{staff.name}</p>
                             <p className="text-xs text-gray-500">{staff.email}</p>
                           </div>
-                          <span className={`px-2 py-1 rounded text-xs font-black whitespace-nowrap ${getPositionColor(staff.position)}`}>
+                          <span className={`px-2 py-1 rounded text-xs font-semibold whitespace-nowrap ${getPositionColor(staff.position)}`}>
                             {staff.position}
                           </span>
                         </div>
@@ -167,11 +167,11 @@ export default function OrgChart({ user, staffs, depts, selectedCo, setSelectedC
       {selectedStaff && (
         <div className="border-t border-gray-200 bg-gray-50 p-6">
           <div className="flex items-start gap-4">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-black text-2xl">
+            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold text-2xl">
               {selectedStaff.name?.charAt(0)}
             </div>
             <div className="flex-1">
-              <h3 className="text-xl font-black text-gray-800">{selectedStaff.name}</h3>
+              <h3 className="text-xl font-semibold text-gray-800">{selectedStaff.name}</h3>
               <p className="text-sm text-gray-600 mb-3">{selectedStaff.department} · {selectedStaff.position}</p>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
