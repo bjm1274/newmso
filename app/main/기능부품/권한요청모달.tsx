@@ -75,12 +75,12 @@ export default function PermissionPromptModal() {
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-sm w-full p-6 border border-[#E5E8EB]">
-        <h3 className="text-lg font-semibold text-[#191F28] mb-2">권한 안내</h3>
-        <p className="text-sm text-[#4E5968] mb-5">
+      <div className="bg-[var(--toss-card)] rounded-lg shadow-xl max-w-sm w-full p-6 border border-[var(--toss-border)]">
+        <h3 className="text-lg font-semibold text-[var(--foreground)] mb-2">권한 안내</h3>
+        <p className="text-sm text-[var(--toss-gray-4)] mb-5">
           서비스 이용을 위해 아래 권한 허용을 권장합니다.
         </p>
-        <ul className="text-xs text-[#6B7684] space-y-2 mb-6">
+        <ul className="text-xs text-[var(--toss-gray-4)] space-y-2 mb-6">
           <li>• <strong>알림</strong>: 푸시 알림, 결재·채팅 등 알림 수신</li>
           <li>• <strong>위치(GPS)</strong>: 출퇴근 시 근무지 인증에 사용</li>
         </ul>
@@ -89,7 +89,7 @@ export default function PermissionPromptModal() {
             type="button"
             onClick={requestNotification}
             disabled={notifying}
-            className="w-full py-3 px-4 rounded-xl bg-[#3182F6] text-white text-sm font-bold disabled:opacity-60"
+            className="w-full py-3 px-4 rounded-xl bg-[var(--toss-blue)] text-white text-sm font-bold disabled:opacity-60"
           >
             {notifying ? '요청 중…' : '🔔 알림 허용'}
           </button>
@@ -104,7 +104,7 @@ export default function PermissionPromptModal() {
           <button
             type="button"
             onClick={close}
-            className="w-full py-2.5 px-4 rounded-xl border border-[#E5E8EB] text-[#4E5968] text-sm font-bold mt-1"
+            className="w-full py-2.5 px-4 rounded-xl border border-[var(--toss-border)] text-[var(--toss-gray-4)] text-sm font-bold mt-1"
           >
             나중에 하기
           </button>

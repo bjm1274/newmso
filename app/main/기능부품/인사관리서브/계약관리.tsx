@@ -95,17 +95,17 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: any) {
   };
 
   return (
-    <div className="flex flex-col h-full animate-in fade-in duration-500 bg-gray-50/20">
-      <header className="p-8 border-b border-gray-100 bg-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
+    <div className="flex flex-col h-full animate-in fade-in duration-500 bg-[var(--tab-bg)]/20">
+      <header className="p-8 border-b border-[var(--toss-border)] bg-[var(--toss-card)] flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
         <div>
-          <h2 className="text-lg font-bold text-gray-800 tracking-tighter italic">전자 계약 및 법적 비과세 관리 <span className="text-sm text-blue-600 ml-2">[{selectedCo}]</span></h2>
-          <div className="flex gap-0.5 p-1 bg-[#eef2f7] rounded-lg w-fit mt-2">
+          <h2 className="text-lg font-bold text-[var(--foreground)] tracking-tighter italic">전자 계약 및 법적 비과세 관리 <span className="text-sm text-[var(--toss-blue)] ml-2">[{selectedCo}]</span></h2>
+          <div className="flex gap-0.5 p-1 app-tab-bar w-fit mt-2">
             {['계약현황', '신규/변경계약서', '연봉계약갱신'].map(tab => (
-              <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 text-xs font-medium rounded-md transition-all whitespace-nowrap ${activeTab === tab ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-white/60'}`}>{tab}</button>
+              <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 text-xs font-medium rounded-md transition-all whitespace-nowrap ${activeTab === tab ? 'bg-[var(--toss-card)] text-[var(--toss-blue)] shadow-sm' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-card)]/60'}`}>{tab}</button>
             ))}
           </div>
         </div>
-        <button onClick={handleRequestSignature} disabled={loading || checkedIds.length === 0} className="px-6 py-3 bg-gray-900 text-white text-[11px] font-semibold rounded-lg shadow-xl hover:scale-[0.98] transition-all disabled:opacity-50">
+        <button onClick={handleRequestSignature} disabled={loading || checkedIds.length === 0} className="px-6 py-3 bg-[var(--foreground)] text-white text-[11px] font-semibold rounded-lg shadow-xl hover:scale-[0.98] transition-all disabled:opacity-50">
           {loading ? '처리 중...' : `${activeTab === '연봉계약갱신' ? '연봉 갱신 및 계약 발송' : activeTab === '신규/변경계약서' ? `${contractSubType} 계약서 발송` : '근로계약서 발송'} (${checkedIds.length}명)`}
         </button>
       </header>
@@ -114,12 +114,12 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: any) {
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
           <div className="xl:col-span-2 space-y-8">
             {activeTab === '신규/변경계약서' && (
-              <div className="p-8 bg-[#3182F6] text-white rounded-[2rem] shadow-xl space-y-6 animate-in slide-in-from-top-4 duration-500">
+              <div className="p-8 bg-[var(--toss-blue)] text-white rounded-[2rem] shadow-xl space-y-6 animate-in slide-in-from-top-4 duration-500">
                 <div className="flex gap-4 items-center">
                   <h3 className="text-lg font-bold">각종 비과세 항목 등록 (신규/변경 계약서)</h3>
                   <div className="flex gap-2">
-                    <button onClick={() => setContractSubType('신규')} className={`px-4 py-2 rounded-[12px] text-[11px] font-semibold transition-all ${contractSubType === '신규' ? 'bg-white text-[#3182F6]' : 'bg-white/20 hover:bg-white/30'}`}>신규 계약서</button>
-                    <button onClick={() => setContractSubType('변경')} className={`px-4 py-2 rounded-[12px] text-[11px] font-semibold transition-all ${contractSubType === '변경' ? 'bg-white text-[#3182F6]' : 'bg-white/20 hover:bg-white/30'}`}>변경 계약서</button>
+                    <button onClick={() => setContractSubType('신규')} className={`px-4 py-2 rounded-[12px] text-[11px] font-semibold transition-all ${contractSubType === '신규' ? 'bg-[var(--toss-card)] text-[var(--toss-blue)]' : 'bg-[var(--toss-card)]/20 hover:bg-[var(--toss-card)]/30'}`}>신규 계약서</button>
+                    <button onClick={() => setContractSubType('변경')} className={`px-4 py-2 rounded-[12px] text-[11px] font-semibold transition-all ${contractSubType === '변경' ? 'bg-[var(--toss-card)] text-[var(--toss-blue)]' : 'bg-[var(--toss-card)]/20 hover:bg-[var(--toss-card)]/30'}`}>변경 계약서</button>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -160,7 +160,7 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: any) {
               </div>
             )}
             {activeTab === '연봉계약갱신' && (
-              <div className="p-8 bg-[#3182F6] text-white rounded-[2rem] shadow-xl space-y-6 animate-in slide-in-from-top-4 duration-500">
+              <div className="p-8 bg-[var(--toss-blue)] text-white rounded-[2rem] shadow-xl space-y-6 animate-in slide-in-from-top-4 duration-500">
                 <h3 className="text-lg font-bold">법적 비과세 항목 및 연봉 설정</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   <div className="space-y-2">

@@ -79,31 +79,31 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
   const periodLabel = y && m ? `${y}년 ${Number(m)}월` : '';
 
   return (
-    <div className="flex flex-col h-full animate-in fade-in duration-500 bg-[#f8fafc]">
-      <header className="shrink-0 bg-white border-b border-gray-200">
+    <div className="flex flex-col h-full animate-in fade-in duration-500 app-page">
+      <header className="shrink-0 app-header">
         <div className="px-6 md:px-8 pt-5 pb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex flex-wrap items-center gap-4">
             <div>
-              <h1 className="text-lg font-bold text-gray-900">{periodLabel || '급여'} 급여</h1>
-              <p className="text-xs text-gray-500 mt-0.5">[{selectedCo}]</p>
+              <h1 className="page-header-title text-lg font-bold">{periodLabel || '급여'} 급여</h1>
+              <p className="page-header-caption text-xs mt-0.5">[{selectedCo}]</p>
             </div>
             {activeTab === '대장' && (
-              <label className="flex items-center gap-2 text-sm text-gray-600">
+              <label className="flex items-center gap-2 text-sm text-[var(--toss-gray-4)]">
                 <span>기간</span>
-                <input type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="h-9 px-3 border border-gray-300 rounded-md text-gray-900 font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                <input type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="h-9 px-3 border border-[var(--toss-border)] rounded-md bg-[var(--input-bg)] text-[var(--foreground)] font-medium focus:ring-2 focus:ring-[var(--toss-blue)]/30 focus:border-[var(--toss-blue)]" />
               </label>
             )}
           </div>
           {activeTab === '대장' && (
-            <span className="text-xs text-gray-500 hidden md:inline">우측 패널에서 대장 내보내기</span>
+            <span className="caption hidden md:inline">우측 패널에서 대장 내보내기</span>
           )}
         </div>
-        <nav className="flex gap-0.5 p-1 bg-[#eef2f7] rounded-lg overflow-x-auto no-scrollbar w-full md:w-fit mt-2">
+        <nav className="flex gap-0.5 p-1 app-tab-bar overflow-x-auto no-scrollbar w-full md:w-fit mt-2">
           {['대장', '대시보드', '급여정산', '중간정산', '연말정산', '퇴직금', '설정'].map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`min-h-[44px] touch-manipulation px-4 py-2 text-xs font-medium whitespace-nowrap rounded-md transition-all ${activeTab === tab ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-white/60'}`}
+              className={`min-h-[44px] touch-manipulation px-4 py-2 text-xs font-medium whitespace-nowrap rounded-md transition-all ${activeTab === tab ? 'bg-[var(--toss-card)] text-[var(--toss-blue)] shadow-sm' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'}`}
             >
               {tab}
             </button>
@@ -153,8 +153,8 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
             )}
           </>
         ) : (
-          <div className="h-full flex items-center justify-center bg-white border border-dashed border-gray-200 rounded-[2rem] p-20">
-            <p className="text-sm font-medium text-gray-500">
+          <div className="h-full flex items-center justify-center bg-[var(--toss-card)] border border-dashed border-[var(--toss-border)] rounded-[2rem] p-20">
+            <p className="text-sm font-medium text-[var(--toss-gray-3)]">
               &quot;{selectedCo}&quot; 소속 인원이 없습니다.
             </p>
           </div>
@@ -172,14 +172,14 @@ function BenefitSummary({ staff }: { staff: Staff }) {
   const health = Math.round(base * 0.03545);
 
   return (
-    <div className="border border-gray-200 p-4 bg-white rounded-lg shadow-sm">
-      <h3 className="text-sm font-semibold text-gray-800 mb-3">복리후생 · 4대보험 (DEMO)</h3>
-      <div className="space-y-1.5 text-xs font-medium text-gray-600">
-        <div className="flex justify-between"><span>복리후생 예산</span><span className="text-blue-600">{welfare.toLocaleString()}원/월</span></div>
+    <div className="app-card p-4 shadow-sm">
+      <h3 className="text-sm font-semibold text-[var(--foreground)] mb-3">복리후생 · 4대보험 (DEMO)</h3>
+      <div className="space-y-1.5 text-xs font-medium text-[var(--toss-gray-4)]">
+        <div className="flex justify-between"><span>복리후생 예산</span><span className="text-[var(--toss-blue)]">{welfare.toLocaleString()}원/월</span></div>
         <div className="flex justify-between"><span>국민연금 회사부담</span><span className="text-red-600">-{pension.toLocaleString()}원</span></div>
         <div className="flex justify-between"><span>건강보험 회사부담</span><span className="text-red-600">-{health.toLocaleString()}원</span></div>
       </div>
-      <p className="mt-2 text-[10px] text-gray-400">* Supabase 연동 후 자동 반영 예정</p>
+      <p className="mt-2 text-[10px] text-[var(--toss-gray-3)]">* Supabase 연동 후 자동 반영 예정</p>
     </div>
   );
 }
@@ -194,17 +194,17 @@ function SalarySimulationSummary({ staff }: { staff: Staff }) {
   ];
 
   return (
-    <div className="border border-gray-200 p-4 bg-[#f8fafc] rounded-lg shadow-sm">
-      <h3 className="text-sm font-semibold text-gray-800 mb-3">급여 시뮬레이션 (DEMO)</h3>
-      <div className="space-y-1.5 text-xs font-medium text-gray-700">
+    <div className="app-card p-4 shadow-sm">
+      <h3 className="text-sm font-semibold text-[var(--foreground)] mb-3">급여 시뮬레이션 (DEMO)</h3>
+      <div className="space-y-1.5 text-xs font-medium text-[var(--foreground)]">
         {scenarios.map((s) => (
           <div key={s.name} className="flex justify-between">
             <span>{s.name}</span>
-            <span className="text-blue-600">{s.total.toLocaleString()}원</span>
+            <span className="text-[var(--toss-blue)]">{s.total.toLocaleString()}원</span>
           </div>
         ))}
       </div>
-      <p className="mt-2 text-[10px] text-gray-500">* 시나리오 저장/비교 연동 예정</p>
+      <p className="mt-2 text-[10px] text-[var(--toss-gray-3)]">* 시나리오 저장/비교 연동 예정</p>
     </div>
   );
 }

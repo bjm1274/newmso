@@ -16,21 +16,21 @@ export default function ExtraFeatures({ user }: { user?: any }) {
   const [subView, setSubView] = useState<string | null>(null);
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar bg-[#F9FAFB]">
+    <div className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar bg-[var(--page-bg)]">
       <div className="max-w-xl mx-auto">
-        <h2 className="text-lg font-bold text-[#191F28] mb-1">추가 기능</h2>
-        <p className="text-[11px] text-[#8B95A1] mb-6">외부 서비스 바로가기, 부서별 재고, AI채팅</p>
+        <h2 className="text-lg font-bold text-[var(--foreground)] mb-1">추가 기능</h2>
+        <p className="text-[11px] text-[var(--toss-gray-3)] mb-6">외부 서비스 바로가기, 부서별 재고, AI채팅</p>
 
         {subView === '부서별재고' && (
           <div className="space-y-4">
             <button
               type="button"
               onClick={() => setSubView(null)}
-              className="text-[11px] font-bold text-[#3182F6] hover:underline"
+              className="text-[11px] font-bold text-[var(--toss-blue)] hover:underline"
             >
               ← 목록으로
             </button>
-            <div className="bg-white border border-[#E5E8EB] rounded-[16px] p-6 shadow-sm">
+            <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] p-6 shadow-sm">
               <부서별물품장비현황 user={user || {}} />
             </div>
           </div>
@@ -41,11 +41,11 @@ export default function ExtraFeatures({ user }: { user?: any }) {
             <button
               type="button"
               onClick={() => setSubView(null)}
-              className="text-[11px] font-bold text-[#3182F6] hover:underline shrink-0"
+              className="text-[11px] font-bold text-[var(--toss-blue)] hover:underline shrink-0"
             >
               ← 목록으로
             </button>
-            <div className="flex-1 min-h-0 bg-white border border-[#E5E8EB] rounded-[16px] overflow-hidden shadow-sm">
+            <div className="flex-1 min-h-0 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] overflow-hidden shadow-sm">
               <AIChatView />
             </div>
           </div>
@@ -56,30 +56,30 @@ export default function ExtraFeatures({ user }: { user?: any }) {
             <button
               type="button"
               onClick={() => setSubView('부서별재고')}
-              className="flex items-center gap-3 p-4 bg-white border border-[#E5E8EB] rounded-[16px] shadow-sm hover:bg-[#E8F3FF]/50 hover:border-[#3182F6]/30 transition-all group text-left w-full"
+              className="flex items-center gap-3 p-4 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] shadow-sm hover:bg-[var(--toss-blue-light)]/50 hover:border-[var(--toss-blue)]/30 transition-all group text-left w-full"
             >
-              <div className="w-12 h-12 bg-[#F2F4F6] group-hover:bg-[#E8F3FF] rounded-[12px] flex items-center justify-center text-xl transition-colors">
+              <div className="w-12 h-12 bg-[var(--toss-gray-1)] group-hover:bg-[var(--toss-blue-light)] rounded-[12px] flex items-center justify-center text-xl transition-colors">
                 🏢
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-[#191F28] text-sm">부서별 재고</h3>
-                <p className="text-[11px] text-[#8B95A1] mt-0.5">우리 부서 물품·장비 현황</p>
+                <h3 className="font-semibold text-[var(--foreground)] text-sm">부서별 재고</h3>
+                <p className="text-[11px] text-[var(--toss-gray-3)] mt-0.5">우리 부서 물품·장비 현황</p>
               </div>
-              <span className="text-[#8B95A1] group-hover:text-[#3182F6]">→</span>
+              <span className="text-[var(--toss-gray-3)] group-hover:text-[var(--toss-blue)]">→</span>
             </button>
             <button
               type="button"
               onClick={() => setSubView('AI채팅')}
-              className="flex items-center gap-3 p-4 bg-white border border-[#E5E8EB] rounded-[16px] shadow-sm hover:bg-[#E8F3FF]/50 hover:border-[#3182F6]/30 transition-all group text-left w-full"
+              className="flex items-center gap-3 p-4 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] shadow-sm hover:bg-[var(--toss-blue-light)]/50 hover:border-[var(--toss-blue)]/30 transition-all group text-left w-full"
             >
-              <div className="w-12 h-12 bg-[#F2F4F6] group-hover:bg-[#E8F3FF] rounded-[12px] flex items-center justify-center text-xl transition-colors">
+              <div className="w-12 h-12 bg-[var(--toss-gray-1)] group-hover:bg-[var(--toss-blue-light)] rounded-[12px] flex items-center justify-center text-xl transition-colors">
                 ✨
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-[#191F28] text-sm">AI채팅</h3>
-                <p className="text-[11px] text-[#8B95A1] mt-0.5">AI와 대화하기</p>
+                <h3 className="font-semibold text-[var(--foreground)] text-sm">AI채팅</h3>
+                <p className="text-[11px] text-[var(--toss-gray-3)] mt-0.5">AI와 대화하기</p>
               </div>
-              <span className="text-[#8B95A1] group-hover:text-[#3182F6]">→</span>
+              <span className="text-[var(--toss-gray-3)] group-hover:text-[var(--toss-blue)]">→</span>
             </button>
             {EXTERNAL_LINKS.map((item) => (
               <a
@@ -87,16 +87,16 @@ export default function ExtraFeatures({ user }: { user?: any }) {
                 href={item.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-3 p-4 bg-white border border-[#E5E8EB] rounded-[16px] shadow-sm hover:bg-[#E8F3FF]/50 hover:border-[#3182F6]/30 transition-all group"
+                className="flex items-center gap-3 p-4 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] shadow-sm hover:bg-[var(--toss-blue-light)]/50 hover:border-[var(--toss-blue)]/30 transition-all group"
               >
-                <div className="w-12 h-12 bg-[#F2F4F6] group-hover:bg-[#E8F3FF] rounded-[12px] flex items-center justify-center text-xl transition-colors">
+                <div className="w-12 h-12 bg-[var(--toss-gray-1)] group-hover:bg-[var(--toss-blue-light)] rounded-[12px] flex items-center justify-center text-xl transition-colors">
                   {item.icon}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-[#191F28] text-sm">{item.label}</h3>
-                  <p className="text-[11px] text-[#8B95A1] mt-0.5 truncate">{item.url}</p>
+                  <h3 className="font-semibold text-[var(--foreground)] text-sm">{item.label}</h3>
+                  <p className="text-[11px] text-[var(--toss-gray-3)] mt-0.5 truncate">{item.url}</p>
                 </div>
-                <span className="text-[#8B95A1] group-hover:text-[#3182F6]">↗</span>
+                <span className="text-[var(--toss-gray-3)] group-hover:text-[var(--toss-blue)]">↗</span>
               </a>
             ))}
           </div>

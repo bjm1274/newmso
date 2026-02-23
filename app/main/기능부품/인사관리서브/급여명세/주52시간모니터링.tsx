@@ -58,22 +58,22 @@ export default function WeeklyHoursMonitor({ selectedCo, yearMonth: initialYm }:
   }, [yearMonth, selectedCo]);
 
   return (
-    <div className="border border-gray-200 p-5 bg-white rounded-lg shadow-sm">
-      <div className="pb-2 border-b border-gray-100 mb-3">
-        <h3 className="text-sm font-semibold text-gray-800">주 52시간 모니터링</h3>
+    <div className="border border-[var(--toss-border)] p-5 bg-[var(--toss-card)] rounded-lg shadow-sm">
+      <div className="pb-2 border-b border-[var(--toss-border)] mb-3">
+        <h3 className="text-sm font-semibold text-[var(--foreground)]">주 52시간 모니터링</h3>
       </div>
       <div className="mb-4">
-        <input type="month" value={yearMonth} onChange={(e) => setYearMonth(e.target.value)} className="h-9 px-3 border border-gray-300 rounded-md text-sm font-medium w-full" />
+        <input type="month" value={yearMonth} onChange={(e) => setYearMonth(e.target.value)} className="h-9 px-3 border border-[var(--toss-border)] rounded-md text-sm font-medium w-full" />
       </div>
       {loading ? (
-        <p className="text-xs text-gray-500">로딩 중...</p>
+        <p className="text-xs text-[var(--toss-gray-3)]">로딩 중...</p>
       ) : weeklyData.length === 0 ? (
         <p className="text-xs font-medium text-emerald-600">52시간 초과 없음</p>
       ) : (
         <div className="space-y-1.5">
           {weeklyData.slice(0, 10).map((x, i) => (
-            <div key={i} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
-              <span className="text-xs font-medium text-gray-800">{x.name}</span>
+            <div key={i} className="flex justify-between items-center py-2 border-b border-[var(--toss-border)] last:border-0">
+              <span className="text-xs font-medium text-[var(--foreground)]">{x.name}</span>
               <span className="text-xs font-medium text-red-600">{x.hours}h 초과</span>
             </div>
           ))}

@@ -104,10 +104,10 @@ export default function NotificationAutomation({ user }: any) {
   }, [enabled, payrollDay, user?.id]);
 
   return (
-    <div className="bg-white p-8 border border-gray-100 rounded-lg shadow-xl max-w-xl space-y-6">
+    <div className="bg-[var(--toss-card)] p-8 border border-[var(--toss-border)] rounded-lg shadow-xl max-w-xl space-y-6">
       <div>
-        <h3 className="text-xl font-semibold text-gray-900 mb-2">알림 자동화</h3>
-        <p className="text-xs text-gray-500 font-bold">
+        <h3 className="text-xl font-semibold text-[var(--foreground)] mb-2">알림 자동화</h3>
+        <p className="text-xs text-[var(--toss-gray-3)] font-bold">
           급여 정산 알림 + 연차 촉진(1차/2차)을 자동으로 발송하고, 발송 이력을 별도 테이블에 기록합니다.
         </p>
       </div>
@@ -122,7 +122,7 @@ export default function NotificationAutomation({ user }: any) {
           <span className="font-bold text-sm">알림 자동화 활성화</span>
         </label>
         <div>
-          <label className="text-[10px] font-semibold text-gray-400 uppercase">
+          <label className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">
             급여 정산 알림일 (매월)
           </label>
           <input
@@ -136,12 +136,12 @@ export default function NotificationAutomation({ user }: any) {
             className="w-full p-4 mt-1 rounded-xl border font-bold"
           />
         </div>
-        <div className="rounded-lg bg-[#F9FAFB] border border-[#E5E8EB] p-4 text-[11px] text-gray-600 space-y-1">
-          <p className="font-bold text-gray-800 mb-1">연차 촉진 법적 기준</p>
+        <div className="rounded-lg bg-[var(--page-bg)] border border-[var(--toss-border)] p-4 text-[11px] text-[var(--toss-gray-4)] space-y-1">
+          <p className="font-bold text-[var(--foreground)] mb-1">연차 촉진 법적 기준</p>
           <p>- 기준: 연차휴가가 속한 연도의 종료일(12월 31일) 기준</p>
           <p>- 1차 촉진: 종료 6개월 전 일괄 안내 (예: 6월 말 기준)</p>
           <p>- 2차 촉진: 종료 2개월 전 일괄 안내 (예: 10월 말 기준)</p>
-          <p className="mt-1 text-[10px] text-gray-500">
+          <p className="mt-1 text-[10px] text-[var(--toss-gray-3)]">
             각 단계별로 발송한 내역은 `annual_leave_promotion_logs` 테이블에
             직원·연도·단계별로 기록됩니다.
           </p>

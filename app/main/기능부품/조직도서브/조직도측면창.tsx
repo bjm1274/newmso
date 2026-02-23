@@ -122,7 +122,7 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
                   key={m.id} 
                   onClick={() => { handleMenuClick(m.id); setShowMore(false); }}
                   className={`flex flex-col items-center justify-center py-4 rounded-[12px] transition-all ${
-                    mainMenu === m.id ? 'bg-[#E8F3FF] text-[#3182F6]' : 'bg-[#F2F4F6] text-[#191F28]'
+                    mainMenu === m.id ? 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)]' : 'bg-[var(--toss-gray-1)] text-[var(--foreground)]'
                   }`}
                 >
                   <span className="text-2xl mb-2">{m.icon}</span>

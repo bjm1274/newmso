@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -60,17 +60,17 @@ export default function SuppliesForm({ setExtraData, initialItems }: any) {
   };
 
   return (
-    <div className="border-t-2 border-b border-gray-200 overflow-hidden bg-white rounded-none">
+    <div className="border-t-2 border-b border-[var(--toss-border)] overflow-hidden bg-white rounded-none">
       <div className="p-4 bg-blue-50/50 border-b border-blue-100 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <p className="text-[10px] font-semibold text-blue-600 uppercase tracking-widest flex items-center gap-2">
-          <span className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></span> 실시간 재고 연동 모드 활성화
+        <p className="text-[10px] font-semibold text-[var(--toss-blue)] uppercase tracking-widest flex items-center gap-2">
+          <span className="w-2 h-2 bg-[var(--toss-blue)] rounded-full animate-pulse"></span> 실시간 재고 연동 모드 활성화
         </p>
-        <div className="flex items-center gap-2 text-[10px] font-semibold text-gray-500">
+        <div className="flex items-center gap-2 text-[10px] font-semibold text-[var(--toss-gray-3)]">
           <span>수령부서 일괄 적용</span>
           <select
             value={bulkDept}
             onChange={e => setBulkDept(e.target.value)}
-            className="px-2 py-1 border border-gray-200 rounded-lg bg-white text-[10px] font-bold"
+            className="px-2 py-1 border border-[var(--toss-border)] rounded-lg bg-white text-[10px] font-bold"
           >
             <option value="">선택...</option>
             {departments.map(d => (
@@ -88,7 +88,7 @@ export default function SuppliesForm({ setExtraData, initialItems }: any) {
         </div>
       </div>
       <table className="w-full text-left border-collapse">
-        <thead className="bg-gray-50 text-[10px] font-semibold text-gray-400 border-b border-gray-200">
+        <thead className="bg-[var(--toss-gray-1)] text-[10px] font-semibold text-[var(--toss-gray-3)] border-b border-[var(--toss-border)]">
           <tr>
             <th className="p-4">품목명 (재고 검색)</th>
             <th className="p-4 w-24 text-center">현재고</th>
@@ -99,16 +99,16 @@ export default function SuppliesForm({ setExtraData, initialItems }: any) {
         </thead>
         <tbody>
           {items.map((item, idx) => (
-            <tr key={idx} className="border-b border-gray-100 last:border-none relative">
+            <tr key={idx} className="border-b border-[var(--toss-border)] last:border-none relative">
               <td className="p-2 relative">
                 <input 
                   value={item.name} 
                   onChange={e => handleSearch(idx, e.target.value)} 
-                  className="w-full p-3 bg-gray-50 text-xs font-bold outline-none rounded-none border-none focus:bg-white transition-all" 
+                  className="w-full p-3 bg-[var(--toss-gray-1)] text-xs font-bold outline-none rounded-none border-none focus:bg-white transition-all" 
                   placeholder="품목명 입력" 
                 />
                 {item.suggestions.length > 0 && (
-                  <div className="absolute top-full left-0 w-full bg-white border shadow-2xl z-[100] mt-1 border-gray-100 rounded-none">
+                  <div className="absolute top-full left-0 w-full bg-white border shadow-2xl z-[100] mt-1 border-[var(--toss-border)] rounded-none">
                     {item.suggestions.map((s, si) => (
                       <div 
                         key={si} 
@@ -124,7 +124,7 @@ export default function SuppliesForm({ setExtraData, initialItems }: any) {
                   </div>
                 )}
               </td>
-              <td className={`p-2 text-center text-xs font-semibold ${item.currentStock !== null && item.currentStock <= 5 ? 'text-red-600 animate-pulse' : 'text-blue-600'}`}>
+              <td className={`p-2 text-center text-xs font-semibold ${item.currentStock !== null && item.currentStock <= 5 ? 'text-red-600 animate-pulse' : 'text-[var(--toss-blue)]'}`}>
                 {item.currentStock ?? '-'}
               </td>
               <td className="p-2">
@@ -137,12 +137,12 @@ export default function SuppliesForm({ setExtraData, initialItems }: any) {
                     nl[idx].qty = Number(e.target.value); 
                     setItems(nl);
                   }} 
-                  className="w-full p-3 bg-blue-50 text-xs font-semibold text-center text-blue-600 outline-none rounded-none border-none" 
+                  className="w-full p-3 bg-blue-50 text-xs font-semibold text-center text-[var(--toss-blue)] outline-none rounded-none border-none" 
                 />
               </td>
               <td className="p-2">
                 <select 
-                  className="w-full p-3 bg-white border border-gray-100 text-[11px] font-bold rounded-none outline-none" 
+                  className="w-full p-3 bg-white border border-[var(--toss-border)] text-[11px] font-bold rounded-none outline-none" 
                   onChange={e => {
                     const nl = [...items]; 
                     nl[idx].dept = e.target.value; 
@@ -160,7 +160,7 @@ export default function SuppliesForm({ setExtraData, initialItems }: any) {
                     nl[idx].purpose = e.target.value; 
                     setItems(nl);
                   }} 
-                  className="w-full p-3 bg-gray-50 text-xs font-medium rounded-none border-none outline-none" 
+                  className="w-full p-3 bg-[var(--toss-gray-1)] text-xs font-medium rounded-none border-none outline-none" 
                   placeholder="용도 입력" 
                 />
               </td>

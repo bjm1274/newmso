@@ -12,14 +12,14 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
   ];
 
   return (
-    <aside className="w-20 bg-[#F8F9FA] border-r border-gray-100 flex flex-col items-center py-8 space-y-4">
-      <div className="w-14 h-14 border border-gray-100 bg-white mb-6 flex items-center justify-center">
+    <aside className="w-20 bg-[var(--tab-bg)] border-r border-[var(--toss-border)] flex flex-col items-center py-8 space-y-4">
+      <div className="w-14 h-14 border border-[var(--toss-border)] bg-[var(--toss-card)] mb-6 flex items-center justify-center">
         <img src="/logo.png" alt="로고" className="p-2 object-contain" />
       </div>
       {menus.map(m => (
         <button key={m.id} onClick={() => onMenuChange(m.id)} 
           className={`w-14 h-14 flex items-center justify-center border transition-all ${
-            mainMenu === m.id ? 'bg-blue-600 text-white border-blue-600 shadow-inner' : 'text-gray-300 border-transparent hover:bg-gray-50'
+            mainMenu === m.id ? 'bg-[var(--toss-blue)] text-white border-[var(--toss-blue)] shadow-inner' : 'text-[var(--toss-gray-3)] border-transparent hover:bg-[var(--toss-gray-1)]'
           }`}
         >
           <span className="text-xl">{m.icon}</span>

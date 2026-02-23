@@ -21,16 +21,16 @@ export default function SalaryChangeHistory({ staffId, staffName }: { staffId?: 
   if (list.length === 0) return null;
 
   return (
-    <div className="border border-gray-200 p-4 bg-white rounded-lg shadow-sm">
-      <div className="pb-2 border-b border-gray-100 mb-3">
-        <h3 className="text-sm font-semibold text-gray-800">급여 변경 이력</h3>
+    <div className="border border-[var(--toss-border)] p-4 bg-[var(--toss-card)] rounded-lg shadow-sm">
+      <div className="pb-2 border-b border-[var(--toss-border)] mb-3">
+        <h3 className="text-sm font-semibold text-[var(--foreground)]">급여 변경 이력</h3>
       </div>
       <div className="space-y-2 max-h-48 overflow-y-auto">
         {list.map((r) => (
-          <div key={r.id} className="flex justify-between items-center py-2 border-b border-gray-100 text-xs">
+          <div key={r.id} className="flex justify-between items-center py-2 border-b border-[var(--toss-border)] text-xs">
             <span className="font-medium">{CHANGE_LABELS[r.change_type] || r.change_type}</span>
-            <span className="text-gray-600">{(r.before_value || 0).toLocaleString()} → {(r.after_value || 0).toLocaleString()}</span>
-            <span className="text-gray-500">{r.effective_date}</span>
+            <span className="text-[var(--toss-gray-4)]">{(r.before_value || 0).toLocaleString()} → {(r.after_value || 0).toLocaleString()}</span>
+            <span className="text-[var(--toss-gray-3)]">{r.effective_date}</span>
           </div>
         ))}
       </div>

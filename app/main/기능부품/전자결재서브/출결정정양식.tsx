@@ -176,20 +176,20 @@ export default function AttendanceCorrectionForm({ user, staffs }: any) {
   };
 
   return (
-    <div className="flex flex-col h-full bg-gray-50/30 overflow-y-auto custom-scrollbar space-y-8 p-8">
+    <div className="flex flex-col h-full bg-[var(--tab-bg)]/30 overflow-y-auto custom-scrollbar space-y-8 p-8">
       <header>
-        <h2 className="text-2xl font-semibold text-gray-800 tracking-tighter italic">출결 정정 신청</h2>
-        <p className="text-xs text-gray-400 font-bold uppercase mt-1">지각 또는 미기록 사유 제출 및 결재</p>
+        <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tighter italic">출결 정정 신청</h2>
+        <p className="text-xs text-[var(--toss-gray-3)] font-bold uppercase mt-1">지각 또는 미기록 사유 제출 및 결재</p>
       </header>
 
       {/* 탭 */}
-      <div className="flex gap-2 bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
+      <div className="flex gap-2 bg-[var(--toss-card)] p-4 rounded-lg border border-[var(--toss-border)] shadow-sm">
         <button
           onClick={() => setViewMode('신청')}
           className={`px-6 py-3 rounded-xl text-xs font-semibold transition-all ${
             viewMode === '신청'
-              ? 'bg-blue-600 text-white shadow-lg'
-              : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
+              ? 'bg-[var(--toss-blue)] text-white shadow-lg'
+              : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]/80'
           }`}
         >
           신청하기
@@ -198,8 +198,8 @@ export default function AttendanceCorrectionForm({ user, staffs }: any) {
           onClick={() => setViewMode('현황')}
           className={`px-6 py-3 rounded-xl text-xs font-semibold transition-all ${
             viewMode === '현황'
-              ? 'bg-blue-600 text-white shadow-lg'
-              : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
+              ? 'bg-[var(--toss-blue)] text-white shadow-lg'
+              : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]/80'
           }`}
         >
           신청 현황
@@ -209,8 +209,8 @@ export default function AttendanceCorrectionForm({ user, staffs }: any) {
             onClick={() => setViewMode('결재')}
             className={`px-6 py-3 rounded-xl text-xs font-semibold transition-all ${
               viewMode === '결재'
-                ? 'bg-blue-600 text-white shadow-lg'
-                : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
+                ? 'bg-[var(--toss-blue)] text-white shadow-lg'
+                : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]/80'
             }`}
           >
             결재 대기
@@ -229,19 +229,19 @@ export default function AttendanceCorrectionForm({ user, staffs }: any) {
           </button>
 
           {showNewCorrection && (
-            <div className="bg-white p-8 border border-gray-100 shadow-sm rounded-lg space-y-6 animate-in fade-in duration-300">
-              <h3 className="text-lg font-semibold text-gray-800">출결 정정 신청</h3>
-              <p className="text-xs text-gray-500 font-bold">출퇴근 미체크·지각·결근이 있는 날짜를 선택한 뒤 정정 유형과 사유를 입력하세요.</p>
+            <div className="bg-[var(--toss-card)] p-8 border border-[var(--toss-border)] shadow-sm rounded-lg space-y-6 animate-in fade-in duration-300">
+              <h3 className="text-lg font-semibold text-[var(--foreground)]">출결 정정 신청</h3>
+              <p className="text-xs text-[var(--toss-gray-3)] font-bold">출퇴근 미체크·지각·결근이 있는 날짜를 선택한 뒤 정정 유형과 사유를 입력하세요.</p>
 
               <div className="space-y-4">
                 <div>
-                  <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest mb-2 block">
+                  <label className="text-[10px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">
                     정정할 날짜 선택 (근태 자동 연동)
                   </label>
                   {problemDatesLoading ? (
-                    <p className="text-sm text-gray-400 font-bold py-4">조회 중...</p>
+                    <p className="text-sm text-[var(--toss-gray-3)] font-bold py-4">조회 중...</p>
                   ) : problemDates.length === 0 ? (
-                    <p className="text-sm text-gray-500 font-bold py-4 bg-gray-50 rounded-xl px-4">최근 60일 이내 미체크·지각·결근 대상 일자가 없습니다.</p>
+                    <p className="text-sm text-[var(--toss-gray-3)] font-bold py-4 bg-[var(--toss-gray-1)] rounded-xl px-4">최근 60일 이내 미체크·지각·결근 대상 일자가 없습니다.</p>
                   ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-48 overflow-y-auto">
                       {problemDates.map((item) => (
@@ -251,14 +251,14 @@ export default function AttendanceCorrectionForm({ user, staffs }: any) {
                           onClick={() => setSelectedDate(item.date)}
                           className={`text-left p-3 rounded-xl border-2 transition-all text-xs font-bold ${
                             selectedDate === item.date
-                              ? 'border-blue-600 bg-blue-50 text-blue-800'
-                              : 'border-gray-100 bg-gray-50 text-gray-700 hover:border-gray-200'
+                              ? 'border-[var(--toss-blue)] bg-[var(--toss-blue-light)] text-[var(--toss-blue)]'
+                              : 'border-[var(--toss-border)] bg-[var(--toss-gray-1)] text-[var(--foreground)] hover:border-[var(--toss-gray-3)]'
                           }`}
                         >
-                          <span className="block text-[10px] text-gray-500">{item.date}</span>
+                          <span className="block text-[10px] text-[var(--toss-gray-3)]">{item.date}</span>
                           <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-semibold ${
                             item.reason === '결근' ? 'bg-red-100 text-red-600' :
-                            item.reason === '지각' ? 'bg-amber-100 text-amber-700' : 'bg-gray-200 text-gray-600'
+                            item.reason === '지각' ? 'bg-amber-100 text-amber-700' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'
                           }`}>
                             {item.label}
                           </span>
@@ -269,13 +269,13 @@ export default function AttendanceCorrectionForm({ user, staffs }: any) {
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest mb-2 block">
+                  <label className="text-[10px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">
                     정정 유형
                   </label>
                   <select
                     value={correctionType}
                     onChange={e => setCorrectionType(e.target.value)}
-                    className="w-full p-4 bg-gray-50 rounded-xl border-none outline-none text-sm font-bold focus:ring-2 focus:ring-blue-100"
+                    className="w-full p-4 bg-[var(--toss-gray-1)] rounded-xl border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20"
                   >
                     <option value="정상반영">정상 반영 (지각 아님)</option>
                     <option value="지각처리">지각 처리 (인정)</option>
@@ -284,14 +284,14 @@ export default function AttendanceCorrectionForm({ user, staffs }: any) {
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest mb-2 block">
+                  <label className="text-[10px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">
                     사유
                   </label>
                   <textarea
                     value={reason}
                     onChange={e => setReason(e.target.value)}
                     placeholder="지각 또는 미기록 사유를 상세히 입력해주세요."
-                    className="w-full h-32 p-4 bg-gray-50 rounded-xl border-none outline-none text-sm font-bold leading-relaxed focus:ring-2 focus:ring-blue-100 resize-none"
+                    className="w-full h-32 p-4 bg-[var(--toss-gray-1)] rounded-xl border-none outline-none text-sm font-bold leading-relaxed focus:ring-2 focus:ring-[var(--toss-blue)]/20 resize-none"
                   />
                 </div>
               </div>
@@ -299,7 +299,7 @@ export default function AttendanceCorrectionForm({ user, staffs }: any) {
               <button
                 onClick={handleSubmitCorrection}
                 disabled={loading}
-                className="w-full py-4 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow-lg hover:scale-[0.98] transition-all disabled:opacity-50"
+                className="w-full py-4 bg-[var(--toss-blue)] text-white rounded-xl font-semibold text-sm shadow-lg hover:scale-[0.98] transition-all disabled:opacity-50"
               >
                 {loading ? '신청 중...' : '결재 상신'}
               </button>
@@ -314,11 +314,11 @@ export default function AttendanceCorrectionForm({ user, staffs }: any) {
           {corrections
             .filter(c => c.staff_id === user.id)
             .map((correction, idx) => (
-              <div key={correction.id || idx} className="bg-white p-6 border border-gray-100 shadow-sm rounded-lg">
+              <div key={correction.id || idx} className="bg-[var(--toss-card)] p-6 border border-[var(--toss-border)] shadow-sm rounded-lg">
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <p className="text-sm font-semibold text-gray-800">{correction.attendance_date}</p>
-                    <p className="text-xs text-gray-400 font-bold mt-1">{correction.reason}</p>
+                    <p className="text-sm font-semibold text-[var(--foreground)]">{correction.attendance_date}</p>
+                    <p className="text-xs text-[var(--toss-gray-3)] font-bold mt-1">{correction.reason}</p>
                   </div>
                   <span
                     className={`px-3 py-1 rounded-lg text-[10px] font-semibold ${
@@ -332,8 +332,8 @@ export default function AttendanceCorrectionForm({ user, staffs }: any) {
                     {correction.approval_status ?? correction.status}
                   </span>
                 </div>
-                <div className="pt-4 border-t border-gray-50">
-                  <p className="text-[10px] font-bold text-gray-400">
+                <div className="pt-4 border-t border-[var(--toss-border)]">
+                  <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">
                     정정 유형: {correction.correction_type}
                   </p>
                 </div>
@@ -348,19 +348,19 @@ export default function AttendanceCorrectionForm({ user, staffs }: any) {
           {corrections
             .filter(c => (c.approval_status || c.status) === '대기')
             .map((correction, idx) => (
-              <div key={correction.id || idx} className="bg-white p-6 border border-gray-100 shadow-sm rounded-lg">
+              <div key={correction.id || idx} className="bg-[var(--toss-card)] p-6 border border-[var(--toss-border)] shadow-sm rounded-lg">
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <p className="text-sm font-semibold text-gray-800">{correction.attendance_date}</p>
-                    <p className="text-xs text-gray-400 font-bold mt-1">{correction.reason}</p>
+                    <p className="text-sm font-semibold text-[var(--foreground)]">{correction.attendance_date}</p>
+                    <p className="text-xs text-[var(--toss-gray-3)] font-bold mt-1">{correction.reason}</p>
                   </div>
                   <span className="px-3 py-1 rounded-lg text-[10px] font-semibold bg-orange-100 text-orange-500">
                     대기
                   </span>
                 </div>
 
-                <div className="pt-4 border-t border-gray-50 space-y-3">
-                  <p className="text-[10px] font-bold text-gray-400">정정 유형: {correction.correction_type}</p>
+                <div className="pt-4 border-t border-[var(--toss-border)] space-y-3">
+                  <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">정정 유형: {correction.correction_type}</p>
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleApprove(correction, '승인')}

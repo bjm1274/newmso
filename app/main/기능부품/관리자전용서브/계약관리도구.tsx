@@ -178,10 +178,10 @@ export default function ContractManager() {
   return (
     <div className="space-y-6 animate-in fade-in">
       {/* 회사 선택 탭 */}
-      <div className="flex gap-1 border-b border-gray-100 pb-4">
+      <div className="flex gap-1 border-b border-[var(--toss-border)] pb-4">
         {COMPANIES.filter(c => c !== '전체').map(co => (
           <button key={co} onClick={() => setSelectedCo(co)} 
-            className={`px-6 py-2 text-[10px] font-semibold border ${selectedCo === co ? 'bg-blue-600 border-blue-600 text-white shadow-lg' : 'bg-white text-gray-400 border-gray-100'}`}>
+            className={`px-6 py-2 text-[10px] font-semibold border ${selectedCo === co ? 'bg-[var(--toss-blue)] border-[var(--toss-blue)] text-white shadow-lg' : 'bg-[var(--toss-card)] text-[var(--toss-gray-3)] border-[var(--toss-border)]'}`}>
             {co}
           </button>
         ))}
@@ -212,7 +212,7 @@ export default function ContractManager() {
           </div>
 
           {loading ? (
-            <div className="w-full h-[520px] flex items-center justify-center bg-gray-50 rounded-lg border border-gray-100">
+            <div className="w-full h-[520px] flex items-center justify-center bg-[var(--toss-gray-1)] rounded-lg border border-[var(--toss-border)]">
               로딩 중...
             </div>
           ) : (
@@ -220,22 +220,22 @@ export default function ContractManager() {
               {/* 편집기 + 토큰 안내 */}
               <div className="grid grid-cols-12 gap-4">
                 <div className="col-span-8">
-                  <label className="text-[11px] font-semibold text-gray-600 mb-1.5 block">
+                  <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] mb-1.5 block">
                     계약서 본문
-                    <span className="ml-2 text-[10px] text-gray-400">
+                    <span className="ml-2 text-[10px] text-[var(--toss-gray-3)]">
                       {'{{...}} 형태의 토큰은 직원/급여/근무형태 데이터로 자동 채워집니다.'}
                     </span>
                   </label>
                   <textarea
-                    className="w-full h-[320px] p-5 bg-white border border-gray-200 rounded-lg text-[13px] leading-relaxed outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-inner custom-scrollbar font-mono"
+                    className="w-full h-[320px] p-5 bg-[var(--input-bg)] border border-[var(--toss-border)] rounded-lg text-[13px] leading-relaxed outline-none focus:border-[var(--toss-blue)] focus:ring-2 focus:ring-[var(--toss-blue)] shadow-inner custom-scrollbar font-mono"
                     value={template}
                     onChange={e => setTemplate(e.target.value)}
                     placeholder="계약서 본문을 입력하세요. 인사관리 → 계약에서 직원에게 발송 시 이 양식이 사용됩니다."
                   />
                 </div>
                 <div className="col-span-4">
-                  <div className="h-full rounded-lg border border-dashed border-gray-200 bg-slate-50 px-4 py-3 text-[11px] text-gray-600 flex flex-col gap-2">
-                    <p className="font-bold text-gray-700 text-xs mb-1">사용 가능한 자동입력 토큰</p>
+                  <div className="h-full rounded-lg border border-dashed border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-4 py-3 text-[11px] text-[var(--toss-gray-4)] flex flex-col gap-2">
+                    <p className="font-bold text-[var(--foreground)] text-xs mb-1">사용 가능한 자동입력 토큰</p>
                     <div className="flex flex-wrap gap-1.5">
                       {[
                         '{{company_name}}',
@@ -254,13 +254,13 @@ export default function ContractManager() {
                       ].map((tkn) => (
                         <span
                           key={tkn}
-                          className="px-2 py-0.5 rounded-full bg-white border border-gray-200 font-mono text-[10px] text-gray-700"
+                          className="px-2 py-0.5 rounded-full bg-[var(--toss-card)] border border-[var(--toss-border)] font-mono text-[10px] text-[var(--foreground)]"
                         >
                           {tkn}
                         </span>
                       ))}
                     </div>
-                    <p className="mt-auto text-[10px] text-gray-400">
+                    <p className="mt-auto text-[10px] text-[var(--toss-gray-3)]">
                       위 토큰들은 조직도·급여·근무형태에 등록된 데이터를 기준으로 전자서명 화면에서 자동 채워집니다.
                     </p>
                   </div>
@@ -269,21 +269,21 @@ export default function ContractManager() {
 
               {/* 미리보기: 실제 근로자 서명 화면과 동일한 레이아웃 */}
               <div className="mt-5">
-                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-[0.18em] mb-2 flex items-center gap-2">
-                  <span className="w-1 h-3 bg-gray-400" />
+                <p className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-[0.18em] mb-2 flex items-center gap-2">
+                  <span className="w-1 h-3 bg-[var(--toss-gray-3)]" />
                   실시간 미리보기 (근로자 서명 화면)
                 </p>
-                <div className="w-full bg-slate-100 rounded-lg border border-slate-200 py-6 px-3">
-                  <div className="max-w-[760px] mx-auto bg-white rounded-lg shadow-lg border border-slate-200 overflow-hidden">
-                    <div className="px-6 md:px-8 pt-6 pb-4 border-b border-slate-100 flex items-center justify-between">
+                <div className="w-full bg-[var(--toss-gray-1)] rounded-lg border border-[var(--toss-border)] py-6 px-3">
+                  <div className="max-w-[760px] mx-auto bg-[var(--toss-card)] rounded-lg shadow-lg border border-[var(--toss-border)] overflow-hidden">
+                    <div className="px-6 md:px-8 pt-6 pb-4 border-b border-[var(--toss-border)] flex items-center justify-between">
                       <div>
-                        <p className="text-[11px] font-semibold text-slate-500">전자 근로계약서</p>
-                        <h3 className="mt-1 text-base md:text-lg font-bold text-slate-900">
+                        <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">전자 근로계약서</p>
+                        <h3 className="mt-1 text-base md:text-lg font-bold text-[var(--foreground)]">
                           표준 근로계약서
                         </h3>
                       </div>
                       {sealUrl && (
-                        <div className="flex flex-col items-center text-[10px] text-slate-500">
+                        <div className="flex flex-col items-center text-[10px] text-[var(--toss-gray-3)]">
                           <span className="mb-1">사업자 직인</span>
                           <img
                             src={sealUrl}
@@ -293,7 +293,7 @@ export default function ContractManager() {
                         </div>
                       )}
                     </div>
-                    <div className="px-6 md:px-8 py-5 max-h-[260px] overflow-y-auto custom-scrollbar text-[12px] leading-relaxed text-slate-700">
+                    <div className="px-6 md:px-8 py-5 max-h-[260px] overflow-y-auto custom-scrollbar text-[12px] leading-relaxed text-[var(--foreground)]">
                     <div className="whitespace-pre-wrap font-mono text-[12px]">
                         {template || '여기에 입력한 계약서 본문이 근로자 서명 화면에 그대로 표시됩니다.'}
                       </div>
@@ -308,8 +308,8 @@ export default function ContractManager() {
         {/* 오른쪽: 소형 직인 관리 카드 */}
         <div className="col-span-3 space-y-6">
           <div className="space-y-3">
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">사업자 공식 직인</p>
-            <label className="aspect-square w-full border-2 border-dashed border-gray-100 flex flex-col items-center justify-center bg-gray-50 group hover:border-red-100 transition-all cursor-pointer relative overflow-hidden">
+            <p className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">사업자 공식 직인</p>
+            <label className="aspect-square w-full border-2 border-dashed border-[var(--toss-border)] flex flex-col items-center justify-center bg-[var(--toss-gray-1)] group hover:border-red-100 transition-all cursor-pointer relative overflow-hidden">
               {sealUrl ? (
                 <>
                   <img src={sealUrl} alt="사업자 직인" className="w-full h-full object-contain" />
@@ -320,7 +320,7 @@ export default function ContractManager() {
               ) : (
                 <>
                   <span className="text-4xl opacity-10 font-serif text-red-600 mb-2">印</span>
-                  <span className="text-[9px] font-semibold text-gray-400">파일 선택</span>
+                  <span className="text-[9px] font-semibold text-[var(--toss-gray-3)]">파일 선택</span>
                 </>
               )}
               <input
@@ -361,17 +361,17 @@ export default function ContractManager() {
                 }}
               />
             </label>
-            <p className="text-[9px] text-gray-400 font-bold leading-tight bg-gray-50 p-3 border border-gray-100">
+            <p className="text-[9px] text-[var(--toss-gray-3)] font-bold leading-tight bg-[var(--toss-gray-1)] p-3 border border-[var(--toss-border)]">
                 * PNG(투명배경) 권장<br/>
                 * Supabase Storage의 <code>company-seals</code> 버킷에 저장됩니다.<br/>
                 * 저장 시 모든 사원 계약서에 적용
             </p>
             {uploadingSeal && (
-              <p className="text-[9px] text-blue-500 font-bold">직인 업로드 중...</p>
+              <p className="text-[9px] text-[var(--toss-blue)] font-bold">직인 업로드 중...</p>
             )}
           </div>
           
-          <button onClick={handleSave} disabled={saving || loading} className="w-full py-5 bg-[#3182F6] text-white text-xs font-semibold shadow-xl hover:bg-[#1B64DA] transition-all disabled:opacity-50">
+          <button onClick={handleSave} disabled={saving || loading} className="w-full py-5 bg-[var(--toss-blue)] text-white text-xs font-semibold shadow-xl hover:bg-[var(--toss-blue)] transition-all disabled:opacity-50">
             {saving ? '저장 중...' : `${selectedCo} 양식 저장`}
           </button>
         </div>

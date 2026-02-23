@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -60,14 +60,14 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-center gap-4">
-        <h2 className="text-xl font-semibold text-gray-800">🏢 부서별 물품·장비 현황</h2>
+        <h2 className="text-xl font-semibold text-[var(--foreground)]">🏢 부서별 물품·장비 현황</h2>
         {departments.length > 0 && (
           <div className="flex items-center gap-2">
-            <label className="text-[10px] font-semibold text-gray-400 uppercase">조회 부서</label>
+            <label className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">조회 부서</label>
             <select
               value={viewDept}
               onChange={e => setViewDept(e.target.value)}
-              className="border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold"
+              className="border border-[var(--toss-border)] rounded-xl px-3 py-2 text-sm font-bold"
             >
               <option value="">내 부서 ({myDept || '미지정'})</option>
               {departments.map(d => (
@@ -85,19 +85,19 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
       )}
 
       {/* 우리 부서 물품 */}
-      <div className="bg-white border border-gray-100 rounded-lg p-6 shadow-sm">
-        <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+      <div className="bg-white border border-[var(--toss-border)] rounded-lg p-6 shadow-sm">
+        <h3 className="text-sm font-semibold text-[var(--foreground)] mb-4 flex items-center gap-2">
           📦 {effectiveDept ? `[${effectiveDept}] 물품 재고` : '물품 재고 (부서 선택 시 필터)'}
         </h3>
         {loading ? (
-          <p className="text-gray-400 text-sm">로딩 중...</p>
+          <p className="text-[var(--toss-gray-3)] text-sm">로딩 중...</p>
         ) : deptItems.length === 0 ? (
-          <p className="text-gray-400 text-sm">해당 부서에 배정된 물품이 없습니다.</p>
+          <p className="text-[var(--toss-gray-3)] text-sm">해당 부서에 배정된 물품이 없습니다.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-gray-200 text-[10px] font-semibold text-gray-500 uppercase">
+                <tr className="border-b border-[var(--toss-border)] text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">
                   <th className="pb-3 pr-4">품목명</th>
                   <th className="pb-3 pr-4">분류</th>
                   <th className="pb-3 pr-4">잔여 수량</th>
@@ -108,10 +108,10 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
               <tbody>
                 {deptItems.map((item: any) => (
                   <tr key={item.id} className="border-b border-gray-50">
-                    <td className="py-3 pr-4 font-bold text-gray-900">{item.name || item.item_name}</td>
-                    <td className="py-3 pr-4 text-gray-500">{item.category || '-'}</td>
-                    <td className="py-3 pr-4 font-semibold text-gray-800">{item.stock ?? item.quantity ?? 0}</td>
-                    <td className="py-3 pr-4 text-gray-500">{item.min_stock ?? item.min_quantity ?? '-'}</td>
+                    <td className="py-3 pr-4 font-bold text-[var(--foreground)]">{item.name || item.item_name}</td>
+                    <td className="py-3 pr-4 text-[var(--toss-gray-3)]">{item.category || '-'}</td>
+                    <td className="py-3 pr-4 font-semibold text-[var(--foreground)]">{item.stock ?? item.quantity ?? 0}</td>
+                    <td className="py-3 pr-4 text-[var(--toss-gray-3)]">{item.min_stock ?? item.min_quantity ?? '-'}</td>
                     <td className="py-3 pr-4">
                       {(item.stock ?? item.quantity ?? 0) <= (item.min_stock ?? item.min_quantity ?? 0) ? (
                         <span className="text-red-600 text-[10px] font-semibold">발주 필요</span>
@@ -128,19 +128,19 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
       </div>
 
       {/* 우리 부서 장비 */}
-      <div className="bg-white border border-gray-100 rounded-lg p-6 shadow-sm">
-        <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+      <div className="bg-white border border-[var(--toss-border)] rounded-lg p-6 shadow-sm">
+        <h3 className="text-sm font-semibold text-[var(--foreground)] mb-4 flex items-center gap-2">
           🖥️ {effectiveDept ? `[${effectiveDept}] 보유 장비 (미반납)` : '보유 장비 (부서 선택 시 필터)'}
         </h3>
         {loading ? (
-          <p className="text-gray-400 text-sm">로딩 중...</p>
+          <p className="text-[var(--toss-gray-3)] text-sm">로딩 중...</p>
         ) : deptAssets.length === 0 ? (
-          <p className="text-gray-400 text-sm">해당 부서에서 사용 중인 장비가 없습니다.</p>
+          <p className="text-[var(--toss-gray-3)] text-sm">해당 부서에서 사용 중인 장비가 없습니다.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-gray-200 text-[10px] font-semibold text-gray-500 uppercase">
+                <tr className="border-b border-[var(--toss-border)] text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">
                   <th className="pb-3 pr-4">장비 종류</th>
                   <th className="pb-3 pr-4">장비명</th>
                   <th className="pb-3 pr-4">사용자</th>
@@ -150,10 +150,10 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
               <tbody>
                 {deptAssets.map((r: any) => (
                   <tr key={r.id} className="border-b border-gray-50">
-                    <td className="py-3 pr-4 font-bold text-gray-900">{r.asset_type}</td>
-                    <td className="py-3 pr-4 text-gray-600">{r.asset_name || '-'}</td>
-                    <td className="py-3 pr-4 text-gray-700">{r.staff?.name ?? '-'}</td>
-                    <td className="py-3 pr-4 text-gray-500">{r.loaned_at}</td>
+                    <td className="py-3 pr-4 font-bold text-[var(--foreground)]">{r.asset_type}</td>
+                    <td className="py-3 pr-4 text-[var(--toss-gray-4)]">{r.asset_name || '-'}</td>
+                    <td className="py-3 pr-4 text-[var(--foreground)]">{r.staff?.name ?? '-'}</td>
+                    <td className="py-3 pr-4 text-[var(--toss-gray-3)]">{r.loaned_at}</td>
                   </tr>
                 ))}
               </tbody>

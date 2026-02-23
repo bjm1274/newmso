@@ -17,25 +17,25 @@ export default function DeductionCalculator({ grossSalary: initialGross }: { gro
   ];
 
   return (
-    <div className="bg-white border border-gray-200 p-4 rounded-lg shadow-sm">
-      <h2 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+    <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] p-4 rounded-lg shadow-sm">
+      <h2 className="text-sm font-semibold text-[var(--foreground)] mb-3 flex items-center gap-2">
         <span className="w-1 h-4 bg-red-500 rounded" /> 법정 공제 계산기 (2026)
       </h2>
       <div className="mb-3 space-y-1">
-        <label className="block text-xs font-medium text-gray-600">총급여 (원)</label>
+        <label className="block text-xs font-medium text-[var(--toss-gray-4)]">총급여 (원)</label>
         <input
           type="number"
           value={inputSalary}
           onChange={(e) => setInputSalary(e.target.value)}
           placeholder="총급여 입력"
-          className="w-full h-9 px-3 border border-gray-300 rounded-md text-sm font-medium"
+          className="w-full h-9 px-3 border border-[var(--toss-border)] rounded-md text-sm font-medium"
         />
       </div>
       <div className="grid grid-cols-2 gap-2">
         {taxRates.map((t, i) => (
-          <div key={i} className="p-3 border border-gray-200 bg-[#f8fafc] rounded-lg">
-            <p className="text-xs font-medium text-gray-500">{t.name}</p>
-            <p className="text-sm font-semibold text-gray-800">
+          <div key={i} className="p-3 border border-[var(--toss-border)] bg-[var(--page-bg)] rounded-lg">
+            <p className="text-xs font-medium text-[var(--toss-gray-3)]">{t.name}</p>
+            <p className="text-sm font-semibold text-[var(--foreground)]">
               {result && t.key in result
                 ? `${(result[t.key] as number).toLocaleString()}원`
                 : t.rate}
@@ -44,9 +44,9 @@ export default function DeductionCalculator({ grossSalary: initialGross }: { gro
         ))}
       </div>
       {result && (
-        <div className="mt-3 p-3 bg-[#eef2f7] border border-gray-200 rounded-lg">
-          <p className="text-xs font-medium text-gray-500">실급여</p>
-          <p className="text-base font-bold text-blue-600">{result.netSalary.toLocaleString()}원</p>
+        <div className="mt-3 p-3 bg-[var(--tab-bg)] border border-[var(--toss-border)] rounded-lg">
+          <p className="text-xs font-medium text-[var(--toss-gray-3)]">실급여</p>
+          <p className="text-base font-bold text-[var(--toss-blue)]">{result.netSalary.toLocaleString()}원</p>
         </div>
       )}
     </div>

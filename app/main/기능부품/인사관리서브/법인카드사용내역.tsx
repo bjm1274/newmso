@@ -148,27 +148,27 @@ export default function CorporateCardTransactions({ staffs = [] }: any) {
   };
 
   return (
-    <div className="bg-white p-6 md:p-10 rounded-[2.5rem] border border-gray-100 shadow-xl">
+    <div className="bg-[var(--toss-card)] p-6 md:p-10 rounded-[2.5rem] border border-[var(--toss-border)] shadow-xl">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
-          <h3 className="text-xl font-semibold text-gray-900 tracking-tighter">법인카드 관리</h3>
-          <p className="text-[10px] text-blue-600 font-bold uppercase tracking-widest">회사별 카드 등록 · 사용내역 실시간 반영</p>
+          <h3 className="text-xl font-semibold text-[var(--foreground)] tracking-tighter">법인카드 관리</h3>
+          <p className="text-[10px] text-[var(--toss-blue)] font-bold uppercase tracking-widest">회사별 카드 등록 · 사용내역 실시간 반영</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <div className="flex gap-0.5 p-1 bg-[#eef2f7] rounded-lg">
+          <div className="flex gap-0.5 p-1 app-tab-bar">
             {COMPANIES.map((c) => (
               <button
                 key={c}
                 onClick={() => setSelectedCo(c)}
-                className={`px-4 py-2 text-[10px] font-semibold rounded-[12px] transition-all ${selectedCo === c ? 'bg-white shadow-md text-blue-600' : 'text-gray-400'}`}
+                className={`px-4 py-2 text-[10px] font-semibold rounded-[12px] transition-all ${selectedCo === c ? 'bg-[var(--toss-card)] shadow-md text-[var(--toss-blue)]' : 'text-[var(--toss-gray-3)]'}`}
               >
                 {c}
               </button>
             ))}
           </div>
-          <div className="flex gap-0.5 p-1 bg-[#eef2f7] rounded-lg">
-            <button onClick={() => setActiveTab('cards')} className={`px-4 py-2 text-[10px] font-semibold rounded-[12px] transition-all ${activeTab === 'cards' ? 'bg-white shadow-md text-blue-600' : 'text-gray-400'}`}>카드 등록</button>
-            <button onClick={() => setActiveTab('transactions')} className={`px-4 py-2 text-[10px] font-semibold rounded-[12px] transition-all ${activeTab === 'transactions' ? 'bg-white shadow-md text-blue-600' : 'text-gray-400'}`}>사용내역</button>
+          <div className="flex gap-0.5 p-1 app-tab-bar">
+            <button onClick={() => setActiveTab('cards')} className={`px-4 py-2 text-[10px] font-semibold rounded-[12px] transition-all ${activeTab === 'cards' ? 'bg-[var(--toss-card)] shadow-md text-[var(--toss-blue)]' : 'text-[var(--toss-gray-3)]'}`}>카드 등록</button>
+            <button onClick={() => setActiveTab('transactions')} className={`px-4 py-2 text-[10px] font-semibold rounded-[12px] transition-all ${activeTab === 'transactions' ? 'bg-[var(--toss-card)] shadow-md text-[var(--toss-blue)]' : 'text-[var(--toss-gray-3)]'}`}>사용내역</button>
           </div>
         </div>
       </div>
@@ -176,24 +176,24 @@ export default function CorporateCardTransactions({ staffs = [] }: any) {
       {activeTab === 'cards' && (
         <div className="space-y-6">
           <div className="flex justify-between items-center">
-            <h4 className="font-semibold text-gray-800">회사별 법인카드 목록</h4>
-            <button onClick={() => setAddingCard(true)} className="px-4 py-2 bg-blue-600 text-white text-xs font-semibold rounded-xl">+ 카드 등록</button>
+            <h4 className="font-semibold text-[var(--foreground)]">회사별 법인카드 목록</h4>
+            <button onClick={() => setAddingCard(true)} className="px-4 py-2 bg-[var(--toss-blue)] text-white text-xs font-semibold rounded-xl">+ 카드 등록</button>
           </div>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {cardsByCo.map((c: any) => (
-              <div key={c.id} className="p-5 border border-gray-100 rounded-lg bg-gray-50/50">
+              <div key={c.id} className="p-5 border border-[var(--toss-border)] rounded-lg bg-[var(--toss-gray-1)]/50">
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-xs font-semibold text-gray-800">{c.card_nickname || '미지정'}</p>
-                    <p className="text-[10px] text-gray-500">{c.company_name} {c.last_four ? `· ****${c.last_four}` : ''}</p>
-                    {c.staff_members?.name && <p className="text-[10px] text-blue-600 mt-1">사용자: {c.staff_members.name}</p>}
+                    <p className="text-xs font-semibold text-[var(--foreground)]">{c.card_nickname || '미지정'}</p>
+                    <p className="text-[10px] text-[var(--toss-gray-3)]">{c.company_name} {c.last_four ? `· ****${c.last_four}` : ''}</p>
+                    {c.staff_members?.name && <p className="text-[10px] text-[var(--toss-blue)] mt-1">사용자: {c.staff_members.name}</p>}
                   </div>
                   <button onClick={() => handleDeleteCard(c.id)} className="text-red-500 text-[10px] font-semibold">비활성화</button>
                 </div>
               </div>
             ))}
             {cardsByCo.length === 0 && (
-              <p className="col-span-full text-sm text-gray-400 font-bold">등록된 카드가 없습니다. 카드를 등록해주세요.</p>
+              <p className="col-span-full text-sm text-[var(--toss-gray-3)] font-bold">등록된 카드가 없습니다. 카드를 등록해주세요.</p>
             )}
           </div>
         </div>
@@ -215,8 +215,8 @@ export default function CorporateCardTransactions({ staffs = [] }: any) {
                 <option key={c.id} value={c.id}>{c.card_nickname || `****${c.last_four}`}</option>
               ))}
             </select>
-            <button onClick={() => setAdding(true)} className="px-4 py-2 bg-blue-600 text-white text-xs font-semibold rounded-xl">+ 수동 등록</button>
-            <label className="px-4 py-2 bg-gray-100 text-gray-700 text-xs font-semibold rounded-xl cursor-pointer hover:bg-gray-200">
+            <button onClick={() => setAdding(true)} className="px-4 py-2 bg-[var(--toss-blue)] text-white text-xs font-semibold rounded-xl">+ 수동 등록</button>
+            <label className="px-4 py-2 bg-[var(--toss-gray-1)] text-[var(--foreground)] text-xs font-semibold rounded-xl cursor-pointer hover:opacity-90">
               CSV 가져오기
               <input type="file" accept=".csv,.txt" className="hidden" onChange={handleCsvImport} disabled={importing} />
             </label>
@@ -224,21 +224,21 @@ export default function CorporateCardTransactions({ staffs = [] }: any) {
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             {Object.entries(totalByCat).map(([cat, amt]) => (
-              <div key={cat} className="p-4 bg-gray-50 rounded-xl">
-                <p className="text-[10px] font-bold text-gray-500">{cat}</p>
-                <p className="text-lg font-semibold text-gray-900">{amt.toLocaleString()}원</p>
+              <div key={cat} className="p-4 bg-[var(--toss-gray-1)] rounded-xl">
+                <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">{cat}</p>
+                <p className="text-lg font-semibold text-[var(--foreground)]">{amt.toLocaleString()}원</p>
               </div>
             ))}
-            <div className="p-4 bg-blue-50 rounded-xl">
-              <p className="text-[10px] font-bold text-blue-600">합계</p>
-              <p className="text-lg font-semibold text-blue-700">{grandTotal.toLocaleString()}원</p>
+            <div className="p-4 bg-[var(--toss-blue-light)] rounded-xl">
+              <p className="text-[10px] font-bold text-[var(--toss-blue)]">합계</p>
+              <p className="text-lg font-semibold text-[var(--toss-blue)]">{grandTotal.toLocaleString()}원</p>
             </div>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-200 text-[10px] font-semibold text-gray-500 uppercase">
+                <tr className="border-b border-[var(--toss-border)] text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">
                   <th className="p-4 text-left">날짜</th>
                   <th className="p-4 text-left">가맹점</th>
                   <th className="p-4 text-left">카드</th>
@@ -248,10 +248,10 @@ export default function CorporateCardTransactions({ staffs = [] }: any) {
               </thead>
               <tbody>
                 {list.map((r) => (
-                  <tr key={r.id} className="border-b border-gray-50">
+                  <tr key={r.id} className="border-b border-[var(--toss-border)]">
                     <td className="p-4">{r.transaction_date}</td>
                     <td className="p-4">{r.merchant}</td>
-                    <td className="p-4 text-[10px] text-gray-500">{r.corporate_cards?.card_nickname || (r.corporate_cards?.last_four ? `****${r.corporate_cards.last_four}` : null) || '-'}</td>
+                    <td className="p-4 text-[10px] text-[var(--toss-gray-3)]">{r.corporate_cards?.card_nickname || (r.corporate_cards?.last_four ? `****${r.corporate_cards.last_four}` : null) || '-'}</td>
                     <td className="p-4">{r.category}</td>
                     <td className="p-4 text-right font-bold">{Number(r.amount).toLocaleString()}원</td>
                   </tr>
@@ -269,7 +269,7 @@ export default function CorporateCardTransactions({ staffs = [] }: any) {
 
       {adding && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]" onClick={() => setAdding(false)}>
-          <div className="bg-white p-8 rounded-lg max-w-md w-full space-y-4" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-[var(--toss-card)] p-8 rounded-lg max-w-md w-full space-y-4" onClick={(e) => e.stopPropagation()}>
             <h4 className="font-semibold">법인카드 사용 등록</h4>
             <select value={form.card_id} onChange={(e) => setForm({ ...form, card_id: e.target.value })} className="w-full p-3 border rounded-xl">
               <option value="">카드 선택 (선택)</option>
@@ -286,8 +286,8 @@ export default function CorporateCardTransactions({ staffs = [] }: any) {
             </select>
             <input type="number" value={form.amount || ''} onChange={(e) => setForm({ ...form, amount: parseInt(e.target.value) || 0 })} placeholder="금액" className="w-full p-3 border rounded-xl" />
             <div className="flex gap-2">
-              <button onClick={handleAdd} className="flex-1 py-3 bg-blue-600 text-white font-semibold rounded-xl">등록</button>
-              <button onClick={() => setAdding(false)} className="flex-1 py-3 bg-gray-200 font-semibold rounded-xl">취소</button>
+              <button onClick={handleAdd} className="flex-1 py-3 bg-[var(--toss-blue)] text-white font-semibold rounded-xl">등록</button>
+              <button onClick={() => setAdding(false)} className="flex-1 py-3 bg-[var(--toss-gray-1)] font-semibold rounded-xl text-[var(--foreground)]">취소</button>
             </div>
           </div>
         </div>
@@ -295,7 +295,7 @@ export default function CorporateCardTransactions({ staffs = [] }: any) {
 
       {addingCard && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]" onClick={() => setAddingCard(false)}>
-          <div className="bg-white p-8 rounded-lg max-w-md w-full space-y-4" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-[var(--toss-card)] p-8 rounded-lg max-w-md w-full space-y-4" onClick={(e) => e.stopPropagation()}>
             <h4 className="font-semibold">법인카드 등록</h4>
             <select value={cardForm.company_name} onChange={(e) => setCardForm({ ...cardForm, company_name: e.target.value })} className="w-full p-3 border rounded-xl">
               {COMPANIES.filter((c) => c !== '전체').map((c) => (
@@ -312,8 +312,8 @@ export default function CorporateCardTransactions({ staffs = [] }: any) {
               ))}
             </select>
             <div className="flex gap-2">
-              <button onClick={handleAddCard} className="flex-1 py-3 bg-blue-600 text-white font-semibold rounded-xl">등록</button>
-              <button onClick={() => setAddingCard(false)} className="flex-1 py-3 bg-gray-200 font-semibold rounded-xl">취소</button>
+              <button onClick={handleAddCard} className="flex-1 py-3 bg-[var(--toss-blue)] text-white font-semibold rounded-xl">등록</button>
+              <button onClick={() => setAddingCard(false)} className="flex-1 py-3 bg-[var(--toss-gray-1)] font-semibold rounded-xl text-[var(--foreground)]">취소</button>
             </div>
           </div>
         </div>

@@ -1,9 +1,16 @@
 @import "tailwindcss";
 
-/* 토스(Toss) 디자인 시스템 */
+/* ========== 인사/급여 디자인 기준 · 프로그램 전체 통일 ==========
+ * 글꼴: Pretendard
+ * 라이트: 배경 #f8fafc, 카드 #fff, 탭바 #eef2f7, 테두리 #E5E8EB
+ * 다크: 눈 피로 완화용 어두운 배경, 부드러운 대비
+ */
 :root {
   --background: #F9FAFB;
   --foreground: #191F28;
+  --page-bg: #f8fafc;
+  --tab-bg: #eef2f7;
+  --input-bg: #ffffff;
   --toss-blue: #3182F6;
   --toss-blue-light: #E8F3FF;
   --toss-gray-1: #F2F4F6;
@@ -15,35 +22,33 @@
   --toss-danger: #F04452;
 }
 
-/* ThemeContext에서 html 요소에 .dark 클래스를 붙였을 때 사용할 다크 모드 값 */
+/* 다크 모드 (눈 피로 완화) — ThemeProvider가 html에 .dark 부여 */
 :root.dark {
-  --background: #191F28;
-  --foreground: #F9FAFB;
-  --toss-gray-1: #333D4B;
-  --toss-gray-2: #4E5968;
-  --toss-gray-3: #8B95A1;
-  --toss-gray-4: #D1D5DB;
-  --toss-card: #1F2937;
-  --toss-border: #4B5563;
+  --background: #0f172a;
+  --foreground: #e2e8f0;
+  --page-bg: #0f172a;
+  --tab-bg: #1e293b;
+  --input-bg: #1e293b;
+  --toss-blue: #60a5fa;
+  --toss-blue-light: #1e3a5f;
+  --toss-gray-1: #1e293b;
+  --toss-gray-2: #334155;
+  --toss-gray-3: #94a3b8;
+  --toss-gray-4: #cbd5e1;
+  --toss-card: #1e293b;
+  --toss-border: #334155;
+  --toss-danger: #f87171;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-page-bg: var(--page-bg);
+  --color-tab-bg: var(--tab-bg);
+  --color-toss-card: var(--toss-card);
+  --color-toss-border: var(--toss-border);
   --font-sans: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
   --font-mono: 'Pretendard', ui-monospace, monospace;
-}
-
-/* 시스템 다크모드 기본값 (사용자가 '자동' 모드 선택 시 활용) */
-@media (prefers-color-scheme: dark) {
-  :root:not(.dark) {
-    --background: #191F28;
-    --foreground: #F9FAFB;
-    --toss-gray-1: #333D4B;
-    --toss-gray-2: #4E5968;
-    --toss-card: #333D4B;
-    --toss-border: #4E5968;
-  }
 }
 
 body {
@@ -58,14 +63,16 @@ body {
 /* ========== 글씨체·타이포 통일 ========== */
 .font-app { font-family: var(--font-sans); }
 .page-title { font-size: 1.125rem; font-weight: 600; color: var(--foreground); letter-spacing: -0.02em; }
-.section-title { font-size: 0.875rem; font-weight: 600; color: #1f2937; }
-.caption { font-size: 0.75rem; font-weight: 500; color: #6b7280; }
+.section-title { font-size: 0.875rem; font-weight: 600; color: var(--foreground); }
+.caption { font-size: 0.75rem; font-weight: 500; color: var(--toss-gray-3); }
 
-/* 다크모드에서 입력창 글자가 안 보이지 않도록 (항상 진한 글자색) */
+/* 다크모드 입력창: 배경·글자색 대비 확보 */
 :root.dark input,
 :root.dark textarea,
 :root.dark select {
-  color: #111827; /* text-gray-900 */
+  background-color: var(--input-bg);
+  color: var(--foreground);
+  border-color: var(--toss-border);
 }
 
 /* 모바일 안전 영역 (노치/홈 인디케이터) */
@@ -101,7 +108,7 @@ body {
   display: flex;
   gap: 2px;
   padding: 4px;
-  background: #eef2f7;
+  background: var(--tab-bg);
   border-radius: 8px;
   width: fit-content;
 }
@@ -112,12 +119,12 @@ body {
   border-radius: 6px;
   transition: all 0.15s;
   white-space: nowrap;
-  color: #6b7280;
+  color: var(--toss-gray-3);
 }
-.tab-btn:hover { color: #374151; background: rgba(255,255,255,0.6); }
+.tab-btn:hover { color: var(--foreground); background: var(--toss-gray-1); }
 .tab-btn-active {
-  background: #fff;
-  color: #2563eb;
+  background: var(--toss-card);
+  color: var(--toss-blue);
   box-shadow: 0 1px 2px rgba(0,0,0,0.06);
 }
 
@@ -164,8 +171,14 @@ body {
 .radius-toss-xl { border-radius: 16px; }
 
 /* 페이지 제목 통일 (각 메뉴 상단) */
-.page-header-title { font-size: 1.125rem; font-weight: 600; color: #111827; letter-spacing: -0.02em; }
-.page-header-caption { font-size: 0.75rem; font-weight: 500; color: #6b7280; margin-top: 2px; }
+.page-header-title { font-size: 1.125rem; font-weight: 600; color: var(--foreground); letter-spacing: -0.02em; }
+.page-header-caption { font-size: 0.75rem; font-weight: 500; color: var(--toss-gray-3); margin-top: 2px; }
+
+/* 레이아웃용 유틸 (전체 프로그램 통일) */
+.app-page { background: var(--page-bg); color: var(--foreground); }
+.app-card { background: var(--toss-card); border: 1px solid var(--toss-border); border-radius: 8px; }
+.app-header { background: var(--toss-card); border-bottom: 1px solid var(--toss-border); }
+.app-tab-bar { background: var(--tab-bg); border-radius: 8px; }
 
 .no-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
 .no-scrollbar::-webkit-scrollbar-track { background: transparent; }
@@ -173,3 +186,20 @@ body {
 .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: var(--toss-gray-1); border-radius: 3px; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--toss-gray-3); border-radius: 3px; }
+
+/* 다크모드: 라이트 전용 배경/카드 클래스가 테마 색으로 보이도록 (점진적 적용) */
+:root.dark .bg-white { background-color: var(--toss-card) !important; }
+:root.dark .bg-gray-50 { background-color: var(--toss-gray-1) !important; }
+:root.dark .border-gray-200,
+:root.dark .border-gray-100 { border-color: var(--toss-border); }
+:root.dark .text-gray-900,
+:root.dark .text-gray-800 { color: var(--foreground); }
+:root.dark .text-gray-500,
+:root.dark .text-gray-600,
+:root.dark .text-gray-400 { color: var(--toss-gray-3); }
+
+/* 다크모드: 하드코딩된 페이지/카드 배경이 테마 색으로 보이도록 */
+:root.dark [class*="bg-[#f8fafc]"],
+:root.dark [class*="bg-[#F8FAFC]"],
+:root.dark [class*="bg-[#F9FAFB]"] { background-color: var(--page-bg) !important; }
+:root.dark [class*="bg-[#eef2f7]"] { background-color: var(--tab-bg) !important; }

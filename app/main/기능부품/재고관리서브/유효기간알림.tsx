@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -121,9 +121,9 @@ export default function ExpirationAlert() {
           <p className="text-xs text-red-600 mt-2">즉시 폐기 필요</p>
         </div>
         <div className="bg-blue-50 p-6 rounded-xl border border-blue-200">
-          <p className="text-xs font-bold text-blue-600 mb-2">📢 알림 발송</p>
+          <p className="text-xs font-bold text-[var(--toss-blue)] mb-2">📢 알림 발송</p>
           <p className="text-2xl font-semibold text-blue-800">{alertsSent}건</p>
-          <p className="text-xs text-blue-600 mt-2">행정팀에 알림 완료</p>
+          <p className="text-xs text-[var(--toss-blue)] mt-2">행정팀에 알림 완료</p>
         </div>
         <div className="bg-green-50 p-6 rounded-xl border border-green-200">
           <p className="text-xs font-bold text-green-600 mb-2">🔄 마지막 확인</p>
@@ -133,9 +133,9 @@ export default function ExpirationAlert() {
       </div>
 
       {/* 유효기간 임박 제품 */}
-      <div className="bg-white border border-gray-100 shadow-sm rounded-xl overflow-hidden">
-        <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-          <h3 className="text-lg font-semibold text-gray-800">⏰ 유효기간 6개월 이내 제품</h3>
+      <div className="bg-white border border-[var(--toss-border)] shadow-sm rounded-xl overflow-hidden">
+        <div className="p-6 border-b border-[var(--toss-border)] flex justify-between items-center">
+          <h3 className="text-lg font-semibold text-[var(--foreground)]">⏰ 유효기간 6개월 이내 제품</h3>
           <button
             onClick={downloadExpirationReport}
             className="px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-semibold hover:bg-gray-700 transition-all"
@@ -147,15 +147,15 @@ export default function ExpirationAlert() {
         {expiringItems.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className="bg-[var(--toss-gray-1)] border-b border-[var(--toss-border)]">
                 <tr>
-                  <th className="px-6 py-3 text-left font-semibold text-gray-700">품목명</th>
-                  <th className="px-6 py-3 text-center font-semibold text-gray-700">현재고</th>
-                  <th className="px-6 py-3 text-center font-semibold text-gray-700">유효기간</th>
-                  <th className="px-6 py-3 text-center font-semibold text-gray-700">남은 일수</th>
-                  <th className="px-6 py-3 text-center font-semibold text-gray-700">상태</th>
-                  <th className="px-6 py-3 text-left font-semibold text-gray-700">공급처</th>
-                  <th className="px-6 py-3 text-center font-semibold text-gray-700">조치</th>
+                  <th className="px-6 py-3 text-left font-semibold text-[var(--foreground)]">품목명</th>
+                  <th className="px-6 py-3 text-center font-semibold text-[var(--foreground)]">현재고</th>
+                  <th className="px-6 py-3 text-center font-semibold text-[var(--foreground)]">유효기간</th>
+                  <th className="px-6 py-3 text-center font-semibold text-[var(--foreground)]">남은 일수</th>
+                  <th className="px-6 py-3 text-center font-semibold text-[var(--foreground)]">상태</th>
+                  <th className="px-6 py-3 text-left font-semibold text-[var(--foreground)]">공급처</th>
+                  <th className="px-6 py-3 text-center font-semibold text-[var(--foreground)]">조치</th>
                 </tr>
               </thead>
               <tbody>
@@ -163,10 +163,10 @@ export default function ExpirationAlert() {
                   const daysLeft = calculateDaysUntilExpiration(item.expiration_date);
                   const badge = getAlertBadge(daysLeft);
                   return (
-                    <tr key={item.id} className={`border-b border-gray-100 ${getAlertColor(daysLeft)}`}>
-                      <td className="px-6 py-4 font-bold text-gray-800">{item.name}</td>
-                      <td className="px-6 py-4 text-center font-bold text-gray-800">{item.stock}개</td>
-                      <td className="px-6 py-4 text-center font-bold text-gray-800">
+                    <tr key={item.id} className={`border-b border-[var(--toss-border)] ${getAlertColor(daysLeft)}`}>
+                      <td className="px-6 py-4 font-bold text-[var(--foreground)]">{item.name}</td>
+                      <td className="px-6 py-4 text-center font-bold text-[var(--foreground)]">{item.stock}개</td>
+                      <td className="px-6 py-4 text-center font-bold text-[var(--foreground)]">
                         {new Date(item.expiration_date).toLocaleDateString('ko-KR')}
                       </td>
                       <td className="px-6 py-4 text-center font-semibold text-red-600">
@@ -177,7 +177,7 @@ export default function ExpirationAlert() {
                           {badge.text}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-left text-gray-600">{item.supplier}</td>
+                      <td className="px-6 py-4 text-left text-[var(--toss-gray-4)]">{item.supplier}</td>
                       <td className="px-6 py-4 text-center">
                         <button className="px-3 py-1 bg-red-100 text-red-600 rounded text-xs font-semibold hover:bg-red-200">
                           폐기
@@ -191,7 +191,7 @@ export default function ExpirationAlert() {
           </div>
         ) : (
           <div className="p-12 text-center">
-            <p className="text-gray-500 font-bold">✓ 유효기간 6개월 이내 제품이 없습니다.</p>
+            <p className="text-[var(--toss-gray-3)] font-bold">✓ 유효기간 6개월 이내 제품이 없습니다.</p>
           </div>
         )}
       </div>

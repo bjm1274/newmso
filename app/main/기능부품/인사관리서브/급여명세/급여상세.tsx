@@ -62,33 +62,33 @@ export default function SalaryDetail({ record, staff }: any) {
   const advancePayAmount = record ? Number(record.advance_pay) || 0 : 0;
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden animate-in fade-in duration-300">
+    <div className="bg-[var(--toss-card)] rounded-lg border border-[var(--toss-border)] shadow-sm overflow-hidden animate-in fade-in duration-300">
       {/* 명세서 헤더 – 메디플로우 스타일: 연한 띠 + 제목 */}
-      <div className="px-6 py-5 bg-[#eef2f7] border-b border-gray-200">
-        <p className="text-xs font-medium text-gray-500 mb-1">{companyName}</p>
-        <h2 className="text-lg font-bold text-gray-900">
+      <div className="px-6 py-5 bg-[var(--tab-bg)] border-b border-[var(--toss-border)]">
+        <p className="text-xs font-medium text-[var(--toss-gray-3)] mb-1">{companyName}</p>
+        <h2 className="text-lg font-bold text-[var(--foreground)]">
           {monthLabel} 급여명세서 {isAdvancePay && <span className="text-amber-700">(선지급)</span>}
         </h2>
       </div>
 
       <div className="p-6 space-y-6">
         {/* 인적 사항 */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-[#f8fafc] rounded-lg border border-gray-100">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-[var(--page-bg)] rounded-lg border border-[var(--toss-border)]">
           <div>
-            <p className="text-xs font-medium text-gray-500 mb-0.5">성명</p>
-            <p className="text-sm font-semibold text-gray-900">{staff?.name}</p>
+            <p className="text-xs font-medium text-[var(--toss-gray-3)] mb-0.5">성명</p>
+            <p className="text-sm font-semibold text-[var(--foreground)]">{staff?.name}</p>
           </div>
           <div>
-            <p className="text-xs font-medium text-gray-500 mb-0.5">사번</p>
-            <p className="text-sm font-semibold text-gray-900">{staff?.employee_no}</p>
+            <p className="text-xs font-medium text-[var(--toss-gray-3)] mb-0.5">사번</p>
+            <p className="text-sm font-semibold text-[var(--foreground)]">{staff?.employee_no}</p>
           </div>
           <div>
-            <p className="text-xs font-medium text-gray-500 mb-0.5">부서</p>
-            <p className="text-sm font-semibold text-gray-900">{staff?.department}</p>
+            <p className="text-xs font-medium text-[var(--toss-gray-3)] mb-0.5">부서</p>
+            <p className="text-sm font-semibold text-[var(--foreground)]">{staff?.department}</p>
           </div>
           <div>
-            <p className="text-xs font-medium text-gray-500 mb-0.5">직위</p>
-            <p className="text-sm font-semibold text-gray-900">{staff?.position}</p>
+            <p className="text-xs font-medium text-[var(--toss-gray-3)] mb-0.5">직위</p>
+            <p className="text-sm font-semibold text-[var(--foreground)]">{staff?.position}</p>
           </div>
         </div>
 
@@ -98,29 +98,29 @@ export default function SalaryDetail({ record, staff }: any) {
             <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
               <p className="text-xs font-medium text-amber-800 mb-2">선지급 (본 건은 선지급 건입니다. 본급·공제·차인 0원)</p>
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-700">선지급</span>
+                <span className="text-sm font-medium text-[var(--foreground)]">선지급</span>
                 <span className="text-lg font-semibold text-amber-700">₩ {advancePayAmount.toLocaleString()}</span>
               </div>
             </div>
-            <div className="pt-4 border-t border-gray-200 text-center">
-              <p className="text-xs text-gray-500 mb-1">차인지급액 (선지급)</p>
-              <p className="text-xl font-bold text-blue-600">₩ {advancePayAmount.toLocaleString()}</p>
+            <div className="pt-4 border-t border-[var(--toss-border)] text-center">
+              <p className="text-xs text-[var(--toss-gray-3)] mb-1">차인지급액 (선지급)</p>
+              <p className="text-xl font-bold text-[var(--toss-blue)]">₩ {advancePayAmount.toLocaleString()}</p>
             </div>
           </div>
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* 지급 내역 */}
-              <div className="space-y-3 border border-gray-200 rounded-lg overflow-hidden">
-                <div className="flex justify-between items-center px-4 py-2.5 bg-[#eef2f7] border-b border-gray-200">
-                  <h4 className="text-xs font-semibold text-gray-700">지급 내역</h4>
-                  <span className="text-xs font-medium text-blue-600">지급합계 ₩{calc.totalPayment.toLocaleString()}</span>
+              <div className="space-y-3 border border-[var(--toss-border)] rounded-lg overflow-hidden">
+                <div className="flex justify-between items-center px-4 py-2.5 bg-[var(--tab-bg)] border-b border-[var(--toss-border)]">
+                  <h4 className="text-xs font-semibold text-[var(--foreground)]">지급 내역</h4>
+                  <span className="text-xs font-medium text-[var(--toss-blue)]">지급합계 ₩{calc.totalPayment.toLocaleString()}</span>
                 </div>
                 <div className="p-4 space-y-2">
                   <SalaryRow label="기본급" value={data.base_salary} />
                   {data.extra_allowance > 0 && <SalaryRow label="기타 수당" value={data.extra_allowance} />}
                   {data.overtime_pay > 0 && <SalaryRow label="연장근로수당" value={data.overtime_pay} />}
-                  <div className="pt-2 mt-2 border-t border-gray-100 space-y-2">
+                  <div className="pt-2 mt-2 border-t border-[var(--toss-border)] space-y-2">
                     <p className="text-[10px] font-medium text-green-700">비과세 항목</p>
                     <SalaryRow label="식대" value={data.meal_allowance} isTaxFree />
                     {(data.night_duty_allowance || 0) > 0 && <SalaryRow label="당직수당(야간)" value={data.night_duty_allowance} isTaxFree />}
@@ -132,9 +132,9 @@ export default function SalaryDetail({ record, staff }: any) {
               </div>
 
               {/* 공제 내역 */}
-              <div className="space-y-3 border border-gray-200 rounded-lg overflow-hidden">
+              <div className="space-y-3 border border-[var(--toss-border)] rounded-lg overflow-hidden">
                 <div className="flex justify-between items-center px-4 py-2.5 bg-[#fef2f2] border-b border-red-100">
-                  <h4 className="text-xs font-semibold text-gray-700">공제 내역</h4>
+                  <h4 className="text-xs font-semibold text-[var(--foreground)]">공제 내역</h4>
                   <span className="text-xs font-medium text-red-600">공제합계 ₩{calc.totalDeduction.toLocaleString()}</span>
                 </div>
                 <div className="p-4 space-y-2">
@@ -149,21 +149,21 @@ export default function SalaryDetail({ record, staff }: any) {
             </div>
 
             {/* 차인지급액 */}
-            <div className="pt-4 border-t-2 border-gray-200 text-center">
-              <p className="text-xs font-medium text-gray-500 mb-1">차인지급액</p>
-              <p className="text-xl font-bold text-blue-600">₩ {calc.net.toLocaleString()}</p>
+            <div className="pt-4 border-t-2 border-[var(--toss-border)] text-center">
+              <p className="text-xs font-medium text-[var(--toss-gray-3)] mb-1">차인지급액</p>
+              <p className="text-xl font-bold text-[var(--toss-blue)]">₩ {calc.net.toLocaleString()}</p>
             </div>
           </>
         )}
 
         {/* 하단 안내 및 직인 */}
-        <div className="pt-6 border-t border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-xs text-gray-500 leading-relaxed text-center md:text-left">
+        <div className="pt-6 border-t border-[var(--toss-border)] flex flex-col md:flex-row justify-between items-center gap-4">
+          <p className="text-xs text-[var(--toss-gray-3)] leading-relaxed text-center md:text-left">
             * 본 명세서는 법적 효력을 갖는 전자 문서입니다. · 급여 문의: 경영지원팀
           </p>
           <div className="flex items-center gap-3">
-            <span className="text-xs font-medium text-gray-600">{staff?.company || 'SY INC.'} 대표원장</span>
-            <span className="w-10 h-10 border-2 border-gray-300 rounded flex items-center justify-center text-[10px] text-gray-400 font-medium">(인)</span>
+            <span className="text-xs font-medium text-[var(--toss-gray-4)]">{staff?.company || 'SY INC.'} 대표원장</span>
+            <span className="w-10 h-10 border-2 border-[var(--toss-border)] rounded flex items-center justify-center text-[10px] text-[var(--toss-gray-3)] font-medium">(인)</span>
           </div>
         </div>
       </div>
@@ -175,10 +175,10 @@ function SalaryRow({ label, value, isDeduction, isTaxFree }: any) {
   return (
     <div className="flex justify-between items-center py-1">
       <div className="flex items-center gap-2">
-        <span className="text-xs font-medium text-gray-600">{label}</span>
-        {isTaxFree && <span className="text-[10px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">비과세</span>}
+        <span className="text-xs font-medium text-[var(--toss-gray-4)]">{label}</span>
+        {isTaxFree && <span className="text-[10px] font-medium text-[var(--toss-blue)] bg-[var(--toss-blue-light)] px-1.5 py-0.5 rounded">비과세</span>}
       </div>
-      <span className={`text-sm font-medium ${isDeduction ? 'text-red-600' : 'text-gray-900'}`}>
+      <span className={`text-sm font-medium ${isDeduction ? 'text-red-600' : 'text-[var(--foreground)]'}`}>
         {isDeduction ? '-' : ''} ₩{(Number(value) || 0).toLocaleString()}
       </span>
     </div>

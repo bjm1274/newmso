@@ -112,12 +112,12 @@ export default function ChatMessengerAdvanced({ user }: any) {
   return (
     <div className="flex h-full gap-4">
       {/* 채팅방 목록 */}
-      <div className="w-80 bg-white border border-gray-100 rounded-xl shadow-sm flex flex-col">
-        <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-          <h3 className="font-semibold text-gray-800">💬 채팅</h3>
+      <div className="w-80 bg-white border border-[var(--toss-border)] rounded-xl shadow-sm flex flex-col">
+        <div className="p-6 border-b border-[var(--toss-border)] flex justify-between items-center">
+          <h3 className="font-semibold text-[var(--foreground)]">💬 채팅</h3>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-all"
+            className="px-3 py-2 bg-[var(--toss-blue)] text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-all"
           >
             + 새 채팅
           </button>
@@ -133,14 +133,14 @@ export default function ChatMessengerAdvanced({ user }: any) {
               }}
               className={`w-full text-left p-4 rounded-lg transition-all ${
                 selectedRoom?.id === room.id
-                  ? 'bg-blue-100 border-2 border-blue-600'
-                  : 'bg-gray-50 hover:bg-gray-100 border border-gray-200'
+                  ? 'bg-[var(--toss-blue-light)] border-2 border-blue-600'
+                  : 'bg-[var(--toss-gray-1)] hover:bg-[var(--toss-gray-1)] border border-[var(--toss-border)]'
               }`}
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-bold text-sm text-gray-800">{room.name}</p>
-                  <p className="text-xs text-gray-400">
+                  <p className="font-bold text-sm text-[var(--foreground)]">{room.name}</p>
+                  <p className="text-xs text-[var(--toss-gray-3)]">
                     {room.type === '1:1' ? '1:1 채팅' : '그룹 채팅'}
                     {room.is_announcement && ' • 공지'}
                   </p>
@@ -154,12 +154,12 @@ export default function ChatMessengerAdvanced({ user }: any) {
 
       {/* 채팅 영역 */}
       {selectedRoom ? (
-        <div className="flex-1 bg-white border border-gray-100 rounded-xl shadow-sm flex flex-col">
+        <div className="flex-1 bg-white border border-[var(--toss-border)] rounded-xl shadow-sm flex flex-col">
           {/* 헤더 */}
-          <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+          <div className="p-6 border-b border-[var(--toss-border)] flex justify-between items-center">
             <div>
-              <h2 className="font-semibold text-lg text-gray-800">{selectedRoom.name}</h2>
-              <p className="text-xs text-gray-400">
+              <h2 className="font-semibold text-lg text-[var(--foreground)]">{selectedRoom.name}</h2>
+              <p className="text-xs text-[var(--toss-gray-3)]">
                 {selectedRoom.type === '1:1' ? '1:1 채팅' : `그룹 채팅 (${selectedRoom.members?.length || 0}명)`}
               </p>
             </div>
@@ -180,8 +180,8 @@ export default function ChatMessengerAdvanced({ user }: any) {
                 <div
                   className={`max-w-xs px-4 py-3 rounded-lg ${
                     msg.sender_id === user.id
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-800'
+                      ? 'bg-[var(--toss-blue)] text-white'
+                      : 'bg-[var(--toss-gray-1)] text-[var(--foreground)]'
                   } group relative`}
                 >
                   <p className="text-sm">{msg.content}</p>
@@ -207,26 +207,26 @@ export default function ChatMessengerAdvanced({ user }: any) {
           </div>
 
           {/* 입력 영역 */}
-          <div className="p-6 border-t border-gray-100 flex gap-3">
+          <div className="p-6 border-t border-[var(--toss-border)] flex gap-3">
             <input
               type="text"
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
               placeholder="메시지를 입력하세요..."
-              className="flex-1 px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-600"
+              className="flex-1 px-4 py-3 border border-[var(--toss-border)] rounded-lg focus:outline-none focus:border-[var(--toss-blue)]"
             />
             <button
               onClick={sendMessage}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-all"
+              className="px-6 py-3 bg-[var(--toss-blue)] text-white rounded-lg font-bold hover:bg-blue-700 transition-all"
             >
               전송
             </button>
           </div>
         </div>
       ) : (
-        <div className="flex-1 bg-white border border-gray-100 rounded-xl shadow-sm flex items-center justify-center">
-          <p className="text-gray-400 font-bold">채팅방을 선택해주세요.</p>
+        <div className="flex-1 bg-white border border-[var(--toss-border)] rounded-xl shadow-sm flex items-center justify-center">
+          <p className="text-[var(--toss-gray-3)] font-bold">채팅방을 선택해주세요.</p>
         </div>
       )}
 
@@ -234,11 +234,11 @@ export default function ChatMessengerAdvanced({ user }: any) {
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-8 w-96 shadow-2xl">
-            <h3 className="text-xl font-semibold text-gray-800 mb-6">새 채팅방 만들기</h3>
+            <h3 className="text-xl font-semibold text-[var(--foreground)] mb-6">새 채팅방 만들기</h3>
 
             {/* 채팅 유형 선택 */}
             <div className="mb-6">
-              <label className="block text-sm font-bold text-gray-700 mb-3">
+              <label className="block text-sm font-bold text-[var(--foreground)] mb-3">
                 채팅 유형
               </label>
               <div className="flex gap-3">
@@ -246,8 +246,8 @@ export default function ChatMessengerAdvanced({ user }: any) {
                   onClick={() => setRoomType('1:1')}
                   className={`flex-1 py-3 rounded-lg font-bold transition-all ${
                     roomType === '1:1'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-600'
+                      ? 'bg-[var(--toss-blue)] text-white'
+                      : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'
                   }`}
                 >
                   1:1 채팅
@@ -256,8 +256,8 @@ export default function ChatMessengerAdvanced({ user }: any) {
                   onClick={() => setRoomType('그룹')}
                   className={`flex-1 py-3 rounded-lg font-bold transition-all ${
                     roomType === '그룹'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-600'
+                      ? 'bg-[var(--toss-blue)] text-white'
+                      : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'
                   }`}
                 >
                   그룹 채팅
@@ -267,7 +267,7 @@ export default function ChatMessengerAdvanced({ user }: any) {
 
             {/* 채팅방 이름 */}
             <div className="mb-6">
-              <label className="block text-sm font-bold text-gray-700 mb-2">
+              <label className="block text-sm font-bold text-[var(--foreground)] mb-2">
                 채팅방 이름
               </label>
               <input
@@ -275,21 +275,21 @@ export default function ChatMessengerAdvanced({ user }: any) {
                 value={roomName}
                 onChange={(e) => setRoomName(e.target.value)}
                 placeholder="채팅방 이름을 입력하세요"
-                className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-600"
+                className="w-full px-4 py-3 border border-[var(--toss-border)] rounded-lg focus:outline-none focus:border-[var(--toss-blue)]"
               />
             </div>
 
             {/* 그룹 멤버 선택 */}
             {roomType === '그룹' && (
               <div className="mb-6">
-                <label className="block text-sm font-bold text-gray-700 mb-3">
+                <label className="block text-sm font-bold text-[var(--foreground)] mb-3">
                   멤버 선택
                 </label>
                 <div className="space-y-2 max-h-48 overflow-y-auto">
                   {staffList.map((staff) => (
                     <label
                       key={staff.id}
-                      className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer"
+                      className="flex items-center gap-3 p-2 hover:bg-[var(--toss-gray-1)] rounded-lg cursor-pointer"
                     >
                       <input
                         type="checkbox"
@@ -306,8 +306,8 @@ export default function ChatMessengerAdvanced({ user }: any) {
                         className="w-4 h-4"
                       />
                       <div>
-                        <p className="text-sm font-bold text-gray-800">{staff.name}</p>
-                        <p className="text-xs text-gray-400">{staff.position}</p>
+                        <p className="text-sm font-bold text-[var(--foreground)]">{staff.name}</p>
+                        <p className="text-xs text-[var(--toss-gray-3)]">{staff.position}</p>
                       </div>
                     </label>
                   ))}
@@ -323,13 +323,13 @@ export default function ChatMessengerAdvanced({ user }: any) {
                   setRoomName('');
                   setSelectedMembers([]);
                 }}
-                className="flex-1 py-3 bg-gray-100 text-gray-800 rounded-lg font-bold hover:bg-gray-200 transition-all"
+                className="flex-1 py-3 bg-[var(--toss-gray-1)] text-[var(--foreground)] rounded-lg font-bold hover:bg-[var(--toss-gray-2)] transition-all"
               >
                 취소
               </button>
               <button
                 onClick={createChatRoom}
-                className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-all"
+                className="flex-1 py-3 bg-[var(--toss-blue)] text-white rounded-lg font-bold hover:bg-blue-700 transition-all"
               >
                 생성
               </button>
@@ -342,8 +342,8 @@ export default function ChatMessengerAdvanced({ user }: any) {
       {showDeleteConfirm && deleteTarget && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-8 w-80 shadow-2xl">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">메시지 삭제</h3>
-            <p className="text-sm text-gray-600 mb-6">
+            <h3 className="text-lg font-semibold text-[var(--foreground)] mb-4">메시지 삭제</h3>
+            <p className="text-sm text-[var(--toss-gray-4)] mb-6">
               {selectedRoom.is_announcement
                 ? '이 공지사항을 삭제하시겠습니까?'
                 : '이 메시지를 삭제하시겠습니까?'}
@@ -351,7 +351,7 @@ export default function ChatMessengerAdvanced({ user }: any) {
             <div className="flex gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 py-3 bg-gray-100 text-gray-800 rounded-lg font-bold hover:bg-gray-200 transition-all"
+                className="flex-1 py-3 bg-[var(--toss-gray-1)] text-[var(--foreground)] rounded-lg font-bold hover:bg-[var(--toss-gray-2)] transition-all"
               >
                 취소
               </button>

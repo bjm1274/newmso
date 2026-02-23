@@ -37,7 +37,7 @@ export default function EducationMain({ staffs, selectedCo }: any) {
   }, [staffs, selectedCo]);
 
   return (
-    <div className="flex flex-col h-full animate-in fade-in duration-500 bg-gray-50/20 relative">
+    <div className="flex flex-col h-full animate-in fade-in duration-500 bg-[var(--tab-bg)]/20 relative">
       {/* 상단 알림 배너 (기한 임박 직원 존재 시) */}
       {notifications.length > 0 && (
         <div className="bg-red-600 text-white px-8 py-2 flex justify-between items-center animate-pulse">
@@ -47,18 +47,18 @@ export default function EducationMain({ staffs, selectedCo }: any) {
       )}
 
       {/* 상단 액션 헤더 */}
-      <header className="p-8 border-b border-gray-100 bg-white flex justify-between items-center shrink-0">
+      <header className="p-8 border-b border-[var(--toss-border)] bg-[var(--toss-card)] flex justify-between items-center shrink-0">
         <div>
-          <h2 className="text-xl font-semibold text-gray-800 tracking-tighter">
-            법정 의무 교육 관리 <span className="text-sm text-blue-600 ml-2">[{selectedCo}]</span>
+          <h2 className="text-xl font-semibold text-[var(--foreground)] tracking-tighter">
+            법정 의무 교육 관리 <span className="text-sm text-[var(--toss-blue)] ml-2">[{selectedCo}]</span>
           </h2>
-          <p className="text-[10px] text-gray-400 font-bold mt-1 uppercase tracking-widest">Mandatory Compliance Training Dashboard</p>
+          <p className="text-[10px] text-[var(--toss-gray-3)] font-bold mt-1 uppercase tracking-widest">Mandatory Compliance Training Dashboard</p>
         </div>
         <div className="flex gap-2">
-          <button className="px-6 py-3 bg-white border border-gray-200 text-gray-600 text-[11px] font-semibold shadow-sm hover:bg-gray-50 transition-all">
+          <button className="px-6 py-3 bg-[var(--toss-card)] border border-[var(--toss-border)] text-[var(--toss-gray-4)] text-[11px] font-semibold shadow-sm hover:bg-[var(--toss-gray-1)] transition-all">
             교육 일정 자동 알림 설정
           </button>
-          <button className="px-6 py-3 bg-[#2563EB] text-white text-[11px] font-semibold shadow-xl hover:scale-105 transition-all">
+          <button className="px-6 py-3 bg-[var(--toss-blue)] text-white text-[11px] font-semibold shadow-xl hover:scale-105 transition-all">
             + 교육 이수 등록
           </button>
         </div>
@@ -66,17 +66,17 @@ export default function EducationMain({ staffs, selectedCo }: any) {
 
       {/* 알림 팝업 레이어 */}
       {showNoti && (
-        <div className="absolute top-32 right-8 w-80 bg-white border border-gray-200 shadow-2xl z-50 p-6 rounded-none animate-in slide-in-from-top-4">
+        <div className="absolute top-32 right-8 w-80 bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-2xl z-50 p-6 rounded-none animate-in slide-in-from-top-4">
           <div className="flex justify-between items-center mb-4 border-b pb-2">
-            <h4 className="text-xs font-semibold text-gray-800">교육 이수 독려 대상</h4>
-            <button onClick={() => setShowNoti(false)} className="text-gray-400 text-lg">×</button>
+            <h4 className="text-xs font-semibold text-[var(--foreground)]">교육 이수 독려 대상</h4>
+            <button onClick={() => setShowNoti(false)} className="text-[var(--toss-gray-3)] text-lg">×</button>
           </div>
           <div className="space-y-3 max-h-60 overflow-y-auto custom-scrollbar">
             {notifications.map((n, i) => (
               <div key={i} className={`p-3 border-l-4 ${n.type === 'URGENT' ? 'border-red-500 bg-red-50' : 'border-orange-400 bg-orange-50'}`}>
-                <p className="text-[11px] font-semibold text-gray-800">{n.name} ({n.education})</p>
-                <p className="text-[10px] font-bold text-gray-500 mt-1">만료까지 {n.daysLeft}일 남음</p>
-                <button className="mt-2 text-[9px] font-semibold text-blue-600 uppercase tracking-tighter">알림톡 발송 →</button>
+                <p className="text-[11px] font-semibold text-[var(--foreground)]">{n.name} ({n.education})</p>
+                <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mt-1">만료까지 {n.daysLeft}일 남음</p>
+                <button className="mt-2 text-[9px] font-semibold text-[var(--toss-blue)] uppercase tracking-tighter">알림톡 발송 →</button>
               </div>
             ))}
           </div>
@@ -89,7 +89,7 @@ export default function EducationMain({ staffs, selectedCo }: any) {
         <EducationStatus selectedCo={selectedCo} urgentCount={notifications.length} />
         
         {/* 상세 이수 명단 테이블 */}
-        <div className="bg-white border border-gray-100 p-8 shadow-sm">
+        <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] p-8 shadow-sm">
           <EducationList selectedCo={selectedCo} staffs={staffs} notifications={notifications} />
         </div>
       </div>

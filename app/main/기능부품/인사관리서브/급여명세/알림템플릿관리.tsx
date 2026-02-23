@@ -14,25 +14,25 @@ export default function NotificationTemplatesPanel({ companyName }: { companyNam
 
   if (list.length === 0) {
     return (
-      <div className="border border-gray-200 p-4 bg-white rounded-lg shadow-sm">
-        <div className="pb-2 border-b border-gray-100 mb-3">
-          <h3 className="text-sm font-semibold text-gray-800">알림톡/메일 템플릿</h3>
+      <div className="border border-[var(--toss-border)] p-4 bg-[var(--toss-card)] rounded-lg shadow-sm">
+        <div className="pb-2 border-b border-[var(--toss-border)] mb-3">
+          <h3 className="text-sm font-semibold text-[var(--foreground)]">알림톡/메일 템플릿</h3>
         </div>
-        <p className="text-xs text-gray-500">등록된 템플릿이 없습니다. tax_free_settings 마이그레이션 후 notification_templates 테이블이 생성됩니다.</p>
+        <p className="text-xs text-[var(--toss-gray-3)]">등록된 템플릿이 없습니다. tax_free_settings 마이그레이션 후 notification_templates 테이블이 생성됩니다.</p>
       </div>
     );
   }
 
   return (
-    <div className="border border-gray-200 p-4 bg-white rounded-lg shadow-sm">
-      <div className="pb-2 border-b border-gray-100 mb-3">
-        <h3 className="text-sm font-semibold text-gray-800">알림톡/메일 템플릿</h3>
+    <div className="border border-[var(--toss-border)] p-4 bg-[var(--toss-card)] rounded-lg shadow-sm">
+      <div className="pb-2 border-b border-[var(--toss-border)] mb-3">
+        <h3 className="text-sm font-semibold text-[var(--foreground)]">알림톡/메일 템플릿</h3>
       </div>
       <div className="space-y-2">
         {list.map((t) => (
-          <div key={t.id} className="p-3 bg-[#f8fafc] rounded-lg border border-gray-200">
-            <p className="text-xs font-semibold text-gray-800">{t.template_type} - {t.name}</p>
-            <p className="text-[11px] text-gray-600 mt-1 truncate">{t.content}</p>
+          <div key={t.id} className="p-3 bg-[var(--page-bg)] rounded-lg border border-[var(--toss-border)]">
+            <p className="text-xs font-semibold text-[var(--foreground)]">{t.template_type} - {t.name}</p>
+            <p className="text-[11px] text-[var(--toss-gray-4)] mt-1 truncate">{t.content}</p>
           </div>
         ))}
       </div>

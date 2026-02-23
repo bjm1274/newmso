@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -84,10 +84,10 @@ export default function PurchaseOrderManagement({ user, inventory, suppliers, fe
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="bg-white p-6 md:p-10 border border-gray-100 shadow-xl rounded-[2.5rem]">
+      <div className="bg-white p-6 md:p-10 border border-[var(--toss-border)] shadow-xl rounded-[2.5rem]">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
-            <h2 className="text-2xl font-semibold text-gray-900 tracking-tighter italic">스마트 발주 제어 시스템</h2>
+            <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tighter italic">스마트 발주 제어 시스템</h2>
             <p className="text-[10px] text-orange-600 font-bold mt-1 uppercase tracking-widest">Smart Purchase Order Engine</p>
           </div>
           <button
@@ -108,7 +108,7 @@ export default function PurchaseOrderManagement({ user, inventory, suppliers, fe
             {lowStockItems.map((item: any) => (
               <div key={item.id} className="p-6 bg-orange-50 border border-orange-100 rounded-lg flex justify-between items-center">
                 <div>
-                  <p className="text-sm font-semibold text-gray-900">{item.item_name}</p>
+                  <p className="text-sm font-semibold text-[var(--foreground)]">{item.item_name}</p>
                   <p className="text-[10px] font-bold text-orange-600 mt-1">
                     현재: {item.quantity}개 / 최소: {item.min_quantity}개
                   </p>
@@ -120,20 +120,20 @@ export default function PurchaseOrderManagement({ user, inventory, suppliers, fe
         )}
       </div>
 
-      <div className="bg-white p-6 md:p-10 border border-gray-100 shadow-xl rounded-[2.5rem]">
-        <h3 className="text-xl font-semibold text-gray-900 tracking-tighter italic mb-8">발주 이력 및 상태</h3>
+      <div className="bg-white p-6 md:p-10 border border-[var(--toss-border)] shadow-xl rounded-[2.5rem]">
+        <h3 className="text-xl font-semibold text-[var(--foreground)] tracking-tighter italic mb-8">발주 이력 및 상태</h3>
         {purchaseOrders.length === 0 ? (
-          <div className="text-center py-20 bg-gray-50 rounded-[2rem] border border-dashed border-gray-200">
-            <p className="text-sm font-semibold text-gray-400">발주 이력이 없습니다.</p>
+          <div className="text-center py-20 bg-[var(--toss-gray-1)] rounded-[2rem] border border-dashed border-[var(--toss-border)]">
+            <p className="text-sm font-semibold text-[var(--toss-gray-3)]">발주 이력이 없습니다.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-6">
             {purchaseOrders.map((order: any) => (
-              <div key={order.id} className="p-8 border border-gray-100 rounded-[2rem] hover:shadow-lg transition-all bg-white">
+              <div key={order.id} className="p-8 border border-[var(--toss-border)] rounded-[2rem] hover:shadow-lg transition-all bg-white">
                 <div className="flex justify-between items-start mb-6">
                   <div>
-                    <p className="text-lg font-semibold text-gray-900">발주서 #{order.id?.toString().slice(0, 8)}</p>
-                    <p className="text-[10px] text-gray-400 font-bold mt-1 uppercase tracking-widest">
+                    <p className="text-lg font-semibold text-[var(--foreground)]">발주서 #{order.id?.toString().slice(0, 8)}</p>
+                    <p className="text-[10px] text-[var(--toss-gray-3)] font-bold mt-1 uppercase tracking-widest">
                       {new Date(order.created_at).toLocaleDateString()} | {order.supplier_name || '미지정'}
                     </p>
                   </div>
@@ -143,18 +143,18 @@ export default function PurchaseOrderManagement({ user, inventory, suppliers, fe
                     {order.status}
                   </span>
                 </div>
-                <div className="bg-gray-50 p-6 rounded-lg mb-6">
+                <div className="bg-[var(--toss-gray-1)] p-6 rounded-lg mb-6">
                   <div className="space-y-2">
                     {(order.items || []).map((item: any, idx: number) => (
-                      <div key={idx} className="flex justify-between text-xs font-bold text-gray-600">
+                      <div key={idx} className="flex justify-between text-xs font-bold text-[var(--toss-gray-4)]">
                         <span>{item.name}</span>
                         <span>{item.qty}개 × ₩{(item.unit_price || 0).toLocaleString()}</span>
                       </div>
                     ))}
                   </div>
-                  <div className="mt-4 pt-4 border-t border-gray-200 flex justify-between items-center">
-                    <span className="text-xs font-semibold text-gray-900">총 발주액</span>
-                    <span className="text-lg font-semibold text-blue-600">₩{(order.total_amount || 0).toLocaleString()}</span>
+                  <div className="mt-4 pt-4 border-t border-[var(--toss-border)] flex justify-between items-center">
+                    <span className="text-xs font-semibold text-[var(--foreground)]">총 발주액</span>
+                    <span className="text-lg font-semibold text-[var(--toss-blue)]">₩{(order.total_amount || 0).toLocaleString()}</span>
                   </div>
                 </div>
                 {order.status === '대기' && (

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -61,21 +61,21 @@ export default function CalendarSync({ yearMonth }: { yearMonth?: string }) {
   };
 
   return (
-    <div className="bg-white p-6 rounded-lg border border-gray-100 shadow-sm">
-      <h3 className="text-sm font-semibold text-gray-800 mb-4">캘린더 동기화</h3>
+    <div className="bg-white p-6 rounded-lg border border-[var(--toss-border)] shadow-sm">
+      <h3 className="text-sm font-semibold text-[var(--foreground)] mb-4">캘린더 동기화</h3>
       <div className="flex items-center gap-2 mb-4">
         <input type="month" value={ym} onChange={(e) => setYm(e.target.value)} className="p-2 border rounded-lg text-sm font-bold" />
-        <span className="text-xs text-gray-500">({events.length}건)</span>
+        <span className="text-xs text-[var(--toss-gray-3)]">({events.length}건)</span>
       </div>
       <div className="flex flex-col gap-2">
-        <button onClick={exportICS} className="w-full py-3 bg-blue-600 text-white text-xs font-semibold rounded-xl">
+        <button onClick={exportICS} className="w-full py-3 bg-[var(--toss-blue)] text-white text-xs font-semibold rounded-xl">
           .ics 파일 다운로드 (구글/아웃룩 가져오기)
         </button>
-        <a href={googleCalendarUrl()} target="_blank" rel="noopener noreferrer" className="w-full py-3 bg-gray-100 text-gray-700 text-xs font-semibold rounded-xl text-center">
+        <a href={googleCalendarUrl()} target="_blank" rel="noopener noreferrer" className="w-full py-3 bg-[var(--toss-gray-1)] text-[var(--foreground)] text-xs font-semibold rounded-xl text-center">
           구글 캘린더에 추가
         </a>
       </div>
-      <p className="mt-4 text-[10px] text-gray-500">* .ics 파일을 구글 캘린더 또는 아웃룩에서 가져오기로 등록하세요.</p>
+      <p className="mt-4 text-[10px] text-[var(--toss-gray-3)]">* .ics 파일을 구글 캘린더 또는 아웃룩에서 가져오기로 등록하세요.</p>
     </div>
   );
 }

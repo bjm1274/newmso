@@ -139,21 +139,21 @@ export default function VendorAnalysis() {
     <div className="space-y-6">
       {/* 월 선택 */}
       <div className="flex gap-4 items-center">
-        <label className="font-semibold text-gray-700">조회 월:</label>
+        <label className="font-semibold text-[var(--foreground)]">조회 월:</label>
         <input
           type="month"
           value={selectedMonth}
           onChange={(e) => setSelectedMonth(e.target.value)}
-          className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-600"
+          className="px-4 py-2 border border-[var(--toss-border)] rounded-lg focus:outline-none focus:border-[var(--toss-blue)]"
         />
       </div>
 
       {/* 탭 */}
-      <div className="flex gap-3 border-b border-gray-200 pb-4">
-        <button className="px-6 py-3 font-semibold text-sm bg-blue-600 text-white rounded-lg">
+      <div className="flex gap-3 border-b border-[var(--toss-border)] pb-4">
+        <button className="px-6 py-3 font-semibold text-sm bg-[var(--toss-blue)] text-white rounded-lg">
           🏢 업체별 현황
         </button>
-        <button className="px-6 py-3 font-semibold text-sm bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200">
+        <button className="px-6 py-3 font-semibold text-sm bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] rounded-lg hover:bg-[var(--toss-gray-2)]">
           👥 환자 처방
         </button>
       </div>
@@ -161,9 +161,9 @@ export default function VendorAnalysis() {
       {/* 업체별 현황 */}
       <div className="space-y-6">
         <div className="grid grid-cols-3 gap-4">
-          <div className="bg-blue-50 p-6 rounded-xl border border-blue-200">
-            <p className="text-xs font-bold text-blue-600 mb-2">총 구매액</p>
-            <p className="text-2xl font-semibold text-blue-800">
+          <div className="bg-[var(--toss-blue-light)] p-6 rounded-xl border border-[var(--toss-blue)]/30">
+            <p className="text-xs font-bold text-[var(--toss-blue)] mb-2">총 구매액</p>
+            <p className="text-2xl font-semibold text-[var(--foreground)]">
               ₩{vendorData.reduce((sum, v) => sum + v.total_purchase_amount, 0).toLocaleString()}
             </p>
           </div>
@@ -180,12 +180,12 @@ export default function VendorAnalysis() {
         </div>
 
         {/* 업체별 테이블 */}
-        <div className="bg-white border border-gray-100 shadow-sm rounded-xl overflow-hidden">
-          <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-            <h3 className="text-lg font-semibold text-gray-800">🏢 업체별 구매 현황</h3>
+        <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-xl overflow-hidden">
+          <div className="p-6 border-b border-[var(--toss-border)] flex justify-between items-center">
+            <h3 className="text-lg font-semibold text-[var(--foreground)]">🏢 업체별 구매 현황</h3>
             <button
               onClick={downloadVendorReport}
-              className="px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-semibold hover:bg-gray-700 transition-all"
+              className="px-4 py-2 bg-[var(--foreground)] text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-all"
             >
               📥 CSV 다운로드
             </button>
@@ -193,34 +193,34 @@ export default function VendorAnalysis() {
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className="bg-[var(--toss-gray-1)] border-b border-[var(--toss-border)]">
                 <tr>
-                  <th className="px-6 py-3 text-left font-semibold text-gray-700">업체명</th>
-                  <th className="px-6 py-3 text-right font-semibold text-gray-700">총 구매액</th>
-                  <th className="px-6 py-3 text-right font-semibold text-gray-700">총 수량</th>
-                  <th className="px-6 py-3 text-right font-semibold text-gray-700">품목 수</th>
-                  <th className="px-6 py-3 text-center font-semibold text-gray-700">상세</th>
+                  <th className="px-6 py-3 text-left font-semibold text-[var(--foreground)]">업체명</th>
+                  <th className="px-6 py-3 text-right font-semibold text-[var(--foreground)]">총 구매액</th>
+                  <th className="px-6 py-3 text-right font-semibold text-[var(--foreground)]">총 수량</th>
+                  <th className="px-6 py-3 text-right font-semibold text-[var(--foreground)]">품목 수</th>
+                  <th className="px-6 py-3 text-center font-semibold text-[var(--foreground)]">상세</th>
                 </tr>
               </thead>
               <tbody>
                 {vendorData.map((vendor) => (
-                  <tr key={vendor.vendor_name} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="px-6 py-4 font-bold text-gray-800">{vendor.vendor_name}</td>
-                    <td className="px-6 py-4 text-right font-semibold text-blue-600">
+                  <tr key={vendor.vendor_name} className="border-b border-[var(--toss-border)] hover:bg-[var(--toss-gray-1)]">
+                    <td className="px-6 py-4 font-bold text-[var(--foreground)]">{vendor.vendor_name}</td>
+                    <td className="px-6 py-4 text-right font-semibold text-[var(--toss-blue)]">
                       ₩{vendor.total_purchase_amount.toLocaleString()}
                     </td>
-                    <td className="px-6 py-4 text-right font-bold text-gray-800">
+                    <td className="px-6 py-4 text-right font-bold text-[var(--foreground)]">
                       {vendor.total_quantity}개
                     </td>
-                    <td className="px-6 py-4 text-right font-bold text-gray-800">
+                    <td className="px-6 py-4 text-right font-bold text-[var(--foreground)]">
                       {vendor.item_count}개
                     </td>
                     <td className="px-6 py-4 text-center">
                       <details className="cursor-pointer">
-                        <summary className="px-3 py-1 bg-gray-100 rounded text-xs font-semibold hover:bg-gray-200">
+                        <summary className="px-3 py-1 bg-[var(--toss-gray-1)] rounded text-xs font-semibold hover:opacity-90">
                           보기
                         </summary>
-                        <div className="mt-3 p-3 bg-gray-50 rounded text-xs space-y-1">
+                        <div className="mt-3 p-3 bg-[var(--toss-gray-1)] rounded text-xs space-y-1">
                           {vendor.items.map((item: any, idx: number) => (
                             <div key={idx} className="flex justify-between">
                               <span>{item.name}</span>
@@ -241,12 +241,12 @@ export default function VendorAnalysis() {
       </div>
 
       {/* 환자 처방 섹션 */}
-      <div className="space-y-6 pt-8 border-t border-gray-200">
+      <div className="space-y-6 pt-8 border-t border-[var(--toss-border)]">
         <div className="flex justify-between items-center">
-          <h3 className="text-lg font-semibold text-gray-800">👥 환자 처방 금액 현황</h3>
+          <h3 className="text-lg font-semibold text-[var(--foreground)]">👥 환자 처방 금액 현황</h3>
           <button
             onClick={() => setShowUploadModal(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-all"
+            className="px-4 py-2 bg-[var(--toss-blue)] text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-all"
           >
             📤 엑셀 업로드
           </button>
@@ -272,12 +272,12 @@ export default function VendorAnalysis() {
         </div>
 
         {/* 환자 처방 테이블 */}
-        <div className="bg-white border border-gray-100 shadow-sm rounded-xl overflow-hidden">
-          <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-            <h4 className="font-semibold text-gray-800">처방 내역</h4>
+        <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-xl overflow-hidden">
+          <div className="p-6 border-b border-[var(--toss-border)] flex justify-between items-center">
+            <h4 className="font-semibold text-[var(--foreground)]">처방 내역</h4>
             <button
               onClick={downloadPrescriptionReport}
-              className="px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-semibold hover:bg-gray-700 transition-all"
+              className="px-4 py-2 bg-[var(--foreground)] text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-all"
             >
               📥 CSV 다운로드
             </button>
@@ -285,31 +285,31 @@ export default function VendorAnalysis() {
 
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className="bg-[var(--toss-gray-1)] border-b border-[var(--toss-border)]">
                 <tr>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700">환자명</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700">환자ID</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700">품목명</th>
-                  <th className="px-4 py-3 text-right font-semibold text-gray-700">수량</th>
-                  <th className="px-4 py-3 text-right font-semibold text-gray-700">단가</th>
-                  <th className="px-4 py-3 text-right font-semibold text-gray-700">합계</th>
-                  <th className="px-4 py-3 text-center font-semibold text-gray-700">처방일</th>
+                  <th className="px-4 py-3 text-left font-semibold text-[var(--foreground)]">환자명</th>
+                  <th className="px-4 py-3 text-left font-semibold text-[var(--foreground)]">환자ID</th>
+                  <th className="px-4 py-3 text-left font-semibold text-[var(--foreground)]">품목명</th>
+                  <th className="px-4 py-3 text-right font-semibold text-[var(--foreground)]">수량</th>
+                  <th className="px-4 py-3 text-right font-semibold text-[var(--foreground)]">단가</th>
+                  <th className="px-4 py-3 text-right font-semibold text-[var(--foreground)]">합계</th>
+                  <th className="px-4 py-3 text-center font-semibold text-[var(--foreground)]">처방일</th>
                 </tr>
               </thead>
               <tbody>
                 {prescriptionData.slice(0, 20).map((prescription, idx) => (
-                  <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="px-4 py-3 font-bold text-gray-800">{prescription.patient_name}</td>
-                    <td className="px-4 py-3 text-gray-600">{prescription.patient_id}</td>
-                    <td className="px-4 py-3 text-gray-800">{prescription.item_name}</td>
-                    <td className="px-4 py-3 text-right font-bold text-gray-800">{prescription.quantity}</td>
-                    <td className="px-4 py-3 text-right text-gray-600">
+                  <tr key={idx} className="border-b border-[var(--toss-border)] hover:bg-[var(--toss-gray-1)]">
+                    <td className="px-4 py-3 font-bold text-[var(--foreground)]">{prescription.patient_name}</td>
+                    <td className="px-4 py-3 text-[var(--toss-gray-4)]">{prescription.patient_id}</td>
+                    <td className="px-4 py-3 text-[var(--foreground)]">{prescription.item_name}</td>
+                    <td className="px-4 py-3 text-right font-bold text-[var(--foreground)]">{prescription.quantity}</td>
+                    <td className="px-4 py-3 text-right text-[var(--toss-gray-4)]">
                       ₩{prescription.unit_price?.toLocaleString()}
                     </td>
                     <td className="px-4 py-3 text-right font-semibold text-green-600">
                       ₩{prescription.total_amount?.toLocaleString()}
                     </td>
-                    <td className="px-4 py-3 text-center text-gray-600">
+                    <td className="px-4 py-3 text-center text-[var(--toss-gray-4)]">
                       {new Date(prescription.prescription_date).toLocaleDateString('ko-KR')}
                     </td>
                   </tr>
@@ -323,18 +323,18 @@ export default function VendorAnalysis() {
       {/* 엑셀 업로드 모달 */}
       {showUploadModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]">
-          <div className="bg-white rounded-xl p-8 w-full max-w-md shadow-2xl">
-            <h3 className="text-xl font-semibold text-gray-800 mb-6">📤 환자 처방 데이터 업로드</h3>
+          <div className="bg-[var(--toss-card)] rounded-xl p-8 w-full max-w-md shadow-2xl">
+            <h3 className="text-xl font-semibold text-[var(--foreground)] mb-6">📤 환자 처방 데이터 업로드</h3>
 
             <div className="space-y-4 mb-6">
-              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                <p className="text-sm font-bold text-blue-700 mb-2">📋 파일 형식</p>
-                <p className="text-xs text-blue-600">
+              <div className="bg-[var(--toss-blue-light)] p-4 rounded-lg border border-[var(--toss-blue)]/30">
+                <p className="text-sm font-bold text-[var(--toss-blue)] mb-2">📋 파일 형식</p>
+                <p className="text-xs text-[var(--toss-gray-4)]">
                   CSV 또는 엑셀 파일 (환자명, 환자ID, 품목명, 수량, 단가)
                 </p>
               </div>
 
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+              <div className="border-2 border-dashed border-[var(--toss-border)] rounded-lg p-6 text-center">
                 <input
                   type="file"
                   accept=".csv,.xlsx,.xls"
@@ -344,8 +344,8 @@ export default function VendorAnalysis() {
                 />
                 <label htmlFor="file-upload" className="cursor-pointer">
                   <p className="text-3xl mb-2">📁</p>
-                  <p className="font-semibold text-gray-800">파일을 선택하거나 드래그하세요</p>
-                  <p className="text-xs text-gray-400 mt-1">
+                  <p className="font-semibold text-[var(--foreground)]">파일을 선택하거나 드래그하세요</p>
+                  <p className="text-xs text-[var(--toss-gray-3)] mt-1">
                     {uploadFile ? uploadFile.name : '지원 형식: CSV, XLSX'}
                   </p>
                 </label>
@@ -355,7 +355,7 @@ export default function VendorAnalysis() {
             <div className="flex gap-3">
               <button
                 onClick={() => setShowUploadModal(false)}
-                className="flex-1 py-3 bg-gray-100 text-gray-800 rounded-lg font-bold hover:bg-gray-200 transition-all"
+                className="flex-1 py-3 bg-[var(--toss-gray-1)] text-[var(--foreground)] rounded-lg font-bold hover:opacity-90 transition-all"
               >
                 취소
               </button>
@@ -367,7 +367,7 @@ export default function VendorAnalysis() {
                   }
                 }}
                 disabled={!uploadFile}
-                className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-all disabled:opacity-50"
+                className="flex-1 py-3 bg-[var(--toss-blue)] text-white rounded-lg font-bold hover:opacity-90 transition-all disabled:opacity-50"
               >
                 업로드
               </button>

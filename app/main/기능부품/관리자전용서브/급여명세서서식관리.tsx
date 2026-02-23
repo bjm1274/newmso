@@ -97,16 +97,16 @@ export default function PayrollSlipDesignManager() {
   };
 
   return (
-    <div className="bg-white p-6 rounded-lg border border-gray-100 shadow-sm space-y-4">
+    <div className="bg-white p-6 rounded-lg border border-[var(--toss-border)] shadow-sm space-y-4">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <h2 className="text-sm font-semibold text-gray-800">급여명세서 서식 관리</h2>
-          <p className="text-[11px] text-gray-500">
+          <h2 className="text-sm font-semibold text-[var(--foreground)]">급여명세서 서식 관리</h2>
+          <p className="text-[11px] text-[var(--toss-gray-3)]">
             PDF 급여명세서 상단 제목, 색상, 회사명, 하단 문구 등을 설정합니다.
           </p>
         </div>
         {loading && (
-          <span className="text-[11px] text-gray-400 font-bold">불러오는 중...</span>
+          <span className="text-[11px] text-[var(--toss-gray-3)] font-bold">불러오는 중...</span>
         )}
       </div>
 
@@ -114,30 +114,30 @@ export default function PayrollSlipDesignManager() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-[13px]">
         <div className="space-y-3">
           <label className="flex flex-col gap-1">
-            <span className="text-[11px] font-semibold text-gray-500">제목</span>
+            <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">제목</span>
             <input
               type="text"
               value={design.title}
               onChange={(e) => handleChange('title', e.target.value)}
-              className="px-3 py-2 rounded-xl border border-gray-200 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+              className="px-3 py-2 rounded-xl border border-[var(--toss-border)] text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 focus:border-blue-400"
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-[11px] font-semibold text-gray-500">부제 (설명)</span>
+            <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">부제 (설명)</span>
             <input
               type="text"
               value={design.subtitle}
               onChange={(e) => handleChange('subtitle', e.target.value)}
-              className="px-3 py-2 rounded-xl border border-gray-200 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+              className="px-3 py-2 rounded-xl border border-[var(--toss-border)] text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 focus:border-blue-400"
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-[11px] font-semibold text-gray-500">회사명 라벨</span>
+            <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">회사명 라벨</span>
             <input
               type="text"
               value={design.companyLabel}
               onChange={(e) => handleChange('companyLabel', e.target.value)}
-              className="px-3 py-2 rounded-xl border border-gray-200 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+              className="px-3 py-2 rounded-xl border border-[var(--toss-border)] text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 focus:border-blue-400"
             />
           </label>
         </div>
@@ -145,40 +145,40 @@ export default function PayrollSlipDesignManager() {
         <div className="space-y-3">
           <div className="flex gap-3">
             <label className="flex-1 flex flex-col gap-1">
-              <span className="text-[11px] font-semibold text-gray-500">대표 색상 (Primary)</span>
+              <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">대표 색상 (Primary)</span>
               <input
                 type="text"
                 value={design.primaryColor}
                 onChange={(e) => handleChange('primaryColor', e.target.value)}
-                className="px-3 py-2 rounded-xl border border-gray-200 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                className="px-3 py-2 rounded-xl border border-[var(--toss-border)] text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 focus:border-blue-400"
                 placeholder="#2563eb"
               />
             </label>
             <label className="w-20 flex flex-col gap-1">
-              <span className="text-[11px] font-semibold text-gray-500">색상 미리보기</span>
+              <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">색상 미리보기</span>
               <span
-                className="w-full h-9 rounded-xl border border-gray-200"
+                className="w-full h-9 rounded-xl border border-[var(--toss-border)]"
                 style={{ backgroundColor: design.primaryColor }}
               />
             </label>
           </div>
           <label className="flex flex-col gap-1">
-            <span className="text-[11px] font-semibold text-gray-500">테두리 색상</span>
+            <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">테두리 색상</span>
             <input
               type="text"
               value={design.borderColor}
               onChange={(e) => handleChange('borderColor', e.target.value)}
-              className="px-3 py-2 rounded-xl border border-gray-200 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+              className="px-3 py-2 rounded-xl border border-[var(--toss-border)] text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 focus:border-blue-400"
               placeholder="#e5e7eb"
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-[11px] font-semibold text-gray-500">하단 문구</span>
+            <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">하단 문구</span>
             <input
               type="text"
               value={design.footerText}
               onChange={(e) => handleChange('footerText', e.target.value)}
-              className="px-3 py-2 rounded-xl border border-gray-200 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+              className="px-3 py-2 rounded-xl border border-[var(--toss-border)] text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 focus:border-blue-400"
               placeholder="예: 위 금액을 수령하였습니다."
             />
           </label>
@@ -187,9 +187,9 @@ export default function PayrollSlipDesignManager() {
               type="checkbox"
               checked={design.showSignArea}
               onChange={(e) => handleChange('showSignArea', e.target.checked)}
-              className="w-4 h-4 rounded border-gray-300"
+              className="w-4 h-4 rounded border-[var(--toss-border)]"
             />
-            <span className="text-[11px] font-bold text-gray-600">
+            <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">
               하단에 서명란(직원 서명) 표시
             </span>
           </label>
@@ -197,8 +197,8 @@ export default function PayrollSlipDesignManager() {
       </div>
 
       {/* 미리보기 */}
-      <div className="mt-2 border border-dashed border-gray-200 rounded-lg p-4 bg-gray-50">
-        <p className="text-[11px] font-semibold text-gray-400 mb-2 uppercase tracking-widest">
+      <div className="mt-2 border border-dashed border-[var(--toss-border)] rounded-lg p-4 bg-[var(--toss-gray-1)]">
+        <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] mb-2 uppercase tracking-widest">
           Preview
         </p>
         <div
@@ -211,20 +211,20 @@ export default function PayrollSlipDesignManager() {
           >
             {design.title || '급여명세서'}
           </div>
-          <div className="mb-3 text-[11px] text-gray-500">
+          <div className="mb-3 text-[11px] text-[var(--toss-gray-3)]">
             {design.subtitle || '월별 급여 내역서'} · {design.companyLabel || '회사명'}
           </div>
-          <div className="border-t border-gray-100 pt-2 mt-2 flex justify-between text-[11px] text-gray-600">
+          <div className="border-t border-[var(--toss-border)] pt-2 mt-2 flex justify-between text-[11px] text-[var(--toss-gray-4)]">
             <span>기본급 / 공제 / 실지급액 요약</span>
             <span style={{ color: design.primaryColor || '#2563eb' }}>실지급액 0원</span>
           </div>
           {design.footerText && (
-            <div className="mt-3 text-[10px] text-gray-400">
+            <div className="mt-3 text-[10px] text-[var(--toss-gray-3)]">
               {design.footerText}
             </div>
           )}
           {design.showSignArea && (
-            <div className="mt-4 pt-3 border-t border-dotted border-gray-200 flex justify-end text-[10px] text-gray-500">
+            <div className="mt-4 pt-3 border-t border-dotted border-[var(--toss-border)] flex justify-end text-[10px] text-[var(--toss-gray-3)]">
               <span>
                 직원 서명: ____________________
               </span>
@@ -238,7 +238,7 @@ export default function PayrollSlipDesignManager() {
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="px-5 py-2.5 rounded-xl bg-blue-600 text-white text-[12px] font-semibold hover:bg-blue-700 disabled:opacity-60"
+          className="px-5 py-2.5 rounded-xl bg-[var(--toss-blue)] text-white text-[12px] font-semibold hover:bg-blue-700 disabled:opacity-60"
         >
           {saving ? '저장 중...' : '급여명세서 서식 저장'}
         </button>

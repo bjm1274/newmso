@@ -59,7 +59,7 @@ export default function GlobalNotificationBell({ user, onOpenFull }: { user: any
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="relative min-h-[44px] min-w-[44px] flex items-center justify-center p-2 rounded-[12px] text-[#8B95A1] hover:bg-[#F2F4F6] hover:text-[#191F28] transition-all touch-manipulation"
+        className="relative min-h-[44px] min-w-[44px] flex items-center justify-center p-2 rounded-[12px] text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)] hover:text-[var(--foreground)] transition-all touch-manipulation"
         aria-label="알림"
       >
         <span className="text-xl">🔔</span>
@@ -70,40 +70,40 @@ export default function GlobalNotificationBell({ user, onOpenFull }: { user: any
         )}
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 w-[320px] max-h-[400px] bg-white border border-[#E5E8EB] rounded-[16px] shadow-lg z-[200] flex flex-col overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-          <div className="p-3 border-b border-[#E5E8EB] flex items-center justify-between shrink-0">
-            <span className="text-xs font-black text-[#191F28]">알림</span>
-            {unreadCount > 0 && <span className="text-[10px] font-bold text-[#8B95A1]">안읽음 {unreadCount}건</span>}
+        <div className="absolute right-0 top-full mt-1 w-[320px] max-h-[400px] bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] shadow-lg z-[200] flex flex-col overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="p-3 border-b border-[var(--toss-border)] flex items-center justify-between shrink-0">
+            <span className="text-xs font-black text-[var(--foreground)]">알림</span>
+            {unreadCount > 0 && <span className="text-[10px] font-bold text-[var(--toss-gray-3)]">안읽음 {unreadCount}건</span>}
           </div>
           <div className="overflow-y-auto flex-1 max-h-[320px] custom-scrollbar">
             {list.length === 0 ? (
-              <div className="p-6 text-center text-xs text-[#8B95A1] font-bold">알림이 없습니다.</div>
+              <div className="p-6 text-center text-xs text-[var(--toss-gray-3)] font-bold">알림이 없습니다.</div>
             ) : (
               list.slice(0, 8).map((n: any) => (
                 <button
                   key={n.id}
                   type="button"
                   onClick={() => { if (!n.is_read) markRead(n.id); setOpen(false); }}
-                  className={`w-full text-left px-3 py-2.5 border-b border-[#F2F4F6] transition-colors hover:bg-[#F8FAFC] ${!n.is_read ? 'bg-blue-50/50' : ''}`}
+                  className={`w-full text-left px-3 py-2.5 border-b border-[var(--toss-gray-1)] transition-colors hover:bg-[var(--toss-gray-1)] ${!n.is_read ? 'bg-[var(--toss-blue-light)]/50' : ''}`}
                 >
                   <div className="flex gap-2">
                     <span className="text-base shrink-0">{TYPE_ICONS[n.type] || TYPE_ICONS.default}</span>
                     <div className="min-w-0 flex-1">
-                      <p className="text-[11px] font-bold text-[#191F28] truncate">{n.title}</p>
-                      <p className="text-[10px] text-[#8B95A1] line-clamp-2">{n.body}</p>
-                      <p className="text-[9px] text-[#8B95A1] mt-0.5">{new Date(n.created_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                      <p className="text-[11px] font-bold text-[var(--foreground)] truncate">{n.title}</p>
+                      <p className="text-[10px] text-[var(--toss-gray-3)] line-clamp-2">{n.body}</p>
+                      <p className="text-[9px] text-[var(--toss-gray-3)] mt-0.5">{new Date(n.created_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
                     </div>
-                    {!n.is_read && <span className="w-1.5 h-1.5 bg-blue-500 rounded-full shrink-0 mt-1.5" />}
+                    {!n.is_read && <span className="w-1.5 h-1.5 bg-[var(--toss-blue)] rounded-full shrink-0 mt-1.5" />}
                   </div>
                 </button>
               ))
             )}
           </div>
-          <div className="p-2 border-t border-[#E5E8EB] shrink-0">
+          <div className="p-2 border-t border-[var(--toss-border)] shrink-0">
             <button
               type="button"
               onClick={() => { onOpenFull(); setOpen(false); }}
-              className="w-full py-2 rounded-[12px] text-xs font-bold text-[#3182F6] hover:bg-[#E8F3FF] transition-colors"
+              className="w-full py-2 rounded-[12px] text-xs font-bold text-[var(--toss-blue)] hover:bg-[var(--toss-blue-light)] transition-colors"
             >
               전체 보기 (내 정보 → 알림)
             </button>

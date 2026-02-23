@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { Component, ReactNode } from 'react';
 
 type Props = { children: ReactNode };
@@ -26,8 +26,8 @@ export default class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="min-h-[200px] flex flex-col items-center justify-center p-8 bg-red-50 border border-red-100 rounded-2xl">
           <span className="text-4xl mb-4">⚠️</span>
-          <h3 className="text-lg font-black text-gray-800 mb-2">오류가 발생했습니다</h3>
-          <p className="text-sm text-gray-500 font-bold mb-4">{this.state.error?.message}</p>
+          <h3 className="text-lg font-black text-[var(--foreground)] mb-2">오류가 발생했습니다</h3>
+          <p className="text-sm text-[var(--toss-gray-3)] font-bold mb-4">{this.state.error?.message}</p>
           <button onClick={() => this.setState({ hasError: false })} className="px-6 py-2 bg-gray-800 text-white rounded-xl text-xs font-black">
             다시 시도
           </button>

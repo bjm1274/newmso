@@ -10,7 +10,7 @@ import AdminView from '../관리자전용';
 
 export default function MainContent({ user, mainMenu, data, subView, setSubView, selectedCo, setSelectedCo, onRefresh }: any) {
   return (
-    <div className="flex-1 flex overflow-hidden relative bg-[#FDFDFD]">
+    <div className="flex-1 flex overflow-hidden relative bg-[var(--page-bg)]">
       {/* 1. 조직도 (명칭 변경 반영됨) */}
       {mainMenu === '조직도' && (
         <OrgChart 
@@ -21,7 +21,7 @@ export default function MainContent({ user, mainMenu, data, subView, setSubView,
       
       {/* 2. 채팅 (ID 일치 확인) */}
       {mainMenu === '채팅' && (
-        <div className="absolute inset-0 bg-white z-20 animate-in slide-in-from-right duration-300">
+        <div className="absolute inset-0 bg-[var(--toss-card)] z-20 animate-in slide-in-from-right duration-300">
           <ChatView user={user} onRefresh={onRefresh} />
         </div>
       )}

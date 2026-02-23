@@ -65,11 +65,11 @@ export default function TeamManager({ onRefresh }: { onRefresh?: () => void }) {
   }));
 
   return (
-    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-8 animate-in fade-in">
+    <div className="bg-white rounded-3xl border border-[var(--toss-border)] shadow-sm p-8 animate-in fade-in">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h3 className="text-xl font-semibold text-gray-800 tracking-tighter">팀 관리</h3>
-          <p className="text-[10px] text-blue-600 font-bold uppercase tracking-widest">병원장 → 진료부/간호부/총무부 → 팀</p>
+          <h3 className="text-xl font-semibold text-[var(--foreground)] tracking-tighter">팀 관리</h3>
+          <p className="text-[10px] text-[var(--toss-blue)] font-bold uppercase tracking-widest">병원장 → 진료부/간호부/총무부 → 팀</p>
         </div>
         <div className="flex gap-2">
           <select value={company} onChange={(e) => setCompany(e.target.value)} className="p-2 border rounded-xl text-sm font-bold">
@@ -77,22 +77,22 @@ export default function TeamManager({ onRefresh }: { onRefresh?: () => void }) {
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
-          <button onClick={() => setAdding(true)} className="px-4 py-2 bg-blue-600 text-white text-xs font-semibold rounded-xl">+ 팀 추가</button>
+          <button onClick={() => setAdding(true)} className="px-4 py-2 bg-[var(--toss-blue)] text-white text-xs font-semibold rounded-xl">+ 팀 추가</button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {byDivision.map((div) => (
-          <div key={div.name} className="border border-gray-100 rounded-lg p-6">
-            <h4 className="text-sm font-semibold text-gray-800 mb-4 border-b-2 border-gray-900 pb-2">{div.name}</h4>
+          <div key={div.name} className="border border-[var(--toss-border)] rounded-lg p-6">
+            <h4 className="text-sm font-semibold text-[var(--foreground)] mb-4 border-b-2 border-[var(--foreground)] pb-2">{div.name}</h4>
             <div className="space-y-2">
               {div.teams.map((t) => (
-                <div key={t.id} className="flex justify-between items-center py-2 px-3 bg-gray-50 rounded-xl">
+                <div key={t.id} className="flex justify-between items-center py-2 px-3 bg-[var(--toss-gray-1)] rounded-xl">
                   <span className="text-sm font-bold">{t.team_name}</span>
                   <button onClick={() => handleDelete(t.id)} className="text-red-500 hover:text-red-700 text-xs font-semibold">삭제</button>
                 </div>
               ))}
-              {div.teams.length === 0 && <p className="text-xs text-gray-400">팀 없음</p>}
+              {div.teams.length === 0 && <p className="text-xs text-[var(--toss-gray-3)]">팀 없음</p>}
             </div>
           </div>
         ))}
@@ -109,8 +109,8 @@ export default function TeamManager({ onRefresh }: { onRefresh?: () => void }) {
             </select>
             <input type="text" value={newTeam.team_name} onChange={(e) => setNewTeam({ ...newTeam, team_name: e.target.value })} placeholder="팀명" className="w-full p-3 border rounded-xl" />
             <div className="flex gap-2">
-              <button onClick={handleAdd} className="flex-1 py-3 bg-blue-600 text-white font-semibold rounded-xl">추가</button>
-              <button onClick={() => setAdding(false)} className="flex-1 py-3 bg-gray-200 font-semibold rounded-xl">취소</button>
+              <button onClick={handleAdd} className="flex-1 py-3 bg-[var(--toss-blue)] text-white font-semibold rounded-xl">추가</button>
+              <button onClick={() => setAdding(false)} className="flex-1 py-3 bg-[var(--toss-gray-2)] font-semibold rounded-xl">취소</button>
             </div>
           </div>
         </div>

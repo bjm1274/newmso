@@ -134,11 +134,11 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: any) {
   return (
     <div className="space-y-5">
       <div className="flex gap-3 items-center">
-        <label className="text-sm font-medium text-gray-700">정산 년도</label>
+        <label className="text-sm font-medium text-[var(--foreground)]">정산 년도</label>
         <select
           value={selectedYear}
           onChange={(e) => setSelectedYear(e.target.value)}
-          className="h-9 px-3 border border-gray-300 rounded-md text-sm font-medium focus:outline-none focus:border-blue-500"
+          className="h-9 px-3 border border-[var(--toss-border)] rounded-md text-sm font-medium focus:outline-none focus:border-[var(--toss-blue)]"
         >
           {[2024, 2025, 2026].map((year) => (
             <option key={year} value={year.toString()}>{year}년</option>
@@ -147,71 +147,71 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: any) {
       </div>
 
       <div className="grid grid-cols-4 gap-3">
-        <div className="bg-[#f8fafc] p-4 rounded-lg border border-gray-200">
-          <p className="text-xs font-medium text-gray-500 mb-1">총 급여액</p>
-          <p className="text-lg font-semibold text-gray-800">
+        <div className="bg-[var(--page-bg)] p-4 rounded-lg border border-[var(--toss-border)]">
+          <p className="text-xs font-medium text-[var(--toss-gray-3)] mb-1">총 급여액</p>
+          <p className="text-lg font-semibold text-[var(--foreground)]">
             ₩{settlementData.reduce((sum, item) => sum + item.total_salary, 0).toLocaleString()}
           </p>
         </div>
-        <div className="bg-[#f8fafc] p-4 rounded-lg border border-gray-200">
+        <div className="bg-[var(--page-bg)] p-4 rounded-lg border border-[var(--toss-border)]">
           <p className="text-xs font-medium text-emerald-600 mb-1">총 환급액</p>
           <p className="text-lg font-semibold text-emerald-700">
             ₩{settlementData.filter(item => item.refund_or_additional > 0).reduce((sum, item) => sum + item.refund_or_additional, 0).toLocaleString()}
           </p>
         </div>
-        <div className="bg-[#f8fafc] p-4 rounded-lg border border-gray-200">
+        <div className="bg-[var(--page-bg)] p-4 rounded-lg border border-[var(--toss-border)]">
           <p className="text-xs font-medium text-red-600 mb-1">총 추가납부</p>
           <p className="text-lg font-semibold text-red-700">
             ₩{Math.abs(settlementData.filter(item => item.refund_or_additional < 0).reduce((sum, item) => sum + item.refund_or_additional, 0)).toLocaleString()}
           </p>
         </div>
-        <div className="bg-[#f8fafc] p-4 rounded-lg border border-gray-200">
-          <p className="text-xs font-medium text-gray-500 mb-1">정산 대상</p>
-          <p className="text-lg font-semibold text-gray-800">{settlementData.length}명</p>
+        <div className="bg-[var(--page-bg)] p-4 rounded-lg border border-[var(--toss-border)]">
+          <p className="text-xs font-medium text-[var(--toss-gray-3)] mb-1">정산 대상</p>
+          <p className="text-lg font-semibold text-[var(--foreground)]">{settlementData.length}명</p>
         </div>
       </div>
 
-      <div className="bg-white border border-gray-200 shadow-sm rounded-lg overflow-hidden">
-        <div className="p-4 border-b border-gray-200 bg-[#eef2f7]">
-          <h3 className="text-sm font-semibold text-gray-800">연말정산 현황</h3>
+      <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-lg overflow-hidden">
+        <div className="p-4 border-b border-[var(--toss-border)] bg-[var(--tab-bg)]">
+          <h3 className="text-sm font-semibold text-[var(--foreground)]">연말정산 현황</h3>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
-            <thead className="bg-[#eef2f7] border-b border-gray-200">
+            <thead className="bg-[var(--tab-bg)] border-b border-[var(--toss-border)]">
               <tr>
-                <th className="px-4 py-2.5 text-left font-semibold text-gray-700">직원명</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-gray-700">연간급여</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-gray-700">기본공제</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-gray-700">과세표준</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-gray-700">산출세액</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-gray-700">기납부세액</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-gray-700">환급/추가</th>
-                <th className="px-4 py-2.5 text-center font-semibold text-gray-700">상태</th>
-                <th className="px-4 py-2.5 text-center font-semibold text-gray-700">액션</th>
+                <th className="px-4 py-2.5 text-left font-semibold text-[var(--foreground)]">직원명</th>
+                <th className="px-4 py-2.5 text-right font-semibold text-[var(--foreground)]">연간급여</th>
+                <th className="px-4 py-2.5 text-right font-semibold text-[var(--foreground)]">기본공제</th>
+                <th className="px-4 py-2.5 text-right font-semibold text-[var(--foreground)]">과세표준</th>
+                <th className="px-4 py-2.5 text-right font-semibold text-[var(--foreground)]">산출세액</th>
+                <th className="px-4 py-2.5 text-right font-semibold text-[var(--foreground)]">기납부세액</th>
+                <th className="px-4 py-2.5 text-right font-semibold text-[var(--foreground)]">환급/추가</th>
+                <th className="px-4 py-2.5 text-center font-semibold text-[var(--foreground)]">상태</th>
+                <th className="px-4 py-2.5 text-center font-semibold text-[var(--foreground)]">액션</th>
               </tr>
             </thead>
             <tbody>
               {settlementData.map((item) => (
-                <tr key={item.staff_id} className="border-b border-gray-100 hover:bg-[#f8fafc]">
-                  <td className="px-4 py-2.5 font-medium text-gray-800">{item.staff_name}</td>
-                  <td className="px-4 py-2.5 text-right font-medium text-gray-800">
+                <tr key={item.staff_id} className="border-b border-[var(--toss-border)] hover:bg-[var(--page-bg)]">
+                  <td className="px-4 py-2.5 font-medium text-[var(--foreground)]">{item.staff_name}</td>
+                  <td className="px-4 py-2.5 text-right font-medium text-[var(--foreground)]">
                     ₩{item.total_salary.toLocaleString()}
                   </td>
-                  <td className="px-4 py-2.5 text-right text-gray-600">
+                  <td className="px-4 py-2.5 text-right text-[var(--toss-gray-4)]">
                     ₩{item.standard_deduction.toLocaleString()}
                   </td>
-                  <td className="px-4 py-2.5 text-right text-gray-600">
+                  <td className="px-4 py-2.5 text-right text-[var(--toss-gray-4)]">
                     ₩{item.taxable_income.toLocaleString()}
                   </td>
-                  <td className="px-4 py-2.5 text-right font-medium text-gray-800">
+                  <td className="px-4 py-2.5 text-right font-medium text-[var(--foreground)]">
                     ₩{item.calculated_tax.toLocaleString()}
                   </td>
-                  <td className="px-4 py-2.5 text-right text-gray-600">
+                  <td className="px-4 py-2.5 text-right text-[var(--toss-gray-4)]">
                     ₩{item.tax_paid.toLocaleString()}
                   </td>
                   <td className={`px-4 py-2.5 text-right font-semibold ${
-                    item.refund_or_additional > 0 ? 'text-emerald-600' : item.refund_or_additional < 0 ? 'text-red-600' : 'text-gray-600'
+                    item.refund_or_additional > 0 ? 'text-emerald-600' : item.refund_or_additional < 0 ? 'text-red-600' : 'text-[var(--toss-gray-4)]'
                   }`}>
                     ₩{Math.abs(item.refund_or_additional).toLocaleString()}
                   </td>
@@ -221,7 +221,7 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: any) {
                         ? 'bg-emerald-100 text-emerald-700'
                         : item.settlement_status === '추가납부'
                         ? 'bg-red-100 text-red-700'
-                        : 'bg-blue-100 text-blue-700'
+                        : 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)]'
                     }`}>
                       {item.settlement_status}
                     </span>
@@ -232,13 +232,13 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: any) {
                         setSelectedStaff(item);
                         setShowCertificate(true);
                       }}
-                      className="px-2 py-1 bg-blue-100 text-blue-600 rounded-md text-xs font-medium hover:bg-blue-200"
+                      className="px-2 py-1 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] rounded-md text-xs font-medium hover:opacity-90"
                     >
                       보기
                     </button>
                     <button
                       onClick={() => downloadCertificate(item)}
-                      className="px-2 py-1 bg-gray-100 text-gray-600 rounded-md text-xs font-medium hover:bg-gray-200"
+                      className="px-2 py-1 bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] rounded-md text-xs font-medium hover:opacity-90"
                     >
                       다운
                     </button>
@@ -252,37 +252,37 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: any) {
 
       {showCertificate && selectedStaff && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl shadow-xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-[var(--toss-card)] rounded-lg p-6 w-full max-w-2xl shadow-xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-base font-semibold text-gray-800">근로소득 원천징수영수증</h3>
+              <h3 className="text-base font-semibold text-[var(--foreground)]">근로소득 원천징수영수증</h3>
               <button
                 onClick={() => setShowCertificate(false)}
-                className="text-gray-400 hover:text-gray-600 text-xl"
+                className="text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] text-xl"
               >
                 ✕
               </button>
             </div>
 
-            <div className="bg-[#f8fafc] p-4 rounded-lg font-mono text-sm whitespace-pre-wrap mb-4 border border-gray-200">
+            <div className="bg-[var(--page-bg)] p-4 rounded-lg font-mono text-sm whitespace-pre-wrap mb-4 border border-[var(--toss-border)]">
               {generateWithholdingCertificate(selectedStaff)}
             </div>
 
             <div className="flex gap-2">
               <button
                 onClick={() => setShowCertificate(false)}
-                className="flex-1 py-2.5 bg-gray-100 text-gray-800 rounded-lg text-sm font-medium hover:bg-gray-200"
+                className="flex-1 py-2.5 bg-[var(--toss-gray-1)] text-[var(--foreground)] rounded-lg text-sm font-medium hover:opacity-90"
               >
                 닫기
               </button>
               <button
                 onClick={() => downloadCertificate(selectedStaff)}
-                className="flex-1 py-2.5 bg-gray-700 text-white rounded-lg text-sm font-medium hover:bg-gray-800"
+                className="flex-1 py-2.5 bg-[var(--foreground)] text-white rounded-lg text-sm font-medium hover:opacity-90"
               >
                 다운로드
               </button>
               <button
                 onClick={() => sendCertificateEmail(selectedStaff)}
-                className="flex-1 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+                className="flex-1 py-2.5 bg-[var(--toss-blue)] text-white rounded-lg text-sm font-medium hover:opacity-90"
               >
                 이메일 발송
               </button>

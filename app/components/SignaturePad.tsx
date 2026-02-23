@@ -79,7 +79,7 @@ export default function SignaturePad({ onSave, width = 300, height = 150 }: { on
 
   return (
     <div className="space-y-3">
-      <div className="border-2 border-[#E5E8EB] rounded-[12px] overflow-hidden bg-white">
+      <div className="border-2 border-[var(--toss-border)] rounded-[12px] overflow-hidden bg-[var(--toss-card)]">
         <canvas
           ref={canvasRef}
           width={width}
@@ -100,7 +100,7 @@ export default function SignaturePad({ onSave, width = 300, height = 150 }: { on
         <button
           type="button"
           onClick={handleClear}
-          className="px-4 py-2 text-[13px] font-semibold text-[#4E5968] bg-[#F2F4F6] rounded-[10px] hover:bg-[#E5E8EB]"
+          className="px-4 py-2 text-[13px] font-semibold text-[var(--toss-gray-4)] bg-[var(--toss-gray-1)] rounded-[10px] hover:bg-[var(--toss-border)]"
         >
           다시 쓰기
         </button>
@@ -108,7 +108,7 @@ export default function SignaturePad({ onSave, width = 300, height = 150 }: { on
           type="button"
           onClick={handleSave}
           disabled={!hasDrawn}
-          className="flex-1 px-4 py-2 text-[13px] font-semibold text-white bg-[#3182F6] rounded-[10px] hover:bg-[#1B64DA] disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-1 px-4 py-2 text-[13px] font-semibold text-white bg-[var(--toss-blue)] rounded-[10px] hover:bg-[var(--toss-blue)] disabled:opacity-50 disabled:cursor-not-allowed"
         >
           서명 적용
         </button>

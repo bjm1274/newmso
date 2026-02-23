@@ -45,12 +45,12 @@ export default function AIChatView() {
   }, [messages]);
 
   return (
-    <div className="flex flex-col h-full bg-[#F8FAFC] p-4 md:p-8">
+    <div className="flex flex-col h-full app-page p-4 md:p-8">
       <header className="mb-6">
-        <h2 className="text-xl md:text-2xl font-semibold text-gray-800 tracking-tighter italic">
+        <h2 className="text-xl md:text-2xl font-semibold text-[var(--foreground)] tracking-tighter italic">
           AI 업무 도우미
         </h2>
-        <p className="text-[10px] md:text-xs text-gray-400 font-bold uppercase mt-1 tracking-widest">
+        <p className="text-[10px] md:text-xs text-[var(--toss-gray-3)] font-bold uppercase mt-1 tracking-widest">
           인사·급여·근태·전자결재 문의
         </p>
       </header>

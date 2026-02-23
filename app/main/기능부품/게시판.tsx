@@ -498,11 +498,11 @@ export default function BoardView({ user, setMainMenu }: any) {
   };
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-[#F8FAFC] overflow-y-auto custom-scrollbar p-4 md:p-8 space-y-6 md:space-y-8 pb-24 md:pb-8">
+    <div className="flex flex-col h-full min-h-0 app-page overflow-y-auto custom-scrollbar p-4 md:p-8 space-y-6 md:space-y-8 pb-24 md:pb-8">
       <header className="flex justify-between items-end">
         <div>
-          <h2 className="text-xl md:text-2xl font-bold text-[#191F28] tracking-tight">게시판</h2>
-          <p className="text-[10px] md:text-xs text-[#8B95A1] font-bold uppercase mt-1">병원 공지 및 일정 관리</p>
+          <h2 className="text-xl md:text-2xl font-bold text-[var(--foreground)] tracking-tight">게시판</h2>
+          <p className="text-[10px] md:text-xs text-[var(--toss-gray-3)] font-bold uppercase mt-1">병원 공지 및 일정 관리</p>
         </div>
         
         {(activeBoard === '공지사항' || activeBoard === '자유게시판' || activeBoard === '경조사' || activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
@@ -516,15 +516,15 @@ export default function BoardView({ user, setMainMenu }: any) {
       </header>
 
       {/* 게시판 탭 - 모바일 가로 스크롤 */}
-      <div className="flex gap-2 overflow-x-auto no-scrollbar bg-white p-2 md:p-4 rounded-[16px] border border-[#E5E8EB] shadow-sm shrink-0">
+      <div className="flex gap-2 overflow-x-auto no-scrollbar bg-[var(--toss-card)] p-2 md:p-4 rounded-[16px] border border-[var(--toss-border)] shadow-sm shrink-0">
         {boards.map(board => (
           <button
             key={board.id}
             onClick={() => setActiveBoard(board.id)}
             className={`flex-1 min-w-[100px] md:min-w-0 px-4 md:px-6 py-2.5 md:py-3 rounded-[12px] text-[11px] md:text-xs font-bold transition-all whitespace-nowrap ${
               activeBoard === board.id
-                ? 'bg-[#3182F6] text-white shadow-sm'
-                : 'bg-[#F2F4F6] text-[#8B95A1] hover:bg-[#E5E8EB]'
+                ? 'bg-[var(--toss-blue)] text-white shadow-sm'
+                : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] hover:bg-[var(--toss-border)]'
             }`}
           >
             {board.label}
@@ -534,9 +534,9 @@ export default function BoardView({ user, setMainMenu }: any) {
 
       {/* 새 게시물 작성 폼 */}
       {showNewPost && (
-        <div className="bg-white p-6 md:p-8 border border-[#E5E8EB] shadow-sm rounded-[16px] space-y-6 animate-in fade-in slide-in-from-top-4 duration-300">
+        <div className="bg-[var(--toss-card)] p-6 md:p-8 border border-[var(--toss-border)] shadow-sm rounded-[16px] space-y-6 animate-in fade-in slide-in-from-top-4 duration-300">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h3 className="text-lg font-bold text-[#191F28]">새 게시물 작성</h3>
+            <h3 className="text-lg font-bold text-[var(--foreground)]">새 게시물 작성</h3>
             {(activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
               <button
                 type="button"
@@ -544,7 +544,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                   if (!VALID_BODY_IDS.has(selectedBodyPart)) setSelectedBodyPart('all');
                   setShowBodyPicker(true);
                 }}
-                className="px-6 py-3 rounded-full bg-white border border-[#E5E8EB] text-base font-bold text-[#3182F6] hover:bg-[#E8F3FF] shrink-0"
+                className="px-6 py-3 rounded-full bg-[var(--toss-card)] border border-[var(--toss-border)] text-base font-bold text-[var(--toss-blue)] hover:bg-[var(--toss-blue-light)] shrink-0"
               >
                 👤 사람 모형으로 선택
               </button>
@@ -562,7 +562,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                       if (!v) return;
                       setTitle(v);
                     }}
-                    className="w-full p-3 bg-[#F2F4F6] rounded-[12px] border border-[#E5E8EB] outline-none text-xs font-bold focus:ring-2 focus:ring-[#3182F6]/20"
+                    className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] outline-none text-xs font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20"
                   >
                     <option value="">
                       {activeBoard === '수술일정'
@@ -584,20 +584,20 @@ export default function BoardView({ user, setMainMenu }: any) {
                           ? '수술명을 입력하거나 위에서 선택하세요.'
                           : '검사명을 입력하거나 위에서 선택하세요.'
                       }
-                      className="flex-1 min-w-0 p-4 bg-[#F2F4F6] rounded-[12px] border border-[#E5E8EB] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[#3182F6]/20"
+                      className="flex-1 min-w-0 p-4 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20"
                     />
-                    <div className="flex rounded-[12px] border border-[#E5E8EB] overflow-hidden bg-[#F2F4F6] shrink-0 min-w-[120px]">
+                    <div className="flex rounded-[12px] border border-[var(--toss-border)] overflow-hidden bg-[var(--toss-gray-1)] shrink-0 min-w-[120px]">
                       <button
                         type="button"
                         onClick={() => setScheduleSide(scheduleSide === '좌' ? '' : '좌')}
-                        className={`flex-1 min-w-[56px] px-6 py-3 text-sm font-bold transition-colors ${scheduleSide === '좌' ? 'bg-[#3182F6] text-white' : 'text-[#4E5968] hover:bg-[#E5E8EB]'}`}
+                        className={`flex-1 min-w-[56px] px-6 py-3 text-sm font-bold transition-colors ${scheduleSide === '좌' ? 'bg-[var(--toss-blue)] text-white' : 'text-[var(--toss-gray-4)] hover:bg-[var(--toss-border)]'}`}
                       >
                         좌
                       </button>
                       <button
                         type="button"
                         onClick={() => setScheduleSide(scheduleSide === '우' ? '' : '우')}
-                        className={`flex-1 min-w-[56px] px-6 py-3 text-sm font-bold transition-colors ${scheduleSide === '우' ? 'bg-[#3182F6] text-white' : 'text-[#4E5968] hover:bg-[#E5E8EB]'}`}
+                        className={`flex-1 min-w-[56px] px-6 py-3 text-sm font-bold transition-colors ${scheduleSide === '우' ? 'bg-[var(--toss-blue)] text-white' : 'text-[var(--toss-gray-4)] hover:bg-[var(--toss-border)]'}`}
                       >
                         우
                       </button>
@@ -606,12 +606,12 @@ export default function BoardView({ user, setMainMenu }: any) {
                 </div>
               ) : (
                 <>
-                  <label className="text-[10px] font-semibold text-[#4E5968] uppercase tracking-widest mb-2 block">제목</label>
+                  <label className="text-[10px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">제목</label>
                   <input
                     value={title}
                     onChange={e => setTitle(e.target.value)}
                     placeholder="게시물 제목을 입력하세요."
-                    className="w-full p-4 bg-[#F2F4F6] rounded-[12px] border border-[#E5E8EB] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[#3182F6]/20"
+                    className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20"
                   />
                 </>
               )}
@@ -621,7 +621,7 @@ export default function BoardView({ user, setMainMenu }: any) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-[10px] font-semibold text-[#4E5968] uppercase tracking-widest mb-2 block">날짜 (YYYY-MM-DD)</label>
+                    <label className="text-[10px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">날짜 (YYYY-MM-DD)</label>
                     <input
                       type="text"
                       value={scheduleDate}
@@ -638,11 +638,11 @@ export default function BoardView({ user, setMainMenu }: any) {
                         }
                         setScheduleDate(formatted);
                       }}
-                      className="w-full p-4 bg-[#F2F4F6] rounded-[12px] border border-[#E5E8EB] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[#3182F6]/20"
+                      className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20"
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-semibold text-[#4E5968] uppercase tracking-widest mb-2 block">시간</label>
+                    <label className="text-[10px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">시간</label>
                     <div className="grid grid-cols-3 gap-2">
                       <select
                         value={schedulePeriod}
@@ -651,7 +651,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                           setSchedulePeriod(v);
                           updateScheduleTime(v, scheduleHour, scheduleMinute);
                         }}
-                        className="w-full p-3 bg-[#F2F4F6] rounded-[12px] border border-[#E5E8EB] border-[#E5E8EB] outline-none text-xs font-bold focus:ring-2 focus:ring-[#3182F6]/20"
+                        className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-[var(--toss-border)] outline-none text-xs font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20"
                       >
                         <option value="">오전/오후</option>
                         <option value="오전">오전</option>
@@ -664,7 +664,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                           setScheduleHour(v);
                           updateScheduleTime(schedulePeriod, v, scheduleMinute);
                         }}
-                        className="w-full p-3 bg-[#F2F4F6] rounded-[12px] border border-[#E5E8EB] border-[#E5E8EB] outline-none text-xs font-bold focus:ring-2 focus:ring-[#3182F6]/20"
+                        className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-[var(--toss-border)] outline-none text-xs font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20"
                       >
                         <option value="">시간</option>
                         {Array.from({ length: 12 }).map((_, idx) => {
@@ -682,7 +682,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                           setScheduleMinute(v);
                           updateScheduleTime(schedulePeriod, scheduleHour, v);
                         }}
-                        className="w-full p-3 bg-[#F2F4F6] rounded-[12px] border border-[#E5E8EB] border-[#E5E8EB] outline-none text-xs font-bold focus:ring-2 focus:ring-[#3182F6]/20"
+                        className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-[var(--toss-border)] outline-none text-xs font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20"
                       >
                         <option value="">분</option>
                         <option value="00">00분</option>
@@ -693,26 +693,26 @@ export default function BoardView({ user, setMainMenu }: any) {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-[10px] font-semibold text-[#4E5968] uppercase tracking-widest mb-2 block">수술실/검사실</label>
-                    <input value={scheduleRoom} onChange={e => setScheduleRoom(e.target.value)} placeholder="예: 수술실 1" className="w-full p-4 bg-[#F2F4F6] rounded-[12px] border border-[#E5E8EB] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[#3182F6]/20" />
+                    <label className="text-[10px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">수술실/검사실</label>
+                    <input value={scheduleRoom} onChange={e => setScheduleRoom(e.target.value)} placeholder="예: 수술실 1" className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20" />
                   </div>
                   <div>
-                    <label className="text-[10px] font-semibold text-[#4E5968] uppercase tracking-widest mb-2 block">환자명</label>
-                    <input value={schedulePatient} onChange={e => setSchedulePatient(e.target.value)} placeholder="환자명 입력" className="w-full p-4 bg-[#F2F4F6] rounded-[12px] border border-[#E5E8EB] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[#3182F6]/20" />
+                    <label className="text-[10px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">환자명</label>
+                    <input value={schedulePatient} onChange={e => setSchedulePatient(e.target.value)} placeholder="환자명 입력" className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20" />
                   </div>
                 </div>
                 {(activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
                   <div className="space-y-3">
-                    <label className="text-[15px] font-semibold text-[#4E5968] uppercase tracking-widest mb-1.5 block">
+                    <label className="text-[15px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-1.5 block">
                       {activeBoard === '수술일정' ? '수술 관련 체크' : '촬영 관련 체크'}
                     </label>
-                    <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-base font-bold text-[#4E5968]">
+                    <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-base font-bold text-[var(--toss-gray-4)]">
                       <label className="inline-flex items-center gap-3 cursor-pointer shrink-0">
                         <input
                           type="checkbox"
                           checked={scheduleFasting}
                           onChange={(e) => setScheduleFasting(e.target.checked)}
-                          className="w-6 h-6 rounded border-[#E5E8EB]"
+                          className="w-6 h-6 rounded border-[var(--toss-border)]"
                         />
                         <span>금식 필요</span>
                       </label>
@@ -722,7 +722,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                             type="checkbox"
                             checked={scheduleInpatient}
                             onChange={(e) => setScheduleInpatient(e.target.checked)}
-                            className="w-6 h-6 rounded border-[#E5E8EB]"
+                            className="w-6 h-6 rounded border-[var(--toss-border)]"
                           />
                           <span>입원 예정</span>
                         </label>
@@ -731,7 +731,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                             type="checkbox"
                             checked={scheduleGuardian}
                             onChange={(e) => setScheduleGuardian(e.target.checked)}
-                            className="w-6 h-6 rounded border-[#E5E8EB]"
+                            className="w-6 h-6 rounded border-[var(--toss-border)]"
                           />
                           <span>보호자 동반</span>
                         </label>
@@ -741,7 +741,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                           type="checkbox"
                           checked={scheduleCaregiver}
                           onChange={(e) => setScheduleCaregiver(e.target.checked)}
-                          className="w-6 h-6 rounded border-[#E5E8EB]"
+                          className="w-6 h-6 rounded border-[var(--toss-border)]"
                         />
                         <span>간병인 배치</span>
                       </label>
@@ -750,7 +750,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                           type="checkbox"
                           checked={scheduleTransfusion}
                           onChange={(e) => setScheduleTransfusion(e.target.checked)}
-                          className="w-6 h-6 rounded border-[#E5E8EB]"
+                          className="w-6 h-6 rounded border-[var(--toss-border)]"
                         />
                         <span>수혈 필요</span>
                       </label>
@@ -761,25 +761,25 @@ export default function BoardView({ user, setMainMenu }: any) {
             ) : (
               <>
                 <div>
-                  <label className="text-[10px] font-semibold text-[#4E5968] uppercase tracking-widest mb-2 block">태그 (쉼표로 구분)</label>
+                  <label className="text-[10px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">태그 (쉼표로 구분)</label>
                   <input
                     value={tagsInput}
                     onChange={(e) => setTagsInput(e.target.value)}
                     placeholder="예: 공지, 회의, 환영"
-                    className="w-full p-4 bg-[#F2F4F6] rounded-[12px] border border-[#E5E8EB] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[#3182F6]/20 mb-4"
+                    className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20 mb-4"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-semibold text-[#4E5968] uppercase tracking-widest mb-2 block">내용</label>
+                  <label className="text-[10px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">내용</label>
                   <textarea
                   value={content}
                   onChange={e => setContent(e.target.value)}
                   placeholder="게시물 내용을 입력하세요."
-                  className="w-full h-32 md:h-48 p-4 bg-[#F2F4F6] rounded-[12px] border border-[#E5E8EB] border-none outline-none text-sm font-bold leading-relaxed focus:ring-2 focus:ring-[#3182F6]/20 resize-none"
+                  className="w-full h-32 md:h-48 p-4 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-none outline-none text-sm font-bold leading-relaxed focus:ring-2 focus:ring-[var(--toss-blue)]/20 resize-none"
                 />
                 </div>
                 <div>
-                  <label className="text-[10px] font-semibold text-[#4E5968] uppercase tracking-widest mb-2 block">사진·동영상·파일 첨부</label>
+                  <label className="text-[10px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">사진·동영상·파일 첨부</label>
                   <input
                     type="file"
                     multiple
@@ -789,7 +789,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                       setAttachmentFiles((prev) => [...prev, ...files].slice(0, 10));
                       e.target.value = '';
                     }}
-                    className="w-full text-sm font-bold text-[#4E5968] file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-[#E8F3FF] file:text-[#3182F6] file:font-bold"
+                    className="w-full text-sm font-bold text-[var(--toss-gray-4)] file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-[var(--toss-blue-light)] file:text-[var(--toss-blue)] file:font-bold"
                   />
                   {attachmentFiles.length > 0 && (
                     <div className="mt-3 space-y-3">
@@ -801,13 +801,13 @@ export default function BoardView({ user, setMainMenu }: any) {
                           return (
                             <div key={i} className="relative group">
                               {isImg && (
-                                <img src={url} alt={f.name} className="w-24 h-24 object-cover rounded-xl border border-[#E5E8EB]" />
+                                <img src={url} alt={f.name} className="w-24 h-24 object-cover rounded-xl border border-[var(--toss-border)]" />
                               )}
                               {isVideo && (
-                                <video src={url} className="w-40 h-24 object-cover rounded-xl border border-[#E5E8EB]" muted playsInline />
+                                <video src={url} className="w-40 h-24 object-cover rounded-xl border border-[var(--toss-border)]" muted playsInline />
                               )}
                               {!isImg && !isVideo && (
-                                <div className="w-24 h-24 rounded-xl border border-[#E5E8EB] bg-[#F2F4F6] flex items-center justify-center text-[10px] font-bold text-[#4E5968] truncate px-1">
+                                <div className="w-24 h-24 rounded-xl border border-[var(--toss-border)] bg-[var(--toss-gray-1)] flex items-center justify-center text-[10px] font-bold text-[var(--toss-gray-4)] truncate px-1">
                                   📎 {f.name}
                                 </div>
                               )}
@@ -824,7 +824,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                       </div>
                       <ul className="space-y-1">
                         {attachmentFiles.map((f, i) => (
-                          <li key={i} className="flex items-center gap-2 text-xs font-bold text-[#4E5968]">
+                          <li key={i} className="flex items-center gap-2 text-xs font-bold text-[var(--toss-gray-4)]">
                             <span className="truncate flex-1">{f.name}</span>
                             <button
                               type="button"
@@ -846,7 +846,7 @@ export default function BoardView({ user, setMainMenu }: any) {
           <button
             onClick={handleNewPost}
             disabled={loading}
-            className="w-full py-4 bg-[#3182F6] text-white rounded-[12px] font-bold text-sm shadow-sm hover:opacity-95 active:scale-[0.99] transition-all disabled:opacity-50"
+            className="w-full py-4 bg-[var(--toss-blue)] text-white rounded-[12px] font-bold text-sm shadow-sm hover:opacity-95 active:scale-[0.99] transition-all disabled:opacity-50"
           >
             {loading ? '등록 중...' : '게시물 등록'}
           </button>
@@ -863,7 +863,7 @@ export default function BoardView({ user, setMainMenu }: any) {
           }}
         >
           <div
-            className="w-full max-w-7xl max-h-[94vh] bg-white rounded-[24px] shadow-2xl border border-[#E5E8EB] p-5 md:p-8 flex flex-col md:flex-row gap-5 md:gap-8"
+            className="w-full max-w-7xl max-h-[94vh] bg-[var(--toss-card)] rounded-[24px] shadow-2xl border border-[var(--toss-border)] p-5 md:p-8 flex flex-col md:flex-row gap-5 md:gap-8"
             onClick={(e) => e.stopPropagation()}
           >
             {/* 왼쪽: 생성된 전신 이미지 + 부위 클릭 (이미지와 동일 비율 박스 안에서 좌표 고정) */}
@@ -923,24 +923,24 @@ export default function BoardView({ user, setMainMenu }: any) {
             <div className="flex-1 flex flex-col">
               <div className="flex items-center justify-between mb-2">
                 <div>
-                  <p className="text-[10px] font-semibold text-[#8B95A1] uppercase tracking-widest">
+                  <p className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
                     {activeBoard === '수술일정' ? '수술명 선택' : '검사명 선택'}
                   </p>
-                  <p className="text-xs font-bold text-[#4E5968] mt-1">
+                  <p className="text-xs font-bold text-[var(--toss-gray-4)] mt-1">
                     {BODY_PARTS.find((b) => b.id === resolvedBodyPart)?.label || '전체'} 기준 추천 목록
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowBodyPicker(false)}
-                  className="px-3 py-1.5 rounded-full border border-gray-200 text-[10px] font-bold text-gray-500 hover:bg-gray-50"
+                  className="px-3 py-1.5 rounded-full border border-[var(--toss-border)] text-[10px] font-bold text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]"
                 >
                   닫기
                 </button>
               </div>
-              <div className="flex-1 mt-2 bg-[#F8FAFC] border border-[#E5E8EB] rounded-[12px] p-2 overflow-y-auto custom-scrollbar">
+              <div className="flex-1 mt-2 bg-[var(--page-bg)] border border-[var(--toss-border)] rounded-[12px] p-2 overflow-y-auto custom-scrollbar">
                 {filteredTemplates.length === 0 ? (
-                  <p className="text-[11px] text-[#8B95A1] font-bold py-4 text-center">
+                  <p className="text-[11px] text-[var(--toss-gray-3)] font-bold py-4 text-center">
                     선택한 부위에 해당하는 등록된 수술·검사명이 없습니다.<br />
                     관리자 메뉴의 “수술·검사명”에서 템플릿을 추가해주세요.
                   </p>
@@ -954,9 +954,9 @@ export default function BoardView({ user, setMainMenu }: any) {
                             setTitle(t.name);
                             setShowBodyPicker(false);
                           }}
-                          className="w-full text-left px-3 py-2 rounded-[8px] text-[12px] font-bold text-[#191F28] hover:bg-white hover:shadow-sm flex items-center gap-2"
+                          className="w-full text-left px-3 py-2 rounded-[8px] text-[12px] font-bold text-[var(--foreground)] hover:bg-[var(--toss-card)] hover:shadow-sm flex items-center gap-2"
                         >
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#3182F6]" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-[var(--toss-blue)]" />
                           <span className="flex-1 truncate">{t.name}</span>
                         </button>
                       </li>
@@ -971,13 +971,13 @@ export default function BoardView({ user, setMainMenu }: any) {
 
       {/* 수술일정·MRI일정용 달력 뷰 */}
       {(activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
-        <div className="bg-white border border-[#E5E8EB] rounded-[16px] shadow-sm p-4 md:p-6 space-y-4">
+        <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] shadow-sm p-4 md:p-6 space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-semibold text-[#8B95A1] uppercase tracking-widest">
+              <p className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
                 {activeBoard === '수술일정' ? '수술 일정 캘린더' : 'MRI 일정 캘린더'}
               </p>
-              <h3 className="text-lg md:text-xl font-semibold text-[#191F28] mt-1">
+              <h3 className="text-lg md:text-xl font-semibold text-[var(--foreground)] mt-1">
                 {calendarMonth.getFullYear()}년 {calendarMonth.getMonth() + 1}월
               </h3>
             </div>
@@ -989,14 +989,14 @@ export default function BoardView({ user, setMainMenu }: any) {
                     new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1)
                   )
                 }
-                className="px-3 py-1.5 rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50"
+                className="px-3 py-1.5 rounded-full border border-[var(--toss-border)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-gray-1)]"
               >
                 ← 이전달
               </button>
               <button
                 type="button"
                 onClick={() => setCalendarMonth(new Date())}
-                className="px-3 py-1.5 rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50"
+                className="px-3 py-1.5 rounded-full border border-[var(--toss-border)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-gray-1)]"
               >
                 오늘
               </button>
@@ -1007,7 +1007,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                     new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1)
                   )
                 }
-                className="px-3 py-1.5 rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50"
+                className="px-3 py-1.5 rounded-full border border-[var(--toss-border)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-gray-1)]"
               >
                 다음달 →
               </button>
@@ -1015,7 +1015,7 @@ export default function BoardView({ user, setMainMenu }: any) {
           </div>
 
           {posts.length === 0 ? (
-            <div className="py-10 text-center text-xs text-[#8B95A1] font-bold">
+            <div className="py-10 text-center text-xs text-[var(--toss-gray-3)] font-bold">
               등록된 일정이 없습니다.
             </div>
           ) : (
@@ -1045,15 +1045,15 @@ export default function BoardView({ user, setMainMenu }: any) {
                   .padStart(2, '0')}`;
 
               return (
-                <div className="border border-[#E5E8EB] rounded-[16px] overflow-hidden">
-                  <div className="grid grid-cols-7 bg-[#F2F4F6] text-[10px] font-semibold text-[#8B95A1]">
+                <div className="border border-[var(--toss-border)] rounded-[16px] overflow-hidden">
+                  <div className="grid grid-cols-7 bg-[var(--toss-gray-1)] text-[10px] font-semibold text-[var(--toss-gray-3)]">
                     {['일', '월', '화', '수', '목', '금', '토'].map((d) => (
                       <div key={d} className="px-2 py-2 text-center">
                         {d}
                       </div>
                     ))}
                   </div>
-                  <div className="grid grid-cols-7 bg-white text-[11px]">
+                  <div className="grid grid-cols-7 bg-[var(--toss-card)] text-[11px]">
                     {days.map((d, idx) => {
                       const key = toKey(d);
                       const inMonth = d.getMonth() === month;
@@ -1061,18 +1061,18 @@ export default function BoardView({ user, setMainMenu }: any) {
                       return (
                         <div
                           key={key + idx}
-                          className={`min-h-[80px] border border-[#F1F3F5] p-1.5 align-top ${
-                            inMonth ? 'bg-white' : 'bg-[#F9FAFB]'
+                          className={`min-h-[80px] border border-[var(--toss-border)] p-1.5 align-top ${
+                            inMonth ? 'bg-[var(--toss-card)]' : 'bg-[var(--tab-bg)]'
                           }`}
                         >
                           <div className="flex items-center justify-between mb-1">
                             <span
                               className={`text-[10px] font-semibold ${
-                                !inMonth ? 'text-gray-300' : d.getDay() === 0
+                                !inMonth ? 'text-[var(--toss-gray-3)]' : d.getDay() === 0
                                 ? 'text-red-500'
                                 : d.getDay() === 6
-                                  ? 'text-blue-500'
-                                  : 'text-gray-700'
+                                  ? 'text-[var(--toss-blue)]'
+                                  : 'text-[var(--foreground)]'
                               }`}
                             >
                               {d.getDate()}
@@ -1081,7 +1081,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                               <button
                                 type="button"
                                 onClick={() => events[0] && setSelectedPostId(events[0].id)}
-                                className="text-[9px] font-semibold text-[#3182F6] px-1 py-0.5 rounded-full hover:bg-[#E8F3FF]"
+                                className="text-[9px] font-semibold text-[var(--toss-blue)] px-1 py-0.5 rounded-full hover:bg-[var(--toss-blue-light)]"
                               >
                                 {events.length}건
                               </button>
@@ -1093,13 +1093,13 @@ export default function BoardView({ user, setMainMenu }: any) {
                                 key={ev.id}
                                 type="button"
                                 onClick={() => setSelectedPostId(ev.id)}
-                                className="w-full text-left px-1 py-0.5 rounded-[6px] bg-[#E8F3FF] text-[9px] font-bold text-[#3182F6] truncate hover:bg-[#D6EBFF]"
+                                className="w-full text-left px-1 py-0.5 rounded-[6px] bg-[var(--toss-blue-light)] text-[9px] font-bold text-[var(--toss-blue)] truncate hover:bg-[var(--toss-blue-light)]"
                               >
                                 {ev.schedule_time || ''} {ev.title}
                               </button>
                             ))}
                             {events.length > 3 && (
-                              <p className="text-[9px] text-gray-400 font-bold">
+                              <p className="text-[9px] text-[var(--toss-gray-3)] font-bold">
                                 + {events.length - 3}건 더보기
                               </p>
                             )}
@@ -1125,15 +1125,15 @@ export default function BoardView({ user, setMainMenu }: any) {
             return (
             <div
               key={post.id || idx}
-              className={`bg-white border border-[#E5E8EB] shadow-sm rounded-[14px] px-3 md:px-4 py-2.5 md:py-3 hover:border-[#3182F6]/40 hover:shadow-md transition-all cursor-pointer`}
+              className={`bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-[14px] px-3 md:px-4 py-2.5 md:py-3 hover:border-[var(--toss-blue)]/40 hover:shadow-md transition-all cursor-pointer`}
               onClick={() => setSelectedPostId(post.id)}
             >
               {(activeBoard === '수술일정' || activeBoard === 'MRI일정') ? (
                 <div className="space-y-2 md:space-y-1">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
-                      <h3 className="font-bold text-[#191F28] text-base md:text-lg line-clamp-1">{post.title}</h3>
-                      <p className="text-[11px] text-[#3182F6] font-bold mt-1 uppercase tracking-widest">{post.patient_name || '환자명 미지정'}</p>
+                      <h3 className="font-bold text-[var(--foreground)] text-base md:text-lg line-clamp-1">{post.title}</h3>
+                      <p className="text-[11px] text-[var(--toss-blue)] font-bold mt-1 uppercase tracking-widest">{post.patient_name || '환자명 미지정'}</p>
                     </div>
                     <span className={`px-2 py-1 rounded-lg text-[8px] font-semibold shrink-0 ${
                       activeBoard === '수술일정' ? 'bg-red-100 text-red-600' : 'bg-purple-100 text-purple-600'
@@ -1141,18 +1141,18 @@ export default function BoardView({ user, setMainMenu }: any) {
                       {activeBoard === '수술일정' ? '🏥 수술' : '🔬 MRI'}
                     </span>
                   </div>
-                  <div className="grid grid-cols-3 gap-2 pt-4 border-t border-[#E5E8EB]">
+                  <div className="grid grid-cols-3 gap-2 pt-4 border-t border-[var(--toss-border)]">
                     <div>
-                      <p className="text-[8px] font-bold text-[#8B95A1] uppercase">날짜</p>
-                      <p className="text-[11px] font-semibold text-[#191F28]">{post.schedule_date}</p>
+                      <p className="text-[8px] font-bold text-[var(--toss-gray-3)] uppercase">날짜</p>
+                      <p className="text-[11px] font-semibold text-[var(--foreground)]">{post.schedule_date}</p>
                     </div>
                     <div>
-                      <p className="text-[8px] font-bold text-[#8B95A1] uppercase">시간</p>
-                      <p className="text-[11px] font-semibold text-[#191F28]">{post.schedule_time}</p>
+                      <p className="text-[8px] font-bold text-[var(--toss-gray-3)] uppercase">시간</p>
+                      <p className="text-[11px] font-semibold text-[var(--foreground)]">{post.schedule_time}</p>
                     </div>
                     <div>
-                      <p className="text-[8px] font-bold text-[#8B95A1] uppercase">위치</p>
-                      <p className="text-[11px] font-semibold text-[#191F28] line-clamp-1">{post.schedule_room}</p>
+                      <p className="text-[8px] font-bold text-[var(--toss-gray-3)] uppercase">위치</p>
+                      <p className="text-[11px] font-semibold text-[var(--foreground)] line-clamp-1">{post.schedule_room}</p>
                     </div>
                   </div>
                   {(post.surgery_fasting || post.surgery_inpatient || post.surgery_guardian || post.surgery_caregiver || post.surgery_transfusion) && (
@@ -1163,7 +1163,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                         </span>
                       )}
                       {post.surgery_inpatient && (
-                        <span className="px-2 py-1 rounded-full bg-[#E8F3FF] text-[#3182F6] text-[9px] font-semibold">
+                        <span className="px-2 py-1 rounded-full bg-[var(--toss-blue-light)] text-[var(--toss-blue)] text-[9px] font-semibold">
                           입원
                         </span>
                       )}
@@ -1187,24 +1187,24 @@ export default function BoardView({ user, setMainMenu }: any) {
                 </div>
               ) : (
                 <div className="flex items-center gap-3 text-[11px] md:text-xs">
-                  <div className="w-8 text-center text-[10px] font-bold text-[#8B95A1] shrink-0">
+                  <div className="w-8 text-center text-[10px] font-bold text-[var(--toss-gray-3)] shrink-0">
                     {rowNumber}
                   </div>
                   <div className="flex-1 min-w-0 flex items-center gap-1.5">
-                    <p className="font-bold text-[#191F28] truncate group-hover:text-[#3182F6]">
+                    <p className="font-bold text-[var(--foreground)] truncate group-hover:text-[var(--toss-blue)]">
                       {post.title}
                     </p>
                     {(Array.isArray(post.attachments) ? post.attachments : []).length > 0 && (
-                      <span className="shrink-0 text-[#8B95A1]" title="첨부파일 있음">📎</span>
+                      <span className="shrink-0 text-[var(--toss-gray-3)]" title="첨부파일 있음">📎</span>
                     )}
                   </div>
-                  <div className="hidden md:flex w-32 text-[10px] font-bold text-[#8B95A1] justify-center shrink-0">
+                  <div className="hidden md:flex w-32 text-[10px] font-bold text-[var(--toss-gray-3)] justify-center shrink-0">
                     {post.author_name || '익명'}
                   </div>
-                  <div className="w-20 md:w-24 text-[10px] font-bold text-[#8B95A1] text-center shrink-0">
+                  <div className="w-20 md:w-24 text-[10px] font-bold text-[var(--toss-gray-3)] text-center shrink-0">
                     {new Date(post.created_at).toLocaleDateString()}
                   </div>
-                  <div className="w-14 text-[10px] font-bold text-[#8B95A1] text-center shrink-0">
+                  <div className="w-14 text-[10px] font-bold text-[var(--toss-gray-3)] text-center shrink-0">
                     조회 {post.views ?? 0}
                   </div>
                 </div>
@@ -1212,7 +1212,7 @@ export default function BoardView({ user, setMainMenu }: any) {
             </div>
           )})
         ) : (
-          <div className="text-center py-20 text-[#8B95A1]">
+          <div className="text-center py-20 text-[var(--toss-gray-3)]">
             <p className="font-semibold text-sm italic">게시물이 없습니다.</p>
           </div>
         )}
@@ -1222,16 +1222,16 @@ export default function BoardView({ user, setMainMenu }: any) {
       {/* 게시글 상세 보기 모달 */}
       {selectedPost && (
         <div className="fixed inset-0 z-[110] flex items-end md:items-center justify-center bg-black/40 p-0 md:p-8">
-          <div className="w-full max-w-4xl max-h-[90dvh] overflow-y-auto bg-white border-0 md:border border-[#E5E8EB] rounded-t-[24px] md:rounded-[24px] shadow-2xl p-4 md:p-8 pb-8 space-y-5 text-[13px] md:text-[14px] safe-area-pb">
+          <div className="w-full max-w-4xl max-h-[90dvh] overflow-y-auto bg-[var(--toss-card)] border-0 md:border border-[var(--toss-border)] rounded-t-[24px] md:rounded-[24px] shadow-2xl p-4 md:p-8 pb-8 space-y-5 text-[13px] md:text-[14px] safe-area-pb">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
-              <p className="text-[11px] md:text-[12px] font-semibold text-[#8B95A1] uppercase tracking-widest mb-1">
+              <p className="text-[11px] md:text-[12px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">
                 {selectedPost.board_type}
               </p>
-              <h3 className="text-lg md:text-2xl font-semibold text-[#191F28]">
+              <h3 className="text-lg md:text-2xl font-semibold text-[var(--foreground)]">
                 {selectedPost.title}
               </h3>
-              <p className="mt-2 text-[11px] md:text-[12px] text-[#8B95A1] font-bold">
+              <p className="mt-2 text-[11px] md:text-[12px] text-[var(--toss-gray-3)] font-bold">
                 👤 {selectedPost.author_name || '익명'} ·{' '}
                 {new Date(selectedPost.created_at).toLocaleString('ko-KR')}
               </p>
@@ -1249,7 +1249,7 @@ export default function BoardView({ user, setMainMenu }: any) {
               <button
                 type="button"
                 onClick={() => setSelectedPostId(null)}
-                className="px-3 py-1.5 rounded-full border border-gray-200 text-[11px] font-bold text-gray-500 hover:bg-gray-50"
+                className="px-3 py-1.5 rounded-full border border-[var(--toss-border)] text-[11px] font-bold text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]"
               >
                 닫기
               </button>
@@ -1257,21 +1257,21 @@ export default function BoardView({ user, setMainMenu }: any) {
           </div>
 
           {(selectedPost.board_type === '수술일정' || selectedPost.board_type === 'MRI일정') && (
-            <div className="space-y-4 border-t border-[#E5E8EB] pt-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-[11px] font-bold text-[#4E5968]">
+            <div className="space-y-4 border-t border-[var(--toss-border)] pt-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-[11px] font-bold text-[var(--toss-gray-4)]">
                 <div>
-                  <p className="text-[9px] font-semibold text-[#8B95A1] uppercase">수술/검사명</p>
-                  <p className="mt-1 text-sm font-semibold text-[#191F28]">{selectedPost.title}</p>
+                  <p className="text-[9px] font-semibold text-[var(--toss-gray-3)] uppercase">수술/검사명</p>
+                  <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">{selectedPost.title}</p>
                 </div>
                 <div>
-                  <p className="text-[9px] font-semibold text-[#8B95A1] uppercase">날짜·시간</p>
-                  <p className="mt-1 text-sm font-semibold text-[#191F28]">
+                  <p className="text-[9px] font-semibold text-[var(--toss-gray-3)] uppercase">날짜·시간</p>
+                  <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">
                     {selectedPost.schedule_date} {selectedPost.schedule_time}
                   </p>
                 </div>
                 <div>
-                  <p className="text-[9px] font-semibold text-[#8B95A1] uppercase">위치 / 환자명</p>
-                  <p className="mt-1 text-sm font-semibold text-[#191F28]">
+                  <p className="text-[9px] font-semibold text-[var(--toss-gray-3)] uppercase">위치 / 환자명</p>
+                  <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">
                     {selectedPost.schedule_room || '-'} / {selectedPost.patient_name || '-'}
                   </p>
                 </div>
@@ -1282,8 +1282,8 @@ export default function BoardView({ user, setMainMenu }: any) {
                 selectedPost.surgery_guardian ||
                 selectedPost.surgery_caregiver ||
                 selectedPost.surgery_transfusion) && (
-                <div className="bg-[#F8FAFC] border border-[#E5E8EB] rounded-[12px] p-3 space-y-1 text-[11px] font-bold text-[#4E5968]">
-                  <p className="text-[10px] font-semibold text-[#8B95A1] uppercase">수술/검사 준비 상태</p>
+                <div className="bg-[var(--page-bg)] border border-[var(--toss-border)] rounded-[12px] p-3 space-y-1 text-[11px] font-bold text-[var(--toss-gray-4)]">
+                  <p className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">수술/검사 준비 상태</p>
                   <div className="flex flex-wrap gap-1 pt-1">
                     {selectedPost.surgery_fasting && (
                       <span className="px-2 py-1 rounded-full bg-red-50 text-red-600 text-[9px] font-semibold">
@@ -1291,7 +1291,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                       </span>
                     )}
                     {selectedPost.surgery_inpatient && (
-                      <span className="px-2 py-1 rounded-full bg-[#E8F3FF] text-[#3182F6] text-[9px] font-semibold">
+                      <span className="px-2 py-1 rounded-full bg-[var(--toss-blue-light)] text-[var(--toss-blue)] text-[9px] font-semibold">
                         입원
                       </span>
                     )}
@@ -1315,8 +1315,8 @@ export default function BoardView({ user, setMainMenu }: any) {
               )}
 
               {/* 같은 날짜의 전체 일정 목록 */}
-              <div className="bg-[#F8FAFC] border border-[#E5E8EB] rounded-[12px] p-3 space-y-2">
-                <p className="text-[10px] font-semibold text-[#4E5968] flex items-center gap-2">
+              <div className="bg-[var(--page-bg)] border border-[var(--toss-border)] rounded-[12px] p-3 space-y-2">
+                <p className="text-[10px] font-semibold text-[var(--toss-gray-4)] flex items-center gap-2">
                   📅 {selectedPost.schedule_date || '날짜 미지정'} 의 전체 일정
                 </p>
                 <div className="max-h-40 overflow-y-auto custom-scrollbar space-y-1 text-[11px]">
@@ -1331,17 +1331,17 @@ export default function BoardView({ user, setMainMenu }: any) {
                         key={p.id}
                         type="button"
                         onClick={() => setSelectedPostId(p.id)}
-                        className={`w-full flex items-center gap-2 px-2 py-1 rounded-[8px] text-left hover:bg-white ${
-                          p.id === selectedPost.id ? 'bg-white shadow-sm border border-[#E5E8EB]' : ''
+                        className={`w-full flex items-center gap-2 px-2 py-1 rounded-[8px] text-left hover:bg-[var(--toss-card)] ${
+                          p.id === selectedPost.id ? 'bg-[var(--toss-card)] shadow-sm border border-[var(--toss-border)]' : ''
                         }`}
                       >
-                        <span className="text-[10px] font-bold text-[#8B95A1] w-14 shrink-0">
+                        <span className="text-[10px] font-bold text-[var(--toss-gray-3)] w-14 shrink-0">
                           {p.schedule_time || ''}
                         </span>
-                        <span className="flex-1 truncate font-bold text-[#191F28]">
+                        <span className="flex-1 truncate font-bold text-[var(--foreground)]">
                           {p.title}
                         </span>
-                        <span className="text-[10px] font-bold text-[#3182F6] shrink-0">
+                        <span className="text-[10px] font-bold text-[var(--toss-blue)] shrink-0">
                           {p.patient_name || ''}
                         </span>
                       </button>
@@ -1352,16 +1352,16 @@ export default function BoardView({ user, setMainMenu }: any) {
           )}
 
           {selectedPost.content && (
-            <div className="pt-4 border-t border-[#F1F3F5]">
-              <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#4E5968]">
+            <div className="pt-4 border-t border-[var(--toss-border)]">
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--toss-gray-4)]">
                 {selectedPost.content}
               </p>
             </div>
           )}
 
           {(Array.isArray(selectedPost.attachments) ? selectedPost.attachments : []).length > 0 && (
-            <div className="pt-4 border-t border-[#F1F3F5]">
-              <p className="text-[10px] font-semibold text-[#8B95A1] uppercase tracking-widest mb-2">첨부파일 ({(Array.isArray(selectedPost.attachments) ? selectedPost.attachments : []).length}개)</p>
+            <div className="pt-4 border-t border-[var(--toss-border)]">
+              <p className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-2">첨부파일 ({(Array.isArray(selectedPost.attachments) ? selectedPost.attachments : []).length}개)</p>
               <div className="flex flex-wrap gap-4">
                 {(Array.isArray(selectedPost.attachments) ? selectedPost.attachments : []).map((att: any, i: number) =>
                   att.type === 'image' ? (
@@ -1372,7 +1372,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                         loading="eager"
                         decoding="async"
                         referrerPolicy="no-referrer"
-                        className="max-w-[280px] max-h-[280px] rounded-xl border border-[#E5E8EB] object-cover shadow-sm bg-[#F2F4F6]"
+                        className="max-w-[280px] max-h-[280px] rounded-xl border border-[var(--toss-border)] object-cover shadow-sm bg-[var(--toss-gray-1)]"
                         onError={(e) => {
                           const el = e.target as HTMLImageElement;
                           el.alt = '이미지를 불러올 수 없습니다.';
@@ -1381,12 +1381,12 @@ export default function BoardView({ user, setMainMenu }: any) {
                       />
                     </a>
                   ) : att.type === 'video' ? (
-                    <div key={i} className="rounded-xl border border-[#E5E8EB] overflow-hidden bg-black max-w-[320px]">
+                    <div key={i} className="rounded-xl border border-[var(--toss-border)] overflow-hidden bg-black max-w-[320px]">
                       <video src={att.url} controls className="w-full max-h-[240px]" preload="metadata" />
-                      <p className="text-[11px] font-bold text-[#4E5968] p-2 bg-[#F8FAFC] truncate">{att.name}</p>
+                      <p className="text-[11px] font-bold text-[var(--toss-gray-4)] p-2 bg-[var(--page-bg)] truncate">{att.name}</p>
                     </div>
                   ) : (
-                    <a key={i} href={att.url} target="_blank" rel="noopener noreferrer" download={att.name} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-[#F2F4F6] border border-[#E5E8EB] text-sm font-bold text-[#3182F6] hover:bg-[#E8F3FF]">
+                    <a key={i} href={att.url} target="_blank" rel="noopener noreferrer" download={att.name} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--toss-gray-1)] border border-[var(--toss-border)] text-sm font-bold text-[var(--toss-blue)] hover:bg-[var(--toss-blue-light)]">
                       📎 {att.name}
                     </a>
                   )
@@ -1401,7 +1401,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                 (tag: string, i: number) => (
                   <span
                     key={i}
-                    className="px-2 py-0.5 bg-[#E8F3FF] text-[#3182F6] rounded-full text-[9px] font-bold"
+                    className="px-2 py-0.5 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] rounded-full text-[9px] font-bold"
                   >
                     #{tag}
                   </span>
@@ -1411,10 +1411,10 @@ export default function BoardView({ user, setMainMenu }: any) {
           )}
 
           {/* 댓글 + 대댓글 */}
-          <div className="pt-4 border-t border-[#F1F3F5] space-y-3">
-            <p className="text-[11px] font-semibold text-[#4E5968] flex items-center gap-2">
+          <div className="pt-4 border-t border-[var(--toss-border)] space-y-3">
+            <p className="text-[11px] font-semibold text-[var(--toss-gray-4)] flex items-center gap-2">
               💬 댓글
-              <span className="text-[10px] text-[#8B95A1] font-bold">
+              <span className="text-[10px] text-[var(--toss-gray-3)] font-bold">
                 {(comments[selectedPost.id] || []).length}개
               </span>
             </p>
@@ -1432,7 +1432,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                 <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
                   {roots.map((c: any) => (
                     <div key={c.id} className="space-y-1">
-                      <div className="text-xs text-[#4E5968] flex gap-2 items-center flex-wrap">
+                      <div className="text-xs text-[var(--toss-gray-4)] flex gap-2 items-center flex-wrap">
                         <span className="font-bold">{c.author_name}:</span>
                         <span className="flex-1 min-w-0">{c.content}</span>
                         <span className="flex gap-1 shrink-0">
@@ -1443,7 +1443,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                                 setReplyParentId(c.id);
                                 setNewComment('');
                               }}
-                              className="text-[10px] text-[#8B95A1] hover:text-[#3182F6]"
+                              className="text-[10px] text-[var(--toss-gray-3)] hover:text-[var(--toss-blue)]"
                             >
                               답글
                             </button>
@@ -1452,7 +1452,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                             <button
                               type="button"
                               onClick={() => handleDeleteComment(selectedPost.id, c.id)}
-                              className="text-[10px] text-[#8B95A1] hover:text-[#F04452]"
+                              className="text-[10px] text-[var(--toss-gray-3)] hover:text-[#F04452]"
                             >
                               삭제
                             </button>
@@ -1460,14 +1460,14 @@ export default function BoardView({ user, setMainMenu }: any) {
                         </span>
                       </div>
                       {(repliesByParent[String(c.id)] || []).map((r: any) => (
-                        <div key={r.id} className="ml-6 text-xs text-[#4E5968] flex gap-2 items-center flex-wrap">
+                        <div key={r.id} className="ml-6 text-xs text-[var(--toss-gray-4)] flex gap-2 items-center flex-wrap">
                           <span className="font-bold">{r.author_name}:</span>
                           <span className="flex-1 min-w-0">{r.content}</span>
                           {user?.id && String(r.author_id) === String(user.id) && (
                             <button
                               type="button"
                               onClick={() => handleDeleteComment(selectedPost.id, r.id)}
-                              className="text-[10px] text-[#8B95A1] hover:text-[#F04452] shrink-0"
+                              className="text-[10px] text-[var(--toss-gray-3)] hover:text-[#F04452] shrink-0"
                             >
                               삭제
                             </button>
@@ -1477,7 +1477,7 @@ export default function BoardView({ user, setMainMenu }: any) {
                     </div>
                   ))}
                   {roots.length === 0 && (
-                    <p className="text-[11px] text-[#C1C5D0] font-bold">첫 댓글을 남겨보세요.</p>
+                    <p className="text-[11px] text-[var(--toss-gray-3)] font-bold">첫 댓글을 남겨보세요.</p>
                   )}
                 </div>
               );
@@ -1488,13 +1488,13 @@ export default function BoardView({ user, setMainMenu }: any) {
                 onChange={(e) => setNewComment(e.target.value)}
                 placeholder={user?.id ? '댓글을 입력하세요.' : '로그인한 후 댓글을 입력할 수 있습니다.'}
                 disabled={!user?.id}
-                className="flex-1 px-3 py-2 border border-[#E5E8EB] rounded-lg text-xs disabled:bg-[#F8FAFC] disabled:text-[#94A3B8]"
+                className="flex-1 px-3 py-2 border border-[var(--toss-border)] rounded-lg text-xs disabled:bg-[var(--page-bg)] disabled:text-[var(--toss-gray-3)]"
               />
               <button
                 type="button"
                 onClick={() => handleAddComment(selectedPost.id, replyParentId)}
                 disabled={!user?.id}
-                className="px-3 py-2 bg-[#3182F6] text-white rounded-[12px] text-xs font-bold hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-2 bg-[var(--toss-blue)] text-white rounded-[12px] text-xs font-bold hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 등록
               </button>

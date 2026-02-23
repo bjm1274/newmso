@@ -191,15 +191,15 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
   };
 
   return (
-    <div className="bg-white border border-gray-100 shadow-sm rounded-[2.5rem] p-10 h-full flex flex-col space-y-10">
+    <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-[2.5rem] p-10 h-full flex flex-col space-y-10">
       
       {/* 실시간 상태 카드 */}
-      <div className="flex justify-between items-center bg-gray-900 p-8 rounded-[2rem] text-white shadow-2xl relative overflow-hidden">
+      <div className="flex justify-between items-center bg-[var(--foreground)] p-8 rounded-[2rem] text-white shadow-2xl relative overflow-hidden">
         {/* 배경 장식 */}
-        <div className="absolute -right-10 -top-10 w-40 h-40 bg-white opacity-5 rounded-full blur-3xl"></div>
+        <div className="absolute -right-10 -top-10 w-40 h-40 bg-[var(--toss-card)] opacity-5 rounded-full blur-3xl"></div>
         
         <div className="space-y-2 z-10">
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+          <p className="text-xs font-bold text-[var(--toss-gray-3)] uppercase tracking-widest flex items-center gap-2">
             Real-time Status 
             {/* 거리 표시 (테스트용) */}
             {distance !== null && (
@@ -210,7 +210,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
           </p>
           <h2 className="text-4xl font-semibold tracking-tighter">{currentTime.toLocaleTimeString('ko-KR')}</h2>
           <div className="flex items-center gap-2 mt-2">
-            <span className={`w-2 h-2 rounded-full animate-pulse ${todayLog ? (todayLog.check_out ? 'bg-gray-500' : 'bg-green-500') : 'bg-red-500'}`}></span>
+            <span className={`w-2 h-2 rounded-full animate-pulse ${todayLog ? (todayLog.check_out ? 'bg-[var(--toss-gray-3)]' : 'bg-green-500') : 'bg-red-500'}`}></span>
             <span className="text-sm font-bold">
               {todayLog ? (todayLog.check_out ? '퇴근 완료' : '근무 중') : '출근 전'}
             </span>
@@ -219,7 +219,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
 
         <div className="flex gap-4 z-10">
           {!todayLog && (
-            <button onClick={() => handleCommute('in')} className="px-10 py-5 bg-blue-600 hover:bg-blue-500 rounded-lg font-semibold text-lg shadow-lg active:scale-95 transition-all flex flex-col items-center leading-none gap-1">
+            <button onClick={() => handleCommute('in')} className="px-10 py-5 bg-[var(--toss-blue)] hover:opacity-90 rounded-lg font-semibold text-lg shadow-lg active:scale-95 transition-all flex flex-col items-center leading-none gap-1">
               <span>출근하기 ☀️</span>
               <span className="text-[10px] font-normal opacity-70">GPS 인증 필요</span>
             </button>
@@ -243,11 +243,11 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
       {/* 리스트 */}
       <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
         <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xl font-semibold text-gray-900 tracking-tight">근무 히스토리</h3>
+          <h3 className="text-xl font-semibold text-[var(--foreground)] tracking-tight">근무 히스토리</h3>
           <div className="flex gap-2">
-            <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() - 1)))} className="p-2 border rounded-full hover:bg-gray-50">◀</button>
+            <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() - 1)))} className="p-2 border rounded-full hover:bg-[var(--toss-gray-1)]">◀</button>
             <span className="font-semibold px-2">{currentMonth.getFullYear()}. {currentMonth.getMonth() + 1}</span>
-            <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() + 1)))} className="p-2 border rounded-full hover:bg-gray-50">▶</button>
+            <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() + 1)))} className="p-2 border rounded-full hover:bg-[var(--toss-gray-1)]">▶</button>
           </div>
         </div>
 
@@ -257,22 +257,22 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
             return (
               <div
                 key={log.id}
-                className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-5 bg-gray-50 rounded-lg border border-transparent hover:border-gray-200 transition-all"
+                className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-5 bg-[var(--toss-gray-1)] rounded-lg border border-transparent hover:border-[var(--toss-border)] transition-all"
               >
                 <div className="flex items-center gap-6">
                   <div
                     className={`w-14 h-14 rounded-lg flex flex-col items-center justify-center font-semibold ${
-                      log.status === '지각' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'
+                      log.status === '지각' ? 'bg-red-100 text-red-600' : 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)]'
                     }`}
                   >
                     <span className="text-[10px] opacity-60">{workDate.getMonth() + 1}월</span>
                     <span className="text-lg leading-tight">{workDate.getDate()}일</span>
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-gray-400">
+                    <p className="text-xs font-bold text-[var(--toss-gray-3)]">
                       {workDate.toLocaleDateString('ko-KR', { weekday: 'long' })}
                     </p>
-                    <p className="font-semibold text-gray-900">{log.status}</p>
+                    <p className="font-semibold text-[var(--foreground)]">{log.status}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-6 md:gap-10 justify-between md:justify-end w-full">
@@ -284,7 +284,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
                     <button
                       type="button"
                       onClick={() => onRequestCorrection(log)}
-                      className="px-3 py-2 rounded-xl text-[11px] font-semibold border border-blue-100 text-blue-600 bg-white hover:bg-blue-50 shrink-0"
+                      className="px-3 py-2 rounded-xl text-[11px] font-semibold border border-[var(--toss-blue-light)] text-[var(--toss-blue)] bg-[var(--toss-card)] hover:bg-[var(--toss-blue-light)] shrink-0"
                     >
                       정정 요청
                     </button>
@@ -301,9 +301,9 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
 
 function StatItem({ label, value, isWarning, isSuccess }: any) {
   return (
-    <div className="bg-white border border-gray-100 p-6 rounded-[2rem] text-center shadow-sm">
-      <p className="text-[11px] font-bold text-gray-400 mb-2 uppercase">{label}</p>
-      <p className={`text-2xl font-semibold ${isWarning ? 'text-red-500' : isSuccess ? 'text-blue-600' : 'text-gray-900'}`}>{value}</p>
+    <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] p-6 rounded-[2rem] text-center shadow-sm">
+      <p className="text-[11px] font-bold text-[var(--toss-gray-3)] mb-2 uppercase">{label}</p>
+      <p className={`text-2xl font-semibold ${isWarning ? 'text-red-500' : isSuccess ? 'text-[var(--toss-blue)]' : 'text-[var(--foreground)]'}`}>{value}</p>
     </div>
   );
 }
@@ -311,8 +311,8 @@ function StatItem({ label, value, isWarning, isSuccess }: any) {
 function TimeBox({ label, time }: any) {
   return (
     <div className="text-right">
-      <p className="text-[10px] font-bold text-gray-400 mb-1">{label}</p>
-      <p className="text-base font-semibold text-gray-800">{time}</p>
+      <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mb-1">{label}</p>
+      <p className="text-base font-semibold text-[var(--foreground)]">{time}</p>
     </div>
   );
 }

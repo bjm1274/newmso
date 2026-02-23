@@ -233,19 +233,19 @@ export default function ApprovalFormTypesManager() {
   return (
     <div className="max-w-5xl space-y-8">
       <div>
-        <h2 className="text-xl font-semibold text-gray-800">서식양식 관리</h2>
-        <p className="text-xs text-gray-500 mt-1">
+        <h2 className="text-xl font-semibold text-[var(--foreground)]">서식양식 관리</h2>
+        <p className="text-xs text-[var(--toss-gray-3)] mt-1">
           전자결재에서 사용할 서식/양식을 관리하고, 각 서식의 디자인(제목, 색상, 하단 문구 등)을 설정합니다.
           여기서 추가한 양식은 전자결재 작성하기 탭에 함께 표시됩니다.
         </p>
       </div>
 
       {/* 추가 */}
-      <div className="bg-white p-6 rounded-lg border border-gray-100 shadow-sm">
-        <h3 className="text-sm font-semibold text-gray-700 mb-4">양식 추가</h3>
+      <div className="bg-white p-6 rounded-lg border border-[var(--toss-border)] shadow-sm">
+        <h3 className="text-sm font-semibold text-[var(--foreground)] mb-4">양식 추가</h3>
         <div className="flex flex-wrap gap-3 items-end">
           <div>
-            <label className="block text-[10px] font-bold text-gray-500 mb-1">표시 이름</label>
+            <label className="block text-[10px] font-bold text-[var(--toss-gray-3)] mb-1">표시 이름</label>
             <input
               type="text"
               value={addName}
@@ -254,22 +254,22 @@ export default function ApprovalFormTypesManager() {
                 if (!addSlug) setAddSlug(slugFromName(e.target.value));
               }}
               placeholder="예: 외부출장신청"
-              className="w-48 md:w-56 p-3 rounded-xl border border-gray-200 text-sm font-bold outline-none focus:ring-2 focus:ring-blue-200"
+              className="w-48 md:w-56 p-3 rounded-xl border border-[var(--toss-border)] text-sm font-bold outline-none focus:ring-2 focus:ring-blue-200"
             />
           </div>
           <div>
-            <label className="block text-[10px] font-bold text-gray-500 mb-1">양식 코드(slug)</label>
+            <label className="block text-[10px] font-bold text-[var(--toss-gray-3)] mb-1">양식 코드(slug)</label>
             <input
               type="text"
               value={addSlug}
               onChange={e => setAddSlug(e.target.value)}
               placeholder="자동 생성 또는 입력"
-              className="w-40 md:w-48 p-3 rounded-xl border border-gray-200 text-sm font-bold outline-none focus:ring-2 focus:ring-blue-200"
+              className="w-40 md:w-48 p-3 rounded-xl border border-[var(--toss-border)] text-sm font-bold outline-none focus:ring-2 focus:ring-blue-200"
             />
           </div>
           <button
             onClick={handleAdd}
-            className="px-5 py-3 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700"
+            className="px-5 py-3 bg-[var(--toss-blue)] text-white rounded-xl text-sm font-semibold hover:bg-blue-700"
           >
             추가
           </button>
@@ -277,16 +277,16 @@ export default function ApprovalFormTypesManager() {
       </div>
 
       {/* 목록 */}
-      <div className="bg-white rounded-lg border border-gray-100 shadow-sm overflow-hidden">
-        <h3 className="text-sm font-semibold text-gray-700 p-4 border-b border-gray-50">등록된 추가 양식</h3>
+      <div className="bg-white rounded-lg border border-[var(--toss-border)] shadow-sm overflow-hidden">
+        <h3 className="text-sm font-semibold text-[var(--foreground)] p-4 border-b border-gray-50">등록된 추가 양식</h3>
         {loading ? (
-          <div className="p-8 text-center text-gray-400">로딩 중...</div>
+          <div className="p-8 text-center text-[var(--toss-gray-3)]">로딩 중...</div>
         ) : list.length === 0 ? (
-          <div className="p-8 text-center text-gray-400">추가 양식이 없습니다. 위에서 새로 등록하세요.</div>
+          <div className="p-8 text-center text-[var(--toss-gray-3)]">추가 양식이 없습니다. 위에서 새로 등록하세요.</div>
         ) : (
           <ul className="divide-y divide-gray-50">
             {list.map(row => (
-              <li key={row.id} className="flex items-center justify-between gap-4 p-4 hover:bg-gray-50/50">
+              <li key={row.id} className="flex items-center justify-between gap-4 p-4 hover:bg-[var(--toss-gray-1)]/50">
                 {editingId === row.id ? (
                   <>
                     <input
@@ -300,18 +300,18 @@ export default function ApprovalFormTypesManager() {
                       className="w-32 p-2 rounded-lg border text-xs"
                       placeholder="slug"
                     />
-                    <button onClick={saveEdit} className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold">저장</button>
-                    <button onClick={() => setEditingId(null)} className="px-3 py-1.5 bg-gray-200 rounded-lg text-xs">취소</button>
+                    <button onClick={saveEdit} className="px-3 py-1.5 bg-[var(--toss-blue)] text-white rounded-lg text-xs font-bold">저장</button>
+                    <button onClick={() => setEditingId(null)} className="px-3 py-1.5 bg-[var(--toss-gray-2)] rounded-lg text-xs">취소</button>
                   </>
                 ) : (
                   <>
                     <div className="flex-1">
-                      <span className="font-bold text-gray-800">{row.name}</span>
-                      <span className="ml-2 text-xs text-gray-400">{row.slug}</span>
+                      <span className="font-bold text-[var(--foreground)]">{row.name}</span>
+                      <span className="ml-2 text-xs text-[var(--toss-gray-3)]">{row.slug}</span>
                       {!row.is_active && <span className="ml-2 text-xs text-red-500">(비활성)</span>}
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={() => toggleActive(row)} className="px-3 py-1.5 bg-gray-100 rounded-lg text-xs font-bold hover:bg-gray-200">
+                      <button onClick={() => toggleActive(row)} className="px-3 py-1.5 bg-[var(--toss-gray-1)] rounded-lg text-xs font-bold hover:bg-[var(--toss-gray-2)]">
                         {row.is_active ? '비활성' : '활성'}
                       </button>
                       <button onClick={() => startEdit(row)} className="px-3 py-1.5 bg-amber-100 text-amber-800 rounded-lg text-xs font-bold">수정</button>
@@ -326,30 +326,30 @@ export default function ApprovalFormTypesManager() {
       </div>
 
       {/* 서식 디자인 설정 */}
-      <div className="bg-white rounded-lg border border-gray-100 shadow-sm p-6 space-y-4">
+      <div className="bg-white rounded-lg border border-[var(--toss-border)] shadow-sm p-6 space-y-4">
         <div className="flex items-center justify-between gap-2">
           <div>
-            <h3 className="text-sm font-semibold text-gray-800">서식 디자인 설정</h3>
-            <p className="text-[11px] text-gray-500">
+            <h3 className="text-sm font-semibold text-[var(--foreground)]">서식 디자인 설정</h3>
+            <p className="text-[11px] text-[var(--toss-gray-3)]">
               좌측에서 서식을 선택한 뒤, 우측에서 제목/색상/하단 문구 등을 조정합니다. 급여명세서 서식도 여기에서 함께 관리됩니다.
             </p>
           </div>
           {designLoading && (
-            <span className="text-[11px] text-gray-400 font-bold">디자인 불러오는 중...</span>
+            <span className="text-[11px] text-[var(--toss-gray-3)] font-bold">디자인 불러오는 중...</span>
           )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-2">
           {/* 서식 목록 (서식 선택) */}
           <div className="space-y-2">
-            <p className="text-[11px] font-semibold text-gray-500 mb-1">디자인 대상 서식 선택</p>
-            <div className="border border-gray-100 rounded-lg bg-gray-50/60 max-h-64 overflow-y-auto custom-scrollbar">
+            <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">디자인 대상 서식 선택</p>
+            <div className="border border-[var(--toss-border)] rounded-lg bg-[var(--toss-gray-1)]/60 max-h-64 overflow-y-auto custom-scrollbar">
               {combinedTemplates.length === 0 ? (
-                <div className="p-4 text-[11px] text-gray-400 text-center">
+                <div className="p-4 text-[11px] text-[var(--toss-gray-3)] text-center">
                   등록된 서식이 없습니다. 위에서 먼저 양식을 추가하세요.
                 </div>
               ) : (
-                <ul className="divide-y divide-gray-100">
+                <ul className="divide-y divide-[var(--toss-border)]">
                   {combinedTemplates.map((tpl) => {
                     const isBuiltin = builtinTemplates.some(b => b.slug === tpl.slug);
                     const active = selectedSlug === tpl.slug;
@@ -360,8 +360,8 @@ export default function ApprovalFormTypesManager() {
                           onClick={() => handleSelectTemplate(tpl.slug, tpl.name)}
                           className={`w-full flex items-center justify-between px-3 py-2 text-left text-[12px] font-bold transition-all ${
                             active
-                              ? 'bg-white text-blue-600 shadow-sm'
-                              : 'text-gray-600 hover:bg-white/80'
+                              ? 'bg-white text-[var(--toss-blue)] shadow-sm'
+                              : 'text-[var(--toss-gray-4)] hover:bg-white/80'
                           }`}
                         >
                           <span className="truncate">{tpl.name}</span>
@@ -383,14 +383,14 @@ export default function ApprovalFormTypesManager() {
           <div className="lg:col-span-2 space-y-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[11px] font-semibold text-gray-500 mb-1">
+                <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">
                   선택된 서식
                 </p>
-                <p className="text-sm font-semibold text-gray-900">
+                <p className="text-sm font-semibold text-[var(--foreground)]">
                   {selectedName || '서식을 선택해 주세요'}
                 </p>
               </div>
-              <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-full px-1 py-1">
+              <div className="flex items-center gap-1 bg-[var(--toss-gray-1)] border border-[var(--toss-border)] rounded-full px-1 py-1">
                 {(['title', 'subtitle', 'sign'] as const).map((k) => (
                   <button
                     key={k}
@@ -398,8 +398,8 @@ export default function ApprovalFormTypesManager() {
                     onClick={() => setActiveHandle(k)}
                     className={`px-3 py-1 rounded-full text-[10px] font-semibold transition-all ${
                       activeHandle === k
-                        ? 'bg-blue-600 text-white'
-                        : 'text-gray-500 hover:bg-white'
+                        ? 'bg-[var(--toss-blue)] text-white'
+                        : 'text-[var(--toss-gray-3)] hover:bg-white'
                     }`}
                   >
                     {k === 'title' && '제목 위치'}
@@ -414,30 +414,30 @@ export default function ApprovalFormTypesManager() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-[13px]">
               <div className="space-y-3">
                 <label className="flex flex-col gap-1">
-                  <span className="text-[11px] font-semibold text-gray-500">제목</span>
+                  <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">제목</span>
                   <input
                     type="text"
                     value={currentDesign.title || ''}
                     onChange={(e) => updateCurrentDesign('title', e.target.value)}
-                    className="px-3 py-2 rounded-xl border border-gray-200 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                    className="px-3 py-2 rounded-xl border border-[var(--toss-border)] text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 focus:border-blue-400"
                   />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[11px] font-semibold text-gray-500">부제 (설명)</span>
+                  <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">부제 (설명)</span>
                   <input
                     type="text"
                     value={currentDesign.subtitle || ''}
                     onChange={(e) => updateCurrentDesign('subtitle', e.target.value)}
-                    className="px-3 py-2 rounded-xl border border-gray-200 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                    className="px-3 py-2 rounded-xl border border-[var(--toss-border)] text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 focus:border-blue-400"
                   />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[11px] font-semibold text-gray-500">회사명 라벨</span>
+                  <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">회사명 라벨</span>
                   <input
                     type="text"
                     value={currentDesign.companyLabel || ''}
                     onChange={(e) => updateCurrentDesign('companyLabel', e.target.value)}
-                    className="px-3 py-2 rounded-xl border border-gray-200 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                    className="px-3 py-2 rounded-xl border border-[var(--toss-border)] text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 focus:border-blue-400"
                   />
                 </label>
               </div>
@@ -445,42 +445,42 @@ export default function ApprovalFormTypesManager() {
               <div className="space-y-3">
                 <div className="flex gap-3">
                   <label className="flex-1 flex flex-col gap-1">
-                    <span className="text-[11px] font-semibold text-gray-500">
+                    <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
                       대표 색상 (Primary)
                     </span>
                     <input
                       type="text"
                       value={currentDesign.primaryColor || ''}
                       onChange={(e) => updateCurrentDesign('primaryColor', e.target.value)}
-                      className="px-3 py-2 rounded-xl border border-gray-200 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                      className="px-3 py-2 rounded-xl border border-[var(--toss-border)] text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 focus:border-blue-400"
                       placeholder="#2563eb"
                     />
                   </label>
                   <label className="w-20 flex flex-col gap-1">
-                    <span className="text-[11px] font-semibold text-gray-500">색상</span>
+                    <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">색상</span>
                     <span
-                      className="w-full h-9 rounded-xl border border-gray-200"
+                      className="w-full h-9 rounded-xl border border-[var(--toss-border)]"
                       style={{ backgroundColor: currentDesign.primaryColor || '#2563eb' }}
                     />
                   </label>
                 </div>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[11px] font-semibold text-gray-500">테두리 색상</span>
+                  <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">테두리 색상</span>
                   <input
                     type="text"
                     value={currentDesign.borderColor || ''}
                     onChange={(e) => updateCurrentDesign('borderColor', e.target.value)}
-                    className="px-3 py-2 rounded-xl border border-gray-200 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                    className="px-3 py-2 rounded-xl border border-[var(--toss-border)] text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 focus:border-blue-400"
                     placeholder="#e5e7eb"
                   />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[11px] font-semibold text-gray-500">하단 문구</span>
+                  <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">하단 문구</span>
                   <input
                     type="text"
                     value={currentDesign.footerText || ''}
                     onChange={(e) => updateCurrentDesign('footerText', e.target.value)}
-                    className="px-3 py-2 rounded-xl border border-gray-200 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                    className="px-3 py-2 rounded-xl border border-[var(--toss-border)] text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 focus:border-blue-400"
                     placeholder="예: 위 내용과 금액을 확인하였습니다."
                   />
                 </label>
@@ -489,9 +489,9 @@ export default function ApprovalFormTypesManager() {
                     type="checkbox"
                     checked={currentDesign.showSignArea !== false}
                     onChange={(e) => updateCurrentDesign('showSignArea', e.target.checked)}
-                    className="w-4 h-4 rounded border-gray-300"
+                    className="w-4 h-4 rounded border-[var(--toss-border)]"
                   />
-                  <span className="text-[11px] font-bold text-gray-600">
+                  <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">
                     하단에 서명란(직원/결재자 서명) 표시
                   </span>
                 </label>
@@ -499,12 +499,12 @@ export default function ApprovalFormTypesManager() {
             </div>
 
             {/* 미리보기 – 클릭으로 제목/부제/서명 위치 조정 */}
-            <div className="mt-1 border border-dashed border-gray-200 rounded-lg p-4 bg-gray-50">
+            <div className="mt-1 border border-dashed border-[var(--toss-border)] rounded-lg p-4 bg-[var(--toss-gray-1)]">
               <div className="flex items-center justify-between mb-1">
-                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">
+                <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
                   Preview
                 </p>
-                <p className="text-[10px] text-gray-400">
+                <p className="text-[10px] text-[var(--toss-gray-3)]">
                   미리보기 안을 클릭하면{' '}
                   <span className="font-bold">
                     {activeHandle === 'title'
@@ -563,7 +563,7 @@ export default function ApprovalFormTypesManager() {
 
                 {/* 부제/회사 라벨 – 위치 조정 가능 */}
                 <div
-                  className="absolute text-[11px] text-gray-500 select-none"
+                  className="absolute text-[11px] text-[var(--toss-gray-3)] select-none"
                   style={{
                     top: `${currentDesign.subtitleYPercent ?? 32}%`,
                     left: `${currentDesign.subtitleXPercent ?? 8}%`,
@@ -577,21 +577,21 @@ export default function ApprovalFormTypesManager() {
                 </div>
 
                 {/* 본문/하단 예시 */}
-                <div className="absolute left-4 right-4 top-24 text-[11px] text-gray-500">
-                  <div className="border-t border-gray-100 pt-2 mt-1 flex justify-between text-[11px] text-gray-600">
+                <div className="absolute left-4 right-4 top-24 text-[11px] text-[var(--toss-gray-3)]">
+                  <div className="border-t border-[var(--toss-border)] pt-2 mt-1 flex justify-between text-[11px] text-[var(--toss-gray-4)]">
                     <span>본문 내용 영역 예시</span>
                     <span style={{ color: currentDesign.primaryColor || '#2563eb' }}>
                       중요 수치/상태
                     </span>
                   </div>
                   {currentDesign.footerText && (
-                    <div className="mt-3 text-[10px] text-gray-400">
+                    <div className="mt-3 text-[10px] text-[var(--toss-gray-3)]">
                       {currentDesign.footerText}
                     </div>
                   )}
                   {currentDesign.showSignArea !== false && (
                     <div
-                      className="absolute text-[10px] text-gray-500 select-none"
+                      className="absolute text-[10px] text-[var(--toss-gray-3)] select-none"
                       style={{
                         top: `${currentDesign.signYPercent ?? 78}%`,
                         left: `${currentDesign.signXPercent ?? 75}%`,
@@ -610,7 +610,7 @@ export default function ApprovalFormTypesManager() {
                 type="button"
                 onClick={handleSaveDesign}
                 disabled={savingDesign}
-                className="px-5 py-2.5 rounded-xl bg-blue-600 text-white text-[12px] font-semibold hover:bg-blue-700 disabled:opacity-60"
+                className="px-5 py-2.5 rounded-xl bg-[var(--toss-blue)] text-white text-[12px] font-semibold hover:bg-blue-700 disabled:opacity-60"
               >
                 {savingDesign ? '디자인 저장 중...' : '선택 서식 디자인 저장'}
               </button>

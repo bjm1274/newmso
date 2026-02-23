@@ -8,6 +8,7 @@ import Sidebar from './기능부품/조직도서브/조직도측면창';
 import MainContent from './기능부품/조직도서브/조직도본문';
 import GlobalSearch from '@/app/components/GlobalSearch';
 import GlobalNotificationBell from '@/app/components/GlobalNotificationBell';
+import ThemeToggle from '@/app/components/ThemeToggle';
 import NotificationSystem from './기능부품/알림시스템';
 import ChatAlertBanner from './기능부품/채팅알림배너';
 import PermissionPromptModal from './기능부품/권한요청모달';
@@ -23,13 +24,13 @@ type ERPData = {
 
 function MainPageFallback() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-[#F9FAFB] p-6 text-center">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[var(--background)] p-6 text-center">
       <div className="relative w-20 h-20 mb-8">
-        <div className="absolute inset-0 border-4 border-[#E8F3FF] rounded-full" />
-        <div className="absolute inset-0 border-4 border-[#3182F6] rounded-full border-t-transparent animate-spin" />
+        <div className="absolute inset-0 border-4 border-[var(--toss-blue-light)] rounded-full" />
+        <div className="absolute inset-0 border-4 border-[var(--toss-blue)] rounded-full border-t-transparent animate-spin" />
       </div>
-      <h2 className="text-xl font-bold text-gray-900 mb-2">SY INC. 통합 시스템</h2>
-      <p className="text-xs font-medium text-gray-400 animate-pulse">접속 중...</p>
+      <h2 className="text-xl font-bold text-[var(--foreground)] mb-2">SY INC. 통합 시스템</h2>
+      <p className="text-xs font-medium text-[var(--toss-gray-3)] animate-pulse">접속 중...</p>
     </div>
   );
 }
@@ -204,19 +205,19 @@ function MainPageContent() {
   // user 없으면 로그인 페이지로 리다이렉트 (초기 로드 시)
   if (!user) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F9FAFB] p-6 text-center">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[var(--background)] p-6 text-center">
         <div className="relative w-20 h-20 mb-8">
-          <div className="absolute inset-0 border-4 border-[#E8F3FF] rounded-full"></div>
-          <div className="absolute inset-0 border-4 border-[#3182F6] rounded-full border-t-transparent animate-spin"></div>
+          <div className="absolute inset-0 border-4 border-[var(--toss-blue-light)] rounded-full"></div>
+          <div className="absolute inset-0 border-4 border-[var(--toss-blue)] rounded-full border-t-transparent animate-spin"></div>
         </div>
-        <h2 className="text-xl font-bold text-gray-900 mb-2">SY INC. 통합 시스템</h2>
-        <p className="text-xs font-medium text-gray-400 animate-pulse">접속 중...</p>
+        <h2 className="text-xl font-bold text-[var(--foreground)] mb-2">SY INC. 통합 시스템</h2>
+        <p className="text-xs font-medium text-[var(--toss-gray-3)] animate-pulse">접속 중...</p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col md:flex-row h-screen w-full bg-[#F9FAFB] overflow-hidden min-h-[100dvh]">
+    <div className="flex flex-col md:flex-row h-screen w-full bg-[var(--background)] overflow-hidden min-h-[100dvh]">
       <Sidebar 
         user={user} 
         mainMenu={mainMenu} 
@@ -241,7 +242,8 @@ function MainPageContent() {
           onOpenApproval={() => setMainMenu('전자결재')}
         />
 
-        <div className="flex shrink-0 px-3 py-2 md:px-4 bg-white border-b border-[#E5E8EB] items-center gap-2 justify-end">
+        <div className="flex shrink-0 px-3 py-2 md:px-4 bg-[var(--toss-card)] border-b border-[var(--toss-border)] items-center gap-2 justify-end">
+          <ThemeToggle />
           <GlobalSearch
             user={user}
             staffs={data.staffs}
@@ -262,8 +264,8 @@ function MainPageContent() {
           />
         </div>
         {loading && (
-          <div className="absolute inset-0 bg-white/60 z-40 flex items-center justify-center">
-            <div className="w-10 h-10 border-2 border-[#3182F6] rounded-full border-t-transparent animate-spin" />
+          <div className="absolute inset-0 bg-[var(--toss-card)]/60 z-40 flex items-center justify-center">
+            <div className="w-10 h-10 border-2 border-[var(--toss-blue)] rounded-full border-t-transparent animate-spin" />
           </div>
         )}
         <MainContent 

@@ -78,20 +78,20 @@ export default function PayrollExport({ staffs = [], checkedIds = [], selectedCo
   };
 
   return (
-    <div className="flex flex-col gap-4 p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
-      <div className="pb-2 border-b border-gray-100">
-        <h3 className="text-sm font-semibold text-gray-800">대장 내보내기</h3>
-        <p className="text-xs text-gray-500 mt-0.5">엑셀 · 이체용 CSV</p>
+    <div className="flex flex-col gap-4 p-4 bg-[var(--toss-card)] rounded-lg border border-[var(--toss-border)] shadow-sm">
+      <div className="pb-2 border-b border-[var(--toss-border)]">
+        <h3 className="text-sm font-semibold text-[var(--foreground)]">대장 내보내기</h3>
+        <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">엑셀 · 이체용 CSV</p>
       </div>
       <div className="flex items-center gap-2">
-        <input type="month" value={yearMonth} onChange={(e) => setYearMonth(e.target.value)} className="h-9 px-3 border border-gray-300 rounded-md text-sm font-medium flex-1" />
-        <span className="text-xs text-gray-500 shrink-0">({records.length}건)</span>
+        <input type="month" value={yearMonth} onChange={(e) => setYearMonth(e.target.value)} className="h-9 px-3 border border-[var(--toss-border)] rounded-md text-sm font-medium flex-1" />
+        <span className="text-xs text-[var(--toss-gray-3)] shrink-0">({records.length}건)</span>
       </div>
       <div className="flex gap-2">
-        <button onClick={exportExcel} disabled={loading || records.length === 0} className="flex-1 py-2.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50">
+        <button onClick={exportExcel} disabled={loading || records.length === 0} className="flex-1 py-2.5 bg-[var(--toss-blue)] text-white text-xs font-medium rounded-lg hover:opacity-90 disabled:opacity-50">
           엑셀
         </button>
-        <button onClick={exportSAM} disabled={loading || records.length === 0} className="flex-1 py-2.5 bg-gray-700 text-white text-xs font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50">
+        <button onClick={exportSAM} disabled={loading || records.length === 0} className="flex-1 py-2.5 bg-[var(--foreground)] text-white text-xs font-medium rounded-lg hover:opacity-90 disabled:opacity-50">
           이체 CSV
         </button>
       </div>

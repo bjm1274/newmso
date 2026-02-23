@@ -31,22 +31,22 @@ export default function AttendanceForms({ user, staffs, formType, setExtraData, 
     <div className="animate-in fade-in duration-300">
       {/* 🏖️ 연차/휴가: 원본 3열 레이아웃 */}
       {formType === '연차/휴가' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-[#E8F3FF]/50 p-10 rounded-[2.5rem] border border-[#D6EBFF] shadow-inner">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-[var(--toss-blue-light)]/50 p-10 rounded-[2.5rem] border border-[var(--toss-blue-light)] shadow-inner">
           <div className="space-y-2">
-            <label className="text-[11px] font-bold text-[#3182F6] ml-1 uppercase">휴가 종류</label>
-            <select className="w-full p-4 rounded-lg bg-white font-bold text-xs border-none shadow-sm focus:ring-2 focus:ring-[#3182F6]/30" 
+            <label className="text-[11px] font-bold text-[var(--toss-blue)] ml-1 uppercase">휴가 종류</label>
+            <select className="w-full p-4 rounded-lg bg-[var(--toss-card)] font-bold text-xs border-none shadow-sm focus:ring-2 focus:ring-[var(--toss-blue)]/30" 
               onChange={e => setExtraData((prev:any)=>({...prev, vType: e.target.value}))}>
                 <option>연차 (1.0)</option><option>반차 (0.5)</option><option>병가</option>
             </select>
           </div>
           <div className="space-y-2">
-            <label className="text-[11px] font-bold text-[#3182F6] ml-1 uppercase">시작 일자</label>
-            <input type="date" className="w-full p-4 rounded-lg bg-white font-bold text-xs shadow-sm border-none focus:ring-2 focus:ring-[#3182F6]/30" 
+            <label className="text-[11px] font-bold text-[var(--toss-blue)] ml-1 uppercase">시작 일자</label>
+            <input type="date" className="w-full p-4 rounded-lg bg-[var(--toss-card)] font-bold text-xs shadow-sm border-none focus:ring-2 focus:ring-[var(--toss-blue)]/30" 
               onChange={e => setExtraData((prev:any)=>({...prev, startDate: e.target.value}))} />
           </div>
           <div className="space-y-2">
-            <label className="text-[11px] font-bold text-[#3182F6] ml-1 uppercase">종료 일자</label>
-            <input type="date" className="w-full p-4 rounded-lg bg-white font-bold text-xs shadow-sm border-none focus:ring-2 focus:ring-[#3182F6]/30" 
+            <label className="text-[11px] font-bold text-[var(--toss-blue)] ml-1 uppercase">종료 일자</label>
+            <input type="date" className="w-full p-4 rounded-lg bg-[var(--toss-card)] font-bold text-xs shadow-sm border-none focus:ring-2 focus:ring-[var(--toss-blue)]/30" 
               onChange={e => setExtraData((prev:any)=>({...prev, endDate: e.target.value}))} />
           </div>
         </div>
@@ -65,8 +65,8 @@ export default function AttendanceForms({ user, staffs, formType, setExtraData, 
                   setSelectedDate(a.date);
                   setExtraData({date: a.date, hours: ot, amount: ot * 15000});
                   setFormTitle(`[추가수당청구] ${a.date} 연장근무 ${ot}시간`);
-                }} className={`p-5 rounded-[1.5rem] border-2 text-left transition-all flex justify-between items-center ${selectedDate === a.date ? 'border-orange-500 bg-white shadow-lg' : 'bg-white/50 border-white hover:bg-white'}`}>
-                  <div><span className="text-[10px] font-bold text-[#8B95A1]">{a.date}</span><p className="text-xs font-bold text-[#191F28]">퇴근: {a.check_out.slice(11,16)}</p></div>
+                }} className={`p-5 rounded-[1.5rem] border-2 text-left transition-all flex justify-between items-center ${selectedDate === a.date ? 'border-orange-500 bg-[var(--toss-card)] shadow-lg' : 'bg-[var(--toss-card)]/50 border-[var(--toss-border)] hover:bg-[var(--toss-card)]'}`}>
+                  <div><span className="text-[10px] font-bold text-[var(--toss-gray-3)]">{a.date}</span><p className="text-xs font-bold text-[var(--foreground)]">퇴근: {a.check_out.slice(11,16)}</p></div>
                   <span className="text-[10px] font-bold text-orange-500 bg-orange-50 px-2 py-1 rounded-lg">+{ot}H</span>
                 </button>
               );

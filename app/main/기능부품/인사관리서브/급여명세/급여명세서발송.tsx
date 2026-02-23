@@ -29,12 +29,12 @@ export default function PayrollEmailSender({ staffs, yearMonth }: any) {
   };
 
   return (
-    <div className="bg-white p-5 border border-gray-200 rounded-lg shadow-sm">
-      <div className="pb-2 border-b border-gray-100 mb-4">
-        <h3 className="text-sm font-semibold text-gray-800">급여명세서 발송</h3>
-        <p className="text-xs text-gray-500 mt-0.5">정산 완료 후 직원 알림/이메일</p>
+    <div className="bg-[var(--toss-card)] p-5 border border-[var(--toss-border)] rounded-lg shadow-sm">
+      <div className="pb-2 border-b border-[var(--toss-border)] mb-4">
+        <h3 className="text-sm font-semibold text-[var(--foreground)]">급여명세서 발송</h3>
+        <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">정산 완료 후 직원 알림/이메일</p>
       </div>
-      <button onClick={handleSendAll} disabled={loading || !staffs?.length} className="w-full py-3 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50">
+      <button onClick={handleSendAll} disabled={loading || !staffs?.length} className="w-full py-3 bg-[var(--toss-blue)] text-white text-sm font-medium rounded-lg hover:opacity-90 disabled:opacity-50">
         {loading ? '발송 중...' : `전체 알림 발송 (${staffs?.length || 0}명)`}
       </button>
       {sent > 0 && <p className="text-xs text-emerald-600 mt-2 font-medium">{sent}건 발송 완료</p>}

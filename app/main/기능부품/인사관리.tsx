@@ -94,25 +94,24 @@ export default function HRMainView({ user, staffs, depts, onRefresh }: any) {
 
   if (!hasAccess) {
     return (
-      <div className="h-full flex flex-col items-center justify-center bg-[#F2F4F6] p-6">
+      <div className="h-full flex flex-col items-center justify-center bg-[var(--toss-gray-1)] p-6">
         <div className="text-5xl mb-4">🔒</div>
-        <h2 className="text-lg font-semibold text-[#191F28]">인사관리 접근 권한이 없습니다.</h2>
-        <p className="text-sm text-[#4E5968] font-bold mt-2">MSO 직원이거나 인사 조회 권한이 부여된 직원만 이용할 수 있습니다. 관리자에게 문의하세요.</p>
+        <h2 className="text-lg font-semibold text-[var(--foreground)]">인사관리 접근 권한이 없습니다.</h2>
+        <p className="text-sm text-[var(--toss-gray-4)] font-bold mt-2">MSO 직원이거나 인사 조회 권한이 부여된 직원만 이용할 수 있습니다. 관리자에게 문의하세요.</p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-[#F8FAFC] overflow-hidden">
-      {/* 헤더 - 모바일 대응 */}
-      <header className="bg-white border-b border-[#E5E8EB] p-4 md:p-8 shrink-0 z-20 shadow-sm">
+    <div className="flex flex-col h-full min-h-0 app-page overflow-hidden">
+      <header className="app-header p-4 md:p-8 shrink-0 z-20 shadow-sm">
         <div className="flex flex-col md:flex-row justify-end items-center gap-3">
           <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
             <button onClick={() => 창상태설정(true)} className="w-full md:w-auto bg-[var(--toss-blue)] text-white px-6 py-2.5 text-[11px] font-bold rounded-[12px] shadow-sm hover:opacity-95 transition-all">신규 직원 등록</button>
             
-            <div className="flex gap-0.5 p-1 bg-[#eef2f7] rounded-lg border border-gray-200 overflow-x-auto no-scrollbar w-full md:w-auto">
+            <div className="flex gap-0.5 p-1 app-tab-bar border border-[var(--toss-border)] overflow-x-auto no-scrollbar w-full md:w-auto">
               {visibleHrTabs.map(({ id }) => (
-                <button key={id} onClick={() => 메뉴설정(id)} className={`min-h-[44px] touch-manipulation flex-1 px-4 py-2 text-xs font-medium transition-all rounded-md whitespace-nowrap ${activeMenu === id ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700 hover:bg-white/60'}`}>{id}</button>
+                <button key={id} onClick={() => 메뉴설정(id)} className={`min-h-[44px] touch-manipulation flex-1 px-4 py-2 text-xs font-medium transition-all rounded-md whitespace-nowrap ${activeMenu === id ? 'bg-[var(--toss-card)] shadow-sm text-[var(--toss-blue)]' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'}`}>{id}</button>
               ))}
             </div>
           </div>
@@ -120,21 +119,21 @@ export default function HRMainView({ user, staffs, depts, onRefresh }: any) {
       </header>
 
       <main className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
-        <aside className="w-full md:w-64 bg-white border-b md:border-r border-gray-100 flex flex-col shrink-0">
+        <aside className="w-full md:w-64 bg-[var(--toss-card)] border-b md:border-r border-[var(--toss-border)] flex flex-col shrink-0">
           <div className="p-4 md:p-8 space-y-6">
             <div>
-              <p className="text-[9px] md:text-[10px] font-semibold text-gray-400 uppercase mb-3 md:mb-4 italic tracking-widest">
+              <p className="section-title text-[9px] md:text-[10px] uppercase mb-3 md:mb-4 italic tracking-widest text-[var(--toss-gray-3)]">
                 사업자 필터
               </p>
-              <div className="flex gap-0.5 p-1 bg-[#eef2f7] rounded-lg md:flex-col overflow-x-auto no-scrollbar">
+              <div className="flex gap-0.5 p-1 app-tab-bar md:flex-col overflow-x-auto no-scrollbar">
                 {사업체목록.map(회사 => (
                   <button
                     key={회사}
                     onClick={() => 사업체설정(회사)}
                     className={`flex-1 md:w-full text-center md:text-left px-4 py-2 text-xs font-medium rounded-md transition-all whitespace-nowrap ${
                       선택사업체 === 회사
-                        ? 'bg-white shadow-sm text-blue-600'
-                        : 'text-gray-500 hover:text-gray-700 hover:bg-white/60'
+                        ? 'bg-[var(--toss-card)] shadow-sm text-[var(--toss-blue)]'
+                        : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
                     }`}
                   >
                     {회사}
@@ -144,16 +143,16 @@ export default function HRMainView({ user, staffs, depts, onRefresh }: any) {
             </div>
 
             <div>
-              <p className="text-[9px] md:text-[10px] font-semibold text-gray-400 uppercase mb-3 italic tracking-widest">
+              <p className="text-[9px] md:text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase mb-3 italic tracking-widest">
                 직원 상태
               </p>
-              <div className="flex gap-0.5 p-1 bg-[#eef2f7] rounded-lg md:flex-col">
+              <div className="flex gap-0.5 p-1 app-tab-bar md:flex-col">
                 <button
                   onClick={() => 직원상태필터설정('재직')}
                   className={`flex-1 md:w-full px-4 py-2 text-xs font-medium rounded-md transition-all whitespace-nowrap ${
                     직원상태필터 === '재직'
-                      ? 'bg-white shadow-sm text-emerald-600'
-                      : 'text-gray-500 hover:bg-white/60'
+                      ? 'bg-[var(--toss-card)] shadow-sm text-emerald-600'
+                      : 'text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]'
                   }`}
                 >
                   재직자
@@ -162,8 +161,8 @@ export default function HRMainView({ user, staffs, depts, onRefresh }: any) {
                   onClick={() => 직원상태필터설정('퇴사')}
                   className={`flex-1 md:w-full px-4 py-2 text-xs font-medium rounded-md transition-all whitespace-nowrap ${
                     직원상태필터 === '퇴사'
-                      ? 'bg-white shadow-sm text-red-600'
-                      : 'text-gray-500 hover:bg-white/60'
+                      ? 'bg-[var(--toss-card)] shadow-sm text-red-600'
+                      : 'text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]'
                   }`}
                 >
                   퇴사자
@@ -173,7 +172,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh }: any) {
           </div>
         </aside>
 
-        <section className="flex-1 overflow-y-auto bg-[#F8FAFC] custom-scrollbar p-4 md:p-0">
+        <section className="flex-1 overflow-y-auto bg-[var(--page-bg)] custom-scrollbar p-4 md:p-0">
           {activeMenu === '구성원' && (
             <구성원관리 
               직원목록={staffs}
@@ -201,9 +200,9 @@ export default function HRMainView({ user, staffs, depts, onRefresh }: any) {
           )}
           {activeMenu === '근태' && (
             <div className="flex flex-col h-full">
-              <div className="flex gap-0.5 p-1 bg-[#eef2f7] rounded-lg w-fit mb-4">
-                <button onClick={() => 근태뷰설정('실시간')} className={`px-4 py-2 text-xs font-medium rounded-md transition-all ${근태뷰 === '실시간' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:bg-white/60'}`}>실시간 출퇴근</button>
-                <button onClick={() => 근태뷰설정('월별')} className={`px-4 py-2 text-xs font-medium rounded-md transition-all ${근태뷰 === '월별' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:bg-white/60'}`}>월별/일별 대장</button>
+              <div className="flex gap-0.5 p-1 app-tab-bar w-fit mb-4">
+                <button onClick={() => 근태뷰설정('실시간')} className={`px-4 py-2 text-xs font-medium rounded-md transition-all ${근태뷰 === '실시간' ? 'bg-[var(--toss-card)] shadow-sm text-[var(--toss-blue)]' : 'text-[var(--toss-gray-3)] hover:bg-[var(--toss-card)]/60'}`}>실시간 출퇴근</button>
+                <button onClick={() => 근태뷰설정('월별')} className={`px-4 py-2 text-xs font-medium rounded-md transition-all ${근태뷰 === '월별' ? 'bg-[var(--toss-card)] shadow-sm text-[var(--toss-blue)]' : 'text-[var(--toss-gray-3)] hover:bg-[var(--toss-card)]/60'}`}>월별/일별 대장</button>
               </div>
               {근태뷰 === '실시간' ? <AttendanceSystem user={user} staffs={staffs} selectedCo={선택사업체} isAdminView={true} /> : <AttendanceMain staffs={staffs} selectedCo={선택사업체} />}
             </div>

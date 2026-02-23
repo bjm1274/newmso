@@ -56,7 +56,7 @@ export default function StatusPanel({ user, tasks, surgeries, mris, attStatus, o
   const getNotificationColor = (type: string) => {
     switch (type) {
       case 'approval':
-        return 'bg-blue-50 border-blue-200';
+        return 'bg-[var(--toss-blue-light)] border-[var(--toss-blue)]/30';
       case 'inventory':
         return 'bg-orange-50 border-orange-200';
       case 'payroll':
@@ -64,7 +64,7 @@ export default function StatusPanel({ user, tasks, surgeries, mris, attStatus, o
       case 'education':
         return 'bg-purple-50 border-purple-200';
       default:
-        return 'bg-gray-50 border-gray-200';
+        return 'bg-[var(--toss-gray-1)] border-[var(--toss-border)]';
     }
   };
 
@@ -99,15 +99,15 @@ export default function StatusPanel({ user, tasks, surgeries, mris, attStatus, o
   };
 
   return (
-    <aside className="w-80 bg-white border-l border-gray-50 p-8 flex flex-col shadow-sm overflow-y-auto">
+    <aside className="w-80 bg-[var(--toss-card)] border-l border-[var(--toss-border)] p-8 flex flex-col shadow-sm overflow-y-auto">
       {/* 탭 */}
-      <div className="flex gap-0.5 mb-6 p-1 bg-[#eef2f7] rounded-lg">
+      <div className="flex gap-0.5 mb-6 p-1 app-tab-bar">
         <button
           onClick={() => setActiveTab('알림')}
           className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-all ${
             activeTab === '알림'
-              ? 'bg-white shadow-sm text-blue-600'
-              : 'text-gray-500 hover:bg-white/60'
+              ? 'bg-[var(--toss-card)] shadow-sm text-[var(--toss-blue)]'
+              : 'text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]'
           }`}
         >
           🔔 {unreadCount > 0 && <span className="text-red-400">{unreadCount}</span>}
@@ -116,8 +116,8 @@ export default function StatusPanel({ user, tasks, surgeries, mris, attStatus, o
           onClick={() => setActiveTab('일정')}
           className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-all ${
             activeTab === '일정'
-              ? 'bg-white shadow-sm text-blue-600'
-              : 'text-gray-500 hover:bg-white/60'
+              ? 'bg-[var(--toss-card)] shadow-sm text-[var(--toss-blue)]'
+              : 'text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]'
           }`}
         >
           📅
@@ -126,8 +126,8 @@ export default function StatusPanel({ user, tasks, surgeries, mris, attStatus, o
           onClick={() => setActiveTab('근태')}
           className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-all ${
             activeTab === '근태'
-              ? 'bg-white shadow-sm text-blue-600'
-              : 'text-gray-500 hover:bg-white/60'
+              ? 'bg-[var(--toss-card)] shadow-sm text-[var(--toss-blue)]'
+              : 'text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]'
           }`}
         >
           ⏰
@@ -149,20 +149,20 @@ export default function StatusPanel({ user, tasks, surgeries, mris, attStatus, o
                 <div className="flex items-start gap-2">
                   <span className="text-lg">{getNotificationIcon(notif.type)}</span>
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold text-xs text-gray-800 line-clamp-2">{notif.title}</h4>
-                    <p className="text-[9px] text-gray-600 font-bold mt-0.5 line-clamp-2">{notif.body}</p>
-                    <p className="text-[8px] text-gray-400 font-bold mt-1">
+                    <h4 className="font-semibold text-xs text-[var(--foreground)] line-clamp-2">{notif.title}</h4>
+                    <p className="text-[9px] text-[var(--toss-gray-4)] font-bold mt-0.5 line-clamp-2">{notif.body}</p>
+                    <p className="text-[8px] text-[var(--toss-gray-3)] font-bold mt-1">
                       {new Date(notif.created_at).toLocaleTimeString()}
                     </p>
                   </div>
                   {!notif.is_read && (
-                    <div className="w-2 h-2 bg-blue-600 rounded-full shrink-0 mt-1" />
+                    <div className="w-2 h-2 bg-[var(--toss-blue)] rounded-full shrink-0 mt-1" />
                   )}
                 </div>
               </div>
             ))
           ) : (
-            <div className="text-center py-8 text-gray-300">
+            <div className="text-center py-8 text-[var(--toss-gray-3)]">
               <p className="font-bold text-xs italic">알림이 없습니다.</p>
             </div>
           )}
@@ -173,40 +173,40 @@ export default function StatusPanel({ user, tasks, surgeries, mris, attStatus, o
       {activeTab === '일정' && (
         <div className="space-y-4 flex-1 overflow-y-auto">
           <div className="space-y-3">
-            <p className="px-2 text-[10px] font-semibold text-gray-400 uppercase">오늘 수술</p>
-            <div className="bg-gray-50 rounded-lg p-4 space-y-3 shadow-inner">
+            <p className="px-2 text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">오늘 수술</p>
+            <div className="bg-[var(--toss-gray-1)] rounded-lg p-4 space-y-3 shadow-inner">
               {surgeries && surgeries.length > 0 ? (
                 surgeries.map((s: any, i: number) => (
-                  <div key={i} className="flex flex-col border-b border-gray-200/50 pb-2">
+                  <div key={i} className="flex flex-col border-b border-[var(--toss-border)] pb-2">
                     <span className="text-[10px] font-semibold text-orange-600">{s.surgery_time?.slice(0, 5)}</span>
-                    <span className="text-[11px] font-semibold text-gray-800">{s.patient_name} ({s.surgery_name})</span>
+                    <span className="text-[11px] font-semibold text-[var(--foreground)]">{s.patient_name} ({s.surgery_name})</span>
                   </div>
                 ))
               ) : (
-                <p className="text-[10px] text-gray-400 font-bold">일정이 없습니다.</p>
+                <p className="text-[10px] text-[var(--toss-gray-3)] font-bold">일정이 없습니다.</p>
               )}
             </div>
           </div>
 
           <div className="space-y-3">
-            <p className="px-2 text-[10px] font-semibold text-gray-400 uppercase">오늘 MRI</p>
-            <div className="bg-gray-50 rounded-lg p-4 space-y-3 shadow-inner">
+            <p className="px-2 text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">오늘 MRI</p>
+            <div className="bg-[var(--toss-gray-1)] rounded-lg p-4 space-y-3 shadow-inner">
               {mris && mris.length > 0 ? (
                 mris.map((m: any, i: number) => (
                   <div
                     key={i}
                     className={`p-3 rounded-lg border ${
-                      m.is_fasting ? 'border-blue-100 bg-blue-50/50' : 'bg-white border-gray-100'
+                      m.is_fasting ? 'border-[var(--toss-blue)]/30 bg-[var(--toss-blue-light)]/50' : 'bg-[var(--toss-card)] border-[var(--toss-border)]'
                     }`}
                   >
-                    <span className="text-[10px] font-semibold text-blue-600">{m.mri_time?.slice(0, 5)}</span>
-                    <p className="text-[11px] font-semibold text-gray-700">
+                    <span className="text-[10px] font-semibold text-[var(--toss-blue)]">{m.mri_time?.slice(0, 5)}</span>
+                    <p className="text-[11px] font-semibold text-[var(--foreground)]">
                       {m.patient_name} {m.is_fasting && '(금식)'}
                     </p>
                   </div>
                 ))
               ) : (
-                <p className="text-[10px] text-gray-400 font-bold">일정이 없습니다.</p>
+                <p className="text-[10px] text-[var(--toss-gray-3)] font-bold">일정이 없습니다.</p>
               )}
             </div>
           </div>
@@ -216,7 +216,7 @@ export default function StatusPanel({ user, tasks, surgeries, mris, attStatus, o
       {/* 근태 탭 */}
       {activeTab === '근태' && (
         <div className="space-y-4 flex-1">
-          <p className="px-2 text-[10px] font-semibold text-gray-400 uppercase">실시간 근태 현황</p>
+          <p className="px-2 text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">실시간 근태 현황</p>
           <div className="grid grid-cols-2 gap-2">
             <button
               disabled={attStatus !== 'none' || loading}
@@ -224,7 +224,7 @@ export default function StatusPanel({ user, tasks, surgeries, mris, attStatus, o
               className={`py-5 rounded-3xl font-semibold text-xs transition-all ${
                 attStatus === 'none'
                   ? 'bg-green-600 text-white shadow-lg'
-                  : 'bg-gray-100 text-gray-400'
+                  : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]'
               }`}
             >
               {attStatus === 'none' ? '출근하기' : '출근완료'}
@@ -235,7 +235,7 @@ export default function StatusPanel({ user, tasks, surgeries, mris, attStatus, o
               className={`py-5 rounded-3xl font-semibold text-xs transition-all ${
                 attStatus === 'checked_in'
                   ? 'bg-orange-500 text-white shadow-lg'
-                  : 'bg-gray-100 text-gray-400'
+                  : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]'
               }`}
             >
               {attStatus === 'checked_out' ? '퇴근완료' : '퇴근하기'}
