@@ -14,12 +14,14 @@ export default function GlobalSearch({
   user,
   onSelect,
   staffs = [],
-  posts = []
+  posts = [],
+  variant = 'input'
 }: {
   user: any;
   onSelect: (type: string, id: string, item?: any) => void;
   staffs?: any[];
   posts?: any[];
+  variant?: 'input' | 'icon';
 }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -28,6 +30,20 @@ export default function GlobalSearch({
   const [activeIdx, setActiveIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (variant === 'icon' && open) inputRef.current?.focus();
+  }, [variant, open]);
+
+  useEffect(() => {
+    if (variant !== 'icon' || !open) return;
+    const onOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('click', onOutside);
+    return () => document.removeEventListener('click', onOutside);
+  }, [variant, open]);
 
   const search = useCallback(async (q: string) => {
     if (!q || q.trim().length < 2) {
@@ -117,24 +133,28 @@ export default function GlobalSearch({
 
   const typeLabel: Record<string, string> = { staff: '👤 직원', post: '📋 게시글', approval: '✍️ 결재', message: '💬 채팅' };
 
-  return (
-    <div className="relative">
-      <input
-        ref={inputRef}
-        type="search"
-        placeholder="직원·게시글·결재·채팅 검색..."
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 200)}
-        onKeyDown={handleKeyDown}
-        className="w-full max-w-[240px] min-h-[44px] px-4 py-2 rounded-[12px] bg-[var(--input-bg)] text-sm text-[var(--foreground)] placeholder:text-[var(--toss-gray-3)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 touch-manipulation"
-      />
-      {open && (query.length >= 2 || results.length > 0) && (
-        <div
-          ref={listRef}
-          className="absolute top-full left-0 right-0 mt-1 bg-[var(--toss-card)] rounded-[12px] shadow-lg border border-[var(--toss-border)] overflow-hidden z-[999] max-h-[320px] overflow-y-auto"
-        >
+  const dropdown = open && (variant === 'icon' ? true : query.length >= 2 || results.length > 0) ? (
+    <div
+      ref={listRef}
+      className={`absolute z-[999] bg-[var(--toss-card)] rounded-[12px] shadow-lg border border-[var(--toss-border)] overflow-hidden max-h-[320px] overflow-y-auto ${
+        variant === 'icon' ? 'left-full top-0 ml-1 min-w-[280px]' : 'top-full left-0 right-0 mt-1'
+      }`}
+    >
+      {variant === 'icon' && (
+        <div className="p-2 border-b border-[var(--toss-border)]">
+          <input
+            ref={inputRef}
+            type="search"
+            placeholder="직원·게시글·결재·채팅 검색..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="w-full min-h-[40px] px-3 py-2 rounded-[10px] bg-[var(--input-bg)] text-sm text-[var(--foreground)] placeholder:text-[var(--toss-gray-3)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+          />
+        </div>
+      )}
+      {(query.length >= 2 || results.length > 0) && (
+        <>
           {loading ? (
             <div className="p-6 text-center text-[var(--toss-gray-3)] text-sm">검색 중...</div>
           ) : results.length === 0 ? (
@@ -155,8 +175,41 @@ export default function GlobalSearch({
               </button>
             ))
           )}
-        </div>
+        </>
       )}
+    </div>
+  ) : null;
+
+  if (variant === 'icon') {
+    return (
+      <div className="relative" ref={containerRef}>
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="min-h-[44px] min-w-[44px] flex items-center justify-center p-2 rounded-[12px] text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)] hover:text-[var(--foreground)] transition-colors touch-manipulation"
+          aria-label="검색"
+        >
+          <span className="text-xl">🔍</span>
+        </button>
+        {open && dropdown}
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative">
+      <input
+        ref={inputRef}
+        type="search"
+        placeholder="직원·게시글·결재·채팅 검색..."
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 200)}
+        onKeyDown={handleKeyDown}
+        className="w-full max-w-[240px] min-h-[44px] px-4 py-2 rounded-[12px] bg-[var(--input-bg)] text-sm text-[var(--foreground)] placeholder:text-[var(--toss-gray-3)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 touch-manipulation"
+      />
+      {dropdown}
     </div>
   );
 }

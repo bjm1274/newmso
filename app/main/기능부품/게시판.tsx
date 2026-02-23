@@ -498,39 +498,39 @@ export default function BoardView({ user, setMainMenu }: any) {
   };
 
   return (
-    <div className="flex flex-col h-full min-h-0 app-page overflow-y-auto custom-scrollbar p-4 md:p-8 space-y-6 md:space-y-8 pb-24 md:pb-8">
-      <header className="flex justify-between items-end">
-        <div>
-          <h2 className="text-xl md:text-2xl font-bold text-[var(--foreground)] tracking-tight">게시판</h2>
-          <p className="text-[10px] md:text-xs text-[var(--toss-gray-3)] font-bold uppercase mt-1">병원 공지 및 일정 관리</p>
-        </div>
-        
-        {(activeBoard === '공지사항' || activeBoard === '자유게시판' || activeBoard === '경조사' || activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
-          <button
-            onClick={() => setShowNewPost(!showNewPost)}
-            className="px-4 md:px-6 py-2.5 md:py-3 bg-[var(--toss-blue)] text-white rounded-[12px] text-[11px] md:text-xs font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all"
-          >
-            {showNewPost ? '✕ 취소' : '+ 새 게시물'}
-          </button>
-        )}
-      </header>
-
-      {/* 게시판 탭 - 모바일 가로 스크롤 */}
-      <div className="flex gap-2 overflow-x-auto no-scrollbar bg-[var(--toss-card)] p-2 md:p-4 rounded-[16px] border border-[var(--toss-border)] shadow-sm shrink-0">
+    <div className="flex flex-row h-full min-h-0 app-page overflow-hidden">
+      {/* 좌측 세로 탭 - 관리자 메뉴와 동일 스타일 */}
+      <aside className="flex flex-col gap-1.5 p-3 md:p-4 bg-[var(--toss-card)] border-r border-[var(--toss-border)] shrink-0 w-[72px] md:w-44 overflow-y-auto">
         {boards.map(board => (
           <button
             key={board.id}
             onClick={() => setActiveBoard(board.id)}
-            className={`flex-1 min-w-[100px] md:min-w-0 px-4 md:px-6 py-2.5 md:py-3 rounded-[12px] text-[11px] md:text-xs font-bold transition-all whitespace-nowrap ${
+            className={`w-full px-3 py-2.5 text-[10px] md:text-[11px] font-semibold rounded-[12px] transition-all text-left ${
               activeBoard === board.id
-                ? 'bg-[var(--toss-blue)] text-white shadow-sm'
-                : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] hover:bg-[var(--toss-border)]'
+                ? 'bg-[var(--toss-blue)] text-white shadow-md'
+                : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
             }`}
           >
             {board.label}
           </button>
         ))}
-      </div>
+      </aside>
+
+      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto custom-scrollbar p-4 md:p-8 space-y-6 md:space-y-8 pb-24 md:pb-8">
+        <header className="flex justify-between items-end shrink-0">
+          <div>
+            <h2 className="text-xl md:text-2xl font-bold text-[var(--foreground)] tracking-tight">게시판</h2>
+            <p className="text-[10px] md:text-xs text-[var(--toss-gray-3)] font-bold uppercase mt-1">병원 공지 및 일정 관리</p>
+          </div>
+          {(activeBoard === '공지사항' || activeBoard === '자유게시판' || activeBoard === '경조사' || activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
+            <button
+              onClick={() => setShowNewPost(!showNewPost)}
+              className="px-4 md:px-6 py-2.5 md:py-3 bg-[var(--toss-blue)] text-white rounded-[12px] text-[11px] md:text-xs font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all"
+            >
+              {showNewPost ? '✕ 취소' : '+ 새 게시물'}
+            </button>
+          )}
+        </header>
 
       {/* 새 게시물 작성 폼 */}
       {showNewPost && (
@@ -1504,6 +1504,7 @@ export default function BoardView({ user, setMainMenu }: any) {
         </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

@@ -56,26 +56,25 @@ export default function AdminView({ user, staffs = [], depts = [], onRefresh }: 
   }
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-[var(--page-bg)] h-full relative animate-in fade-in duration-500">
-      <header className="px-4 md:px-10 py-4 md:py-8 flex justify-end items-center bg-[var(--toss-card)] border-b border-[var(--toss-border)] shrink-0 shadow-sm flex-wrap gap-4">
-        <div className="flex gap-0.5 p-1 app-tab-bar border border-[var(--toss-border)] overflow-x-auto max-w-full">
-          {adminTabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2 text-xs font-medium whitespace-nowrap rounded-md transition-all ${
-                activeTab === tab.id
-                  ? 'bg-[var(--toss-card)] text-[var(--toss-blue)] shadow-sm'
-                  : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-card)]/60'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </header>
+    <div className="flex-1 flex flex-row min-h-0 bg-[var(--page-bg)] h-full relative animate-in fade-in duration-500">
+      {/* 좌측 세로 탭 */}
+      <aside className="flex flex-col gap-1.5 p-3 md:p-4 bg-[var(--toss-card)] border-r border-[var(--toss-border)] shrink-0 w-[72px] md:w-44 overflow-y-auto">
+        {adminTabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`w-full px-3 py-2.5 text-[10px] md:text-[11px] font-semibold rounded-[12px] transition-all text-left ${
+              activeTab === tab.id
+                ? 'bg-[var(--toss-blue)] text-white shadow-md'
+                : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </aside>
 
-      <main className="flex-1 min-h-0 overflow-y-auto p-4 md:p-10 custom-scrollbar bg-[var(--toss-gray-1)]/30">
+      <main className="flex-1 min-h-0 min-w-0 overflow-y-auto p-4 md:p-10 custom-scrollbar bg-[var(--toss-gray-1)]/30">
         {activeTab === '경영대시보드' && (
           <BusinessDashboard staffs={staffs} inventory={inventory} />
         )}

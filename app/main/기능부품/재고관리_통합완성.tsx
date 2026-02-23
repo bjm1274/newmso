@@ -180,23 +180,20 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
   };
 
   return (
-    <div className="flex flex-col h-full min-h-0 app-page overflow-hidden relative">
+    <div className="flex flex-row h-full min-h-0 app-page overflow-hidden relative">
       <InventoryAlertBadge lowCount={lowStockItems.length} expiryCount={expiryImminentItems.length} />
-      <header className="bg-[var(--toss-card)] border-b border-[var(--toss-border)] p-4 md:p-8 shrink-0 z-20 shadow-sm">
-        <div className="flex justify-end items-center gap-4">
-          <div className="flex gap-2 w-full md:w-auto overflow-x-auto no-scrollbar pb-1">
-            <button onClick={() => { setActiveView('UDI'); if (typeof window !== 'undefined') window.localStorage.setItem(INV_VIEW_KEY, 'UDI'); }} className={`px-4 py-2 rounded-[12px] text-[10px] font-semibold whitespace-nowrap transition-all ${activeView === 'UDI' ? 'bg-[#A11DFF] text-white shadow-lg' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'}`}>📡 UDI</button>
-            <button onClick={() => { setActiveView('명세서'); if (typeof window !== 'undefined') window.localStorage.setItem(INV_VIEW_KEY, '명세서'); }} className={`px-4 py-2 rounded-[12px] text-[10px] font-semibold whitespace-nowrap transition-all ${activeView === '명세서' ? 'bg-[#00B44E] text-white shadow-lg' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'}`}>📄 명세서</button>
-            <button onClick={() => { setActiveView('발주'); if (typeof window !== 'undefined') window.localStorage.setItem(INV_VIEW_KEY, '발주'); }} className={`px-4 py-2 rounded-[12px] text-[10px] font-semibold whitespace-nowrap transition-all ${activeView === '발주' ? 'bg-[#FF6B00] text-white shadow-lg' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'}`}>📝 발주</button>
-            <button onClick={() => { setActiveView('스캔'); if (typeof window !== 'undefined') window.localStorage.setItem(INV_VIEW_KEY, '스캔'); }} className={`px-4 py-2 rounded-[12px] text-[10px] font-semibold whitespace-nowrap transition-all ${activeView === '스캔' ? 'bg-[var(--toss-blue)] text-white shadow-sm' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'}`}>🔍 스캔</button>
-            <button onClick={() => { setActiveView('등록'); if (typeof window !== 'undefined') window.localStorage.setItem(INV_VIEW_KEY, '등록'); }} className={`px-4 py-2 rounded-[12px] text-[10px] font-semibold whitespace-nowrap transition-all ${activeView === '등록' ? 'bg-[var(--toss-blue)] text-white shadow-sm' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'}`}>+ 등록</button>
-            <button onClick={() => { setActiveView('현황'); if (typeof window !== 'undefined') window.localStorage.setItem(INV_VIEW_KEY, '현황'); }} className={`px-4 py-2 rounded-[12px] text-[10px] font-semibold whitespace-nowrap transition-all ${activeView === '현황' ? 'bg-[var(--toss-blue)] text-white shadow-sm' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'}`}>📊 현황</button>
-            <button onClick={() => { setShowLogs(true); fetchLogs(); }} className="px-4 py-2 rounded-[12px] text-[10px] font-semibold whitespace-nowrap transition-all bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-border)]">📋 이력</button>
-          </div>
-        </div>
-      </header>
+      {/* 좌측 세로 탭 - 관리자 메뉴와 동일 스타일 */}
+      <aside className="flex flex-col gap-1.5 p-3 md:p-4 bg-[var(--toss-card)] border-r border-[var(--toss-border)] shrink-0 w-[72px] md:w-44 overflow-y-auto">
+        <button onClick={() => { setActiveView('UDI'); if (typeof window !== 'undefined') window.localStorage.setItem(INV_VIEW_KEY, 'UDI'); }} className={`w-full px-3 py-2.5 text-[10px] md:text-[11px] font-semibold rounded-[12px] transition-all text-left ${activeView === 'UDI' ? 'bg-[#A11DFF] text-white shadow-md' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'}`}>📡 UDI</button>
+        <button onClick={() => { setActiveView('명세서'); if (typeof window !== 'undefined') window.localStorage.setItem(INV_VIEW_KEY, '명세서'); }} className={`w-full px-3 py-2.5 text-[10px] md:text-[11px] font-semibold rounded-[12px] transition-all text-left ${activeView === '명세서' ? 'bg-[#00B44E] text-white shadow-md' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'}`}>📄 명세서</button>
+        <button onClick={() => { setActiveView('발주'); if (typeof window !== 'undefined') window.localStorage.setItem(INV_VIEW_KEY, '발주'); }} className={`w-full px-3 py-2.5 text-[10px] md:text-[11px] font-semibold rounded-[12px] transition-all text-left ${activeView === '발주' ? 'bg-[#FF6B00] text-white shadow-md' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'}`}>📝 발주</button>
+        <button onClick={() => { setActiveView('스캔'); if (typeof window !== 'undefined') window.localStorage.setItem(INV_VIEW_KEY, '스캔'); }} className={`w-full px-3 py-2.5 text-[10px] md:text-[11px] font-semibold rounded-[12px] transition-all text-left ${activeView === '스캔' ? 'bg-[var(--toss-blue)] text-white shadow-md' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'}`}>🔍 스캔</button>
+        <button onClick={() => { setActiveView('등록'); if (typeof window !== 'undefined') window.localStorage.setItem(INV_VIEW_KEY, '등록'); }} className={`w-full px-3 py-2.5 text-[10px] md:text-[11px] font-semibold rounded-[12px] transition-all text-left ${activeView === '등록' ? 'bg-[var(--toss-blue)] text-white shadow-md' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'}`}>+ 등록</button>
+        <button onClick={() => { setActiveView('현황'); if (typeof window !== 'undefined') window.localStorage.setItem(INV_VIEW_KEY, '현황'); }} className={`w-full px-3 py-2.5 text-[10px] md:text-[11px] font-semibold rounded-[12px] transition-all text-left ${activeView === '현황' ? 'bg-[var(--toss-blue)] text-white shadow-md' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'}`}>📊 현황</button>
+        <button onClick={() => { setShowLogs(true); fetchLogs(); }} className="w-full px-3 py-2.5 text-[10px] md:text-[11px] font-semibold rounded-[12px] transition-all text-left text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]">📋 이력</button>
+      </aside>
 
-      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <main className="flex-1 p-4 md:p-10 bg-[var(--page-bg)] overflow-y-auto custom-scrollbar">
           {activeView === '현황' && (
             loading ? (

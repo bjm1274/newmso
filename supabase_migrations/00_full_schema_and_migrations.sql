@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS staff_members (
   position VARCHAR(50),
   email VARCHAR(100),
   phone VARCHAR(20),
+  extension VARCHAR(20),
   join_date DATE,
   status VARCHAR(20) DEFAULT '재직',
   role VARCHAR(20) DEFAULT 'user',
@@ -30,10 +31,12 @@ CREATE TABLE IF NOT EXISTS staff_members (
   base_salary BIGINT DEFAULT 0,
   shift_id UUID,
   meal_allowance BIGINT DEFAULT 0,
+  night_duty_allowance BIGINT DEFAULT 0,
   vehicle_allowance BIGINT DEFAULT 0,
   childcare_allowance BIGINT DEFAULT 0,
   research_allowance BIGINT DEFAULT 0,
   other_taxfree BIGINT DEFAULT 0,
+  position_allowance BIGINT DEFAULT 0,
   photo_url TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -277,6 +280,7 @@ CREATE TABLE IF NOT EXISTS payroll_records (
   year_month VARCHAR(7) NOT NULL,
   base_salary BIGINT DEFAULT 0,
   meal_allowance BIGINT DEFAULT 0,
+  night_duty_allowance BIGINT DEFAULT 0,
   vehicle_allowance BIGINT DEFAULT 0,
   childcare_allowance BIGINT DEFAULT 0,
   research_allowance BIGINT DEFAULT 0,

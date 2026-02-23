@@ -70,7 +70,7 @@ export default function GlobalNotificationBell({ user, onOpenFull }: { user: any
         )}
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 w-[320px] max-h-[400px] bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] shadow-lg z-[200] flex flex-col overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="absolute left-0 top-full mt-1 w-[320px] max-h-[400px] bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] shadow-lg z-[200] flex flex-col overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
           <div className="p-3 border-b border-[var(--toss-border)] flex items-center justify-between shrink-0">
             <span className="text-xs font-black text-[var(--foreground)]">알림</span>
             {unreadCount > 0 && <span className="text-[10px] font-bold text-[var(--toss-gray-3)]">안읽음 {unreadCount}건</span>}

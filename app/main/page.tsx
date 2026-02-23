@@ -6,9 +6,6 @@ import { setSelectedCompanyId as persistSelectedCompanyId, getSelectedCompanyId 
 
 import Sidebar from './기능부품/조직도서브/조직도측면창';
 import MainContent from './기능부품/조직도서브/조직도본문';
-import GlobalSearch from '@/app/components/GlobalSearch';
-import GlobalNotificationBell from '@/app/components/GlobalNotificationBell';
-import ThemeToggle from '@/app/components/ThemeToggle';
 import NotificationSystem from './기능부품/알림시스템';
 import ChatAlertBanner from './기능부품/채팅알림배너';
 import PermissionPromptModal from './기능부품/권한요청모달';
@@ -173,9 +170,10 @@ function MainPageContent() {
       const isMso = u?.company === 'SY INC.' || u?.permissions?.mso === true;
       const filterCompanyId = isMso ? companyIdFilter : u?.company_id;
 
-      let staffQuery = supabase.from('staff_members').select('*').order('employee_no', { ascending: true });
-      if (filterCompanyId) staffQuery = staffQuery.eq('company_id', filterCompanyId);
-      const { data: staffData } = await staffQuery;
+      const { data: staffData } = await supabase
+        .from('staff_members')
+        .select('*')
+        .order('employee_no', { ascending: true });
 
       let postQuery = supabase.from('board_posts').select('*').order('created_at', { ascending: false });
       if (filterCompanyId) {
@@ -183,7 +181,7 @@ function MainPageContent() {
       }
       const { data: postData } = await postQuery;
 
-      const uniqueDepts = Array.from(new Set(staffData?.map((s: any) => s.department)))
+      const uniqueDepts = Array.from(new Set((staffData || []).map((s: any) => s.department)))
         .filter(Boolean)
         .map(d => ({ name: d }));
 
@@ -218,12 +216,14 @@ function MainPageContent() {
 
   return (
     <div className="flex flex-col md:flex-row h-screen w-full bg-[var(--background)] overflow-hidden min-h-[100dvh]">
-      <Sidebar 
-        user={user} 
-        mainMenu={mainMenu} 
-        onMenuChange={(menu: string) => {
-          setMainMenu(menu);
-        }} 
+      <Sidebar
+        user={user}
+        mainMenu={mainMenu}
+        onMenuChange={(menu: string) => setMainMenu(menu)}
+        onOpenNotifications={() => {
+          setMainMenu('내정보');
+          setInitialMyPageTab('notifications');
+        }}
       />
 
       <div className="flex-1 flex flex-col overflow-hidden min-h-0 pb-[72px] md:pb-0 relative">
@@ -242,27 +242,6 @@ function MainPageContent() {
           onOpenApproval={() => setMainMenu('전자결재')}
         />
 
-        <div className="flex shrink-0 px-3 py-2 md:px-4 bg-[var(--toss-card)] border-b border-[var(--toss-border)] items-center gap-2 justify-end">
-          <ThemeToggle />
-          <GlobalSearch
-            user={user}
-            staffs={data.staffs}
-            posts={data.posts}
-            onSelect={(type, id) => {
-              if (type === 'staff') setMainMenu('조직도');
-              else if (type === 'post') setMainMenu('게시판');
-              else if (type === 'approval') setMainMenu('전자결재');
-              else if (type === 'message') setMainMenu('채팅');
-            }}
-          />
-          <GlobalNotificationBell
-            user={user}
-            onOpenFull={() => {
-              setMainMenu('내정보');
-              setInitialMyPageTab('notifications');
-            }}
-          />
-        </div>
         {loading && (
           <div className="absolute inset-0 bg-[var(--toss-card)]/60 z-40 flex items-center justify-center">
             <div className="w-10 h-10 border-2 border-[var(--toss-blue)] rounded-full border-t-transparent animate-spin" />

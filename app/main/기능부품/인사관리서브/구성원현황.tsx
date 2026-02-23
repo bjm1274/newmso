@@ -14,7 +14,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   const [근무형태목록, 근무형태목록설정] = useState<any[]>([]);
   const [팀목록캐시, 팀목록캐시설정] = useState<Record<string, string[]>>({});
   const [신규직원, 신규직원설정] = useState({
-    성명: '', 전화번호: '', 사업체: '박철홍정형외과', 팀: '원무팀', 직함: '', 입사일: '', 퇴사일: '',
+    성명: '', 전화번호: '', 내선번호: '', 사업체: '박철홍정형외과', 팀: '원무팀', 직함: '', 입사일: '', 퇴사일: '',
     주민번호: '', 이메일: '', 주소: '', 면허사항: '', 계좌정보: '', 임금정보: '', 상태: '재직',
     연차총개수: 0, 연차사용개수: 0, 근무형태ID: '',
     base_salary: 0,
@@ -46,14 +46,14 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   const 팀목록가져오기 = (회사: string) => {
     if (팀목록캐시[회사]?.length) return 팀목록캐시[회사];
     if (회사 === 'SY INC.') return ['경영지원팀', '재무팀', '인사팀', '전략기획팀', '마케팅팀'];
-    return ['진료부', '진료팀', '병동팀', '수술팀', '외래팀', '검사팀', '원무팀', '총무팀', '행정팀', '관리팀'];
+    return ['진료부', '간호부', '총무부', '진료팀', '병동팀', '수술팀', '외래팀', '외래간호팀', '검사팀', '원무팀', '총무팀', '행정팀', '관리팀', '영양팀'];
   };
 
   const 정보저장 = async () => {
     if (!신규직원.성명 || !신규직원.입사일) return alert('성함과 입사일은 필수 입력 사항입니다.');
     try {
       const commonData = {
-        name: 신규직원.성명, phone: 신규직원.전화번호, company: 신규직원.사업체, department: 신규직원.팀,
+        name: 신규직원.성명, phone: 신규직원.전화번호, extension: 신규직원.내선번호 || null, company: 신규직원.사업체, department: 신규직원.팀 === '' ? null : 신규직원.팀,
         position: 신규직원.직함, resident_no: 신규직원.주민번호, email: 신규직원.이메일, address: 신규직원.주소,
         license: 신규직원.면허사항, bank_account: 신규직원.계좌정보, salary_info: 신규직원.임금정보,
         joined_at: 신규직원.입사일, resigned_at: 신규직원.퇴사일 || null, status: 신규직원.상태,
@@ -87,8 +87,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   const 수정시작 = (직원: any) => {
     선택된직원ID설정(직원.id);
     신규직원설정({
-      성명: 직원.name || '', 전화번호: 직원.phone || '', 사업체: 직원.company || '박철홍정형외과',
-      팀: 직원.department || '원무팀', 직함: 직원.position || '', 입사일: 직원.joined_at || '',
+      성명: 직원.name || '', 전화번호: 직원.phone || '', 내선번호: 직원.extension || '', 사업체: 직원.company || '박철홍정형외과',
+      팀: 직원.department ?? '', 직함: 직원.position || '', 입사일: 직원.joined_at || '',
       퇴사일: 직원.resigned_at || '', 주민번호: 직원.resident_no || '', 이메일: 직원.email || '',
       주소: 직원.address || '', 면허사항: 직원.license || '', 계좌정보: 직원.bank_account || '',
       임금정보: 직원.salary_info || '', 상태: 직원.status || '재직',
@@ -105,7 +105,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   const 닫기함수 = () => {
     편집모드설정(false); 선택된직원ID설정(null);
     신규직원설정({
-      성명: '', 전화번호: '', 사업체: '박철홍정형외과', 팀: '원무팀', 직함: '', 입사일: '', 퇴사일: '',
+      성명: '', 전화번호: '', 내선번호: '', 사업체: '박철홍정형외과', 팀: '원무팀', 직함: '', 입사일: '', 퇴사일: '',
       주민번호: '', 이메일: '', 주소: '', 면허사항: '', 계좌정보: '', 임금정보: '', 상태: '재직',
       연차총개수: 0, 연차사용개수: 0, 근무형태ID: '',
       base_salary: 0,
@@ -311,7 +311,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] font-semibold text-[var(--toss-gray-3)]">연락처</label>
+                  <label className="text-[9px] font-semibold text-[var(--toss-gray-3)]">연락처 (개인)</label>
                   <input
                     type="text"
                     inputMode="numeric"
@@ -342,6 +342,16 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                   />
                 </div>
                 <div className="space-y-1">
+                  <label className="text-[9px] font-semibold text-[var(--toss-gray-3)]">내선번호</label>
+                  <input
+                    type="text"
+                    value={신규직원.내선번호}
+                    onChange={e => 신규직원설정({ ...신규직원, 내선번호: e.target.value })}
+                    placeholder="예: 1234"
+                    className="w-full p-3 bg-[var(--toss-gray-1)] rounded-lg border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+                  />
+                </div>
+                <div className="space-y-1">
                   <label className="text-[9px] font-semibold text-[var(--toss-gray-3)]">주소</label>
                   <input type="text" value={신규직원.주소} onChange={e => 신규직원설정({...신규직원, 주소: e.target.value})} className="w-full p-3 bg-[var(--toss-gray-1)] rounded-lg border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-[var(--toss-blue)]/30" />
                 </div>
@@ -352,7 +362,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-[9px] font-semibold text-[var(--toss-gray-3)]">사업체</label>
-                    <select value={신규직원.사업체} onChange={e => 신규직원설정({...신규직원, 사업체: e.target.value, 팀: 팀목록가져오기(e.target.value)[0]})} className="w-full p-3 bg-[var(--toss-gray-1)] rounded-lg border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-[var(--toss-blue)]/30">
+                    <select value={신규직원.사업체} onChange={e => 신규직원설정({...신규직원, 사업체: e.target.value, 팀: 팀목록가져오기(e.target.value)[0] ?? ''})} className="w-full p-3 bg-[var(--toss-gray-1)] rounded-lg border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-[var(--toss-blue)]/30">
                       <option value="박철홍정형외과">박철홍정형외과</option>
                       <option value="수연의원">수연의원</option>
                       <option value="SY INC.">SY INC.</option>
@@ -361,6 +371,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                   <div className="space-y-1">
                     <label className="text-[9px] font-semibold text-[var(--toss-gray-3)]">부서/팀</label>
                     <select value={신규직원.팀} onChange={e => 신규직원설정({...신규직원, 팀: e.target.value})} className="w-full p-3 bg-[var(--toss-gray-1)] rounded-lg border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-[var(--toss-blue)]/30">
+                      <option value="">팀 선택 안함</option>
                       {팀목록가져오기(신규직원.사업체).map(팀 => <option key={팀} value={팀}>{팀}</option>)}
                     </select>
                   </div>
@@ -375,9 +386,13 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                       <option value="대리">대리</option>
                       <option value="팀장">팀장</option>
                       <option value="간호과장">간호과장</option>
+                      <option value="간호부장">간호부장</option>
                       <option value="실장">실장</option>
                       <option value="부장">부장</option>
+                      <option value="진료부장">진료부장</option>
+                      <option value="총무부장">총무부장</option>
                       <option value="이사">이사</option>
+                      <option value="원장">원장</option>
                       <option value="병원장">병원장</option>
                     </select>
                   </div>

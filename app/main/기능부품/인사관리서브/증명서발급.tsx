@@ -52,7 +52,26 @@ export default function CertificateGenerator({ staffs = [] }: any) {
       const html = printRef.current.innerHTML.replace('제 2026-0001', `제 ${sn}`).replace(/2026-0001/g, sn);
       const w = window.open('', '_blank');
       if (!w) return;
-      w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${certType}</title><style>body{font-family:serif;padding:40px;max-width:600px;margin:0 auto}</style></head><body>${html}</body></html>`);
+      const printStyles = `
+        * { box-sizing: border-box; }
+        body { font-family: 'Noto Serif KR', Georgia, serif; padding: 40px; max-width: 620px; margin: 0 auto; background: #f5f5f5; color: #191F28; }
+        #cert-print-root { max-width: 600px; margin: 0 auto; padding: 3rem 5rem; background: #fff; border: 1px solid #E5E8EB; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15); position: relative; text-align: center; }
+        #cert-print-root .cert-watermark { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0.03; pointer-events: none; font-size: 7rem; font-weight: 600; transform: rotate(-45deg); }
+        #cert-print-root .cert-header { margin-bottom: 0.5rem; }
+        #cert-print-root .cert-header .cert-no { font-size: 10px; font-weight: 600; color: #6b7280; letter-spacing: 0.5em; }
+        #cert-print-root .cert-header .cert-title { font-size: 1.75rem; letter-spacing: 0.3em; border-bottom: 4px solid #191F28; padding-bottom: 1rem; display: inline-block; margin-top: 0.5rem; font-weight: 600; }
+        #cert-print-root .cert-body { text-align: left; padding-top: 2.5rem; }
+        #cert-print-root .cert-body .cert-row { display: flex; border-bottom: 1px solid #E5E8EB; padding-bottom: 0.5rem; margin-bottom: 1rem; }
+        #cert-print-root .cert-body .cert-row .cert-label { width: 6rem; font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; flex-shrink: 0; }
+        #cert-print-root .cert-body .cert-row .cert-value { font-size: 14px; font-weight: 600; color: #191F28; }
+        #cert-print-root .cert-footer { padding-top: 3rem; text-align: center; }
+        #cert-print-root .cert-footer .cert-closing { font-size: 14px; font-weight: 600; letter-spacing: 0.1em; margin-bottom: 1rem; }
+        #cert-print-root .cert-footer .cert-date { font-size: 12px; font-weight: 700; color: #6b7280; margin-bottom: 1.5rem; }
+        #cert-print-root .cert-footer .cert-sign { font-size: 1.25rem; font-weight: 600; font-style: italic; margin-top: 2rem; position: relative; display: inline-block; }
+        #cert-print-root .cert-seal { position: absolute; right: -3rem; top: -0.5rem; width: 5rem; height: 5rem; border: 4px solid rgba(220,38,38,0.8); border-radius: 50%; display: flex; align-items: center; justify-content: center; transform: rotate(12deg); opacity: 0.9; font-size: 10px; font-weight: 600; color: rgba(220,38,38,0.9); text-align: center; line-height: 1.2; }
+        @media print { body { background: #fff !important; padding: 0; } #cert-print-root { box-shadow: none; border: 1px solid #ccc; } }
+      `;
+      w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${certType}</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600;700&display=swap" rel="stylesheet"><style>${printStyles}</style></head><body><div id="cert-print-root">${html}</div></body></html>`);
       w.document.close();
       w.print();
       w.close();
@@ -137,54 +156,53 @@ export default function CertificateGenerator({ staffs = [] }: any) {
           
           {selectedStaff ? (
             <div ref={printRef} className="w-full max-w-[600px] bg-[var(--toss-card)] shadow-2xl p-12 md:p-20 space-y-12 text-center border border-[var(--toss-border)] relative animate-in zoom-in-95 duration-500">
-              {/* 워터마크: 발급 대상 직원 소속 회사 */}
-              <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none select-none">
+              {/* 워터마크: 발급 대상 직원 소속 회사 (인쇄창 스타일용 클래스) */}
+              <div className="cert-watermark absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none select-none">
                 <p className="text-9xl font-semibold -rotate-45">{selectedStaff.company || 'SY INC.'}</p>
               </div>
 
-              <div className="space-y-2">
-                <p className="text-[10px] font-semibold text-[var(--toss-gray-3)] tracking-[0.5em]">제 {serialNo || '2026-0001'} 호</p>
-                <h4 className="text-4xl font-semibold tracking-[0.3em] text-[var(--foreground)] border-b-4 border-[var(--foreground)] pb-4 inline-block">{certType}</h4>
+              <div className="cert-header space-y-2">
+                <p className="cert-no text-[10px] font-semibold text-[var(--toss-gray-3)] tracking-[0.5em]">제 {serialNo || '2026-0001'} 호</p>
+                <h4 className="cert-title text-4xl font-semibold tracking-[0.3em] text-[var(--foreground)] border-b-4 border-[var(--foreground)] pb-4 inline-block">{certType}</h4>
               </div>
 
-              <div className="text-left space-y-8 pt-10">
+              <div className="cert-body text-left space-y-8 pt-10">
                 <div className="grid grid-cols-1 gap-6">
-                  <div className="flex border-b border-[var(--toss-border)] pb-2">
-                    <span className="w-24 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">성 명</span>
-                    <span className="text-sm font-semibold text-[var(--foreground)]">{selectedStaff.name}</span>
+                  <div className="cert-row flex border-b border-[var(--toss-border)] pb-2">
+                    <span className="cert-label w-24 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">성 명</span>
+                    <span className="cert-value text-sm font-semibold text-[var(--foreground)]">{selectedStaff.name}</span>
                   </div>
-                  <div className="flex border-b border-[var(--toss-border)] pb-2">
-                    <span className="w-24 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">소 속</span>
-                    <span className="text-sm font-semibold text-[var(--foreground)]">{selectedStaff.company} / {selectedStaff.department}</span>
+                  <div className="cert-row flex border-b border-[var(--toss-border)] pb-2">
+                    <span className="cert-label w-24 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">소 속</span>
+                    <span className="cert-value text-sm font-semibold text-[var(--foreground)]">{selectedStaff.company} / {selectedStaff.department}</span>
                   </div>
-                  <div className="flex border-b border-[var(--toss-border)] pb-2">
-                    <span className="w-24 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">직 위</span>
-                    <span className="text-sm font-semibold text-[var(--foreground)]">{selectedStaff.position}</span>
+                  <div className="cert-row flex border-b border-[var(--toss-border)] pb-2">
+                    <span className="cert-label w-24 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">직 위</span>
+                    <span className="cert-value text-sm font-semibold text-[var(--foreground)]">{selectedStaff.position}</span>
                   </div>
-                  <div className="flex border-b border-[var(--toss-border)] pb-2">
-                    <span className="w-24 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">재직기간</span>
-                    <span className="text-sm font-semibold text-[var(--foreground)]">{workPeriod}</span>
+                  <div className="cert-row flex border-b border-[var(--toss-border)] pb-2">
+                    <span className="cert-label w-24 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">재직기간</span>
+                    <span className="cert-value text-sm font-semibold text-[var(--foreground)]">{workPeriod}</span>
                   </div>
                   {(certType === '급여인증서' || certType === '소득금액증명원' || certType === '원천징수영수증') && (
-                    <div className="flex border-b border-[var(--toss-border)] pb-2">
-                      <span className="w-24 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">월 급여액</span>
-                      <span className="text-sm font-semibold text-[var(--foreground)]">{totalPay.toLocaleString()}원</span>
+                    <div className="cert-row flex border-b border-[var(--toss-border)] pb-2">
+                      <span className="cert-label w-24 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">월 급여액</span>
+                      <span className="cert-value text-sm font-semibold text-[var(--foreground)]">{totalPay.toLocaleString()}원</span>
                     </div>
                   )}
-                  <div className="flex border-b border-[var(--toss-border)] pb-2">
-                    <span className="w-24 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">용 도</span>
-                    <span className="text-sm font-semibold text-[var(--foreground)]">{purpose}</span>
+                  <div className="cert-row flex border-b border-[var(--toss-border)] pb-2">
+                    <span className="cert-label w-24 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">용 도</span>
+                    <span className="cert-value text-sm font-semibold text-[var(--foreground)]">{purpose}</span>
                   </div>
                 </div>
 
-                <div className="pt-24 text-center space-y-10">
-                  <p className="text-sm font-semibold text-[var(--foreground)] tracking-widest">{certClosingText[certType] || '위와 같이 증명함.'}</p>
-                  <p className="text-xs font-bold text-[var(--toss-gray-3)]">{new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                <div className="cert-footer pt-24 text-center space-y-10">
+                  <p className="cert-closing text-sm font-semibold text-[var(--foreground)] tracking-widest">{certClosingText[certType] || '위와 같이 증명함.'}</p>
+                  <p className="cert-date text-xs font-bold text-[var(--toss-gray-3)]">{new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
                   
-                  <div className="relative inline-block pt-10">
-                    <p className="text-2xl font-semibold tracking-tighter text-[var(--foreground)] italic">{selectedStaff.company || 'SY INC.'} 대표이사 박철홍</p>
-                    {/* 디지털 직인: 해당 회사명 표기 */}
-                    <div className="absolute -right-12 -top-2 w-20 h-20 border-4 border-red-600/80 rounded-full flex items-center justify-center rotate-12 opacity-80">
+                  <div className="cert-sign-wrap relative inline-block pt-10">
+                    <p className="cert-sign text-2xl font-semibold tracking-tighter text-[var(--foreground)] italic">{selectedStaff.company || 'SY INC.'} 대표이사 박철홍</p>
+                    <div className="cert-seal absolute -right-12 -top-2 w-20 h-20 border-4 border-red-600/80 rounded-full flex items-center justify-center rotate-12 opacity-80">
                       <div className="text-[10px] font-semibold text-red-600/80 text-center leading-tight">
                         {selectedStaff.company || 'SY INC.'}<br/>대표이사<br/>박철홍
                       </div>

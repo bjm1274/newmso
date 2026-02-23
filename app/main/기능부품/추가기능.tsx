@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import ThemeToggle from '@/app/components/ThemeToggle';
+import GlobalSearch from '@/app/components/GlobalSearch';
 import 부서별물품장비현황 from './재고관리서브/부서별물품장비현황';
 import AIChatView from './AI채팅';
 
@@ -12,14 +14,26 @@ const EXTERNAL_LINKS = [
 // 컴포넌트 이름을 영문 대문자로 시작하는 형태로 지정하여
 // React ESLint 규칙을 만족시킵니다. default export 이므로
 // 외부에서의 import 이름(추가기능)은 그대로 사용할 수 있습니다.
-export default function ExtraFeatures({ user }: { user?: any }) {
+export default function ExtraFeatures({ user, staffs = [], posts = [], onSearchSelect }: { user?: any; staffs?: any[]; posts?: any[]; onSearchSelect?: (type: string, id: string) => void }) {
   const [subView, setSubView] = useState<string | null>(null);
 
   return (
     <div className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar bg-[var(--page-bg)]">
       <div className="max-w-xl mx-auto">
         <h2 className="text-lg font-bold text-[var(--foreground)] mb-1">추가 기능</h2>
-        <p className="text-[11px] text-[var(--toss-gray-3)] mb-6">외부 서비스 바로가기, 부서별 재고, AI채팅</p>
+        <p className="text-[11px] text-[var(--toss-gray-3)] mb-4">모드 선택, 검색, 외부 서비스, 부서별 재고, AI채팅</p>
+
+        <div className="flex flex-col sm:flex-row gap-3 mb-6 p-4 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] shadow-sm">
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">모드</span>
+            <ThemeToggle />
+          </div>
+          {onSearchSelect && (
+            <div className="flex-1 min-w-0">
+              <GlobalSearch user={user} staffs={staffs} posts={posts} onSelect={onSearchSelect} variant="input" />
+            </div>
+          )}
+        </div>
 
         {subView === '부서별재고' && (
           <div className="space-y-4">

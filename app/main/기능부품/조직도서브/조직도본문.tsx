@@ -346,43 +346,8 @@ export default function MainContent({
     setSignatureMode('none');
   };
 
-  const isMso = user?.company === 'SY INC.' || user?.permissions?.mso === true;
-  const hospitalCompanies = (companies || []).filter((c: any) => c.type !== 'MSO').sort((a: any, b: any) => {
-    const order = ['박철홍정형외과', '수연의원', 'SY INC.'];
-    const ia = order.indexOf(a.name);
-    const ib = order.indexOf(b.name);
-    if (ia >= 0 && ib >= 0) return ia - ib;
-    if (ia >= 0) return -1;
-    if (ib >= 0) return 1;
-    return (a.name || '').localeCompare(b.name || '');
-  });
-
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative bg-[var(--page-bg)]">
-      {isMso && hospitalCompanies.length > 0 && setSelectedCompanyId && (
-        <div className="shrink-0 px-4 py-2 bg-[var(--toss-card)] border-b border-[var(--toss-border)] flex items-center gap-2">
-          <span className="text-xs font-bold text-[var(--toss-gray-3)]">회사 선택</span>
-          <select
-            value={selectedCo}
-            onChange={(e) => {
-              const v = e.target.value;
-              setSelectedCo(v);
-              if (v === '전체') setSelectedCompanyId(null);
-              else {
-                const c = hospitalCompanies.find((x: any) => x.name === v);
-                if (c) setSelectedCompanyId(c.id);
-              }
-            }}
-            className="text-sm font-bold text-[var(--foreground)] bg-[var(--input-bg)] border border-[var(--toss-border)] rounded-lg px-3 py-2 focus:ring-2 focus:ring-[var(--toss-blue)]/30"
-          >
-            <option value="전체">전체</option>
-            {hospitalCompanies.map((c: any) => (
-              <option key={c.id} value={c.name}>{c.name}</option>
-            ))}
-          </select>
-        </div>
-      )}
-
       {mainMenu === '내정보' && (
         <div className="w-full flex-1 min-h-0 overflow-hidden">
           <MyPage
@@ -394,7 +359,7 @@ export default function MainContent({
           />
         </div>
       )}
-      {mainMenu === '조직도' && <div className="flex-1 overflow-hidden"><OrgChart staffs={data.staffs} selectedCo={selectedCo} setSelectedCo={setSelectedCo} /></div>}
+      {mainMenu === '조직도' && <div className="flex-1 overflow-hidden"><OrgChart user={user} staffs={data.staffs} selectedCo={selectedCo} setSelectedCo={setSelectedCo} /></div>}
       {mainMenu === '채팅' && <div className="flex-1 overflow-hidden bg-[var(--toss-card)] z-20"><ChatView user={user} onRefresh={onRefresh} staffs={data.staffs} initialOpenChatRoomId={initialOpenChatRoomId} onConsumeOpenChatRoomId={onConsumeOpenChatRoomId} /></div>}
       {mainMenu === '게시판' && (
         <div className="flex-1 overflow-hidden">
@@ -414,7 +379,21 @@ export default function MainContent({
       {mainMenu === '근태관리' && <div className="flex-1 overflow-hidden"><AttendanceView user={user} staffs={data.staffs} selectedCo={selectedCo} /></div>}
       {mainMenu === '인사관리' && <div className="flex-1 overflow-hidden"><HRView user={user} staffs={data.staffs} depts={data.depts} selectedCo={selectedCo} onRefresh={onRefresh} /></div>}
       {mainMenu === '재고관리' && <div className="flex-1 overflow-hidden"><InventoryView user={user} depts={data.depts} onRefresh={onRefresh} selectedCo={selectedCo} /></div>}
-      {mainMenu === '추가기능' && <div className="flex-1 overflow-hidden"><추가기능 user={user} /></div>}
+      {mainMenu === '추가기능' && (
+        <div className="flex-1 overflow-hidden">
+          <추가기능
+            user={user}
+            staffs={data.staffs}
+            posts={data.posts}
+            onSearchSelect={(type: string) => {
+              if (type === 'staff') setMainMenu('조직도');
+              else if (type === 'post') setMainMenu('게시판');
+              else if (type === 'approval') setMainMenu('전자결재');
+              else if (type === 'message') setMainMenu('채팅');
+            }}
+          />
+        </div>
+      )}
       {mainMenu === '관리자' && <div className="flex-1 overflow-hidden"><AdminView user={user} staffs={data.staffs} depts={data.depts} onRefresh={onRefresh} /></div>}
 
       {/* 근로계약서 서명 팝업 - 모바일/PC 서명 지원 (창 닫기 허용) */}
