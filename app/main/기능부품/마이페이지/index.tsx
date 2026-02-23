@@ -168,7 +168,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
 
   return (
     <div className="h-full min-h-0 flex flex-col app-page px-3 py-4 md:p-6 rounded-none md:rounded-[3rem] overflow-hidden">
-      
+
       {/* 상단 로고 및 헤더 */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 shrink-0">
         <div className="text-left space-y-2 w-full">
@@ -237,37 +237,37 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
           </div>
         </div>
 
-        {/* 통합 탭 네비게이션 (슬라이드 없이 줄바꿈) */}
-        <div className="flex flex-wrap bg-[var(--toss-card)] p-1.5 rounded-full shadow-sm border border-[var(--toss-border)] gap-1 w-full">
-          <TabButton 
-            isActive={activeTab === 'profile'} 
-            onClick={() => setActiveTab('profile')} 
-            label="내 정보" icon="👤" 
+        {/* 통합 탭 네비게이션 (모바일 가로 슬라이드) */}
+        <div className="flex bg-[var(--toss-card)] p-1.5 rounded-full shadow-sm border border-[var(--toss-border)] gap-1 w-full overflow-x-auto no-scrollbar scroll-smooth">
+          <TabButton
+            isActive={activeTab === 'profile'}
+            onClick={() => setActiveTab('profile')}
+            label="내 정보" icon="👤"
           />
-          <TabButton 
-            isActive={activeTab === 'commute'} 
-            onClick={() => setActiveTab('commute')} 
-            label="출퇴근" icon="⏰" 
+          <TabButton
+            isActive={activeTab === 'commute'}
+            onClick={() => setActiveTab('commute')}
+            label="출퇴근" icon="⏰"
           />
-          <TabButton 
-            isActive={activeTab === 'todo'} 
-            onClick={() => setActiveTab('todo')} 
-            label="할일" icon="✅" 
+          <TabButton
+            isActive={activeTab === 'todo'}
+            onClick={() => setActiveTab('todo')}
+            label="할일" icon="✅"
           />
-          <TabButton 
-            isActive={activeTab === 'certificates'} 
-            onClick={() => setActiveTab('certificates')} 
+          <TabButton
+            isActive={activeTab === 'certificates'}
+            onClick={() => setActiveTab('certificates')}
             label="증명서" icon="📄" // [추가] 신규 탭
           />
-          <TabButton 
-            isActive={activeTab === 'salary'} 
-            onClick={() => setActiveTab('salary')} 
-            label="급여명세서" icon="💰" 
+          <TabButton
+            isActive={activeTab === 'salary'}
+            onClick={() => setActiveTab('salary')}
+            label="급여명세서" icon="💰"
           />
-          <TabButton 
-            isActive={activeTab === 'notifications'} 
-            onClick={() => setActiveTab('notifications')} 
-            label="알림" icon="🔔" 
+          <TabButton
+            isActive={activeTab === 'notifications'}
+            onClick={() => setActiveTab('notifications')}
+            label="알림" icon="🔔"
           />
         </div>
       </div>
@@ -291,7 +291,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
           {activeTab === 'todo' && <MyTodoList user={user} />}
           {activeTab === 'salary' && <SalarySlipContainer user={user} />}
           {activeTab === 'certificates' && <MyCertificates user={user} />}
-          {activeTab === 'notifications' && <NotificationInbox user={user} onRefresh={() => {}} />}
+          {activeTab === 'notifications' && <NotificationInbox user={user} onRefresh={() => { }} />}
         </div>
       </div>
 

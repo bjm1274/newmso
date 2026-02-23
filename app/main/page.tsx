@@ -45,7 +45,7 @@ function MainPageContent() {
   const [subView, setSubView] = useState('전체');
   const [selectedCo, setSelectedCo] = useState('전체');
   const [initialMyPageTab, setInitialMyPageTab] = useState<string | null>(null);
-  const [initialOpenChatRoomId, setInitialOpenChatRoomId] = useState<string | null>(null); 
+  const [initialOpenChatRoomId, setInitialOpenChatRoomId] = useState<string | null>(null);
 
   const [data, setData] = useState<ERPData>({
     staffs: [],
@@ -65,7 +65,7 @@ function MainPageContent() {
     }
     const parsedUser = JSON.parse(storedUser);
     setUser(parsedUser);
-    
+
     // 이전 메뉴 상태 복구
     const savedMenu = localStorage.getItem('erp_last_menu');
     const savedSubView = localStorage.getItem('erp_last_subview');
@@ -73,7 +73,7 @@ function MainPageContent() {
 
     if (savedMenu) setMainMenu(savedMenu);
     if (savedSubView) setSubView(savedSubView);
-    
+
     if (parsedUser.company !== 'SY INC.' && !parsedUser.permissions?.mso) {
       setSelectedCo(parsedUser.company);
     } else if (savedCo) {
@@ -177,7 +177,7 @@ function MainPageContent() {
 
       let postQuery = supabase.from('board_posts').select('*').order('created_at', { ascending: false });
       if (filterCompanyId) {
-        try { postQuery = postQuery.eq('company_id', filterCompanyId); } catch (_) {}
+        try { postQuery = postQuery.eq('company_id', filterCompanyId); } catch (_) { }
       }
       const { data: postData } = await postQuery;
 
@@ -241,18 +241,17 @@ function MainPageContent() {
         }}
       />
 
-      {/* PC 서브메뉴 컬럼: 게시판·전자결재·인사관리·재고관리·관리자 등 */}
+      {/* 서브메뉴: 게시판·전자결재·인사관리·재고관리·관리자 등 (모바일 가로 스크롤, PC 세로 사이드바) */}
       {currentSubMenus.length > 0 && (
-        <aside className="hidden md:flex w-44 bg-[var(--toss-card)] border-r border-[var(--toss-border)] flex-col py-4 px-3 space-y-1 shrink-0">
+        <aside className="flex flex-row md:flex-col w-full md:w-44 bg-[var(--toss-card)] border-b md:border-b-0 md:border-r border-[var(--toss-border)] p-2 md:py-4 md:px-3 space-x-1 md:space-x-0 md:space-y-1 shrink-0 overflow-x-auto md:overflow-x-visible no-scrollbar">
           {currentSubMenus.map((sub) => (
             <button
               key={sub.id}
               onClick={() => setSubView(sub.id)}
-              className={`w-full text-left px-3 py-2.5 text-[11px] font-semibold rounded-[12px] transition-all ${
-                subView === sub.id
+              className={`flex-none md:w-full text-center md:text-left px-4 md:px-3 py-2 md:py-2.5 text-[11px] font-bold rounded-[12px] transition-all whitespace-nowrap ${subView === sub.id
                   ? 'bg-[var(--toss-blue)] text-white shadow-md'
                   : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
-              }`}
+                }`}
             >
               {sub.label}
             </button>
@@ -281,7 +280,7 @@ function MainPageContent() {
             <div className="w-10 h-10 border-2 border-[var(--toss-blue)] rounded-full border-t-transparent animate-spin" />
           </div>
         )}
-        <MainContent 
+        <MainContent
           user={user}
           mainMenu={mainMenu}
           data={data}
