@@ -24,12 +24,12 @@ export default function PayrollPage() {
       {/* 1. 상단 마스터 헤더: image_2d03bd.png의 레이아웃 유지 */}
       <header className="px-10 py-8 bg-white border-b border-gray-100 flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-black text-gray-800 tracking-tighter uppercase">인사 관리 : 급여 정산</h1>
-          <p className="text-[10px] text-blue-600 font-bold mt-1 uppercase tracking-widest">Park Cheol Hong Orthopedic x SY Medical</p>
+          <h1 className="text-xl font-bold text-gray-800 tracking-tight">인사 관리 : 급여 정산</h1>
+          <p className="text-xs text-blue-600 font-medium mt-0.5">Park Cheol Hong Orthopedic x SY Medical</p>
         </div>
         <div className="flex gap-2">
-          <button className="px-6 py-3 bg-[#232933] text-white text-[11px] font-black shadow-lg">은행 이체 데이터 생성</button>
-          <button className="px-6 py-3 bg-[#2563EB] text-white text-[11px] font-black shadow-xl">명세서 일괄 발송</button>
+          <button className="px-4 py-2.5 bg-gray-800 text-white text-xs font-medium rounded-lg hover:bg-gray-900">은행 이체 데이터 생성</button>
+          <button className="px-4 py-2.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700">명세서 일괄 발송</button>
         </div>
       </header>
 
@@ -37,7 +37,7 @@ export default function PayrollPage() {
         {/* 2. 좌측 조직도 기반 명단 */}
         <aside className="w-80 bg-white border-r border-gray-50 flex flex-col">
           <div className="p-8">
-            <h2 className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-6">전체 직원 ({employees.length}명)</h2>
+            <h2 className="text-xs font-semibold text-gray-500 mb-4">전체 직원 ({employees.length}명)</h2>
             <div className="space-y-1">
               {employees.map(emp => (
                 <button 
@@ -47,8 +47,8 @@ export default function PayrollPage() {
                     selectedEmpId === emp.id ? 'bg-blue-50 border-blue-600' : 'hover:bg-gray-25 border-transparent'
                   }`}
                 >
-                  <p className={`text-xs font-black ${selectedEmpId === emp.id ? 'text-blue-600' : 'text-gray-700'}`}>{emp.name}</p>
-                  <p className="text-[9px] text-gray-400 font-bold">{emp.dept}</p>
+                  <p className={`text-sm font-semibold ${selectedEmpId === emp.id ? 'text-blue-600' : 'text-gray-700'}`}>{emp.name}</p>
+                  <p className="text-xs text-gray-500">{emp.dept}</p>
                 </button>
               ))}
             </div>
@@ -63,12 +63,12 @@ export default function PayrollPage() {
               <div className="bg-white border border-gray-100 p-8 shadow-sm">
                 <div className="flex justify-between items-end mb-8 border-b border-gray-50 pb-6">
                   <div>
-                    <h2 className="text-xl font-black text-gray-800">{currentEmp.name} <span className="text-xs font-bold text-gray-300">{currentEmp.dept}</span></h2>
-                    <p className="text-[10px] text-gray-400 font-bold mt-1 tracking-widest uppercase">Employee Monthly Settlement</p>
+                    <h2 className="text-lg font-bold text-gray-800">{currentEmp.name} <span className="text-xs font-medium text-gray-500">{currentEmp.dept}</span></h2>
+                    <p className="text-xs text-gray-500 mt-0.5">Employee Monthly Settlement</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-[10px] font-black text-blue-500 uppercase">Total Net Salary</p>
-                    <p className="text-3xl font-black text-blue-600 tracking-tighter">{(currentEmp.base * 0.91).toLocaleString()}원</p>
+                    <p className="text-xs font-medium text-gray-500">Total Net Salary</p>
+                    <p className="text-2xl font-bold text-blue-600">{(currentEmp.base * 0.91).toLocaleString()}원</p>
                   </div>
                 </div>
                 
@@ -84,8 +84,8 @@ export default function PayrollPage() {
               <TaxReporter employees={employees} />
               <MessageTemplate />
               <div className="p-8 bg-[#2563EB] shadow-2xl">
-                <p className="text-[10px] font-black text-blue-200 uppercase tracking-widest mb-4">Final Approval</p>
-                <button className="w-full py-4 bg-white text-blue-600 text-xs font-black hover:bg-gray-100 transition-all">
+                <p className="text-[10px] font-semibold text-blue-200 uppercase tracking-widest mb-4">Final Approval</p>
+                <button className="w-full py-4 bg-white text-blue-600 text-xs font-semibold hover:bg-gray-100 transition-all">
                   2월 급여 최종 마감
                 </button>
               </div>

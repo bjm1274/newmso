@@ -28,8 +28,8 @@ export default function MonthlyCalendar({ calendarData, targetMonth, onCellClick
       {/* 상단 컨트롤러: 주차 선택 버튼 */}
       <div className="p-5 border-b bg-gray-50 flex justify-between items-center shrink-0">
         <div className="flex items-center gap-6">
-            <h3 className="font-black text-gray-800 text-lg">🗓️ {targetMonth} 월간 근태 현황</h3>
-            <div className="flex p-1.5 bg-gray-200 rounded-2xl gap-1 shadow-inner">
+            <h3 className="font-semibold text-gray-800 text-lg">🗓️ {targetMonth} 월간 근태 현황</h3>
+            <div className="flex p-1.5 bg-gray-200 rounded-lg gap-1 shadow-inner">
                 {Array.from({ length: totalWeeks }, (_, i) => i + 1).map(week => {
                     const range = getWeekRange(week);
                     return (
@@ -56,11 +56,11 @@ export default function MonthlyCalendar({ calendarData, targetMonth, onCellClick
         <table className="w-full border-collapse table-fixed">
           <thead>
             <tr className="bg-gray-50/50">
-              <th className="w-32 p-4 border-b border-r font-black text-gray-400 text-[10px] uppercase tracking-tighter">직원명</th>
+              <th className="w-32 p-4 border-b border-r font-semibold text-gray-400 text-[10px] uppercase tracking-tighter">직원명</th>
               {daysArray.map(d => (
                 <th key={d} className="p-3 border-b text-center">
                     <span className="text-[10px] text-gray-400 font-bold block mb-0.5">{targetMonth}</span>
-                    <span className="text-base font-black text-gray-800">{d}일</span>
+                    <span className="text-base font-semibold text-gray-800">{d}일</span>
                 </th>
               ))}
               {/* 7일이 안되는 마지막 주차(5주차)의 경우 빈 칸을 채워 레이아웃 유지 */}
@@ -73,7 +73,7 @@ export default function MonthlyCalendar({ calendarData, targetMonth, onCellClick
             {calendarData.map((row: any) => (
               <tr key={row.staff.id} className="hover:bg-blue-50/10 transition-colors group">
                 <td 
-                  className="p-4 font-black border-r text-center text-sm cursor-pointer group-hover:text-blue-600 transition-colors bg-white sticky left-0 z-10"
+                  className="p-4 font-semibold border-r text-center text-sm cursor-pointer group-hover:text-blue-600 transition-colors bg-white sticky left-0 z-10"
                   onClick={() => onBulkNormal(row.staff)}
                 >
                   {row.staff.name}
@@ -97,13 +97,13 @@ export default function MonthlyCalendar({ calendarData, targetMonth, onCellClick
                       >
                         {d.status !== 'none' ? (
                           <>
-                            <div className="text-xs font-black mb-2">{d.status}</div>
+                            <div className="text-xs font-semibold mb-2">{d.status}</div>
                             <div className="text-[10px] font-mono font-bold opacity-60 leading-tight text-center">
                                 {d.check_in?.slice(11, 16) || '--:--'}<br/>
                                 ~ {d.check_out?.slice(11, 16) || '--:--'}
                             </div>
                           </>
-                        ) : <span className="text-xs opacity-20 font-black">-</span>}
+                        ) : <span className="text-xs opacity-20 font-semibold">-</span>}
                       </div>
                     </td>
                   );

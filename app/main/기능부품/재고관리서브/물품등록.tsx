@@ -102,11 +102,11 @@ export default function ProductRegistration({ user, suppliers, fetchInventory, f
           {/* 기본 정보 */}
           <div className="space-y-2">
             <label className="text-[10px] font-bold text-[#8B95A1] uppercase tracking-widest">제품명 *</label>
-            <input value={productForm.item_name} onChange={e => setProductForm({...productForm, item_name: e.target.value})} className="w-full p-4 bg-[#F2F4F6] rounded-2xl border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[#3182F6]/20" placeholder="제품명을 입력하세요" />
+            <input value={productForm.item_name} onChange={e => setProductForm({...productForm, item_name: e.target.value})} className="w-full p-4 bg-[#F2F4F6] rounded-lg border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[#3182F6]/20" placeholder="제품명을 입력하세요" />
           </div>
           <div className="space-y-2">
             <label className="text-[10px] font-bold text-[#8B95A1] uppercase tracking-widest">분류 *</label>
-            <select value={productForm.category} onChange={e => setProductForm({...productForm, category: e.target.value})} className="w-full p-4 bg-[#F2F4F6] rounded-2xl border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[#3182F6]/20">
+            <select value={productForm.category} onChange={e => setProductForm({...productForm, category: e.target.value})} className="w-full p-4 bg-[#F2F4F6] rounded-lg border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[#3182F6]/20">
               <option value="">분류 선택</option>
               <option value="의료기기">의료기기</option>
               <option value="소모품">소모품</option>
@@ -118,31 +118,31 @@ export default function ProductRegistration({ user, suppliers, fetchInventory, f
           {/* 수량 및 단가 */}
           <div className="space-y-2">
             <label className="text-[10px] font-bold text-[#8B95A1] uppercase tracking-widest">현재 수량</label>
-            <input type="number" value={productForm.quantity} onChange={e => setProductForm({...productForm, quantity: parseInt(e.target.value) || 0})} className="w-full p-4 bg-[#F2F4F6] rounded-2xl border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[#3182F6]/20" />
+            <input type="number" value={productForm.quantity} onChange={e => setProductForm({...productForm, quantity: parseInt(e.target.value) || 0})} className="w-full p-4 bg-[#F2F4F6] rounded-lg border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[#3182F6]/20" />
           </div>
           <div className="space-y-2">
             <label className="text-[10px] font-bold text-[#8B95A1] uppercase tracking-widest">단가 (원)</label>
-            <input type="number" value={productForm.unit_price} onChange={e => setProductForm({...productForm, unit_price: parseInt(e.target.value) || 0})} className="w-full p-4 bg-[#F2F4F6] rounded-2xl border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[#3182F6]/20" placeholder="0" />
+            <input type="number" value={productForm.unit_price} onChange={e => setProductForm({...productForm, unit_price: parseInt(e.target.value) || 0})} className="w-full p-4 bg-[#F2F4F6] rounded-lg border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[#3182F6]/20" placeholder="0" />
           </div>
 
           {/* 유효기간 및 LOT */}
           <div className="space-y-2">
             <label className="text-[10px] font-bold text-[#8B95A1] uppercase tracking-widest">유효기간 (선택)</label>
-            <input type="date" value={productForm.expiry_date} onChange={e => setProductForm({...productForm, expiry_date: e.target.value})} className="w-full p-4 bg-[#F2F4F6] rounded-2xl border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[#3182F6]/20" />
+            <input type="date" value={productForm.expiry_date} onChange={e => setProductForm({...productForm, expiry_date: e.target.value})} className="w-full p-4 bg-[#F2F4F6] rounded-lg border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[#3182F6]/20" />
           </div>
           <div className="space-y-2">
             <label className="text-[10px] font-bold text-[#8B95A1] uppercase tracking-widest">LOT 번호 (선택)</label>
-            <input value={productForm.lot_number} onChange={e => setProductForm({...productForm, lot_number: e.target.value})} className="w-full p-4 bg-[#F2F4F6] rounded-2xl border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[#3182F6]/20" placeholder="LOT-0000-00" />
+            <input value={productForm.lot_number} onChange={e => setProductForm({...productForm, lot_number: e.target.value})} className="w-full p-4 bg-[#F2F4F6] rounded-lg border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[#3182F6]/20" placeholder="LOT-0000-00" />
           </div>
 
           {/* 기타 설정 */}
           <div className="space-y-2">
             <label className="text-[10px] font-bold text-[#8B95A1] uppercase tracking-widest">안전 재고</label>
-            <input type="number" value={productForm.min_quantity} onChange={e => setProductForm({...productForm, min_quantity: parseInt(e.target.value) || 0})} className="w-full p-4 bg-[#F2F4F6] rounded-2xl border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[#3182F6]/20" />
+            <input type="number" value={productForm.min_quantity} onChange={e => setProductForm({...productForm, min_quantity: parseInt(e.target.value) || 0})} className="w-full p-4 bg-[#F2F4F6] rounded-lg border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[#3182F6]/20" />
           </div>
           <div className="space-y-2">
             <label className="text-[10px] font-bold text-[#8B95A1] uppercase tracking-widest">공급 업체</label>
-            <select value={productForm.supplier_name} onChange={e => setProductForm({...productForm, supplier_name: e.target.value})} className="w-full p-4 bg-[#F2F4F6] rounded-2xl border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[#3182F6]/20">
+            <select value={productForm.supplier_name} onChange={e => setProductForm({...productForm, supplier_name: e.target.value})} className="w-full p-4 bg-[#F2F4F6] rounded-lg border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[#3182F6]/20">
               <option value="">업체 선택</option>
               {suppliers.map((s: any) => <option key={s.id} value={s.name}>{s.name}</option>)}
             </select>
@@ -154,7 +154,7 @@ export default function ProductRegistration({ user, suppliers, fetchInventory, f
             <input
               value={productForm.insurance_code}
               onChange={e => setProductForm({ ...productForm, insurance_code: e.target.value })}
-              className="w-full p-4 bg-[#F2F4F6] rounded-2xl border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[#3182F6]/20"
+              className="w-full p-4 bg-[#F2F4F6] rounded-lg border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[#3182F6]/20"
               placeholder="예: B0741301"
             />
           </div>
@@ -163,7 +163,7 @@ export default function ProductRegistration({ user, suppliers, fetchInventory, f
             <input
               value={productForm.spec}
               onChange={e => setProductForm({ ...productForm, spec: e.target.value })}
-              className="w-full p-4 bg-[#F2F4F6] rounded-2xl border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[#3182F6]/20"
+              className="w-full p-4 bg-[#F2F4F6] rounded-lg border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[#3182F6]/20"
               placeholder="예: 1/0(고), 30매/BOX"
             />
           </div>
@@ -173,7 +173,7 @@ export default function ProductRegistration({ user, suppliers, fetchInventory, f
             <select
               value={productForm.department}
               onChange={e => setProductForm({...productForm, department: e.target.value})}
-              className="w-full p-4 bg-[#F2F4F6] rounded-2xl border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[#3182F6]/20"
+              className="w-full p-4 bg-[#F2F4F6] rounded-lg border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[#3182F6]/20"
             >
               <option value="">미지정</option>
               {departments.map((d) => (

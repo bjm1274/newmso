@@ -3,9 +3,11 @@
  * company-collab-system의 salary-compliance-service를 Supabase용으로 변환
  */
 
-const MINIMUM_WAGE_2024 = 9860;  // 2024년 최저임금 (시급)
-const MINIMUM_WAGE_2025 = 10030; // 2025년 최저임금 (시급)
-const MONTHLY_HOURS = 209;       // 월 소정근로시간
+import { MINIMUM_WAGE_2024 as MW24, MINIMUM_WAGE_2025 as MW25, MONTHLY_STANDARD_HOURS } from './tax-free-limits';
+
+const MINIMUM_WAGE_2024 = MW24;
+const MINIMUM_WAGE_2025 = MW25;
+const MONTHLY_HOURS = MONTHLY_STANDARD_HOURS; // 월 소정근로시간(미입력 시 209h 기본값)
 
 export interface StaffForCompliance {
   id: string;

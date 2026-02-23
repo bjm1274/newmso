@@ -233,7 +233,7 @@ export default function ApprovalFormTypesManager() {
   return (
     <div className="max-w-5xl space-y-8">
       <div>
-        <h2 className="text-xl font-black text-gray-800">서식양식 관리</h2>
+        <h2 className="text-xl font-semibold text-gray-800">서식양식 관리</h2>
         <p className="text-xs text-gray-500 mt-1">
           전자결재에서 사용할 서식/양식을 관리하고, 각 서식의 디자인(제목, 색상, 하단 문구 등)을 설정합니다.
           여기서 추가한 양식은 전자결재 작성하기 탭에 함께 표시됩니다.
@@ -241,8 +241,8 @@ export default function ApprovalFormTypesManager() {
       </div>
 
       {/* 추가 */}
-      <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-        <h3 className="text-sm font-black text-gray-700 mb-4">양식 추가</h3>
+      <div className="bg-white p-6 rounded-lg border border-gray-100 shadow-sm">
+        <h3 className="text-sm font-semibold text-gray-700 mb-4">양식 추가</h3>
         <div className="flex flex-wrap gap-3 items-end">
           <div>
             <label className="block text-[10px] font-bold text-gray-500 mb-1">표시 이름</label>
@@ -269,7 +269,7 @@ export default function ApprovalFormTypesManager() {
           </div>
           <button
             onClick={handleAdd}
-            className="px-5 py-3 bg-blue-600 text-white rounded-xl text-sm font-black hover:bg-blue-700"
+            className="px-5 py-3 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700"
           >
             추가
           </button>
@@ -277,8 +277,8 @@ export default function ApprovalFormTypesManager() {
       </div>
 
       {/* 목록 */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <h3 className="text-sm font-black text-gray-700 p-4 border-b border-gray-50">등록된 추가 양식</h3>
+      <div className="bg-white rounded-lg border border-gray-100 shadow-sm overflow-hidden">
+        <h3 className="text-sm font-semibold text-gray-700 p-4 border-b border-gray-50">등록된 추가 양식</h3>
         {loading ? (
           <div className="p-8 text-center text-gray-400">로딩 중...</div>
         ) : list.length === 0 ? (
@@ -326,10 +326,10 @@ export default function ApprovalFormTypesManager() {
       </div>
 
       {/* 서식 디자인 설정 */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+      <div className="bg-white rounded-lg border border-gray-100 shadow-sm p-6 space-y-4">
         <div className="flex items-center justify-between gap-2">
           <div>
-            <h3 className="text-sm font-black text-gray-800">서식 디자인 설정</h3>
+            <h3 className="text-sm font-semibold text-gray-800">서식 디자인 설정</h3>
             <p className="text-[11px] text-gray-500">
               좌측에서 서식을 선택한 뒤, 우측에서 제목/색상/하단 문구 등을 조정합니다. 급여명세서 서식도 여기에서 함께 관리됩니다.
             </p>
@@ -342,8 +342,8 @@ export default function ApprovalFormTypesManager() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-2">
           {/* 서식 목록 (서식 선택) */}
           <div className="space-y-2">
-            <p className="text-[11px] font-black text-gray-500 mb-1">디자인 대상 서식 선택</p>
-            <div className="border border-gray-100 rounded-2xl bg-gray-50/60 max-h-64 overflow-y-auto custom-scrollbar">
+            <p className="text-[11px] font-semibold text-gray-500 mb-1">디자인 대상 서식 선택</p>
+            <div className="border border-gray-100 rounded-lg bg-gray-50/60 max-h-64 overflow-y-auto custom-scrollbar">
               {combinedTemplates.length === 0 ? (
                 <div className="p-4 text-[11px] text-gray-400 text-center">
                   등록된 서식이 없습니다. 위에서 먼저 양식을 추가하세요.
@@ -366,7 +366,7 @@ export default function ApprovalFormTypesManager() {
                         >
                           <span className="truncate">{tpl.name}</span>
                           {isBuiltin && (
-                            <span className="ml-2 text-[9px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-500 font-black">
+                            <span className="ml-2 text-[9px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-500 font-semibold">
                               기본
                             </span>
                           )}
@@ -383,10 +383,10 @@ export default function ApprovalFormTypesManager() {
           <div className="lg:col-span-2 space-y-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[11px] font-black text-gray-500 mb-1">
+                <p className="text-[11px] font-semibold text-gray-500 mb-1">
                   선택된 서식
                 </p>
-                <p className="text-sm font-black text-gray-900">
+                <p className="text-sm font-semibold text-gray-900">
                   {selectedName || '서식을 선택해 주세요'}
                 </p>
               </div>
@@ -396,7 +396,7 @@ export default function ApprovalFormTypesManager() {
                     key={k}
                     type="button"
                     onClick={() => setActiveHandle(k)}
-                    className={`px-3 py-1 rounded-full text-[10px] font-black transition-all ${
+                    className={`px-3 py-1 rounded-full text-[10px] font-semibold transition-all ${
                       activeHandle === k
                         ? 'bg-blue-600 text-white'
                         : 'text-gray-500 hover:bg-white'
@@ -414,7 +414,7 @@ export default function ApprovalFormTypesManager() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-[13px]">
               <div className="space-y-3">
                 <label className="flex flex-col gap-1">
-                  <span className="text-[11px] font-black text-gray-500">제목</span>
+                  <span className="text-[11px] font-semibold text-gray-500">제목</span>
                   <input
                     type="text"
                     value={currentDesign.title || ''}
@@ -423,7 +423,7 @@ export default function ApprovalFormTypesManager() {
                   />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[11px] font-black text-gray-500">부제 (설명)</span>
+                  <span className="text-[11px] font-semibold text-gray-500">부제 (설명)</span>
                   <input
                     type="text"
                     value={currentDesign.subtitle || ''}
@@ -432,7 +432,7 @@ export default function ApprovalFormTypesManager() {
                   />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[11px] font-black text-gray-500">회사명 라벨</span>
+                  <span className="text-[11px] font-semibold text-gray-500">회사명 라벨</span>
                   <input
                     type="text"
                     value={currentDesign.companyLabel || ''}
@@ -445,7 +445,7 @@ export default function ApprovalFormTypesManager() {
               <div className="space-y-3">
                 <div className="flex gap-3">
                   <label className="flex-1 flex flex-col gap-1">
-                    <span className="text-[11px] font-black text-gray-500">
+                    <span className="text-[11px] font-semibold text-gray-500">
                       대표 색상 (Primary)
                     </span>
                     <input
@@ -457,7 +457,7 @@ export default function ApprovalFormTypesManager() {
                     />
                   </label>
                   <label className="w-20 flex flex-col gap-1">
-                    <span className="text-[11px] font-black text-gray-500">색상</span>
+                    <span className="text-[11px] font-semibold text-gray-500">색상</span>
                     <span
                       className="w-full h-9 rounded-xl border border-gray-200"
                       style={{ backgroundColor: currentDesign.primaryColor || '#2563eb' }}
@@ -465,7 +465,7 @@ export default function ApprovalFormTypesManager() {
                   </label>
                 </div>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[11px] font-black text-gray-500">테두리 색상</span>
+                  <span className="text-[11px] font-semibold text-gray-500">테두리 색상</span>
                   <input
                     type="text"
                     value={currentDesign.borderColor || ''}
@@ -475,7 +475,7 @@ export default function ApprovalFormTypesManager() {
                   />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[11px] font-black text-gray-500">하단 문구</span>
+                  <span className="text-[11px] font-semibold text-gray-500">하단 문구</span>
                   <input
                     type="text"
                     value={currentDesign.footerText || ''}
@@ -499,9 +499,9 @@ export default function ApprovalFormTypesManager() {
             </div>
 
             {/* 미리보기 – 클릭으로 제목/부제/서명 위치 조정 */}
-            <div className="mt-1 border border-dashed border-gray-200 rounded-2xl p-4 bg-gray-50">
+            <div className="mt-1 border border-dashed border-gray-200 rounded-lg p-4 bg-gray-50">
               <div className="flex items-center justify-between mb-1">
-                <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">
+                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">
                   Preview
                 </p>
                 <p className="text-[10px] text-gray-400">
@@ -518,7 +518,7 @@ export default function ApprovalFormTypesManager() {
               </div>
               <div
                 ref={previewRef}
-                className="bg-white rounded-2xl text-xs font-bold relative overflow-hidden cursor-pointer"
+                className="bg-white rounded-lg text-xs font-bold relative overflow-hidden cursor-pointer"
                 style={{
                   borderColor: currentDesign.borderColor || '#e5e7eb',
                   borderWidth: 1,
@@ -610,7 +610,7 @@ export default function ApprovalFormTypesManager() {
                 type="button"
                 onClick={handleSaveDesign}
                 disabled={savingDesign}
-                className="px-5 py-2.5 rounded-xl bg-blue-600 text-white text-[12px] font-black hover:bg-blue-700 disabled:opacity-60"
+                className="px-5 py-2.5 rounded-xl bg-blue-600 text-white text-[12px] font-semibold hover:bg-blue-700 disabled:opacity-60"
               >
                 {savingDesign ? '디자인 저장 중...' : '선택 서식 디자인 저장'}
               </button>

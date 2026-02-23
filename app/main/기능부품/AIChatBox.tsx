@@ -56,7 +56,7 @@ export function AIChatBox({
 
   return (
     <div
-      className={`flex flex-col bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden ${className}`}
+      className={`flex flex-col bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden ${className}`}
       style={{ height }}
     >
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
@@ -86,7 +86,7 @@ export function AIChatBox({
               className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               <div
-                className={`max-w-[85%] px-4 py-2.5 rounded-2xl text-sm ${
+                className={`max-w-[85%] px-4 py-2.5 rounded-lg text-sm ${
                   msg.role === 'user'
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-100 text-gray-800'
@@ -100,7 +100,7 @@ export function AIChatBox({
 
         {isLoading && (
           <div className="flex justify-start">
-            <div className="px-4 py-2.5 rounded-2xl bg-gray-100 text-gray-500 text-sm">
+            <div className="px-4 py-2.5 rounded-lg bg-gray-100 text-gray-500 text-sm">
               <span className="animate-pulse">답변 생성 중...</span>
             </div>
           </div>

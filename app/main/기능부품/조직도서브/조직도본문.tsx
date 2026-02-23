@@ -457,12 +457,12 @@ export default function MainContent({
                 if (rows.length === 0) return null;
                 return (
                   <div className="bg-white p-6 rounded-[16px] border-2 border-[#3182F6]/20">
-                    <h4 className="text-xs font-black text-[#191F28] mb-3 uppercase tracking-wider">통상임금 산출 (월 소정근로시간 209시간 기준)</h4>
+                    <h4 className="text-xs font-semibold text-[#191F28] mb-3 uppercase tracking-wider">통상임금 산출 (월 소정근로시간 209시간 기준)</h4>
                     <table className="w-full text-[11px] border-collapse">
                       <thead>
                         <tr className="border-b border-gray-200">
-                          <th className="text-left py-2 font-black text-gray-500">항목</th>
-                          <th className="text-right py-2 font-black text-gray-500">금액 (원/월)</th>
+                          <th className="text-left py-2 font-semibold text-gray-500">항목</th>
+                          <th className="text-right py-2 font-semibold text-gray-500">금액 (원/월)</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -472,11 +472,11 @@ export default function MainContent({
                             <td className="py-2 text-right font-bold text-gray-900">{r.amount.toLocaleString()}</td>
                           </tr>
                         ))}
-                        <tr className="bg-[#F2F4F6] font-black">
+                        <tr className="bg-[#F2F4F6] font-semibold">
                           <td className="py-2 text-gray-800">월 통상급여 합계</td>
                           <td className="py-2 text-right text-[#3182F6]">{totalMonthly.toLocaleString()}</td>
                         </tr>
-                        <tr className="font-black">
+                        <tr className="font-semibold">
                           <td className="py-2 text-gray-800">시 통상임금 (원/시간)</td>
                           <td className="py-2 text-right text-[#3182F6]">{hourlyWage.toLocaleString()}</td>
                         </tr>
@@ -536,7 +536,7 @@ export default function MainContent({
 
       {/* 연차 촉진 알림 - 모바일 대응 */}
       {annualLeaveNotice && !pendingContract && (
-        <div className="fixed bottom-24 right-4 left-4 md:left-auto md:right-10 z-[9998] animate-in slide-in-from-bottom-10">
+        <div className="fixed bottom-28 right-4 left-4 md:bottom-10 md:left-auto md:right-10 z-[9998] animate-in slide-in-from-bottom-10">
           <div className="bg-white border border-[#E5E8EB] p-6 md:p-8 shadow-[0_4px_20px_rgba(0,0,0,0.08)] rounded-[20px] w-full md:w-80 space-y-4">
             <div className="flex justify-between items-start">
               <h3 className="text-lg font-bold text-[#191F28] tracking-tight">연차 사용 촉진 알림</h3>

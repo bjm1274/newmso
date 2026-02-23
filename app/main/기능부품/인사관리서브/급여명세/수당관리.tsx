@@ -8,18 +8,20 @@ export default function AllowanceManager() {
   ];
 
   return (
-    <div className="bg-white border border-gray-200 p-6 rounded-none shadow-sm">
-      <h2 className="text-xs font-black text-gray-800 mb-4 flex items-center gap-2">
-        <span className="w-1 h-4 bg-blue-600"></span> 수당 항목 설정
-      </h2>
-      <div className="space-y-3">
+    <div className="bg-white border border-gray-200 p-4 rounded-lg shadow-sm">
+      <div className="pb-2 border-b border-gray-100 mb-3">
+        <h2 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+          <span className="w-1 h-4 bg-blue-600 rounded" /> 수당 항목 설정
+        </h2>
+      </div>
+      <div className="space-y-2">
         {allowanceTypes.map((a, i) => (
-          <div key={i} className="flex justify-between items-center p-3 bg-gray-50 border border-gray-100">
+          <div key={i} className="flex justify-between items-center p-3 bg-[#f8fafc] rounded-lg border border-gray-200">
             <div>
-              <p className="text-[11px] font-black text-gray-700">{a.name}</p>
-              <p className="text-[9px] text-gray-400 font-bold">{a.type}</p>
+              <p className="text-sm font-semibold text-gray-800">{a.name}</p>
+              <p className="text-xs text-gray-500">{a.type}</p>
             </div>
-            <span className="text-[10px] font-black text-blue-500">{a.limit}</span>
+            <span className="text-xs font-medium text-blue-600">{a.limit}</span>
           </div>
         ))}
       </div>

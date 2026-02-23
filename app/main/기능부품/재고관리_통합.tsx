@@ -10,7 +10,7 @@ export default function IntegratedInventorySystem({ user, staffs }: any) {
     <div className="flex flex-col h-full bg-gray-50/30 overflow-hidden">
       {/* 헤더 */}
       <div className="p-8 border-b border-gray-100 bg-white shadow-sm">
-        <h2 className="text-2xl font-black text-gray-800 tracking-tighter italic">재고관리 시스템</h2>
+        <h2 className="text-2xl font-semibold text-gray-800 tracking-tighter italic">재고관리 시스템</h2>
         <p className="text-xs text-gray-400 font-bold uppercase mt-1">UDI, 명세서, 발주, 스캔 통합</p>
       </div>
 
@@ -18,7 +18,7 @@ export default function IntegratedInventorySystem({ user, staffs }: any) {
       <div className="flex gap-2 p-6 bg-white border-b border-gray-100 overflow-x-auto">
         <button
           onClick={() => setActiveModule('관리')}
-          className={`px-6 py-3 rounded-xl text-xs font-black whitespace-nowrap transition-all ${
+          className={`px-6 py-3 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
             activeModule === '관리'
               ? 'bg-blue-600 text-white shadow-lg'
               : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
@@ -28,7 +28,7 @@ export default function IntegratedInventorySystem({ user, staffs }: any) {
         </button>
         <button
           onClick={() => setActiveModule('스캔')}
-          className={`px-6 py-3 rounded-xl text-xs font-black whitespace-nowrap transition-all ${
+          className={`px-6 py-3 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
             activeModule === '스캔'
               ? 'bg-blue-600 text-white shadow-lg'
               : 'bg-gray-50 text-gray-400 hover:bg-gray-100'

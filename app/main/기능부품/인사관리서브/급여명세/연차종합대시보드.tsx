@@ -47,15 +47,15 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
   }, [filteredStaffs, currentUser]);
 
   return (
-    <div className="border border-gray-200 p-6 bg-white rounded-[1.75rem] shadow-sm">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-[11px] font-black text-teal-600 uppercase tracking-widest">연차 종합 대시보드</h3>
-        <div className="flex gap-1 bg-gray-100 rounded-full p-1">
+    <div className="border border-gray-200 p-4 bg-white rounded-lg shadow-sm">
+      <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-100">
+        <h3 className="text-sm font-semibold text-gray-800">연차 종합 대시보드</h3>
+        <div className="flex gap-0.5 bg-[#eef2f7] rounded-lg p-0.5">
           <button
             type="button"
             onClick={() => setViewMode('dept')}
-            className={`px-3 py-1 rounded-full text-[10px] font-black ${
-              viewMode === 'dept' ? 'bg-teal-600 text-white' : 'text-gray-500'
+            className={`px-2.5 py-1 rounded-md text-xs font-medium ${
+              viewMode === 'dept' ? 'bg-teal-600 text-white' : 'text-gray-500 hover:text-gray-700'
             }`}
           >
             팀별
@@ -63,8 +63,8 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
           <button
             type="button"
             onClick={() => setViewMode('personal')}
-            className={`px-3 py-1 rounded-full text-[10px] font-black ${
-              viewMode === 'personal' ? 'bg-teal-600 text-white' : 'text-gray-500'
+            className={`px-2.5 py-1 rounded-md text-xs font-medium ${
+              viewMode === 'personal' ? 'bg-teal-600 text-white' : 'text-gray-500 hover:text-gray-700'
             }`}
           >
             개인별
@@ -73,27 +73,27 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
       </div>
 
       {viewMode === 'dept' ? (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {byDept.map((x) => (
-            <div key={x.dept} className="p-4 bg-gray-50 rounded-xl">
-              <p className="text-sm font-black text-gray-800 mb-2">{x.dept}</p>
+            <div key={x.dept} className="p-3 bg-[#f8fafc] rounded-lg border border-gray-200">
+              <p className="text-sm font-semibold text-gray-800 mb-2">{x.dept}</p>
               <div className="grid grid-cols-3 gap-2 text-xs">
                 <div>
                   <span className="text-gray-500">총</span>{' '}
-                  <span className="font-black">{x.total}일</span>
+                  <span className="font-semibold">{x.total}일</span>
                 </div>
                 <div>
                   <span className="text-gray-500">사용</span>{' '}
-                  <span className="font-black text-orange-600">{x.used}일</span>
+                  <span className="font-semibold text-amber-600">{x.used}일</span>
                 </div>
                 <div>
                   <span className="text-gray-500">잔여</span>{' '}
-                  <span className="font-black text-emerald-600">{x.remain}일</span>
+                  <span className="font-semibold text-emerald-600">{x.remain}일</span>
                 </div>
               </div>
-              <div className="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div className="mt-2 h-1.5 bg-gray-200 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-emerald-500"
+                  className="h-full bg-emerald-500 rounded-full"
                   style={{ width: `${x.total ? (x.remain / x.total) * 100 : 0}%` }}
                 />
               </div>
@@ -109,23 +109,23 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
             return (
               <div
                 key={s.id}
-                className="p-3 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between text-xs"
+                className="p-3 bg-[#f8fafc] rounded-lg border border-gray-200 flex items-center justify-between text-xs"
               >
                 <div>
-                  <p className="font-black text-gray-800">
+                  <p className="font-semibold text-gray-800">
                     {s.name}{' '}
-                    <span className="text-[10px] text-gray-400">
+                    <span className="text-[10px] text-gray-400 font-normal">
                       ({s.department || '미지정'})
                     </span>
                   </p>
-                  <p className="text-[10px] text-gray-400">
+                  <p className="text-[10px] text-gray-500">
                     총 {total}일 · 사용 {used}일 · 잔여{' '}
-                    <span className="font-black text-emerald-600">{remain}일</span>
+                    <span className="font-semibold text-emerald-600">{remain}일</span>
                   </p>
                 </div>
-                <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div className="w-20 h-1.5 bg-gray-200 rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-emerald-500"
+                    className="h-full bg-emerald-500 rounded-full"
                     style={{ width: `${total ? (remain / total) * 100 : 0}%` }}
                   />
                 </div>

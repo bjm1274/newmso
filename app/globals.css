@@ -30,8 +30,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
+  --font-mono: 'Pretendard', ui-monospace, monospace;
 }
 
 /* 시스템 다크모드 기본값 (사용자가 '자동' 모드 선택 시 활용) */
@@ -49,10 +49,17 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
+  font-family: var(--font-sans);
   font-size: 15px;
   -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.01em;
 }
+
+/* ========== 글씨체·타이포 통일 ========== */
+.font-app { font-family: var(--font-sans); }
+.page-title { font-size: 1.125rem; font-weight: 600; color: var(--foreground); letter-spacing: -0.02em; }
+.section-title { font-size: 0.875rem; font-weight: 600; color: #1f2937; }
+.caption { font-size: 0.75rem; font-weight: 500; color: #6b7280; }
 
 /* 다크모드에서 입력창 글자가 안 보이지 않도록 (항상 진한 글자색) */
 :root.dark input,
@@ -67,20 +74,52 @@ body {
     padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
   }
 }
+@supports (padding-top: env(safe-area-inset-top)) {
+  .safe-area-inset-top {
+    padding-top: max(0.75rem, env(safe-area-inset-top));
+  }
+}
 
 /* 모바일에서 스크롤 영역이 자연스럽게 스크롤되도록 */
 .overflow-y-auto, .overflow-x-auto {
   -webkit-overflow-scrolling: touch;
 }
 
-/* ========== 디자인·UX 통일 기준 (토스 스타일) ==========
- * - 메인 액션(등록/상신/저장): --toss-blue (#3182F6)
+/* ========== 디자인·UX 통일 기준 (토스/메디플로우) ==========
+ * - 글씨체: Pretendard 전역
+ * - 메인 액션: --toss-blue (#3182F6)
  * - 보조/비활성: --toss-gray-1~4
- * - 위험(반려/삭제): --toss-danger (#F04452)
- * - 카드: border 1px --toss-border, rounded 16px
- * - 버튼/입력: rounded 12px
- * - 제목/본문: --foreground (#191F28), 보조문구 --toss-gray-3/4
+ * - 위험: --toss-danger (#F04452)
+ * - 카드: border 1px --toss-border, rounded-lg(8px)
+ * - 버튼/입력: rounded-lg, h-9/h-10
+ * - 탭: .tab-bar + .tab-btn / .tab-btn-active
+ * - 페이지 제목: .page-title (text-lg font-semibold)
  * ======================================================== */
+
+/* 통일 탭 스타일 (메뉴·서브 탭 공통) */
+.tab-bar {
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  background: #eef2f7;
+  border-radius: 8px;
+  width: fit-content;
+}
+.tab-btn {
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 6px;
+  transition: all 0.15s;
+  white-space: nowrap;
+  color: #6b7280;
+}
+.tab-btn:hover { color: #374151; background: rgba(255,255,255,0.6); }
+.tab-btn-active {
+  background: #fff;
+  color: #2563eb;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+}
 
 .btn-toss-primary {
   background: var(--toss-blue);
@@ -120,9 +159,13 @@ body {
   box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
 
-.radius-toss { border-radius: 12px; }
-.radius-toss-lg { border-radius: 16px; }
-.radius-toss-xl { border-radius: 20px; }
+.radius-toss { border-radius: 8px; }
+.radius-toss-lg { border-radius: 12px; }
+.radius-toss-xl { border-radius: 16px; }
+
+/* 페이지 제목 통일 (각 메뉴 상단) */
+.page-header-title { font-size: 1.125rem; font-weight: 600; color: #111827; letter-spacing: -0.02em; }
+.page-header-caption { font-size: 0.75rem; font-weight: 500; color: #6b7280; margin-top: 2px; }
 
 .no-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
 .no-scrollbar::-webkit-scrollbar-track { background: transparent; }

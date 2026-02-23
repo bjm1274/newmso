@@ -113,6 +113,25 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
     return R * c; // 거리 (m)
   };
 
+  // attendance → attendances 동기화 (근태관리메인·급여정산과 연계)
+  const syncToAttendances = async (workDate: string, checkIn: string | null, checkOut: string | null, status: string) => {
+    try {
+      const statusMap: Record<string, string> = { '정상': 'present', '지각': 'late' };
+      const attStatus = statusMap[status] || 'present';
+      const mins = checkIn && checkOut
+        ? Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 60000)
+        : null;
+      await supabase.from('attendances').upsert({
+        staff_id: user.id,
+        work_date: workDate,
+        check_in_time: checkIn,
+        check_out_time: checkOut,
+        status: attStatus,
+        work_hours_minutes: mins ?? undefined,
+      }, { onConflict: 'staff_id,work_date' });
+    } catch (_) {}
+  };
+
   // 출퇴근 처리 (위치 검증 포함)
   const handleCommute = async (type: 'in' | 'out') => {
     // 1. 위치 검증 먼저 수행
@@ -140,6 +159,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
         }], { onConflict: 'staff_id,date' }).select().single();
         
         if (error) throw error;
+        await syncToAttendances(today, timeString, null, isLate ? '지각' : '정상');
         setTodayLog(data);
         alert(isLate ? `지각 처리되었습니다. (기준: ${lateThreshold}:${lateMinute})` : '정상 출근되었습니다. 오늘도 화이팅!');
       
@@ -155,6 +175,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
           .single();
 
         if (error) throw error;
+        await syncToAttendances(today, todayLog.check_in, timeString, todayLog.status || '정상');
         setTodayLog(data);
         alert('퇴근 처리되었습니다. 고생하셨습니다!');
       }
@@ -187,7 +208,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
               </span>
             )}
           </p>
-          <h2 className="text-4xl font-black tracking-tighter">{currentTime.toLocaleTimeString('ko-KR')}</h2>
+          <h2 className="text-4xl font-semibold tracking-tighter">{currentTime.toLocaleTimeString('ko-KR')}</h2>
           <div className="flex items-center gap-2 mt-2">
             <span className={`w-2 h-2 rounded-full animate-pulse ${todayLog ? (todayLog.check_out ? 'bg-gray-500' : 'bg-green-500') : 'bg-red-500'}`}></span>
             <span className="text-sm font-bold">
@@ -198,13 +219,13 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
 
         <div className="flex gap-4 z-10">
           {!todayLog && (
-            <button onClick={() => handleCommute('in')} className="px-10 py-5 bg-blue-600 hover:bg-blue-500 rounded-2xl font-black text-lg shadow-lg active:scale-95 transition-all flex flex-col items-center leading-none gap-1">
+            <button onClick={() => handleCommute('in')} className="px-10 py-5 bg-blue-600 hover:bg-blue-500 rounded-lg font-semibold text-lg shadow-lg active:scale-95 transition-all flex flex-col items-center leading-none gap-1">
               <span>출근하기 ☀️</span>
               <span className="text-[10px] font-normal opacity-70">GPS 인증 필요</span>
             </button>
           )}
           {todayLog && !todayLog.check_out && (
-            <button onClick={() => handleCommute('out')} className="px-10 py-5 bg-red-600 hover:bg-red-500 rounded-2xl font-black text-lg shadow-lg active:scale-95 transition-all flex flex-col items-center leading-none gap-1">
+            <button onClick={() => handleCommute('out')} className="px-10 py-5 bg-red-600 hover:bg-red-500 rounded-lg font-semibold text-lg shadow-lg active:scale-95 transition-all flex flex-col items-center leading-none gap-1">
               <span>퇴근하기 🌙</span>
               <span className="text-[10px] font-normal opacity-70">GPS 인증 필요</span>
             </button>
@@ -222,10 +243,10 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
       {/* 리스트 */}
       <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
         <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xl font-black text-gray-900 tracking-tight">근무 히스토리</h3>
+          <h3 className="text-xl font-semibold text-gray-900 tracking-tight">근무 히스토리</h3>
           <div className="flex gap-2">
             <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() - 1)))} className="p-2 border rounded-full hover:bg-gray-50">◀</button>
-            <span className="font-black px-2">{currentMonth.getFullYear()}. {currentMonth.getMonth() + 1}</span>
+            <span className="font-semibold px-2">{currentMonth.getFullYear()}. {currentMonth.getMonth() + 1}</span>
             <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() + 1)))} className="p-2 border rounded-full hover:bg-gray-50">▶</button>
           </div>
         </div>
@@ -236,11 +257,11 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
             return (
               <div
                 key={log.id}
-                className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-5 bg-gray-50 rounded-2xl border border-transparent hover:border-gray-200 transition-all"
+                className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-5 bg-gray-50 rounded-lg border border-transparent hover:border-gray-200 transition-all"
               >
                 <div className="flex items-center gap-6">
                   <div
-                    className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center font-black ${
+                    className={`w-14 h-14 rounded-lg flex flex-col items-center justify-center font-semibold ${
                       log.status === '지각' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'
                     }`}
                   >
@@ -251,7 +272,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
                     <p className="text-xs font-bold text-gray-400">
                       {workDate.toLocaleDateString('ko-KR', { weekday: 'long' })}
                     </p>
-                    <p className="font-black text-gray-900">{log.status}</p>
+                    <p className="font-semibold text-gray-900">{log.status}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-6 md:gap-10 justify-between md:justify-end w-full">
@@ -263,7 +284,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
                     <button
                       type="button"
                       onClick={() => onRequestCorrection(log)}
-                      className="px-3 py-2 rounded-xl text-[11px] font-black border border-blue-100 text-blue-600 bg-white hover:bg-blue-50 shrink-0"
+                      className="px-3 py-2 rounded-xl text-[11px] font-semibold border border-blue-100 text-blue-600 bg-white hover:bg-blue-50 shrink-0"
                     >
                       정정 요청
                     </button>
@@ -282,7 +303,7 @@ function StatItem({ label, value, isWarning, isSuccess }: any) {
   return (
     <div className="bg-white border border-gray-100 p-6 rounded-[2rem] text-center shadow-sm">
       <p className="text-[11px] font-bold text-gray-400 mb-2 uppercase">{label}</p>
-      <p className={`text-2xl font-black ${isWarning ? 'text-red-500' : isSuccess ? 'text-blue-600' : 'text-gray-900'}`}>{value}</p>
+      <p className={`text-2xl font-semibold ${isWarning ? 'text-red-500' : isSuccess ? 'text-blue-600' : 'text-gray-900'}`}>{value}</p>
     </div>
   );
 }
@@ -291,7 +312,7 @@ function TimeBox({ label, time }: any) {
   return (
     <div className="text-right">
       <p className="text-[10px] font-bold text-gray-400 mb-1">{label}</p>
-      <p className="text-base font-black text-gray-800">{time}</p>
+      <p className="text-base font-semibold text-gray-800">{time}</p>
     </div>
   );
 }

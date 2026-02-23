@@ -60,10 +60,10 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-center gap-4">
-        <h2 className="text-xl font-black text-gray-800">🏢 부서별 물품·장비 현황</h2>
+        <h2 className="text-xl font-semibold text-gray-800">🏢 부서별 물품·장비 현황</h2>
         {departments.length > 0 && (
           <div className="flex items-center gap-2">
-            <label className="text-[10px] font-black text-gray-400 uppercase">조회 부서</label>
+            <label className="text-[10px] font-semibold text-gray-400 uppercase">조회 부서</label>
             <select
               value={viewDept}
               onChange={e => setViewDept(e.target.value)}
@@ -85,8 +85,8 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
       )}
 
       {/* 우리 부서 물품 */}
-      <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
-        <h3 className="text-sm font-black text-gray-700 mb-4 flex items-center gap-2">
+      <div className="bg-white border border-gray-100 rounded-lg p-6 shadow-sm">
+        <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
           📦 {effectiveDept ? `[${effectiveDept}] 물품 재고` : '물품 재고 (부서 선택 시 필터)'}
         </h3>
         {loading ? (
@@ -97,7 +97,7 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-gray-200 text-[10px] font-black text-gray-500 uppercase">
+                <tr className="border-b border-gray-200 text-[10px] font-semibold text-gray-500 uppercase">
                   <th className="pb-3 pr-4">품목명</th>
                   <th className="pb-3 pr-4">분류</th>
                   <th className="pb-3 pr-4">잔여 수량</th>
@@ -110,13 +110,13 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
                   <tr key={item.id} className="border-b border-gray-50">
                     <td className="py-3 pr-4 font-bold text-gray-900">{item.name || item.item_name}</td>
                     <td className="py-3 pr-4 text-gray-500">{item.category || '-'}</td>
-                    <td className="py-3 pr-4 font-black text-gray-800">{item.stock ?? item.quantity ?? 0}</td>
+                    <td className="py-3 pr-4 font-semibold text-gray-800">{item.stock ?? item.quantity ?? 0}</td>
                     <td className="py-3 pr-4 text-gray-500">{item.min_stock ?? item.min_quantity ?? '-'}</td>
                     <td className="py-3 pr-4">
                       {(item.stock ?? item.quantity ?? 0) <= (item.min_stock ?? item.min_quantity ?? 0) ? (
-                        <span className="text-red-600 text-[10px] font-black">발주 필요</span>
+                        <span className="text-red-600 text-[10px] font-semibold">발주 필요</span>
                       ) : (
-                        <span className="text-emerald-600 text-[10px] font-black">정상</span>
+                        <span className="text-emerald-600 text-[10px] font-semibold">정상</span>
                       )}
                     </td>
                   </tr>
@@ -128,8 +128,8 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
       </div>
 
       {/* 우리 부서 장비 */}
-      <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
-        <h3 className="text-sm font-black text-gray-700 mb-4 flex items-center gap-2">
+      <div className="bg-white border border-gray-100 rounded-lg p-6 shadow-sm">
+        <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
           🖥️ {effectiveDept ? `[${effectiveDept}] 보유 장비 (미반납)` : '보유 장비 (부서 선택 시 필터)'}
         </h3>
         {loading ? (
@@ -140,7 +140,7 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-gray-200 text-[10px] font-black text-gray-500 uppercase">
+                <tr className="border-b border-gray-200 text-[10px] font-semibold text-gray-500 uppercase">
                   <th className="pb-3 pr-4">장비 종류</th>
                   <th className="pb-3 pr-4">장비명</th>
                   <th className="pb-3 pr-4">사용자</th>

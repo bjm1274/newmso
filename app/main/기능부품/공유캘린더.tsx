@@ -35,13 +35,13 @@ export default function SharedCalendar({ user }: any) {
   const days = Array.from({ length: firstDay + lastDay }, (_, i) => i < firstDay ? null : i - firstDay + 1);
 
   return (
-    <div className="bg-white p-6 border border-gray-100 rounded-2xl shadow-xl">
+    <div className="bg-white p-6 border border-gray-100 rounded-lg shadow-xl">
       <div className="flex justify-between items-center mb-6">
-        <h3 className="text-xl font-black text-gray-900">공유 캘린더</h3>
+        <h3 className="text-xl font-semibold text-gray-900">공유 캘린더</h3>
         <input type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="p-2 rounded-xl border font-bold" />
       </div>
       <div className="grid grid-cols-7 gap-1 text-center">
-        {['일','월','화','수','목','금','토'].map(d => <div key={d} className="text-[10px] font-black text-gray-400 py-2">{d}</div>)}
+        {['일','월','화','수','목','금','토'].map(d => <div key={d} className="text-[10px] font-semibold text-gray-400 py-2">{d}</div>)}
         {days.map((d, i) => {
           if (d === null) return <div key={i} />;
           const dateStr = `${yearMonth}-${String(d).padStart(2, '0')}`;

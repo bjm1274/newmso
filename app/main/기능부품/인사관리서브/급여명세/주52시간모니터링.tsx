@@ -58,21 +58,23 @@ export default function WeeklyHoursMonitor({ selectedCo, yearMonth: initialYm }:
   }, [yearMonth, selectedCo]);
 
   return (
-    <div className="border border-amber-200 p-6 bg-amber-50/50 rounded-[1.75rem]">
-      <h3 className="text-[11px] font-black text-amber-700 uppercase tracking-widest mb-4">주 52시간 근무 모니터링</h3>
-      <div className="flex items-center gap-2 mb-4">
-        <input type="month" value={yearMonth} onChange={(e) => setYearMonth(e.target.value)} className="p-2 border rounded-lg text-xs font-bold" />
+    <div className="border border-gray-200 p-5 bg-white rounded-lg shadow-sm">
+      <div className="pb-2 border-b border-gray-100 mb-3">
+        <h3 className="text-sm font-semibold text-gray-800">주 52시간 모니터링</h3>
+      </div>
+      <div className="mb-4">
+        <input type="month" value={yearMonth} onChange={(e) => setYearMonth(e.target.value)} className="h-9 px-3 border border-gray-300 rounded-md text-sm font-medium w-full" />
       </div>
       {loading ? (
         <p className="text-xs text-gray-500">로딩 중...</p>
       ) : weeklyData.length === 0 ? (
-        <p className="text-xs font-bold text-green-600">52시간 초과 없음</p>
+        <p className="text-xs font-medium text-emerald-600">52시간 초과 없음</p>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {weeklyData.slice(0, 10).map((x, i) => (
-            <div key={i} className="flex justify-between items-center py-2 border-b border-amber-100 last:border-0">
-              <span className="text-xs font-bold text-gray-800">{x.name}</span>
-              <span className="text-xs font-black text-red-600">{x.hours}h (초과)</span>
+            <div key={i} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
+              <span className="text-xs font-medium text-gray-800">{x.name}</span>
+              <span className="text-xs font-medium text-red-600">{x.hours}h 초과</span>
             </div>
           ))}
         </div>

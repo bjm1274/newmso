@@ -171,7 +171,7 @@ export default function ScanModule({ user, inventory, fetchInventory }: ScanModu
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="bg-white p-6 md:p-10 border border-gray-100 shadow-xl rounded-[2.5rem]">
         <div className="mb-6">
-          <h2 className="text-2xl font-black text-gray-900 tracking-tighter italic">
+          <h2 className="text-2xl font-semibold text-gray-900 tracking-tighter italic">
             의료기기 QR·바코드 스캔 입고
           </h2>
           <p className="text-[10px] text-blue-600 font-bold mt-1 uppercase tracking-widest">
@@ -184,8 +184,8 @@ export default function ScanModule({ user, inventory, fetchInventory }: ScanModu
         </div>
 
         {/* 스캐너 입력 영역 */}
-        <div className="mb-6 p-4 bg-gray-50 rounded-2xl border border-dashed border-gray-300">
-          <label className="text-[11px] font-black text-gray-600 mb-2 block">
+        <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+          <label className="text-[11px] font-semibold text-gray-600 mb-2 block">
             스캐너 입력창
           </label>
           <input
@@ -207,9 +207,9 @@ export default function ScanModule({ user, inventory, fetchInventory }: ScanModu
         </div>
 
         {/* 스캔 목록 */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-inner p-4 md:p-5">
+        <div className="bg-white rounded-lg border border-gray-100 shadow-inner p-4 md:p-5">
           <div className="flex justify-between items-center mb-3">
-            <h3 className="text-sm font-black text-gray-800">스캔된 의료기기 목록</h3>
+            <h3 className="text-sm font-semibold text-gray-800">스캔된 의료기기 목록</h3>
             <span className="text-[10px] font-bold text-gray-400">
               총 {scannedItems.length}개 품목
             </span>
@@ -228,10 +228,10 @@ export default function ScanModule({ user, inventory, fetchInventory }: ScanModu
                 >
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-black text-blue-600">
+                      <span className="text-[11px] font-semibold text-blue-600">
                         {item.company}
                       </span>
-                      <span className="text-xs font-black text-gray-800">
+                      <span className="text-xs font-semibold text-gray-800">
                         {item.item_name}
                       </span>
                     </div>
@@ -253,17 +253,17 @@ export default function ScanModule({ user, inventory, fetchInventory }: ScanModu
                       <button
                         type="button"
                         onClick={() => handleChangeQty(item.id, -1)}
-                        className="w-7 h-7 flex items-center justify-center text-xs font-black text-gray-500 hover:text-gray-800"
+                        className="w-7 h-7 flex items-center justify-center text-xs font-semibold text-gray-500 hover:text-gray-800"
                       >
                         −
                       </button>
-                      <span className="w-9 text-center text-xs font-black text-gray-800">
+                      <span className="w-9 text-center text-xs font-semibold text-gray-800">
                         {item.qty}
                       </span>
                       <button
                         type="button"
                         onClick={() => handleChangeQty(item.id, +1)}
-                        className="w-7 h-7 flex items-center justify-center text-xs font-black text-gray-500 hover:text-gray-800"
+                        className="w-7 h-7 flex items-center justify-center text-xs font-semibold text-gray-500 hover:text-gray-800"
                       >
                         +
                       </button>
@@ -271,7 +271,7 @@ export default function ScanModule({ user, inventory, fetchInventory }: ScanModu
                     <button
                       type="button"
                       onClick={() => handleRemoveItem(item.id)}
-                      className="text-[11px] font-black text-red-500 px-2 py-1 rounded-lg hover:bg-red-50"
+                      className="text-[11px] font-semibold text-red-500 px-2 py-1 rounded-lg hover:bg-red-50"
                     >
                       삭제
                     </button>
@@ -285,7 +285,7 @@ export default function ScanModule({ user, inventory, fetchInventory }: ScanModu
             type="button"
             onClick={handleConfirmScan}
             disabled={loading || scannedItems.length === 0}
-            className="mt-5 w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-sm shadow-lg hover:bg-blue-700 disabled:opacity-50 disabled:hover:bg-blue-600"
+            className="mt-5 w-full py-4 bg-blue-600 text-white rounded-lg font-semibold text-sm shadow-lg hover:bg-blue-700 disabled:opacity-50 disabled:hover:bg-blue-600"
           >
             {loading ? '입고 처리 중...' : '✅ 스캔된 의료기기 입고 확정하기'}
           </button>

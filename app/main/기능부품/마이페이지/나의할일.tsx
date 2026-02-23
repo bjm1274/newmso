@@ -191,7 +191,7 @@ export default function MyTodoList({ user: initialUser }: any) {
     <div className="bg-white border border-gray-100 shadow-sm rounded-[2.5rem] p-8 h-full flex flex-col space-y-6">
       <div className="flex flex-col gap-3">
         <div className="flex justify-between items-center flex-wrap gap-2">
-          <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">나의 할일 관리</h3>
+          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">나의 할일 관리</h3>
           <div className="flex items-center gap-2">
             <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
               {(['day', 'week', 'month'] as const).map((r) => (
@@ -209,7 +209,7 @@ export default function MyTodoList({ user: initialUser }: any) {
               type={viewRange === 'month' ? 'month' : 'date'}
               value={viewRange === 'month' ? selectedDate.slice(0, 7) : selectedDate}
               onChange={(e) => setSelectedDate(viewRange === 'month' ? e.target.value + '-01' : e.target.value)}
-              className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-xs font-black text-gray-700 outline-none focus:border-blue-500 cursor-pointer"
+              className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-gray-700 outline-none focus:border-blue-500 cursor-pointer"
             />
           </div>
         </div>
@@ -237,7 +237,7 @@ export default function MyTodoList({ user: initialUser }: any) {
         <button
           onClick={handleAddTask}
           disabled={!user?.id || !newTask.trim()}
-          className="bg-gray-900 text-white rounded-xl px-6 py-3 text-sm font-black hover:bg-black transition-all shadow-md disabled:opacity-50"
+          className="bg-gray-900 text-white rounded-xl px-6 py-3 text-sm font-semibold hover:bg-black transition-all shadow-md disabled:opacity-50"
         >
           등록
         </button>
@@ -257,7 +257,7 @@ export default function MyTodoList({ user: initialUser }: any) {
         ) : tasks.length > 0 ? (
           <>
             <section className="space-y-3">
-              <h4 className="text-[10px] font-black text-blue-600 uppercase flex items-center gap-2">
+              <h4 className="text-[10px] font-semibold text-blue-600 uppercase flex items-center gap-2">
                 <span className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-pulse"></span>
                 진행 중 ({inProgressTasks.length})
               </h4>
@@ -269,7 +269,7 @@ export default function MyTodoList({ user: initialUser }: any) {
 
             {completedTasks.length > 0 && (
               <section className="space-y-3 opacity-60">
-                <h4 className="text-[10px] font-black text-gray-400 uppercase flex items-center gap-2">
+                <h4 className="text-[10px] font-semibold text-gray-400 uppercase flex items-center gap-2">
                   <span className="w-1.5 h-1.5 bg-gray-400 rounded-full"></span>
                   완료 내역 ({completedTasks.length})
                 </h4>
@@ -292,7 +292,7 @@ export default function MyTodoList({ user: initialUser }: any) {
 
 function TodoItem({ task, onToggle, onDelete }: any) {
   return (
-    <div className="group flex items-center gap-3 p-4 bg-white border border-gray-100 rounded-2xl hover:border-blue-200 hover:shadow-sm transition-all animate-fade-in-up">
+    <div className="group flex items-center gap-3 p-4 bg-white border border-gray-100 rounded-lg hover:border-blue-200 hover:shadow-sm transition-all animate-fade-in-up">
       <button onClick={() => onToggle(task.id, task.is_complete)} className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all flex-shrink-0 ${task.is_complete ? 'bg-green-500 border-green-500 text-white' : 'border-gray-200 hover:border-blue-400'}`}>
         {task.is_complete && <span className="text-[10px] font-bold">V</span>}
       </button>
@@ -306,7 +306,7 @@ function TodoItem({ task, onToggle, onDelete }: any) {
           </span>
         )}
       </div>
-      <button onClick={() => onDelete(task.id)} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all text-[10px] font-black px-2 py-1 bg-gray-50 hover:bg-red-50 rounded-md">삭제</button>
+      <button onClick={() => onDelete(task.id)} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all text-[10px] font-semibold px-2 py-1 bg-gray-50 hover:bg-red-50 rounded-md">삭제</button>
     </div>
   );
 }

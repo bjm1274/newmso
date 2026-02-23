@@ -174,7 +174,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
         <div className="text-left space-y-2">
           <div className="flex items-center gap-3 mb-2">
             <AppLogo size={40} />
-            <h1 className="text-2xl font-black text-gray-900 tracking-tight">
+            <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">
               반갑습니다, {user.name}님 👋
             </h1>
           </div>
@@ -209,7 +209,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
               <button
                 type="button"
                 onClick={() => setShowFavPicker((v) => !v)}
-                className="px-3 py-1.5 rounded-full text-[11px] font-black border border-dashed border-gray-300 text-gray-500 hover:bg-gray-50"
+                className="px-3 py-1.5 rounded-full text-[11px] font-semibold border border-dashed border-gray-300 text-gray-500 hover:bg-gray-50"
               >
                 + 즐겨찾기 추가
               </button>
@@ -218,7 +218,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
                   <select
                     value={pendingFav}
                     onChange={(e) => setPendingFav(e.target.value as FavoriteId | '')}
-                    className="px-3 py-1.5 rounded-full text-[11px] font-black border border-gray-300 bg-white"
+                    className="px-3 py-1.5 rounded-full text-[11px] font-semibold border border-gray-300 bg-white"
                   >
                     <option value="">항목 선택</option>
                     {FAVORITE_OPTIONS.filter(o => !favorites.includes(o.id)).map((o) => (
@@ -230,7 +230,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
                   <button
                     type="button"
                     onClick={handleAddFavorite}
-                    className="px-3 py-1.5 rounded-full text-[11px] font-black bg-gray-900 text-white hover:bg-black"
+                    className="px-3 py-1.5 rounded-full text-[11px] font-semibold bg-gray-900 text-white hover:bg-black"
                   >
                     추가
                   </button>
@@ -306,7 +306,7 @@ function TabButton({ isActive, onClick, label, icon }: any) {
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-black transition-all duration-200 whitespace-nowrap
+      className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-200 whitespace-nowrap
         ${isActive ? 'bg-[var(--toss-blue)] text-white shadow-md' : 'bg-transparent text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]'}
       `}
     >
@@ -320,7 +320,7 @@ function QuickFavoriteButton({ label, icon, onClick, active, onRemove }: any) {
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-black border transition-all
+      className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-all
         ${active ? 'bg-[var(--toss-blue)] text-white border-[var(--toss-blue)] shadow-sm' : 'bg-white text-[var(--toss-gray-4)] border-[var(--toss-border)] hover:bg-[var(--toss-gray-1)]'}
       `}
     >

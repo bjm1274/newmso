@@ -18,8 +18,8 @@ export default function CertTransferPanel({ staffId, staffName }: { staffId: str
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div className="border border-gray-200 p-6 bg-white rounded-2xl">
-        <h3 className="text-[11px] font-black text-gray-600 uppercase tracking-widest mb-4">교육·자격 현황</h3>
+      <div className="border border-gray-200 p-6 bg-white rounded-lg">
+        <h3 className="text-[11px] font-semibold text-gray-600 uppercase tracking-widest mb-4">교육·자격 현황</h3>
         {certs.length === 0 ? <p className="text-xs text-gray-500">등록된 자격이 없습니다.</p> : (
           <div className="space-y-2">
             {certs.map((x) => (
@@ -31,8 +31,8 @@ export default function CertTransferPanel({ staffId, staffName }: { staffId: str
           </div>
         )}
       </div>
-      <div className="border border-gray-200 p-6 bg-white rounded-2xl">
-        <h3 className="text-[11px] font-black text-gray-600 uppercase tracking-widest mb-4">인사이동 이력</h3>
+      <div className="border border-gray-200 p-6 bg-white rounded-lg">
+        <h3 className="text-[11px] font-semibold text-gray-600 uppercase tracking-widest mb-4">인사이동 이력</h3>
         {transfers.length === 0 ? <p className="text-xs text-gray-500">이동 이력이 없습니다.</p> : (
           <div className="space-y-2">
             {transfers.map((x) => (

@@ -20,48 +20,45 @@ export default function CompliancePanel({ staffs, companyName }: { staffs: any[]
   }, 0);
 
   return (
-    <div className="space-y-8">
-      {/* 노무 준수 리포트 */}
-      <div className="border border-gray-200 p-6 bg-white rounded-none shadow-sm">
-        <h3 className="text-[11px] font-black text-blue-600 uppercase tracking-widest mb-4">Labor Law Compliance (노무 준수)</h3>
+    <div className="space-y-4">
+      <div className="border border-gray-200 p-4 bg-white rounded-lg shadow-sm">
+        <h3 className="text-sm font-semibold text-gray-800 mb-3">노무 준수</h3>
         <div className="space-y-2">
-          <div className="p-3 bg-gray-50 border border-gray-100 flex justify-between">
-            <span className="text-[9px] font-black text-gray-400 uppercase">준수율</span>
-            <span className={`text-sm font-black ${Number(report.complianceRate) === 100 ? 'text-green-600' : 'text-orange-600'}`}>{report.complianceRate}%</span>
+          <div className="p-3 bg-[#f8fafc] border border-gray-100 rounded-md flex justify-between items-center">
+            <span className="text-xs font-medium text-gray-500">준수율</span>
+            <span className={`text-sm font-semibold ${Number(report.complianceRate) === 100 ? 'text-emerald-600' : 'text-amber-600'}`}>{report.complianceRate}%</span>
           </div>
           {report.totalViolations > 0 && (
-            <div className="p-3 bg-orange-50 border border-orange-100">
-              <p className="text-[9px] font-black text-orange-600 uppercase">최저임금 미달</p>
-              <p className="text-xs font-bold text-orange-800">{report.totalViolations}명</p>
+            <div className="p-3 bg-amber-50 border border-amber-100 rounded-md">
+              <p className="text-xs font-medium text-amber-700">최저임금 미달</p>
+              <p className="text-sm font-semibold text-amber-800">{report.totalViolations}명</p>
             </div>
           )}
         </div>
       </div>
 
-      {/* 국세청 신고 영역 */}
-      <div className="border border-gray-200 p-6 bg-white rounded-none shadow-sm">
-        <h3 className="text-[11px] font-black text-red-500 uppercase tracking-widest mb-4">Tax Compliance (원천세 신고)</h3>
-        <div className="space-y-4">
-          <div className="p-4 bg-gray-50 border border-gray-100">
-            <p className="text-[9px] font-black text-gray-400 uppercase">예상 원천세액</p>
-            <p className="text-lg font-black text-gray-800">{Math.round(totalTax).toLocaleString()}원</p>
+      <div className="border border-gray-200 p-4 bg-white rounded-lg shadow-sm">
+        <h3 className="text-sm font-semibold text-gray-800 mb-3">원천세 신고</h3>
+        <div className="space-y-3">
+          <div className="p-3 bg-[#f8fafc] border border-gray-100 rounded-md">
+            <p className="text-xs font-medium text-gray-500">예상 원천세액</p>
+            <p className="text-base font-semibold text-gray-800">{Math.round(totalTax).toLocaleString()}원</p>
           </div>
-          <button className="w-full py-3 bg-[#232933] text-white text-[10px] font-black hover:bg-black transition-all">
+          <button className="w-full py-2.5 bg-gray-700 text-white text-xs font-medium rounded-lg hover:bg-gray-800">
             홈택스 신고 파일(SAM) 추출
           </button>
         </div>
       </div>
 
-      {/* 알림톡 템플릿 영역 */}
-      <div className="border border-gray-200 p-6 bg-white rounded-none shadow-sm">
-        <h3 className="text-[11px] font-black text-gray-800 uppercase tracking-widest mb-4">Notification (알림톡)</h3>
-        <div className="p-4 bg-blue-50 border border-blue-100 mb-4">
-          <p className="text-[10px] text-blue-900 leading-relaxed font-bold">
+      <div className="border border-gray-200 p-4 bg-white rounded-lg shadow-sm">
+        <h3 className="text-sm font-semibold text-gray-800 mb-3">알림톡</h3>
+        <div className="p-3 bg-blue-50 border border-blue-100 rounded-md mb-3">
+          <p className="text-xs text-blue-900 leading-relaxed font-medium">
             [{companyName ?? '회사'}] {`{name}`}님, 02월 급여명세서가 발행되었습니다.
           </p>
         </div>
-        <button className="w-full py-3 bg-blue-600 text-white text-[10px] font-black shadow-lg">
-          명세서 일괄 발송 시작
+        <button className="w-full py-2.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700">
+          명세서 일괄 발송
         </button>
       </div>
     </div>

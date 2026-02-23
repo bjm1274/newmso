@@ -9,6 +9,10 @@ export default function PayrollExport({ staffs = [], checkedIds = [], selectedCo
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    setYearMonth(initialYm || new Date().toISOString().slice(0, 7));
+  }, [initialYm]);
+
+  useEffect(() => {
     (async () => {
       setLoading(true);
       const { data } = await supabase
@@ -21,7 +25,8 @@ export default function PayrollExport({ staffs = [], checkedIds = [], selectedCo
         list = list.filter((r: any) => r.staff_members?.company === selectedCo);
       }
       if (checkedIds.length > 0) {
-        list = list.filter((r: any) => checkedIds.includes(r.staff_id));
+        const idSet = new Set(checkedIds.map((id: any) => String(id)));
+        list = list.filter((r: any) => idSet.has(String(r.staff_id)));
       }
       setRecords(list);
       setLoading(false);
@@ -43,6 +48,7 @@ export default function PayrollExport({ staffs = [], checkedIds = [], selectedCo
       비과세총액: r.total_taxfree || 0,
       공제합계: r.total_deduction || 0,
       실지급액: r.net_pay || 0,
+      선지급: r.advance_pay || 0,
       정산상태: r.status || '',
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -72,18 +78,21 @@ export default function PayrollExport({ staffs = [], checkedIds = [], selectedCo
   };
 
   return (
-    <div className="flex flex-col gap-4 p-4 bg-white border border-gray-100 rounded-2xl">
-      <h3 className="text-sm font-black text-gray-800">📤 급여 대장 내보내기</h3>
+    <div className="flex flex-col gap-4 p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
+      <div className="pb-2 border-b border-gray-100">
+        <h3 className="text-sm font-semibold text-gray-800">대장 내보내기</h3>
+        <p className="text-xs text-gray-500 mt-0.5">엑셀 · 이체용 CSV</p>
+      </div>
       <div className="flex items-center gap-2">
-        <input type="month" value={yearMonth} onChange={(e) => setYearMonth(e.target.value)} className="p-2 border rounded-lg text-xs font-bold" />
-        <span className="text-xs text-gray-500">({records.length}건)</span>
+        <input type="month" value={yearMonth} onChange={(e) => setYearMonth(e.target.value)} className="h-9 px-3 border border-gray-300 rounded-md text-sm font-medium flex-1" />
+        <span className="text-xs text-gray-500 shrink-0">({records.length}건)</span>
       </div>
       <div className="flex gap-2">
-        <button onClick={exportExcel} disabled={loading || records.length === 0} className="flex-1 py-2.5 bg-emerald-600 text-white text-[10px] font-black rounded-xl hover:bg-emerald-700 disabled:opacity-50">
-          엑셀 다운로드
+        <button onClick={exportExcel} disabled={loading || records.length === 0} className="flex-1 py-2.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50">
+          엑셀
         </button>
-        <button onClick={exportSAM} disabled={loading || records.length === 0} className="flex-1 py-2.5 bg-[#232933] text-white text-[10px] font-black rounded-xl hover:bg-gray-800 disabled:opacity-50">
-          이체 SAM(CSV)
+        <button onClick={exportSAM} disabled={loading || records.length === 0} className="flex-1 py-2.5 bg-gray-700 text-white text-xs font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50">
+          이체 CSV
         </button>
       </div>
     </div>

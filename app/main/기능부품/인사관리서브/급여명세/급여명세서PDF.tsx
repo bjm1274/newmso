@@ -106,6 +106,8 @@ export default function PayrollSlipPDF({ staff, record, yearMonth }: any) {
     w.close();
   };
 
+  const advancePay = record ? Number(record.advance_pay) || 0 : 0;
+  const isAdvancePay = advancePay > 0;
   const base = record?.base_salary ?? staff?.base_salary ?? staff?.base ?? 0;
   const net = record?.net_pay ?? 0;
 
@@ -113,12 +115,12 @@ export default function PayrollSlipPDF({ staff, record, yearMonth }: any) {
   const ym = String(yearMonth || new Date().toISOString().slice(0, 7));
   const [y, m] = ym.split('-');
   const monthLabel = `${y}-${Number(m || '1')}월`;
-  const title = `${companyName} ${monthLabel} 급여명세서`;
+  const title = `${companyName} ${monthLabel} 급여명세서${isAdvancePay ? ' (선지급)' : ''}`;
   const footerText = design?.footerText || '';
   const showSignArea = design?.showSignArea ?? true;
 
   return (
-    <div className="p-6 bg-white border border-gray-200 rounded-2xl">
+    <div className="p-5 bg-white border border-gray-200 rounded-lg shadow-sm">
       <div ref={printRef} className="relative min-h-[220px]">
         {/* 제목 – 회사명 + 해당 월 급여명세서 (위치는 디자인 설정 사용) */}
         <div
@@ -146,34 +148,51 @@ export default function PayrollSlipPDF({ staff, record, yearMonth }: any) {
           <span>· {companyName}</span>
         </div>
 
-        {/* 급여 표 영역 (고정) */}
+        {/* 급여 표 영역 – 선지급 건은 본급·공제 0원, 선지급 금액만 표시 */}
         <div className="absolute left-0 right-0" style={{ top: '40%' }}>
           <table className="w-full text-xs">
             <tbody>
-              <tr>
-                <td>기본급</td>
-                <td className="text-right">
-                  {base.toLocaleString()}원
-                </td>
-              </tr>
-              <tr>
-                <td>식대</td>
-                <td className="text-right">
-                  {(record?.meal_allowance ?? staff?.meal_allowance ?? 0).toLocaleString()}원
-                </td>
-              </tr>
-              <tr>
-                <td>공제합계</td>
-                <td className="text-right text-red-600">
-                  -{(record?.total_deduction ?? 0).toLocaleString()}원
-                </td>
-              </tr>
-              <tr>
-                <td className="font-bold">실지급액</td>
-                <td className="text-right font-bold text-blue-600 total">
-                  {net.toLocaleString()}원
-                </td>
-              </tr>
+              {isAdvancePay ? (
+                <>
+                  <tr>
+                    <td>선지급 (본 건은 선지급 건입니다. 본급·공제·차인 0원)</td>
+                    <td className="text-right font-bold text-amber-600">
+                      {advancePay.toLocaleString()}원
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="font-bold">실지급액 (선지급)</td>
+                    <td className="text-right font-bold text-blue-600 total">
+                      {net.toLocaleString()}원
+                    </td>
+                  </tr>
+                </>
+              ) : (
+                <>
+                  <tr>
+                    <td>기본급</td>
+                    <td className="text-right">{base.toLocaleString()}원</td>
+                  </tr>
+                  <tr>
+                    <td>식대</td>
+                    <td className="text-right">
+                      {(record?.meal_allowance ?? staff?.meal_allowance ?? 0).toLocaleString()}원
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>공제합계</td>
+                    <td className="text-right text-red-600">
+                      -{(record?.total_deduction ?? 0).toLocaleString()}원
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="font-bold">실지급액</td>
+                    <td className="text-right font-bold text-blue-600 total">
+                      {net.toLocaleString()}원
+                    </td>
+                  </tr>
+                </>
+              )}
             </tbody>
           </table>
         </div>
@@ -199,10 +218,7 @@ export default function PayrollSlipPDF({ staff, record, yearMonth }: any) {
           </div>
         )}
       </div>
-      <button
-        onClick={handlePrint}
-        className="mt-4 w-full py-3 bg-blue-600 text-white text-xs font-black rounded-xl"
-      >
+      <button onClick={handlePrint} className="mt-4 w-full py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700">
         PDF 인쇄
       </button>
     </div>

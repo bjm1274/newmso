@@ -39,7 +39,7 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
   const [activeTab, setActiveTab] = useState('대장');
   const [selectedStaffId, setSelectedStaffId] = useState(1);
   const [checkedIds, setCheckedIds] = useState<number[]>([]);
-  const [yearMonth] = useState<string>(() => new Date().toISOString().slice(0, 7));
+  const [yearMonth, setYearMonth] = useState<string>(() => new Date().toISOString().slice(0, 7));
   const [payrollRecords, setPayrollRecords] = useState<any[]>([]);
   
   const filtered: Staff[] = selectedCo === '전체' ? staffs : staffs.filter((s: Staff) => s.company === selectedCo);
@@ -75,48 +75,60 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
     ? payrollRecords.find((r: any) => String(r.staff_id) === String(current.id))
     : null;
 
+  const [y, m] = (yearMonth || '').split('-');
+  const periodLabel = y && m ? `${y}년 ${Number(m)}월` : '';
+
   return (
-    <div className="flex flex-col h-full animate-in fade-in duration-500">
-      <header className="p-6 md:p-8 border-b border-gray-50 bg-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
-        <div>
-          <h2 className="text-xl font-black text-gray-800 tracking-tighter">급여 통합 관리 <span className="text-sm text-blue-600 ml-2">[{selectedCo}]</span></h2>
-          <div className="flex gap-1 bg-gray-100 p-1 rounded-[12px] w-fit mt-2 overflow-x-auto no-scrollbar">
-            {['대장', '대시보드', '급여정산', '중간정산', '연말정산', '퇴직금', '설정'].map(tab => (
-              <button 
-                key={tab} 
-                onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2 text-[11px] font-black tracking-widest uppercase rounded-[12px] transition-all whitespace-nowrap ${activeTab === tab ? 'bg-white shadow-md text-blue-600' : 'text-gray-400'}`}
-              >
-                {tab}
-              </button>
-            ))}
+    <div className="flex flex-col h-full animate-in fade-in duration-500 bg-[#f8fafc]">
+      <header className="shrink-0 bg-white border-b border-gray-200">
+        <div className="px-6 md:px-8 pt-5 pb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-4">
+            <div>
+              <h1 className="text-lg font-bold text-gray-900">{periodLabel || '급여'} 급여</h1>
+              <p className="text-xs text-gray-500 mt-0.5">[{selectedCo}]</p>
+            </div>
+            {activeTab === '대장' && (
+              <label className="flex items-center gap-2 text-sm text-gray-600">
+                <span>기간</span>
+                <input type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="h-9 px-3 border border-gray-300 rounded-md text-gray-900 font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+              </label>
+            )}
           </div>
+          {activeTab === '대장' && (
+            <span className="text-xs text-gray-500 hidden md:inline">우측 패널에서 대장 내보내기</span>
+          )}
         </div>
-        {activeTab === '대장' && (
-          <div className="flex gap-2 w-full md:w-auto">
-            <span className="text-[10px] font-bold text-gray-500 hidden md:inline">대장 내보내기: aside 패널에서 이용</span>
-          </div>
-        )}
+        <nav className="flex gap-0.5 p-1 bg-[#eef2f7] rounded-lg overflow-x-auto no-scrollbar w-full md:w-fit mt-2">
+          {['대장', '대시보드', '급여정산', '중간정산', '연말정산', '퇴직금', '설정'].map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`min-h-[44px] touch-manipulation px-4 py-2 text-xs font-medium whitespace-nowrap rounded-md transition-all ${activeTab === tab ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-white/60'}`}
+            >
+              {tab}
+            </button>
+          ))}
+        </nav>
       </header>
 
-      <div className="flex-1 p-4 md:p-8 overflow-y-auto bg-gray-50/20 custom-scrollbar">
+      <div className="flex-1 p-4 md:p-6 overflow-y-auto custom-scrollbar">
         {filtered.length > 0 ? (
           <>
             {activeTab === '대장' && (
-              <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-                <div className="xl:col-span-2 space-y-8">
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <div className="xl:col-span-2 space-y-6">
                   {current && <SalaryDetail staff={current} record={currentRecord || null} />}
-                  <PayrollTable staffs={filtered} checkedIds={checkedIds} setCheckedIds={setCheckedIds} onSelect={setSelectedStaffId} />
+                  <PayrollTable staffs={filtered} payrollRecords={payrollRecords} yearMonth={yearMonth} checkedIds={checkedIds} setCheckedIds={setCheckedIds} onSelect={setSelectedStaffId} />
                 </div>
-                <aside className="space-y-6">
-                  <PayrollExport staffs={filtered} checkedIds={checkedIds} selectedCo={selectedCo} yearMonth={new Date().toISOString().slice(0, 7)} />
+                <aside className="space-y-4">
+                  <PayrollExport staffs={filtered} checkedIds={checkedIds} selectedCo={selectedCo} yearMonth={yearMonth} />
                   <PayrollMonthlySummary selectedCo={selectedCo} />
                   <WeeklyHoursMonitor selectedCo={selectedCo} />
                   <LaborCostSimulation staffs={filtered} selectedCo={selectedCo} />
                   <CompliancePanel staffs={filtered.filter((s: Staff) => checkedIds.includes(s.id))} companyName={selectedCo} />
                   {current && <BenefitSummary staff={current} />}
                   {current && <SalarySimulationSummary staff={current} />}
-                  {current && <PayrollSlipPDF staff={current} record={currentRecord || null} yearMonth={yearMonth} />}
+                  {current && <PayrollSlipPDF staff={current} record={currentRecord ?? null} yearMonth={yearMonth} />}
                   {current && <SalaryChangeHistory staffId={String(current.id)} staffName={current.name} />}
                 </aside>
               </div>
@@ -131,7 +143,7 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
                 <TaxFreeSettingsPanel companyName={selectedCo} />
                 <LegalStandardsPanel />
                 <div className="space-y-6">
-                  <PayrollLockPanel yearMonth={new Date().toISOString().slice(0, 7)} companyName={selectedCo} />
+                  <PayrollLockPanel yearMonth={yearMonth} companyName={selectedCo} />
                   <TaxInsuranceRatesPanel companyName={selectedCo} />
                   <ShiftPatternManager selectedCo={selectedCo} />
                   <NotificationTemplatesPanel companyName={selectedCo} />
@@ -142,7 +154,7 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
           </>
         ) : (
           <div className="h-full flex items-center justify-center bg-white border border-dashed border-gray-200 rounded-[2rem] p-20">
-            <p className="text-sm font-black text-gray-400">
+            <p className="text-sm font-medium text-gray-500">
               &quot;{selectedCo}&quot; 소속 인원이 없습니다.
             </p>
           </div>
@@ -152,40 +164,27 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
   );
 }
 
-// 복리후생 요약 (DEMO 버전 – 나중에 Supabase 연동 예정)
+// 복리후생 요약 (DEMO)
 function BenefitSummary({ staff }: { staff: Staff }) {
   const base = staff.base ?? 3_000_000;
-  const welfare = Math.round(base * 0.05);   // 예: 기본급의 5%를 복리후생 예산으로 가정
+  const welfare = Math.round(base * 0.05);
   const pension = Math.round(base * 0.045);
   const health = Math.round(base * 0.03545);
 
   return (
-    <div className="border border-gray-200 p-6 bg-white rounded-[1.75rem] shadow-sm">
-      <h3 className="text-[11px] font-black text-gray-800 uppercase tracking-widest mb-4">
-        Benefits & Social Insurance (DEMO)
-      </h3>
-      <div className="space-y-2 text-xs font-bold text-gray-600">
-        <div className="flex justify-between">
-          <span>복리후생 예산 (추정)</span>
-          <span className="text-blue-600">{welfare.toLocaleString()}원 / 월</span>
-        </div>
-        <div className="flex justify-between">
-          <span>국민연금 (회사부담 추정)</span>
-          <span className="text-red-500">-{pension.toLocaleString()}원</span>
-        </div>
-        <div className="flex justify-between">
-          <span>건강보험 (회사부담 추정)</span>
-          <span className="text-red-500">-{health.toLocaleString()}원</span>
-        </div>
+    <div className="border border-gray-200 p-4 bg-white rounded-lg shadow-sm">
+      <h3 className="text-sm font-semibold text-gray-800 mb-3">복리후생 · 4대보험 (DEMO)</h3>
+      <div className="space-y-1.5 text-xs font-medium text-gray-600">
+        <div className="flex justify-between"><span>복리후생 예산</span><span className="text-blue-600">{welfare.toLocaleString()}원/월</span></div>
+        <div className="flex justify-between"><span>국민연금 회사부담</span><span className="text-red-600">-{pension.toLocaleString()}원</span></div>
+        <div className="flex justify-between"><span>건강보험 회사부담</span><span className="text-red-600">-{health.toLocaleString()}원</span></div>
       </div>
-      <p className="mt-3 text-[10px] text-gray-400">
-        * 실제 수치는 향후 Supabase 급여/복리후생 테이블과 연동하여 자동 계산됩니다.
-      </p>
+      <p className="mt-2 text-[10px] text-gray-400">* Supabase 연동 후 자동 반영 예정</p>
     </div>
   );
 }
 
-// 급여 시뮬레이션 간단 요약 (DEMO)
+// 급여 시뮬레이션 (DEMO)
 function SalarySimulationSummary({ staff }: { staff: Staff }) {
   const base = staff.base ?? 3_000_000;
   const scenarios = [
@@ -195,21 +194,17 @@ function SalarySimulationSummary({ staff }: { staff: Staff }) {
   ];
 
   return (
-    <div className="border border-blue-100 p-6 bg-blue-50/40 rounded-[1.75rem] shadow-sm">
-      <h3 className="text-[11px] font-black text-blue-700 uppercase tracking-widest mb-4">
-        Salary Simulation (DEMO)
-      </h3>
-      <div className="space-y-2 text-xs font-bold text-gray-700">
+    <div className="border border-gray-200 p-4 bg-[#f8fafc] rounded-lg shadow-sm">
+      <h3 className="text-sm font-semibold text-gray-800 mb-3">급여 시뮬레이션 (DEMO)</h3>
+      <div className="space-y-1.5 text-xs font-medium text-gray-700">
         {scenarios.map((s) => (
           <div key={s.name} className="flex justify-between">
             <span>{s.name}</span>
-            <span className="text-blue-700">{s.total.toLocaleString()}원</span>
+            <span className="text-blue-600">{s.total.toLocaleString()}원</span>
           </div>
         ))}
       </div>
-      <p className="mt-3 text-[10px] text-blue-500">
-        * 향후 `salary_simulations` 테이블과 연동하여 실제 시나리오를 저장/비교할 수 있습니다.
-      </p>
+      <p className="mt-2 text-[10px] text-gray-500">* 시나리오 저장/비교 연동 예정</p>
     </div>
   );
 }

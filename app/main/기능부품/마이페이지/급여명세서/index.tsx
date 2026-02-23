@@ -170,9 +170,9 @@ export default function SalarySlipContainer({ user }: any) {
               <button onClick={() => changeMonth(-1)} className="w-10 h-10 rounded-full bg-white border border-gray-200 hover:bg-gray-100 flex items-center justify-center shadow-sm">◀</button>
               <button onClick={() => changeMonth(1)} className="w-10 h-10 rounded-full bg-white border border-gray-200 hover:bg-gray-100 flex items-center justify-center shadow-sm">▶</button>
             </div>
-            <h3 className="text-xl font-black text-gray-900">{currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월 내역</h3>
+            <h3 className="text-xl font-semibold text-gray-900">{currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월 내역</h3>
           </div>
-          <button onClick={handlePrint} className="px-8 py-4 bg-gray-900 text-white text-sm font-black rounded-2xl hover:bg-black transition-all flex items-center gap-2 shadow-xl">
+          <button onClick={handlePrint} className="px-8 py-4 bg-gray-900 text-white text-sm font-semibold rounded-lg hover:bg-black transition-all flex items-center gap-2 shadow-xl">
              🖨️ A4 한 장에 맞춰 인쇄
           </button>
         </div>

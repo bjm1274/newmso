@@ -241,7 +241,7 @@ function MainPageContent() {
           onOpenApproval={() => setMainMenu('전자결재')}
         />
 
-        <div className="hidden md:flex shrink-0 px-4 py-2 bg-white border-b border-[#E5E8EB] items-center gap-2 justify-end">
+        <div className="flex shrink-0 px-3 py-2 md:px-4 bg-white border-b border-[#E5E8EB] items-center gap-2 justify-end">
           <GlobalSearch
             user={user}
             staffs={data.staffs}

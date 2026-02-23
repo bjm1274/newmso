@@ -22,18 +22,20 @@ export default function TurnoverDashboard({ staffs = [] }: any) {
   const avgYears = (avgTenure / 365).toFixed(1);
 
   return (
-    <div className="border border-gray-200 p-6 bg-white rounded-[1.75rem] shadow-sm">
-      <h3 className="text-[11px] font-black text-slate-600 uppercase tracking-widest mb-4">이직률 · 근속률</h3>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="p-4 bg-red-50 rounded-xl">
-          <p className="text-[10px] font-bold text-red-600 uppercase">이직률</p>
-          <p className="text-2xl font-black text-red-700">{turnover}%</p>
-          <p className="text-[10px] text-red-500">퇴사 {resigned}명 / 전체 {total}명</p>
+    <div className="border border-gray-200 p-4 bg-white rounded-lg shadow-sm">
+      <div className="pb-2 border-b border-gray-100 mb-3">
+        <h3 className="text-sm font-semibold text-gray-800">이직률 · 근속률</h3>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="p-3 bg-[#f8fafc] rounded-lg border border-gray-200">
+          <p className="text-xs font-medium text-gray-500">이직률</p>
+          <p className="text-lg font-bold text-red-600 mt-0.5">{turnover}%</p>
+          <p className="text-[10px] text-gray-500 mt-1">퇴사 {resigned}명 / 전체 {total}명</p>
         </div>
-        <div className="p-4 bg-blue-50 rounded-xl">
-          <p className="text-[10px] font-bold text-blue-600 uppercase">평균 근속</p>
-          <p className="text-2xl font-black text-blue-700">{avgYears}년</p>
-          <p className="text-[10px] text-blue-500">재직 {active}명 기준</p>
+        <div className="p-3 bg-[#f8fafc] rounded-lg border border-gray-200">
+          <p className="text-xs font-medium text-gray-500">평균 근속</p>
+          <p className="text-lg font-bold text-blue-600 mt-0.5">{avgYears}년</p>
+          <p className="text-[10px] text-gray-500 mt-1">재직 {active}명 기준</p>
         </div>
       </div>
     </div>

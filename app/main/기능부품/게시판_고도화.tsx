@@ -114,7 +114,7 @@ export default function BoardAdvanced() {
           <button
             key={board.id}
             onClick={() => setActiveBoard(board.id)}
-            className={`px-6 py-3 font-black text-sm transition-all rounded-lg ${
+            className={`px-6 py-3 font-semibold text-sm transition-all rounded-lg ${
               activeBoard === board.id
                 ? 'bg-blue-600 text-white'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -129,7 +129,7 @@ export default function BoardAdvanced() {
       <div className="flex justify-end">
         <button
           onClick={() => setShowCreateModal(true)}
-          className="px-6 py-3 bg-blue-600 text-white rounded-lg font-black hover:bg-blue-700 transition-all"
+          className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-all"
         >
           + 새 글 작성
         </button>
@@ -146,7 +146,7 @@ export default function BoardAdvanced() {
             >
               <div className="flex justify-between items-start gap-4">
                 <div className="flex-1">
-                  <h3 className="font-black text-lg text-gray-800 group-hover:text-blue-600 transition-all">
+                  <h3 className="font-semibold text-lg text-gray-800 group-hover:text-blue-600 transition-all">
                     {post.title}
                   </h3>
                   <p className="text-sm text-gray-600 mt-2 line-clamp-2">
@@ -160,31 +160,31 @@ export default function BoardAdvanced() {
                         <p className="font-bold text-gray-600">
                           {activeBoard === '수술' ? '수술명' : '검사명'}
                         </p>
-                        <p className="font-black text-gray-800 mt-1">
+                        <p className="font-semibold text-gray-800 mt-1">
                           {post.surgery_name || post.exam_name || '-'}
                         </p>
                       </div>
                       <div className="bg-gray-50 p-3 rounded-lg">
                         <p className="font-bold text-gray-600">환자명</p>
-                        <p className="font-black text-gray-800 mt-1">
+                        <p className="font-semibold text-gray-800 mt-1">
                           {post.patient_name || '-'}
                         </p>
                       </div>
                       <div className="bg-gray-50 p-3 rounded-lg">
                         <p className="font-bold text-gray-600">예정 시간</p>
-                        <p className="font-black text-gray-800 mt-1">
+                        <p className="font-semibold text-gray-800 mt-1">
                           {post.scheduled_time || '-'}
                         </p>
                       </div>
                       <div className="bg-gray-50 p-3 rounded-lg">
                         <p className="font-bold text-gray-600">담당의</p>
-                        <p className="font-black text-gray-800 mt-1">
+                        <p className="font-semibold text-gray-800 mt-1">
                           {post.doctor_name || '-'}
                         </p>
                       </div>
                       <div className="bg-gray-50 p-3 rounded-lg">
                         <p className="font-bold text-gray-600">방향</p>
-                        <p className="font-black text-gray-800 mt-1">
+                        <p className="font-semibold text-gray-800 mt-1">
                           {post.side || '-'}
                         </p>
                       </div>
@@ -192,37 +192,37 @@ export default function BoardAdvanced() {
                         <>
                           <div className="bg-blue-50 p-3 rounded-lg">
                             <p className="font-bold text-blue-600">금식</p>
-                            <p className="font-black text-blue-800 mt-1">
+                            <p className="font-semibold text-blue-800 mt-1">
                               {post.fasting ? '필수' : '불필요'}
                             </p>
                           </div>
                           <div className="bg-blue-50 p-3 rounded-lg">
                             <p className="font-bold text-blue-600">보호자</p>
-                            <p className="font-black text-blue-800 mt-1">
+                            <p className="font-semibold text-blue-800 mt-1">
                               {post.guardian ? '있음' : '없음'}
                             </p>
                           </div>
                           <div className="bg-red-50 p-3 rounded-lg">
                             <p className="font-bold text-red-600">수혈</p>
-                            <p className="font-black text-red-800 mt-1">
+                            <p className="font-semibold text-red-800 mt-1">
                               {post.blood_transfusion ? '필요' : '불필요'}
                             </p>
                           </div>
                           <div className="bg-blue-50 p-3 rounded-lg">
                             <p className="font-bold text-blue-600">보호자 상주</p>
-                            <p className="font-black text-blue-800 mt-1">
+                            <p className="font-semibold text-blue-800 mt-1">
                               {post.guardian_stay ? '상주' : '비상주'}
                             </p>
                           </div>
                           <div className="bg-blue-50 p-3 rounded-lg">
                             <p className="font-bold text-blue-600">입원 여부</p>
-                            <p className="font-black text-blue-800 mt-1">
+                            <p className="font-semibold text-blue-800 mt-1">
                               {post.hospitalization ? '입원' : '당일 퇴원'}
                             </p>
                           </div>
                           <div className="bg-gray-50 p-3 rounded-lg">
                             <p className="font-bold text-gray-600">특이사항</p>
-                            <p className="font-black text-gray-800 mt-1 text-xs">
+                            <p className="font-semibold text-gray-800 mt-1 text-xs">
                               {post.notes || '-'}
                             </p>
                           </div>
@@ -253,7 +253,7 @@ export default function BoardAdvanced() {
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-8 w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-black text-gray-800 mb-6">
+            <h3 className="text-xl font-semibold text-gray-800 mb-6">
               {boards.find((b) => b.id === activeBoard)?.label} - 새 글 작성
             </h3>
 

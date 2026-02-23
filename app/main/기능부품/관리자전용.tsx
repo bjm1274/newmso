@@ -58,15 +58,15 @@ export default function AdminView({ user, staffs = [], depts = [], onRefresh }: 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-[#FDFDFD] h-full relative animate-in fade-in duration-500">
       <header className="px-4 md:px-10 py-4 md:py-8 flex justify-end items-center bg-white border-b border-gray-100 shrink-0 shadow-sm flex-wrap gap-4">
-        <div className="flex gap-1 bg-[#F2F4F6] p-1 border border-[#E5E8EB] rounded-[12px] overflow-x-auto max-w-full">
+        <div className="flex gap-0.5 p-1 bg-[#eef2f7] rounded-lg border border-gray-200 overflow-x-auto max-w-full">
           {adminTabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2 text-[10px] font-bold whitespace-nowrap rounded-[12px] transition-all ${
+              className={`px-4 py-2 text-xs font-medium whitespace-nowrap rounded-md transition-all ${
                 activeTab === tab.id
-                  ? 'bg-white text-[#3182F6] shadow-sm'
-                  : 'text-gray-400'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-white/60'
               }`}
             >
               {tab.label}

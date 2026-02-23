@@ -85,6 +85,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
         initialData[s.id] = {
           base_salary: s.base_salary || 0,
           meal_allowance: s.meal_allowance || 0,
+          night_duty_allowance: s.night_duty_allowance || 0,
           vehicle_allowance: s.vehicle_allowance || 0,
           childcare_allowance: s.childcare_allowance || 0,
           research_allowance: s.research_allowance || 0,
@@ -96,6 +97,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
           apply_insurance: true,
           attendance_deduction: total,
           attendance_deduction_detail: detail,
+          advance_pay: 0,
         };
       });
       setSettlementData(initialData);
@@ -128,10 +130,12 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
     const childcare_tf = Math.min(Number(data.childcare_allowance), TAX_FREE_LIMITS.childcare);
     const childcare_taxable = Math.max(0, Number(data.childcare_allowance) - TAX_FREE_LIMITS.childcare);
 
+    const nightDuty = Number(data.night_duty_allowance) || 0;
+
     const research_tf = Math.min(Number(data.research_allowance), TAX_FREE_LIMITS.research);
     const research_taxable = Math.max(0, Number(data.research_allowance) - TAX_FREE_LIMITS.research);
 
-    const total_taxfree = meal_tf + vehicle_tf + childcare_tf + research_tf + Number(data.other_taxfree);
+    const total_taxfree = meal_tf + vehicle_tf + childcare_tf + research_tf + nightDuty + Number(data.other_taxfree);
     
     // 과세 대상: 기본급 + 한도초과 비과세분 + 연장수당 + 상여 + 기타수당 - 근태차감
     const attendance_deduction = Number(data.attendance_deduction) || 0;
@@ -139,23 +143,37 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
                           Number(data.overtime_pay) + Number(data.bonus) + Number(data.extra_allowance) - attendance_deduction;
 
     const total_payment = total_taxable + total_taxfree;
-    
-    // 공제 계산 (과세 대상 기준)
-    let deduction = 0;
+
+    // 공제 상세: 4대보험·소득세는 과세표준(급여−비과세) 기준, 항목별 계산 (학습 문서 §8·§14.3)
+    let national_pension = 0, health_insurance = 0, long_term_care = 0, employment_insurance = 0, income_tax = 0, local_tax = 0;
     if (data.apply_insurance) {
-      deduction += total_taxable * 0.0932; // 4대보험 약 9.32% (국민4.5+건강3.545+장기0.459+고용0.9)
+      national_pension = Math.floor(total_taxable * 0.045);   // 국민연금 근로자 4.5%
+      health_insurance = Math.floor(total_taxable * 0.03545);  // 건강보험 근로자 3.545%
+      long_term_care = Math.floor(health_insurance * 0.1295); // 장기요양 12.95%
+      employment_insurance = Math.floor(total_taxable * 0.009); // 고용보험 근로자 0.9%
     }
     if (data.apply_tax) {
-      deduction += total_taxable * 0.033; // 소득세/지방소득세 약 3.3% (간이세액표 기준 근사치)
+      income_tax = Math.floor(total_taxable * 0.03);  // 소득세 간이세액표 근사
+      local_tax = Math.floor(income_tax * 0.1 / 10) * 10; // 지방소득세 10%, 10원 단위 절사 (국고금관리법 제47조)
     }
+    const deduction = national_pension + health_insurance + long_term_care + employment_insurance + income_tax + local_tax;
+    const deductionDetail = {
+      national_pension,
+      health_insurance,
+      long_term_care,
+      employment_insurance,
+      income_tax,
+      local_tax
+    };
 
     return {
       taxable: total_taxable,
       taxfree: total_taxfree,
       total: total_payment,
-      deduction: Math.floor(deduction),
+      deduction,
+      deductionDetail,
       attendance_deduction,
-      net: total_payment - Math.floor(deduction)
+      net: total_payment - deduction
     };
   };
 
@@ -164,14 +182,18 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
     
     setLoading(true);
     try {
+      const advancePayAmount = (id: string) => Number(settlementData[id]?.advance_pay) || 0;
       const records = selectedStaffs.map(s => {
-        const calc = calculateSalary(s.id);
         const data = settlementData[s.id];
+        const advancePay = advancePayAmount(s.id);
+        const isAdvanceOnly = advancePay > 0;
+        const calc = isAdvanceOnly ? null : calculateSalary(s.id);
         return {
           staff_id: s.id,
           year_month: yearMonth,
           base_salary: data.base_salary,
           meal_allowance: data.meal_allowance,
+          night_duty_allowance: data.night_duty_allowance ?? 0,
           vehicle_allowance: data.vehicle_allowance,
           childcare_allowance: data.childcare_allowance,
           research_allowance: data.research_allowance,
@@ -179,12 +201,14 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
           extra_allowance: data.extra_allowance,
           overtime_pay: data.overtime_pay,
           bonus: data.bonus,
-          total_taxable: calc.taxable,
-          total_taxfree: calc.taxfree,
-          total_deduction: calc.deduction,
-          net_pay: calc.net,
+          total_taxable: isAdvanceOnly ? 0 : calc!.taxable,
+          total_taxfree: isAdvanceOnly ? 0 : calc!.taxfree,
+          total_deduction: isAdvanceOnly ? 0 : calc!.deduction,
+          deduction_detail: isAdvanceOnly ? {} : (calc!.deductionDetail || {}),
+          net_pay: isAdvanceOnly ? advancePay : calc!.net,
           attendance_deduction: data.attendance_deduction || 0,
           attendance_deduction_detail: data.attendance_deduction_detail || {},
+          advance_pay: advancePay,
           status: '확정'
         };
       });
@@ -204,54 +228,54 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
   };
 
   return (
-    <div className="bg-white border border-gray-100 shadow-2xl rounded-[2.5rem] overflow-hidden animate-in slide-in-from-bottom-4 duration-500">
-      <div className="p-8 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
+    <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden animate-in fade-in duration-300">
+      <div className="bg-[#f8fafc] border-b border-gray-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h3 className="text-xl font-black text-gray-900 tracking-tighter italic">전문 급여 정산 시스템</h3>
-          <p className="text-[10px] text-blue-600 font-bold mt-1 tracking-widest">법적 비과세 한도를 자동 반영하는 급여 정산</p>
+          <h2 className="text-lg font-bold text-gray-900">급여 정산</h2>
+          <p className="text-xs text-gray-500 mt-0.5">법적 비과세 한도 자동 반영</p>
         </div>
-        <div className="flex gap-2">
-          {[1, 2, 3].map(s => (
-            <div key={s} className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all ${step >= s ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-200 text-gray-400'}`}>
-              {s}
+        <div className="flex border border-gray-200 rounded-lg p-0.5 bg-white">
+          {[
+            { step: 1, label: '대상 선택' },
+            { step: 2, label: '수당·공제' },
+            { step: 3, label: '완료' },
+          ].map(({ step: s, label }) => (
+            <div key={s} className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${step === s ? 'bg-blue-600 text-white' : step > s ? 'text-blue-600' : 'text-gray-400'}`}>
+              {s}. {label}
             </div>
           ))}
         </div>
       </div>
 
-      <div className="p-8">
+      <div className="p-6">
         {step === 1 && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-end flex-wrap gap-4">
-              <div className="flex items-center gap-4">
-                <div>
-                  <label className="text-[10px] font-black text-gray-400 uppercase">정산 월</label>
-                  <input type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="ml-2 p-2 border rounded-xl text-sm font-bold" />
-                </div>
-                <p className="text-sm font-bold text-gray-500">정산 대상을 선택하세요. (근태 자동 반영)</p>
+          <div className="space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <label className="text-sm text-gray-600">정산 월</label>
+                <input type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="h-9 px-3 border border-gray-300 rounded-md text-sm font-medium" />
               </div>
-              <button onClick={() => setSelectedStaffs(filteredStaffs)} className="text-[10px] font-black text-blue-600 hover:underline">전체 선택</button>
+              <p className="text-sm text-gray-500">정산 대상을 선택하세요. (근태 자동 반영)</p>
+              <button onClick={() => setSelectedStaffs(filteredStaffs)} className="text-sm font-medium text-blue-600 hover:underline">전체 선택</button>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[400px] overflow-y-auto p-2 custom-scrollbar">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[380px] overflow-y-auto custom-scrollbar">
               {filteredStaffs.map((s: any) => (
-                <div 
-                  key={s.id} 
+                <div
+                  key={s.id}
                   onClick={() => toggleStaff(s)}
-                  className={`p-5 rounded-2xl border-2 cursor-pointer transition-all flex items-center gap-4 ${
-                    selectedStaffs.find(ts => ts.id === s.id) ? 'border-blue-600 bg-blue-50 shadow-md' : 'border-gray-100 bg-white hover:border-gray-200'
+                  className={`p-4 rounded-lg border cursor-pointer transition-colors flex items-center gap-3 ${
+                    selectedStaffs.find(ts => ts.id === s.id) ? 'border-blue-500 bg-blue-50/70 ring-1 ring-blue-200' : 'border-gray-200 bg-white hover:bg-gray-50'
                   }`}
                 >
-                  <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center font-black text-blue-600 shadow-sm border border-gray-100">
-                    {s.name[0]}
-                  </div>
+                  <div className="w-10 h-10 rounded-lg bg-[#eef2f7] flex items-center justify-center text-sm font-semibold text-blue-700">{s.name[0]}</div>
                   <div>
-                    <p className="text-sm font-black text-gray-900">{s.name}</p>
-                    <p className="text-[10px] font-bold text-gray-400">기본급: ₩{(s.base_salary || 0).toLocaleString()}</p>
+                    <p className="text-sm font-medium text-gray-900">{s.name}</p>
+                    <p className="text-xs text-gray-500">기본급 ₩{(s.base_salary || 0).toLocaleString()}</p>
                   </div>
                 </div>
               ))}
             </div>
-            <button onClick={handleNextStep} disabled={loading} className="w-full py-5 bg-gray-900 text-white font-black rounded-2xl text-sm shadow-xl hover:scale-[0.99] transition-all disabled:opacity-50">{loading ? '로딩 중...' : '다음 단계: 수당 설정 및 정산'}</button>
+            <button onClick={handleNextStep} disabled={loading} className="w-full py-3.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50">{loading ? '로딩 중...' : '다음: 수당 설정 및 정산'}</button>
           </div>
         )}
 
@@ -259,89 +283,93 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
           <div className="space-y-8">
             <div className="max-h-[500px] overflow-y-auto space-y-6 p-2 custom-scrollbar">
               {selectedStaffs.map((s: any) => {
-                const res = calculateSalary(s.id);
                 const data = settlementData[s.id];
+                const advancePay = Number(data?.advance_pay) || 0;
+                const isAdvanceOnly = advancePay > 0;
+                const res = isAdvanceOnly ? { net: advancePay, taxable: 0, taxfree: 0 } : calculateSalary(s.id);
                 return (
-                  <div key={s.id} className="p-8 bg-gray-50 border border-gray-100 rounded-[2.5rem] space-y-6">
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-3">
-                        <span className="px-3 py-1 bg-blue-600 text-white text-[10px] font-black rounded-lg">{s.company}</span>
-                        <span className="text-lg font-black text-gray-900">{s.name}</span>
+                  <div key={s.id} className="p-5 bg-[#f8fafc] border border-gray-200 rounded-lg space-y-5">
+                    <div className="flex justify-between items-center flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded">{s.company}</span>
+                        <span className="text-base font-semibold text-gray-900">{s.name}</span>
+                        {isAdvanceOnly && <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-xs font-medium rounded">선지급</span>}
                       </div>
                       <div className="text-right">
-                        <p className="text-[10px] font-black text-gray-400 uppercase">최종 실수령액</p>
-                        <p className="text-xl font-black text-blue-600">₩ {res.net.toLocaleString()}</p>
+                        <p className="text-xs text-gray-500">차인지급액</p>
+                        <p className="text-lg font-semibold text-blue-600">₩ {res.net.toLocaleString()}</p>
                       </div>
                     </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">기본급 (계약연동)</label>
-                        <input type="number" value={data.base_salary} readOnly className="w-full p-4 bg-gray-100 border border-gray-200 rounded-xl font-black text-sm text-gray-500 outline-none" />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-gray-600">과세 · 기본급</label>
+                        <input type="number" value={data.base_salary} readOnly className="w-full h-9 px-3 bg-gray-100 border border-gray-200 rounded-md text-sm text-gray-600" />
                       </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest">기타 수당 (추가입력)</label>
-                        <input type="number" value={data.extra_allowance} onChange={(e) => updateData(s.id, 'extra_allowance', e.target.value)} className="w-full p-4 bg-white border-2 border-blue-200 rounded-xl font-black text-sm outline-none focus:border-blue-600 transition-all" placeholder="0" />
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-gray-600">기타 수당</label>
+                        <input type="number" value={data.extra_allowance} onChange={(e) => updateData(s.id, 'extra_allowance', e.target.value)} className="w-full h-9 px-3 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="0" />
                       </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">연장/상여</label>
-                        <input type="number" value={Number(data.overtime_pay) + Number(data.bonus)} onChange={(e) => updateData(s.id, 'overtime_pay', e.target.value)} className="w-full p-4 bg-white border border-gray-200 rounded-xl font-black text-sm outline-none focus:border-blue-600 transition-all" />
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-gray-600">비과세 · 당직수당(야간)</label>
+                        <input type="number" value={Number(data.night_duty_allowance) || 0} onChange={(e) => updateData(s.id, 'night_duty_allowance', e.target.value)} className="w-full h-9 px-3 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500" placeholder="0" />
                       </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">비과세 합계 (한도 자동체크)</label>
-                        <div className="w-full p-4 bg-gray-100 border border-gray-200 rounded-xl font-black text-sm text-green-600">
-                          ₩ {res.taxfree.toLocaleString()}
-                        </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-gray-600">연장/상여</label>
+                        <input type="number" value={Number(data.overtime_pay) + Number(data.bonus)} onChange={(e) => updateData(s.id, 'overtime_pay', e.target.value)} className="w-full h-9 px-3 border border-gray-300 rounded-md text-sm" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-amber-700">선지급 (원)</label>
+                        <input type="number" min={0} value={advancePay} onChange={(e) => updateData(s.id, 'advance_pay', Number(e.target.value) || 0)} className="w-full h-9 px-3 border border-amber-200 rounded-md text-sm focus:ring-2 focus:ring-amber-400" placeholder="0" />
+                        <p className="text-[10px] text-gray-500">0 초과 시 해당 월 선지급만 적용</p>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-gray-600">비과세 합계</label>
+                        <div className="h-9 px-3 flex items-center bg-gray-100 border border-gray-200 rounded-md text-sm font-medium text-gray-700">₩ {(isAdvanceOnly ? 0 : res.taxfree).toLocaleString()}</div>
                       </div>
                       {(data.attendance_deduction || 0) > 0 && (
-                        <div className="col-span-full space-y-2">
-                          <label className="text-[10px] font-black text-orange-600 uppercase tracking-widest">근태 차감 (지각/조퇴/결근 자동 반영)</label>
-                          <div className="p-4 bg-orange-50 border border-orange-100 rounded-xl font-black text-sm text-orange-700">
+                        <div className="sm:col-span-2 lg:col-span-3 space-y-1">
+                          <label className="text-xs font-medium text-orange-700">근태 차감</label>
+                          <div className="px-3 py-2 bg-orange-50 border border-orange-200 rounded-md text-sm font-medium text-orange-800">
                             -₩ {(data.attendance_deduction || 0).toLocaleString()}
                             {data.attendance_deduction_detail && Object.keys(data.attendance_deduction_detail).length > 0 && (
-                              <span className="ml-2 text-xs font-bold text-orange-500">
-                                (지각 {data.attendance_deduction_detail.late || 0}원 / 조퇴 {data.attendance_deduction_detail.early_leave || 0}원 / 결근 {data.attendance_deduction_detail.absent || 0}원)
-                              </span>
+                              <span className="ml-2 text-xs text-orange-600">(지각/조퇴/결근)</span>
                             )}
                           </div>
                         </div>
                       )}
                     </div>
-
-                    <div className="flex justify-between items-center pt-4 border-t border-gray-200/50">
-                      <div className="flex gap-6">
-                        <label className="flex items-center gap-2 cursor-pointer group">
-                          <input type="checkbox" checked={data.apply_insurance} onChange={(e) => updateData(s.id, 'apply_insurance', e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                          <span className="text-[11px] font-black text-gray-500 group-hover:text-gray-900">4대보험 적용</span>
+                    <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-gray-200">
+                      <div className="flex gap-4">
+                        <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-600">
+                          <input type="checkbox" checked={data.apply_insurance} onChange={(e) => updateData(s.id, 'apply_insurance', e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-blue-600" />
+                          4대보험
                         </label>
-                        <label className="flex items-center gap-2 cursor-pointer group">
-                          <input type="checkbox" checked={data.apply_tax} onChange={(e) => updateData(s.id, 'apply_tax', e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                          <span className="text-[11px] font-black text-gray-500 group-hover:text-gray-900">소득세 적용</span>
+                        <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-600">
+                          <input type="checkbox" checked={data.apply_tax} onChange={(e) => updateData(s.id, 'apply_tax', e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-blue-600" />
+                          소득세
                         </label>
                       </div>
-                      <p className="text-[10px] font-bold text-gray-400">과세대상: ₩{res.taxable.toLocaleString()} / 비과세: ₩{res.taxfree.toLocaleString()}</p>
+                      <p className="text-xs text-gray-500">과세 ₩{(isAdvanceOnly ? 0 : res.taxable).toLocaleString()} / 비과세 ₩{(isAdvanceOnly ? 0 : res.taxfree).toLocaleString()}</p>
                     </div>
                   </div>
                 );
               })}
             </div>
-            <div className="flex gap-4">
-              <button onClick={() => setStep(1)} className="flex-1 py-5 bg-white border border-gray-200 text-gray-400 font-black rounded-2xl text-sm hover:bg-gray-50 transition-all">이전 단계</button>
-              <button onClick={handleFinalize} disabled={loading} className="flex-[2] py-5 bg-blue-600 text-white font-black rounded-2xl text-sm shadow-xl hover:scale-[0.99] transition-all disabled:opacity-50">
-                {loading ? '처리 중...' : '급여 정산 확정 및 명세서 생성'}
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setStep(1)} className="flex-1 py-3 bg-white border border-gray-300 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-50">이전</button>
+              <button onClick={handleFinalize} disabled={loading} className="flex-[2] py-3 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                {loading ? '처리 중...' : '저장하기 · 정산 확정'}
               </button>
             </div>
           </div>
         )}
 
         {step === 3 && (
-          <div className="py-20 text-center space-y-6 animate-in zoom-in duration-500">
-            <div className="w-24 h-24 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-4xl mx-auto shadow-inner">✓</div>
-            <h3 className="text-2xl font-black text-gray-900 tracking-tighter">급여 정산이 완료되었습니다!</h3>
-            <p className="text-sm text-gray-500 font-bold">
-              법적 비과세 한도가 자동 적용된 명세서가 생성되었습니다.
-            </p>
-            <button onClick={() => setStep(1)} className="px-10 py-4 bg-gray-900 text-white font-black rounded-2xl text-xs shadow-xl hover:scale-[0.98] transition-all">처음으로 돌아가기</button>
+          <div className="py-16 text-center space-y-5 animate-in fade-in duration-300">
+            <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-3xl mx-auto">✓</div>
+            <h3 className="text-xl font-bold text-gray-900">정산이 완료되었습니다</h3>
+            <p className="text-sm text-gray-500">명세서가 생성되었습니다. 대장에서 확인하세요.</p>
+            <button onClick={() => setStep(1)} className="px-6 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700">다시 정산하기</button>
           </div>
         )}
       </div>

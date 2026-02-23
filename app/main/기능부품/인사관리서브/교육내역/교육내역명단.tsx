@@ -26,7 +26,7 @@ export default function EducationList({ selectedCo, staffs, notifications = [] }
   return (
     <div className="bg-white border border-gray-100 shadow-sm overflow-hidden">
       <div className="p-6 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
-        <h3 className="text-[11px] font-black text-gray-400 uppercase tracking-widest">직원별 교육 이수 내역 (2026년)</h3>
+        <h3 className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">직원별 교육 이수 내역 (2026년)</h3>
         <div className="flex gap-4">
           <div className="flex items-center gap-1.5">
             <div className="w-2 h-2 bg-green-500 rounded-full"></div>
@@ -44,7 +44,7 @@ export default function EducationList({ selectedCo, staffs, notifications = [] }
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse min-w-[1000px]">
-          <thead className="bg-white text-[9px] font-black text-gray-300 border-b border-gray-100 uppercase">
+          <thead className="bg-white text-[9px] font-semibold text-gray-300 border-b border-gray-100 uppercase">
             <tr>
               <th className="p-4 sticky left-0 bg-white z-10 w-32 border-r border-gray-50">성명 / 소속</th>
               {eduItems.map(item => (
@@ -70,7 +70,7 @@ export default function EducationList({ selectedCo, staffs, notifications = [] }
                 <tr key={s.id} className="hover:bg-gray-25 transition-colors">
                   <td className="p-4 sticky left-0 bg-white z-10 border-r border-gray-50">
                     <div className="flex flex-col">
-                      <span className="text-xs font-black text-gray-800">{s.name}</span>
+                      <span className="text-xs font-semibold text-gray-800">{s.name}</span>
                       <span className="text-[9px] text-gray-300 font-bold">{s.company}</span>
                     </div>
                   </td>
@@ -82,13 +82,13 @@ export default function EducationList({ selectedCo, staffs, notifications = [] }
                       <td key={idx} className="p-4 text-center">
                         {isUrgent ? (
                           <div className="flex flex-col items-center gap-1">
-                            <span className="px-2 py-1 text-[9px] font-black border bg-orange-50 text-orange-600 border-orange-100 animate-pulse">
+                            <span className="px-2 py-1 text-[9px] font-semibold border bg-orange-50 text-orange-600 border-orange-100 animate-pulse">
                               기한임박
                             </span>
                             <span className="text-[8px] font-bold text-orange-400">7일 남음</span>
                           </div>
                         ) : (
-                          <span className={`px-2 py-1 text-[9px] font-black border ${isCompleted ? 'bg-green-50 text-green-600 border-green-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
+                          <span className={`px-2 py-1 text-[9px] font-semibold border ${isCompleted ? 'bg-green-50 text-green-600 border-green-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
                             {isCompleted ? '이수완료' : '미이수'}
                           </span>
                         )}

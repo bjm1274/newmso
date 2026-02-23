@@ -62,13 +62,13 @@ export default function AnnualLeaveManualGrant({ staffs = [], onRefresh }: { sta
 
   return (
     <div className="bg-white border border-gray-100 rounded-[2rem] p-8 shadow-xl max-w-5xl">
-      <h3 className="text-xl font-black text-gray-900 mb-2">연차 개수 수동 부여</h3>
+      <h3 className="text-xl font-semibold text-gray-900 mb-2">연차 개수 수동 부여</h3>
       <p className="text-[10px] text-gray-500 font-bold mb-6">
         신규입사자 포함 모든 직원의 연차 부여일·사용일을 직접 설정할 수 있습니다. 자동 부여 규칙과 무관하게 반영됩니다.
       </p>
 
       <div className="flex items-center gap-4 mb-6">
-        <label className="text-[10px] font-black text-gray-400 uppercase">회사</label>
+        <label className="text-[10px] font-semibold text-gray-400 uppercase">회사</label>
         <select
           value={companyFilter}
           onChange={e => setCompanyFilter(e.target.value)}
@@ -91,12 +91,12 @@ export default function AnnualLeaveManualGrant({ staffs = [], onRefresh }: { sta
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="border-b border-gray-200">
-              <th className="pb-3 text-[10px] font-black text-gray-400 uppercase">이름</th>
-              <th className="pb-3 text-[10px] font-black text-gray-400 uppercase">회사/부서</th>
-              <th className="pb-3 text-[10px] font-black text-gray-400 uppercase">입사일</th>
-              <th className="pb-3 text-[10px] font-black text-gray-400 uppercase">부여 연차(일)</th>
-              <th className="pb-3 text-[10px] font-black text-gray-400 uppercase">사용 연차(일)</th>
-              <th className="pb-3 text-[10px] font-black text-gray-400 uppercase">동작</th>
+              <th className="pb-3 text-[10px] font-semibold text-gray-400 uppercase">이름</th>
+              <th className="pb-3 text-[10px] font-semibold text-gray-400 uppercase">회사/부서</th>
+              <th className="pb-3 text-[10px] font-semibold text-gray-400 uppercase">입사일</th>
+              <th className="pb-3 text-[10px] font-semibold text-gray-400 uppercase">부여 연차(일)</th>
+              <th className="pb-3 text-[10px] font-semibold text-gray-400 uppercase">사용 연차(일)</th>
+              <th className="pb-3 text-[10px] font-semibold text-gray-400 uppercase">동작</th>
             </tr>
           </thead>
           <tbody>
@@ -150,7 +150,7 @@ export default function AnnualLeaveManualGrant({ staffs = [], onRefresh }: { sta
           type="button"
           onClick={handleSaveAll}
           disabled={saving}
-          className="mt-6 w-full py-4 bg-teal-600 text-white font-black rounded-2xl text-sm hover:bg-teal-700 disabled:opacity-50"
+          className="mt-6 w-full py-4 bg-teal-600 text-white font-semibold rounded-lg text-sm hover:bg-teal-700 disabled:opacity-50"
         >
           {saving ? '저장 중...' : `위 ${filtered.length}명 일괄 저장`}
         </button>

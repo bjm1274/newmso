@@ -117,11 +117,11 @@ export default function AnnualLeavePromotion({ staffs, selectedCo }: { staffs: S
       <div className="bg-white p-8 border border-gray-100 shadow-xl rounded-[2.5rem]">
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h2 className="text-2xl font-black text-gray-900 tracking-tighter italic">연차사용촉진 자동화 시스템</h2>
+            <h2 className="text-2xl font-semibold text-gray-900 tracking-tighter italic">연차사용촉진 자동화 시스템</h2>
             <p className="text-[10px] text-blue-600 font-bold mt-1 uppercase tracking-widest">Annual Leave Promotion Engine</p>
           </div>
           <div className="px-4 py-2 bg-blue-50 rounded-xl">
-            <p className="text-[10px] font-black text-blue-600">현재 촉진 시기: <span className="text-sm">1차 촉진 (7월)</span></p>
+            <p className="text-[10px] font-semibold text-blue-600">현재 촉진 시기: <span className="text-sm">1차 촉진 (7월)</span></p>
           </div>
         </div>
 
@@ -129,28 +129,28 @@ export default function AnnualLeavePromotion({ staffs, selectedCo }: { staffs: S
           {promotionTargets.filter(t => t.actionRequired).map((staff: any) => (
             <div key={staff.id} className="p-6 bg-gray-50 border border-gray-100 rounded-[2rem] flex flex-col md:flex-row justify-between items-center gap-4">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center font-black text-blue-600 shadow-sm border border-gray-100">
+                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center font-semibold text-blue-600 shadow-sm border border-gray-100">
                   {staff.name[0]}
                 </div>
                 <div>
-                  <p className="text-sm font-black text-gray-900">{staff.name} <span className="text-[10px] text-gray-400 font-bold ml-1">{staff.position}</span></p>
+                  <p className="text-sm font-semibold text-gray-900">{staff.name} <span className="text-[10px] text-gray-400 font-bold ml-1">{staff.position}</span></p>
                   <p className="text-[10px] font-bold text-gray-500">{staff.company} / {staff.department}</p>
                 </div>
               </div>
               
               <div className="flex items-center gap-8">
                 <div className="text-center">
-                  <p className="text-[9px] font-black text-gray-400 uppercase">잔여 연차</p>
-                  <p className="text-lg font-black text-red-600">{staff.remainingLeave}일</p>
+                  <p className="text-[9px] font-semibold text-gray-400 uppercase">잔여 연차</p>
+                  <p className="text-lg font-semibold text-red-600">{staff.remainingLeave}일</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-[9px] font-black text-gray-400 uppercase">상태</p>
-                  <span className="px-3 py-1 bg-orange-100 text-orange-600 rounded-full text-[9px] font-black">{staff.status}</span>
+                  <p className="text-[9px] font-semibold text-gray-400 uppercase">상태</p>
+                  <span className="px-3 py-1 bg-orange-100 text-orange-600 rounded-full text-[9px] font-semibold">{staff.status}</span>
                 </div>
                 <button 
                   onClick={() => handleSendPromotion(staff)}
                   disabled={loading}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-xl text-[11px] font-black shadow-lg hover:scale-[0.98] transition-all disabled:opacity-50"
+                  className="px-6 py-3 bg-blue-600 text-white rounded-xl text-[11px] font-semibold shadow-lg hover:scale-[0.98] transition-all disabled:opacity-50"
                 >
                   ⚡ 촉진 통보 발송
                 </button>
@@ -159,14 +159,14 @@ export default function AnnualLeavePromotion({ staffs, selectedCo }: { staffs: S
           ))}
           {promotionTargets.filter(t => t.actionRequired).length === 0 && (
             <div className="text-center py-20 bg-green-50 rounded-[2rem] border border-dashed border-green-200">
-              <p className="text-sm font-black text-green-600">✅ 현재 연차사용촉진 대상자가 없습니다.</p>
+              <p className="text-sm font-semibold text-green-600">✅ 현재 연차사용촉진 대상자가 없습니다.</p>
             </div>
           )}
         </div>
       </div>
 
       <div className="bg-orange-50 p-8 rounded-[2rem] border border-orange-100">
-        <h3 className="text-sm font-black text-orange-800 mb-4">⚖️ 근로기준법 제61조 (연차 유급휴가의 사용 촉진)</h3>
+        <h3 className="text-sm font-semibold text-orange-800 mb-4">⚖️ 근로기준법 제61조 (연차 유급휴가의 사용 촉진)</h3>
         <ul className="space-y-3 text-[11px] text-orange-700 font-bold leading-relaxed">
           <li>• 1차 촉진: 연차 유급휴가 발생일로부터 1년이 끝나기 6개월 전을 기준으로 10일 이내에 서면으로 통보</li>
           <li>• 2차 촉진: 1차 촉진에도 불구하고 사용하지 아니하면 1년이 끝나기 2개월 전까지 사용 시기를 정하여 서면으로 통보</li>

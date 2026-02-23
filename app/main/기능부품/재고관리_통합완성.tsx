@@ -185,13 +185,13 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
       <header className="bg-white border-b border-gray-100 p-4 md:p-8 shrink-0 z-20 shadow-sm">
         <div className="flex justify-end items-center gap-4">
           <div className="flex gap-2 w-full md:w-auto overflow-x-auto no-scrollbar pb-1">
-            <button onClick={() => { setActiveView('UDI'); if (typeof window !== 'undefined') window.localStorage.setItem(INV_VIEW_KEY, 'UDI'); }} className={`px-4 py-2 rounded-[12px] text-[10px] font-black whitespace-nowrap transition-all ${activeView === 'UDI' ? 'bg-[#A11DFF] text-white shadow-lg' : 'bg-[#F2F4F6] text-[#4E5968]'}`}>📡 UDI</button>
-            <button onClick={() => { setActiveView('명세서'); if (typeof window !== 'undefined') window.localStorage.setItem(INV_VIEW_KEY, '명세서'); }} className={`px-4 py-2 rounded-[12px] text-[10px] font-black whitespace-nowrap transition-all ${activeView === '명세서' ? 'bg-[#00B44E] text-white shadow-lg' : 'bg-[#F2F4F6] text-[#4E5968]'}`}>📄 명세서</button>
-            <button onClick={() => { setActiveView('발주'); if (typeof window !== 'undefined') window.localStorage.setItem(INV_VIEW_KEY, '발주'); }} className={`px-4 py-2 rounded-[12px] text-[10px] font-black whitespace-nowrap transition-all ${activeView === '발주' ? 'bg-[#FF6B00] text-white shadow-lg' : 'bg-[#F2F4F6] text-[#4E5968]'}`}>📝 발주</button>
-            <button onClick={() => { setActiveView('스캔'); if (typeof window !== 'undefined') window.localStorage.setItem(INV_VIEW_KEY, '스캔'); }} className={`px-4 py-2 rounded-[12px] text-[10px] font-black whitespace-nowrap transition-all ${activeView === '스캔' ? 'bg-[#3182F6] text-white shadow-sm' : 'bg-[#F2F4F6] text-[#4E5968]'}`}>🔍 스캔</button>
-            <button onClick={() => { setActiveView('등록'); if (typeof window !== 'undefined') window.localStorage.setItem(INV_VIEW_KEY, '등록'); }} className={`px-4 py-2 rounded-[12px] text-[10px] font-black whitespace-nowrap transition-all ${activeView === '등록' ? 'bg-[#3182F6] text-white shadow-sm' : 'bg-[#F2F4F6] text-[#4E5968]'}`}>+ 등록</button>
-            <button onClick={() => { setActiveView('현황'); if (typeof window !== 'undefined') window.localStorage.setItem(INV_VIEW_KEY, '현황'); }} className={`px-4 py-2 rounded-[12px] text-[10px] font-black whitespace-nowrap transition-all ${activeView === '현황' ? 'bg-[var(--toss-blue)] text-white shadow-sm' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'}`}>📊 현황</button>
-            <button onClick={() => { setShowLogs(true); fetchLogs(); }} className="px-4 py-2 rounded-[12px] text-[10px] font-black whitespace-nowrap transition-all bg-[#F2F4F6] text-[#4E5968] hover:bg-[#E5E8EB]">📋 이력</button>
+            <button onClick={() => { setActiveView('UDI'); if (typeof window !== 'undefined') window.localStorage.setItem(INV_VIEW_KEY, 'UDI'); }} className={`px-4 py-2 rounded-[12px] text-[10px] font-semibold whitespace-nowrap transition-all ${activeView === 'UDI' ? 'bg-[#A11DFF] text-white shadow-lg' : 'bg-[#F2F4F6] text-[#4E5968]'}`}>📡 UDI</button>
+            <button onClick={() => { setActiveView('명세서'); if (typeof window !== 'undefined') window.localStorage.setItem(INV_VIEW_KEY, '명세서'); }} className={`px-4 py-2 rounded-[12px] text-[10px] font-semibold whitespace-nowrap transition-all ${activeView === '명세서' ? 'bg-[#00B44E] text-white shadow-lg' : 'bg-[#F2F4F6] text-[#4E5968]'}`}>📄 명세서</button>
+            <button onClick={() => { setActiveView('발주'); if (typeof window !== 'undefined') window.localStorage.setItem(INV_VIEW_KEY, '발주'); }} className={`px-4 py-2 rounded-[12px] text-[10px] font-semibold whitespace-nowrap transition-all ${activeView === '발주' ? 'bg-[#FF6B00] text-white shadow-lg' : 'bg-[#F2F4F6] text-[#4E5968]'}`}>📝 발주</button>
+            <button onClick={() => { setActiveView('스캔'); if (typeof window !== 'undefined') window.localStorage.setItem(INV_VIEW_KEY, '스캔'); }} className={`px-4 py-2 rounded-[12px] text-[10px] font-semibold whitespace-nowrap transition-all ${activeView === '스캔' ? 'bg-[#3182F6] text-white shadow-sm' : 'bg-[#F2F4F6] text-[#4E5968]'}`}>🔍 스캔</button>
+            <button onClick={() => { setActiveView('등록'); if (typeof window !== 'undefined') window.localStorage.setItem(INV_VIEW_KEY, '등록'); }} className={`px-4 py-2 rounded-[12px] text-[10px] font-semibold whitespace-nowrap transition-all ${activeView === '등록' ? 'bg-[#3182F6] text-white shadow-sm' : 'bg-[#F2F4F6] text-[#4E5968]'}`}>+ 등록</button>
+            <button onClick={() => { setActiveView('현황'); if (typeof window !== 'undefined') window.localStorage.setItem(INV_VIEW_KEY, '현황'); }} className={`px-4 py-2 rounded-[12px] text-[10px] font-semibold whitespace-nowrap transition-all ${activeView === '현황' ? 'bg-[var(--toss-blue)] text-white shadow-sm' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'}`}>📊 현황</button>
+            <button onClick={() => { setShowLogs(true); fetchLogs(); }} className="px-4 py-2 rounded-[12px] text-[10px] font-semibold whitespace-nowrap transition-all bg-[#F2F4F6] text-[#4E5968] hover:bg-[#E5E8EB]">📋 이력</button>
           </div>
         </div>
       </header>
@@ -235,26 +235,26 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
                       className="flex-1 min-w-[160px] max-w-md px-4 py-3 rounded-[12px] border border-[#E5E8EB] bg-white text-sm font-bold focus:ring-2 focus:ring-[#3182F6]/20 focus:border-[#3182F6] outline-none"
                     />
                   </div>
-                  <button onClick={() => activeView === '현황' ? fetchInventory('전체') : fetchInventory(selectedCo)} className="px-4 py-3 rounded-[12px] bg-[#F2F4F6] text-[#4E5968] text-xs font-black hover:bg-[#E5E8EB] transition-all shrink-0">🔄 새로고침</button>
+                  <button onClick={() => activeView === '현황' ? fetchInventory('전체') : fetchInventory(selectedCo)} className="px-4 py-3 rounded-[12px] bg-[#F2F4F6] text-[#4E5968] text-xs font-semibold hover:bg-[#E5E8EB] transition-all shrink-0">🔄 새로고침</button>
                 </div>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm text-center">
+                  <div className="bg-white p-6 rounded-lg border border-gray-100 shadow-sm text-center">
                     <p className="text-[9px] font-bold text-[#8B95A1] uppercase">조회 품목</p>
-                    <p className="text-2xl font-black text-[#3182F6] mt-1">{filteredInventory.length}</p>
+                    <p className="text-2xl font-semibold text-[#3182F6] mt-1">{filteredInventory.length}</p>
                   </div>
-                  <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm text-center">
+                  <div className="bg-white p-6 rounded-lg border border-gray-100 shadow-sm text-center">
                     <p className="text-[9px] font-bold text-[#8B95A1] uppercase">안전재고 미달</p>
-                    <p className="text-2xl font-black text-red-600 mt-1">{filteredInventory.filter(i => (i.quantity ?? i.stock ?? 0) <= (i.min_quantity ?? i.min_stock ?? 0)).length}</p>
+                    <p className="text-2xl font-semibold text-red-600 mt-1">{filteredInventory.filter(i => (i.quantity ?? i.stock ?? 0) <= (i.min_quantity ?? i.min_stock ?? 0)).length}</p>
                   </div>
-                  <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm text-center">
+                  <div className="bg-white p-6 rounded-lg border border-gray-100 shadow-sm text-center">
                     <p className="text-[9px] font-bold text-[#8B95A1] uppercase">유효기간 임박</p>
-                    <p className="text-2xl font-black text-orange-600 mt-1">
+                    <p className="text-2xl font-semibold text-orange-600 mt-1">
                       {filteredInventory.filter(i => i.expiry_date && new Date(i.expiry_date).getTime() < new Date().getTime() + 30 * 24 * 60 * 60 * 1000).length}
                     </p>
                   </div>
-                  <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm text-center">
+                  <div className="bg-white p-6 rounded-lg border border-gray-100 shadow-sm text-center">
                     <p className="text-[9px] font-bold text-[#8B95A1] uppercase">조회 회사 / 부서</p>
-                    <p className="text-xs font-black text-[#191F28] mt-1 truncate">{viewCompany === '전체' ? '전체' : viewCompany}{selectedDept !== '전체' ? ` · ${selectedDept}` : ''}</p>
+                    <p className="text-xs font-semibold text-[#191F28] mt-1 truncate">{viewCompany === '전체' ? '전체' : viewCompany}{selectedDept !== '전체' ? ` · ${selectedDept}` : ''}</p>
                   </div>
                 </div>
 
@@ -263,13 +263,13 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
                     <table className="w-full text-left border-collapse min-w-[1000px]">
                       <thead>
                         <tr className="bg-[#F2F4F6]/50 border-b border-[#E5E8EB]">
-                          <th className="px-6 py-4 text-[10px] font-black text-[#8B95A1] uppercase">회사/분류</th>
-                          <th className="px-6 py-4 text-[10px] font-black text-[#8B95A1] uppercase">품목명/LOT</th>
-                          <th className="px-6 py-4 text-[10px] font-black text-[#8B95A1] uppercase text-center">현재고</th>
-                          <th className="px-6 py-4 text-[10px] font-black text-[#8B95A1] uppercase text-center">단가</th>
-                          <th className="px-6 py-4 text-[10px] font-black text-[#8B95A1] uppercase text-center">유효기간</th>
-                          <th className="px-6 py-4 text-[10px] font-black text-[#8B95A1] uppercase">상태</th>
-                          <th className="px-6 py-4 text-[10px] font-black text-[#8B95A1] uppercase text-right">관리</th>
+                          <th className="px-6 py-4 text-[10px] font-semibold text-[#8B95A1] uppercase">회사/분류</th>
+                          <th className="px-6 py-4 text-[10px] font-semibold text-[#8B95A1] uppercase">품목명/LOT</th>
+                          <th className="px-6 py-4 text-[10px] font-semibold text-[#8B95A1] uppercase text-center">현재고</th>
+                          <th className="px-6 py-4 text-[10px] font-semibold text-[#8B95A1] uppercase text-center">단가</th>
+                          <th className="px-6 py-4 text-[10px] font-semibold text-[#8B95A1] uppercase text-center">유효기간</th>
+                          <th className="px-6 py-4 text-[10px] font-semibold text-[#8B95A1] uppercase">상태</th>
+                          <th className="px-6 py-4 text-[10px] font-semibold text-[#8B95A1] uppercase text-right">관리</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
@@ -278,40 +278,40 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
                           return (
                             <tr key={item.id} className="hover:bg-[#E8F3FF]/50 transition-all group">
                               <td className="px-6 py-4">
-                                <p className="text-[9px] font-black text-[#3182F6]">{item.company}</p>
+                                <p className="text-[9px] font-semibold text-[#3182F6]">{item.company}</p>
                                 <p className="text-[8px] font-bold text-[#8B95A1]">{item.category}</p>
                               </td>
                               <td className="px-6 py-4">
-                                <p className="text-xs font-black text-[#191F28] group-hover:text-[#3182F6] transition-colors">{item.item_name}</p>
+                                <p className="text-xs font-semibold text-[#191F28] group-hover:text-[#3182F6] transition-colors">{item.item_name}</p>
                                 <div className="flex gap-1 mt-0.5">
-                                  {item.lot_number && <span className="text-[7px] font-black bg-[#F2F4F6] text-[#4E5968] px-1 py-0.5 rounded">LOT: {item.lot_number}</span>}
-                                  {item.is_udi && <span className="text-[7px] font-black bg-purple-50 text-purple-500 px-1 py-0.5 rounded uppercase">UDI</span>}
+                                  {item.lot_number && <span className="text-[7px] font-semibold bg-[#F2F4F6] text-[#4E5968] px-1 py-0.5 rounded">LOT: {item.lot_number}</span>}
+                                  {item.is_udi && <span className="text-[7px] font-semibold bg-purple-50 text-purple-500 px-1 py-0.5 rounded uppercase">UDI</span>}
                                 </div>
                               </td>
                               <td className="px-6 py-4 text-center">
-                                <span className={`text-xs font-black ${item.quantity <= item.min_quantity ? 'text-red-600' : 'text-[#191F28]'}`}>{item.quantity}</span>
+                                <span className={`text-xs font-semibold ${item.quantity <= item.min_quantity ? 'text-red-600' : 'text-[#191F28]'}`}>{item.quantity}</span>
                                 <p className="text-[8px] font-bold text-[#8B95A1]">안전: {item.min_quantity}</p>
                               </td>
                               <td className="px-6 py-4 text-center">
-                                <p className="text-xs font-black text-[#4E5968]">{item.unit_price?.toLocaleString()}원</p>
+                                <p className="text-xs font-semibold text-[#4E5968]">{item.unit_price?.toLocaleString()}원</p>
                                 <p className="text-[8px] font-bold text-[#8B95A1]">총액: {(item.unit_price * item.quantity)?.toLocaleString()}원</p>
                               </td>
                               <td className="px-6 py-4 text-center">
-                                <p className={`text-[10px] font-black ${isExpiryImminent ? 'text-orange-600' : 'text-[#8B95A1]'}`}>
+                                <p className={`text-[10px] font-semibold ${isExpiryImminent ? 'text-orange-600' : 'text-[#8B95A1]'}`}>
                                   {item.expiry_date || '-'}
                                 </p>
-                                {isExpiryImminent && <p className="text-[7px] font-black text-orange-400 animate-pulse">임박</p>}
+                                {isExpiryImminent && <p className="text-[7px] font-semibold text-orange-400 animate-pulse">임박</p>}
                               </td>
                               <td className="px-6 py-4">
-                                <span className={`px-2 py-0.5 rounded-full text-[8px] font-black ${item.quantity <= item.min_quantity ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                                <span className={`px-2 py-0.5 rounded-full text-[8px] font-semibold ${item.quantity <= item.min_quantity ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
                                   {item.quantity <= item.min_quantity ? '재고부족' : '정상'}
                                 </span>
                               </td>
                               <td className="px-6 py-4 text-right space-x-1">
-                                <button onClick={() => { setStockModal({ item, type: 'in' }); setStockAmount(1); }} className="px-2 py-1 bg-blue-50 text-[#3182F6] text-[9px] font-black rounded-md hover:bg-[#D6EBFF]">입고</button>
-                                <button onClick={() => { setStockModal({ item, type: 'out' }); setStockAmount(1); }} className="px-2 py-1 bg-[#F2F4F6] text-[#4E5968] text-[9px] font-black rounded-md hover:bg-gray-100">출고</button>
+                                <button onClick={() => { setStockModal({ item, type: 'in' }); setStockAmount(1); }} className="px-2 py-1 bg-blue-50 text-[#3182F6] text-[9px] font-semibold rounded-md hover:bg-[#D6EBFF]">입고</button>
+                                <button onClick={() => { setStockModal({ item, type: 'out' }); setStockAmount(1); }} className="px-2 py-1 bg-[#F2F4F6] text-[#4E5968] text-[9px] font-semibold rounded-md hover:bg-gray-100">출고</button>
                                 {item.quantity <= item.min_quantity && (
-                                  <button onClick={() => handleAutoApprovalRequest(item)} className="px-2 py-1 bg-orange-600 text-white text-[9px] font-black rounded-md shadow-sm">발주</button>
+                                  <button onClick={() => handleAutoApprovalRequest(item)} className="px-2 py-1 bg-orange-600 text-white text-[9px] font-semibold rounded-md shadow-sm">발주</button>
                                 )}
                               </td>
                             </tr>
@@ -340,7 +340,7 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
                 <button
                   type="button"
                   onClick={() => setRegistrationMode('form')}
-                  className={`flex-1 px-4 py-3 rounded-[12px] text-[11px] font-black transition-all ${
+                  className={`flex-1 px-4 py-3 rounded-[12px] text-[11px] font-semibold transition-all ${
                     registrationMode === 'form'
                       ? 'bg-[#3182F6] text-white shadow-sm'
                       : 'bg-[#F2F4F6] text-[#4E5968]'
@@ -351,7 +351,7 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
                 <button
                   type="button"
                   onClick={() => setRegistrationMode('excel')}
-                  className={`flex-1 px-4 py-3 rounded-[12px] text-[11px] font-black transition-all ${
+                  className={`flex-1 px-4 py-3 rounded-[12px] text-[11px] font-semibold transition-all ${
                     registrationMode === 'excel'
                       ? 'bg-emerald-600 text-white shadow-md'
                       : 'bg-[#F2F4F6] text-[#4E5968]'
@@ -377,15 +377,15 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
 
       {/* 입출고 수량 입력 모달 */}
       {stockModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={() => setStockModal(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-black text-[#191F28] mb-4">{stockModal.type === 'in' ? '입고' : '출고'} 수량 입력</h3>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[110] flex items-center justify-center p-4" onClick={() => setStockModal(null)}>
+          <div className="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-[#191F28] mb-4">{stockModal.type === 'in' ? '입고' : '출고'} 수량 입력</h3>
             <p className="text-xs font-bold text-[#8B95A1] mb-2">{stockModal.item.item_name || stockModal.item.name}</p>
             <p className="text-[10px] text-[#8B95A1] mb-4">현재고: {stockModal.item.quantity ?? stockModal.item.stock ?? 0}</p>
-            <input type="number" min={1} max={stockModal.type === 'out' ? (stockModal.item.quantity ?? stockModal.item.stock ?? 0) : 99999} value={stockAmount} onChange={e => setStockAmount(Math.max(1, parseInt(e.target.value) || 1))} className="w-full px-4 py-3 rounded-[12px] border border-[#E5E8EB] text-lg font-black mb-6" />
+            <input type="number" min={1} max={stockModal.type === 'out' ? (stockModal.item.quantity ?? stockModal.item.stock ?? 0) : 99999} value={stockAmount} onChange={e => setStockAmount(Math.max(1, parseInt(e.target.value) || 1))} className="w-full px-4 py-3 rounded-[12px] border border-[#E5E8EB] text-lg font-semibold mb-6" />
             <div className="flex gap-2">
-              <button onClick={() => setStockModal(null)} className="flex-1 py-3 rounded-[12px] bg-[#F2F4F6] text-[#4E5968] font-black text-sm">취소</button>
-              <button onClick={executeStockUpdate} className="flex-1 py-3 rounded-[12px] bg-blue-600 text-white font-black text-sm">확인</button>
+              <button onClick={() => setStockModal(null)} className="flex-1 py-3 rounded-[12px] bg-[#F2F4F6] text-[#4E5968] font-semibold text-sm">취소</button>
+              <button onClick={executeStockUpdate} className="flex-1 py-3 rounded-[12px] bg-blue-600 text-white font-semibold text-sm">확인</button>
             </div>
           </div>
         </div>
@@ -393,10 +393,10 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
 
       {/* 재고 이력 모달 */}
       {showLogs && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={() => setShowLogs(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[110] flex items-center justify-center p-4" onClick={() => setShowLogs(false)}>
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-              <h3 className="text-lg font-black text-[#191F28]">📋 재고 입출고 이력</h3>
+              <h3 className="text-lg font-semibold text-[#191F28]">📋 재고 입출고 이력</h3>
               <button onClick={() => setShowLogs(false)} className="p-2 hover:bg-gray-100 rounded-full">✕</button>
             </div>
             <div className="flex-1 overflow-y-auto p-4">
@@ -405,7 +405,7 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
               ) : (
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-gray-100 text-[10px] font-black text-[#8B95A1] uppercase">
+                    <tr className="border-b border-gray-100 text-[10px] font-semibold text-[#8B95A1] uppercase">
                       <th className="py-3 px-2">일시</th>
                       <th className="py-3 px-2">유형</th>
                       <th className="py-3 px-2">수량</th>
@@ -417,7 +417,7 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
                     {logs.map((l: any) => (
                       <tr key={l.id} className="border-b border-gray-50">
                         <td className="py-2 px-2 font-mono text-[10px]">{new Date(l.created_at).toLocaleString()}</td>
-                        <td className="py-2 px-2"><span className={`px-2 py-0.5 rounded text-[9px] font-black ${(l.change_type || l.type) === '입고' ? 'bg-blue-50 text-[#3182F6]' : 'bg-[#F2F4F6] text-[#4E5968]'}`}>{l.change_type || l.type || '-'}</span></td>
+                        <td className="py-2 px-2"><span className={`px-2 py-0.5 rounded text-[9px] font-semibold ${(l.change_type || l.type) === '입고' ? 'bg-blue-50 text-[#3182F6]' : 'bg-[#F2F4F6] text-[#4E5968]'}`}>{l.change_type || l.type || '-'}</span></td>
                         <td className="py-2 px-2 font-bold">{l.quantity ?? '-'}</td>
                         <td className="py-2 px-2 text-[#8B95A1]">{(l.prev_quantity ?? '') !== '' ? `${l.prev_quantity}→${l.next_quantity}` : '-'}</td>
                         <td className="py-2 px-2">{l.actor_name || '-'}</td>

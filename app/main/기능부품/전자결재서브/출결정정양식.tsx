@@ -178,15 +178,15 @@ export default function AttendanceCorrectionForm({ user, staffs }: any) {
   return (
     <div className="flex flex-col h-full bg-gray-50/30 overflow-y-auto custom-scrollbar space-y-8 p-8">
       <header>
-        <h2 className="text-2xl font-black text-gray-800 tracking-tighter italic">출결 정정 신청</h2>
+        <h2 className="text-2xl font-semibold text-gray-800 tracking-tighter italic">출결 정정 신청</h2>
         <p className="text-xs text-gray-400 font-bold uppercase mt-1">지각 또는 미기록 사유 제출 및 결재</p>
       </header>
 
       {/* 탭 */}
-      <div className="flex gap-2 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+      <div className="flex gap-2 bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
         <button
           onClick={() => setViewMode('신청')}
-          className={`px-6 py-3 rounded-xl text-xs font-black transition-all ${
+          className={`px-6 py-3 rounded-xl text-xs font-semibold transition-all ${
             viewMode === '신청'
               ? 'bg-blue-600 text-white shadow-lg'
               : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
@@ -196,7 +196,7 @@ export default function AttendanceCorrectionForm({ user, staffs }: any) {
         </button>
         <button
           onClick={() => setViewMode('현황')}
-          className={`px-6 py-3 rounded-xl text-xs font-black transition-all ${
+          className={`px-6 py-3 rounded-xl text-xs font-semibold transition-all ${
             viewMode === '현황'
               ? 'bg-blue-600 text-white shadow-lg'
               : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
@@ -207,7 +207,7 @@ export default function AttendanceCorrectionForm({ user, staffs }: any) {
         {(user.department === '행정팀' || user.role === 'admin') && (
           <button
             onClick={() => setViewMode('결재')}
-            className={`px-6 py-3 rounded-xl text-xs font-black transition-all ${
+            className={`px-6 py-3 rounded-xl text-xs font-semibold transition-all ${
               viewMode === '결재'
                 ? 'bg-blue-600 text-white shadow-lg'
                 : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
@@ -223,19 +223,19 @@ export default function AttendanceCorrectionForm({ user, staffs }: any) {
         <div className="space-y-6">
           <button
             onClick={() => setShowNewCorrection(!showNewCorrection)}
-            className="px-6 py-3 bg-black text-white rounded-xl text-xs font-black shadow-lg hover:scale-[0.98] transition-all"
+            className="px-6 py-3 bg-black text-white rounded-xl text-xs font-semibold shadow-lg hover:scale-[0.98] transition-all"
           >
             {showNewCorrection ? '✕ 취소' : '+ 새 신청'}
           </button>
 
           {showNewCorrection && (
-            <div className="bg-white p-8 border border-gray-100 shadow-sm rounded-2xl space-y-6 animate-in fade-in duration-300">
-              <h3 className="text-lg font-black text-gray-800">출결 정정 신청</h3>
+            <div className="bg-white p-8 border border-gray-100 shadow-sm rounded-lg space-y-6 animate-in fade-in duration-300">
+              <h3 className="text-lg font-semibold text-gray-800">출결 정정 신청</h3>
               <p className="text-xs text-gray-500 font-bold">출퇴근 미체크·지각·결근이 있는 날짜를 선택한 뒤 정정 유형과 사유를 입력하세요.</p>
 
               <div className="space-y-4">
                 <div>
-                  <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2 block">
+                  <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest mb-2 block">
                     정정할 날짜 선택 (근태 자동 연동)
                   </label>
                   {problemDatesLoading ? (
@@ -256,7 +256,7 @@ export default function AttendanceCorrectionForm({ user, staffs }: any) {
                           }`}
                         >
                           <span className="block text-[10px] text-gray-500">{item.date}</span>
-                          <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-black ${
+                          <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-semibold ${
                             item.reason === '결근' ? 'bg-red-100 text-red-600' :
                             item.reason === '지각' ? 'bg-amber-100 text-amber-700' : 'bg-gray-200 text-gray-600'
                           }`}>
@@ -269,7 +269,7 @@ export default function AttendanceCorrectionForm({ user, staffs }: any) {
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2 block">
+                  <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest mb-2 block">
                     정정 유형
                   </label>
                   <select
@@ -284,7 +284,7 @@ export default function AttendanceCorrectionForm({ user, staffs }: any) {
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2 block">
+                  <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest mb-2 block">
                     사유
                   </label>
                   <textarea
@@ -299,7 +299,7 @@ export default function AttendanceCorrectionForm({ user, staffs }: any) {
               <button
                 onClick={handleSubmitCorrection}
                 disabled={loading}
-                className="w-full py-4 bg-blue-600 text-white rounded-xl font-black text-sm shadow-lg hover:scale-[0.98] transition-all disabled:opacity-50"
+                className="w-full py-4 bg-blue-600 text-white rounded-xl font-semibold text-sm shadow-lg hover:scale-[0.98] transition-all disabled:opacity-50"
               >
                 {loading ? '신청 중...' : '결재 상신'}
               </button>
@@ -314,14 +314,14 @@ export default function AttendanceCorrectionForm({ user, staffs }: any) {
           {corrections
             .filter(c => c.staff_id === user.id)
             .map((correction, idx) => (
-              <div key={correction.id || idx} className="bg-white p-6 border border-gray-100 shadow-sm rounded-2xl">
+              <div key={correction.id || idx} className="bg-white p-6 border border-gray-100 shadow-sm rounded-lg">
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <p className="text-sm font-black text-gray-800">{correction.attendance_date}</p>
+                    <p className="text-sm font-semibold text-gray-800">{correction.attendance_date}</p>
                     <p className="text-xs text-gray-400 font-bold mt-1">{correction.reason}</p>
                   </div>
                   <span
-                    className={`px-3 py-1 rounded-lg text-[10px] font-black ${
+                    className={`px-3 py-1 rounded-lg text-[10px] font-semibold ${
                       (correction.approval_status || correction.status) === '승인'
                         ? 'bg-green-100 text-green-600'
                         : (correction.approval_status || correction.status) === '거절'
@@ -348,13 +348,13 @@ export default function AttendanceCorrectionForm({ user, staffs }: any) {
           {corrections
             .filter(c => (c.approval_status || c.status) === '대기')
             .map((correction, idx) => (
-              <div key={correction.id || idx} className="bg-white p-6 border border-gray-100 shadow-sm rounded-2xl">
+              <div key={correction.id || idx} className="bg-white p-6 border border-gray-100 shadow-sm rounded-lg">
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <p className="text-sm font-black text-gray-800">{correction.attendance_date}</p>
+                    <p className="text-sm font-semibold text-gray-800">{correction.attendance_date}</p>
                     <p className="text-xs text-gray-400 font-bold mt-1">{correction.reason}</p>
                   </div>
-                  <span className="px-3 py-1 rounded-lg text-[10px] font-black bg-orange-100 text-orange-500">
+                  <span className="px-3 py-1 rounded-lg text-[10px] font-semibold bg-orange-100 text-orange-500">
                     대기
                   </span>
                 </div>
@@ -364,13 +364,13 @@ export default function AttendanceCorrectionForm({ user, staffs }: any) {
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleApprove(correction, '승인')}
-                      className="flex-1 py-2 bg-green-600 text-white rounded-lg text-xs font-black shadow-lg hover:scale-[0.98] transition-all"
+                      className="flex-1 py-2 bg-green-600 text-white rounded-lg text-xs font-semibold shadow-lg hover:scale-[0.98] transition-all"
                     >
                       ✅ 승인 (근태 반영)
                     </button>
                     <button
                       onClick={() => handleApprove(correction, '거절')}
-                      className="flex-1 py-2 bg-red-600 text-white rounded-lg text-xs font-black shadow-lg hover:scale-[0.98] transition-all"
+                      className="flex-1 py-2 bg-red-600 text-white rounded-lg text-xs font-semibold shadow-lg hover:scale-[0.98] transition-all"
                     >
                       ❌ 거절
                     </button>

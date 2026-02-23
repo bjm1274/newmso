@@ -87,13 +87,13 @@ export default function PurchaseOrderManagement({ user, inventory, suppliers, fe
       <div className="bg-white p-6 md:p-10 border border-gray-100 shadow-xl rounded-[2.5rem]">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
-            <h2 className="text-2xl font-black text-gray-900 tracking-tighter italic">스마트 발주 제어 시스템</h2>
+            <h2 className="text-2xl font-semibold text-gray-900 tracking-tighter italic">스마트 발주 제어 시스템</h2>
             <p className="text-[10px] text-orange-600 font-bold mt-1 uppercase tracking-widest">Smart Purchase Order Engine</p>
           </div>
           <button
             onClick={handleAutoGeneratePurchaseOrder}
             disabled={loading || lowStockItems.length === 0}
-            className="w-full md:w-auto px-8 py-4 bg-orange-600 text-white rounded-2xl text-sm font-black shadow-xl shadow-orange-100 hover:scale-[0.98] transition-all disabled:opacity-50"
+            className="w-full md:w-auto px-8 py-4 bg-orange-600 text-white rounded-lg text-sm font-semibold shadow-xl shadow-orange-100 hover:scale-[0.98] transition-all disabled:opacity-50"
           >
             🚨 자동 발주 생성 ({lowStockItems.length})
           </button>
@@ -101,19 +101,19 @@ export default function PurchaseOrderManagement({ user, inventory, suppliers, fe
 
         {lowStockItems.length === 0 ? (
           <div className="text-center py-20 bg-green-50 rounded-[2rem] border border-dashed border-green-200">
-            <p className="text-sm font-black text-green-600">✅ 모든 품목이 안전재고 이상입니다.</p>
+            <p className="text-sm font-semibold text-green-600">✅ 모든 품목이 안전재고 이상입니다.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
             {lowStockItems.map((item: any) => (
-              <div key={item.id} className="p-6 bg-orange-50 border border-orange-100 rounded-2xl flex justify-between items-center">
+              <div key={item.id} className="p-6 bg-orange-50 border border-orange-100 rounded-lg flex justify-between items-center">
                 <div>
-                  <p className="text-sm font-black text-gray-900">{item.item_name}</p>
+                  <p className="text-sm font-semibold text-gray-900">{item.item_name}</p>
                   <p className="text-[10px] font-bold text-orange-600 mt-1">
                     현재: {item.quantity}개 / 최소: {item.min_quantity}개
                   </p>
                 </div>
-                <span className="px-3 py-1 bg-orange-600 text-white rounded-full text-[9px] font-black">재고부족</span>
+                <span className="px-3 py-1 bg-orange-600 text-white rounded-full text-[9px] font-semibold">재고부족</span>
               </div>
             ))}
           </div>
@@ -121,10 +121,10 @@ export default function PurchaseOrderManagement({ user, inventory, suppliers, fe
       </div>
 
       <div className="bg-white p-6 md:p-10 border border-gray-100 shadow-xl rounded-[2.5rem]">
-        <h3 className="text-xl font-black text-gray-900 tracking-tighter italic mb-8">발주 이력 및 상태</h3>
+        <h3 className="text-xl font-semibold text-gray-900 tracking-tighter italic mb-8">발주 이력 및 상태</h3>
         {purchaseOrders.length === 0 ? (
           <div className="text-center py-20 bg-gray-50 rounded-[2rem] border border-dashed border-gray-200">
-            <p className="text-sm font-black text-gray-400">발주 이력이 없습니다.</p>
+            <p className="text-sm font-semibold text-gray-400">발주 이력이 없습니다.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-6">
@@ -132,18 +132,18 @@ export default function PurchaseOrderManagement({ user, inventory, suppliers, fe
               <div key={order.id} className="p-8 border border-gray-100 rounded-[2rem] hover:shadow-lg transition-all bg-white">
                 <div className="flex justify-between items-start mb-6">
                   <div>
-                    <p className="text-lg font-black text-gray-900">발주서 #{order.id?.toString().slice(0, 8)}</p>
+                    <p className="text-lg font-semibold text-gray-900">발주서 #{order.id?.toString().slice(0, 8)}</p>
                     <p className="text-[10px] text-gray-400 font-bold mt-1 uppercase tracking-widest">
                       {new Date(order.created_at).toLocaleDateString()} | {order.supplier_name || '미지정'}
                     </p>
                   </div>
-                  <span className={`px-4 py-2 rounded-xl text-[10px] font-black ${
+                  <span className={`px-4 py-2 rounded-xl text-[10px] font-semibold ${
                     order.status === '승인' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'
                   }`}>
                     {order.status}
                   </span>
                 </div>
-                <div className="bg-gray-50 p-6 rounded-2xl mb-6">
+                <div className="bg-gray-50 p-6 rounded-lg mb-6">
                   <div className="space-y-2">
                     {(order.items || []).map((item: any, idx: number) => (
                       <div key={idx} className="flex justify-between text-xs font-bold text-gray-600">
@@ -153,12 +153,12 @@ export default function PurchaseOrderManagement({ user, inventory, suppliers, fe
                     ))}
                   </div>
                   <div className="mt-4 pt-4 border-t border-gray-200 flex justify-between items-center">
-                    <span className="text-xs font-black text-gray-900">총 발주액</span>
-                    <span className="text-lg font-black text-blue-600">₩{(order.total_amount || 0).toLocaleString()}</span>
+                    <span className="text-xs font-semibold text-gray-900">총 발주액</span>
+                    <span className="text-lg font-semibold text-blue-600">₩{(order.total_amount || 0).toLocaleString()}</span>
                   </div>
                 </div>
                 {order.status === '대기' && (
-                  <button onClick={() => handleApprovePurchaseOrder(order.id)} className="w-full py-4 bg-green-600 text-white rounded-xl font-black text-xs shadow-lg hover:scale-[0.98] transition-all">✅ 발주 승인하기</button>
+                  <button onClick={() => handleApprovePurchaseOrder(order.id)} className="w-full py-4 bg-green-600 text-white rounded-xl font-semibold text-xs shadow-lg hover:scale-[0.98] transition-all">✅ 발주 승인하기</button>
                 )}
               </div>
             ))}

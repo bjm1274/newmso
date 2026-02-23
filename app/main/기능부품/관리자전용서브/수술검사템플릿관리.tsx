@@ -125,7 +125,7 @@ export default function SurgeryExamTemplateManager() {
 
   return (
     <div className="bg-white border border-gray-100 rounded-[2rem] p-8 shadow-sm space-y-8">
-      <h2 className="text-xl font-black text-gray-900 tracking-tighter mb-2">
+      <h2 className="text-xl font-semibold text-gray-900 tracking-tighter mb-2">
         수술 · 검사명 템플릿 관리
       </h2>
       <p className="text-[11px] text-gray-500 font-bold">
@@ -136,13 +136,13 @@ export default function SurgeryExamTemplateManager() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* 수술 템플릿 */}
         <section className="space-y-3">
-          <h3 className="text-sm font-black text-gray-800 flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
             <span className="text-lg">🏥</span>
             수술명 템플릿
           </h3>
           <div className="space-y-2">
             <div className="flex items-center gap-3 p-2 bg-gray-50 rounded-xl border border-gray-100">
-              <span className="text-[11px] font-black text-gray-600 shrink-0">부위 선택</span>
+              <span className="text-[11px] font-semibold text-gray-600 shrink-0">부위 선택</span>
               <select
                 value={newSurgeryPart}
                 onChange={(e) => setNewSurgeryPart(e.target.value)}
@@ -164,13 +164,13 @@ export default function SurgeryExamTemplateManager() {
                 type="button"
                 disabled={loading}
                 onClick={() => addTemplate('surgery')}
-                className="px-4 py-2 rounded-xl bg-blue-600 text-white text-[11px] font-black disabled:opacity-50"
+                className="px-4 py-2 rounded-xl bg-blue-600 text-white text-[11px] font-semibold disabled:opacity-50"
               >
                 추가
               </button>
             </div>
           </div>
-          <div className="border border-gray-100 rounded-2xl p-3 max-h-64 overflow-y-auto custom-scrollbar space-y-1 bg-gray-50/40">
+          <div className="border border-gray-100 rounded-lg p-3 max-h-64 overflow-y-auto custom-scrollbar space-y-1 bg-gray-50/40">
             {surgeryTemplates.length === 0 ? (
               <p className="text-[11px] text-gray-400 font-bold text-center py-4">
                 등록된 수술명 템플릿이 없습니다.
@@ -196,14 +196,14 @@ export default function SurgeryExamTemplateManager() {
                   <button
                     type="button"
                     onClick={() => toggleActive('surgery', t)}
-                    className="px-2 py-1 rounded-lg text-[10px] font-black border border-gray-200 text-gray-500 hover:bg-gray-100"
+                    className="px-2 py-1 rounded-lg text-[10px] font-semibold border border-gray-200 text-gray-500 hover:bg-gray-100"
                   >
                     {t.is_active ? '숨기기' : '보이기'}
                   </button>
                   <button
                     type="button"
                     onClick={() => removeTemplate('surgery', t.id)}
-                    className="px-2 py-1 rounded-lg text-[10px] font-black text-red-500 hover:bg-red-50"
+                    className="px-2 py-1 rounded-lg text-[10px] font-semibold text-red-500 hover:bg-red-50"
                   >
                     삭제
                   </button>
@@ -215,13 +215,13 @@ export default function SurgeryExamTemplateManager() {
 
         {/* MRI 템플릿 */}
         <section className="space-y-3">
-          <h3 className="text-sm font-black text-gray-800 flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
             <span className="text-lg">🔬</span>
             MRI 검사명 템플릿
           </h3>
           <div className="space-y-2">
             <div className="flex items-center gap-3 p-2 bg-gray-50 rounded-xl border border-gray-100">
-              <span className="text-[11px] font-black text-gray-600 shrink-0">부위 선택</span>
+              <span className="text-[11px] font-semibold text-gray-600 shrink-0">부위 선택</span>
               <select
                 value={newMriPart}
                 onChange={(e) => setNewMriPart(e.target.value)}
@@ -243,13 +243,13 @@ export default function SurgeryExamTemplateManager() {
                 type="button"
                 disabled={loading}
                 onClick={() => addTemplate('mri')}
-                className="px-4 py-2 rounded-xl bg-blue-600 text-white text-[11px] font-black disabled:opacity-50"
+                className="px-4 py-2 rounded-xl bg-blue-600 text-white text-[11px] font-semibold disabled:opacity-50"
               >
                 추가
               </button>
             </div>
           </div>
-          <div className="border border-gray-100 rounded-2xl p-3 max-h-64 overflow-y-auto custom-scrollbar space-y-1 bg-gray-50/40">
+          <div className="border border-gray-100 rounded-lg p-3 max-h-64 overflow-y-auto custom-scrollbar space-y-1 bg-gray-50/40">
             {mriTemplates.length === 0 ? (
               <p className="text-[11px] text-gray-400 font-bold text-center py-4">
                 등록된 검사명 템플릿이 없습니다.
@@ -275,14 +275,14 @@ export default function SurgeryExamTemplateManager() {
                   <button
                     type="button"
                     onClick={() => toggleActive('mri', t)}
-                    className="px-2 py-1 rounded-lg text-[10px] font-black border border-gray-200 text-gray-500 hover:bg-gray-100"
+                    className="px-2 py-1 rounded-lg text-[10px] font-semibold border border-gray-200 text-gray-500 hover:bg-gray-100"
                   >
                     {t.is_active ? '숨기기' : '보이기'}
                   </button>
                   <button
                     type="button"
                     onClick={() => removeTemplate('mri', t.id)}
-                    className="px-2 py-1 rounded-lg text-[10px] font-black text-red-500 hover:bg-red-50"
+                    className="px-2 py-1 rounded-lg text-[10px] font-semibold text-red-500 hover:bg-red-50"
                   >
                     삭제
                   </button>

@@ -168,13 +168,31 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
         }
 
         if (item.type === '연차/휴가') {
-            await supabase.from('attendance').upsert({ 
-                staff_id: item.sender_id, date: item.meta_data.startDate, status: '휴가', is_approved: true 
-            });
-            const { data: staff } = await supabase.from('staff_members').select('annual_leave').eq('id', item.sender_id).single();
-            if (staff) {
-                await supabase.from('staff_members').update({ annual_leave: staff.annual_leave - 1 }).eq('id', item.sender_id);
+            const startStr = item.meta_data?.startDate || item.meta_data?.start;
+            const endStr = item.meta_data?.endDate || item.meta_data?.end || startStr;
+            const start = new Date(startStr);
+            const end = new Date(endStr);
+            const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+            for (let d = 0; d < days; d++) {
+                const dte = new Date(start);
+                dte.setDate(dte.getDate() + d);
+                const dateStr = dte.toISOString().split('T')[0];
+                await supabase.from('attendance').upsert({
+                    staff_id: item.sender_id,
+                    date: dateStr,
+                    status: '휴가',
+                }, { onConflict: 'staff_id,date' });
+                try {
+                    await supabase.from('attendances').upsert({
+                        staff_id: item.sender_id,
+                        work_date: dateStr,
+                        status: 'annual_leave',
+                    }, { onConflict: 'staff_id,work_date' });
+                } catch (_) {}
             }
+            const { data: staff } = await supabase.from('staff_members').select('annual_leave_used').eq('id', item.sender_id).single();
+            const used = (Number(staff?.annual_leave_used) || 0) + days;
+            await supabase.from('staff_members').update({ annual_leave_used: used }).eq('id', item.sender_id);
         }
 
         if (item.type === '양식신청' && item.meta_data?.form_type && item.meta_data?.target_staff && item.meta_data?.auto_issue) {
@@ -315,12 +333,12 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                     결재선 지정
                   </label>
                   
-                  <div className="flex gap-1 bg-[#F2F4F6] p-1 rounded-[12px] w-full md:w-auto overflow-x-auto no-scrollbar">
+                  <div className="flex gap-0.5 p-1 bg-[#eef2f7] rounded-lg w-full md:w-auto overflow-x-auto no-scrollbar">
                     {['전체', '박철홍정형외과', '수연의원', 'SY INC.'].map(co => (
                       <button
                         key={co}
                         onClick={() => setSelectedCo(co)}
-                        className={`flex-1 md:flex-none px-3 py-1.5 rounded-[12px] text-[9px] font-bold transition-all whitespace-nowrap ${selectedCo === co ? 'bg-white shadow-sm text-[#3182F6]' : 'text-[#8B95A1]'}`}
+                        className={`min-h-[44px] touch-manipulation flex-1 md:flex-none px-3 py-1.5 rounded-[12px] text-[9px] font-bold transition-all whitespace-nowrap ${selectedCo === co ? 'bg-white shadow-sm text-[#3182F6]' : 'text-[#8B95A1]'}`}
                       >
                         {co}
                       </button>
@@ -365,7 +383,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                   <button
                     type="button"
                     onClick={loadLastDraft}
-                    className="shrink-0 px-4 py-2 rounded-xl bg-amber-500 text-white text-[11px] font-black hover:bg-amber-600 transition-all"
+                    className="shrink-0 px-4 py-2 rounded-xl bg-amber-500 text-white text-[11px] font-semibold hover:bg-amber-600 transition-all"
                   >
                     이전 기안 불러오기
                   </button>
@@ -442,7 +460,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
             {listForView.length === 0 ? (
               <div className="h-96 flex flex-col items-center justify-center opacity-20">
                 <span className="text-6xl mb-4">📄</span>
-                <p className="font-black text-sm">
+                <p className="font-semibold text-sm">
                   {approvalStatusFilter === '전체' ? '결재 내역이 없습니다.' : `${approvalStatusFilter === '대기' ? '대기중' : approvalStatusFilter === '승인' ? '승인된' : '반려된'} 건이 없습니다.`}
                 </p>
               </div>
@@ -466,20 +484,20 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                     className="bg-white p-6 md:p-8 border border-[#E5E8EB] rounded-[16px] shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6 group hover:border-[#3182F6]/30 hover:shadow-md transition-all animate-in fade-in-up cursor-pointer"
                   >
                     <div className="flex gap-4 md:gap-6 items-center flex-1 min-w-0">
-                        <div className="w-14 h-14 md:w-16 md:h-16 bg-gray-50 shrink-0 rounded-2xl flex items-center justify-center text-xl md:text-2xl shadow-inner group-hover:bg-blue-50 transition-colors">
+                        <div className="w-14 h-14 md:w-16 md:h-16 bg-gray-50 shrink-0 rounded-lg flex items-center justify-center text-xl md:text-2xl shadow-inner group-hover:bg-blue-50 transition-colors">
                             {item.type === '물품신청' ? '📦' : item.type === '양식신청' ? '📄' : item.type === '인사명령' ? '🎖️' : item.type === '수리요청서' ? '🔧' : '📋'}
                         </div>
                         <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap gap-2 mb-2 items-center">
-                                <span className="px-2 py-0.5 bg-gray-100 rounded-md text-[8px] md:text-[9px] font-black text-gray-400">{item.type}</span>
-                                <span className={`px-2 py-0.5 rounded-md text-[8px] md:text-[9px] font-black ${item.status === '승인' ? 'bg-green-100 text-green-600' : item.status === '반려' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-500'}`}>{item.status}</span>
-                                <span className="px-2 py-0.5 bg-blue-50 rounded-md text-[8px] md:text-[9px] font-black text-blue-400">{item.sender_company}</span>
+                                <span className="px-2 py-0.5 bg-gray-100 rounded-md text-[8px] md:text-[9px] font-semibold text-gray-400">{item.type}</span>
+                                <span className={`px-2 py-0.5 rounded-md text-[8px] md:text-[9px] font-semibold ${item.status === '승인' ? 'bg-green-100 text-green-600' : item.status === '반려' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-500'}`}>{item.status}</span>
+                                <span className="px-2 py-0.5 bg-blue-50 rounded-md text-[8px] md:text-[9px] font-semibold text-blue-400">{item.sender_company}</span>
                             </div>
-                            <h3 className="font-black text-gray-800 text-sm md:text-base tracking-tight line-clamp-1">{item.title}</h3>
+                            <h3 className="font-semibold text-gray-800 text-sm md:text-base tracking-tight line-clamp-1">{item.title}</h3>
                             <p className="text-[9px] md:text-[10px] text-gray-400 font-bold mt-1">기안자: {item.sender_name || '사용자'} | {new Date(item.created_at).toLocaleDateString()}</p>
                             {steps.length > 0 && (
                               <div className="mt-2 flex flex-wrap gap-1.5">
-                                <span className="text-[9px] font-black text-gray-400 uppercase">결재선</span>
+                                <span className="text-[9px] font-semibold text-gray-400 uppercase">결재선</span>
                                 {steps.map((s: { step: number; name: string; isCurrent: boolean }) => (
                                   <span key={s.step} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-bold ${item.status === '승인' ? 'bg-green-50 text-green-600' : s.isCurrent ? 'bg-amber-100 text-amber-700' : 'bg-gray-50 text-gray-400'}`}>
                                     {s.step}. {s.name} {item.status === '승인' ? '(승인)' : s.isCurrent ? '(결재대기)' : '(대기)'}
@@ -511,15 +529,15 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
         if (!item) return null;
         return (
           <div
-            className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 bg-black/50"
+            className="fixed inset-0 z-[110] flex items-end md:items-center justify-center p-0 md:p-4 bg-black/50"
             onClick={() => setSelectedApprovalId(null)}
           >
             <div
-              className="bg-white rounded-t-2xl md:rounded-2xl shadow-xl max-w-lg w-full max-h-[90dvh] overflow-hidden flex flex-col"
+              className="bg-white rounded-t-2xl md:rounded-lg shadow-xl max-w-lg w-full max-h-[90dvh] overflow-hidden flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="p-4 md:p-6 border-b border-[#E5E8EB] flex items-center justify-between">
-                <span className="px-2 py-0.5 bg-gray-100 rounded-md text-[9px] font-black text-gray-500">{item.type}</span>
+                <span className="px-2 py-0.5 bg-gray-100 rounded-md text-[9px] font-semibold text-gray-500">{item.type}</span>
                 <button type="button" onClick={() => setSelectedApprovalId(null)} className="p-2 rounded-lg text-[#8B95A1] hover:bg-[#F2F4F6]">✕</button>
               </div>
               <div className="p-4 md:p-6 overflow-y-auto flex-1">

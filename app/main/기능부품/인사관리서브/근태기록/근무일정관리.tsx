@@ -6,10 +6,10 @@ export default function ScheduleManager({ schedules, onAdd, onEdit, onDelete }: 
     <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-8 h-full overflow-y-auto custom-scrollbar">
         <div className="flex justify-between items-end mb-8 border-b pb-4">
             <div>
-                <h3 className="font-black text-xl text-gray-800">근무 형태 설정</h3>
+                <h3 className="font-semibold text-xl text-gray-800">근무 형태 설정</h3>
                 <p className="text-sm text-gray-500 mt-1">병원 내 다양한 근무 규칙(3교대, 상근, 야간 등)을 상세하게 정의합니다.</p>
             </div>
-            <button onClick={onAdd} className="bg-black text-white px-5 py-3 rounded-2xl text-sm font-bold shadow-lg hover:scale-105 transition-transform flex items-center gap-2">
+            <button onClick={onAdd} className="bg-black text-white px-5 py-3 rounded-lg text-sm font-bold shadow-lg hover:scale-105 transition-transform flex items-center gap-2">
                 <span>+</span> 새 근무형태 만들기
             </button>
         </div>

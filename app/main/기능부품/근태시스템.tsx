@@ -199,7 +199,7 @@ export default function AttendanceSystem({ user, staffs, selectedCo, isAdminView
 
       {!isAdminView && (
         <>
-          <div className={`p-8 rounded-2xl border-2 shadow-sm ${isWithinRange ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'}`}>
+          <div className={`p-8 rounded-lg border-2 shadow-sm ${isWithinRange ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'}`}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-[#191F28]">📍 위치 정보</h3>
               <button onClick={getLocation} className="px-4 py-2 bg-[var(--toss-blue)] text-white rounded-[12px] text-xs font-bold shadow-sm">위치 새로고침</button>
@@ -213,10 +213,10 @@ export default function AttendanceSystem({ user, staffs, selectedCo, isAdminView
           </div>
 
           <div className="grid grid-cols-2 gap-6">
-            <button onClick={handleCheckIn} disabled={!isWithinRange || loading || todayAttendance?.check_in} className={`py-8 rounded-2xl font-bold text-lg shadow-xl transition-all ${todayAttendance?.check_in ? 'bg-[#F2F4F6] text-[#8B95A1]' : isWithinRange ? 'bg-green-600 text-white' : 'bg-[#E5E8EB] text-[#4E5968]'}`}>
+            <button onClick={handleCheckIn} disabled={!isWithinRange || loading || todayAttendance?.check_in} className={`py-8 rounded-lg font-bold text-lg shadow-xl transition-all ${todayAttendance?.check_in ? 'bg-[#F2F4F6] text-[#8B95A1]' : isWithinRange ? 'bg-green-600 text-white' : 'bg-[#E5E8EB] text-[#4E5968]'}`}>
               {todayAttendance?.check_in ? '✅ 출근 완료' : '🚪 출근 (체크인)'}
             </button>
-            <button onClick={handleCheckOut} disabled={!isWithinRange || loading || !todayAttendance?.check_in || todayAttendance?.check_out} className={`py-8 rounded-2xl font-bold text-lg shadow-xl transition-all ${todayAttendance?.check_out ? 'bg-[#F2F4F6] text-[#8B95A1]' : !todayAttendance?.check_in ? 'bg-[#E5E8EB] text-[#4E5968]' : isWithinRange ? 'bg-orange-600 text-white' : 'bg-[#E5E8EB] text-[#4E5968]'}`}>
+            <button onClick={handleCheckOut} disabled={!isWithinRange || loading || !todayAttendance?.check_in || todayAttendance?.check_out} className={`py-8 rounded-lg font-bold text-lg shadow-xl transition-all ${todayAttendance?.check_out ? 'bg-[#F2F4F6] text-[#8B95A1]' : !todayAttendance?.check_in ? 'bg-[#E5E8EB] text-[#4E5968]' : isWithinRange ? 'bg-orange-600 text-white' : 'bg-[#E5E8EB] text-[#4E5968]'}`}>
               {todayAttendance?.check_out ? '✅ 퇴근 완료' : '🚪 퇴근 (체크아웃)'}
             </button>
           </div>

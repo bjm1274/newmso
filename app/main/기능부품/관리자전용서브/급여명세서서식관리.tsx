@@ -97,10 +97,10 @@ export default function PayrollSlipDesignManager() {
   };
 
   return (
-    <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
+    <div className="bg-white p-6 rounded-lg border border-gray-100 shadow-sm space-y-4">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <h2 className="text-sm font-black text-gray-800">급여명세서 서식 관리</h2>
+          <h2 className="text-sm font-semibold text-gray-800">급여명세서 서식 관리</h2>
           <p className="text-[11px] text-gray-500">
             PDF 급여명세서 상단 제목, 색상, 회사명, 하단 문구 등을 설정합니다.
           </p>
@@ -114,7 +114,7 @@ export default function PayrollSlipDesignManager() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-[13px]">
         <div className="space-y-3">
           <label className="flex flex-col gap-1">
-            <span className="text-[11px] font-black text-gray-500">제목</span>
+            <span className="text-[11px] font-semibold text-gray-500">제목</span>
             <input
               type="text"
               value={design.title}
@@ -123,7 +123,7 @@ export default function PayrollSlipDesignManager() {
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-[11px] font-black text-gray-500">부제 (설명)</span>
+            <span className="text-[11px] font-semibold text-gray-500">부제 (설명)</span>
             <input
               type="text"
               value={design.subtitle}
@@ -132,7 +132,7 @@ export default function PayrollSlipDesignManager() {
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-[11px] font-black text-gray-500">회사명 라벨</span>
+            <span className="text-[11px] font-semibold text-gray-500">회사명 라벨</span>
             <input
               type="text"
               value={design.companyLabel}
@@ -145,7 +145,7 @@ export default function PayrollSlipDesignManager() {
         <div className="space-y-3">
           <div className="flex gap-3">
             <label className="flex-1 flex flex-col gap-1">
-              <span className="text-[11px] font-black text-gray-500">대표 색상 (Primary)</span>
+              <span className="text-[11px] font-semibold text-gray-500">대표 색상 (Primary)</span>
               <input
                 type="text"
                 value={design.primaryColor}
@@ -155,7 +155,7 @@ export default function PayrollSlipDesignManager() {
               />
             </label>
             <label className="w-20 flex flex-col gap-1">
-              <span className="text-[11px] font-black text-gray-500">색상 미리보기</span>
+              <span className="text-[11px] font-semibold text-gray-500">색상 미리보기</span>
               <span
                 className="w-full h-9 rounded-xl border border-gray-200"
                 style={{ backgroundColor: design.primaryColor }}
@@ -163,7 +163,7 @@ export default function PayrollSlipDesignManager() {
             </label>
           </div>
           <label className="flex flex-col gap-1">
-            <span className="text-[11px] font-black text-gray-500">테두리 색상</span>
+            <span className="text-[11px] font-semibold text-gray-500">테두리 색상</span>
             <input
               type="text"
               value={design.borderColor}
@@ -173,7 +173,7 @@ export default function PayrollSlipDesignManager() {
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-[11px] font-black text-gray-500">하단 문구</span>
+            <span className="text-[11px] font-semibold text-gray-500">하단 문구</span>
             <input
               type="text"
               value={design.footerText}
@@ -197,12 +197,12 @@ export default function PayrollSlipDesignManager() {
       </div>
 
       {/* 미리보기 */}
-      <div className="mt-2 border border-dashed border-gray-200 rounded-2xl p-4 bg-gray-50">
-        <p className="text-[11px] font-black text-gray-400 mb-2 uppercase tracking-widest">
+      <div className="mt-2 border border-dashed border-gray-200 rounded-lg p-4 bg-gray-50">
+        <p className="text-[11px] font-semibold text-gray-400 mb-2 uppercase tracking-widest">
           Preview
         </p>
         <div
-          className="bg-white rounded-2xl p-4 text-xs font-bold"
+          className="bg-white rounded-lg p-4 text-xs font-bold"
           style={{ borderColor: design.borderColor || '#e5e7eb', borderWidth: 1 }}
         >
           <div
@@ -238,7 +238,7 @@ export default function PayrollSlipDesignManager() {
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="px-5 py-2.5 rounded-xl bg-blue-600 text-white text-[12px] font-black hover:bg-blue-700 disabled:opacity-60"
+          className="px-5 py-2.5 rounded-xl bg-blue-600 text-white text-[12px] font-semibold hover:bg-blue-700 disabled:opacity-60"
         >
           {saving ? '저장 중...' : '급여명세서 서식 저장'}
         </button>
