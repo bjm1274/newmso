@@ -5,8 +5,10 @@ import { supabase } from '@/lib/supabase';
 const CHAT_ROOM_KEY = 'erp_chat_last_room';
 const CHAT_FOCUS_KEY = 'erp_chat_focus_keyword';
 
-export default function BoardView({ user, setMainMenu }: any) {
-  const [activeBoard, setActiveBoard] = useState('공지사항');
+const BOARD_IDS = ['공지사항', '자유게시판', '경조사', '수술일정', 'MRI일정'];
+
+export default function BoardView({ user, subView, setSubView, initialBoard, surgeries, mris, onRefresh, setMainMenu }: any) {
+  const [activeBoard, setActiveBoard] = useState(initialBoard && BOARD_IDS.includes(initialBoard) ? initialBoard : (subView && BOARD_IDS.includes(subView) ? subView : '공지사항'));
   const [posts, setPosts] = useState<any[]>([]);
   const [showNewPost, setShowNewPost] = useState(false);
   const [title, setTitle] = useState('');
@@ -98,6 +100,12 @@ export default function BoardView({ user, setMainMenu }: any) {
     const { data } = await supabase.from('board_posts').select('*').eq('board_type', activeBoard).order('created_at', { ascending: false });
     if (data) setPosts(data as any);
   };
+
+  // 메인 사이드바 플라이아웃에서 선택한 게시판 반영
+  useEffect(() => {
+    const board = initialBoard || subView;
+    if (board && BOARD_IDS.includes(board)) setActiveBoard(board);
+  }, [initialBoard, subView]);
 
   // 수술·MRI 템플릿 불러오기
   useEffect(() => {
@@ -498,38 +506,25 @@ export default function BoardView({ user, setMainMenu }: any) {
   };
 
   return (
-    <div className="flex flex-row h-full min-h-0 app-page overflow-hidden">
-      {/* 좌측 세로 탭 - 관리자 메뉴와 동일 스타일 */}
-      <aside className="flex flex-col gap-1.5 p-3 md:p-4 bg-[var(--toss-card)] border-r border-[var(--toss-border)] shrink-0 w-[72px] md:w-44 overflow-y-auto">
-        {boards.map(board => (
-          <button
-            key={board.id}
-            onClick={() => setActiveBoard(board.id)}
-            className={`w-full px-3 py-2.5 text-[10px] md:text-[11px] font-semibold rounded-[12px] transition-all text-left ${
-              activeBoard === board.id
-                ? 'bg-[var(--toss-blue)] text-white shadow-md'
-                : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
-            }`}
-          >
-            {board.label}
-          </button>
-        ))}
-      </aside>
-
+    <div className="flex flex-col h-full min-h-0 app-page overflow-hidden">
+      {/* 상세 메뉴(공지사항·자유게시판 등)는 메인 좌측 사이드바에서 게시판 호버/클릭 시 플라이아웃으로 선택 */}
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto custom-scrollbar p-4 md:p-8 space-y-6 md:space-y-8 pb-24 md:pb-8">
-        <header className="flex justify-between items-end shrink-0">
-          <div>
-            <h2 className="text-xl md:text-2xl font-bold text-[var(--foreground)] tracking-tight">게시판</h2>
-            <p className="text-[10px] md:text-xs text-[var(--toss-gray-3)] font-bold uppercase mt-1">병원 공지 및 일정 관리</p>
-          </div>
-          {(activeBoard === '공지사항' || activeBoard === '자유게시판' || activeBoard === '경조사' || activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
+        {/* 새 게시물 버튼을 공지사항(제목) 위에 배치 */}
+        {(activeBoard === '공지사항' || activeBoard === '자유게시판' || activeBoard === '경조사' || activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
+          <div className="shrink-0 flex justify-end">
             <button
               onClick={() => setShowNewPost(!showNewPost)}
               className="px-4 md:px-6 py-2.5 md:py-3 bg-[var(--toss-blue)] text-white rounded-[12px] text-[11px] md:text-xs font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all"
             >
               {showNewPost ? '✕ 취소' : '+ 새 게시물'}
             </button>
-          )}
+          </div>
+        )}
+        <header className="flex justify-between items-end shrink-0">
+          <div>
+            <h2 className="text-xl md:text-2xl font-bold text-[var(--foreground)] tracking-tight">게시판</h2>
+            <p className="text-[10px] md:text-xs text-[var(--toss-gray-3)] font-bold uppercase mt-1">병원 공지 및 일정 관리</p>
+          </div>
         </header>
 
       {/* 새 게시물 작성 폼 */}

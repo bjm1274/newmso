@@ -10,8 +10,10 @@ import RepairRequestForm from './전자결재서브/수리요청서양식';
 
 const APPROVAL_VIEW_KEY = 'erp_approval_view';
 
-export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, selectedCompanyId, onRefresh }: any) {
-  const [viewMode, setViewMode] = useState('기안함');
+const APPROVAL_VIEWS = ['기안함', '결재함', '작성하기'];
+
+export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, selectedCompanyId, onRefresh, initialView }: any) {
+  const [viewMode, setViewMode] = useState(initialView && APPROVAL_VIEWS.includes(initialView) ? initialView : '기안함');
   const [approvals, setApprovals] = useState<any[]>([]);
   const [formType, setFormType] = useState('연차/휴가');
   const [formTitle, setFormTitle] = useState('');
@@ -44,18 +46,19 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     });
   }, []);
 
-  // 마지막으로 보던 탭(기안함/결재함/작성하기)을 복구
+  // initialView 또는 로컬스토리지에서 탭 복구
   useEffect(() => {
+    if (initialView && APPROVAL_VIEWS.includes(initialView)) {
+      setViewMode(initialView);
+      try { window.localStorage.setItem(APPROVAL_VIEW_KEY, initialView); } catch { /* ignore */ }
+      return;
+    }
     if (typeof window === 'undefined') return;
     try {
       const saved = window.localStorage.getItem(APPROVAL_VIEW_KEY);
-      if (saved && ['기안함', '결재함', '작성하기'].includes(saved)) {
-        setViewMode(saved);
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
+      if (saved && APPROVAL_VIEWS.includes(saved)) setViewMode(saved);
+    } catch { /* ignore */ }
+  }, [initialView]);
 
   const fetchApprovals = async () => {
     let query = supabase.from('approvals').select('*').order('created_at', { ascending: false });
@@ -294,31 +297,8 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const listForView = viewMode === '기안함' ? draftBoxList : approvalBoxList;
 
   return (
-    <div className="flex flex-row h-full min-h-0 app-page overflow-hidden">
-      {/* 좌측 세로 탭 - 관리자 메뉴와 동일 스타일 */}
-      <aside className="flex flex-col gap-1.5 p-3 md:p-4 bg-[var(--toss-card)] border-r border-[var(--toss-border)] shrink-0 w-[72px] md:w-44 overflow-y-auto">
-        {['기안함', '결재함', '작성하기'].map(m => (
-          <button
-            type="button"
-            key={m}
-            onClick={() => {
-              setViewMode(m);
-              if (typeof window !== 'undefined') {
-                window.localStorage.setItem(APPROVAL_VIEW_KEY, m);
-              }
-            }}
-            className={`w-full px-3 py-2.5 text-[10px] md:text-[11px] font-semibold rounded-[12px] transition-all text-left ${
-              viewMode === m ? 'bg-[var(--toss-blue)] text-white shadow-md' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
-            }`}
-          >
-            {m === '기안함' && '📥 '}
-            {m === '결재함' && '📤 '}
-            {m === '작성하기' && '✍️ '}
-            {m}
-          </button>
-        ))}
-      </aside>
-
+    <div className="flex flex-col h-full min-h-0 app-page overflow-hidden">
+      {/* 상세 메뉴(기안함·결재함·작성하기)는 메인 좌측 사이드바에서 전자결재 호버/클릭 시 플라이아웃으로 선택 */}
       {/* 메인 콘텐츠 */}
       <main className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden p-4 md:p-10 bg-[var(--page-bg)] custom-scrollbar">
         {viewMode === '작성하기' ? (
