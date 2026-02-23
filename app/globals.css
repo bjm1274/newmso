@@ -1,43 +1,94 @@
 @import "tailwindcss";
 
-/* ========== 인사/급여 디자인 기준 · 프로그램 전체 통일 ==========
- * 글꼴: Pretendard
- * 라이트: 배경 #f8fafc, 카드 #fff, 탭바 #eef2f7, 테두리 #E5E8EB
- * 다크: 눈 피로 완화용 어두운 배경, 부드러운 대비
+/* ========== MSO ERP Premium Design System (Cursor/Linear Grade) ==========
+ * Font: Pretendard (Optimized spacing)
+ * Palette: Slate/Zinc Neutral Scale
+ * Effects: Glassmorphism, Half-pixel borders, Sharp & Soft shadows
+ * Radius: 12px (Regular), 8px (Small), 16px (Large/Card)
  */
+
 :root {
-  --background: #F9FAFB;
-  --foreground: #191F28;
-  --page-bg: #f8fafc;
-  --tab-bg: #eef2f7;
-  --input-bg: #ffffff;
+  --background: #FFFFFF;
+  --foreground: #09090B;
+  /* Zinc-950 */
+  --page-bg: #FAFAFA;
+  --tab-bg: #F4F4F5;
+  /* Zinc-100 */
+  --input-bg: #FFFFFF;
+
+  --primary: #18181B;
+  /* Zinc-900 */
+  --primary-foreground: #FAFAFA;
+
+  --accent: #3182F6;
+  /* Premium Blue for key actions */
+  --accent-light: #EBF5FF;
+
+  --zinc-50: #FAFAFA;
+  --zinc-100: #F4F4F5;
+  --zinc-200: #E4E4E7;
+  --zinc-300: #D4D4D8;
+  --zinc-400: #A1A1AA;
+  --zinc-500: #71717A;
+  --zinc-600: #52525B;
+  --zinc-700: #3F3F46;
+  --zinc-800: #27272A;
+  --zinc-900: #18181B;
+
+  --border: #E4E4E7;
+  /* Zinc-200 */
+  --card: #FFFFFF;
+  --danger: #EF4444;
+  --success: #10B981;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-premium: 0 0 0 1px rgba(0, 0, 0, 0.03), 0 2px 4px rgba(0, 0, 0, 0.05), 0 12px 24px rgba(0, 0, 0, 0.05);
+
+  /* Toss System Colors */
   --toss-blue: #3182F6;
-  --toss-blue-light: #E8F3FF;
+  --toss-blue-light: #EBF5FF;
   --toss-gray-1: #F2F4F6;
   --toss-gray-2: #E5E8EB;
-  --toss-gray-3: #8B95A1;
-  --toss-gray-4: #4E5968;
-  --toss-card: #FFFFFF;
+  --toss-gray-3: #ADB5BD;
+  --toss-gray-4: #6B7684;
+  --toss-gray-5: #4E5968;
   --toss-border: #E5E8EB;
-  --toss-danger: #F04452;
+  --toss-card: #FFFFFF;
 }
 
-/* 다크 모드 (눈 피로 완화) — ThemeProvider가 html에 .dark 부여 */
 :root.dark {
-  --background: #0f172a;
-  --foreground: #e2e8f0;
-  --page-bg: #0f172a;
-  --tab-bg: #1e293b;
-  --input-bg: #1e293b;
-  --toss-blue: #60a5fa;
-  --toss-blue-light: #1e3a5f;
-  --toss-gray-1: #1e293b;
-  --toss-gray-2: #334155;
-  --toss-gray-3: #94a3b8;
-  --toss-gray-4: #cbd5e1;
-  --toss-card: #1e293b;
-  --toss-border: #334155;
-  --toss-danger: #f87171;
+  --background: #09090B;
+  --foreground: #FAFAFA;
+  --page-bg: #09090B;
+  --tab-bg: #18181B;
+  --input-bg: #18181B;
+
+  --primary: #FAFAFA;
+  --primary-foreground: #09090B;
+
+  --border: #27272A;
+  /* Zinc-800 */
+  --card: #09090B;
+  --danger: #EF4444;
+  --success: #10B981;
+
+  --shadow-premium: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 10px 30px rgba(0, 0, 0, 0.5);
+
+  /* Toss System Colors (Dark) */
+  --toss-blue: #3182F6;
+  --toss-blue-light: rgba(49, 130, 246, 0.15);
+  --toss-gray-1: #18181B;
+  --toss-gray-2: #27272A;
+  --toss-gray-3: #71717A;
+  --toss-gray-4: #A1A1AA;
+  --toss-gray-5: #D4D4D8;
+  --toss-border: #27272A;
+  --toss-card: #09090B;
 }
 
 @theme inline {
@@ -45,168 +96,219 @@
   --color-foreground: var(--foreground);
   --color-page-bg: var(--page-bg);
   --color-tab-bg: var(--tab-bg);
-  --color-toss-card: var(--toss-card);
-  --color-toss-border: var(--toss-border);
-  --font-sans: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
-  --font-mono: 'Pretendard', ui-monospace, monospace;
+  --color-card: var(--card);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-accent: var(--accent);
+  --font-sans: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 body {
-  background: var(--background);
+  background: var(--page-bg);
   color: var(--foreground);
   font-family: var(--font-sans);
-  font-size: 15px;
+  font-size: 14px;
+  /* Reduced from 15px for a more professional look */
   -webkit-font-smoothing: antialiased;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
+  /* Tighter tracking for precision */
+  line-height: 1.5;
 }
 
-/* ========== 글씨체·타이포 통일 ========== */
-.font-app { font-family: var(--font-sans); }
-.page-title { font-size: 1.125rem; font-weight: 600; color: var(--foreground); letter-spacing: -0.02em; }
-.section-title { font-size: 0.875rem; font-weight: 600; color: var(--foreground); }
-.caption { font-size: 0.75rem; font-weight: 500; color: var(--toss-gray-3); }
-
-/* 다크모드 입력창: 배경·글자색 대비 확보 */
-:root.dark input,
-:root.dark textarea,
-:root.dark select {
-  background-color: var(--input-bg);
+/* Typography Hierarchy */
+.heading-premium {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
   color: var(--foreground);
-  border-color: var(--toss-border);
 }
 
-/* 모바일 안전 영역 (노치/홈 인디케이터) */
-@supports (padding-bottom: env(safe-area-inset-bottom)) {
-  .safe-area-pb {
-    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
-  }
-}
-@supports (padding-top: env(safe-area-inset-top)) {
-  .safe-area-inset-top {
-    padding-top: max(0.75rem, env(safe-area-inset-top));
-  }
+.subheading-premium {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--zinc-500);
 }
 
-/* 모바일에서 스크롤 영역이 자연스럽게 스크롤되도록 */
-.overflow-y-auto, .overflow-x-auto {
-  -webkit-overflow-scrolling: touch;
+.body-premium {
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: var(--foreground);
 }
 
-/* ========== 디자인·UX 통일 기준 (토스/메디플로우) ==========
- * - 글씨체: Pretendard 전역
- * - 메인 액션: --toss-blue (#3182F6)
- * - 보조/비활성: --toss-gray-1~4
- * - 위험: --toss-danger (#F04452)
- * - 카드/패널: border 1px --toss-border, rounded-[16px]
- * - 버튼/입력: rounded-[12px], 작은 버튼 px-3 py-2.5, 큰 버튼 px-4 py-3
- * - 보조 글자: text-[11px], 본문 text-xs/text-sm
- * - 탭: .tab-bar + .tab-btn / .tab-btn-active
- * - 페이지 제목: .page-title (text-lg font-semibold)
- * ======================================================== */
-
-/* 통일 탭 스타일 (메뉴·서브 탭 공통) */
-.tab-bar {
-  display: flex;
-  gap: 2px;
-  padding: 4px;
-  background: var(--tab-bg);
-  border-radius: 8px;
-  width: fit-content;
-}
-.tab-btn {
-  padding: 6px 12px;
+.caption-premium {
   font-size: 0.75rem;
   font-weight: 500;
-  border-radius: 6px;
-  transition: all 0.15s;
-  white-space: nowrap;
-  color: var(--toss-gray-3);
-}
-.tab-btn:hover { color: var(--foreground); background: var(--toss-gray-1); }
-.tab-btn-active {
-  background: var(--toss-card);
-  color: var(--toss-blue);
-  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+  color: var(--zinc-400);
 }
 
-.btn-toss-primary {
-  background: var(--toss-blue);
-  color: white;
-  font-weight: 700;
-  border-radius: 12px;
-  transition: opacity 0.15s, transform 0.1s;
+/* Glassmorphism */
+.glass {
+  background: rgba(255, 255, 255, 0.7) !important;
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 0, 0, 0.05);
 }
-.btn-toss-primary:hover { opacity: 0.95; }
-.btn-toss-primary:active { transform: scale(0.98); }
 
-.btn-toss-secondary {
-  background: var(--toss-gray-1);
+:root.dark .glass {
+  background: rgba(9, 9, 11, 0.7) !important;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Premium Components */
+.card-premium {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s ease;
+}
+
+.card-premium:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--zinc-300);
+}
+
+:root.dark .card-premium:hover {
+  border-color: var(--zinc-700);
+}
+
+.btn-premium-primary {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-premium-primary:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.btn-premium-primary:active {
+  transform: translateY(0);
+}
+
+.btn-premium-secondary {
+  background: var(--card);
   color: var(--foreground);
-  font-weight: 700;
-  border-radius: 12px;
-  border: none;
-  transition: background 0.15s;
-}
-.btn-toss-secondary:hover { background: var(--toss-gray-2); }
-
-.btn-toss-danger {
-  background: var(--toss-danger);
-  color: white;
-  font-weight: 700;
-  border-radius: 12px;
-  border: none;
-  transition: opacity 0.15s, transform 0.1s;
-}
-.btn-toss-danger:hover { opacity: 0.95; }
-.btn-toss-danger:active { transform: scale(0.98); }
-
-.card-toss {
-  background: var(--toss-card);
-  border: 1px solid var(--toss-border);
-  border-radius: 16px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  border: 1px solid var(--border);
+  font-weight: 500;
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  transition: all 0.2s;
 }
 
-.radius-toss { border-radius: 8px; }
-.radius-toss-lg { border-radius: 12px; }
-.radius-toss-xl { border-radius: 16px; }
+.btn-premium-secondary:hover {
+  background: var(--tab-bg);
+  border-color: var(--zinc-300);
+}
 
-/* 페이지 제목 통일 (각 메뉴 상단) */
-.page-header-title { font-size: 1.125rem; font-weight: 600; color: var(--foreground); letter-spacing: -0.02em; }
-.page-header-caption { font-size: 0.75rem; font-weight: 500; color: var(--toss-gray-3); margin-top: 2px; }
+/* Custom Inputs */
+input.premium,
+textarea.premium,
+select.premium {
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  font-size: 0.875rem;
+  color: var(--foreground);
+  transition: all 0.2s;
+}
 
-/* 레이아웃용 유틸 (전체 프로그램 통일) */
-.app-page { background: var(--page-bg); color: var(--foreground); }
-.app-card { background: var(--toss-card); border: 1px solid var(--toss-border); border-radius: 16px; }
-.app-header { background: var(--toss-card); border-bottom: 1px solid var(--toss-border); }
-/* 메뉴 내 상단 탭 통일: 배경·모서리 */
-.app-tab-bar { background: var(--tab-bg); border-radius: 12px; }
-/* 탭 버튼 공통 (선택: bg-[var(--toss-card)] shadow-md text-[var(--toss-blue)] / 미선택: text-[var(--toss-gray-3)]) */
-.app-tab-bar button.selected,
-.app-tab-bar .tab-selected { background: var(--toss-card); box-shadow: 0 1px 3px rgba(0,0,0,.08); color: var(--toss-blue); }
-.app-tab-bar button:not(.selected),
-.app-tab-bar .tab-default { color: var(--toss-gray-3); }
+input.premium:focus {
+  outline: none;
+  border-color: var(--accent);
+  ring: 2px solid var(--accent-light);
+}
 
-.no-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
-.no-scrollbar::-webkit-scrollbar-track { background: transparent; }
-.no-scrollbar::-webkit-scrollbar-thumb { background: var(--toss-gray-2); border-radius: 3px; }
-.custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
-.custom-scrollbar::-webkit-scrollbar-track { background: var(--toss-gray-1); border-radius: 3px; }
-.custom-scrollbar::-webkit-scrollbar-thumb { background: var(--toss-gray-3); border-radius: 3px; }
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
 
-/* 다크모드: 라이트 전용 배경/카드 클래스가 테마 색으로 보이도록 (점진적 적용) */
-:root.dark .bg-white { background-color: var(--toss-card) !important; }
-:root.dark .bg-gray-50 { background-color: var(--toss-gray-1) !important; }
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--zinc-200);
+  border-radius: 10px;
+}
+
+:root.dark ::-webkit-scrollbar-thumb {
+  background: var(--zinc-800);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--zinc-300);
+}
+
+/* Animation Utils */
+.animate-premium-fade {
+  animation: premium-fade 0.4s ease-out;
+}
+
+@keyframes premium-fade {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Layout Utilities (Migration Helper) */
+.app-page {
+  background: var(--page-bg);
+  color: var(--foreground);
+}
+
+.app-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.app-header {
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+}
+
+/* Mobile Bottom Tab Safe Area */
+.safe-pb {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Utility Overrides for Dark Mode */
+:root.dark .bg-white {
+  background-color: var(--card) !important;
+}
+
+:root.dark .bg-gray-50 {
+  background-color: var(--tab-bg) !important;
+}
+
 :root.dark .border-gray-200,
-:root.dark .border-gray-100 { border-color: var(--toss-border); }
-:root.dark .text-gray-900,
-:root.dark .text-gray-800 { color: var(--foreground); }
-:root.dark .text-gray-500,
-:root.dark .text-gray-600,
-:root.dark .text-gray-400 { color: var(--toss-gray-3); }
+:root.dark .border-slate-200 {
+  border-color: var(--border) !important;
+}
 
-/* 다크모드: 하드코딩된 페이지/카드 배경이 테마 색으로 보이도록 */
-:root.dark [class*="bg-[#f8fafc]"],
-:root.dark [class*="bg-[#F8FAFC]"],
-:root.dark [class*="bg-[#F9FAFB]"] { background-color: var(--page-bg) !important; }
-:root.dark [class*="bg-[#eef2f7]"] { background-color: var(--tab-bg) !important; }
+:root.dark .text-gray-900,
+:root.dark .text-slate-900 {
+  color: var(--foreground) !important;
+}
+
+:root.dark .text-gray-500,
+:root.dark .text-slate-500 {
+  color: var(--zinc-500) !important;
+}

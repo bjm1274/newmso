@@ -33,11 +33,7 @@ function isVideoUrl(url: string): boolean {
 
 export default function ChatView({ user, onRefresh, staffs = [], initialOpenChatRoomId, onConsumeOpenChatRoomId }: any) {
   const [messages, setMessages] = useState<any[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [msgSearchKeyword, setMsgSearchKeyword] = useState(''); // 메시지 본문 검색
-  const [searchDateFrom, setSearchDateFrom] = useState('');
-  const [searchDateTo, setSearchDateTo] = useState('');
-  const [searchFileOnly, setSearchFileOnly] = useState(false);
+  const [omniSearch, setOmniSearch] = useState(''); // 통합 검색 (Omni-Search)
   const [inputMsg, setInputMsg] = useState('');
   const [activeActionMsg, setActiveActionMsg] = useState<any>(null);
   const [replyTo, setReplyTo] = useState<any>(null);
@@ -56,18 +52,13 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [readCounts, setReadCounts] = useState<Record<string, number>>({});
   const [roomUnreadCounts, setRoomUnreadCounts] = useState<Record<string, number>>({});
-  const [showSearchPanel, setShowSearchPanel] = useState(false);
-  const [toolbarMsgId, setToolbarMsgId] = useState<string | null>(null);
-  const [showMediaPanel, setShowMediaPanel] = useState(false);
-  const [mediaFilter, setMediaFilter] = useState<'all' | 'image' | 'file' | 'link'>('all');
-  const [showUnreadOnly, setShowUnreadOnly] = useState(false);
+  const [showSettings, setShowSettings] = useState(false); // 통합 설정 드롭다운
+  const [showDrawer, setShowDrawer] = useState(false); // 채팅방 상세 정보 드로어 (프리미엄)
 
   const [roomNotifyOn, setRoomNotifyOn] = useState(true);
   const [editingRoomName, setEditingRoomName] = useState(false);
   const [roomNameDraft, setRoomNameDraft] = useState('');
 
-  // 다중 선택 나가기용 상태
-  const [selectedRoomIdsForLeave, setSelectedRoomIdsForLeave] = useState<string[]>([]);
 
   const chatRoomsRef = useRef<any[]>([]);
 
@@ -109,6 +100,8 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   const [pollQuestion, setPollQuestion] = useState('');
   const [pollOptions, setPollOptions] = useState('찬성, 반대');
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
+  const [showMediaPanel, setShowMediaPanel] = useState(false);
+  const [mediaFilter, setMediaFilter] = useState<'all' | 'image' | 'video' | 'file'>('all');
 
   // 메시지 전달/공유용 상태
   const [showForwardModal, setShowForwardModal] = useState(false);
@@ -296,8 +289,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     try {
       const key = window.localStorage.getItem(CHAT_FOCUS_KEY);
       if (key) {
-        setMsgSearchKeyword(key);
-        setShowSearchPanel(true);
+        setOmniSearch(key);
         window.localStorage.removeItem(CHAT_FOCUS_KEY);
       }
     } catch {
@@ -367,47 +359,14 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   }, []);
 
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (toolbarMsgId && !(e.target as Element)?.closest?.('[data-msg-toolbar-area]')) {
-        setToolbarMsgId(null);
-      }
-    };
-    document.addEventListener('click', handleClickOutside, true);
-    return () => document.removeEventListener('click', handleClickOutside, true);
-  }, [toolbarMsgId]);
-
-  useEffect(() => { scrollRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages.length]);
+    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages.length]);
 
   const pinnedMessages = useMemo(
     () => messages.filter((m) => pinnedIds.includes(m.id)),
     [messages, pinnedIds]
   );
 
-  const mediaMessages = useMemo(
-    () =>
-      messages.filter((m: any) => {
-        if (m.file_url) return true;
-        const text = (m.content || '') as string;
-        return /https?:\/\/\S+/i.test(text);
-      }),
-    [messages]
-  );
-
-  const filteredMediaMessages = useMemo(
-    () =>
-      mediaMessages.filter((m: any) => {
-        const fileUrl: string | null = m.file_url || null;
-        const hasFile = !!fileUrl;
-        const image = hasFile && isImageUrl(fileUrl as string);
-        const hasLink = /(https?:\/\/\S+)/i.test(m.content || '');
-
-        if (mediaFilter === 'image') return hasFile && image;
-        if (mediaFilter === 'file') return hasFile && !image;
-        if (mediaFilter === 'link') return hasLink;
-        return true;
-      }),
-    [mediaMessages, mediaFilter]
-  );
 
   const roomMembers = useMemo(() => {
     if (!selectedRoomId) return [];
@@ -539,56 +498,6 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     }
   };
 
-  const handleBulkLeaveRooms = async () => {
-    if (!user?.id) return;
-    const targets = chatRooms.filter(
-      (room: any) =>
-        selectedRoomIdsForLeave.includes(room.id) &&
-        room.id !== NOTICE_ROOM_ID
-    );
-    if (!targets.length) {
-      alert('나갈 수 있는 채팅방이 선택되지 않았습니다.');
-      return;
-    }
-    if (
-      !confirm(
-        `선택한 ${targets.length}개 채팅방에서 한 번에 나가시겠습니까?\n\n나간 후에는 다시 초대 받아야 합니다.`
-      )
-    )
-      return;
-
-    try {
-      const userIdStr = String(user.id);
-      const updates = targets.map((room: any) => {
-        const currentMembers: any[] = Array.isArray(room.members) ? room.members : [];
-        const newMembers = currentMembers.filter((id: any) => String(id) !== userIdStr);
-        return { id: room.id, members: newMembers };
-      });
-
-      for (const u of updates) {
-        await supabase.from('chat_rooms').update({ members: u.members }).eq('id', u.id);
-      }
-
-      setChatRooms((prev) =>
-        prev.map((room: any) => {
-          const upd = updates.find((u) => u.id === room.id);
-          return upd ? { ...room, members: upd.members } : room;
-        })
-      );
-
-      // 현재 보고 있던 방도 나간 방이면 선택 해제
-      if (selectedRoomId && updates.some((u) => u.id === selectedRoomId)) {
-        setRoom(null);
-        setMessages([]);
-      }
-
-      setSelectedRoomIdsForLeave([]);
-      alert('선택한 채팅방에서 나갔습니다.');
-    } catch (e) {
-      console.error('handleBulkLeaveRooms error', e);
-      alert('채팅방 일괄 나가기 중 오류가 발생했습니다.');
-    }
-  };
 
   const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024; // 100MB
   const handleSendMessage = async (
@@ -645,7 +554,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     if (fileKind) payload.file_kind = fileKind;
     const { data: inserted, error } = await supabase.from('messages').insert([payload]).select().single();
     if (!error && inserted) {
-      setInputMsg(''); 
+      setInputMsg('');
       setReplyTo(null);
       // 카카오톡처럼 내 메시지 즉시 표시 (낙관적 업데이트)
       const optimisticMsg = {
@@ -700,8 +609,8 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       const hint = msg.includes('Bucket not found') || msg.includes('not found')
         ? 'Supabase 대시보드에서 Storage > New bucket > 이름 "pchos-files" (Public) 생성 후 다시 시도해 주세요.'
         : msg.includes('policy') || msg.includes('RLS')
-        ? 'Storage 버킷 pchos-files의 RLS 정책에서 INSERT를 허용해 주세요.'
-        : '버킷 생성 여부와 RLS 정책을 확인해 주세요.';
+          ? 'Storage 버킷 pchos-files의 RLS 정책에서 INSERT를 허용해 주세요.'
+          : '버킷 생성 여부와 RLS 정책을 확인해 주세요.';
       alert(`파일 업로드에 실패했습니다.\n\n${hint}`);
     } finally {
       setFileUploading(false);
@@ -712,12 +621,12 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   const handleAction = async (type: 'task') => {
     if (!activeActionMsg) return;
     if (type === 'task') {
-      const { error } = await supabase.from('tasks').insert([{ 
-        assignee_id: user.id, 
-        title: `[채팅] ${activeActionMsg.content}`, 
-        status: 'pending' 
+      const { error } = await supabase.from('tasks').insert([{
+        assignee_id: user.id,
+        title: `[채팅] ${activeActionMsg.content}`,
+        status: 'pending'
       }]);
-      if (!error) { alert("할일 등록 완료"); if(onRefresh) onRefresh(); }
+      if (!error) { alert("할일 등록 완료"); if (onRefresh) onRefresh(); }
     }
     setActiveActionMsg(null);
   };
@@ -741,11 +650,30 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     }
   };
 
-  const filteredStaffs = useMemo(() => {
-    return staffs.filter((s: any) => 
-      s.name.includes(searchTerm) || s.department?.includes(searchTerm)
-    );
-  }, [staffs, searchTerm]);
+  const groupedStaffs = useMemo(() => {
+    const grouped: Record<string, Record<string, any[]>> = {};
+    staffs.forEach((s: any) => {
+      const company = s.company || '기타';
+      const dept = s.department || '미지정';
+      if (!grouped[company]) grouped[company] = {};
+      if (!grouped[company][dept]) grouped[company][dept] = [];
+      grouped[company][dept].push(s);
+    });
+    return grouped;
+  }, [staffs]);
+
+  const mediaMessages = useMemo(() => {
+    return messages.filter((m: any) => m.file_url);
+  }, [messages]);
+
+  const filteredMediaMessages = useMemo(() => {
+    if (mediaFilter === 'all') return mediaMessages;
+    return mediaMessages.filter((m: any) => {
+      if (mediaFilter === 'image') return isImageUrl(m.file_url);
+      if (mediaFilter === 'video') return isVideoUrl(m.file_url);
+      return !isImageUrl(m.file_url) && !isVideoUrl(m.file_url);
+    });
+  }, [mediaMessages, mediaFilter]);
 
   // 현재 선택된 방 멤버 중에서 @멘션 자동완성 후보
   const mentionCandidates = useMemo(() => {
@@ -793,7 +721,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
         { onConflict: 'poll_id,user_id' }
       );
       if (!error) fetchData();
-    } catch (_) {}
+    } catch (_) { }
     setPollVotes((prev: any) => {
       const ex = prev[pollId] || {};
       return { ...prev, [pollId]: { ...ex, [optionIndex]: (ex[optionIndex] || 0) + 1 } };
@@ -809,7 +737,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
         await supabase.from('message_reactions').insert([{ message_id: messageId, user_id: user.id, emoji }]);
       }
       fetchData();
-    } catch (_) {}
+    } catch (_) { }
   };
 
   const togglePin = async (messageId: string) => {
@@ -835,17 +763,26 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
         { onConflict: 'user_id,message_id' }
       );
       fetchData(); // 읽음 수 갱신
-    } catch (_) {}
+    } catch (_) { }
   };
 
-  const filteredMessages = useMemo(() => {
-    let list = messages.filter((m: any) => !m.is_deleted);
-    if (msgSearchKeyword) list = list.filter((m) => (m.content || '').includes(msgSearchKeyword) || (m.file_url && '파일'.includes(msgSearchKeyword)));
-    if (searchFileOnly) list = list.filter((m) => !!m.file_url);
-    if (searchDateFrom) list = list.filter((m) => new Date(m.created_at).toISOString().slice(0, 10) >= searchDateFrom);
-    if (searchDateTo) list = list.filter((m) => new Date(m.created_at).toISOString().slice(0, 10) <= searchDateTo);
-    return list;
-  }, [messages, msgSearchKeyword, searchFileOnly, searchDateFrom, searchDateTo]);
+  const combinedTimeline = useMemo(() => {
+    const msgs = messages.filter((m: any) => !m.is_deleted);
+    let filtered = msgs;
+    if (omniSearch.trim()) {
+      const q = omniSearch.toLowerCase();
+      filtered = msgs.filter((m) =>
+        (m.content || '').toLowerCase().includes(q) ||
+        (m.staff?.name || '').toLowerCase().includes(q)
+      );
+    }
+    const ms = filtered.map(m => ({ ...m, type: 'message' }));
+    const ps = polls
+      .filter((p: any) => p.room_id === selectedRoomId)
+      .map(p => ({ ...p, type: 'poll', created_at: p.created_at || new Date().toISOString() }));
+
+    return [...ms, ...ps].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  }, [messages, omniSearch, polls, selectedRoomId]);
 
   useEffect(() => {
     const load = async () => {
@@ -925,165 +862,83 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   return (
     <div className="flex flex-1 min-h-0 overflow-hidden relative font-sans h-full bg-[var(--background)] md:bg-[var(--toss-card)]">
       {/* 좌측 사이드바: 모바일에서는 채팅방 미선택 시에만 전체 표시, 선택 시 숨김 */}
-      <aside className={`${selectedRoomId ? 'hidden md:flex' : 'flex'} w-full md:w-80 border-r border-[var(--toss-border)] md:border-0 bg-[var(--toss-card)] md:bg-[#191F28] flex-col shrink-0 text-[var(--toss-gray-4)] md:text-slate-50 shadow-sm md:shadow-none`}>
-        <div className="p-4 md:p-6 space-y-3 flex flex-col min-h-0">
-          <div className="flex gap-1 bg-[var(--toss-gray-1)] md:bg-slate-800 p-1 rounded-[12px]">
+      <aside className={`${selectedRoomId ? 'hidden md:flex' : 'flex'} w-full md:w-80 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 flex-col shrink-0 z-50 transition-all`}>
+        <div className="p-4 md:p-6 space-y-4 flex flex-col min-h-0">
+          <div className="flex gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl glass">
             <button
               onClick={() => setViewMode('chat')}
-              className={`flex-1 py-2 text-[11px] font-bold rounded-[12px] transition-all ${
-                viewMode === 'chat'
-                  ? 'bg-[var(--toss-card)] text-[var(--toss-blue)] shadow-sm md:bg-slate-50 md:text-slate-900'
-                  : 'text-[var(--toss-gray-3)] hover:bg-[var(--toss-card)]/80 md:text-slate-300 md:hover:bg-slate-700/80'
-              }`}
+              className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all ${viewMode === 'chat'
+                ? 'bg-white dark:bg-zinc-700 text-foreground shadow-premium'
+                : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+                }`}
             >
-              채팅목록
+              채팅
             </button>
             <button
               onClick={() => setViewMode('org')}
-              className={`flex-1 py-2 text-[11px] font-bold rounded-[12px] transition-all ${
-                viewMode === 'org'
-                  ? 'bg-[var(--toss-card)] text-[var(--toss-blue)] shadow-sm md:bg-slate-50 md:text-slate-900'
-                  : 'text-[var(--toss-gray-3)] hover:bg-[var(--toss-card)]/80 md:text-slate-300 md:hover:bg-slate-700/80'
-              }`}
+              className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all ${viewMode === 'org'
+                ? 'bg-white dark:bg-zinc-700 text-foreground shadow-premium'
+                : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+                }`}
             >
-              조직도검색
+              조직도
             </button>
           </div>
-          
-          <input 
-            className="w-full p-3 md:p-4 bg-[var(--toss-gray-1)] md:bg-slate-800 border border-[var(--toss-border)] md:border-slate-700 rounded-[12px] text-xs font-medium outline-none text-[var(--foreground)] placeholder:text-[var(--toss-gray-3)] md:text-slate-50 md:placeholder:text-slate-400 focus:ring-2 focus:ring-[var(--toss-blue)]/30" 
-            placeholder={viewMode === 'chat' ? "채팅방 검색..." : "이름 또는 부서 검색..."}
-            value={searchTerm} 
-            onChange={e => setSearchTerm(e.target.value)}
-            aria-label="채팅방 또는 조직 검색"
-          />
-          {viewMode === 'chat' && (
-            <div className="flex flex-col gap-2">
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setShowSearchPanel(!showSearchPanel)}
-                  className="flex-1 py-2 text-[11px] font-bold text-[var(--toss-blue)] bg-[var(--toss-blue-light)] md:text-blue-300 md:bg-slate-800 md:hover:bg-slate-700 hover:bg-[var(--toss-blue-light)] rounded-[12px] transition-colors"
-                  aria-label="메시지 검색 패널 열기"
-                >
-                  🔍 메시지 검색
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowUnreadOnly((v) => !v)}
-                  className={`px-3 py-2 text-[11px] font-bold rounded-[12px] border transition-colors ${
-                    showUnreadOnly
-                      ? 'bg-rose-100 border-rose-200 text-rose-600 md:bg-rose-500/20 md:border-rose-300 md:text-rose-200'
-                      : 'bg-[var(--toss-gray-1)] border-[var(--toss-border)] text-[var(--toss-gray-4)] md:bg-slate-800 md:border-slate-700 md:text-slate-300'
-                  }`}
-                >
-                  {showUnreadOnly ? '전체 보기' : '안읽은 방'}
-                </button>
-              </div>
-              <div className="flex gap-2">
-                <label className="flex-1 flex items-center gap-2 px-3 py-2 bg-[var(--toss-gray-1)] md:bg-slate-800 border border-[var(--toss-border)] md:border-slate-700 rounded-[12px] cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={
-                      selectedRoomIdsForLeave.length > 0 &&
-                      visibleRooms.some(
-                        (room: any) =>
-                          room.id !== NOTICE_ROOM_ID &&
-                          selectedRoomIdsForLeave.includes(room.id)
-                      )
-                    }
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        const ids = visibleRooms
-                          .filter((room: any) => room.id !== NOTICE_ROOM_ID)
-                          .map((r: any) => r.id);
-                        setSelectedRoomIdsForLeave(ids);
-                      } else {
-                        setSelectedRoomIdsForLeave([]);
-                      }
-                    }}
-                  />
-                  <span className="text-[11px] font-bold text-[var(--toss-gray-4)] md:text-slate-200">일반 채팅방 전체 선택</span>
-                </label>
-                <button
-                  type="button"
-                  onClick={handleBulkLeaveRooms}
-                  className="px-3 py-2 text-[11px] font-bold rounded-[12px] bg-rose-100 text-rose-600 hover:bg-rose-200 md:bg-rose-500/20 md:text-rose-100 md:hover:bg-rose-500/40 disabled:opacity-40"
-                  disabled={selectedRoomIdsForLeave.length === 0}
-                >
-                  선택 방 나가기
-                </button>
-              </div>
-            </div>
-          )}
+
+          <div className="flex items-center justify-between px-1">
+            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest leading-none">
+              {viewMode === 'chat' ? '최근 대화' : '조직도'}
+            </span>
+          </div>
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-6 space-y-2 custom-scrollbar">
           {viewMode === 'chat' ? (
             <>
-              <button
-                onClick={() => setShowGroupModal(true)}
-                className="w-full p-4 bg-[var(--toss-blue)] text-white rounded-[16px] text-[11px] font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all"
-              >
-                + 단체 채팅방 생성
-              </button>
               {[...visibleRooms]
                 .filter(r => {
                   const name = r.id === NOTICE_ROOM_ID ? NOTICE_ROOM_NAME : (r.name || '');
-                  return r.id === NOTICE_ROOM_ID || name.includes(searchTerm);
+                  return r.id === NOTICE_ROOM_ID || name.toLowerCase().includes(omniSearch.toLowerCase());
                 })
-                .filter(room => !showUnreadOnly || room.id === NOTICE_ROOM_ID || (roomUnreadCounts[room.id] || 0) > 0)
                 .sort((a, b) => {
                   if (a.id === NOTICE_ROOM_ID) return -1;
                   if (b.id === NOTICE_ROOM_ID) return 1;
-                  return (roomUnreadCounts[b.id] || 0) - (roomUnreadCounts[a.id] || 0);
+                  const at = new Date(a.last_message_at || a.created_at || 0).getTime();
+                  const bt = new Date(b.last_message_at || b.created_at || 0).getTime();
+                  return bt - at;
                 })
                 .map(room => {
                   const unread = roomUnreadCounts[room.id] || 0;
                   const isSelected = selectedRoomId === room.id;
                   const isNoticeChannel = room.id === NOTICE_ROOM_ID;
                   const label = room.id === NOTICE_ROOM_ID ? NOTICE_ROOM_NAME : room.name || '채팅방';
-                  const isBulkSelectable = !isNoticeChannel;
-                  const checked = selectedRoomIdsForLeave.includes(room.id);
                   return (
                     <div
                       key={room.id}
                       onClick={() => setRoom(room.id)}
-                      className={`p-4 rounded-[16px] cursor-pointer transition-all flex items-center justify-between gap-2 ${
-                        isSelected
-                          ? 'bg-[var(--toss-blue-light)] border border-[var(--toss-blue)] shadow-sm md:bg-slate-100 md:border-slate-200'
-                          : 'bg-[var(--toss-card)] border border-[var(--toss-border)] hover:border-[var(--toss-blue)]/50 md:bg-slate-800/60 md:border-slate-700 md:hover:border-emerald-400'
-                      }`}
+                      className={`group p-3.5 rounded-xl cursor-pointer transition-all flex items-center justify-between gap-3 border relative overflow-hidden ${isSelected
+                        ? 'bg-zinc-800 border-zinc-700 shadow-sm'
+                        : 'bg-white dark:bg-zinc-900 border-transparent hover:border-zinc-200 dark:hover:border-zinc-800'
+                        }`}
                     >
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        {isBulkSelectable && (
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              setSelectedRoomIdsForLeave((prev) =>
-                                e.target.checked
-                                  ? [...prev, room.id]
-                                  : prev.filter((id) => id !== room.id)
-                              );
-                            }}
-                            className="w-3 h-3 rounded border-[var(--toss-border)] md:border-slate-400 bg-[var(--toss-card)] md:bg-slate-900 text-[var(--toss-blue)] md:text-emerald-400"
-                          />
-                        )}
+                      {isSelected && (
+                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500"></div>
+                      )}
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm ${isNoticeChannel ? 'bg-blue-100 text-blue-600' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500'}`}>
+                          {isNoticeChannel ? '📢' : '👥'}
+                        </div>
                         <div className="flex flex-col min-w-0">
-                          <p className={`text-xs font-bold truncate ${isSelected ? 'text-[var(--foreground)]' : 'text-[var(--toss-gray-4)] md:text-slate-50'}`}>
-                            {isNoticeChannel ? '📢 ' : '👥 '}
+                          <p className={`text-[12px] font-bold truncate ${isSelected ? 'text-white' : 'text-zinc-600 dark:text-zinc-300'}`}>
                             {label}
+                          </p>
+                          <p className="text-[10px] text-zinc-400 font-medium truncate">
+                            {room.last_message || '대화가 없습니다.'}
                           </p>
                         </div>
                       </div>
                       {unread > 0 && (
-                        <span
-                          className={`ml-2 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full text-[11px] font-bold ${
-                            isSelected ? 'bg-[var(--toss-blue)] text-white' : 'bg-rose-500 text-white'
-                          }`}
-                        >
+                        <span className="ml-2 min-w-[16px] h-[16px] px-1 flex items-center justify-center rounded-full bg-blue-600 text-white text-[9px] font-bold shadow-soft">
                           {unread > 99 ? '99+' : unread}
                         </span>
                       )}
@@ -1092,36 +947,56 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                 })}
             </>
           ) : (
-            <div className="space-y-1">
-              {filteredStaffs.map((s: any) => (
-                <div key={s.id} className="flex items-center gap-3 p-3 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] hover:border-[var(--toss-blue)] cursor-pointer transition-all">
-                  <div className="w-8 h-8 bg-[var(--toss-gray-1)] rounded-[12px] flex items-center justify-center text-xs font-semibold text-[var(--toss-gray-3)] overflow-hidden">
-                    {s.photo_url ? <img src={s.photo_url} alt={s.name ?? '직원 사진'} className="w-full h-full object-cover" /> : s.name[0]}
+            <div className="space-y-6">
+              {Object.entries(groupedStaffs).map(([company, depts]) => (
+                <div key={company} className="space-y-4">
+                  <div className="flex items-center gap-2 px-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                    <h3 className="text-[11px] font-black text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">{company}</h3>
+                    <div className="flex-1 h-[1px] bg-zinc-100 dark:bg-zinc-800/50"></div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-[var(--foreground)] truncate">{s.name}</p>
-                    <p className="text-[11px] font-bold text-[var(--toss-gray-3)] truncate">{s.department} · {s.position}</p>
+                  <div className="space-y-5 pl-1">
+                    {Object.entries(depts).map(([dept, members]) => (
+                      <div key={dept} className="space-y-2">
+                        <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 ml-1">{dept}</p>
+                        <div className="space-y-1">
+                          {members.map((s: any) => (
+                            <div key={s.id} className="flex items-center gap-3 p-2.5 bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800/50 rounded-xl hover:border-blue-400/50 dark:hover:border-blue-500/50 cursor-pointer transition-all group">
+                              <div className="w-8 h-8 bg-zinc-100 dark:bg-zinc-800 rounded-lg flex items-center justify-center text-xs font-bold text-zinc-400 overflow-hidden shrink-0">
+                                {s.photo_url ? <img src={s.photo_url} alt={s.name} className="w-full h-full object-cover" /> : s.name[0]}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <p className="text-xs font-bold text-foreground truncate">{s.name}</p>
+                                  <span className="text-[10px] font-medium text-zinc-400">{s.position}</span>
+                                </div>
+                              </div>
+                              <button
+                                onClick={async () => {
+                                  const otherId = s.id;
+                                  const { data: rooms } = await supabase.from('chat_rooms').select('id, members').eq('type', 'direct');
+                                  const found = (rooms || []).find((r: any) => {
+                                    const m = new Set((r.members || []).map((x: any) => String(x)));
+                                    const p = new Set([String(user.id), String(otherId)]);
+                                    return m.size === p.size && [...p].every((id) => m.has(id));
+                                  });
+                                  if (found) setRoom(found.id);
+                                  else {
+                                    const { data: room } = await supabase.from('chat_rooms').insert([{ name: `${s.name}`, type: 'direct', members: [user.id, otherId] }]).select('id').single();
+                                    if (room) { setRoom(room.id); fetchData(); }
+                                  }
+                                  setViewMode('chat');
+                                }}
+                                className="px-3 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-all border border-blue-100 dark:border-blue-800/50"
+                              >
+                                대화
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <button onClick={async () => {
-                    const otherId = s.id;
-                    const pair = new Set([user.id, otherId]);
-                    const { data: rooms } = await supabase.from('chat_rooms').select('id, members').eq('type', 'direct');
-                    const found = (rooms || []).find((r: any) => {
-                      const m = new Set((r.members || []).map((x: any) => String(x)));
-                      const p = new Set([String(user.id), String(otherId)]);
-                      return m.size === p.size && [...p].every((id) => m.has(id));
-                    });
-                    if (found) setRoom(found.id);
-                    else {
-                      const { data: room } = await supabase.from('chat_rooms').insert([{ name: `${s.name}`, type: 'direct', members: [user.id, otherId] }]).select('id').single();
-                      if (room) {
-                        setRoom(room.id);
-                        setTimeout(() => fetchData(), 300);
-                      }
-                    }
-                    setViewMode('chat');
-                    fetchData();
-                  }} className="px-3 py-1.5 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] rounded-[12px] text-[11px] font-bold hover:bg-[var(--toss-blue)] hover:text-white transition-all">대화</button>
                 </div>
               ))}
             </div>
@@ -1133,57 +1008,47 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       <main className={`${!selectedRoomId ? 'hidden md:flex' : 'flex'} flex-1 min-h-0 flex-col bg-[var(--toss-gray-1)] relative pb-20 md:pb-0`}>
         {/* 선택된 채팅방 정보 및 액션 버튼들 */}
         {selectedRoomId && selectedRoom && (
-          <header className="px-4 md:px-6 pt-3 md:pt-4 pb-3 flex items-center gap-3 border-b border-[var(--toss-border)] bg-[var(--toss-card)] shrink-0">
-            <button
-              type="button"
-              onClick={() => setRoom(null)}
-              className="md:hidden w-9 h-9 flex items-center justify-center rounded-[12px] text-[var(--toss-gray-4)] hover:bg-[var(--toss-gray-1)] -ml-1"
-              aria-label="채팅목록으로"
-            >
-              ←
-            </button>
-            <div className="flex-1 min-w-0">
-              <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wide">
-                현재 채팅방
-              </p>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <p className="text-sm font-bold text-[var(--foreground)] truncate flex-1 min-w-0">
-                  {selectedRoom.id === NOTICE_ROOM_ID
-                    ? NOTICE_ROOM_NAME
-                    : selectedRoom.name || '채팅방'}
+          <header className="px-6 py-3.5 flex items-center justify-between border-b border-zinc-200/50 dark:border-zinc-800/50 glass glass-border shrink-0 z-40">
+            <div className="flex items-center gap-3 min-w-0">
+              <button onClick={() => setRoom(null)} className="md:hidden text-zinc-400">←</button>
+              <div className="w-9 h-9 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-lg">
+                {selectedRoom.id === NOTICE_ROOM_ID ? '📢' : '👥'}
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-[13px] font-bold text-foreground truncate">
+                  {selectedRoom.id === NOTICE_ROOM_ID ? NOTICE_ROOM_NAME : selectedRoom.name || '채팅방'}
+                </h3>
+                <p className="text-[10px] text-zinc-500 font-medium">
+                  {selectedRoom.members?.length || 0} 참여중
                 </p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setShowMediaPanel(true)}
-              className="w-9 h-9 flex items-center justify-center text-[var(--toss-gray-4)] rounded-[12px] hover:bg-[var(--toss-gray-1)] hover:text-[var(--toss-blue)] transition-colors"
-              aria-label="파일·사진·링크 메뉴 열기"
-              title="파일·사진·링크 보기"
-            >
-              ☰
-            </button>
-          </header>
-        )}
-        {showSearchPanel && (
-          <div className="shrink-0 p-4 bg-[var(--toss-gray-1)] border-b border-[var(--toss-border)] space-y-3">
-            <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">메시지 검색</p>
-            <div className="flex flex-wrap gap-2">
-              <input
-                value={msgSearchKeyword}
-                onChange={(e) => setMsgSearchKeyword(e.target.value)}
-                placeholder="키워드"
-                className="flex-1 min-w-[120px] p-2 text-xs font-bold border border-[var(--toss-border)] rounded-[12px] outline-none focus:ring-2 focus:ring-blue-200"
-                aria-label="검색 키워드"
-              />
-              <input type="date" value={searchDateFrom} onChange={(e) => setSearchDateFrom(e.target.value)} className="p-2 text-[11px] font-bold border rounded-[12px]" aria-label="시작일" />
-              <input type="date" value={searchDateTo} onChange={(e) => setSearchDateTo(e.target.value)} className="p-2 text-[11px] font-bold border rounded-[12px]" aria-label="종료일" />
-              <label className="flex items-center gap-2 text-[11px] font-bold">
-                <input type="checkbox" checked={searchFileOnly} onChange={(e) => setSearchFileOnly(e.target.checked)} className="rounded" />
-                파일만
-              </label>
+
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <button
+                  onClick={() => setShowSettings(!showSettings)}
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${showSettings ? 'bg-zinc-200 dark:bg-zinc-800' : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
+                >
+                  <span className="text-sm">⚙️</span>
+                </button>
+                {showSettings && (
+                  <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-premium z-50 p-1 animate-premium-fade">
+                    <button onClick={() => { setShowAddMemberModal(true); setShowSettings(false); }} className="w-full text-left px-3 py-2 text-[11px] font-bold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg">대화상대 초대</button>
+                    <button onClick={() => { setEditingRoomName(true); setShowSettings(false); }} className="w-full text-left px-3 py-2 text-[11px] font-bold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg">채팅방 이름 변경</button>
+                    <button onClick={() => { toggleRoomNotify(); setShowSettings(false); }} className="w-full text-left px-3 py-2 text-[11px] font-bold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg">
+                      {roomNotifyOn ? '알림 끄기' : '알림 켜기'}
+                    </button>
+                    <div className="h-[1px] bg-zinc-100 dark:bg-zinc-800 my-1"></div>
+                    <button onClick={() => { setShowMediaPanel(true); setShowSettings(false); }} className="w-full text-left px-3 py-2 text-[11px] font-bold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg">📎 파일/링크 내역</button>
+                    <button onClick={() => { setShowPollModal(true); setShowSettings(false); }} className="w-full text-left px-3 py-2 text-[11px] font-bold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg">📊 투표 만들기</button>
+                    <div className="h-[1px] bg-zinc-100 dark:bg-zinc-800 my-1"></div>
+                    <button onClick={() => { handleLeaveRoom(); setShowSettings(false); }} className="w-full text-left px-3 py-2 text-[11px] font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg">채팅방 나가기</button>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          </header>
         )}
 
         <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6 pb-24 md:pb-6 space-y-3 custom-scrollbar">
@@ -1200,13 +1065,41 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
           ) : (
             (() => {
               let lastDateLabel = '';
-              return filteredMessages.map((msg) => {
+              return combinedTimeline.map((item) => {
+                if (item.type === 'poll') {
+                  const votes = pollVotes[item.id] || {};
+                  const totalVotes = (Object.values(votes) as number[]).reduce((a: number, b: number) => a + b, 0);
+                  return (
+                    <div key={`poll-${item.id}`} className="max-w-[85%] md:max-w-[70%] bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 rounded-2xl p-4 shadow-soft">
+                      <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                        <span className="text-sm">📊</span> 투표
+                      </p>
+                      <p className="mb-4 text-xs font-bold text-foreground leading-relaxed">{item.question}</p>
+                      <div className="space-y-1.5">
+                        {item.options.map((opt: string, idx: number) => (
+                          <button
+                            key={idx}
+                            onClick={() => handleVote(item.id, idx)}
+                            className="w-full flex justify-between items-center px-4 py-2.5 rounded-xl bg-white dark:bg-zinc-800/50 border border-blue-200/50 dark:border-blue-700/30 hover:border-blue-400 dark:hover:border-blue-500 transition-all text-[11px] font-medium group"
+                          >
+                            <span className="text-zinc-700 dark:text-zinc-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{opt}</span>
+                            <span className="text-blue-600 font-bold bg-blue-50 dark:bg-blue-900/50 px-2 py-0.5 rounded-md">
+                              {votes[idx] || 0}
+                              {totalVotes > 0 && <span className="ml-1 opacity-60 font-medium">({Math.round(((votes[idx] || 0) / totalVotes) * 100)}%)</span>}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+
+                const msg = item;
                 const isMine = msg.sender_id === user.id;
                 const msgReacts = reactions[msg.id] || {};
                 const hasReacts = Object.keys(msgReacts).some(e => (msgReacts[e] || 0) > 0);
                 const readCount = readCounts[msg.id] || 0;
                 const TOOLBAR_EMOJIS = ['👍', '👌', '😎', '😍', '😂', '😕', '😢', '😠'];
-                const showToolbar = toolbarMsgId === msg.id;
 
                 const created = new Date(msg.created_at);
                 const dateLabel = created.toLocaleDateString('ko-KR', {
@@ -1237,136 +1130,115 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                         </span>
                       </div>
                     ) : (
-                    <div
-                      ref={el => { msgRefs.current[msg.id] = el; }}
-                      data-msg-toolbar-area
-                      className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}
-                      onMouseEnter={() => setToolbarMsgId(msg.id)}
-                      onMouseLeave={() => setToolbarMsgId(prev => prev === msg.id ? null : prev)}
-                    >
-                      {!isMine && (
-                        <span className="text-[11px] text-[var(--toss-gray-4)] px-2 mb-1 font-bold">
-                          {msg.staff?.name} {msg.staff?.position}
-                        </span>
-                      )}
-                      <div 
-                        onClick={(e) => { e.stopPropagation(); setToolbarMsgId(msg.id); markMessageRead(msg); }}
-                        className={`group relative px-3 py-2 rounded-[12px] text-sm shadow-sm cursor-pointer transition-all max-w-[70%] ${
-                          isMine
-                            ? 'bg-emerald-600 text-white rounded-tr-none'
-                            : 'bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-tl-none hover:border-emerald-400 text-[var(--foreground)]'
-                        }`}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => e.key === 'Enter' && (setToolbarMsgId(msg.id), markMessageRead(msg))}
-                        aria-label={`${msg.staff?.name || '알 수 없음'} 메시지`}
+                      <div
+                        ref={el => { msgRefs.current[msg.id] = el; }}
+                        className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}
                       >
-                        {msg.reply_to_id && (() => {
-                          const parent = messages.find((m: any) => m.id === msg.reply_to_id);
-                          return parent ? (
-                            <div className={`mb-2 p-2 rounded-[12px] text-[11px] border-l-2 ${
-                              isMine ? 'bg-white/10 border-white/30 text-white' : 'bg-[var(--toss-gray-1)] border-[var(--toss-border)] text-[var(--foreground)]'
-                            }`}>
-                              <span className="font-bold opacity-80">↩️ {parent.staff?.name}: </span>
-                              <span className="truncate">{parent.content || '📎 파일'}</span>
-                            </div>
-                          ) : null;
-                        })()}
-                        {msg.content}
-                        {msg.file_url && (
-                          <div className="mt-2 space-y-1" onClick={(e) => e.stopPropagation()}>
-                            {isImageUrl(msg.file_url) ? (
-                              <a href={msg.file_url} target="_blank" rel="noopener noreferrer" className="block">
-                                <img
-                                  src={msg.file_url}
-                                  alt="첨부 이미지"
-                                  className="max-w-[200px] max-h-[150px] rounded-[12px] object-cover border border-[var(--toss-border)]"
-                                />
-                              </a>
-                            ) : null}
-                            <a
-                              href={msg.file_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              download
-                              className={`block p-2 rounded-[12px] text-[11px] font-bold border flex items-center gap-2 hover:opacity-80 transition-opacity ${
-                                isMine ? 'bg-white/10 border-white/20 text-white' : 'bg-[var(--toss-gray-1)] border-[var(--toss-border)] text-[var(--toss-blue)]'
-                              }`}
-                            >
-                              📎 파일 첨부됨 — 다운로드
-                            </a>
-                          </div>
+                        {!isMine && (
+                          <span className="text-[11px] text-[var(--toss-gray-4)] px-2 mb-1 font-bold">
+                            {msg.staff?.name} {msg.staff?.position}
+                          </span>
                         )}
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            markMessageRead(msg);
+                            setActiveActionMsg(msg); // [복구] 메시지 클릭 시 액션 메뉴 표시
+                          }}
+                          className={`group relative px-3 py-2 rounded-[12px] text-sm shadow-sm cursor-pointer transition-all max-w-[70%] ${isMine
+                            ? 'bg-emerald-600 text-white rounded-tr-none'
+                            : 'bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-tl-none hover:border-emerald-400 text-foreground'
+                            }`}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => e.key === 'Enter' && markMessageRead(msg)}
+                          aria-label={`${msg.staff?.name || '알 수 없음'} 메시지`}
+                        >
+                          {msg.reply_to_id && (() => {
+                            const parent = messages.find((m: any) => m.id === msg.reply_to_id);
+                            return parent ? (
+                              <div className={`mb-2 p-2 rounded-[12px] text-[11px] border-l-2 ${isMine ? 'bg-white/10 border-white/30 text-white' : 'bg-[var(--toss-gray-1)] border-[var(--toss-border)] text-[var(--foreground)]'
+                                }`}>
+                                <span className="font-bold opacity-80">↩️ {parent.staff?.name}: </span>
+                                <span className="truncate">{parent.content || '📎 파일'}</span>
+                              </div>
+                            ) : null;
+                          })()}
+                          {msg.content}
+                          {msg.file_url && (
+                            <div className="mt-2 space-y-1" onClick={(e) => e.stopPropagation()}>
+                              {isImageUrl(msg.file_url) ? (
+                                <a href={msg.file_url} target="_blank" rel="noopener noreferrer" className="block">
+                                  <img
+                                    src={msg.file_url}
+                                    alt="첨부 이미지"
+                                    className="max-w-[200px] max-h-[150px] rounded-[12px] object-cover border border-[var(--toss-border)]"
+                                  />
+                                </a>
+                              ) : null}
+                              <a
+                                href={msg.file_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                download
+                                className={`block p-2 rounded-[12px] text-[11px] font-bold border flex items-center gap-2 hover:opacity-80 transition-opacity ${isMine ? 'bg-white/10 border-white/20 text-white' : 'bg-[var(--toss-gray-1)] border-[var(--toss-border)] text-[var(--toss-blue)]'
+                                  }`}
+                              >
+                                📎 파일 첨부됨 — 다운로드
+                              </a>
+                            </div>
+                          )}
 
-                        {(hasReacts || (readCount > 0 && !isMine)) && (
-                          <div className="mt-2 flex items-center gap-2 text-[11px] flex-wrap">
-                            {hasReacts && (
-                              <span className="flex gap-1 flex-wrap">
-                                {Object.entries(msgReacts).map(([emoji, cnt]) =>
+                          {(hasReacts || (readCount > 0 && !isMine)) && (
+                            <div className="mt-2 flex items-center gap-2 text-[11px] flex-wrap">
+                              {hasReacts && (
+                                <span className="flex gap-1 flex-wrap">
+                                  {Object.entries(msgReacts).map(([emoji, cnt]) =>
                                   ((cnt as number) > 0 ? (
                                     <span
                                       key={emoji}
-                                      className={`px-1.5 py-0.5 rounded text-[11px] ${
-                                        isMine ? 'bg-white/20' : 'bg-[var(--toss-gray-1)]'
-                                      }`}
+                                      className={`px-1.5 py-0.5 rounded text-[11px] ${isMine ? 'bg-white/20' : 'bg-[var(--toss-gray-1)]'
+                                        }`}
                                     >
                                       {emoji} {cnt as number}
                                     </span>
                                   ) : null)
-                                )}
-                              </span>
-                            )}
-                            {readCount > 0 && !isMine && (
-                              <span className="text-[var(--toss-gray-4)] font-bold">{readCount}명이 읽음</span>
-                            )}
-                          </div>
-                        )}
+                                  )}
+                                </span>
+                              )}
+                              {readCount > 0 && !isMine && (
+                                <span className="text-[var(--toss-gray-4)] font-bold">{readCount}명이 읽음</span>
+                              )}
+                            </div>
+                          )}
 
-                        <span
-                          className={`absolute bottom-0 ${
-                            isMine ? 'right-full mr-2' : 'left-full ml-2'
-                          } text-[8px] font-bold text-[var(--toss-gray-4)] whitespace-nowrap`}
-                        >
-                          {created.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </div>
-                      {showToolbar && (
-                        <div 
-                          className={`flex items-center gap-1 px-3 py-2 mt-1 rounded-[12px] bg-[var(--toss-card)]/95 backdrop-blur border border-[var(--toss-border)] shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200 ${
-                            isMine ? 'flex-row-reverse' : ''
-                          }`}
+                          <span
+                            className={`absolute bottom-0 ${isMine ? 'right-full mr-2' : 'left-full ml-2'
+                              } text-[8px] font-bold text-[var(--toss-gray-4)] whitespace-nowrap`}
+                          >
+                            {created.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <div
+                          className={`flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity ${isMine ? 'flex-row-reverse' : ''}`}
                           onClick={e => e.stopPropagation()}
                         >
                           <button
                             type="button"
-                            onClick={() => { setReplyTo(msg); setToolbarMsgId(null); }}
-                            className="p-1.5 rounded-[16px] hover:bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] transition-colors"
-                            title="답글"
+                            onClick={() => { setReplyTo(msg); }}
+                            className="p-1 px-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-[10px] font-bold text-zinc-400 hover:text-blue-500 transition-colors"
                           >
-                            ↩️
+                            답장
                           </button>
-                          {TOOLBAR_EMOJIS.map(emoji => (
-                            <button
-                              key={emoji}
-                              type="button"
-                              onClick={() => toggleReaction(msg.id, emoji)}
-                              className="p-1.5 rounded-[16px] hover:bg-[var(--toss-gray-1)] text-lg transition-colors"
-                              title={emoji}
-                            >
-                              {emoji}
-                            </button>
-                          ))}
                           <button
                             type="button"
-                            onClick={() => { setActiveActionMsg(msg); setToolbarMsgId(null); }}
-                            className="p-1.5 rounded-[16px] hover:bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] transition-colors ml-0.5"
-                            title="더보기"
+                            onClick={() => { setActiveActionMsg(msg); }}
+                            className="p-1 px-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-[10px] font-bold text-zinc-400 hover:text-zinc-600 transition-colors"
                           >
-                            ⋯
+                            더보기
                           </button>
                         </div>
-                      )}
-                    </div>
+                      </div>
                     )}
                   </div>
                 );
@@ -1374,486 +1246,308 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
             })()
           )}
 
-          {/* 투표 메시지들 (DEMO: 로컬 상태) */}
-          {polls
-            .filter((p: any) => p.room_id === selectedRoomId)
-            .map((poll: any) => {
-              const votes = pollVotes[poll.id] || {};
-              const totalVotes = (Object.values(votes) as number[]).reduce(
-                (a: number, b: number) => a + b,
-                0
-              );
-              return (
-                <div
-                  key={poll.id}
-                  className="max-w-[70%] bg-[var(--toss-card)] border border-[var(--toss-blue-light)] rounded-[12px] p-4 shadow-sm text-xs font-bold text-[var(--foreground)]"
-                >
-                  <p className="text-[11px] font-semibold text-[var(--toss-blue)] mb-2">📊 투표</p>
-                  <p className="mb-3 text-sm">{poll.question}</p>
-                  <div className="space-y-1">
-                    {poll.options.map((opt: string, idx: number) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => handleVote(poll.id, idx)}
-                        className="w-full flex justify-between items-center px-3 py-2 rounded-[16px] bg-[var(--toss-blue-light)] hover:bg-[var(--toss-blue-light)] text-[11px]"
-                      >
-                        <span>{opt}</span>
-                        <span className="text-[var(--toss-blue)]">
-                          {(votes[idx] || 0)}표
-                          {totalVotes > 0 && (
-                            <span className="ml-1 text-[11px] text-[var(--toss-blue)]">
-                              ({Math.round(((votes[idx] || 0) / totalVotes) * 100)}%)
-                            </span>
-                          )}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-
           <div ref={scrollRef} />
         </div>
 
         {/* 입력창 — 모바일에서 하단 네비 위에 고정 */}
         <div className="absolute left-0 right-0 bottom-0 md:relative p-4 md:p-6 bg-[var(--toss-card)] border-t border-[var(--toss-border)] shrink-0 safe-area-pb">
-           {replyTo && (
-             <div className="mb-3 flex items-center justify-between bg-[var(--toss-blue-light)] p-3 rounded-[16px] border border-[var(--toss-blue-light)] animate-in slide-in-from-bottom-2">
-               <p className="text-[11px] font-bold text-[var(--toss-blue)]">@{replyTo.staff?.name}님에게 답글 작성 중...</p>
-               <button onClick={()=>setReplyTo(null)} className="text-[var(--toss-blue)] hover:text-[var(--toss-blue)] font-semibold">✕</button>
-             </div>
-           )}
-           {selectedRoomId === NOTICE_ROOM_ID && user?.position && !CAN_WRITE_NOTICE_POSITIONS.includes(user.position) && (
-             <div className="mb-3 py-2 px-4 bg-amber-50 border border-amber-200 rounded-[16px] text-[11px] font-bold text-amber-800">
-               📢 공지메시지 방에는 부서장(팀장·부장·원장 등) 이상만 작성할 수 있습니다.
-             </div>
-           )}
-           <div className={`flex items-center gap-3 p-3 rounded-[16px] border transition-all ${
-             selectedRoomId === NOTICE_ROOM_ID && user?.position && !CAN_WRITE_NOTICE_POSITIONS.includes(user.position)
-               ? 'bg-[var(--toss-gray-1)] border-[var(--toss-border)] opacity-80 pointer-events-none'
-               : 'bg-[var(--toss-gray-1)] border-[var(--toss-border)] focus-within:bg-[var(--toss-card)] focus-within:ring-4 focus-within:ring-[var(--toss-blue)]'
-           }`}>
-             <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
-             <button
-               onClick={()=>fileInputRef.current?.click()}
-               disabled={fileUploading}
-               title="파일 첨부"
-               className="w-10 h-10 flex items-center justify-center text-[var(--toss-gray-3)] hover:text-[var(--toss-blue)] transition-colors disabled:opacity-50"
-             >
-               {fileUploading ? <span className="animate-pulse text-xs">...</span> : '📎'}
-             </button>
-             <div className="relative flex-1">
-               <input 
-                 className="w-full bg-transparent p-2 outline-none text-[16px] md:text-sm font-bold min-w-0"
-                 placeholder={selectedRoomId === NOTICE_ROOM_ID && user?.position && !CAN_WRITE_NOTICE_POSITIONS.includes(user.position) ? "부서장 이상만 작성 가능" : "메시지를 입력하세요... (예: @홍길동 메모) "}
-                 value={inputMsg} 
-                 onChange={e=>{
-                   const value = e.target.value;
-                   setInputMsg(value);
-                   const caret = e.target.selectionStart ?? value.length;
-                   const upToCaret = value.slice(0, caret);
-                   const match = upToCaret.match(/@([^\s@]{0,20})$/);
-                   if (match) {
-                     setMentionQuery(match[1] || '');
-                     setShowMentionList(true);
-                   } else {
-                     setShowMentionList(false);
-                     setMentionQuery('');
-                   }
-                 }} 
-                 onKeyDown={e=>e.key==='Enter'&&handleSendMessage()} 
-               />
-               {showMentionList && mentionCandidates.length > 0 && (
-                 <div className="absolute left-0 bottom-full mb-1 w-full max-h-48 overflow-y-auto bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[12px] shadow-lg z-20 text-xs">
-                   {mentionCandidates.map((m: any) => (
-                     <button
-                       key={m.id}
-                       type="button"
-                       onClick={() => {
-                         // 마지막 @쿼리 부분을 실제 이름으로 교체
-                         const value = inputMsg;
-                         const match = value.match(/@([^\s@]{0,20})$/);
-                         if (match) {
-                           const replaced = value.replace(/@([^\s@]{0,20})$/, `@${m.name} `);
-                           setInputMsg(replaced);
-                         }
-                         setShowMentionList(false);
-                         setMentionQuery('');
-                       }}
-                       className="w-full px-3 py-2 flex items-center gap-2 hover:bg-[var(--toss-blue-light)] text-left"
-                     >
-                       <span className="text-[11px] font-semibold text-[var(--foreground)] truncate">{m.name}</span>
-                       <span className="text-[11px] text-[var(--toss-gray-3)] truncate">
-                         {(m.department || '')}{m.position ? ` · ${m.position}` : ''}
-                       </span>
-                     </button>
-                   ))}
-                 </div>
-               )}
-             </div>
-             <button onClick={()=>handleSendMessage()} className="bg-[var(--toss-blue)] text-white w-10 h-10 rounded-full shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center justify-center">↑</button>
-           </div>
-        </div>
-
-        {/* 파일·사진·링크 모아보기 패널 */}
-        {showMediaPanel && selectedRoomId && (
-          <>
-            <div
-              className="absolute inset-0 bg-black/10 z-40"
-              onClick={() => setShowMediaPanel(false)}
-              aria-hidden="true"
-            />
-            <aside className="absolute top-0 right-0 bottom-0 w-80 bg-[var(--toss-card)] border-l border-[var(--toss-border)] shadow-2xl z-50 flex flex-col animate-in slide-in-from-right duration-300">
-              <div className="p-4 border-b border-[var(--toss-border)] flex items-center justify-between">
-                <div>
-                  <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
-                    파일·사진·링크
-                  </p>
-                  <p className="text-xs font-semibold text-[var(--foreground)] mt-0.5 line-clamp-1">
-                    {selectedRoom?.id === NOTICE_ROOM_ID
-                      ? NOTICE_ROOM_NAME
-                      : selectedRoom?.name || '채팅방'}
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowMediaPanel(false)}
-                  className="p-2 text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] rounded-[12px] hover:bg-[var(--toss-gray-1)]"
-                >
-                  ✕
-                </button>
-              </div>
-              <div className="p-3 border-b border-[var(--toss-border)] flex flex-col gap-2">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">
-                    총 {filteredMediaMessages.length}개
-                  </span>
-                  <button
-                    type="button"
-                    onClick={toggleRoomNotify}
-                    className="px-2.5 py-1 text-[11px] font-semibold rounded-[16px] border border-[var(--toss-border)] hover:bg-[var(--toss-gray-1)] transition-colors"
-                  >
-                    {roomNotifyOn ? '🔔 알림 on' : '🔕 알림 off'}
-                  </button>
-                </div>
-                {selectedRoom?.id !== NOTICE_ROOM_ID && (
-                  <div className="flex items-center gap-2">
+          {replyTo && (
+            <div className="mb-3 flex items-center justify-between bg-[var(--toss-blue-light)] p-3 rounded-[16px] border border-[var(--toss-blue-light)] animate-in slide-in-from-bottom-2">
+              <p className="text-[11px] font-bold text-[var(--toss-blue)]">@{replyTo.staff?.name}님에게 답글 작성 중...</p>
+              <button onClick={() => setReplyTo(null)} className="text-[var(--toss-blue)] hover:text-[var(--toss-blue)] font-semibold">✕</button>
+            </div>
+          )}
+          {selectedRoomId === NOTICE_ROOM_ID && user?.position && !CAN_WRITE_NOTICE_POSITIONS.includes(user.position) && (
+            <div className="mb-3 py-2 px-4 bg-amber-50 border border-amber-200 rounded-[16px] text-[11px] font-bold text-amber-800">
+              📢 공지메시지 방에는 부서장(팀장·부장·원장 등) 이상만 작성할 수 있습니다.
+            </div>
+          )}
+          <div className={`flex items-center gap-3 p-3 rounded-[16px] border transition-all ${selectedRoomId === NOTICE_ROOM_ID && user?.position && !CAN_WRITE_NOTICE_POSITIONS.includes(user.position)
+            ? 'bg-[var(--toss-gray-1)] border-[var(--toss-border)] opacity-80 pointer-events-none'
+            : 'bg-[var(--toss-gray-1)] border-[var(--toss-border)] focus-within:bg-[var(--toss-card)] focus-within:ring-4 focus-within:ring-[var(--toss-blue)]'
+            }`}>
+            <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={fileUploading}
+              title="파일 첨부"
+              className="w-10 h-10 flex items-center justify-center text-[var(--toss-gray-3)] hover:text-[var(--toss-blue)] transition-colors disabled:opacity-50"
+            >
+              {fileUploading ? <span className="animate-pulse text-xs">...</span> : '📎'}
+            </button>
+            <div className="relative flex-1">
+              <input
+                className="w-full bg-transparent p-2 outline-none text-[16px] md:text-sm font-bold min-w-0"
+                placeholder={selectedRoomId === NOTICE_ROOM_ID && user?.position && !CAN_WRITE_NOTICE_POSITIONS.includes(user.position) ? "부서장 이상만 작성 가능" : "메시지를 입력하세요... (예: @홍길동 메모) "}
+                value={inputMsg}
+                onChange={e => {
+                  const value = e.target.value;
+                  setInputMsg(value);
+                  const caret = e.target.selectionStart ?? value.length;
+                  const upToCaret = value.slice(0, caret);
+                  const match = upToCaret.match(/@([^\s@]{0,20})$/);
+                  if (match) {
+                    setMentionQuery(match[1] || '');
+                    setShowMentionList(true);
+                  } else {
+                    setShowMentionList(false);
+                    setMentionQuery('');
+                  }
+                }}
+                onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
+              />
+              {showMentionList && mentionCandidates.length > 0 && (
+                <div className="absolute left-0 bottom-full mb-1 w-full max-h-48 overflow-y-auto bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[12px] shadow-lg z-20 text-xs">
+                  {mentionCandidates.map((m: any) => (
                     <button
+                      key={m.id}
                       type="button"
                       onClick={() => {
-                        setShowAddMemberModal(true);
-                        setAddMemberSearch('');
-                        setAddMemberSelectingIds([]);
+                        // 마지막 @쿼리 부분을 실제 이름으로 교체
+                        const value = inputMsg;
+                        const match = value.match(/@([^\s@]{0,20})$/);
+                        if (match) {
+                          const replaced = value.replace(/@([^\s@]{0,20})$/, `@${m.name} `);
+                          setInputMsg(replaced);
+                        }
+                        setShowMentionList(false);
+                        setMentionQuery('');
                       }}
-                      className="px-3 py-1.5 text-[11px] font-semibold text-[var(--toss-blue)] border border-[var(--toss-blue-light)] rounded-[16px] hover:bg-[var(--toss-blue-light)] transition-colors"
+                      className="w-full px-3 py-2 flex items-center gap-2 hover:bg-[var(--toss-blue-light)] text-left"
                     >
-                      대화상대 추가
+                      <span className="text-[11px] font-semibold text-[var(--foreground)] truncate">{m.name}</span>
+                      <span className="text-[11px] text-[var(--toss-gray-3)] truncate">
+                        {(m.department || '')}{m.position ? ` · ${m.position}` : ''}
+                      </span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setRoomNameDraft(selectedRoom?.name || '채팅방');
-                        setEditingRoomName(true);
-                      }}
-                      className="px-3 py-1.5 text-[11px] font-semibold text-[var(--toss-gray-4)] border border-[var(--toss-border)] rounded-[16px] hover:bg-[var(--toss-gray-1)] transition-colors"
-                    >
-                      채팅방 이름 변경
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowMediaPanel(false);
-                        setShowPollModal(true);
-                      }}
-                      className="px-3 py-1.5 text-[11px] font-semibold text-[var(--toss-blue)] border border-[var(--toss-blue-light)] rounded-[16px] hover:bg-[var(--toss-blue-light)] transition-colors"
-                    >
-                      📊 투표 만들기
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowMediaPanel(false);
-                        handleLeaveRoom();
-                      }}
-                      className="px-3 py-1.5 text-[11px] font-semibold text-red-600 border border-red-100 rounded-[16px] hover:bg-red-50 transition-colors"
-                    >
-                      채팅방 나가기
-                    </button>
-                  </div>
-                )}
-              </div>
-              <div className="px-3 py-2 border-b border-[var(--toss-border)] flex flex-wrap gap-2 text-[11px] font-semibold">
-                <button
-                  type="button"
-                  onClick={() => setMediaFilter('all')}
-                  className={`px-2.5 py-1 rounded-full transition-colors ${
-                    mediaFilter === 'all'
-                      ? 'bg-[var(--toss-blue)] text-white'
-                      : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]'
-                  }`}
-                >
-                  전체
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMediaFilter('image')}
-                  className={`px-2.5 py-1 rounded-full transition-colors ${
-                    mediaFilter === 'image'
-                      ? 'bg-[var(--toss-blue)] text-white'
-                      : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]'
-                  }`}
-                >
-                  사진
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMediaFilter('file')}
-                  className={`px-2.5 py-1 rounded-full transition-colors ${
-                    mediaFilter === 'file'
-                      ? 'bg-[var(--toss-blue)] text-white'
-                      : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]'
-                  }`}
-                >
-                  파일함
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMediaFilter('link')}
-                  className={`px-2.5 py-1 rounded-full transition-colors ${
-                    mediaFilter === 'link'
-                      ? 'bg-[var(--toss-blue)] text-white'
-                      : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]'
-                  }`}
-                >
-                  링크
-                </button>
-              </div>
-              {/* 채팅방 설정 (이름 변경) - 보기 좋게 사이드 패널 안에서 처리 */}
-              {editingRoomName && selectedRoom?.id !== NOTICE_ROOM_ID && (
-                <div className="px-3 pt-3 pb-1 border-b border-[var(--toss-border)] space-y-2">
-                  <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">채팅방 이름 변경</p>
-                  <div className="flex items-center gap-2">
-                    <input
-                      value={roomNameDraft}
-                      onChange={(e) => setRoomNameDraft(e.target.value)}
-                      className="flex-1 px-2 py-1 text-xs font-bold text-[var(--foreground)] border border-[var(--toss-blue)] rounded-[8px] outline-none"
-                      placeholder="채팅방 이름"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const name = roomNameDraft.trim() || selectedRoom?.name || '채팅방';
-                        supabase
-                          .from('chat_rooms')
-                          .update({ name })
-                          .eq('id', selectedRoomId)
-                          .then(() => {
-                            setChatRooms((prev) =>
-                              prev.map((r: any) => (r.id === selectedRoomId ? { ...r, name } : r))
-                            );
-                            setEditingRoomName(false);
-                          });
-                      }}
-                      className="px-3 py-1.5 text-[11px] font-semibold text-[var(--toss-blue)] border border-[var(--toss-blue)]/40 rounded-[16px] hover:bg-[var(--toss-blue)]/5 transition-colors"
-                    >
-                      저장
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditingRoomName(false)}
-                      className="px-3 py-1.5 text-[11px] font-semibold text-[var(--toss-gray-3)] border border-[var(--toss-border)] rounded-[16px] hover:bg-[var(--toss-gray-1)] transition-colors"
-                    >
-                      취소
-                    </button>
-                  </div>
+                  ))}
                 </div>
               )}
+            </div>
+            <button onClick={() => handleSendMessage()} className="bg-[var(--toss-blue)] text-white w-10 h-10 rounded-full shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center justify-center">↑</button>
+          </div>
+        </div>
 
-              <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-4">
-                {filteredMediaMessages.length === 0 ? (
-                  <p className="text-[11px] text-[var(--toss-gray-3)] font-bold text-center mt-4">
-                    이 채팅방에서 공유된 파일·사진·링크가 없습니다.
-                  </p>
-                ) : (
-                  filteredMediaMessages.map((msg: any) => {
-                    const isImage = msg.file_url && isImageUrl(msg.file_url);
-                    const isVideo = msg.file_url && isVideoUrl(msg.file_url);
-                    const hasFile = !!msg.file_url;
-                    const hasLink = /(https?:\/\/\S+)/i.test(msg.content || '');
-                    const createdAt = new Date(msg.created_at);
-                    const urlMatch = (msg.content || '').match(/https?:\/\/\S+/i);
-                    const firstLink = urlMatch ? urlMatch[0] : null;
 
-                    return (
-                      <div
-                        key={msg.id}
-                        className="border border-[var(--toss-border)] rounded-[12px] p-3 bg-[var(--toss-gray-1)] hover:bg-[var(--toss-gray-1)] transition-colors text-[11px] space-y-2"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-bold text-[var(--foreground)] truncate">
-                            {msg.staff?.name || '알 수 없음'}
-                          </span>
-                          <span className="text-[11px] text-[var(--toss-gray-3)]">
-                            {createdAt.toLocaleDateString('ko-KR')}{' '}
-                            {createdAt.toLocaleTimeString('ko-KR', {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </span>
-                        </div>
-                        {hasFile && (
-                          <div className="space-y-1">
-                            <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
-                              {isImage
-                                ? '📷 이미지'
-                                : isVideo
-                                ? '🎬 동영상'
-                                : '📎 파일'}
-                            </p>
-                            {isImage && (
-                              <a
-                                href={msg.file_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="block"
-                              >
-                                <img
-                                  src={msg.file_url}
-                                  alt="첨부 이미지"
-                                  className="w-full max-h-40 object-cover rounded-[16px] border border-[var(--toss-border)]"
-                                />
-                              </a>
-                            )}
-                            {!isImage && hasFile && (
-                              <a
-                                href={msg.file_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="block px-3 py-2 rounded-[16px] bg-[var(--toss-card)] border border-[var(--toss-border)] text-[var(--toss-blue)] font-bold hover:bg-[var(--toss-blue-light)] truncate"
-                              >
-                                파일 열기 / 다운로드
-                              </a>
-                            )}
-                          </div>
-                        )}
-                        {hasLink && firstLink && (
-                          <div className="space-y-1">
-                            <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
-                              🔗 링크
-                            </p>
-                            <a
-                              href={firstLink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="block px-3 py-2 rounded-[16px] bg-[var(--toss-card)] border border-[var(--toss-border)] text-[11px] text-[var(--toss-blue)] font-bold hover:bg-[var(--toss-blue-light)] break-all"
-                            >
-                              {firstLink}
-                            </a>
-                          </div>
-                        )}
-                        {msg.content && (
-                          <p className="text-[11px] text-[var(--foreground)] line-clamp-2">
-                            {msg.content}
-                          </p>
+        {/* 채팅방 상세 정보 드로어 (프리미엄 - 이미지 2 스타일) */}
+        {showDrawer && (
+          <>
+            <div className="absolute inset-0 bg-black/10 z-50 animate-in fade-in duration-200" onClick={() => setShowDrawer(false)} aria-hidden="true" />
+            <div className="absolute top-0 right-0 bottom-0 w-full md:w-80 bg-white dark:bg-zinc-900 shadow-2xl z-[60] flex flex-col animate-in slide-in-from-right duration-300 border-l border-[var(--toss-border)]">
+              <div className="p-4 border-b border-[var(--toss-border)] flex items-center justify-between bg-[var(--toss-card)]">
+                <span className="text-sm font-bold">채팅방 정보</span>
+                <button onClick={() => setShowDrawer(false)} className="p-2 text-[var(--toss-gray-3)] hover:text-black dark:hover:text-white rounded-full">✕</button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
+                {/* 알림 설정 */}
+                <div className="flex items-center justify-between p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl">
+                  <span className="text-sm font-semibold">알림 설정</span>
+                  <button
+                    onClick={() => setRoomNotifyOn(!roomNotifyOn)}
+                    className={`w-12 h-6 rounded-full transition-colors relative ${roomNotifyOn ? 'bg-emerald-500' : 'bg-zinc-300'}`}
+                  >
+                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${roomNotifyOn ? 'right-1' : 'left-1'}`} />
+                  </button>
+                </div>
+
+                {/* 공지사항 섹션 */}
+                <div className="space-y-3">
+                  <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider px-1">소식 / 공지</p>
+                  <div className="p-4 bg-orange-50 dark:bg-orange-950/20 rounded-2xl border border-orange-100 dark:border-orange-900/30">
+                    <p className="text-xs font-bold text-orange-800 dark:text-orange-300 mb-1">📢 공지</p>
+                    <p className="text-xs text-orange-900/70 dark:text-orange-200/50 leading-relaxed whitespace-pre-wrap">
+                      {selectedRoom?.notice_message?.content || '등록된 공지가 없습니다.'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* 사진/동영상 (Media) Grid */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center px-1">
+                    <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider">사진 · 동영상</p>
+                    <button className="text-[10px] font-bold text-[var(--toss-blue)]">전체보기</button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1 rounded-2xl overflow-hidden">
+                    {messages.filter(m => m.file_kind === 'image' || m.file_kind === 'video').slice(-6).map((m, idx) => (
+                      <div key={idx} className="aspect-square bg-zinc-100 dark:bg-zinc-800 relative group cursor-pointer">
+                        {m.file_kind === 'image' ? (
+                          <img src={m.file_url} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-xl">🎬</div>
                         )}
                       </div>
-                    );
-                  })
-                )}
+                    ))}
+                    {messages.filter(m => m.file_kind === 'image' || m.file_kind === 'video').length === 0 && (
+                      <div className="col-span-3 py-8 text-center bg-zinc-50 dark:bg-zinc-800/30 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-700">
+                        <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">주고받은 미디어가 없습니다.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
 
-                {/* 참여 멤버 목록 */}
-                {roomMembers.length > 0 && (
-                  <div className="pt-3 border-t border-[var(--toss-border)] space-y-2">
-                    <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
-                      참여 멤버 ({roomMembers.length})
-                    </p>
-                    <div className="space-y-1">
-                      {roomMembers.map((m: any) => {
-                        const lastSeen = m.last_seen_at ? new Date(m.last_seen_at).getTime() : 0;
-                        const now = Date.now();
-                        const diffSec = lastSeen ? (now - lastSeen) / 1000 : Infinity;
-                        let presenceLabel = '오프라인';
-                        let presenceColor = 'bg-[var(--toss-gray-3)]';
-                        if (diffSec <= 60) {
-                          presenceLabel = '온라인';
-                          presenceColor = 'bg-emerald-500';
-                        } else if (diffSec <= 300) {
-                          presenceLabel = '자리비움';
-                          presenceColor = 'bg-amber-400';
-                        }
-                        return (
-                          <div
-                            key={m.id}
-                            className="flex items-center gap-3 px-2 py-2 rounded-[16px] hover:bg-[var(--toss-gray-1)] transition-colors"
-                          >
-                            <div className="w-8 h-8 rounded-full bg-[var(--toss-gray-1)] flex items-center justify-center text-[11px] font-semibold text-[var(--toss-gray-3)] overflow-hidden">
-                              {m.photo_url ? (
-                                <img
-                                  src={m.photo_url}
-                                  alt={m.name}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                (m.name || '?').charAt(0)
-                              )}
+                {/* 링크 (Links) */}
+                <div className="space-y-3">
+                  <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider px-1">링크</p>
+                  <div className="space-y-2">
+                    {messages.filter(m => m.content && m.content.includes('http')).slice(-3).map((m, idx) => {
+                      const urlMatch = m.content.match(/https?:\/\/[^\s]+/);
+                      const url = urlMatch ? urlMatch[0] : '';
+                      return (
+                        <a key={idx} href={url} target="_blank" rel="noreferrer" className="block p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-100 dark:border-zinc-800 hover:border-emerald-500 transition-colors">
+                          <p className="text-[11px] font-bold truncate text-emerald-600 mb-0.5">{url}</p>
+                          <p className="text-[10px] text-[var(--toss-gray-4)] truncate">{m.staff?.name} · {new Date(m.created_at).toLocaleDateString()}</p>
+                        </a>
+                      );
+                    })}
+                    {messages.filter(m => m.content && m.content.includes('http')).length === 0 && (
+                      <div className="py-4 text-center bg-zinc-50 dark:bg-zinc-800/30 rounded-xl border border-zinc-100 dark:border-zinc-800">
+                        <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">공유된 링크가 없습니다.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 대화 상대 (Participants) */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center px-1">
+                    <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider">대화 상대 ({selectedRoom?.members?.length || 0})</p>
+                    <button onClick={() => setShowGroupModal(true)} className="w-6 h-6 flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 rounded-full text-zinc-500 hover:text-emerald-500 transition-colors">＋</button>
+                  </div>
+                  <div className="space-y-3">
+                    {selectedRoom?.members?.map((memberId: string) => {
+                      const s = staffs.find((st: any) => st.id === memberId);
+                      const isOwner = selectedRoom?.created_by === user.id;
+                      return (
+                        <div key={memberId} className="flex items-center justify-between group">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-[10px] font-bold text-emerald-600">
+                              {s?.photo_url ? <img src={s.photo_url} className="w-full h-full rounded-full object-cover" /> : (s?.name?.[0] || '?')}
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-[11px] font-semibold text-[var(--foreground)] truncate">
-                                {m.name}
-                              </p>
-                              <p className="text-[11px] font-bold text-[var(--toss-gray-3)] truncate">
-                                {(m.position || '')}{" "}
-                                {m.company || m.department
-                                  ? `· ${m.company || m.department}`
-                                  : ""}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-1 shrink-0">
-                              <span className={`w-2 h-2 rounded-full ${presenceColor}`} />
-                              <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">
-                                {presenceLabel}
-                              </span>
+                            <div>
+                              <p className="text-xs font-bold text-foreground">{s?.name || '알 수 없음'}</p>
+                              <p className="text-[10px] text-[var(--toss-gray-4)] font-medium">{(s?.department || '')} · {s?.position}</p>
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
+                          {isOwner && memberId !== user.id && (
+                            <button className="opacity-0 group-hover:opacity-100 p-1 text-red-500 text-[10px] font-bold hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-all">내보내기</button>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                )}
+                </div>
               </div>
-            </aside>
+
+              {/* 하단 액션 */}
+              <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 border-t border-[var(--toss-border)] flex gap-2">
+                <button onClick={() => { if (confirm('채팅방을 나가시겠습니까?')) { /* 채팅방 나가기 로직 */ } }} className="flex-1 py-3 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-xl text-[11px] font-bold hover:bg-red-100 transition-colors">방 나가기</button>
+                <button onClick={() => { setEditingRoomName(true); setRoomNameDraft(selectedRoom?.name || ''); }} className="flex-1 py-3 bg-[var(--toss-gray-1)] text-foreground rounded-xl text-[11px] font-bold hover:bg-[var(--toss-gray-2)] transition-colors">이름 수정</button>
+              </div>
+            </div>
           </>
         )}
 
-        {/* 메시지 액션 슬라이드 패널 */}
+        {/* 메시지 액션 패널 - PC: 사이드 / 모바일: 바텀시트 */}
         {activeActionMsg && (
           <>
-            <div className="absolute inset-0 bg-black/10 z-30 animate-in fade-in duration-200" onClick={()=>{setActiveActionMsg(null); setEditingMsg(null);}} aria-hidden="true" />
-            <div className="absolute top-0 right-0 bottom-0 w-72 bg-[var(--toss-card)] border-l border-[var(--toss-border)] shadow-2xl z-40 flex flex-col animate-in slide-in-from-right duration-300">
+            <div className="absolute inset-0 bg-black/10 z-30 animate-in fade-in duration-200" onClick={() => { setActiveActionMsg(null); setEditingMsg(null); }} aria-hidden="true" />
+
+            {/* 모바일 전용 바텀 시트 (이미지 1 스타일) */}
+            <div className="md:hidden absolute left-0 right-0 bottom-0 bg-white dark:bg-zinc-900 rounded-t-[24px] shadow-2xl z-40 flex flex-col animate-in slide-in-from-bottom duration-300 max-h-[85vh] overflow-hidden">
+              <div className="w-12 h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-full mx-auto my-3 shrink-0" />
+              <div className="px-4 pb-8 space-y-4 overflow-y-auto">
+                {/* 이모티콘 반응바 */}
+                <div className="flex justify-between items-center bg-zinc-100 dark:bg-zinc-800/50 p-2 rounded-[20px] gap-1 px-4">
+                  {['👍', '👌', '👏', '😍', '😆', '😲', '😢', '😡'].map(emoji => (
+                    <button key={emoji} onClick={() => { toggleReaction(activeActionMsg.id, emoji); setActiveActionMsg(null); }} className="text-2xl hover:scale-110 transition-transform p-1">{emoji}</button>
+                  ))}
+                </div>
+                {/* 메뉴 리스트 */}
+                <div className="space-y-1">
+                  <button onClick={() => { handleAction('task'); setActiveActionMsg(null) }} className="w-full flex items-center gap-4 p-4 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[12px] transition-colors">
+                    <span className="text-xl">✅</span>
+                    <span className="text-sm font-bold">할일 추가</span>
+                  </button>
+                  <button onClick={async () => { if (!activeActionMsg) return; await supabase.from('chat_rooms').update({ notice_message_id: activeActionMsg.id }).eq('id', selectedRoomId); alert('공지로 등록되었습니다.'); fetchData(); setActiveActionMsg(null); }} className="w-full flex items-center gap-4 p-4 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[12px] transition-colors">
+                    <span className="text-xl">📢</span>
+                    <span className="text-sm font-bold">공지</span>
+                  </button>
+                  <button onClick={async () => { await navigator.clipboard?.writeText(activeActionMsg.content || ''); alert('복사되었습니다.'); setActiveActionMsg(null); }} className="w-full flex items-center gap-4 p-4 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[12px] transition-colors">
+                    <span className="text-xl">📋</span>
+                    <span className="text-sm font-bold">복사</span>
+                  </button>
+                  {activeActionMsg.sender_id === user.id && (
+                    <button onClick={() => { deleteMessage(activeActionMsg); setActiveActionMsg(null) }} className="w-full flex items-center gap-4 p-4 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-[12px] transition-colors text-red-500">
+                      <span className="text-xl">🗑️</span>
+                      <span className="text-sm font-bold">삭제</span>
+                    </button>
+                  )}
+                  <button onClick={() => { setReplyTo(activeActionMsg); setActiveActionMsg(null) }} className="w-full flex items-center gap-4 p-4 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[12px] transition-colors">
+                    <span className="text-xl">↩️</span>
+                    <span className="text-sm font-bold">답장</span>
+                  </button>
+                  <button onClick={() => { setForwardSourceMsg(activeActionMsg); setShowForwardModal(true); setActiveActionMsg(null); }} className="w-full flex items-center gap-4 p-4 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[12px] transition-colors">
+                    <span className="text-xl">📤</span>
+                    <span className="text-sm font-bold">전달</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* PC 전용 우측 사이드 패널 (기존 유지) */}
+            <div className="hidden md:flex absolute top-0 right-0 bottom-0 w-80 bg-[var(--toss-card)] border-l border-[var(--toss-border)] shadow-2xl z-40 flex-col animate-in slide-in-from-right duration-300">
               <div className="p-4 border-b border-[var(--toss-border)] flex items-center justify-between">
                 <span className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">메시지 액션</span>
-                <button onClick={()=>{setActiveActionMsg(null); setEditingMsg(null)}} className="p-2 text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] rounded-[12px] hover:bg-[var(--toss-gray-1)]">✕</button>
+                <button onClick={() => { setActiveActionMsg(null); setEditingMsg(null) }} className="p-2 text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] rounded-[12px] hover:bg-[var(--toss-gray-1)]">✕</button>
               </div>
               <div className="p-4 space-y-4 overflow-y-auto flex-1">
                 <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">감정 표현</p>
                 <div className="flex gap-2 flex-wrap">
-                  {['👍','😂','❤️','😮','😢'].map(emoji => (
-                    <button key={emoji} onClick={()=>{toggleReaction(activeActionMsg.id, emoji);}} className="w-11 h-11 flex items-center justify-center rounded-[12px] bg-[var(--toss-gray-1)] hover:bg-[var(--toss-blue-light)] text-xl transition-colors" title={emoji}>
+                  {['👍', '😂', '❤️', '😮', '😢'].map(emoji => (
+                    <button key={emoji} onClick={() => { toggleReaction(activeActionMsg.id, emoji); }} className="w-11 h-11 flex items-center justify-center rounded-[12px] bg-[var(--toss-gray-1)] hover:bg-[var(--toss-blue-light)] text-xl transition-colors" title={emoji}>
                       {emoji}
                     </button>
                   ))}
                 </div>
                 <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase pt-2">기능</p>
                 <div className="space-y-1">
-                  <button onClick={()=>{setReplyTo(activeActionMsg); setActiveActionMsg(null)}} className="w-full p-3 text-left hover:bg-[var(--toss-blue-light)] rounded-[12px] text-xs font-semibold text-[var(--toss-blue)] transition-colors">↩️ 답글 달기</button>
+                  <button
+                    onClick={() => {
+                      setReplyTo(activeActionMsg);
+                      setActiveActionMsg(null);
+                    }}
+                    className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors"
+                  >
+                    💬 답글 달기
+                  </button>
                   {activeActionMsg.sender_id === user.id && (
                     <>
-                      <button onClick={()=>{setEditingMsg(activeActionMsg); setEditContent(activeActionMsg.content||''); setActiveActionMsg(null)}} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">✏️ 수정</button>
-                      <button onClick={()=>{deleteMessage(activeActionMsg); setActiveActionMsg(null)}} className="w-full p-3 text-left hover:bg-red-50 rounded-[12px] text-xs font-semibold text-red-600 transition-colors">🗑️ 삭제</button>
+                      <button onClick={() => { setEditingMsg(activeActionMsg); setEditContent(activeActionMsg.content || ''); setActiveActionMsg(null) }} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">✏️ 수정</button>
+                      <button onClick={() => { deleteMessage(activeActionMsg); setActiveActionMsg(null) }} className="w-full p-3 text-left hover:bg-red-50 rounded-[12px] text-xs font-semibold text-red-600 transition-colors">🗑️ 삭제</button>
                     </>
                   )}
-                  <button onClick={()=>{handleAction('task'); setActiveActionMsg(null)}} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">✅ 할일로 등록</button>
+                  <button
+                    onClick={async () => {
+                      if (!activeActionMsg) return;
+                      try {
+                        const { error } = await supabase
+                          .from('chat_rooms')
+                          .update({ notice_message_id: activeActionMsg.id })
+                          .eq('id', selectedRoomId);
+                        if (error) throw error;
+                        alert('공지로 등록되었습니다.');
+                        fetchData();
+                      } catch (err) {
+                        alert('공지 등록 중 오류가 발생했습니다.');
+                      }
+                      setActiveActionMsg(null);
+                    }}
+                    className="w-full p-3 text-left hover:bg-orange-50 rounded-[12px] text-xs font-semibold text-orange-600 transition-colors"
+                  >
+                    📢 공지로 등록
+                  </button>
+                  <button onClick={() => { handleAction('task'); setActiveActionMsg(null) }} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">✅ 할일로 등록</button>
                   {selectedRoom?.id === NOTICE_ROOM_ID && (
                     <button
                       onClick={() => {
@@ -1875,51 +1569,9 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                   >
                     📤 다른 채팅방으로 전달
                   </button>
-                  <button
-                    onClick={() => {
-                      setThreadRoot(activeActionMsg);
-                      setActiveActionMsg(null);
-                    }}
-                    className="w-full p-3 text-left hover:bg-[var(--toss-blue-light)] rounded-[12px] text-xs font-semibold text-[var(--toss-blue)] transition-colors"
-                  >
-                    🧵 이 메시지 스레드 보기
-                  </button>
-                  <button
-                    onClick={async () => {
-                      try {
-                        const base =
-                          `[채팅] ${activeActionMsg.staff?.name || '알 수 없음'} (${new Date(activeActionMsg.created_at).toLocaleString('ko-KR')})\n` +
-                          `${activeActionMsg.content || ''}` +
-                          (activeActionMsg.file_url ? `\n파일: ${activeActionMsg.file_url}` : '');
-                        await navigator.clipboard?.writeText(`[전자결재 메모]\n${base}`);
-                        alert('전자결재에 붙여넣을 수 있도록 복사되었습니다.');
-                      } catch {
-                        alert('클립보드 복사에 실패했습니다. 브라우저 권한을 확인해 주세요.');
-                      }
-                      setActiveActionMsg(null);
-                    }}
-                    className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors"
-                  >
-                    📋 전자결재용 내용 복사
-                  </button>
-                  <button
-                    onClick={async () => {
-                      try {
-                        const base =
-                          `[채팅] ${activeActionMsg.staff?.name || '알 수 없음'} (${new Date(activeActionMsg.created_at).toLocaleString('ko-KR')})\n` +
-                          `${activeActionMsg.content || ''}` +
-                          (activeActionMsg.file_url ? `\n파일: ${activeActionMsg.file_url}` : '');
-                        await navigator.clipboard?.writeText(`[게시판 메모]\n${base}`);
-                        alert('게시판 글에 붙여넣을 수 있도록 복사되었습니다.');
-                      } catch {
-                        alert('클립보드 복사에 실패했습니다. 브라우저 권한을 확인해 주세요.');
-                      }
-                      setActiveActionMsg(null);
-                    }}
-                    className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors"
-                  >
-                    📝 게시판용 내용 복사
-                  </button>
+                  <button onClick={() => { setThreadRoot(activeActionMsg); setActiveActionMsg(null); }} className="w-full p-3 text-left hover:bg-[var(--toss-blue-light)] rounded-[12px] text-xs font-semibold text-[var(--toss-blue)] transition-colors">🧵 이 메시지 스레드 보기</button>
+                  <button onClick={async () => { try { const base = `[채팅] ${activeActionMsg.staff?.name || '알 수 없음'} (${new Date(activeActionMsg.created_at).toLocaleString('ko-KR')})\n${activeActionMsg.content || ''}${activeActionMsg.file_url ? `\n파일: ${activeActionMsg.file_url}` : ''}`; await navigator.clipboard?.writeText(`[전자결재 메모]\n${base}`); alert('전자결재용으로 복사되었습니다.'); } catch { alert('복사 실패'); } setActiveActionMsg(null); }} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">📋 전자결재용 내용 복사</button>
+                  <button onClick={async () => { try { const base = `[채팅] ${activeActionMsg.staff?.name || '알 수 없음'} (${new Date(activeActionMsg.created_at).toLocaleString('ko-KR')})\n${activeActionMsg.content || ''}${activeActionMsg.file_url ? `\n파일: ${activeActionMsg.file_url}` : ''}`; await navigator.clipboard?.writeText(`[게시판 메모]\n${base}`); alert('게시판용으로 복사되었습니다.'); } catch { alert('복사 실패'); } setActiveActionMsg(null); }} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">📝 게시판용 내용 복사</button>
                   <button
                     onClick={async () => {
                       try {
@@ -1954,7 +1606,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                   >
                     {bookmarkedIds.has(activeActionMsg.id) ? '⭐ 북마크 해제' : '⭐ 중요 메시지 북마크'}
                   </button>
-                  <button onClick={()=>{togglePin(activeActionMsg.id); setActiveActionMsg(null)}} className={`w-full p-3 text-left rounded-[12px] text-xs font-semibold transition-colors ${pinnedIds.includes(activeActionMsg.id) ? 'hover:bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]' : 'hover:bg-orange-50 text-orange-500'}`}>{pinnedIds.includes(activeActionMsg.id) ? '📢 공지 해제' : '📢 공지로 등록'}</button>
+                  <button onClick={() => { togglePin(activeActionMsg.id); setActiveActionMsg(null) }} className={`w-full p-3 text-left rounded-[12px] text-xs font-semibold transition-colors ${pinnedIds.includes(activeActionMsg.id) ? 'hover:bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]' : 'hover:bg-orange-50 text-orange-500'}`}>{pinnedIds.includes(activeActionMsg.id) ? '📢 공지 해제' : '📢 공지로 등록'}</button>
                 </div>
               </div>
             </div>
@@ -1963,12 +1615,12 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
 
         {/* 수정 모달 */}
         {editingMsg && (
-          <div className="absolute inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-30" onClick={()=>{setEditingMsg(null); setEditContent('');}}>
-            <div className="bg-[var(--toss-card)] p-6 rounded-[12px] w-80 shadow-2xl" onClick={e=>e.stopPropagation()}>
+          <div className="absolute inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-30" onClick={() => { setEditingMsg(null); setEditContent(''); }}>
+            <div className="bg-[var(--toss-card)] p-6 rounded-[12px] w-80 shadow-2xl" onClick={e => e.stopPropagation()}>
               <p className="text-xs font-semibold text-[var(--toss-gray-3)] mb-2">메시지 수정</p>
-              <input value={editContent} onChange={e=>setEditContent(e.target.value)} className="w-full p-3 border rounded-[16px] text-sm mb-4" />
+              <input value={editContent} onChange={e => setEditContent(e.target.value)} className="w-full p-3 border rounded-[16px] text-sm mb-4" />
               <div className="flex gap-2">
-                <button onClick={()=>{setEditingMsg(null); setEditContent('');}} className="flex-1 py-2 bg-[var(--toss-gray-1)] rounded-[16px] text-xs font-semibold">취소</button>
+                <button onClick={() => { setEditingMsg(null); setEditContent(''); }} className="flex-1 py-2 bg-[var(--toss-gray-1)] rounded-[16px] text-xs font-semibold">취소</button>
                 <button onClick={saveEditMessage} className="flex-1 py-2 bg-[var(--toss-blue)] text-white rounded-[16px] text-xs font-semibold">저장</button>
               </div>
             </div>
@@ -1988,7 +1640,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                 <div className="space-y-2">
                   <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest ml-1">멤버 선택 ({selectedMembers.length}명)</label>
                   <div className="h-48 overflow-y-auto border border-[var(--toss-border)] rounded-[12px] p-4 space-y-2 custom-scrollbar bg-[var(--toss-gray-1)]/30">
-                    {staffs.filter((s:any) => s.id !== user.id).map((s: any) => (
+                    {staffs.filter((s: any) => s.id !== user.id).map((s: any) => (
                       <label key={s.id} className="flex items-center gap-3 p-3 bg-[var(--toss-card)] rounded-[16px] border border-[var(--toss-border)] cursor-pointer hover:border-[var(--toss-blue)] transition-all">
                         <input type="checkbox" checked={selectedMembers.includes(s.id)} onChange={e => {
                           if (e.target.checked) setSelectedMembers([...selectedMembers, s.id]);
@@ -2280,9 +1932,8 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                   return (
                     <div
                       key={m.id}
-                      className={`border rounded-[12px] p-3 text-[11px] space-y-1 ${
-                        isRoot ? 'bg-[var(--toss-blue-light)] border-[var(--toss-blue)]' : 'bg-[var(--toss-gray-1)] border-[var(--toss-border)]'
-                      }`}
+                      className={`border rounded-[12px] p-3 text-[11px] space-y-1 ${isRoot ? 'bg-[var(--toss-blue-light)] border-[var(--toss-blue)]' : 'bg-[var(--toss-gray-1)] border-[var(--toss-border)]'
+                        }`}
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-semibold text-[var(--foreground)] truncate">
@@ -2575,6 +2226,115 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                 추가하기
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 우측 미디어 패널 */}
+      {showMediaPanel && (
+        <>
+          <div className="fixed inset-0 bg-black/5 z-[100] md:z-30 animate-in fade-in" onClick={() => setShowMediaPanel(false)} />
+          <aside className="fixed top-0 right-0 bottom-0 w-80 bg-[var(--toss-card)] border-l border-[var(--toss-border)] shadow-2xl z-[101] md:z-40 flex flex-col animate-in slide-in-from-right duration-300">
+            <div className="p-4 border-b border-[var(--toss-border)] flex items-center justify-between">
+              <span className="text-xs font-black text-zinc-500 uppercase tracking-widest">파일/링크 내역</span>
+              <button onClick={() => setShowMediaPanel(false)} className="p-2 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl">✕</button>
+            </div>
+
+            <div className="flex p-2 gap-1 bg-zinc-50 dark:bg-zinc-900 border-b border-[var(--toss-border)]">
+              {(['all', 'image', 'file'] as const).map(f => (
+                <button
+                  key={f}
+                  onClick={() => setMediaFilter(f)}
+                  className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all ${mediaFilter === f ? 'bg-white dark:bg-zinc-800 text-blue-600 shadow-soft' : 'text-zinc-400 hover:text-zinc-600'}`}
+                >
+                  {f === 'all' ? '전체' : f === 'image' ? '이미지' : '파일'}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+              {filteredMediaMessages.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center opacity-30 text-zinc-400">
+                  <span className="text-4xl mb-2">📂</span>
+                  <p className="text-[11px] font-bold">내역이 없습니다.</p>
+                </div>
+              ) : (
+                filteredMediaMessages.map((m: any) => (
+                  <div key={m.id} className="p-3 bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 rounded-xl hover:border-blue-300 transition-all group">
+                    {isImageUrl(m.file_url) ? (
+                      <img src={m.file_url} className="w-full h-24 object-cover rounded-lg mb-2 cursor-pointer" onClick={() => window.open(m.file_url)} />
+                    ) : (
+                      <div className="w-full h-12 bg-zinc-100 dark:bg-zinc-800 rounded-lg mb-2 flex items-center justify-center text-xl">📄</div>
+                    )}
+                    <div className="flex flex-col gap-1 min-w-0">
+                      <p className="text-[11px] font-bold text-foreground truncate">{m.content || '이름 없음'}</p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] font-bold text-zinc-400">{new Date(m.created_at).toLocaleDateString()}</span>
+                        <a href={m.file_url} target="_blank" className="text-[10px] font-bold text-blue-600 hover:underline">다운로드</a>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </aside>
+        </>
+      )}
+
+      {/* 투표 생성 모달 */}
+      {showPollModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[200] p-4 animate-in fade-in" onClick={() => setShowPollModal(false)}>
+          <div className="bg-[var(--toss-card)] w-full max-w-sm rounded-3xl p-6 space-y-5 shadow-2xl border border-[var(--toss-border)]" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-black text-foreground">📊 새로운 투표</h3>
+              <button onClick={() => setShowPollModal(false)} className="text-zinc-400 text-xl font-bold">✕</button>
+            </div>
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-black text-zinc-400 uppercase tracking-widest pl-1">질문</label>
+                <input
+                  className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500/30 transition-all"
+                  placeholder="무엇을 투표할까요?"
+                  value={pollQuestion}
+                  onChange={e => setPollQuestion(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-black text-zinc-400 uppercase tracking-widest pl-1">선택지 (콤마로 구분)</label>
+                <input
+                  className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500/30 transition-all"
+                  placeholder="예: 찬성, 반대, 기권"
+                  value={pollOptions}
+                  onChange={e => setPollOptions(e.target.value)}
+                />
+              </div>
+            </div>
+            <button
+              onClick={async () => {
+                if (!pollQuestion.trim() || !pollOptions.trim()) return alert("질문과 선택지를 입력해주세요.");
+                const options = pollOptions.split(',').map(o => o.trim()).filter(Boolean);
+                if (options.length < 2) return alert("최소 2개 이상의 선택지가 필요합니다.");
+
+                const { error } = await supabase.from('polls').insert([{
+                  room_id: selectedRoomId,
+                  creator_id: user.id,
+                  question: pollQuestion,
+                  options: options
+                }]);
+
+                if (!error) {
+                  setPollQuestion('');
+                  setPollOptions('찬성, 반대');
+                  setShowPollModal(false);
+                  fetchData();
+                } else {
+                  alert("투표 생성에 실패했습니다.");
+                }
+              }}
+              className="w-full py-4 bg-blue-600 text-white rounded-2xl text-[13px] font-black shadow-lg shadow-blue-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+            >
+              투표 만들기
+            </button>
           </div>
         </div>
       )}
