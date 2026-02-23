@@ -21,11 +21,11 @@ export default function CompliancePanel({ staffs, companyName }: { staffs: any[]
 
   return (
     <div className="space-y-4">
-      <div className="border border-gray-200 p-4 bg-white rounded-lg shadow-sm">
-        <h3 className="text-sm font-semibold text-gray-800 mb-3">노무 준수</h3>
+      <div className="border border-[var(--toss-border)] p-4 bg-[var(--toss-card)] rounded-lg shadow-sm">
+        <h3 className="text-sm font-semibold text-[var(--foreground)] mb-3">노무 준수</h3>
         <div className="space-y-2">
-          <div className="p-3 bg-[#f8fafc] border border-gray-100 rounded-md flex justify-between items-center">
-            <span className="text-xs font-medium text-gray-500">준수율</span>
+          <div className="p-3 bg-[var(--page-bg)] border border-[var(--toss-border)] rounded-md flex justify-between items-center">
+            <span className="text-xs font-medium text-[var(--toss-gray-3)]">준수율</span>
             <span className={`text-sm font-semibold ${Number(report.complianceRate) === 100 ? 'text-emerald-600' : 'text-amber-600'}`}>{report.complianceRate}%</span>
           </div>
           {report.totalViolations > 0 && (
@@ -37,27 +37,27 @@ export default function CompliancePanel({ staffs, companyName }: { staffs: any[]
         </div>
       </div>
 
-      <div className="border border-gray-200 p-4 bg-white rounded-lg shadow-sm">
-        <h3 className="text-sm font-semibold text-gray-800 mb-3">원천세 신고</h3>
+      <div className="border border-[var(--toss-border)] p-4 bg-[var(--toss-card)] rounded-lg shadow-sm">
+        <h3 className="text-sm font-semibold text-[var(--foreground)] mb-3">원천세 신고</h3>
         <div className="space-y-3">
-          <div className="p-3 bg-[#f8fafc] border border-gray-100 rounded-md">
-            <p className="text-xs font-medium text-gray-500">예상 원천세액</p>
-            <p className="text-base font-semibold text-gray-800">{Math.round(totalTax).toLocaleString()}원</p>
+          <div className="p-3 bg-[var(--page-bg)] border border-[var(--toss-border)] rounded-md">
+            <p className="text-xs font-medium text-[var(--toss-gray-3)]">예상 원천세액</p>
+            <p className="text-base font-semibold text-[var(--foreground)]">{Math.round(totalTax).toLocaleString()}원</p>
           </div>
-          <button className="w-full py-2.5 bg-gray-700 text-white text-xs font-medium rounded-lg hover:bg-gray-800">
+          <button className="w-full py-2.5 bg-[var(--foreground)] text-white text-xs font-medium rounded-lg hover:opacity-90">
             홈택스 신고 파일(SAM) 추출
           </button>
         </div>
       </div>
 
-      <div className="border border-gray-200 p-4 bg-white rounded-lg shadow-sm">
-        <h3 className="text-sm font-semibold text-gray-800 mb-3">알림톡</h3>
-        <div className="p-3 bg-blue-50 border border-blue-100 rounded-md mb-3">
-          <p className="text-xs text-blue-900 leading-relaxed font-medium">
+      <div className="border border-[var(--toss-border)] p-4 bg-[var(--toss-card)] rounded-lg shadow-sm">
+        <h3 className="text-sm font-semibold text-[var(--foreground)] mb-3">알림톡</h3>
+        <div className="p-3 bg-[var(--toss-blue-light)] border border-[var(--toss-blue)]/30 rounded-md mb-3">
+          <p className="text-xs text-[var(--toss-blue)] leading-relaxed font-medium">
             [{companyName ?? '회사'}] {`{name}`}님, 02월 급여명세서가 발행되었습니다.
           </p>
         </div>
-        <button className="w-full py-2.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700">
+        <button className="w-full py-2.5 bg-[var(--toss-blue)] text-white text-xs font-medium rounded-lg hover:opacity-90">
           명세서 일괄 발송
         </button>
       </div>

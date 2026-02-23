@@ -254,32 +254,32 @@ export default function ApprovalSystemImproved({ user, onRefresh }: any) {
   };
 
   return (
-    <div className="space-y-6 p-8 bg-white h-full overflow-y-auto custom-scrollbar">
+    <div className="space-y-6 p-8 bg-[var(--toss-card)] h-full overflow-y-auto custom-scrollbar">
       <header className="flex justify-between items-center mb-8">
         <div>
-          <h2 className="text-2xl font-semibold text-gray-800 tracking-tighter italic">전자결재</h2>
-          <p className="text-xs text-blue-600 font-bold mt-1">통합 행정 승인 시스템</p>
+          <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tighter italic">전자결재</h2>
+          <p className="text-xs text-[var(--toss-blue)] font-bold mt-1">통합 행정 승인 시스템</p>
         </div>
-        <div className="bg-blue-50 px-4 py-2 border border-blue-100 rounded-xl">
-          <p className="text-[10px] font-semibold text-blue-400 uppercase">나의 잔여 연차</p>
-          <p className="text-lg font-semibold text-blue-600">
+        <div className="bg-[var(--toss-blue-light)] px-4 py-2 border border-[var(--toss-blue)]/20 rounded-xl">
+          <p className="text-[10px] font-semibold text-[var(--toss-blue)]/80 uppercase">나의 잔여 연차</p>
+          <p className="text-lg font-semibold text-[var(--toss-blue)]">
             {userAnnualLeave || 0}일
           </p>
         </div>
       </header>
 
-      <div className="flex gap-3 border-b border-gray-100 pb-4">
+      <div className="flex gap-3 border-b border-[var(--toss-border)] pb-4">
         <button
           onClick={() => setActiveTab('목록')}
           className={`px-8 py-3 font-semibold text-xs transition-all rounded-xl ${
-            activeTab === '목록' ? 'bg-[#1E293B] text-white shadow-lg' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
+            activeTab === '목록' ? 'bg-[#1E293B] text-white shadow-lg' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]'
           }`}
         >
           결재 목록
         </button>
         <button
           onClick={() => setShowDraftModal(true)}
-          className="px-8 py-3 font-semibold text-xs bg-blue-600 text-white rounded-xl shadow-lg hover:bg-blue-700 transition-all"
+          className="px-8 py-3 font-semibold text-xs bg-[var(--toss-blue)] text-white rounded-xl shadow-lg hover:opacity-90 transition-all"
         >
           + 새 기안 작성
         </button>
@@ -292,24 +292,24 @@ export default function ApprovalSystemImproved({ user, onRefresh }: any) {
             <p className="mt-4 font-semibold text-sm">결재 내역이 없습니다.</p>
           </div>
         ) : approvals.map((approval) => (
-          <div key={approval.id} className="bg-white border border-gray-100 p-6 hover:border-blue-200 transition-all shadow-sm rounded-lg">
+          <div key={approval.id} className="bg-[var(--toss-card)] border border-[var(--toss-border)] p-6 hover:border-[var(--toss-blue)]/40 transition-all shadow-sm rounded-lg">
             <div className="flex justify-between items-center">
               <div>
                 <div className="flex items-center gap-3 mb-2">
-                  <span className="text-[10px] font-semibold bg-gray-100 px-2 py-1 text-gray-500 rounded-md uppercase">{approval.type}</span>
+                  <span className="text-[10px] font-semibold bg-[var(--toss-gray-1)] px-2 py-1 text-[var(--toss-gray-3)] rounded-md uppercase">{approval.type}</span>
                   <span className={`text-[10px] font-semibold px-2 py-1 border rounded-md ${
                     approval.status === '승인' ? 'bg-green-50 text-green-600 border-green-100' :
                     approval.status === '반려' ? 'bg-red-50 text-red-600 border-red-100' :
-                    'bg-blue-50 text-blue-600 border-blue-100'
+                    'bg-[var(--toss-blue-light)] text-[var(--toss-blue)] border-[var(--toss-blue)]/30'
                   }`}>{approval.status}</span>
-                  <span className="text-[10px] font-bold text-gray-400">{approval.sender_company}</span>
+                  <span className="text-[10px] font-bold text-[var(--toss-gray-3)]">{approval.sender_company}</span>
                 </div>
-                <h3 className="font-semibold text-gray-800">{approval.title}</h3>
-                <p className="text-[10px] text-gray-400 font-bold mt-1">기안자: {approval.sender_name} | {new Date(approval.created_at).toLocaleString()}</p>
+                <h3 className="font-semibold text-[var(--foreground)]">{approval.title}</h3>
+                <p className="text-[10px] text-[var(--toss-gray-3)] font-bold mt-1">기안자: {approval.sender_name} | {new Date(approval.created_at).toLocaleString()}</p>
               </div>
               <div className="flex gap-2">
                 <div className="flex gap-2 items-center">
-                  <button onClick={() => fetchHistory(approval.id)} className="px-3 py-1.5 bg-gray-100 text-gray-600 text-[9px] font-semibold rounded-lg hover:bg-gray-200">이력</button>
+                  <button onClick={() => fetchHistory(approval.id)} className="px-3 py-1.5 bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] text-[9px] font-semibold rounded-lg hover:bg-[var(--toss-gray-1)]/80">이력</button>
                   {approval.status === '대기' && (user.permissions?.mso || user.role === 'admin') && (
                     <>
                       <button onClick={() => approveApproval(approval)} className="px-4 py-2 bg-green-600 text-white text-[10px] font-semibold shadow-md rounded-lg hover:bg-green-700">승인</button>
@@ -325,13 +325,13 @@ export default function ApprovalSystemImproved({ user, onRefresh }: any) {
 
       {showDraftModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-xl p-10 rounded-[2.5rem] shadow-2xl space-y-6">
-            <h3 className="text-2xl font-semibold text-gray-800 italic tracking-tighter border-b-4 border-blue-600 pb-2 inline-block">새 기안 작성</h3>
+          <div className="bg-[var(--toss-card)] w-full max-w-xl p-10 rounded-[2.5rem] shadow-2xl space-y-6">
+            <h3 className="text-2xl font-semibold text-[var(--foreground)] italic tracking-tighter border-b-4 border-[var(--toss-blue)] pb-2 inline-block">새 기안 작성</h3>
             
             <div className="space-y-4">
               <div>
-                <label className="text-[10px] font-semibold text-gray-400 uppercase ml-2">양식 선택</label>
-                <select value={selectedFormType} onChange={e => { const v = e.target.value; setSelectedFormType(v); loadTemplate(v); }} className="w-full p-4 bg-gray-50 border-none rounded-lg font-semibold text-xs outline-none focus:ring-2 ring-blue-100">
+                <label className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase ml-2">양식 선택</label>
+                <select value={selectedFormType} onChange={e => { const v = e.target.value; setSelectedFormType(v); loadTemplate(v); }} className="w-full p-4 bg-[var(--toss-gray-1)] border-none rounded-lg font-semibold text-xs outline-none focus:ring-2 ring-[var(--toss-blue)]/20">
                   <option value="">양식을 선택하세요</option>
                   {formTypes.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
                 </select>
@@ -340,8 +340,8 @@ export default function ApprovalSystemImproved({ user, onRefresh }: any) {
               {selectedFormType === '휴가신청' && (
                 <div className="grid grid-cols-2 gap-4">
                   <div className="col-span-2">
-                    <label className="text-[10px] font-semibold text-gray-400 uppercase ml-2">휴가 종류</label>
-                    <select value={formData.leave_type || ''} onChange={e => setFormData({...formData, leave_type: e.target.value})} className="w-full p-4 bg-blue-50/30 border-none rounded-lg font-semibold text-xs outline-none">
+                    <label className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase ml-2">휴가 종류</label>
+                    <select value={formData.leave_type || ''} onChange={e => setFormData({...formData, leave_type: e.target.value})} className="w-full p-4 bg-[var(--toss-blue-light)]/30 border-none rounded-lg font-semibold text-xs outline-none">
                       <option value="">선택</option>
                       <option value="연차">연차 (잔여 연차 차감)</option>
                       <option value="병가">병가</option>
@@ -350,19 +350,19 @@ export default function ApprovalSystemImproved({ user, onRefresh }: any) {
                     </select>
                   </div>
                   <div>
-                    <label className="text-[10px] font-semibold text-gray-400 uppercase ml-2">시작일</label>
-                    <input type="date" value={formData.start_date || ''} onChange={e => setFormData({...formData, start_date: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-lg font-semibold text-xs" />
+                    <label className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase ml-2">시작일</label>
+                    <input type="date" value={formData.start_date || ''} onChange={e => setFormData({...formData, start_date: e.target.value})} className="w-full p-4 bg-[var(--toss-gray-1)] border-none rounded-lg font-semibold text-xs" />
                   </div>
                   <div>
-                    <label className="text-[10px] font-semibold text-gray-400 uppercase ml-2">종료일</label>
-                    <input type="date" value={formData.end_date || ''} onChange={e => setFormData({...formData, end_date: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-lg font-semibold text-xs" />
+                    <label className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase ml-2">종료일</label>
+                    <input type="date" value={formData.end_date || ''} onChange={e => setFormData({...formData, end_date: e.target.value})} className="w-full p-4 bg-[var(--toss-gray-1)] border-none rounded-lg font-semibold text-xs" />
                   </div>
                   <div className="col-span-2">
-                    <label className="text-[10px] font-semibold text-gray-400 uppercase ml-2">사유</label>
-                    <textarea value={formData.reason || ''} onChange={e => setFormData({...formData, reason: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-lg font-semibold text-xs h-24" placeholder="상세 사유를 입력하세요" />
+                    <label className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase ml-2">사유</label>
+                    <textarea value={formData.reason || ''} onChange={e => setFormData({...formData, reason: e.target.value})} className="w-full p-4 bg-[var(--toss-gray-1)] border-none rounded-lg font-semibold text-xs h-24" placeholder="상세 사유를 입력하세요" />
                   </div>
                   <div className="col-span-2">
-                    <label className="text-[10px] font-semibold text-gray-400 uppercase ml-2">증빙 서류 (선택)</label>
+                    <label className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase ml-2">증빙 서류 (선택)</label>
                     <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => setAttachmentFile(e.target.files?.[0] || null)} className="w-full p-2 text-xs" />
                   </div>
                 </div>
@@ -371,19 +371,19 @@ export default function ApprovalSystemImproved({ user, onRefresh }: any) {
               {selectedFormType === '출결정정' && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-[10px] font-semibold text-gray-400 uppercase ml-2">정정 대상일</label>
-                    <input type="date" value={formData.date || ''} onChange={e => setFormData({...formData, date: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-lg font-semibold text-xs" />
+                    <label className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase ml-2">정정 대상일</label>
+                    <input type="date" value={formData.date || ''} onChange={e => setFormData({...formData, date: e.target.value})} className="w-full p-4 bg-[var(--toss-gray-1)] border-none rounded-lg font-semibold text-xs" />
                   </div>
                   <div>
-                    <label className="text-[10px] font-semibold text-gray-400 uppercase ml-2">정정 유형</label>
-                    <select value={formData.type || '정상반영'} onChange={e => setFormData({...formData, type: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-lg font-semibold text-xs">
+                    <label className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase ml-2">정정 유형</label>
+                    <select value={formData.type || '정상반영'} onChange={e => setFormData({...formData, type: e.target.value})} className="w-full p-4 bg-[var(--toss-gray-1)] border-none rounded-lg font-semibold text-xs">
                       <option value="정상반영">정상 반영</option>
                       <option value="지각면제">지각 면제</option>
                     </select>
                   </div>
                   <div className="col-span-2">
-                    <label className="text-[10px] font-semibold text-gray-400 uppercase ml-2">사유</label>
-                    <input type="text" value={formData.reason || ''} onChange={e => setFormData({...formData, reason: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-lg font-semibold text-xs" placeholder="정정 사유" />
+                    <label className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase ml-2">사유</label>
+                    <input type="text" value={formData.reason || ''} onChange={e => setFormData({...formData, reason: e.target.value})} className="w-full p-4 bg-[var(--toss-gray-1)] border-none rounded-lg font-semibold text-xs" placeholder="정정 사유" />
                   </div>
                 </div>
               )}
@@ -391,16 +391,16 @@ export default function ApprovalSystemImproved({ user, onRefresh }: any) {
               {selectedFormType === '비품구매' && (
                 <div className="grid grid-cols-2 gap-4">
                   <div className="col-span-2">
-                    <label className="text-[10px] font-semibold text-gray-400 uppercase ml-2">품목명</label>
-                    <input type="text" value={formData.item_name || ''} onChange={e => setFormData({...formData, item_name: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-lg font-semibold text-xs" placeholder="구매할 물품 이름" />
+                    <label className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase ml-2">품목명</label>
+                    <input type="text" value={formData.item_name || ''} onChange={e => setFormData({...formData, item_name: e.target.value})} className="w-full p-4 bg-[var(--toss-gray-1)] border-none rounded-lg font-semibold text-xs" placeholder="구매할 물품 이름" />
                   </div>
                   <div>
-                    <label className="text-[10px] font-semibold text-gray-400 uppercase ml-2">수량</label>
-                    <input type="number" value={formData.quantity || ''} onChange={e => setFormData({...formData, quantity: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-lg font-semibold text-xs" />
+                    <label className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase ml-2">수량</label>
+                    <input type="number" value={formData.quantity || ''} onChange={e => setFormData({...formData, quantity: e.target.value})} className="w-full p-4 bg-[var(--toss-gray-1)] border-none rounded-lg font-semibold text-xs" />
                   </div>
                   <div>
-                    <label className="text-[10px] font-semibold text-gray-400 uppercase ml-2">예상 단가</label>
-                    <input type="number" value={formData.unit_price || ''} onChange={e => setFormData({...formData, unit_price: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-lg font-semibold text-xs" />
+                    <label className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase ml-2">예상 단가</label>
+                    <input type="number" value={formData.unit_price || ''} onChange={e => setFormData({...formData, unit_price: e.target.value})} className="w-full p-4 bg-[var(--toss-gray-1)] border-none rounded-lg font-semibold text-xs" />
                   </div>
                 </div>
               )}
@@ -408,24 +408,24 @@ export default function ApprovalSystemImproved({ user, onRefresh }: any) {
 
       {showHistoryModal && (
         <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4" onClick={() => setShowHistoryModal(null)}>
-          <div className="bg-white rounded-lg p-6 max-w-md w-full" onClick={e => e.stopPropagation()}>
-            <h4 className="font-semibold text-gray-800 mb-4">결재 이력</h4>
+          <div className="bg-[var(--toss-card)] rounded-lg p-6 max-w-md w-full" onClick={e => e.stopPropagation()}>
+            <h4 className="font-semibold text-[var(--foreground)] mb-4">결재 이력</h4>
             <div className="space-y-2 max-h-60 overflow-y-auto">
               {approvalHistory.map((h: any) => (
-                <div key={h.id} className="p-3 bg-gray-50 rounded-xl text-xs">
+                <div key={h.id} className="p-3 bg-[var(--toss-gray-1)] rounded-xl text-xs">
                   <span className="font-semibold">{h.approver_name}</span> · {h.action}
-                  {h.comment && <p className="text-gray-500 mt-1">{h.comment}</p>}
-                  <p className="text-[10px] text-gray-400 mt-1">{new Date(h.created_at).toLocaleString()}</p>
+                  {h.comment && <p className="text-[var(--toss-gray-3)] mt-1">{h.comment}</p>}
+                  <p className="text-[10px] text-[var(--toss-gray-3)] mt-1">{new Date(h.created_at).toLocaleString()}</p>
                 </div>
               ))}
             </div>
-            <button onClick={() => setShowHistoryModal(null)} className="mt-4 w-full py-2 bg-gray-200 rounded-xl text-xs font-semibold">닫기</button>
+            <button onClick={() => setShowHistoryModal(null)} className="mt-4 w-full py-2 bg-[var(--toss-gray-1)] rounded-xl text-xs font-semibold text-[var(--foreground)]">닫기</button>
           </div>
         </div>
       )}
 
             <div className="flex gap-3 pt-4">
-              <button onClick={() => {setShowDraftModal(false); setSelectedFormType(''); setFormData({}); setAttachmentFile(null);}} className="flex-1 py-5 text-[10px] font-semibold text-gray-400 hover:bg-gray-50 rounded-lg transition-all">취소</button>
+              <button onClick={() => {setShowDraftModal(false); setSelectedFormType(''); setFormData({}); setAttachmentFile(null);}} className="flex-1 py-5 text-[10px] font-semibold text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)] rounded-lg transition-all">취소</button>
               <button onClick={createDraft} className="flex-[2] py-5 bg-[#1E293B] text-white text-[10px] font-semibold hover:bg-black rounded-lg transition-all shadow-xl">결재 상신하기</button>
             </div>
           </div>

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useMemo } from 'react';
 
 export default function LaborCostSimulation({ staffs, selectedCo }: any) {
@@ -29,34 +29,34 @@ export default function LaborCostSimulation({ staffs, selectedCo }: any) {
   const grandTotal = filtered.reduce((s: number, st: any) => s + (Number(st.base_salary) || 0), 0);
 
   return (
-    <div className="bg-white border border-gray-100 rounded-lg p-6 shadow-sm">
-      <h3 className="text-sm font-semibold text-gray-800 mb-4">💰 인건비 예측 (부서·직급별)</h3>
+    <div className="bg-white border border-[var(--toss-border)] rounded-lg p-6 shadow-sm">
+      <h3 className="text-sm font-semibold text-[var(--foreground)] mb-4">💰 인건비 예측 (부서·직급별)</h3>
       <div className="space-y-4">
         <div>
-          <p className="text-[10px] font-semibold text-gray-400 uppercase mb-2">부서별</p>
+          <p className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase mb-2">부서별</p>
           <div className="space-y-2 max-h-40 overflow-y-auto">
             {Object.entries(byDept).map(([dept, v]) => (
               <div key={dept} className="flex justify-between text-xs">
-                <span className="font-bold text-gray-600">{dept} ({v.count}명)</span>
+                <span className="font-bold text-[var(--toss-gray-4)]">{dept} ({v.count}명)</span>
                 <span className="font-semibold">{v.total.toLocaleString()}원</span>
               </div>
             ))}
           </div>
         </div>
         <div>
-          <p className="text-[10px] font-semibold text-gray-400 uppercase mb-2">직급별</p>
+          <p className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase mb-2">직급별</p>
           <div className="space-y-2 max-h-40 overflow-y-auto">
             {Object.entries(byPosition).map(([pos, v]) => (
               <div key={pos} className="flex justify-between text-xs">
-                <span className="font-bold text-gray-600">{pos} ({v.count}명)</span>
+                <span className="font-bold text-[var(--toss-gray-4)]">{pos} ({v.count}명)</span>
                 <span className="font-semibold">{v.total.toLocaleString()}원</span>
               </div>
             ))}
           </div>
         </div>
-        <div className="pt-3 border-t border-gray-100 flex justify-between">
-          <span className="text-xs font-semibold text-gray-600">월 인건비 합계</span>
-          <span className="text-sm font-semibold text-blue-600">₩{grandTotal.toLocaleString()}</span>
+        <div className="pt-3 border-t border-[var(--toss-border)] flex justify-between">
+          <span className="text-xs font-semibold text-[var(--toss-gray-4)]">월 인건비 합계</span>
+          <span className="text-sm font-semibold text-[var(--toss-blue)]">₩{grandTotal.toLocaleString()}</span>
         </div>
       </div>
     </div>

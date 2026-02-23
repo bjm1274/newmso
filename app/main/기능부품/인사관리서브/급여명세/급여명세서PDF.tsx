@@ -120,11 +120,11 @@ export default function PayrollSlipPDF({ staff, record, yearMonth }: any) {
   const showSignArea = design?.showSignArea ?? true;
 
   return (
-    <div className="p-5 bg-white border border-gray-200 rounded-lg shadow-sm">
+    <div className="p-5 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-lg shadow-sm">
       <div ref={printRef} className="relative min-h-[220px]">
         {/* 제목 – 회사명 + 해당 월 급여명세서 (위치는 디자인 설정 사용) */}
         <div
-          className="absolute font-extrabold text-lg text-gray-900"
+          className="absolute font-extrabold text-lg text-[var(--foreground)]"
           style={{
             top: `${design?.titleYPercent ?? 8}%`,
             left: `${design?.titleXPercent ?? 5}%`,
@@ -136,7 +136,7 @@ export default function PayrollSlipPDF({ staff, record, yearMonth }: any) {
 
         {/* 부제: 직원/월 정보만 간단히 표시 */}
         <div
-          className="absolute text-[11px] text-gray-600 font-bold"
+          className="absolute text-[11px] text-[var(--toss-gray-4)] font-bold"
           style={{
             top: `${design?.subtitleYPercent ?? 20}%`,
             left: `${design?.subtitleXPercent ?? 5}%`,
@@ -162,7 +162,7 @@ export default function PayrollSlipPDF({ staff, record, yearMonth }: any) {
                   </tr>
                   <tr>
                     <td className="font-bold">실지급액 (선지급)</td>
-                    <td className="text-right font-bold text-blue-600 total">
+                    <td className="text-right font-bold text-[var(--toss-blue)] total">
                       {net.toLocaleString()}원
                     </td>
                   </tr>
@@ -187,7 +187,7 @@ export default function PayrollSlipPDF({ staff, record, yearMonth }: any) {
                   </tr>
                   <tr>
                     <td className="font-bold">실지급액</td>
-                    <td className="text-right font-bold text-blue-600 total">
+                    <td className="text-right font-bold text-[var(--toss-blue)] total">
                       {net.toLocaleString()}원
                     </td>
                   </tr>
@@ -199,7 +199,7 @@ export default function PayrollSlipPDF({ staff, record, yearMonth }: any) {
 
         {/* 하단 문구 */}
         {footerText && (
-          <div className="absolute left-0 right-0 text-center text-[11px] text-gray-500" style={{ bottom: '18%' }}>
+          <div className="absolute left-0 right-0 text-center text-[11px] text-[var(--toss-gray-3)]" style={{ bottom: '18%' }}>
             {footerText}
           </div>
         )}
@@ -207,7 +207,7 @@ export default function PayrollSlipPDF({ staff, record, yearMonth }: any) {
         {/* 서명 위치도 관리화면 값 사용 */}
         {showSignArea && (
           <div
-            className="absolute text-[11px] text-gray-500"
+            className="absolute text-[11px] text-[var(--toss-gray-3)]"
             style={{
               top: `${design?.signYPercent ?? 82}%`,
               left: `${design?.signXPercent ?? 70}%`,
@@ -218,7 +218,7 @@ export default function PayrollSlipPDF({ staff, record, yearMonth }: any) {
           </div>
         )}
       </div>
-      <button onClick={handlePrint} className="mt-4 w-full py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700">
+      <button onClick={handlePrint} className="mt-4 w-full py-2.5 bg-[var(--toss-blue)] text-white text-sm font-medium rounded-lg hover:opacity-90">
         PDF 인쇄
       </button>
     </div>

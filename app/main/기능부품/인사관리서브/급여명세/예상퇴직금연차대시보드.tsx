@@ -29,12 +29,12 @@ export default function SeveranceLeaveDashboard({ staffs = [] }: any) {
   });
 
   return (
-    <div className="border border-gray-200 p-4 bg-white rounded-lg shadow-sm">
-      <div className="pb-2 border-b border-gray-100 mb-3">
-        <h3 className="text-sm font-semibold text-gray-800">예상 퇴직금 · 연차</h3>
+    <div className="border border-[var(--toss-border)] p-4 bg-[var(--toss-card)] rounded-lg shadow-sm">
+      <div className="pb-2 border-b border-[var(--toss-border)] mb-3">
+        <h3 className="text-sm font-semibold text-[var(--foreground)]">예상 퇴직금 · 연차</h3>
       </div>
       <div className="flex items-center gap-2 mb-3">
-        <select value={filterCo} onChange={(e) => setFilterCo(e.target.value)} className="h-9 px-3 border border-gray-300 rounded-md text-xs font-medium">
+        <select value={filterCo} onChange={(e) => setFilterCo(e.target.value)} className="h-9 px-3 border border-[var(--toss-border)] rounded-md text-xs font-medium">
           <option value="전체">전체</option>
           {(Array.from(new Set(staffs.map((s: any) => s.company))).filter(Boolean) as string[]).map((c) => (
             <option key={c} value={c}>{c}</option>
@@ -43,17 +43,17 @@ export default function SeveranceLeaveDashboard({ staffs = [] }: any) {
       </div>
       <div className="max-h-[320px] overflow-y-auto space-y-2 custom-scrollbar">
         {items.map((x: any) => (
-          <div key={x.id} className="p-3 bg-[#f8fafc] rounded-lg border border-gray-200">
+          <div key={x.id} className="p-3 bg-[var(--page-bg)] rounded-lg border border-[var(--toss-border)]">
             <div className="flex justify-between items-start mb-1.5">
-              <span className="text-sm font-semibold text-gray-800">{x.name}</span>
-              <span className="text-[10px] text-gray-500">{formatWorkPeriod(x.workDays)}</span>
+              <span className="text-sm font-semibold text-[var(--foreground)]">{x.name}</span>
+              <span className="text-[10px] text-[var(--toss-gray-3)]">{formatWorkPeriod(x.workDays)}</span>
             </div>
             <div className="flex justify-between text-xs">
-              <span className="font-medium text-gray-600">예상 퇴직금</span>
+              <span className="font-medium text-[var(--toss-gray-4)]">예상 퇴직금</span>
               <span className="font-semibold text-indigo-600">{x.severance.toLocaleString()}원</span>
             </div>
             <div className="flex justify-between text-xs">
-              <span className="font-medium text-gray-600">잔여 연차</span>
+              <span className="font-medium text-[var(--toss-gray-4)]">잔여 연차</span>
               <span className="font-semibold text-emerald-600">{x.leaveRemain}일</span>
             </div>
           </div>

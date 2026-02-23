@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -124,11 +124,11 @@ export default function SurgeryExamTemplateManager() {
   };
 
   return (
-    <div className="bg-white border border-gray-100 rounded-[2rem] p-8 shadow-sm space-y-8">
-      <h2 className="text-xl font-semibold text-gray-900 tracking-tighter mb-2">
+    <div className="bg-white border border-[var(--toss-border)] rounded-[2rem] p-8 shadow-sm space-y-8">
+      <h2 className="text-xl font-semibold text-[var(--foreground)] tracking-tighter mb-2">
         수술 · 검사명 템플릿 관리
       </h2>
-      <p className="text-[11px] text-gray-500 font-bold">
+      <p className="text-[11px] text-[var(--toss-gray-3)] font-bold">
         수술일정표 / MRI일정표 작성 시 드롭다운으로 선택할 수 있는 수술명·검사명
         목록을 관리합니다.
       </p>
@@ -136,17 +136,17 @@ export default function SurgeryExamTemplateManager() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* 수술 템플릿 */}
         <section className="space-y-3">
-          <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-2">
             <span className="text-lg">🏥</span>
             수술명 템플릿
           </h3>
           <div className="space-y-2">
-            <div className="flex items-center gap-3 p-2 bg-gray-50 rounded-xl border border-gray-100">
-              <span className="text-[11px] font-semibold text-gray-600 shrink-0">부위 선택</span>
+            <div className="flex items-center gap-3 p-2 bg-[var(--toss-gray-1)] rounded-xl border border-[var(--toss-border)]">
+              <span className="text-[11px] font-semibold text-[var(--toss-gray-4)] shrink-0">부위 선택</span>
               <select
                 value={newSurgeryPart}
                 onChange={(e) => setNewSurgeryPart(e.target.value)}
-                className="px-3 py-2 rounded-lg border border-gray-200 text-xs font-bold bg-white min-w-[160px]"
+                className="px-3 py-2 rounded-lg border border-[var(--toss-border)] text-xs font-bold bg-white min-w-[160px]"
               >
                 {BODY_PARTS.map((p) => (
                   <option key={p.id} value={p.id}>{p.label}</option>
@@ -158,37 +158,37 @@ export default function SurgeryExamTemplateManager() {
                 value={newSurgeryName}
                 onChange={(e) => setNewSurgeryName(e.target.value)}
                 placeholder="예: 전방십자인대 재건술"
-                className="flex-1 px-3 py-2 rounded-xl border border-gray-200 text-xs font-bold"
+                className="flex-1 px-3 py-2 rounded-xl border border-[var(--toss-border)] text-xs font-bold"
               />
               <button
                 type="button"
                 disabled={loading}
                 onClick={() => addTemplate('surgery')}
-                className="px-4 py-2 rounded-xl bg-blue-600 text-white text-[11px] font-semibold disabled:opacity-50"
+                className="px-4 py-2 rounded-xl bg-[var(--toss-blue)] text-white text-[11px] font-semibold disabled:opacity-50"
               >
                 추가
               </button>
             </div>
           </div>
-          <div className="border border-gray-100 rounded-lg p-3 max-h-64 overflow-y-auto custom-scrollbar space-y-1 bg-gray-50/40">
+          <div className="border border-[var(--toss-border)] rounded-lg p-3 max-h-64 overflow-y-auto custom-scrollbar space-y-1 bg-[var(--toss-gray-1)]/40">
             {surgeryTemplates.length === 0 ? (
-              <p className="text-[11px] text-gray-400 font-bold text-center py-4">
+              <p className="text-[11px] text-[var(--toss-gray-3)] font-bold text-center py-4">
                 등록된 수술명 템플릿이 없습니다.
               </p>
             ) : (
               surgeryTemplates.map((t) => (
                 <div
                   key={t.id}
-                  className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-white border border-gray-100 text-[11px]"
+                  className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-white border border-[var(--toss-border)] text-[11px]"
                 >
                   <span
                     className={`flex-1 truncate font-bold ${
-                      t.is_active ? 'text-gray-800' : 'text-gray-300 line-through'
+                      t.is_active ? 'text-[var(--foreground)]' : 'text-[var(--toss-gray-3)] line-through'
                     }`}
                   >
                     {t.name}
                     {t.body_part && (
-                      <span className="ml-1.5 text-[9px] font-normal text-gray-400">
+                      <span className="ml-1.5 text-[9px] font-normal text-[var(--toss-gray-3)]">
                         ({BODY_PARTS.find((p) => p.id === t.body_part)?.label ?? t.body_part})
                       </span>
                     )}
@@ -196,7 +196,7 @@ export default function SurgeryExamTemplateManager() {
                   <button
                     type="button"
                     onClick={() => toggleActive('surgery', t)}
-                    className="px-2 py-1 rounded-lg text-[10px] font-semibold border border-gray-200 text-gray-500 hover:bg-gray-100"
+                    className="px-2 py-1 rounded-lg text-[10px] font-semibold border border-[var(--toss-border)] text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]"
                   >
                     {t.is_active ? '숨기기' : '보이기'}
                   </button>
@@ -215,17 +215,17 @@ export default function SurgeryExamTemplateManager() {
 
         {/* MRI 템플릿 */}
         <section className="space-y-3">
-          <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-2">
             <span className="text-lg">🔬</span>
             MRI 검사명 템플릿
           </h3>
           <div className="space-y-2">
-            <div className="flex items-center gap-3 p-2 bg-gray-50 rounded-xl border border-gray-100">
-              <span className="text-[11px] font-semibold text-gray-600 shrink-0">부위 선택</span>
+            <div className="flex items-center gap-3 p-2 bg-[var(--toss-gray-1)] rounded-xl border border-[var(--toss-border)]">
+              <span className="text-[11px] font-semibold text-[var(--toss-gray-4)] shrink-0">부위 선택</span>
               <select
                 value={newMriPart}
                 onChange={(e) => setNewMriPart(e.target.value)}
-                className="px-3 py-2 rounded-lg border border-gray-200 text-xs font-bold bg-white min-w-[160px]"
+                className="px-3 py-2 rounded-lg border border-[var(--toss-border)] text-xs font-bold bg-white min-w-[160px]"
               >
                 {BODY_PARTS.map((p) => (
                   <option key={p.id} value={p.id}>{p.label}</option>
@@ -237,37 +237,37 @@ export default function SurgeryExamTemplateManager() {
                 value={newMriName}
                 onChange={(e) => setNewMriName(e.target.value)}
                 placeholder="예: 요추부 MRI"
-                className="flex-1 px-3 py-2 rounded-xl border border-gray-200 text-xs font-bold"
+                className="flex-1 px-3 py-2 rounded-xl border border-[var(--toss-border)] text-xs font-bold"
               />
               <button
                 type="button"
                 disabled={loading}
                 onClick={() => addTemplate('mri')}
-                className="px-4 py-2 rounded-xl bg-blue-600 text-white text-[11px] font-semibold disabled:opacity-50"
+                className="px-4 py-2 rounded-xl bg-[var(--toss-blue)] text-white text-[11px] font-semibold disabled:opacity-50"
               >
                 추가
               </button>
             </div>
           </div>
-          <div className="border border-gray-100 rounded-lg p-3 max-h-64 overflow-y-auto custom-scrollbar space-y-1 bg-gray-50/40">
+          <div className="border border-[var(--toss-border)] rounded-lg p-3 max-h-64 overflow-y-auto custom-scrollbar space-y-1 bg-[var(--toss-gray-1)]/40">
             {mriTemplates.length === 0 ? (
-              <p className="text-[11px] text-gray-400 font-bold text-center py-4">
+              <p className="text-[11px] text-[var(--toss-gray-3)] font-bold text-center py-4">
                 등록된 검사명 템플릿이 없습니다.
               </p>
             ) : (
               mriTemplates.map((t) => (
                 <div
                   key={t.id}
-                  className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-white border border-gray-100 text-[11px]"
+                  className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-white border border-[var(--toss-border)] text-[11px]"
                 >
                   <span
                     className={`flex-1 truncate font-bold ${
-                      t.is_active ? 'text-gray-800' : 'text-gray-300 line-through'
+                      t.is_active ? 'text-[var(--foreground)]' : 'text-[var(--toss-gray-3)] line-through'
                     }`}
                   >
                     {t.name}
                     {t.body_part && (
-                      <span className="ml-1.5 text-[9px] font-normal text-gray-400">
+                      <span className="ml-1.5 text-[9px] font-normal text-[var(--toss-gray-3)]">
                         ({BODY_PARTS.find((p) => p.id === t.body_part)?.label ?? t.body_part})
                       </span>
                     )}
@@ -275,7 +275,7 @@ export default function SurgeryExamTemplateManager() {
                   <button
                     type="button"
                     onClick={() => toggleActive('mri', t)}
-                    className="px-2 py-1 rounded-lg text-[10px] font-semibold border border-gray-200 text-gray-500 hover:bg-gray-100"
+                    className="px-2 py-1 rounded-lg text-[10px] font-semibold border border-[var(--toss-border)] text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]"
                   >
                     {t.is_active ? '숨기기' : '보이기'}
                   </button>

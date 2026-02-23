@@ -17,7 +17,7 @@ export default function AppLogo({
 
   return (
     <div
-      className={`flex items-center justify-center overflow-hidden bg-white shrink-0 ${className}`}
+      className={`flex items-center justify-center overflow-hidden bg-[var(--toss-card)] shrink-0 ${className}`}
       style={{ width: size, height: size, borderRadius: 0 }}
     >
       {!failed ? (
@@ -28,7 +28,7 @@ export default function AppLogo({
           onError={() => setFailed(true)}
         />
       ) : (
-        <span className={`text-[#191F28] font-bold ${textSize}`}>SY</span>
+        <span className={`text-[var(--foreground)] font-bold ${textSize}`}>SY</span>
       )}
     </div>
   );

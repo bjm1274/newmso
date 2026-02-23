@@ -239,16 +239,16 @@ export default function MyProfileCard({ user: initialUser }: any) {
   if (!user) return <div className="p-10">로딩 중...</div>;
 
   return (
-    <div className="bg-white border border-[#E5E8EB] shadow-sm rounded-lg p-4 sm:p-6 lg:p-10 flex flex-col h-full space-y-6 sm:space-y-8 lg:space-y-10">
+    <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-2xl p-5 sm:p-6 lg:p-8 flex flex-col h-full">
       
       {/* 프로필 헤더 */}
-      <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 lg:gap-10 pb-6 sm:pb-8 border-b border-gray-100">
+      <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 pb-6 sm:pb-7 border-b border-[var(--toss-border)] shrink-0">
         <div className="relative group shrink-0">
-          <div className="w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-full bg-[#F2F4F6] flex items-center justify-center overflow-hidden border-2 sm:border-4 border-white shadow-sm">
+          <div className="w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-full bg-[var(--toss-gray-1)] flex items-center justify-center overflow-hidden border-2 sm:border-4 border-[var(--toss-card)] shadow-sm">
             {avatarUrl ? (
               <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
             ) : (
-              <span className="text-5xl font-bold text-[#E5E8EB]">👤</span>
+              <span className="text-5xl font-bold text-[var(--toss-gray-3)]">👤</span>
             )}
           </div>
           {user?.id ? (
@@ -266,17 +266,17 @@ export default function MyProfileCard({ user: initialUser }: any) {
               />
             </>
           ) : (
-            <span className="absolute bottom-1 right-1 text-[9px] font-bold text-[#8B95A1] max-w-[100px] text-right">직원 계정 로그인 시 사진 등록 가능</span>
+            <span className="absolute bottom-1 right-1 text-[9px] font-bold text-[var(--toss-gray-3)] max-w-[100px] text-right">직원 계정 로그인 시 사진 등록 가능</span>
           )}
         </div>
 
         <div className="flex-1 w-full sm:w-auto text-center sm:text-left">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-2">
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-[#191F28] tracking-tighter">{user.name} {user.position}</h2>
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-[var(--foreground)] tracking-tighter">{user.name} {user.position}</h2>
             <div className="flex flex-wrap items-center justify-center sm:justify-end gap-2">
               <button
                 onClick={() => verifyPasswordAndRun(() => setShowSecret((v) => !v))}
-                className="text-[10px] sm:text-[11px] font-bold px-3 py-1.5 sm:px-4 sm:py-2 bg-[#F2F4F6] rounded-full text-[#8B95A1] hover:text-[#3182F6] border border-transparent hover:border-[#E8F3FF]"
+                className="text-[10px] sm:text-[11px] font-bold px-3 py-1.5 sm:px-4 sm:py-2 bg-[var(--toss-gray-1)] rounded-full text-[var(--toss-gray-3)] hover:text-[var(--toss-blue)] border border-transparent hover:border-[var(--toss-blue-light)]"
               >
                 {showSecret ? '민감 정보 숨기기 🔒' : '보안 정보 보기 👁️'}
               </button>
@@ -286,32 +286,33 @@ export default function MyProfileCard({ user: initialUser }: any) {
                 className={`text-[10px] sm:text-[11px] font-bold px-3 py-1.5 sm:px-4 sm:py-2 rounded-full border transition-all ${
                   isEditing
                     ? 'bg-red-50 text-red-500 border-red-100 hover:bg-red-100'
-                    : 'bg-[#E8F3FF] text-[#3182F6] border-[#D6EBFF] hover:bg-[#D6EBFF]'
+                    : 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)] border-[var(--toss-blue-light)] hover:bg-[var(--toss-blue-light)]'
                 }`}
               >
                 {isEditing ? '수정 취소' : '내 정보 수정'}
               </button>
             </div>
           </div>
-          <p className="text-sm sm:text-base lg:text-lg font-bold text-[#3182F6] underline decoration-[#E8F3FF] underline-offset-4">{user.department} 소속</p>
+          <p className="text-sm sm:text-base lg:text-lg font-bold text-[var(--toss-blue)] underline decoration-[var(--toss-blue-light)] underline-offset-4">{user.department} 소속</p>
           {/* 디버깅용 메시지 (작게 표시, 문제 해결 후 삭제 가능) */}
-          {/* <p className="text-[10px] text-[#8B95A1] mt-2">시스템 상태: {debugMsg || '정상'}</p> */}
+          {/* <p className="text-[10px] text-[var(--toss-gray-3)] mt-2">시스템 상태: {debugMsg || '정상'}</p> */}
         </div>
       </div>
 
       {/* 상세 정보 + 나의 근태/연차 요약 */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 sm:pr-4">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8 lg:gap-10">
-          <div className="space-y-5 sm:space-y-6 lg:col-span-2">
-            <h3 className="text-[10px] sm:text-[11px] font-bold text-[#8B95A1] uppercase tracking-widest border-l-2 border-[#3182F6] pl-3">
+      <div className="flex-1 overflow-y-auto custom-scrollbar py-5 sm:py-6 min-h-0">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-10">
+          {/* 인사 관리 정보 */}
+          <div className="lg:col-span-2 space-y-5">
+            <h3 className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest border-l-4 border-[var(--toss-blue)] pl-3 mb-1">
               인사 관리 정보
             </h3>
-            <div className="grid grid-cols-1 min-[480px]:grid-cols-2 gap-4 sm:gap-5">
+            <div className="grid grid-cols-1 min-[480px]:grid-cols-2 gap-x-6 gap-y-5">
               <InfoItem label="사번" value={user.employee_no} />
               <InfoItem label="입사일" value={user.join_date} />
             </div>
             {isEditing ? (
-              <div className="grid grid-cols-1 min-[480px]:grid-cols-2 gap-4 sm:gap-5">
+              <div className="grid grid-cols-1 min-[480px]:grid-cols-2 gap-x-6 gap-y-5 pt-1">
                 <EditableItem
                   label="이메일"
                   value={editForm.email}
@@ -326,23 +327,27 @@ export default function MyProfileCard({ user: initialUser }: any) {
                 />
               </div>
             ) : (
-              <div className="grid grid-cols-1 min-[480px]:grid-cols-2 gap-4 sm:gap-5">
+              <div className="grid grid-cols-1 min-[480px]:grid-cols-2 gap-x-6 gap-y-5 pt-1">
                 <InfoItem label="이메일" value={user.email} />
                 <InfoItem label="연락처" value={user.phone} />
               </div>
             )}
           </div>
-          <div className="space-y-5 sm:space-y-6">
-            <h3 className="text-[10px] sm:text-[11px] font-bold text-[#8B95A1] uppercase tracking-widest border-l-2 border-emerald-500 pl-3">
+
+          {/* 나의 근태 · 연차 */}
+          <div className="space-y-4">
+            <h3 className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest border-l-4 border-emerald-500 pl-3 mb-1">
               나의 근태 · 연차
             </h3>
             <LeaveAndCommuteSummary user={user} />
           </div>
-          <div className="space-y-5 sm:space-y-6 lg:col-span-3">
-            <h3 className="text-[10px] sm:text-[11px] font-bold text-[#8B95A1] uppercase tracking-widest border-l-2 border-red-500 pl-3">
+
+          {/* 보안 및 급여 */}
+          <div className="lg:col-span-3 space-y-5 pt-2 border-t border-[var(--toss-border)] mt-2">
+            <h3 className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest border-l-4 border-[var(--toss-danger)] pl-3 mb-1">
               보안 및 급여
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 lg:gap-x-12 gap-y-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
               {isEditing ? (
                 <>
                   <EditableItem
@@ -352,8 +357,8 @@ export default function MyProfileCard({ user: initialUser }: any) {
                     placeholder="도로명 주소를 입력하세요"
                   />
                   <div className="space-y-3">
-                    <span className="text-[12px] font-bold text-[#8B95A1]">계좌정보</span>
-                    <div className="grid grid-cols-2 gap-2">
+                    <span className="text-[12px] font-bold text-[var(--toss-gray-3)] block mb-2">계좌정보</span>
+                    <div className="grid grid-cols-2 gap-3">
                       <input
                         type="text"
                         value={editForm.bank_name}
@@ -361,7 +366,7 @@ export default function MyProfileCard({ user: initialUser }: any) {
                           setEditForm((f) => ({ ...f, bank_name: e.target.value }))
                         }
                         placeholder="은행명"
-                        className="w-full px-3 py-2.5 rounded-[12px] border border-[#E5E8EB] text-[13px] font-bold text-[#191F28] focus:outline-none focus:ring-2 focus:ring-[#3182F6]/20 focus:border-[#3182F6]"
+                        className="w-full px-3 py-2.5 rounded-xl border border-[var(--toss-border)] text-[13px] font-semibold text-[var(--foreground)] bg-[var(--input-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)]"
                       />
                       <input
                         type="text"
@@ -370,10 +375,10 @@ export default function MyProfileCard({ user: initialUser }: any) {
                           setEditForm((f) => ({ ...f, account_no: e.target.value }))
                         }
                         placeholder="계좌번호"
-                        className="w-full px-3 py-2.5 rounded-[12px] border border-[#E5E8EB] text-[13px] font-bold text-[#191F28] focus:outline-none focus:ring-2 focus:ring-[#3182F6]/20 focus:border-[#3182F6]"
+                        className="w-full px-3 py-2.5 rounded-xl border border-[var(--toss-border)] text-[13px] font-semibold text-[var(--foreground)] bg-[var(--input-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)]"
                       />
                     </div>
-                    <p className="text-[11px] text-[#8B95A1]">
+                    <p className="text-[11px] text-[var(--toss-gray-3)]">
                       급여 이체용 계좌 정보를 정확히 입력해 주세요.
                     </p>
                   </div>
@@ -420,7 +425,7 @@ export default function MyProfileCard({ user: initialUser }: any) {
       </div>
 
       {/* 로그아웃 버튼 */}
-      <div className="pt-4 sm:pt-6 border-t border-gray-100 flex flex-col-reverse sm:flex-row gap-3 sm:items-center sm:justify-between">
+      <div className="pt-5 sm:pt-6 mt-4 border-t border-[var(--toss-border)] flex flex-col-reverse sm:flex-row gap-3 sm:items-center sm:justify-between shrink-0">
         {isEditing && (
           <button
             type="button"
@@ -433,7 +438,7 @@ export default function MyProfileCard({ user: initialUser }: any) {
         )}
         <button
           onClick={handleLogout}
-          className="w-full sm:w-auto py-2.5 rounded-xl bg-[#3182F6] text-white text-[11px] sm:text-[12px] font-semibold hover:bg-[#1B64DA] transition-all shadow-sm flex items-center justify-center gap-2"
+          className="w-full sm:w-auto py-2.5 rounded-xl bg-[var(--toss-blue)] text-white text-[11px] sm:text-[12px] font-semibold hover:bg-[var(--toss-blue)] transition-all shadow-sm flex items-center justify-center gap-2"
         >
           <span className="text-sm">🚪</span>
           <span className="tracking-tight">시스템 안전 로그아웃</span>
@@ -445,9 +450,9 @@ export default function MyProfileCard({ user: initialUser }: any) {
 
 function InfoItem({ label, value, isMasked }: any) {
   return (
-    <div className="flex flex-col gap-2">
-      <span className="text-[12px] font-bold text-[#8B95A1]">{label}</span>
-      <span className={`text-[16px] font-bold ${isMasked ? 'text-[#E5E8EB] tracking-widest' : 'text-[#191F28]'}`}>
+    <div className="flex flex-col gap-1.5">
+      <span className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-wide">{label}</span>
+      <span className={`text-[15px] font-bold leading-snug ${isMasked ? 'text-[var(--toss-gray-3)] tracking-widest' : 'text-[var(--foreground)]'}`}>
         {value || '-'}
       </span>
     </div>
@@ -456,14 +461,14 @@ function InfoItem({ label, value, isMasked }: any) {
 
 function EditableItem({ label, value, onChange, placeholder }: any) {
   return (
-    <div className="flex flex-col gap-2">
-      <span className="text-[12px] font-bold text-[#8B95A1]">{label}</span>
+    <div className="flex flex-col gap-1.5">
+      <span className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-wide">{label}</span>
       <input
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full px-3 py-2.5 rounded-[12px] border border-[#E5E8EB] text-[14px] font-bold text-[#191F28] focus:outline-none focus:ring-2 focus:ring-[#3182F6]/20 focus:border-[#3182F6]"
+        className="w-full px-3 py-2.5 rounded-xl border border-[var(--toss-border)] text-[14px] font-semibold text-[var(--foreground)] bg-[var(--input-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)]"
       />
     </div>
   );
@@ -542,41 +547,34 @@ function LeaveAndCommuteSummary({ user }: any) {
 
   if (!summary) {
     return (
-      <div className="bg-[#F2F4F6] border border-[#E5E8EB] rounded-lg p-3 sm:p-4 text-[11px] sm:text-[12px] text-[#8B95A1] font-bold">
+      <div className="bg-[var(--toss-gray-1)] border border-[var(--toss-border)] rounded-xl p-4 sm:p-5 text-[12px] text-[var(--toss-gray-3)] font-semibold">
         근태·연차 정보를 불러오는 중입니다...
       </div>
     );
   }
 
   return (
-    <div className="bg-[#F2F4F6] border border-[#E5E8EB] rounded-lg p-3 sm:p-4 space-y-3 sm:space-y-4 text-[11px] sm:text-[12px]">
-      <div className="flex justify-between items-end">
-        <div>
-          <p className="text-[10px] sm:text-[11px] font-bold text-[#8B95A1] uppercase tracking-widest">
-            연차 현황
-          </p>
-          <p className="mt-1 text-[12px] sm:text-[13px] font-bold text-[#191F28]">
-            잔여 연차{' '}
-            <span className="text-emerald-600">
-              {summary.remaining.toFixed(1)}일
-            </span>
-          </p>
-          <p className="mt-0.5 text-[10px] sm:text-[11px] text-[#4E5968]">
-            총 {summary.total.toFixed(1)}일 중 {summary.used.toFixed(1)}일 사용
-          </p>
-        </div>
+    <div className="bg-[var(--toss-gray-1)] border border-[var(--toss-border)] rounded-xl p-4 sm:p-5 space-y-4 text-[12px]">
+      <div>
+        <p className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1.5">
+          연차 현황
+        </p>
+        <p className="text-[14px] font-bold text-[var(--foreground)] leading-snug">
+          잔여 연차 <span className="text-emerald-600">{summary.remaining.toFixed(1)}일</span>
+        </p>
+        <p className="text-[11px] text-[var(--toss-gray-4)] mt-0.5">
+          총 {summary.total.toFixed(1)}일 중 {summary.used.toFixed(1)}일 사용
+        </p>
       </div>
 
-      <div className="mt-2 sm:mt-3 border-t border-[#E5E8EB] pt-2 sm:pt-3 space-y-1.5">
-        <p className="text-[10px] sm:text-[11px] font-bold text-[#8B95A1] uppercase tracking-widest">
+      <div className="border-t border-[var(--toss-border)] pt-4 space-y-2">
+        <p className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">
           최근 지각
         </p>
         {summary.lateDays.length === 0 ? (
-          <p className="text-[10px] sm:text-[11px] text-[#4E5968]">
-            최근 60일 이내 지각 기록이 없습니다.
-          </p>
+          <p className="text-[11px] text-[var(--toss-gray-4)]">최근 60일 이내 지각 기록이 없습니다.</p>
         ) : (
-          <ul className="space-y-0.5 text-[10px] sm:text-[11px] text-[#4E5968]">
+          <ul className="space-y-1 text-[11px] text-[var(--toss-gray-4)]">
             {summary.lateDays.slice(0, 3).map((d) => (
               <li key={`${d.date}-${d.status}`}>
                 {new Date(d.date).toLocaleDateString('ko-KR')} · {d.status}
@@ -586,16 +584,14 @@ function LeaveAndCommuteSummary({ user }: any) {
         )}
       </div>
 
-      <div className="mt-2 border-t border-[#E5E8EB] pt-2 sm:pt-3 space-y-1.5">
-        <p className="text-[10px] sm:text-[11px] font-bold text-[#8B95A1] uppercase tracking-widest">
+      <div className="border-t border-[var(--toss-border)] pt-4 space-y-2">
+        <p className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">
           최근 추가근무
         </p>
         {summary.overworkDays.length === 0 ? (
-          <p className="text-[10px] sm:text-[11px] text-[#4E5968]">
-            최근 60일 이내 추가근무 기록이 없습니다.
-          </p>
+          <p className="text-[11px] text-[var(--toss-gray-4)]">최근 60일 이내 추가근무 기록이 없습니다.</p>
         ) : (
-          <ul className="space-y-0.5 text-[10px] sm:text-[11px] text-[#4E5968]">
+          <ul className="space-y-1 text-[11px] text-[var(--toss-gray-4)]">
             {summary.overworkDays.slice(0, 3).map((d) => (
               <li key={`${d.date}-${d.status}`}>
                 {new Date(d.date).toLocaleDateString('ko-KR')} · {d.status}

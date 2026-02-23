@@ -79,24 +79,24 @@ export default function SalarySlipContainer({ user }: any) {
   /* 암호 미확인 시 비밀번호 입력 화면 */
   if (!unlocked) {
     return (
-      <div className="bg-white border border-[#E5E8EB] shadow-sm rounded-[2.5rem] overflow-hidden flex flex-col items-center justify-center min-h-[320px] p-10">
-        <h3 className="text-lg font-bold text-[#191F28] mb-2">급여 명세서 조회</h3>
-        <p className="text-[13px] text-[#4E5968] mb-6">본인 확인을 위해 비밀번호를 입력해 주세요.</p>
-        <form onSubmit={handlePasswordVerify} className="w-full max-w-sm space-y-4">
+      <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-2xl overflow-hidden flex flex-col items-center justify-center min-h-[320px] p-8 sm:p-10">
+        <h3 className="text-xl font-bold text-[var(--foreground)] mb-2">급여 명세서 조회</h3>
+        <p className="text-[13px] text-[var(--toss-gray-4)] mb-8">본인 확인을 위해 비밀번호를 입력해 주세요.</p>
+        <form onSubmit={handlePasswordVerify} className="w-full max-w-sm space-y-5">
           <input
             type="password"
             value={passwordInput}
             onChange={(e) => { setPasswordInput(e.target.value); setVerifyError(''); }}
             placeholder="비밀번호"
-            className="w-full px-4 py-3 rounded-[12px] border border-[#E5E8EB] text-[#191F28] placeholder:text-[#8B95A1] focus:outline-none focus:ring-2 focus:ring-[#3182F6]/20 focus:border-[#3182F6]"
+            className="w-full px-4 py-3.5 rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] placeholder:text-[var(--toss-gray-3)] focus:outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)]"
             autoComplete="current-password"
             disabled={verifying}
           />
-          {verifyError && <p className="text-[12px] text-red-500 font-medium">{verifyError}</p>}
+          {verifyError && <p className="text-[12px] text-[var(--toss-danger)] font-medium">{verifyError}</p>}
           <button
             type="submit"
             disabled={verifying}
-            className="w-full py-3 bg-[#3182F6] text-white font-semibold rounded-[12px] hover:bg-[#1B64DA] disabled:opacity-50 transition-all"
+            className="w-full py-3.5 bg-[var(--toss-blue)] text-white font-semibold rounded-xl hover:opacity-95 disabled:opacity-50 transition-all"
           >
             {verifying ? '확인 중...' : '확인'}
           </button>
@@ -107,15 +107,15 @@ export default function SalarySlipContainer({ user }: any) {
 
   if (!user?.base_salary || user.base_salary <= 0) {
     return (
-      <div className="p-10 text-sm font-bold text-[#4E5968]">
-        아직 <span className="text-[#3182F6]">기본급여</span>가 등록되지 않아 급여명세서를 생성할 수 없습니다.
-        <br />
+      <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-2xl p-8 sm:p-10 text-sm font-semibold text-[var(--toss-gray-4)] leading-relaxed">
+        아직 <span className="text-[var(--toss-blue)]">기본급여</span>가 등록되지 않아 급여명세서를 생성할 수 없습니다.
+        <br className="my-2" />
         인사 담당자에게 직원 기본급을 먼저 등록해 달라고 요청해 주세요.
       </div>
     );
   }
 
-  if (!salaryData) return <div className="p-10 text-[#8B95A1] font-bold">데이터 로딩 중...</div>;
+  if (!salaryData) return <div className="p-8 text-[var(--toss-gray-3)] font-semibold">데이터 로딩 중...</div>;
 
   const totalPayment = salaryData.base_salary + salaryData.overtime_pay + 100000 + salaryData.bonus;
   const totalDeduction = salaryData.national_pension + salaryData.health_insurance + Math.floor(salaryData.health_insurance * 0.1281) + Math.floor(totalPayment * 0.009) + salaryData.income_tax + Math.floor(salaryData.income_tax * 0.1);
@@ -163,22 +163,22 @@ export default function SalarySlipContainer({ user }: any) {
         }
       `}</style>
 
-      <div className="bg-white border border-gray-100 shadow-sm rounded-[2.5rem] overflow-hidden flex flex-col h-full">
-        <div className="p-6 bg-gray-50 border-b border-gray-100 flex justify-between items-center shrink-0">
-          <div className="flex items-center gap-6">
+      <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-2xl overflow-hidden flex flex-col h-full">
+        <div className="px-5 py-4 sm:px-6 sm:py-5 bg-[var(--toss-gray-1)] border-b border-[var(--toss-border)] flex flex-wrap justify-between items-center gap-4 shrink-0">
+          <div className="flex items-center gap-4 sm:gap-6">
             <div className="flex gap-2">
-              <button onClick={() => changeMonth(-1)} className="w-10 h-10 rounded-full bg-white border border-gray-200 hover:bg-gray-100 flex items-center justify-center shadow-sm">◀</button>
-              <button onClick={() => changeMonth(1)} className="w-10 h-10 rounded-full bg-white border border-gray-200 hover:bg-gray-100 flex items-center justify-center shadow-sm">▶</button>
+              <button type="button" onClick={() => changeMonth(-1)} className="w-10 h-10 rounded-full bg-[var(--toss-card)] border border-[var(--toss-border)] hover:bg-[var(--toss-gray-2)] flex items-center justify-center shadow-sm">◀</button>
+              <button type="button" onClick={() => changeMonth(1)} className="w-10 h-10 rounded-full bg-[var(--toss-card)] border border-[var(--toss-border)] hover:bg-[var(--toss-gray-2)] flex items-center justify-center shadow-sm">▶</button>
             </div>
-            <h3 className="text-xl font-semibold text-gray-900">{currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월 내역</h3>
+            <h3 className="text-lg sm:text-xl font-semibold text-[var(--foreground)]">{currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월 내역</h3>
           </div>
-          <button onClick={handlePrint} className="px-8 py-4 bg-gray-900 text-white text-sm font-semibold rounded-lg hover:bg-black transition-all flex items-center gap-2 shadow-xl">
-             🖨️ A4 한 장에 맞춰 인쇄
+          <button type="button" onClick={handlePrint} className="px-6 py-3 sm:px-8 sm:py-4 bg-[var(--foreground)] text-white text-sm font-semibold rounded-xl hover:opacity-95 transition-all flex items-center gap-2 shadow-lg">
+            🖨️ A4 한 장에 맞춰 인쇄
           </button>
         </div>
 
-        <div className="flex-1 overflow-auto bg-gray-200 p-12 flex justify-center custom-scrollbar">
-          <div id="print-section" className="bg-white shadow-2xl print:shadow-none print:w-full">
+        <div className="flex-1 overflow-auto bg-[var(--toss-gray-1)] p-6 sm:p-8 lg:p-10 flex justify-center custom-scrollbar">
+          <div id="print-section" className="bg-[var(--toss-card)] shadow-2xl print:shadow-none print:w-full">
             <SalarySlipUI 
               user={user} 
               currentDate={currentDate} 

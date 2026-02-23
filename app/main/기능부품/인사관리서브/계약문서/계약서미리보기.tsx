@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -74,7 +74,7 @@ export default function ContractPreview({ staff, contract }: Props) {
 
   if (!staff) {
     return (
-      <div className="bg-white border border-gray-200 shadow-sm p-8 flex items-center justify-center h-[800px] text-xs text-gray-400">
+      <div className="bg-white border border-[var(--toss-border)] shadow-sm p-8 flex items-center justify-center h-[800px] text-xs text-[var(--toss-gray-3)]">
         계약 대상자를 왼쪽에서 선택하면 이곳에 근로계약서가 미리보기로 표시됩니다.
       </div>
     );
@@ -176,14 +176,14 @@ export default function ContractPreview({ staff, contract }: Props) {
   const sig = contract?.signature_data as string | undefined;
 
   return (
-    <div className="bg-white border border-gray-200 shadow-2xl p-10 flex flex-col h-[800px] overflow-y-auto rounded-lg relative custom-scrollbar print:shadow-none">
+    <div className="bg-white border border-[var(--toss-border)] shadow-2xl p-10 flex flex-col h-[800px] overflow-y-auto rounded-lg relative custom-scrollbar print:shadow-none">
       <div className="flex items-start justify-between mb-6">
         <div>
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+          <p className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">
             근로계약서 미리보기
           </p>
-          <h1 className="text-lg font-bold text-gray-900 mt-1">표준 근로계약서</h1>
-          <p className="mt-1 text-[11px] text-gray-500">
+          <h1 className="text-lg font-bold text-[var(--foreground)] mt-1">표준 근로계약서</h1>
+          <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
             {staff.company} / {staff.name}
           </p>
         </div>
@@ -200,34 +200,34 @@ export default function ContractPreview({ staff, contract }: Props) {
             </span>
           )}
           {sig && (
-            <div className="text-[10px] text-gray-500">
+            <div className="text-[10px] text-[var(--toss-gray-3)]">
               전자 서명 완료
             </div>
           )}
         </div>
       </div>
 
-      <div className="flex-1 mt-4 p-6 bg-gray-50 border border-gray-100 rounded-xl font-mono text-[11px] leading-relaxed text-gray-800 whitespace-pre-wrap">
+      <div className="flex-1 mt-4 p-6 bg-[var(--toss-gray-1)] border border-[var(--toss-border)] rounded-xl font-mono text-[11px] leading-relaxed text-[var(--foreground)] whitespace-pre-wrap">
         {loading
           ? '계약서 내용을 불러오는 중입니다...'
           : text || '이 회사에 설정된 표준 근로계약서 양식이 없습니다.'}
       </div>
 
       {sig && (
-        <div className="mt-6 pt-4 border-t border-gray-100 flex justify-between items-center">
-          <p className="text-[10px] text-gray-500">
+        <div className="mt-6 pt-4 border-t border-[var(--toss-border)] flex justify-between items-center">
+          <p className="text-[10px] text-[var(--toss-gray-3)]">
             위 내용은 전자 서명을 통해 동의된 근로계약 내용입니다.
           </p>
           <div className="flex items-center gap-3">
-            <span className="text-[10px] text-gray-500 font-semibold">근로자 서명</span>
+            <span className="text-[10px] text-[var(--toss-gray-3)] font-semibold">근로자 서명</span>
             {sig.startsWith('data:image') ? (
               <img
                 src={sig}
                 alt="전자 서명"
-                className="h-10 w-auto object-contain bg-white border border-gray-200 rounded"
+                className="h-10 w-auto object-contain bg-white border border-[var(--toss-border)] rounded"
               />
             ) : (
-              <span className="px-3 py-1 text-[11px] font-semibold text-gray-900 bg-white border border-gray-200 rounded">
+              <span className="px-3 py-1 text-[11px] font-semibold text-[var(--foreground)] bg-white border border-[var(--toss-border)] rounded">
                 {sig}
               </span>
             )}

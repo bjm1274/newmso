@@ -358,10 +358,10 @@ export default function MainContent({
   });
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative bg-[#F9FAFB]">
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative bg-[var(--page-bg)]">
       {isMso && hospitalCompanies.length > 0 && setSelectedCompanyId && (
-        <div className="shrink-0 px-4 py-2 bg-white border-b border-[#E5E8EB] flex items-center gap-2">
-          <span className="text-xs font-bold text-gray-500">회사 선택</span>
+        <div className="shrink-0 px-4 py-2 bg-[var(--toss-card)] border-b border-[var(--toss-border)] flex items-center gap-2">
+          <span className="text-xs font-bold text-[var(--toss-gray-3)]">회사 선택</span>
           <select
             value={selectedCo}
             onChange={(e) => {
@@ -373,7 +373,7 @@ export default function MainContent({
                 if (c) setSelectedCompanyId(c.id);
               }
             }}
-            className="text-sm font-bold text-gray-800 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-100"
+            className="text-sm font-bold text-[var(--foreground)] bg-[var(--input-bg)] border border-[var(--toss-border)] rounded-lg px-3 py-2 focus:ring-2 focus:ring-[var(--toss-blue)]/30"
           >
             <option value="전체">전체</option>
             {hospitalCompanies.map((c: any) => (
@@ -395,7 +395,7 @@ export default function MainContent({
         </div>
       )}
       {mainMenu === '조직도' && <div className="flex-1 overflow-hidden"><OrgChart staffs={data.staffs} selectedCo={selectedCo} setSelectedCo={setSelectedCo} /></div>}
-      {mainMenu === '채팅' && <div className="flex-1 overflow-hidden bg-white z-20"><ChatView user={user} onRefresh={onRefresh} staffs={data.staffs} initialOpenChatRoomId={initialOpenChatRoomId} onConsumeOpenChatRoomId={onConsumeOpenChatRoomId} /></div>}
+      {mainMenu === '채팅' && <div className="flex-1 overflow-hidden bg-[var(--toss-card)] z-20"><ChatView user={user} onRefresh={onRefresh} staffs={data.staffs} initialOpenChatRoomId={initialOpenChatRoomId} onConsumeOpenChatRoomId={onConsumeOpenChatRoomId} /></div>}
       {mainMenu === '게시판' && (
         <div className="flex-1 overflow-hidden">
           <BoardView
@@ -420,11 +420,11 @@ export default function MainContent({
       {/* 근로계약서 서명 팝업 - 모바일/PC 서명 지원 (창 닫기 허용) */}
       {pendingContract && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-md z-[9999] flex items-end md:items-center justify-center p-0 md:p-4">
-          <div className="bg-white w-full max-w-2xl rounded-t-[24px] md:rounded-[24px] shadow-2xl border-t-4 border-[#3182F6] flex flex-col animate-in slide-in-from-bottom duration-300 max-h-[90vh] overflow-y-auto">
-            <div className="p-8 md:p-10 border-b border-[#E5E8EB] flex items-start justify-between gap-4">
+          <div className="bg-[var(--toss-card)] w-full max-w-2xl rounded-t-[24px] md:rounded-[24px] shadow-2xl border-t-4 border-[var(--toss-blue)] flex flex-col animate-in slide-in-from-bottom duration-300 max-h-[90vh] overflow-y-auto">
+            <div className="p-8 md:p-10 border-b border-[var(--toss-border)] flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-2xl font-bold text-[#191F28] tracking-tight">근로계약서 서명 요청</h2>
-                <p className="text-xs text-[#3182F6] font-semibold mt-1 uppercase tracking-wider">
+                <h2 className="text-2xl font-bold text-[var(--foreground)] tracking-tight">근로계약서 서명 요청</h2>
+                <p className="text-xs text-[var(--toss-blue)] font-semibold mt-1 uppercase tracking-wider">
                   본 계약서는 법적 효력을 갖는 전자 문서입니다.
                 </p>
               </div>
@@ -435,7 +435,7 @@ export default function MainContent({
                   setSignature('');
                   setSignatureMode('none');
                 }}
-                className="text-[#8B95A1] hover:text-[#191F28] text-xl md:text-2xl leading-none"
+                className="text-[var(--toss-gray-3)] hover:text-[var(--foreground)] text-xl md:text-2xl leading-none"
                 aria-label="근로계약서 창 닫기"
               >
                 ✕
@@ -456,56 +456,56 @@ export default function MainContent({
                 const { rows, totalMonthly, hourlyWage } = getOrdinaryWageTable(breakdown);
                 if (rows.length === 0) return null;
                 return (
-                  <div className="bg-white p-6 rounded-[16px] border-2 border-[#3182F6]/20">
-                    <h4 className="text-xs font-semibold text-[#191F28] mb-3 uppercase tracking-wider">통상임금 산출 (월 소정근로시간 209시간 기준)</h4>
+                  <div className="bg-[var(--toss-card)] p-6 rounded-[16px] border-2 border-[var(--toss-blue)]/20">
+                    <h4 className="text-xs font-semibold text-[var(--foreground)] mb-3 uppercase tracking-wider">통상임금 산출 (월 소정근로시간 209시간 기준)</h4>
                     <table className="w-full text-[11px] border-collapse">
                       <thead>
-                        <tr className="border-b border-gray-200">
-                          <th className="text-left py-2 font-semibold text-gray-500">항목</th>
-                          <th className="text-right py-2 font-semibold text-gray-500">금액 (원/월)</th>
+                        <tr className="border-b border-[var(--toss-border)]">
+                          <th className="text-left py-2 font-semibold text-[var(--toss-gray-3)]">항목</th>
+                          <th className="text-right py-2 font-semibold text-[var(--toss-gray-3)]">금액 (원/월)</th>
                         </tr>
                       </thead>
                       <tbody>
                         {rows.map((r, i) => (
-                          <tr key={i} className="border-b border-gray-100">
-                            <td className="py-2 font-semibold text-gray-700">{r.label}</td>
-                            <td className="py-2 text-right font-bold text-gray-900">{r.amount.toLocaleString()}</td>
+                          <tr key={i} className="border-b border-[var(--toss-border)]">
+                            <td className="py-2 font-semibold text-[var(--foreground)]">{r.label}</td>
+                            <td className="py-2 text-right font-bold text-[var(--foreground)]">{r.amount.toLocaleString()}</td>
                           </tr>
                         ))}
-                        <tr className="bg-[#F2F4F6] font-semibold">
-                          <td className="py-2 text-gray-800">월 통상급여 합계</td>
-                          <td className="py-2 text-right text-[#3182F6]">{totalMonthly.toLocaleString()}</td>
+                        <tr className="bg-[var(--toss-gray-1)] font-semibold">
+                          <td className="py-2 text-[var(--foreground)]">월 통상급여 합계</td>
+                          <td className="py-2 text-right text-[var(--toss-blue)]">{totalMonthly.toLocaleString()}</td>
                         </tr>
                         <tr className="font-semibold">
-                          <td className="py-2 text-gray-800">시 통상임금 (원/시간)</td>
-                          <td className="py-2 text-right text-[#3182F6]">{hourlyWage.toLocaleString()}</td>
+                          <td className="py-2 text-[var(--foreground)]">시 통상임금 (원/시간)</td>
+                          <td className="py-2 text-right text-[var(--toss-blue)]">{hourlyWage.toLocaleString()}</td>
                         </tr>
                       </tbody>
                     </table>
                   </div>
                 );
               })()}
-              <div className="bg-[#F2F4F6] p-6 md:p-8 rounded-[16px] border border-[#E5E8EB] text-xs leading-relaxed text-[#4E5968] font-medium max-h-[40vh] overflow-y-auto custom-scrollbar font-mono">
-                <h3 className="text-sm font-bold text-[#191F28] mb-4 text-center underline underline-offset-8">{pendingContract.contract_type || '표준 근로계약서'}</h3>
+              <div className="bg-[var(--toss-gray-1)] p-6 md:p-8 rounded-[16px] border border-[var(--toss-border)] text-xs leading-relaxed text-[var(--toss-gray-4)] font-medium max-h-[40vh] overflow-y-auto custom-scrollbar font-mono">
+                <h3 className="text-sm font-bold text-[var(--foreground)] mb-4 text-center underline underline-offset-8">{pendingContract.contract_type || '표준 근로계약서'}</h3>
                 <div className="whitespace-pre-wrap">{contractTemplate || '제1조(계약의 목적)\n본 계약은 근로기준법에 따라 사용자와 근로자 간의 근로조건을 정함을 목적으로 한다.\n\n제2조(근로계약기간) 입사일로부터 정함이 없는 기간\n\n제3조(근무장소) 소속 병원 내 지정 장소\n\n제4조(업무내용) 채용 시 결정된 직무 및 부수 업무\n\n제5조(소정근로시간) 주 40시간 (운영 스케줄에 따름)\n\n제6조(임금) 연봉계약서 및 급여 규정에 따름\n\n[상기 내용을 확인하였으며 이에 동의합니다]'}</div>
               </div>
 
               <div className="space-y-4">
-                <label className="text-[11px] font-semibold text-[#8B95A1] uppercase tracking-wider">전자 서명</label>
+                <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-wider">전자 서명</label>
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={() => { setSignatureMode(signatureMode === 'pad' ? 'none' : 'pad'); setSignature(''); }} className={`px-4 py-2.5 rounded-[12px] text-[13px] font-semibold transition-all ${signatureMode === 'pad' ? 'bg-[#3182F6] text-white' : 'bg-[#F2F4F6] text-[#4E5968] hover:bg-[#E5E8EB]'}`}>
+                  <button type="button" onClick={() => { setSignatureMode(signatureMode === 'pad' ? 'none' : 'pad'); setSignature(''); }} className={`px-4 py-2.5 rounded-[12px] text-[13px] font-semibold transition-all ${signatureMode === 'pad' ? 'bg-[var(--toss-blue)] text-white' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-border)]'}`}>
                     ✍️ 서명하기 (화면에 직접 서명)
                   </button>
-                  <button type="button" onClick={() => { setSignatureMode(signatureMode === 'type' ? 'none' : 'type'); setSignature(''); }} className={`px-4 py-2.5 rounded-[12px] text-[13px] font-semibold transition-all ${signatureMode === 'type' ? 'bg-[#3182F6] text-white' : 'bg-[#F2F4F6] text-[#4E5968] hover:bg-[#E5E8EB]'}`}>
+                  <button type="button" onClick={() => { setSignatureMode(signatureMode === 'type' ? 'none' : 'type'); setSignature(''); }} className={`px-4 py-2.5 rounded-[12px] text-[13px] font-semibold transition-all ${signatureMode === 'type' ? 'bg-[var(--toss-blue)] text-white' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-border)]'}`}>
                     ⌨️ 성함 입력
                   </button>
                 </div>
                 {signatureMode === 'pad' && <SignaturePad onSave={handleSignaturePadSave} width={400} height={180} />}
-                {signatureMode === 'type' && <input type="text" value={signature} onChange={(e) => setSignature(e.target.value)} placeholder="본인의 성함을 정자로 입력해주세요" className="w-full p-5 bg-[#E8F3FF]/50 border-2 border-[#E8F3FF] rounded-[16px] outline-none focus:border-[#3182F6] font-semibold text-xl text-center transition-all" />}
+                {signatureMode === 'type' && <input type="text" value={signature} onChange={(e) => setSignature(e.target.value)} placeholder="본인의 성함을 정자로 입력해주세요" className="w-full p-5 bg-[var(--toss-blue-light)]/50 border-2 border-[var(--toss-blue-light)] rounded-[16px] outline-none focus:border-[var(--toss-blue)] font-semibold text-xl text-center transition-all" />}
                 {signature && !signatureMode && (
-                  <div className="flex items-center gap-3 p-3 bg-[#E8F3FF] rounded-[12px]">
-                    {signature.startsWith('data:image') ? <img src={signature} alt="서명" className="h-12 object-contain bg-white rounded border" /> : <span className="font-semibold text-[#191F28]">{signature}</span>}
-                    <button type="button" onClick={() => setSignature('')} className="text-[#8B95A1] text-sm hover:text-[#191F28]">변경</button>
+                  <div className="flex items-center gap-3 p-3 bg-[var(--toss-blue-light)] rounded-[12px]">
+                    {signature.startsWith('data:image') ? <img src={signature} alt="서명" className="h-12 object-contain bg-[var(--toss-card)] rounded border" /> : <span className="font-semibold text-[var(--foreground)]">{signature}</span>}
+                    <button type="button" onClick={() => setSignature('')} className="text-[var(--toss-gray-3)] text-sm hover:text-[var(--foreground)]">변경</button>
                   </div>
                 )}
               </div>
@@ -513,7 +513,7 @@ export default function MainContent({
                 <button
                   onClick={handleSignContract}
                   disabled={!signature?.trim()}
-                  className="w-full py-5 bg-[#3182F6] text-white font-semibold rounded-[16px] text-[15px] hover:bg-[#1B64DA] active:scale-[0.99] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full py-5 bg-[var(--toss-blue)] text-white font-semibold rounded-[16px] text-[15px] hover:bg-[var(--toss-blue)] active:scale-[0.99] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   확인 및 전자서명 완료
                 </button>
@@ -524,7 +524,7 @@ export default function MainContent({
                     setSignature('');
                     setSignatureMode('none');
                   }}
-                  className="w-full py-3 text-[13px] font-semibold text-[#4E5968] bg-[#F5F7FA] rounded-[14px] hover:bg-[#E5E8EB] transition-all"
+                  className="w-full py-3 text-[13px] font-semibold text-[var(--toss-gray-4)] bg-[var(--toss-gray-1)] rounded-[14px] hover:bg-[var(--toss-border)] transition-all"
                 >
                   나중에 서명할게요
                 </button>
@@ -537,19 +537,19 @@ export default function MainContent({
       {/* 연차 촉진 알림 - 모바일 대응 */}
       {annualLeaveNotice && !pendingContract && (
         <div className="fixed bottom-28 right-4 left-4 md:bottom-10 md:left-auto md:right-10 z-[9998] animate-in slide-in-from-bottom-10">
-          <div className="bg-white border border-[#E5E8EB] p-6 md:p-8 shadow-[0_4px_20px_rgba(0,0,0,0.08)] rounded-[20px] w-full md:w-80 space-y-4">
+          <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] p-6 md:p-8 shadow-[0_4px_20px_rgba(0,0,0,0.08)] rounded-[20px] w-full md:w-80 space-y-4">
             <div className="flex justify-between items-start">
-              <h3 className="text-lg font-bold text-[#191F28] tracking-tight">연차 사용 촉진 알림</h3>
-              <button onClick={() => setAnnualLeaveNotice(null)} className="text-[#8B95A1] hover:text-[#191F28] text-xl">✕</button>
+              <h3 className="text-lg font-bold text-[var(--foreground)] tracking-tight">연차 사용 촉진 알림</h3>
+              <button onClick={() => setAnnualLeaveNotice(null)} className="text-[var(--toss-gray-3)] hover:text-[var(--foreground)] text-xl">✕</button>
             </div>
             <div className="bg-[#FFF8E6] p-4 rounded-[12px] border border-[#FFE4A0]">
               <p className="text-[11px] font-semibold text-[#F59E0B] uppercase mb-1 tracking-wider">법적 준수 사항</p>
-              <p className="text-xs font-medium text-[#4E5968] leading-relaxed">
+              <p className="text-xs font-medium text-[var(--toss-gray-4)] leading-relaxed">
                 {user.name}님, 현재 잔여 연차가 <span className="text-[#F59E0B] font-bold">{annualLeaveNotice.remaining}일</span> 남았습니다. 
                 근로기준법 제61조에 의거하여 연차 사용을 권고드립니다.
               </p>
             </div>
-            <button onClick={() => setAnnualLeaveNotice(null)} className="w-full py-4 bg-[#3182F6] text-white text-[13px] font-semibold rounded-[12px] hover:bg-[#1B64DA] transition-all">확인했습니다</button>
+            <button onClick={() => setAnnualLeaveNotice(null)} className="w-full py-4 bg-[var(--toss-blue)] text-white text-[13px] font-semibold rounded-[12px] hover:bg-[var(--toss-blue)] transition-all">확인했습니다</button>
           </div>
         </div>
       )}

@@ -128,29 +128,29 @@ export default function GlobalSearch({
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 200)}
         onKeyDown={handleKeyDown}
-        className="w-full max-w-[240px] min-h-[44px] px-4 py-2 rounded-[12px] bg-[#F2F4F6] text-sm text-[#191F28] placeholder:text-[#8B95A1] outline-none focus:ring-2 focus:ring-[#3182F6]/30 touch-manipulation"
+        className="w-full max-w-[240px] min-h-[44px] px-4 py-2 rounded-[12px] bg-[var(--input-bg)] text-sm text-[var(--foreground)] placeholder:text-[var(--toss-gray-3)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 touch-manipulation"
       />
       {open && (query.length >= 2 || results.length > 0) && (
         <div
           ref={listRef}
-          className="absolute top-full left-0 right-0 mt-1 bg-white rounded-[12px] shadow-lg border border-[#E5E8EB] overflow-hidden z-[999] max-h-[320px] overflow-y-auto"
+          className="absolute top-full left-0 right-0 mt-1 bg-[var(--toss-card)] rounded-[12px] shadow-lg border border-[var(--toss-border)] overflow-hidden z-[999] max-h-[320px] overflow-y-auto"
         >
           {loading ? (
-            <div className="p-6 text-center text-[#8B95A1] text-sm">검색 중...</div>
+            <div className="p-6 text-center text-[var(--toss-gray-3)] text-sm">검색 중...</div>
           ) : results.length === 0 ? (
-            <div className="p-6 text-center text-[#8B95A1] text-sm">검색 결과 없음</div>
+            <div className="p-6 text-center text-[var(--toss-gray-3)] text-sm">검색 결과 없음</div>
           ) : (
             results.map((r, i) => (
               <button
                 key={`${r.type}-${r.id}`}
                 type="button"
                 onMouseDown={(e) => { e.preventDefault(); onSelect(r.type, r.id); setOpen(false); setQuery(''); }}
-                className={`w-full text-left min-h-[44px] px-4 py-3 flex gap-3 items-start hover:bg-[#F2F4F6] transition-colors touch-manipulation ${i === activeIdx ? 'bg-[#E8F3FF]' : ''}`}
+                className={`w-full text-left min-h-[44px] px-4 py-3 flex gap-3 items-start hover:bg-[var(--toss-gray-1)] transition-colors touch-manipulation ${i === activeIdx ? 'bg-[var(--toss-blue-light)]' : ''}`}
               >
-                <span className="text-[10px] font-semibold text-[#8B95A1] shrink-0">{typeLabel[r.type]}</span>
+                <span className="text-[10px] font-semibold text-[var(--toss-gray-3)] shrink-0">{typeLabel[r.type]}</span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-[#191F28] truncate">{r.title}</p>
-                  {r.subtitle && <p className="text-xs text-[#8B95A1] truncate">{r.subtitle}</p>}
+                  <p className="text-sm font-semibold text-[var(--foreground)] truncate">{r.title}</p>
+                  {r.subtitle && <p className="text-xs text-[var(--toss-gray-3)] truncate">{r.subtitle}</p>}
                 </div>
               </button>
             ))

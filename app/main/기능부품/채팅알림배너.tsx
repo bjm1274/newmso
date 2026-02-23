@@ -58,7 +58,7 @@ export default function ChatAlertBanner({
 
   const isApproval = item.kind === 'alert' && item.type === 'approval';
   const isAttendance = item.kind === 'alert' && item.type === 'attendance';
-  const bg = isApproval ? 'bg-[#3182F6]' : isAttendance ? 'bg-emerald-600' : 'bg-[#3182F6]';
+  const bg = isApproval ? 'bg-[var(--toss-blue)]' : isAttendance ? 'bg-emerald-600' : 'bg-[var(--toss-blue)]';
   const icon = isApproval ? '📋' : isAttendance ? '⏰' : '💬';
 
   return (

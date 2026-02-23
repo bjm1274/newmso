@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -83,9 +83,9 @@ export default function PhotoModule({ user, inventory, fetchInventory }: any) {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="bg-white p-6 md:p-10 border border-gray-100 shadow-xl rounded-[2.5rem]">
+      <div className="bg-white p-6 md:p-10 border border-[var(--toss-border)] shadow-xl rounded-[2.5rem]">
         <div className="mb-8">
-          <h2 className="text-2xl font-semibold text-gray-900 tracking-tighter italic">AI 비주얼 촬영 입고</h2>
+          <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tighter italic">AI 비주얼 촬영 입고</h2>
           <p className="text-[10px] text-green-600 font-bold mt-1 uppercase tracking-widest">AI Visual Recognition Engine</p>
         </div>
 
@@ -104,11 +104,11 @@ export default function PhotoModule({ user, inventory, fetchInventory }: any) {
 
         <div className="flex gap-3">
           {!isCameraActive ? (
-            <button onClick={startCamera} className="flex-1 py-5 bg-blue-600 text-white rounded-lg font-semibold text-sm shadow-xl hover:scale-[0.98] transition-all">📷 카메라 활성화</button>
+            <button onClick={startCamera} className="flex-1 py-5 bg-[var(--toss-blue)] text-white rounded-lg font-semibold text-sm shadow-xl hover:scale-[0.98] transition-all">📷 카메라 활성화</button>
           ) : (
             <>
               <button onClick={capturePhoto} disabled={loading} className="flex-1 py-5 bg-green-600 text-white rounded-lg font-semibold text-sm shadow-xl hover:scale-[0.98] transition-all">📸 촬영 및 인식</button>
-              <button onClick={stopCamera} className="px-8 py-5 bg-gray-100 text-gray-400 rounded-lg font-semibold text-sm hover:bg-red-50 hover:text-red-500 transition-all">✕</button>
+              <button onClick={stopCamera} className="px-8 py-5 bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] rounded-lg font-semibold text-sm hover:bg-red-50 hover:text-red-500 transition-all">✕</button>
             </>
           )}
         </div>
@@ -117,7 +117,7 @@ export default function PhotoModule({ user, inventory, fetchInventory }: any) {
       {showConfirmDialog && recognizedData && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[110] flex items-center justify-center p-4">
           <div className="bg-white rounded-[2.5rem] p-8 md:p-12 max-w-2xl w-full shadow-2xl animate-in zoom-in-95 duration-300">
-            <h3 className="text-2xl font-semibold text-gray-900 mb-8 tracking-tighter italic">인식 정보 확인</h3>
+            <h3 className="text-2xl font-semibold text-[var(--foreground)] mb-8 tracking-tighter italic">인식 정보 확인</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
               <img
                 src={recognizedData.image_url}
@@ -126,24 +126,24 @@ export default function PhotoModule({ user, inventory, fetchInventory }: any) {
               />
               <div className="space-y-4">
                 <div>
-                  <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-widest mb-1">제품명</p>
-                  <p className="text-lg font-semibold text-gray-900">{recognizedData.item_name}</p>
+                  <p className="text-[9px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">제품명</p>
+                  <p className="text-lg font-semibold text-[var(--foreground)]">{recognizedData.item_name}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-widest mb-1">유효기간</p>
-                    <p className="text-sm font-semibold text-blue-600">{recognizedData.expiry_date}</p>
+                    <p className="text-[9px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">유효기간</p>
+                    <p className="text-sm font-semibold text-[var(--toss-blue)]">{recognizedData.expiry_date}</p>
                   </div>
                   <div>
-                    <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-widest mb-1">LOT번호</p>
-                    <p className="text-sm font-semibold text-blue-600">{recognizedData.lot_number}</p>
+                    <p className="text-[9px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">LOT번호</p>
+                    <p className="text-sm font-semibold text-[var(--toss-blue)]">{recognizedData.lot_number}</p>
                   </div>
                 </div>
               </div>
             </div>
             <div className="flex gap-3">
-              <button onClick={handleConfirmRecognition} disabled={loading} className="flex-1 py-5 bg-blue-600 text-white rounded-lg font-semibold text-sm shadow-xl">✅ 확인 및 입고</button>
-              <button onClick={() => setShowConfirmDialog(false)} className="flex-1 py-5 bg-gray-100 text-gray-400 rounded-lg font-semibold text-sm">취소</button>
+              <button onClick={handleConfirmRecognition} disabled={loading} className="flex-1 py-5 bg-[var(--toss-blue)] text-white rounded-lg font-semibold text-sm shadow-xl">✅ 확인 및 입고</button>
+              <button onClick={() => setShowConfirmDialog(false)} className="flex-1 py-5 bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] rounded-lg font-semibold text-sm">취소</button>
             </div>
           </div>
         </div>

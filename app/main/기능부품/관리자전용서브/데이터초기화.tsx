@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -74,12 +74,12 @@ export default function DataReseter({ onRefresh }: { onRefresh: () => void }) {
       {!isUnlocked ? (
         <div className="bg-white p-12 border border-red-100 shadow-2xl text-center space-y-6 max-w-sm w-full">
           <h3 className="font-semibold text-xl text-red-600 tracking-tighter uppercase">시스템 보안 인증</h3>
-          <p className="text-[10px] text-gray-400 font-bold tracking-widest uppercase">보안 구역 접근을 위해 암호를 입력하세요</p>
+          <p className="text-[10px] text-[var(--toss-gray-3)] font-bold tracking-widest uppercase">보안 구역 접근을 위해 암호를 입력하세요</p>
           <input 
             type="password" 
             value={password} 
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full p-4 bg-gray-50 border border-gray-100 text-center font-semibold text-2xl outline-none focus:border-red-600" 
+            className="w-full p-4 bg-[var(--toss-gray-1)] border border-[var(--toss-border)] text-center font-semibold text-2xl outline-none focus:border-red-600" 
             placeholder="••••••" 
           />
           <button onClick={handleUnlock} className="w-full py-4 bg-red-600 text-white text-xs font-semibold shadow-lg">보안 잠금 해제</button>
@@ -114,7 +114,7 @@ export default function DataReseter({ onRefresh }: { onRefresh: () => void }) {
           
           <button 
             onClick={() => setIsUnlocked(false)}
-            className="w-full py-3 text-[10px] font-semibold text-gray-400 uppercase tracking-widest hover:text-gray-600 transition-colors"
+            className="w-full py-3 text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest hover:text-[var(--toss-gray-4)] transition-colors"
           >
             관리자 모드 종료 및 화면 잠금
           </button>
@@ -127,7 +127,7 @@ export default function DataReseter({ onRefresh }: { onRefresh: () => void }) {
 // 공통 버튼 컴포넌트 (각진 디자인)
 function ResetButton({ onClick, label }: { onClick: () => void, label: string }) {
   return (
-    <button onClick={onClick} className="p-5 bg-white border border-gray-100 hover:border-red-500 hover:text-red-600 text-left font-semibold text-xs flex justify-between items-center transition-all group">
+    <button onClick={onClick} className="p-5 bg-white border border-[var(--toss-border)] hover:border-red-500 hover:text-red-600 text-left font-semibold text-xs flex justify-between items-center transition-all group">
       <span>{label}</span>
       <span className="text-[9px] opacity-0 group-hover:opacity-100 transition-opacity font-bold uppercase text-red-500">실행하기</span>
     </button>

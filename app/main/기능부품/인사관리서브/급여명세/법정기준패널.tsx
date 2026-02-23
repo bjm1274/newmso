@@ -24,22 +24,22 @@ export default function LegalStandardsPanel() {
   ];
 
   return (
-    <div className="border border-gray-200 p-5 bg-white rounded-lg shadow-sm">
-      <div className="pb-3 border-b border-gray-100 mb-4">
-        <h3 className="text-sm font-semibold text-gray-800">법정 기준</h3>
-        <p className="text-xs text-gray-500 mt-0.5">근로기준법 · 소득세법</p>
+    <div className="border border-[var(--toss-border)] p-5 bg-[var(--toss-card)] rounded-lg shadow-sm">
+      <div className="pb-3 border-b border-[var(--toss-border)] mb-4">
+        <h3 className="text-sm font-semibold text-[var(--foreground)]">법정 기준</h3>
+        <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">근로기준법 · 소득세법</p>
       </div>
       <div className="space-y-5">
         {items.map((block) => (
           <div key={block.title}>
-            <p className="text-xs font-medium text-gray-500 mb-2">{block.title}</p>
+            <p className="text-xs font-medium text-[var(--toss-gray-3)] mb-2">{block.title}</p>
             <div className="space-y-1.5">
               {block.rows.map((r: any, i: number) => (
                 <div key={i} className="flex justify-between items-start text-xs">
-                  <span className="font-medium text-gray-600">{r.label}</span>
+                  <span className="font-medium text-[var(--toss-gray-4)]">{r.label}</span>
                   <div className="text-right">
-                    <span className="font-medium text-gray-900">{r.value}</span>
-                    {r.sub && <p className="text-[10px] text-gray-400">{r.sub}</p>}
+                    <span className="font-medium text-[var(--foreground)]">{r.value}</span>
+                    {r.sub && <p className="text-[10px] text-[var(--toss-gray-3)]">{r.sub}</p>}
                   </div>
                 </div>
               ))}
@@ -47,7 +47,7 @@ export default function LegalStandardsPanel() {
           </div>
         ))}
       </div>
-      <p className="mt-4 text-[10px] text-gray-400">* 2024-2025년 기준. 법령 개정 시 갱신 필요.</p>
+      <p className="mt-4 text-[10px] text-[var(--toss-gray-3)]">* 2024-2025년 기준. 법령 개정 시 갱신 필요.</p>
     </div>
   );
 }

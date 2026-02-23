@@ -167,18 +167,18 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
   if (!user) return <div className="p-10 text-center font-bold">사용자 정보 로딩 중...</div>;
 
   return (
-    <div className="h-full min-h-0 flex flex-col bg-gray-50 px-3 py-4 md:p-6 rounded-none md:rounded-[3rem] overflow-hidden">
+    <div className="h-full min-h-0 flex flex-col app-page px-3 py-4 md:p-6 rounded-none md:rounded-[3rem] overflow-hidden">
       
       {/* 상단 로고 및 헤더 */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 shrink-0">
         <div className="text-left space-y-2">
           <div className="flex items-center gap-3 mb-2">
             <AppLogo size={40} />
-            <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">
+            <h1 className="page-header-title text-2xl font-semibold tracking-tight">
               반갑습니다, {user.name}님 👋
             </h1>
           </div>
-          <p className="text-xs font-bold text-gray-400">
+          <p className="caption text-xs font-bold">
             내 정보 · 출퇴근 · 할일 · 증명서 · 급여명세서를 한 곳에서 관리합니다.
           </p>
           {/* 자주 쓰는 기능 즐겨찾기 바로가기 */}
@@ -209,7 +209,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
               <button
                 type="button"
                 onClick={() => setShowFavPicker((v) => !v)}
-                className="px-3 py-1.5 rounded-full text-[11px] font-semibold border border-dashed border-gray-300 text-gray-500 hover:bg-gray-50"
+                className="px-3 py-1.5 rounded-full text-[11px] font-semibold border border-dashed border-[var(--toss-border)] text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]"
               >
                 + 즐겨찾기 추가
               </button>
@@ -218,7 +218,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
                   <select
                     value={pendingFav}
                     onChange={(e) => setPendingFav(e.target.value as FavoriteId | '')}
-                    className="px-3 py-1.5 rounded-full text-[11px] font-semibold border border-gray-300 bg-white"
+                    className="px-3 py-1.5 rounded-full text-[11px] font-semibold border border-[var(--toss-border)] bg-[var(--toss-card)]"
                   >
                     <option value="">항목 선택</option>
                     {FAVORITE_OPTIONS.filter(o => !favorites.includes(o.id)).map((o) => (
@@ -230,7 +230,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
                   <button
                     type="button"
                     onClick={handleAddFavorite}
-                    className="px-3 py-1.5 rounded-full text-[11px] font-semibold bg-gray-900 text-white hover:bg-black"
+                    className="px-3 py-1.5 rounded-full text-[11px] font-semibold bg-[var(--foreground)] text-white hover:opacity-90"
                   >
                     추가
                   </button>
@@ -241,7 +241,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
         </div>
 
         {/* 통합 탭 네비게이션 */}
-        <div className="flex bg-white p-1.5 rounded-full shadow-sm border border-gray-100 overflow-x-auto max-w-full">
+        <div className="flex bg-[var(--toss-card)] p-1.5 rounded-full shadow-sm border border-[var(--toss-border)] overflow-x-auto max-w-full">
           <TabButton 
             isActive={activeTab === 'profile'} 
             onClick={() => setActiveTab('profile')} 
@@ -321,7 +321,7 @@ function QuickFavoriteButton({ label, icon, onClick, active, onRemove }: any) {
     <button
       onClick={onClick}
       className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-all
-        ${active ? 'bg-[var(--toss-blue)] text-white border-[var(--toss-blue)] shadow-sm' : 'bg-white text-[var(--toss-gray-4)] border-[var(--toss-border)] hover:bg-[var(--toss-gray-1)]'}
+        ${active ? 'bg-[var(--toss-blue)] text-white border-[var(--toss-blue)] shadow-sm' : 'bg-[var(--toss-card)] text-[var(--toss-gray-4)] border-[var(--toss-border)] hover:bg-[var(--toss-gray-1)]'}
       `}
     >
       <span>{icon}</span>
@@ -332,7 +332,7 @@ function QuickFavoriteButton({ label, icon, onClick, active, onRemove }: any) {
             e.stopPropagation();
             onRemove();
           }}
-          className="ml-1 text-[10px] text-gray-400 hover:text-red-500"
+          className="ml-1 text-[10px] text-[var(--toss-gray-3)] hover:text-red-500"
         >
           ✕
         </span>

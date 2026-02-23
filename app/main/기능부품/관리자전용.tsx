@@ -47,26 +47,26 @@ export default function AdminView({ user, staffs = [], depts = [], onRefresh }: 
 
   if (!isMso) {
     return (
-      <div className="h-full flex flex-col items-center justify-center bg-[#F2F4F6]">
+      <div className="h-full flex flex-col items-center justify-center bg-[var(--toss-gray-1)]">
         <div className="text-6xl mb-4">🚫</div>
-        <h2 className="text-xl font-bold text-[#191F28]">접근 권한이 없습니다.</h2>
-        <p className="text-sm text-gray-400 font-bold mt-2">이 메뉴는 MSO 소속 직원만 이용할 수 있습니다.</p>
+        <h2 className="text-xl font-bold text-[var(--foreground)]">접근 권한이 없습니다.</h2>
+        <p className="text-sm text-[var(--toss-gray-3)] font-bold mt-2">이 메뉴는 MSO 소속 직원만 이용할 수 있습니다.</p>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-[#FDFDFD] h-full relative animate-in fade-in duration-500">
-      <header className="px-4 md:px-10 py-4 md:py-8 flex justify-end items-center bg-white border-b border-gray-100 shrink-0 shadow-sm flex-wrap gap-4">
-        <div className="flex gap-0.5 p-1 bg-[#eef2f7] rounded-lg border border-gray-200 overflow-x-auto max-w-full">
+    <div className="flex-1 flex flex-col min-h-0 bg-[var(--page-bg)] h-full relative animate-in fade-in duration-500">
+      <header className="px-4 md:px-10 py-4 md:py-8 flex justify-end items-center bg-[var(--toss-card)] border-b border-[var(--toss-border)] shrink-0 shadow-sm flex-wrap gap-4">
+        <div className="flex gap-0.5 p-1 app-tab-bar border border-[var(--toss-border)] overflow-x-auto max-w-full">
           {adminTabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`px-4 py-2 text-xs font-medium whitespace-nowrap rounded-md transition-all ${
                 activeTab === tab.id
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-white/60'
+                  ? 'bg-[var(--toss-card)] text-[var(--toss-blue)] shadow-sm'
+                  : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-card)]/60'
               }`}
             >
               {tab.label}
@@ -75,7 +75,7 @@ export default function AdminView({ user, staffs = [], depts = [], onRefresh }: 
         </div>
       </header>
 
-      <main className="flex-1 min-h-0 overflow-y-auto p-4 md:p-10 custom-scrollbar bg-[#F2F4F6]/30">
+      <main className="flex-1 min-h-0 overflow-y-auto p-4 md:p-10 custom-scrollbar bg-[var(--toss-gray-1)]/30">
         {activeTab === '경영대시보드' && (
           <BusinessDashboard staffs={staffs} inventory={inventory} />
         )}

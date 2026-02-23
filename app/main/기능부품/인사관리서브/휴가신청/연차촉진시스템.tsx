@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { calculateAnnualLeavePush } from '@/lib/salary-compliance';
@@ -114,43 +114,43 @@ export default function AnnualLeavePromotion({ staffs, selectedCo }: { staffs: S
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="bg-white p-8 border border-gray-100 shadow-xl rounded-[2.5rem]">
+      <div className="bg-white p-8 border border-[var(--toss-border)] shadow-xl rounded-[2.5rem]">
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h2 className="text-2xl font-semibold text-gray-900 tracking-tighter italic">연차사용촉진 자동화 시스템</h2>
-            <p className="text-[10px] text-blue-600 font-bold mt-1 uppercase tracking-widest">Annual Leave Promotion Engine</p>
+            <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tighter italic">연차사용촉진 자동화 시스템</h2>
+            <p className="text-[10px] text-[var(--toss-blue)] font-bold mt-1 uppercase tracking-widest">Annual Leave Promotion Engine</p>
           </div>
           <div className="px-4 py-2 bg-blue-50 rounded-xl">
-            <p className="text-[10px] font-semibold text-blue-600">현재 촉진 시기: <span className="text-sm">1차 촉진 (7월)</span></p>
+            <p className="text-[10px] font-semibold text-[var(--toss-blue)]">현재 촉진 시기: <span className="text-sm">1차 촉진 (7월)</span></p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 gap-4">
           {promotionTargets.filter(t => t.actionRequired).map((staff: any) => (
-            <div key={staff.id} className="p-6 bg-gray-50 border border-gray-100 rounded-[2rem] flex flex-col md:flex-row justify-between items-center gap-4">
+            <div key={staff.id} className="p-6 bg-[var(--toss-gray-1)] border border-[var(--toss-border)] rounded-[2rem] flex flex-col md:flex-row justify-between items-center gap-4">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center font-semibold text-blue-600 shadow-sm border border-gray-100">
+                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center font-semibold text-[var(--toss-blue)] shadow-sm border border-[var(--toss-border)]">
                   {staff.name[0]}
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-gray-900">{staff.name} <span className="text-[10px] text-gray-400 font-bold ml-1">{staff.position}</span></p>
-                  <p className="text-[10px] font-bold text-gray-500">{staff.company} / {staff.department}</p>
+                  <p className="text-sm font-semibold text-[var(--foreground)]">{staff.name} <span className="text-[10px] text-[var(--toss-gray-3)] font-bold ml-1">{staff.position}</span></p>
+                  <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">{staff.company} / {staff.department}</p>
                 </div>
               </div>
               
               <div className="flex items-center gap-8">
                 <div className="text-center">
-                  <p className="text-[9px] font-semibold text-gray-400 uppercase">잔여 연차</p>
+                  <p className="text-[9px] font-semibold text-[var(--toss-gray-3)] uppercase">잔여 연차</p>
                   <p className="text-lg font-semibold text-red-600">{staff.remainingLeave}일</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-[9px] font-semibold text-gray-400 uppercase">상태</p>
+                  <p className="text-[9px] font-semibold text-[var(--toss-gray-3)] uppercase">상태</p>
                   <span className="px-3 py-1 bg-orange-100 text-orange-600 rounded-full text-[9px] font-semibold">{staff.status}</span>
                 </div>
                 <button 
                   onClick={() => handleSendPromotion(staff)}
                   disabled={loading}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-xl text-[11px] font-semibold shadow-lg hover:scale-[0.98] transition-all disabled:opacity-50"
+                  className="px-6 py-3 bg-[var(--toss-blue)] text-white rounded-xl text-[11px] font-semibold shadow-lg hover:scale-[0.98] transition-all disabled:opacity-50"
                 >
                   ⚡ 촉진 통보 발송
                 </button>

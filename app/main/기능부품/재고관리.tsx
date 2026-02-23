@@ -121,20 +121,20 @@ export default function IntegratedInventoryManagement({ user }: any) {
   });
 
   return (
-    <div className="flex flex-col h-full bg-gray-50 overflow-hidden">
+    <div className="flex flex-col h-full bg-[var(--tab-bg)] overflow-hidden">
       {/* 알림 배지 */}
       <InventoryAlertBadge lowCount={lowStockItems.length} expiryCount={expiryImminentItems.length} />
 
       {/* 탭 네비게이션 */}
-      <div className="flex bg-white border-b border-gray-200 px-6 py-2 gap-2 overflow-x-auto">
+      <div className="flex bg-[var(--toss-card)] border-b border-[var(--toss-border)] px-6 py-2 gap-2 overflow-x-auto">
         {tabs.map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
               activeTab === tab.id
-                ? 'bg-blue-600 text-white shadow-lg'
-                : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                ? 'bg-[var(--toss-blue)] text-white shadow-lg'
+                : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]/80'
             }`}
           >
             <span className="text-lg">{tab.icon}</span>
@@ -147,7 +147,7 @@ export default function IntegratedInventoryManagement({ user }: any) {
       <div className="flex-1 overflow-y-auto p-6">
         {loading ? (
           <div className="flex items-center justify-center h-full">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--toss-blue)]"></div>
           </div>
         ) : (
           <div className="max-w-6xl mx-auto space-y-6">
@@ -157,10 +157,10 @@ export default function IntegratedInventoryManagement({ user }: any) {
                 <h3 className="font-semibold text-orange-700 flex items-center gap-2">🚚 물품 이동 대기 중 ({notifications.length})</h3>
                 <div className="space-y-3">
                   {notifications.map(n => (
-                    <div key={n.id} className="bg-white p-4 rounded-xl shadow-sm border border-orange-100 flex justify-between items-center">
+                    <div key={n.id} className="bg-[var(--toss-card)] p-4 rounded-xl shadow-sm border border-orange-100 flex justify-between items-center">
                       <div>
-                        <p className="text-xs font-semibold text-gray-800">{n.body}</p>
-                        <p className="text-[10px] text-gray-400 font-bold mt-1">
+                        <p className="text-xs font-semibold text-[var(--foreground)]">{n.body}</p>
+                        <p className="text-[10px] text-[var(--toss-gray-3)] font-bold mt-1">
                           {n.metadata.items.map((i:any) => `${i.name}(${i.qty}개/수령:${i.dept})`).join(', ')}
                         </p>
                       </div>
@@ -179,47 +179,47 @@ export default function IntegratedInventoryManagement({ user }: any) {
             {activeTab === '현황' && (
               <div className="space-y-6">
                 {/* 필터 섹션 */}
-                <div className="flex gap-4 items-center bg-white p-4 rounded-lg border border-gray-100 shadow-sm overflow-x-auto">
+                <div className="flex gap-4 items-center bg-[var(--toss-card)] p-4 rounded-lg border border-[var(--toss-border)] shadow-sm overflow-x-auto">
                   <div className="flex gap-2 shrink-0">
-                    <span className="text-[10px] font-semibold text-gray-400 uppercase self-center mr-2">🏢 회사별</span>
+                    <span className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase self-center mr-2">🏢 회사별</span>
                     {companies.map(co => (
-                      <button key={co} onClick={() => { setSelectedCo(co); setSelectedDept('전체'); }} className={`px-4 py-2 rounded-xl text-[10px] font-semibold transition-all ${selectedCo === co ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-50 text-gray-400'}`}>{co}</button>
+                      <button key={co} onClick={() => { setSelectedCo(co); setSelectedDept('전체'); }} className={`px-4 py-2 rounded-xl text-[10px] font-semibold transition-all ${selectedCo === co ? 'bg-[var(--toss-blue)] text-white shadow-md' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]'}`}>{co}</button>
                     ))}
                   </div>
                   {selectedCo === '박철홍정형외과' && (
                     <div className="flex gap-2 shrink-0 border-l pl-4">
-                      <span className="text-[10px] font-semibold text-gray-400 uppercase self-center mr-2">🏥 부서별</span>
+                      <span className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase self-center mr-2">🏥 부서별</span>
                       {hospitalDepts.map(dept => (
-                        <button key={dept} onClick={() => setSelectedDept(dept)} className={`px-4 py-2 rounded-xl text-[10px] font-semibold transition-all ${selectedDept === dept ? 'bg-green-600 text-white shadow-md' : 'bg-gray-50 text-gray-400'}`}>{dept}</button>
+                        <button key={dept} onClick={() => setSelectedDept(dept)} className={`px-4 py-2 rounded-xl text-[10px] font-semibold transition-all ${selectedDept === dept ? 'bg-green-600 text-white shadow-md' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]'}`}>{dept}</button>
                       ))}
                     </div>
                   )}
                 </div>
 
-                <div className="bg-white p-8 border border-gray-100 shadow-sm rounded-lg">
+                <div className="bg-[var(--toss-card)] p-8 border border-[var(--toss-border)] shadow-sm rounded-lg">
                   <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-semibold text-gray-800">📊 {selectedCo} {selectedDept !== '전체' ? `[${selectedDept}]` : ''} 재고 현황</h2>
-                    <button onClick={fetchInventory} className="p-2 hover:bg-gray-100 rounded-full transition-all">🔄</button>
+                    <h2 className="text-2xl font-semibold text-[var(--foreground)]">📊 {selectedCo} {selectedDept !== '전체' ? `[${selectedDept}]` : ''} 재고 현황</h2>
+                    <button onClick={fetchInventory} className="p-2 hover:bg-[var(--toss-gray-1)] rounded-full transition-all">🔄</button>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-left">
                       <thead>
-                        <tr className="border-b-2 border-gray-100">
-                          <th className="py-4 px-4 text-xs font-semibold text-gray-400 uppercase">품목명</th>
-                          <th className="py-4 px-4 text-xs font-semibold text-gray-400 uppercase">분류</th>
-                          <th className="py-4 px-4 text-xs font-semibold text-gray-400 uppercase">현재고</th>
-                          <th className="py-4 px-4 text-xs font-semibold text-gray-400 uppercase">최소재고</th>
-                          <th className="py-4 px-4 text-xs font-semibold text-gray-400 uppercase">상태</th>
-                          <th className="py-4 px-4 text-xs font-semibold text-gray-400 uppercase">UDI</th>
+                        <tr className="border-b-2 border-[var(--toss-border)]">
+                          <th className="py-4 px-4 text-xs font-semibold text-[var(--toss-gray-3)] uppercase">품목명</th>
+                          <th className="py-4 px-4 text-xs font-semibold text-[var(--toss-gray-3)] uppercase">분류</th>
+                          <th className="py-4 px-4 text-xs font-semibold text-[var(--toss-gray-3)] uppercase">현재고</th>
+                          <th className="py-4 px-4 text-xs font-semibold text-[var(--toss-gray-3)] uppercase">최소재고</th>
+                          <th className="py-4 px-4 text-xs font-semibold text-[var(--toss-gray-3)] uppercase">상태</th>
+                          <th className="py-4 px-4 text-xs font-semibold text-[var(--toss-gray-3)] uppercase">UDI</th>
                         </tr>
                       </thead>
                       <tbody>
                         {filteredInventory.map((item: any) => (
-                          <tr key={item.id} className="border-b border-gray-50 hover:bg-gray-50 transition-all">
-                            <td className="py-4 px-4 font-semibold text-gray-800">{item.name}</td>
-                            <td className="py-4 px-4 text-sm font-bold text-gray-500">{item.category}</td>
-                            <td className="py-4 px-4 font-semibold text-gray-800">{item.stock}</td>
-                            <td className="py-4 px-4 text-sm font-bold text-gray-400">{item.min_stock}</td>
+                          <tr key={item.id} className="border-b border-[var(--toss-border)] hover:bg-[var(--toss-gray-1)] transition-all">
+                            <td className="py-4 px-4 font-semibold text-[var(--foreground)]">{item.name}</td>
+                            <td className="py-4 px-4 text-sm font-bold text-[var(--toss-gray-3)]">{item.category}</td>
+                            <td className="py-4 px-4 font-semibold text-[var(--foreground)]">{item.stock}</td>
+                            <td className="py-4 px-4 text-sm font-bold text-[var(--toss-gray-3)]">{item.min_stock}</td>
                             <td className="py-4 px-4">
                               {item.stock <= item.min_stock ? (
                                 <span className="px-3 py-1 bg-red-100 text-red-600 rounded-lg text-[10px] font-semibold">발주필요</span>
@@ -228,7 +228,7 @@ export default function IntegratedInventoryManagement({ user }: any) {
                               )}
                             </td>
                             <td className="py-4 px-4">
-                              {item.is_udi_reportable && <span className="text-blue-600 font-semibold text-xs">REPORT</span>}
+                              {item.is_udi_reportable && <span className="text-[var(--toss-blue)] font-semibold text-xs">REPORT</span>}
                             </td>
                           </tr>
                         ))}

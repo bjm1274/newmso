@@ -5,12 +5,12 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 const TYPE_ICONS: Record<string, { icon: string; color: string }> = {
-  approval: { icon: '📋', color: 'bg-blue-50 border-blue-200' },
+  approval: { icon: '📋', color: 'bg-[var(--toss-blue-light)] border-[var(--toss-blue)]' },
   inventory: { icon: '📦', color: 'bg-orange-50 border-orange-200' },
   payroll: { icon: '💰', color: 'bg-green-50 border-green-200' },
   education: { icon: '📚', color: 'bg-purple-50 border-purple-200' },
   인사: { icon: '👥', color: 'bg-teal-50 border-teal-200' },
-  default: { icon: '🔔', color: 'bg-gray-50 border-gray-200' },
+  default: { icon: '🔔', color: 'bg-[var(--toss-gray-1)] border-[var(--toss-border)]' },
 };
 
 export default function NotificationInbox({ user, onRefresh }: any) {
@@ -94,12 +94,12 @@ export default function NotificationInbox({ user, onRefresh }: any) {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#F8FAFC] overflow-hidden">
-      <header className="p-6 md:p-8 border-b border-gray-100 bg-white shrink-0">
-        <h2 className="text-xl md:text-2xl font-semibold text-gray-800 tracking-tighter italic">
+    <div className="flex flex-col h-full app-page overflow-hidden">
+      <header className="p-6 md:p-8 border-b border-[var(--toss-border)] bg-[var(--toss-card)] shrink-0">
+        <h2 className="text-xl md:text-2xl font-semibold text-[var(--foreground)] tracking-tighter italic">
           알림 센터
         </h2>
-        <p className="text-[10px] md:text-xs text-gray-400 font-bold uppercase mt-1 tracking-widest">
+        <p className="text-[10px] md:text-xs text-[var(--toss-gray-3)] font-bold uppercase mt-1 tracking-widest">
           전체 알림 · 읽음/안읽음 필터
         </p>
 
@@ -111,8 +111,8 @@ export default function NotificationInbox({ user, onRefresh }: any) {
                 onClick={() => setFilter(f)}
                 className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
                   filter === f
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                    ? 'bg-[var(--toss-blue)] text-white'
+                    : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] hover:bg-[var(--toss-border)]'
                 }`}
               >
                 {f === 'all' ? '전체' : '안읽음'}
@@ -122,13 +122,13 @@ export default function NotificationInbox({ user, onRefresh }: any) {
           {unreadCount > 0 && (
             <button
               onClick={markAllAsRead}
-              className="text-xs font-bold text-blue-600 hover:text-blue-700"
+              className="text-xs font-bold text-[var(--toss-blue)] hover:text-[var(--toss-blue)]"
             >
               전체 읽음 처리
             </button>
           )}
           {unreadCount > 0 && (
-            <span className="text-xs text-gray-400">
+            <span className="text-xs text-[var(--toss-gray-3)]">
               안읽음 {unreadCount}건
             </span>
           )}
@@ -138,15 +138,15 @@ export default function NotificationInbox({ user, onRefresh }: any) {
       <main className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
-            <div className="w-8 h-8 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
-            <p className="text-xs text-gray-400 font-bold">알림을 불러오는 중...</p>
+            <div className="w-8 h-8 border-2 border-[var(--toss-blue-light)] border-t-[var(--toss-blue)] rounded-full animate-spin" />
+            <p className="text-xs text-[var(--toss-gray-3)] font-bold">알림을 불러오는 중...</p>
           </div>
         ) : !user?.id ? (
-          <div className="text-center py-20 text-gray-400 text-sm font-bold">
+          <div className="text-center py-20 text-[var(--toss-gray-3)] text-sm font-bold">
             직원 계정으로 로그인하면 알림을 확인할 수 있습니다.
           </div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-20 text-gray-400 text-sm font-bold">
+          <div className="text-center py-20 text-[var(--toss-gray-3)] text-sm font-bold">
             알림이 없습니다.
           </div>
         ) : (
@@ -159,7 +159,7 @@ export default function NotificationInbox({ user, onRefresh }: any) {
                   onClick={() => handleNotificationClick(n)}
                   className={`p-4 rounded-lg border cursor-pointer transition-all ${
                     n.is_read
-                      ? 'bg-white border-gray-100 opacity-70'
+                      ? 'bg-[var(--toss-card)] border-[var(--toss-border)] opacity-70'
                       : `border-l-4 ${style.color}`
                   }`}
                 >
@@ -168,20 +168,20 @@ export default function NotificationInbox({ user, onRefresh }: any) {
                     <div className="flex-1 min-w-0">
                       <h4
                         className={`text-sm font-bold ${
-                          n.is_read ? 'text-gray-500' : 'text-gray-800'
+                          n.is_read ? 'text-[var(--toss-gray-3)]' : 'text-[var(--foreground)]'
                         }`}
                       >
                         {n.title}
                       </h4>
-                      <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                      <p className="text-xs text-[var(--toss-gray-3)] mt-1 line-clamp-2">
                         {n.body}
                       </p>
-                      <p className="text-[10px] text-gray-400 mt-2">
+                      <p className="text-[10px] text-[var(--toss-gray-3)] mt-2">
                         {new Date(n.created_at).toLocaleString('ko-KR')}
                       </p>
                     </div>
                     {!n.is_read && (
-                      <span className="w-2 h-2 bg-blue-500 rounded-full shrink-0 mt-2" />
+                      <span className="w-2 h-2 bg-[var(--toss-blue)] rounded-full shrink-0 mt-2" />
                     )}
                   </div>
                 </div>

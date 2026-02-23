@@ -180,19 +180,19 @@ export default function AttendanceSystem({ user, staffs, selectedCo, isAdminView
   }, [viewDate, viewMonth, selectedCo, isAdminView]);
 
   return (
-    <div className="flex flex-col h-full bg-[#F2F4F6]/30 overflow-y-auto custom-scrollbar space-y-8 p-8">
+    <div className="flex flex-col h-full bg-[var(--toss-gray-1)]/30 overflow-y-auto custom-scrollbar space-y-8 p-8">
       <header className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-[#191F28] tracking-tighter italic">
+          <h2 className="text-2xl font-bold text-[var(--foreground)] tracking-tighter italic">
             {isAdminView ? '근태 종합 관리 (행정팀)' : '실시간 근태 관리'}
           </h2>
-          <p className="text-xs text-[#8B95A1] font-bold uppercase mt-1">
+          <p className="text-xs text-[var(--toss-gray-3)] font-bold uppercase mt-1">
             {userShift ? `내 근무: ${userShift.name} (${userShift.start_time}~${userShift.end_time})` : '기본 근무 (09:00~18:00)'}
           </p>
         </div>
         {isAdminView && (
           <div className="flex gap-2">
-            <input type="date" value={viewDate} onChange={e => setViewDate(e.target.value)} className="p-2 border border-[#E5E8EB] text-xs font-bold outline-none" />
+            <input type="date" value={viewDate} onChange={e => setViewDate(e.target.value)} className="p-2 border border-[var(--toss-border)] text-xs font-bold outline-none" />
           </div>
         )}
       </header>
@@ -201,37 +201,37 @@ export default function AttendanceSystem({ user, staffs, selectedCo, isAdminView
         <>
           <div className={`p-8 rounded-lg border-2 shadow-sm ${isWithinRange ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'}`}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-[#191F28]">📍 위치 정보</h3>
+              <h3 className="text-lg font-bold text-[var(--foreground)]">📍 위치 정보</h3>
               <button onClick={getLocation} className="px-4 py-2 bg-[var(--toss-blue)] text-white rounded-[12px] text-xs font-bold shadow-sm">위치 새로고침</button>
             </div>
             {currentLocation ? (
               <div className="space-y-3">
-                <p className="text-sm font-bold text-[#191F28]">병원 거리: {Math.round(calculateDistance(HOSPITAL_LAT, HOSPITAL_LON, currentLocation.latitude, currentLocation.longitude))}m</p>
+                <p className="text-sm font-bold text-[var(--foreground)]">병원 거리: {Math.round(calculateDistance(HOSPITAL_LAT, HOSPITAL_LON, currentLocation.latitude, currentLocation.longitude))}m</p>
                 {error && <p className="text-xs font-bold text-red-600">{error}</p>}
               </div>
-            ) : <p className="text-sm text-[#4E5968] font-bold">위치 정보를 가져오는 중...</p>}
+            ) : <p className="text-sm text-[var(--toss-gray-4)] font-bold">위치 정보를 가져오는 중...</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-6">
-            <button onClick={handleCheckIn} disabled={!isWithinRange || loading || todayAttendance?.check_in} className={`py-8 rounded-lg font-bold text-lg shadow-xl transition-all ${todayAttendance?.check_in ? 'bg-[#F2F4F6] text-[#8B95A1]' : isWithinRange ? 'bg-green-600 text-white' : 'bg-[#E5E8EB] text-[#4E5968]'}`}>
+            <button onClick={handleCheckIn} disabled={!isWithinRange || loading || todayAttendance?.check_in} className={`py-8 rounded-lg font-bold text-lg shadow-xl transition-all ${todayAttendance?.check_in ? 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]' : isWithinRange ? 'bg-green-600 text-white' : 'bg-[var(--toss-border)] text-[var(--toss-gray-4)]'}`}>
               {todayAttendance?.check_in ? '✅ 출근 완료' : '🚪 출근 (체크인)'}
             </button>
-            <button onClick={handleCheckOut} disabled={!isWithinRange || loading || !todayAttendance?.check_in || todayAttendance?.check_out} className={`py-8 rounded-lg font-bold text-lg shadow-xl transition-all ${todayAttendance?.check_out ? 'bg-[#F2F4F6] text-[#8B95A1]' : !todayAttendance?.check_in ? 'bg-[#E5E8EB] text-[#4E5968]' : isWithinRange ? 'bg-orange-600 text-white' : 'bg-[#E5E8EB] text-[#4E5968]'}`}>
+            <button onClick={handleCheckOut} disabled={!isWithinRange || loading || !todayAttendance?.check_in || todayAttendance?.check_out} className={`py-8 rounded-lg font-bold text-lg shadow-xl transition-all ${todayAttendance?.check_out ? 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]' : !todayAttendance?.check_in ? 'bg-[var(--toss-border)] text-[var(--toss-gray-4)]' : isWithinRange ? 'bg-orange-600 text-white' : 'bg-[var(--toss-border)] text-[var(--toss-gray-4)]'}`}>
               {todayAttendance?.check_out ? '✅ 퇴근 완료' : '🚪 퇴근 (체크아웃)'}
             </button>
           </div>
         </>
       )}
 
-      <div className="bg-white border border-[#E5E8EB] shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-[#E5E8EB] bg-[#F2F4F6]/50 flex justify-between items-center">
-          <h3 className="text-[11px] font-bold text-[#8B95A1] uppercase tracking-widest">
+      <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-[var(--toss-border)] bg-[var(--toss-gray-1)]/50 flex justify-between items-center">
+          <h3 className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">
             {isAdminView ? `${viewDate} 출결 현황` : `${viewMonth} 나의 근태 기록`}
           </h3>
-          {!isAdminView && <input type="month" value={viewMonth} onChange={e => setViewMonth(e.target.value)} className="p-1 border border-[#E5E8EB] text-[10px] font-bold" />}
+          {!isAdminView && <input type="month" value={viewMonth} onChange={e => setViewMonth(e.target.value)} className="p-1 border border-[var(--toss-border)] text-[10px] font-bold" />}
         </div>
         <table className="w-full text-left border-collapse">
-          <thead className="bg-white text-[9px] font-bold text-[#8B95A1] border-b border-[#E5E8EB] uppercase">
+          <thead className="bg-[var(--toss-card)] text-[9px] font-bold text-[var(--toss-gray-3)] border-b border-[var(--toss-border)] uppercase">
             <tr>
               {isAdminView && <th className="p-4">성명</th>}
               <th className="p-4">날짜</th>
@@ -241,19 +241,19 @@ export default function AttendanceSystem({ user, staffs, selectedCo, isAdminView
               <th className="p-4">비고</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#E5E8EB] text-xs font-bold">
+          <tbody className="divide-y divide-[var(--toss-border)] text-xs font-bold">
             {allAttendance.map((a: any, i: number) => (
-              <tr key={i} className="hover:bg-[#F2F4F6] transition-colors">
-                {isAdminView && <td className="p-4 font-bold text-[#191F28]">{a.staff_members?.name}</td>}
-                <td className="p-4 text-[#8B95A1]">{a.date}</td>
-                <td className="p-4 text-[#3182F6]">{a.check_in ? a.check_in.slice(11, 16) : '-'}</td>
+              <tr key={i} className="hover:bg-[var(--toss-gray-1)] transition-colors">
+                {isAdminView && <td className="p-4 font-bold text-[var(--foreground)]">{a.staff_members?.name}</td>}
+                <td className="p-4 text-[var(--toss-gray-3)]">{a.date}</td>
+                <td className="p-4 text-[var(--toss-blue)]">{a.check_in ? a.check_in.slice(11, 16) : '-'}</td>
                 <td className="p-4 text-orange-600">{a.check_out ? a.check_out.slice(11, 16) : '-'}</td>
                 <td className="p-4">
                   <span className={`px-2 py-0.5 text-[9px] font-bold border ${a.status === '정상' ? 'bg-green-50 text-green-600 border-green-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
                     {a.status}
                   </span>
                 </td>
-                <td className="p-4 text-[10px] text-[#8B95A1]">{a.status === '지각' ? '지각' : ''}</td>
+                <td className="p-4 text-[10px] text-[var(--toss-gray-3)]">{a.status === '지각' ? '지각' : ''}</td>
               </tr>
             ))}
           </tbody>

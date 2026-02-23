@@ -222,14 +222,14 @@ export default function DocumentRepository({
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#F8FAFC] p-4 md:p-8">
+    <div className="flex flex-col h-full app-page p-4 md:p-8">
       <div className="flex justify-between items-center mb-6 gap-3 flex-wrap">
-        <h2 className="text-xl font-bold text-[#191F28]">문서 보관함</h2>
+        <h2 className="text-xl font-bold text-[var(--foreground)]">문서 보관함</h2>
         <div className="flex items-center gap-2 flex-wrap">
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="px-3 py-1.5 rounded-[10px] border border-[#E5E8EB] text-[11px] font-bold text-[#4E5968]"
+            className="px-3 py-1.5 rounded-[10px] border border-[var(--toss-border)] text-[11px] font-bold text-[var(--toss-gray-4)]"
           >
             <option value="전체">전체 폴더</option>
             {CATEGORIES.map((c) => (
@@ -243,11 +243,11 @@ export default function DocumentRepository({
             value={staffFilterName || ''}
             onChange={(e) => setStaffFilterName(e.target.value || null)}
             placeholder="직원 이름으로 검색"
-            className="px-3 py-1.5 rounded-[10px] border border-[#E5E8EB] text-[11px] font-bold text-[#191F28] min-w-[140px]"
+            className="px-3 py-1.5 rounded-[10px] border border-[var(--toss-border)] text-[11px] font-bold text-[var(--foreground)] min-w-[140px]"
           />
           <button
             onClick={handleNew}
-            className="px-4 py-2 bg-[#3182F6] text-white text-sm font-semibold rounded-[12px] hover:bg-[#1B64DA]"
+            className="px-4 py-2 bg-[var(--toss-blue)] text-white text-sm font-semibold rounded-[12px] hover:bg-[var(--toss-blue)]"
           >
             + 새 문서
           </button>
@@ -255,49 +255,49 @@ export default function DocumentRepository({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1 bg-white rounded-[16px] border border-[#E5E8EB] overflow-hidden">
-          <div className="p-4 border-b border-[#E5E8EB] flex items-center justify-between gap-2">
-            <span className="font-semibold text-[#191F28]">문서 목록 (폴더별)</span>
+        <div className="lg:col-span-1 bg-[var(--toss-card)] rounded-[16px] border border-[var(--toss-border)] overflow-hidden">
+          <div className="p-4 border-b border-[var(--toss-border)] flex items-center justify-between gap-2">
+            <span className="font-semibold text-[var(--foreground)]">문서 목록 (폴더별)</span>
             {staffFilterName && (
               <button
                 type="button"
                 onClick={() => setStaffFilterName(null)}
-                className="px-2 py-1 rounded-full bg-[#E8F3FF] text-[10px] font-bold text-[#3182F6] hover:bg-[#d0e7ff] whitespace-nowrap"
+                className="px-2 py-1 rounded-full bg-[var(--toss-blue-light)] text-[10px] font-bold text-[var(--toss-blue)] hover:bg-[var(--toss-blue-light)] whitespace-nowrap"
               >
                 직원: {staffFilterName} ✕
               </button>
             )}
           </div>
           {loading ? (
-            <div className="p-8 text-center text-[#8B95A1]">로딩 중...</div>
+            <div className="p-8 text-center text-[var(--toss-gray-3)]">로딩 중...</div>
           ) : (
             <div className="max-h-[500px] overflow-y-auto">
               {CATEGORIES.map((cat) => {
                 const folderDocs = visibleDocs.filter((d) => (d.category || '규정') === cat.id);
                 return (
-                  <div key={cat.id} className="border-b border-[#F2F4F6]">
-                    <div className="px-4 py-2.5 bg-[#F8FAFC] font-bold text-[#4E5968] text-xs flex items-center gap-2">
+                  <div key={cat.id} className="border-b border-[var(--toss-gray-1)]">
+                    <div className="px-4 py-2.5 bg-[var(--page-bg)] font-bold text-[var(--toss-gray-4)] text-xs flex items-center gap-2">
                       <span className="text-base">{cat.id === '규정' ? '📁' : cat.id === '양식' ? '📄' : cat.id === '계약서' ? '📋' : '📂'}</span>
                       {cat.label} ({folderDocs.length})
                     </div>
                     {folderDocs.length === 0 ? (
-                      <p className="px-4 py-2 text-[10px] text-[#8B95A1]">문서 없음</p>
+                      <p className="px-4 py-2 text-[10px] text-[var(--toss-gray-3)]">문서 없음</p>
                     ) : (
                       folderDocs.map((d) => (
                         <div
                           key={d.id}
-                          className={`flex items-center border-b border-[#F2F4F6] hover:bg-[#F2F4F6] ${
-                            selected?.id === d.id ? 'bg-[#E8F3FF]' : ''
+                          className={`flex items-center border-b border-[var(--toss-gray-1)] hover:bg-[var(--toss-gray-1)] ${
+                            selected?.id === d.id ? 'bg-[var(--toss-blue-light)]' : ''
                           }`}
                         >
                           <button
                             onClick={() => handleEdit(d)}
                             className="flex-1 text-left pl-6 pr-4 py-3"
                           >
-                            <p className="font-semibold text-[#191F28] truncate text-sm">
+                            <p className="font-semibold text-[var(--foreground)] truncate text-sm">
                               {d.title}
                             </p>
-                            <p className="text-[10px] text-[#8B95A1] mt-0.5">
+                            <p className="text-[10px] text-[var(--toss-gray-3)] mt-0.5">
                               v{d.version} ·{' '}
                               {new Date(d.updated_at).toLocaleDateString('ko-KR')}
                             </p>
@@ -309,7 +309,7 @@ export default function DocumentRepository({
                 );
               })}
               {visibleDocs.length === 0 && (
-                <div className="p-8 text-center text-[#8B95A1] text-sm">
+                <div className="p-8 text-center text-[var(--toss-gray-3)] text-sm">
                   {staffFilterName
                     ? '해당 직원과 관련된 문서를 찾을 수 없습니다. 제목이나 내용에 직원 이름을 포함해 보관하면 자동으로 모아집니다.'
                     : '등록된 문서가 없습니다.'}
@@ -319,9 +319,9 @@ export default function DocumentRepository({
           )}
         </div>
 
-        <div className="lg:col-span-2 bg-white rounded-[16px] border border-[#E5E8EB] p-6">
+        <div className="lg:col-span-2 bg-[var(--toss-card)] rounded-[16px] border border-[var(--toss-border)] p-6">
           <div className="flex items-center justify-between mb-4 gap-2">
-            <h3 className="text-lg font-bold text-[#191F28]">
+            <h3 className="text-lg font-bold text-[var(--foreground)]">
               {selected ? '문서 수정 (버전 관리)' : '새 문서 등록'}
             </h3>
             {selected && (
@@ -329,7 +329,7 @@ export default function DocumentRepository({
                 <button
                   type="button"
                   onClick={handleOpenPdf}
-                  className="px-3 py-1.5 text-[11px] font-semibold rounded-[10px] border border-[#E5E8EB] text-[#3182F6] hover:bg-[#E8F3FF]"
+                  className="px-3 py-1.5 text-[11px] font-semibold rounded-[10px] border border-[var(--toss-border)] text-[var(--toss-blue)] hover:bg-[var(--toss-blue-light)]"
                 >
                   PDF 열기/인쇄
                 </button>
@@ -345,23 +345,23 @@ export default function DocumentRepository({
           </div>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-semibold text-[#4E5968] mb-2">제목</label>
-              <input type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full px-4 py-2 rounded-[12px] border border-[#E5E8EB] text-[#191F28]" placeholder="문서 제목" />
+              <label className="block text-sm font-semibold text-[var(--toss-gray-4)] mb-2">제목</label>
+              <input type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full px-4 py-2 rounded-[12px] border border-[var(--toss-border)] text-[var(--foreground)]" placeholder="문서 제목" />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-[#4E5968] mb-2">분류</label>
-              <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full px-4 py-2 rounded-[12px] border border-[#E5E8EB] text-[#191F28]">
+              <label className="block text-sm font-semibold text-[var(--toss-gray-4)] mb-2">분류</label>
+              <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full px-4 py-2 rounded-[12px] border border-[var(--toss-border)] text-[var(--foreground)]">
                 {CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-semibold text-[#4E5968] mb-2">내용</label>
-              <textarea value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} rows={12} className="w-full px-4 py-2 rounded-[12px] border border-[#E5E8EB] text-[#191F28] font-mono text-sm" placeholder="규정, 양식, 계약서 본문 등을 입력하세요." />
+              <label className="block text-sm font-semibold text-[var(--toss-gray-4)] mb-2">내용</label>
+              <textarea value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} rows={12} className="w-full px-4 py-2 rounded-[12px] border border-[var(--toss-border)] text-[var(--foreground)] font-mono text-sm" placeholder="규정, 양식, 계약서 본문 등을 입력하세요." />
             </div>
-            {selected && <p className="text-xs text-[#8B95A1]">* 수정 시 이전 버전이 자동으로 버전 이력에 저장됩니다.</p>}
+            {selected && <p className="text-xs text-[var(--toss-gray-3)]">* 수정 시 이전 버전이 자동으로 버전 이력에 저장됩니다.</p>}
             <div className="flex gap-2">
-              <button onClick={handleSave} disabled={saving} className="px-6 py-2 bg-[#3182F6] text-white font-semibold rounded-[12px] hover:bg-[#1B64DA] disabled:opacity-50">저장</button>
-              {selected && <button onClick={() => { setSelected(null); setForm({ title: '', category: '규정', content: '' }); }} className="px-6 py-2 bg-[#F2F4F6] text-[#4E5968] font-semibold rounded-[12px]">취소</button>}
+              <button onClick={handleSave} disabled={saving} className="px-6 py-2 bg-[var(--toss-blue)] text-white font-semibold rounded-[12px] hover:bg-[var(--toss-blue)] disabled:opacity-50">저장</button>
+              {selected && <button onClick={() => { setSelected(null); setForm({ title: '', category: '규정', content: '' }); }} className="px-6 py-2 bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] font-semibold rounded-[12px]">취소</button>}
             </div>
           </div>
         </div>

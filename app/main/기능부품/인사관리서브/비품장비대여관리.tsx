@@ -40,19 +40,19 @@ export default function AssetLoanManager({ staffs = [], selectedCo }: any) {
   };
 
   return (
-    <div className="bg-white p-6 md:p-10 rounded-[2.5rem] border border-gray-100 shadow-xl">
+    <div className="bg-white p-6 md:p-10 rounded-[2.5rem] border border-[var(--toss-border)] shadow-xl">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h3 className="text-xl font-semibold text-gray-900 tracking-tighter">비품/장비 대여 관리</h3>
-          <p className="text-[10px] text-blue-600 font-bold uppercase tracking-widest">입퇴사 시 장비 지급·반납 추적</p>
+          <h3 className="text-xl font-semibold text-[var(--foreground)] tracking-tighter">비품/장비 대여 관리</h3>
+          <p className="text-[10px] text-[var(--toss-blue)] font-bold uppercase tracking-widest">입퇴사 시 장비 지급·반납 추적</p>
         </div>
-        <button onClick={() => setAdding(true)} className="px-5 py-2.5 bg-blue-600 text-white text-xs font-semibold rounded-xl">+ 대여 등록</button>
+        <button onClick={() => setAdding(true)} className="px-5 py-2.5 bg-[var(--toss-blue)] text-white text-xs font-semibold rounded-xl">+ 대여 등록</button>
       </div>
 
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-200 text-[10px] font-semibold text-gray-500 uppercase">
+            <tr className="border-b border-[var(--toss-border)] text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">
               <th className="p-4 text-left">직원</th>
               <th className="p-4 text-left">장비</th>
               <th className="p-4 text-left">대여일</th>
@@ -96,8 +96,8 @@ export default function AssetLoanManager({ staffs = [], selectedCo }: any) {
             <input type="text" value={form.assetName} onChange={(e) => setForm({ ...form, assetName: e.target.value })} placeholder="장비명 (선택)" className="w-full p-3 border rounded-xl" />
             <input type="date" value={form.loanedAt} onChange={(e) => setForm({ ...form, loanedAt: e.target.value })} className="w-full p-3 border rounded-xl" />
             <div className="flex gap-2">
-              <button onClick={handleAdd} className="flex-1 py-3 bg-blue-600 text-white font-semibold rounded-xl">등록</button>
-              <button onClick={() => setAdding(false)} className="flex-1 py-3 bg-gray-200 font-semibold rounded-xl">취소</button>
+              <button onClick={handleAdd} className="flex-1 py-3 bg-[var(--toss-blue)] text-white font-semibold rounded-xl">등록</button>
+              <button onClick={() => setAdding(false)} className="flex-1 py-3 bg-[var(--toss-gray-2)] font-semibold rounded-xl">취소</button>
             </div>
           </div>
         </div>

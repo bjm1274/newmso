@@ -86,16 +86,16 @@ export default function TaskView({ user, tasks, subView, setSubView, onRefresh }
   );
 
   return (
-    <div className="flex-1 flex flex-col bg-[#FDFDFD] h-full relative">
-      <header className="px-10 py-8 flex justify-between items-center bg-white border-b border-gray-50 shrink-0">
-        <h1 className="text-2xl font-semibold text-gray-800">나의 업무</h1>
+    <div className="flex-1 flex flex-col bg-[var(--page-bg)] h-full relative">
+      <header className="px-10 py-8 flex justify-between items-center bg-[var(--toss-card)] border-b border-[var(--toss-border)] shrink-0">
+        <h1 className="text-2xl font-semibold text-[var(--foreground)]">나의 업무</h1>
         <div className="flex gap-2">
           {['전체', '진행중', '완료'].map((menu) => (
             <button
               key={menu}
               onClick={() => setSubView(menu)}
               className={`px-5 py-2 rounded-lg text-xs font-bold transition-all ${
-                subView === menu ? 'bg-black text-white shadow-lg' : 'bg-gray-50 text-gray-400'
+                subView === menu ? 'bg-[var(--foreground)] text-white shadow-lg' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]'
               }`}
             >
               {menu}
@@ -105,7 +105,7 @@ export default function TaskView({ user, tasks, subView, setSubView, onRefresh }
       </header>
 
       <main className="flex-1 overflow-y-auto p-10 custom-scrollbar space-y-6">
-        <div className="bg-white p-4 rounded-[2rem] shadow-sm border border-gray-100 flex items-center gap-4">
+        <div className="bg-[var(--toss-card)] p-4 rounded-[2rem] shadow-sm border border-[var(--toss-border)] flex items-center gap-4">
           <input
             value={newTask}
             onChange={(e) => setNewTask(e.target.value)}
@@ -116,7 +116,7 @@ export default function TaskView({ user, tasks, subView, setSubView, onRefresh }
           <select
             value={newPriority}
             onChange={(e) => setNewPriority(e.target.value)}
-            className="px-3 py-2 rounded-xl border border-gray-200 text-xs font-bold"
+            className="px-3 py-2 rounded-xl border border-[var(--toss-border)] text-xs font-bold"
           >
             <option value="low">낮음</option>
             <option value="medium">보통</option>
@@ -125,7 +125,7 @@ export default function TaskView({ user, tasks, subView, setSubView, onRefresh }
           </select>
           <button
             onClick={handleAddTask}
-            className="w-10 h-10 bg-blue-600 text-white rounded-full font-bold shadow-md hover:scale-105 transition-transform"
+            className="w-10 h-10 bg-[var(--toss-blue)] text-white rounded-full font-bold shadow-md hover:scale-105 transition-transform"
           >
             +
           </button>
@@ -133,9 +133,9 @@ export default function TaskView({ user, tasks, subView, setSubView, onRefresh }
 
         <div className="space-y-3">
           {loading ? (
-            <div className="text-center py-20 text-gray-300 text-xs">업무를 불러오는 중입니다...</div>
+            <div className="text-center py-20 text-[var(--toss-gray-3)] text-xs">업무를 불러오는 중입니다...</div>
           ) : filteredTasks.length === 0 ? (
-            <div className="text-center py-20 text-gray-300 text-xs">업무 내역이 없습니다.</div>
+            <div className="text-center py-20 text-[var(--toss-gray-3)] text-xs">업무 내역이 없습니다.</div>
           ) : (
             filteredTasks.map((t: any) => {
               const pr = PRIORITY_LABELS[t.priority || 'medium'] || PRIORITY_LABELS.medium;
@@ -144,15 +144,15 @@ export default function TaskView({ user, tasks, subView, setSubView, onRefresh }
                   key={t.id}
                   className={`p-6 rounded-[2rem] border flex items-center justify-between transition-all ${
                     t.status === 'completed'
-                      ? 'bg-gray-50 border-gray-100 opacity-60'
-                      : 'bg-white border-gray-100 shadow-sm hover:border-blue-200'
+                      ? 'bg-[var(--toss-gray-1)] border-[var(--toss-border)] opacity-60'
+                      : 'bg-[var(--toss-card)] border-[var(--toss-border)] shadow-sm hover:border-[var(--toss-blue)]'
                   }`}
                 >
                   <div className="flex items-center gap-4">
                     <button
                       onClick={() => toggleStatus(t)}
                       className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                        t.status === 'completed' ? 'bg-green-500 border-green-500' : 'border-gray-300'
+                        t.status === 'completed' ? 'bg-green-500 border-green-500' : 'border-[var(--toss-border)]'
                       }`}
                     >
                       {t.status === 'completed' && <span className="text-white text-xs">✓</span>}
@@ -160,7 +160,7 @@ export default function TaskView({ user, tasks, subView, setSubView, onRefresh }
                     <div className="flex flex-col gap-1">
                       <span
                         className={`text-sm font-bold ${
-                          t.status === 'completed' ? 'line-through text-gray-400' : 'text-gray-700'
+                          t.status === 'completed' ? 'line-through text-[var(--toss-gray-3)]' : 'text-[var(--foreground)]'
                         }`}
                       >
                         {t.title}
@@ -170,7 +170,7 @@ export default function TaskView({ user, tasks, subView, setSubView, onRefresh }
                       </span>
                     </div>
                   </div>
-                  <span className="text-[10px] text-gray-300">
+                  <span className="text-[10px] text-[var(--toss-gray-3)]">
                     {new Date(t.created_at).toLocaleDateString()}
                   </span>
                 </div>

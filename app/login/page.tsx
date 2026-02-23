@@ -148,45 +148,45 @@ export default function LoginPage() {
 
   if (checkingAuth) {
     return (
-      <div className="min-h-screen min-h-[100dvh] bg-[#F9FAFB] flex flex-col items-center justify-center">
-        <div className="w-8 h-8 border-2 border-[#3182F6] rounded-full border-t-transparent animate-spin" />
-        <p className="mt-4 text-xs font-medium text-[#8B95A1]">로그인 상태 확인 중...</p>
+      <div className="min-h-screen min-h-[100dvh] bg-[var(--background)] flex flex-col items-center justify-center">
+        <div className="w-8 h-8 border-2 border-[var(--toss-blue)] rounded-full border-t-transparent animate-spin" />
+        <p className="mt-4 text-xs font-medium text-[var(--toss-gray-3)]">로그인 상태 확인 중...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen min-h-[100dvh] bg-[#F9FAFB] flex flex-col justify-center py-8 px-4 lg:px-8">
+    <div className="min-h-screen min-h-[100dvh] bg-[var(--background)] flex flex-col justify-center py-8 px-4 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-sm text-center">
-        <h2 className="text-2xl md:text-3xl font-bold text-[#191F28] tracking-tight">
+        <h2 className="text-2xl md:text-3xl font-bold text-[var(--foreground)] tracking-tight">
           SY INC. 통합 시스템
         </h2>
-        <p className="mt-2 text-[11px] font-medium text-[#8B95A1] uppercase tracking-wider">
+        <p className="mt-2 text-[11px] font-medium text-[var(--toss-gray-3)] uppercase tracking-wider">
           통합 의료경영지원 시스템
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-sm">
-        <div className="bg-white py-8 px-6 rounded-[20px] shadow-sm border border-[#E5E8EB] animate-in slide-in-from-bottom-10 duration-500">
+        <div className="bg-[var(--toss-card)] py-8 px-6 rounded-[20px] shadow-sm border border-[var(--toss-border)] animate-in slide-in-from-bottom-10 duration-500">
           <div className="space-y-6">
             <div>
-              <label className="block text-[11px] font-semibold text-[#8B95A1] mb-2 ml-1">아이디 (사번 또는 이름)</label>
+              <label className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-2 ml-1">아이디 (사번 또는 이름)</label>
               <input 
                 type="text" 
                 value={loginId}
                 onChange={(e) => setLoginId(e.target.value)}
-                className="w-full p-4 bg-[#F2F4F6] rounded-[12px] text-sm font-medium outline-none focus:ring-2 ring-[#3182F6]/30 border border-transparent focus:border-[#3182F6] transition-all text-[#191F28]"
+                className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] text-sm font-medium outline-none focus:ring-2 ring-[var(--toss-blue)]/30 border border-transparent focus:border-[var(--toss-blue)] transition-all text-[var(--foreground)]"
                 placeholder="사번 또는 이름 (동명이인은 사번 입력)"
                 onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
               />
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-[#8B95A1] mb-2 ml-1">비밀번호</label>
+              <label className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-2 ml-1">비밀번호</label>
               <input 
                 type="password" 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full p-4 bg-[#F2F4F6] rounded-[12px] text-sm font-medium outline-none focus:ring-2 ring-[#3182F6]/30 border border-transparent focus:border-[#3182F6] transition-all text-[#191F28]"
+                className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] text-sm font-medium outline-none focus:ring-2 ring-[var(--toss-blue)]/30 border border-transparent focus:border-[var(--toss-blue)] transition-all text-[var(--foreground)]"
                 placeholder="비밀번호 입력"
                 onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
               />
@@ -199,18 +199,18 @@ export default function LoginPage() {
             <button 
               onClick={handleLogin} 
               disabled={loading}
-              className="w-full py-4 bg-[#3182F6] text-white rounded-[12px] font-semibold text-[15px] hover:bg-[#1B64DA] active:scale-[0.98] transition-all disabled:opacity-50"
+              className="w-full py-4 bg-[var(--toss-blue)] text-white rounded-[12px] font-semibold text-[15px] hover:bg-[var(--toss-blue)] active:scale-[0.98] transition-all disabled:opacity-50"
             >
               {loading ? '인증 진행 중...' : '로그인'}
             </button>
-            <p className="mt-4 text-[16px] text-[#4E5968] text-center font-bold tracking-wide">
+            <p className="mt-4 text-[16px] text-[var(--toss-gray-4)] text-center font-bold tracking-wide">
               Made by JM
             </p>
           </div>
         </div>
         
         <div className="mt-12 text-center">
-          <p className="text-[10px] text-[#8B95A1] font-bold leading-relaxed">
+          <p className="text-[10px] text-[var(--toss-gray-3)] font-bold leading-relaxed">
             © 2026 SY INC. Management Service Organization.
             <br />본 시스템은 인가된 사용자만 접근 가능합니다.
           </p>

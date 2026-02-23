@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -63,10 +63,10 @@ export default function UDIManagement({ user, inventory, fetchInventory }: any) 
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="bg-white p-6 md:p-10 border border-gray-100 shadow-xl rounded-[2.5rem]">
+      <div className="bg-white p-6 md:p-10 border border-[var(--toss-border)] shadow-xl rounded-[2.5rem]">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
-            <h2 className="text-2xl font-semibold text-gray-900 tracking-tighter italic">의료기기 공급내역 보고 (UDI)</h2>
+            <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tighter italic">의료기기 공급내역 보고 (UDI)</h2>
             <p className="text-[10px] text-purple-600 font-bold mt-1 uppercase tracking-widest">Medical Device Supply Reporting</p>
           </div>
           <button
@@ -96,14 +96,14 @@ export default function UDIManagement({ user, inventory, fetchInventory }: any) 
         </div>
 
         {udiItems.length === 0 ? (
-          <div className="text-center py-20 bg-gray-50 rounded-[2rem] border border-dashed border-gray-200">
-            <p className="text-sm font-semibold text-gray-400">UDI 보고 대상 품목이 없습니다.</p>
+          <div className="text-center py-20 bg-[var(--toss-gray-1)] rounded-[2rem] border border-dashed border-[var(--toss-border)]">
+            <p className="text-sm font-semibold text-[var(--toss-gray-3)]">UDI 보고 대상 품목이 없습니다.</p>
           </div>
         ) : (
           <div className="space-y-4">
             <div className="flex items-center gap-3 px-4 pb-4 border-b border-gray-50">
               <input type="checkbox" checked={selectedItems.length === udiItems.length} onChange={toggleSelectAll} className="w-5 h-5 accent-purple-600 rounded-lg cursor-pointer" />
-              <span className="text-xs font-semibold text-gray-800">전체 선택</span>
+              <span className="text-xs font-semibold text-[var(--foreground)]">전체 선택</span>
             </div>
 
             <div className="grid grid-cols-1 gap-4">
@@ -119,21 +119,21 @@ export default function UDIManagement({ user, inventory, fetchInventory }: any) 
                     <input type="checkbox" checked={selectedItems.includes(item.id)} onChange={() => {}} className="w-6 h-6 mt-1 accent-purple-600 rounded-lg" />
                     <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-6">
                       <div className="col-span-2 md:col-span-1">
-                        <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-widest mb-1">제품명</p>
-                        <p className="text-sm font-semibold text-gray-900">{item.item_name}</p>
+                        <p className="text-[9px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">제품명</p>
+                        <p className="text-sm font-semibold text-[var(--foreground)]">{item.item_name}</p>
                         <p className="text-[10px] font-bold text-purple-500 mt-1">{item.company}</p>
                       </div>
                       <div>
-                        <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-widest mb-1">현재고</p>
-                        <p className="text-sm font-semibold text-blue-600">{item.quantity}개</p>
+                        <p className="text-[9px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">현재고</p>
+                        <p className="text-sm font-semibold text-[var(--toss-blue)]">{item.quantity}개</p>
                       </div>
                       <div>
-                        <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-widest mb-1">LOT번호</p>
-                        <p className="text-sm font-semibold text-gray-800">{item.lot_number || '-'}</p>
+                        <p className="text-[9px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">LOT번호</p>
+                        <p className="text-sm font-semibold text-[var(--foreground)]">{item.lot_number || '-'}</p>
                       </div>
                       <div>
-                        <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-widest mb-1">유효기간</p>
-                        <p className="text-sm font-semibold text-gray-800">{item.expiry_date || '-'}</p>
+                        <p className="text-[9px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">유효기간</p>
+                        <p className="text-sm font-semibold text-[var(--foreground)]">{item.expiry_date || '-'}</p>
                       </div>
                     </div>
                   </div>

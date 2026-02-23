@@ -41,20 +41,20 @@ export default function OnboardingChecklist({ staffId, staffName, type }: { staf
   const totalCount = items.length;
 
   return (
-    <div className="border border-gray-200 p-4 bg-white rounded-lg shadow-sm">
-      <div className="flex justify-between items-center pb-2 border-b border-gray-100 mb-3">
-        <h3 className="text-sm font-semibold text-gray-800">{type} 체크리스트 - {staffName}</h3>
-        <span className="text-xs font-semibold text-blue-600">{doneCount}/{totalCount} 완료</span>
+    <div className="app-card p-4 rounded-lg shadow-sm">
+      <div className="flex justify-between items-center pb-2 border-b border-[var(--toss-border)] mb-3">
+        <h3 className="text-sm font-semibold text-[var(--foreground)]">{type} 체크리스트 - {staffName}</h3>
+        <span className="text-xs font-semibold text-[var(--toss-blue)]">{doneCount}/{totalCount} 완료</span>
       </div>
-      <p className="text-xs text-gray-500 mb-3">
+      <p className="text-xs text-[var(--toss-gray-3)] mb-3">
         {type === '입사' ? '권한·장비·계정 발급 단계별 진행' : '권한·장비·계정 반납 후 최종 정산'}
       </p>
       <div className="space-y-1">
         {items.map((x, i) => (
-          <label key={i} className="flex items-center gap-3 py-2 px-3 rounded-lg cursor-pointer hover:bg-[#f8fafc] transition-colors border border-transparent hover:border-gray-100">
-            <input type="checkbox" checked={x.done} onChange={() => toggle(i)} className="w-4 h-4 rounded border-gray-300" />
-            <span className={x.done ? 'line-through text-gray-500 text-sm' : 'font-medium text-sm'}>{x.label}</span>
-            {x.done_at && <span className="text-[9px] text-gray-400 ml-auto">{new Date(x.done_at).toLocaleDateString('ko-KR')}</span>}
+          <label key={i} className="flex items-center gap-3 py-2 px-3 rounded-lg cursor-pointer hover:bg-[var(--page-bg)] transition-colors border border-transparent hover:border-[var(--toss-border)]">
+            <input type="checkbox" checked={x.done} onChange={() => toggle(i)} className="w-4 h-4 rounded border-[var(--toss-border)]" />
+            <span className={x.done ? 'line-through text-[var(--toss-gray-3)] text-sm' : 'font-medium text-sm'}>{x.label}</span>
+            {x.done_at && <span className="text-[9px] text-[var(--toss-gray-3)] ml-auto">{new Date(x.done_at).toLocaleDateString('ko-KR')}</span>}
           </label>
         ))}
       </div>

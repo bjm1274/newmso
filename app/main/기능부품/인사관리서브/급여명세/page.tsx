@@ -20,35 +20,35 @@ export default function PayrollPage() {
   const currentEmp = employees.find(e => e.id === selectedEmpId) || employees[0];
 
   return (
-    <div className="flex flex-col h-full bg-[#FDFDFD] animate-in fade-in duration-500">
+    <div className="flex flex-col h-full bg-[var(--page-bg)] animate-in fade-in duration-500">
       {/* 1. 상단 마스터 헤더: image_2d03bd.png의 레이아웃 유지 */}
-      <header className="px-10 py-8 bg-white border-b border-gray-100 flex justify-between items-center">
+      <header className="px-10 py-8 bg-[var(--toss-card)] border-b border-[var(--toss-border)] flex justify-between items-center">
         <div>
-          <h1 className="text-xl font-bold text-gray-800 tracking-tight">인사 관리 : 급여 정산</h1>
-          <p className="text-xs text-blue-600 font-medium mt-0.5">Park Cheol Hong Orthopedic x SY Medical</p>
+          <h1 className="text-xl font-bold text-[var(--foreground)] tracking-tight">인사 관리 : 급여 정산</h1>
+          <p className="text-xs text-[var(--toss-blue)] font-medium mt-0.5">Park Cheol Hong Orthopedic x SY Medical</p>
         </div>
         <div className="flex gap-2">
-          <button className="px-4 py-2.5 bg-gray-800 text-white text-xs font-medium rounded-lg hover:bg-gray-900">은행 이체 데이터 생성</button>
-          <button className="px-4 py-2.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700">명세서 일괄 발송</button>
+          <button className="px-4 py-2.5 bg-[var(--foreground)] text-white text-xs font-medium rounded-lg hover:opacity-90">은행 이체 데이터 생성</button>
+          <button className="px-4 py-2.5 bg-[var(--toss-blue)] text-white text-xs font-medium rounded-lg hover:opacity-90">명세서 일괄 발송</button>
         </div>
       </header>
 
       <div className="flex-1 flex overflow-hidden">
         {/* 2. 좌측 조직도 기반 명단 */}
-        <aside className="w-80 bg-white border-r border-gray-50 flex flex-col">
+        <aside className="w-80 bg-[var(--toss-card)] border-r border-[var(--toss-border)] flex flex-col">
           <div className="p-8">
-            <h2 className="text-xs font-semibold text-gray-500 mb-4">전체 직원 ({employees.length}명)</h2>
+            <h2 className="text-xs font-semibold text-[var(--toss-gray-3)] mb-4">전체 직원 ({employees.length}명)</h2>
             <div className="space-y-1">
               {employees.map(emp => (
                 <button 
                   key={emp.id} 
                   onClick={() => setSelectedEmpId(emp.id)}
                   className={`w-full text-left p-4 transition-all border-l-4 ${
-                    selectedEmpId === emp.id ? 'bg-blue-50 border-blue-600' : 'hover:bg-gray-25 border-transparent'
+                    selectedEmpId === emp.id ? 'bg-[var(--toss-blue-light)] border-[var(--toss-blue)]' : 'hover:bg-[var(--toss-gray-1)] border-transparent'
                   }`}
                 >
-                  <p className={`text-sm font-semibold ${selectedEmpId === emp.id ? 'text-blue-600' : 'text-gray-700'}`}>{emp.name}</p>
-                  <p className="text-xs text-gray-500">{emp.dept}</p>
+                  <p className={`text-sm font-semibold ${selectedEmpId === emp.id ? 'text-[var(--toss-blue)]' : 'text-[var(--foreground)]'}`}>{emp.name}</p>
+                  <p className="text-xs text-[var(--toss-gray-3)]">{emp.dept}</p>
                 </button>
               ))}
             </div>
@@ -56,19 +56,19 @@ export default function PayrollPage() {
         </aside>
 
         {/* 3. 우측 실무 관리 영역 (기존 '준비 중' 자리에 들어갈 내용) */}
-        <main className="flex-1 p-10 bg-gray-50/20 overflow-y-auto custom-scrollbar">
+        <main className="flex-1 p-10 bg-[var(--tab-bg)]/20 overflow-y-auto custom-scrollbar">
           <div className="max-w-6xl grid grid-cols-1 xl:grid-cols-3 gap-8">
             {/* 정산 요약 및 세부 수당/공제 섹션 */}
             <div className="xl:col-span-2 space-y-8">
-              <div className="bg-white border border-gray-100 p-8 shadow-sm">
-                <div className="flex justify-between items-end mb-8 border-b border-gray-50 pb-6">
+              <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] p-8 shadow-sm">
+                <div className="flex justify-between items-end mb-8 border-b border-[var(--toss-border)] pb-6">
                   <div>
-                    <h2 className="text-lg font-bold text-gray-800">{currentEmp.name} <span className="text-xs font-medium text-gray-500">{currentEmp.dept}</span></h2>
-                    <p className="text-xs text-gray-500 mt-0.5">Employee Monthly Settlement</p>
+                    <h2 className="text-lg font-bold text-[var(--foreground)]">{currentEmp.name} <span className="text-xs font-medium text-[var(--toss-gray-3)]">{currentEmp.dept}</span></h2>
+                    <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">Employee Monthly Settlement</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs font-medium text-gray-500">Total Net Salary</p>
-                    <p className="text-2xl font-bold text-blue-600">{(currentEmp.base * 0.91).toLocaleString()}원</p>
+                    <p className="text-xs font-medium text-[var(--toss-gray-3)]">Total Net Salary</p>
+                    <p className="text-2xl font-bold text-[var(--toss-blue)]">{(currentEmp.base * 0.91).toLocaleString()}원</p>
                   </div>
                 </div>
                 
@@ -83,9 +83,9 @@ export default function PayrollPage() {
             <aside className="space-y-8">
               <TaxReporter employees={employees} />
               <MessageTemplate />
-              <div className="p-8 bg-[#2563EB] shadow-2xl">
-                <p className="text-[10px] font-semibold text-blue-200 uppercase tracking-widest mb-4">Final Approval</p>
-                <button className="w-full py-4 bg-white text-blue-600 text-xs font-semibold hover:bg-gray-100 transition-all">
+              <div className="p-8 bg-[var(--toss-blue)] shadow-2xl">
+                <p className="text-[10px] font-semibold text-white/80 uppercase tracking-widest mb-4">Final Approval</p>
+                <button className="w-full py-4 bg-white/10 text-white text-xs font-semibold hover:bg-white/20 transition-all">
                   2월 급여 최종 마감
                 </button>
               </div>
