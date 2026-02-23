@@ -21,7 +21,7 @@ export default function SalaryChangeHistory({ staffId, staffName }: { staffId?: 
   if (list.length === 0) return null;
 
   return (
-    <div className="border border-[var(--toss-border)] p-4 bg-[var(--toss-card)] rounded-lg shadow-sm">
+    <div className="border border-[var(--toss-border)] p-4 bg-[var(--toss-card)] rounded-[12px] shadow-sm">
       <div className="pb-2 border-b border-[var(--toss-border)] mb-3">
         <h3 className="text-sm font-semibold text-[var(--foreground)]">급여 변경 이력</h3>
       </div>

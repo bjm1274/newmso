@@ -63,11 +63,11 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
         <h2 className="text-xl font-semibold text-[var(--foreground)]">🏢 부서별 물품·장비 현황</h2>
         {departments.length > 0 && (
           <div className="flex items-center gap-2">
-            <label className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">조회 부서</label>
+            <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">조회 부서</label>
             <select
               value={viewDept}
               onChange={e => setViewDept(e.target.value)}
-              className="border border-[var(--toss-border)] rounded-xl px-3 py-2 text-sm font-bold"
+              className="border border-[var(--toss-border)] rounded-[16px] px-3 py-2 text-sm font-bold"
             >
               <option value="">내 부서 ({myDept || '미지정'})</option>
               {departments.map(d => (
@@ -79,13 +79,13 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
       </div>
 
       {!effectiveDept && (
-        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-[16px] text-sm text-amber-800">
           부서가 지정되지 않은 경우 위에서 조회 부서를 선택하면 해당 부서의 물품·장비를 볼 수 있습니다.
         </div>
       )}
 
       {/* 우리 부서 물품 */}
-      <div className="bg-white border border-[var(--toss-border)] rounded-lg p-6 shadow-sm">
+      <div className="bg-white border border-[var(--toss-border)] rounded-[12px] p-6 shadow-sm">
         <h3 className="text-sm font-semibold text-[var(--foreground)] mb-4 flex items-center gap-2">
           📦 {effectiveDept ? `[${effectiveDept}] 물품 재고` : '물품 재고 (부서 선택 시 필터)'}
         </h3>
@@ -97,7 +97,7 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-[var(--toss-border)] text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">
+                <tr className="border-b border-[var(--toss-border)] text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">
                   <th className="pb-3 pr-4">품목명</th>
                   <th className="pb-3 pr-4">분류</th>
                   <th className="pb-3 pr-4">잔여 수량</th>
@@ -114,9 +114,9 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
                     <td className="py-3 pr-4 text-[var(--toss-gray-3)]">{item.min_stock ?? item.min_quantity ?? '-'}</td>
                     <td className="py-3 pr-4">
                       {(item.stock ?? item.quantity ?? 0) <= (item.min_stock ?? item.min_quantity ?? 0) ? (
-                        <span className="text-red-600 text-[10px] font-semibold">발주 필요</span>
+                        <span className="text-red-600 text-[11px] font-semibold">발주 필요</span>
                       ) : (
-                        <span className="text-emerald-600 text-[10px] font-semibold">정상</span>
+                        <span className="text-emerald-600 text-[11px] font-semibold">정상</span>
                       )}
                     </td>
                   </tr>
@@ -128,7 +128,7 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
       </div>
 
       {/* 우리 부서 장비 */}
-      <div className="bg-white border border-[var(--toss-border)] rounded-lg p-6 shadow-sm">
+      <div className="bg-white border border-[var(--toss-border)] rounded-[12px] p-6 shadow-sm">
         <h3 className="text-sm font-semibold text-[var(--foreground)] mb-4 flex items-center gap-2">
           🖥️ {effectiveDept ? `[${effectiveDept}] 보유 장비 (미반납)` : '보유 장비 (부서 선택 시 필터)'}
         </h3>
@@ -140,7 +140,7 @@ export default function DepartmentAssetOverview({ user, inventory: inventoryProp
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-[var(--toss-border)] text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">
+                <tr className="border-b border-[var(--toss-border)] text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">
                   <th className="pb-3 pr-4">장비 종류</th>
                   <th className="pb-3 pr-4">장비명</th>
                   <th className="pb-3 pr-4">사용자</th>

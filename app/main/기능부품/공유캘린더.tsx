@@ -35,22 +35,22 @@ export default function SharedCalendar({ user }: any) {
   const days = Array.from({ length: firstDay + lastDay }, (_, i) => i < firstDay ? null : i - firstDay + 1);
 
   return (
-    <div className="bg-white p-6 border border-[var(--toss-border)] rounded-lg shadow-xl">
+    <div className="bg-white p-6 border border-[var(--toss-border)] rounded-[12px] shadow-xl">
       <div className="flex justify-between items-center mb-6">
         <h3 className="text-xl font-semibold text-[var(--foreground)]">공유 캘린더</h3>
-        <input type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="p-2 rounded-xl border font-bold" />
+        <input type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="p-2 rounded-[16px] border font-bold" />
       </div>
       <div className="grid grid-cols-7 gap-1 text-center">
-        {['일','월','화','수','목','금','토'].map(d => <div key={d} className="text-[10px] font-semibold text-[var(--toss-gray-3)] py-2">{d}</div>)}
+        {['일','월','화','수','목','금','토'].map(d => <div key={d} className="text-[11px] font-semibold text-[var(--toss-gray-3)] py-2">{d}</div>)}
         {days.map((d, i) => {
           if (d === null) return <div key={i} />;
           const dateStr = `${yearMonth}-${String(d).padStart(2, '0')}`;
           const dayEvents = events.filter(e => e.date === dateStr);
           return (
-            <div key={i} className="min-h-[60px] p-1 border border-gray-50 rounded-lg">
+            <div key={i} className="min-h-[60px] p-1 border border-gray-50 rounded-[12px]">
               <p className="text-xs font-bold text-[var(--toss-gray-4)]">{d}</p>
               {dayEvents.slice(0, 2).map((e, j) => (
-                <p key={j} className="text-[9px] font-bold truncate bg-blue-50 text-[var(--toss-blue)] rounded px-0.5 mt-0.5">{e.title}</p>
+                <p key={j} className="text-[11px] font-bold truncate bg-blue-50 text-[var(--toss-blue)] rounded px-0.5 mt-0.5">{e.title}</p>
               ))}
             </div>
           );

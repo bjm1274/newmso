@@ -121,7 +121,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
             <button
               key={id}
               onClick={() => 메뉴설정(id)}
-              className={`w-full px-3 py-2.5 text-[10px] md:text-[11px] font-semibold rounded-[12px] transition-all text-left shrink-0 ${
+              className={`w-full px-3 py-2.5 text-[11px] md:text-[11px] font-semibold rounded-[12px] transition-all text-left shrink-0 ${
                 activeMenu === id
                   ? 'bg-[var(--toss-blue)] text-white shadow-md'
                   : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
@@ -134,11 +134,11 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
         {/* 하단: 사업자 드롭다운 + 직원상태 드롭다운 */}
         <div className="flex flex-col gap-3 mt-auto pt-4 shrink-0 border-t border-[var(--toss-border)]">
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-semibold text-[var(--toss-gray-4)]">사업자</label>
+            <label className="text-[11px] font-semibold text-[var(--toss-gray-4)]">사업자</label>
             <select
               value={선택사업체}
               onChange={(e) => 사업체설정(e.target.value)}
-              className="w-full px-3 py-2.5 text-[10px] md:text-[11px] font-semibold rounded-[12px] border border-[var(--toss-border)] bg-emerald-50 dark:bg-emerald-950/20 text-[var(--foreground)] focus:ring-2 focus:ring-emerald-500/30 outline-none"
+              className="w-full px-3 py-2.5 text-[11px] md:text-[11px] font-semibold rounded-[12px] border border-[var(--toss-border)] bg-emerald-50 dark:bg-emerald-950/20 text-[var(--foreground)] focus:ring-2 focus:ring-emerald-500/30 outline-none"
             >
               {사업체목록.map(회사 => (
                 <option key={회사} value={회사}>{회사}</option>
@@ -146,11 +146,11 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-semibold text-[var(--toss-gray-4)]">직원 상태</label>
+            <label className="text-[11px] font-semibold text-[var(--toss-gray-4)]">직원 상태</label>
             <select
               value={직원상태필터}
               onChange={(e) => 직원상태필터설정(e.target.value as '재직' | '퇴사')}
-              className="w-full px-3 py-2.5 text-[10px] md:text-[11px] font-semibold rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-blue-light)]/30 text-[var(--foreground)] focus:ring-2 focus:ring-[var(--toss-blue)]/30 outline-none"
+              className="w-full px-3 py-2.5 text-[11px] md:text-[11px] font-semibold rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-blue-light)]/30 text-[var(--foreground)] focus:ring-2 focus:ring-[var(--toss-blue)]/30 outline-none"
             >
               <option value="재직">재직자</option>
               <option value="퇴사">퇴사자</option>
@@ -197,7 +197,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
               <div className="flex gap-0.5 p-1 app-tab-bar w-fit mb-4">
                 <button
                   onClick={() => 근태뷰설정('실시간')}
-                  className={`px-4 py-2 text-[10px] md:text-[11px] font-semibold rounded-[12px] transition-all ${
+                  className={`px-4 py-2 text-[11px] md:text-[11px] font-semibold rounded-[12px] transition-all ${
                     근태뷰 === '실시간'
                       ? 'bg-[var(--toss-card)] shadow-md text-[var(--toss-blue)]'
                       : 'text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]'
@@ -207,7 +207,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
                 </button>
                 <button
                   onClick={() => 근태뷰설정('월별')}
-                  className={`px-4 py-2 text-[10px] md:text-[11px] font-semibold rounded-[12px] transition-all ${
+                  className={`px-4 py-2 text-[11px] md:text-[11px] font-semibold rounded-[12px] transition-all ${
                     근태뷰 === '월별'
                       ? 'bg-[var(--toss-card)] shadow-md text-[var(--toss-blue)]'
                       : 'text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]'

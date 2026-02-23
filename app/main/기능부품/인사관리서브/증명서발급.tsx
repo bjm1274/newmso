@@ -91,11 +91,11 @@ export default function CertificateGenerator({ staffs = [] }: any) {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tighter italic">디지털 증명서 발급 센터</h2>
-          <p className="text-[10px] text-[var(--toss-blue)] font-bold mt-1 tracking-widest">직원 증명서 발급 허브</p>
+          <p className="text-[11px] text-[var(--toss-blue)] font-bold mt-1 tracking-widest">직원 증명서 발급 허브</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => setShowHistory(true)} className="px-5 py-2.5 bg-[var(--toss-card)] border border-[var(--toss-border)] text-[var(--toss-gray-4)] text-[11px] font-semibold rounded-xl shadow-sm hover:bg-[var(--toss-gray-1)] transition-all">발급 이력 조회</button>
-          <button className="px-5 py-2.5 bg-[var(--foreground)] text-white text-[11px] font-semibold rounded-xl shadow-lg hover:scale-[0.98] transition-all">직인 설정</button>
+          <button onClick={() => setShowHistory(true)} className="px-5 py-2.5 bg-[var(--toss-card)] border border-[var(--toss-border)] text-[var(--toss-gray-4)] text-[11px] font-semibold rounded-[16px] shadow-sm hover:bg-[var(--toss-gray-1)] transition-all">발급 이력 조회</button>
+          <button className="px-5 py-2.5 bg-[var(--foreground)] text-white text-[11px] font-semibold rounded-[16px] shadow-lg hover:scale-[0.98] transition-all">직인 설정</button>
         </div>
       </div>
 
@@ -104,10 +104,10 @@ export default function CertificateGenerator({ staffs = [] }: any) {
         <div className="lg:col-span-4 space-y-8">
           <div className="bg-[var(--toss-card)] p-8 rounded-[2.5rem] border border-[var(--toss-border)] shadow-xl space-y-8">
             <div className="space-y-4">
-              <label className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">1. 발급 대상 직원</label>
+              <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">1. 발급 대상 직원</label>
               <select 
                 onChange={(e) => setSelectedStaff(staffs.find((s:any) => s.id === e.target.value))}
-                className="w-full p-5 bg-[var(--input-bg)] rounded-lg text-sm font-semibold border-none outline-none focus:ring-2 focus:ring-[var(--toss-blue)] transition-all"
+                className="w-full p-5 bg-[var(--input-bg)] rounded-[12px] text-sm font-semibold border-none outline-none focus:ring-2 focus:ring-[var(--toss-blue)] transition-all"
               >
                 <option value="">직원 선택...</option>
                 {staffs.map((s:any) => <option key={s.id} value={s.id}>{s.name} ({s.department} / {s.position})</option>)}
@@ -115,17 +115,17 @@ export default function CertificateGenerator({ staffs = [] }: any) {
             </div>
 
             <div className="space-y-4">
-              <label className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">2. 용도</label>
-              <input type="text" value={purpose} onChange={e=>setPurpose(e.target.value)} placeholder="금융기관 제출용" className="w-full p-4 bg-[var(--input-bg)] rounded-lg text-sm font-bold border-none outline-none focus:ring-2 focus:ring-[var(--toss-blue)]" />
+              <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">2. 용도</label>
+              <input type="text" value={purpose} onChange={e=>setPurpose(e.target.value)} placeholder="금융기관 제출용" className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] text-sm font-bold border-none outline-none focus:ring-2 focus:ring-[var(--toss-blue)]" />
             </div>
             <div className="space-y-4">
-              <label className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">3. 증명서 종류</label>
+              <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">3. 증명서 종류</label>
               <div className="grid grid-cols-1 gap-3">
                 {CERTIFICATE_TYPES.map((c) => (
                   <button 
                     key={c.id} 
                     onClick={() => setCertType(c.id)}
-                    className={`p-5 rounded-lg text-xs font-semibold border-2 text-left transition-all flex justify-between items-center ${certType === c.id ? 'border-[var(--toss-blue)] bg-[var(--toss-blue-light)] text-[var(--toss-blue)]' : 'border-[var(--toss-border)] text-[var(--toss-gray-3)] hover:border-[var(--toss-border)] bg-[var(--toss-gray-1)]/50'}`}
+                    className={`p-5 rounded-[12px] text-xs font-semibold border-2 text-left transition-all flex justify-between items-center ${certType === c.id ? 'border-[var(--toss-blue)] bg-[var(--toss-blue-light)] text-[var(--toss-blue)]' : 'border-[var(--toss-border)] text-[var(--toss-gray-3)] hover:border-[var(--toss-border)] bg-[var(--toss-gray-1)]/50'}`}
                   >
                     <span>{c.label}</span>
                     {certType === c.id && <span className="w-2 h-2 bg-[var(--toss-blue)] rounded-full animate-pulse"></span>}
@@ -136,15 +136,15 @@ export default function CertificateGenerator({ staffs = [] }: any) {
 
             <button 
               onClick={handleIssue}
-              className="w-full py-6 bg-[var(--toss-blue)] text-white rounded-[2rem] font-semibold text-sm shadow-xl shadow-[var(--toss-blue)] hover:scale-[0.98] transition-all"
+              className="w-full py-6 bg-[var(--toss-blue)] text-white rounded-[16px] font-semibold text-sm shadow-xl shadow-[var(--toss-blue)] hover:scale-[0.98] transition-all"
             >
               ⚡ 증명서 즉시 발급
             </button>
           </div>
 
-          <div className="bg-orange-50 p-6 rounded-[2rem] border border-orange-100">
-            <p className="text-[10px] font-semibold text-orange-800 uppercase mb-2">💡 발급 안내</p>
-            <p className="text-[10px] text-orange-700 font-bold leading-relaxed">
+          <div className="bg-orange-50 p-6 rounded-[16px] border border-orange-100">
+            <p className="text-[11px] font-semibold text-orange-800 uppercase mb-2">💡 발급 안내</p>
+            <p className="text-[11px] text-orange-700 font-bold leading-relaxed">
               발급된 증명서는 고유 번호가 부여되며, 위변조 방지를 위한 디지털 직인이 자동으로 포함됩니다.
             </p>
           </div>
@@ -152,7 +152,7 @@ export default function CertificateGenerator({ staffs = [] }: any) {
 
         {/* 미리보기 패널 */}
         <div className="lg:col-span-8 bg-[var(--toss-card)] rounded-[3rem] p-8 md:p-16 border border-[var(--toss-border)] shadow-2xl flex flex-col items-center justify-center relative overflow-hidden min-h-[800px]">
-          <div className="absolute top-8 right-8 bg-[var(--foreground)] text-white px-4 py-1.5 text-[10px] font-semibold rounded-full tracking-widest">PREVIEW</div>
+          <div className="absolute top-8 right-8 bg-[var(--foreground)] text-white px-4 py-1.5 text-[11px] font-semibold rounded-full tracking-widest">PREVIEW</div>
           
           {selectedStaff ? (
             <div ref={printRef} className="w-full max-w-[600px] bg-[var(--toss-card)] shadow-2xl p-12 md:p-20 space-y-12 text-center border border-[var(--toss-border)] relative animate-in zoom-in-95 duration-500">
@@ -162,7 +162,7 @@ export default function CertificateGenerator({ staffs = [] }: any) {
               </div>
 
               <div className="cert-header space-y-2">
-                <p className="cert-no text-[10px] font-semibold text-[var(--toss-gray-3)] tracking-[0.5em]">제 {serialNo || '2026-0001'} 호</p>
+                <p className="cert-no text-[11px] font-semibold text-[var(--toss-gray-3)] tracking-[0.5em]">제 {serialNo || '2026-0001'} 호</p>
                 <h4 className="cert-title text-4xl font-semibold tracking-[0.3em] text-[var(--foreground)] border-b-4 border-[var(--foreground)] pb-4 inline-block">{certType}</h4>
               </div>
 
@@ -203,7 +203,7 @@ export default function CertificateGenerator({ staffs = [] }: any) {
                   <div className="cert-sign-wrap relative inline-block pt-10">
                     <p className="cert-sign text-2xl font-semibold tracking-tighter text-[var(--foreground)] italic">{selectedStaff.company || 'SY INC.'} 대표이사 박철홍</p>
                     <div className="cert-seal absolute -right-12 -top-2 w-20 h-20 border-4 border-red-600/80 rounded-full flex items-center justify-center rotate-12 opacity-80">
-                      <div className="text-[10px] font-semibold text-red-600/80 text-center leading-tight">
+                      <div className="text-[11px] font-semibold text-red-600/80 text-center leading-tight">
                         {selectedStaff.company || 'SY INC.'}<br/>대표이사<br/>박철홍
                       </div>
                     </div>
@@ -222,7 +222,7 @@ export default function CertificateGenerator({ staffs = [] }: any) {
 
       {showHistory && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110] p-4" onClick={() => setShowHistory(false)}>
-          <div className="bg-[var(--toss-card)] rounded-lg p-8 max-w-2xl w-full max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="bg-[var(--toss-card)] rounded-[12px] p-8 max-w-2xl w-full max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-semibold mb-4">발급 이력</h3>
             <div className="space-y-2">
               {historyList.map((r) => (
@@ -232,7 +232,7 @@ export default function CertificateGenerator({ staffs = [] }: any) {
                 </div>
               ))}
             </div>
-            <button onClick={() => setShowHistory(false)} className="mt-4 w-full py-3 bg-[var(--foreground)] text-white font-semibold rounded-xl">닫기</button>
+            <button onClick={() => setShowHistory(false)} className="mt-4 w-full py-3 bg-[var(--foreground)] text-white font-semibold rounded-[16px]">닫기</button>
           </div>
         </div>
       )}

@@ -29,7 +29,7 @@ export default function PayrollMonthlySummary({ selectedCo }: any) {
   const totalDeduction = records.reduce((s, r) => s + (Number(r.total_deduction) || 0), 0);
 
   return (
-    <div className="bg-[var(--toss-card)] rounded-lg border border-[var(--toss-border)] p-4 shadow-sm">
+    <div className="bg-[var(--toss-card)] rounded-[12px] border border-[var(--toss-border)] p-4 shadow-sm">
       <div className="pb-3 border-b border-[var(--toss-border)] mb-3">
         <h3 className="text-sm font-semibold text-[var(--foreground)]">월별 급여 요약</h3>
       </div>

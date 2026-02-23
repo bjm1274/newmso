@@ -67,28 +67,28 @@ export default function UDIManagement({ user, inventory, fetchInventory }: any) 
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tighter italic">의료기기 공급내역 보고 (UDI)</h2>
-            <p className="text-[10px] text-purple-600 font-bold mt-1 uppercase tracking-widest">Medical Device Supply Reporting</p>
+            <p className="text-[11px] text-purple-600 font-bold mt-1 uppercase tracking-widest">Medical Device Supply Reporting</p>
           </div>
           <button
             onClick={generateUDIReport}
             disabled={loading || selectedItems.length === 0}
-            className="w-full md:w-auto px-8 py-4 bg-purple-600 text-white rounded-lg text-sm font-semibold shadow-xl shadow-purple-100 hover:scale-[0.98] transition-all disabled:opacity-50"
+            className="w-full md:w-auto px-8 py-4 bg-purple-600 text-white rounded-[12px] text-sm font-semibold shadow-xl shadow-purple-100 hover:scale-[0.98] transition-all disabled:opacity-50"
           >
             📊 보고서 생성 ({selectedItems.length})
           </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <div className="bg-purple-50 p-6 rounded-lg border border-purple-100">
-            <p className="text-[9px] font-semibold text-purple-500 uppercase tracking-widest mb-1">UDI 대상 품목</p>
+          <div className="bg-purple-50 p-6 rounded-[12px] border border-purple-100">
+            <p className="text-[11px] font-semibold text-purple-500 uppercase tracking-widest mb-1">UDI 대상 품목</p>
             <p className="text-2xl font-semibold text-purple-700">{udiItems.length}개</p>
           </div>
-          <div className="bg-blue-50 p-6 rounded-lg border border-blue-100">
-            <p className="text-[9px] font-semibold text-blue-500 uppercase tracking-widest mb-1">선택된 품목</p>
+          <div className="bg-blue-50 p-6 rounded-[12px] border border-blue-100">
+            <p className="text-[11px] font-semibold text-blue-500 uppercase tracking-widest mb-1">선택된 품목</p>
             <p className="text-2xl font-semibold text-blue-700">{selectedItems.length}개</p>
           </div>
-          <div className="bg-green-50 p-6 rounded-lg border border-green-100">
-            <p className="text-[9px] font-semibold text-green-500 uppercase tracking-widest mb-1">총 자산가치</p>
+          <div className="bg-green-50 p-6 rounded-[12px] border border-green-100">
+            <p className="text-[11px] font-semibold text-green-500 uppercase tracking-widest mb-1">총 자산가치</p>
             <p className="text-2xl font-semibold text-green-700">
               ₩{udiItems.reduce((sum: number, item: any) => sum + ((item.quantity || 0) * (item.unit_price || 0)), 0).toLocaleString()}
             </p>
@@ -96,13 +96,13 @@ export default function UDIManagement({ user, inventory, fetchInventory }: any) 
         </div>
 
         {udiItems.length === 0 ? (
-          <div className="text-center py-20 bg-[var(--toss-gray-1)] rounded-[2rem] border border-dashed border-[var(--toss-border)]">
+          <div className="text-center py-20 bg-[var(--toss-gray-1)] rounded-[16px] border border-dashed border-[var(--toss-border)]">
             <p className="text-sm font-semibold text-[var(--toss-gray-3)]">UDI 보고 대상 품목이 없습니다.</p>
           </div>
         ) : (
           <div className="space-y-4">
             <div className="flex items-center gap-3 px-4 pb-4 border-b border-gray-50">
-              <input type="checkbox" checked={selectedItems.length === udiItems.length} onChange={toggleSelectAll} className="w-5 h-5 accent-purple-600 rounded-lg cursor-pointer" />
+              <input type="checkbox" checked={selectedItems.length === udiItems.length} onChange={toggleSelectAll} className="w-5 h-5 accent-purple-600 rounded-[12px] cursor-pointer" />
               <span className="text-xs font-semibold text-[var(--foreground)]">전체 선택</span>
             </div>
 
@@ -111,28 +111,28 @@ export default function UDIManagement({ user, inventory, fetchInventory }: any) 
                 <div
                   key={item.id}
                   onClick={() => toggleItemSelection(item.id)}
-                  className={`p-6 rounded-[2rem] border-2 transition-all cursor-pointer ${
+                  className={`p-6 rounded-[16px] border-2 transition-all cursor-pointer ${
                     selectedItems.includes(item.id) ? 'bg-purple-50 border-purple-600 shadow-lg shadow-purple-50' : 'bg-white border-gray-50 hover:border-purple-100'
                   }`}
                 >
                   <div className="flex items-start gap-4">
-                    <input type="checkbox" checked={selectedItems.includes(item.id)} onChange={() => {}} className="w-6 h-6 mt-1 accent-purple-600 rounded-lg" />
+                    <input type="checkbox" checked={selectedItems.includes(item.id)} onChange={() => {}} className="w-6 h-6 mt-1 accent-purple-600 rounded-[12px]" />
                     <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-6">
                       <div className="col-span-2 md:col-span-1">
-                        <p className="text-[9px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">제품명</p>
+                        <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">제품명</p>
                         <p className="text-sm font-semibold text-[var(--foreground)]">{item.item_name}</p>
-                        <p className="text-[10px] font-bold text-purple-500 mt-1">{item.company}</p>
+                        <p className="text-[11px] font-bold text-purple-500 mt-1">{item.company}</p>
                       </div>
                       <div>
-                        <p className="text-[9px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">현재고</p>
+                        <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">현재고</p>
                         <p className="text-sm font-semibold text-[var(--toss-blue)]">{item.quantity}개</p>
                       </div>
                       <div>
-                        <p className="text-[9px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">LOT번호</p>
+                        <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">LOT번호</p>
                         <p className="text-sm font-semibold text-[var(--foreground)]">{item.lot_number || '-'}</p>
                       </div>
                       <div>
-                        <p className="text-[9px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">유효기간</p>
+                        <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">유효기간</p>
                         <p className="text-sm font-semibold text-[var(--foreground)]">{item.expiry_date || '-'}</p>
                       </div>
                     </div>

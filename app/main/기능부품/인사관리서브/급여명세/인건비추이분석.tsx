@@ -31,7 +31,7 @@ export default function LaborCostTrend({ selectedCo }: any) {
   const maxVal = Math.max(...months.map((m) => m.total), 1);
 
   return (
-    <div className="border border-[var(--toss-border)] p-5 bg-[var(--toss-card)] rounded-lg shadow-sm">
+    <div className="border border-[var(--toss-border)] p-5 bg-[var(--toss-card)] rounded-[12px] shadow-sm">
       <div className="pb-2 border-b border-[var(--toss-border)] mb-4">
         <h3 className="text-sm font-semibold text-[var(--foreground)]">인건비 추이</h3>
       </div>

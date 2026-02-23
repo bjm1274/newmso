@@ -196,10 +196,10 @@ export default function InventoryScanModule({ onScanComplete }: any) {
       </header>
 
       {/* 스캔 모드 선택 */}
-      <div className="flex gap-2 bg-white p-4 rounded-lg border border-[var(--toss-border)] shadow-sm">
+      <div className="flex gap-2 bg-white p-4 rounded-[12px] border border-[var(--toss-border)] shadow-sm">
         <button
           onClick={() => setScanMode('바코드')}
-          className={`flex-1 px-6 py-3 rounded-xl text-xs font-semibold transition-all ${
+          className={`flex-1 px-6 py-3 rounded-[16px] text-xs font-semibold transition-all ${
             scanMode === '바코드'
               ? 'bg-[var(--toss-blue)] text-white shadow-lg'
               : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]'
@@ -209,7 +209,7 @@ export default function InventoryScanModule({ onScanComplete }: any) {
         </button>
         <button
           onClick={() => setScanMode('명세서')}
-          className={`flex-1 px-6 py-3 rounded-xl text-xs font-semibold transition-all ${
+          className={`flex-1 px-6 py-3 rounded-[16px] text-xs font-semibold transition-all ${
             scanMode === '명세서'
               ? 'bg-[var(--toss-blue)] text-white shadow-lg'
               : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]'
@@ -220,8 +220,8 @@ export default function InventoryScanModule({ onScanComplete }: any) {
       </div>
 
       {/* 카메라 뷰 */}
-      <div className="bg-white p-8 border border-[var(--toss-border)] shadow-sm rounded-lg space-y-4">
-        <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
+      <div className="bg-white p-8 border border-[var(--toss-border)] shadow-sm rounded-[12px] space-y-4">
+        <div className="relative bg-black rounded-[12px] overflow-hidden aspect-video">
           <video
             ref={videoRef}
             autoPlay
@@ -245,7 +245,7 @@ export default function InventoryScanModule({ onScanComplete }: any) {
           {!isCameraActive ? (
             <button
               onClick={startCamera}
-              className="flex-1 py-4 bg-[var(--toss-blue)] text-white rounded-xl font-semibold text-sm shadow-lg hover:scale-[0.98] transition-all"
+              className="flex-1 py-4 bg-[var(--toss-blue)] text-white rounded-[16px] font-semibold text-sm shadow-lg hover:scale-[0.98] transition-all"
             >
               📷 카메라 시작
             </button>
@@ -254,13 +254,13 @@ export default function InventoryScanModule({ onScanComplete }: any) {
               <button
                 onClick={capturePhoto}
                 disabled={loading}
-                className="flex-1 py-4 bg-green-600 text-white rounded-xl font-semibold text-sm shadow-lg hover:scale-[0.98] transition-all disabled:opacity-50"
+                className="flex-1 py-4 bg-green-600 text-white rounded-[16px] font-semibold text-sm shadow-lg hover:scale-[0.98] transition-all disabled:opacity-50"
               >
                 📸 촬영
               </button>
               <button
                 onClick={stopCamera}
-                className="flex-1 py-4 bg-red-600 text-white rounded-xl font-semibold text-sm shadow-lg hover:scale-[0.98] transition-all"
+                className="flex-1 py-4 bg-red-600 text-white rounded-[16px] font-semibold text-sm shadow-lg hover:scale-[0.98] transition-all"
               >
                 ✕ 중지
               </button>
@@ -270,7 +270,7 @@ export default function InventoryScanModule({ onScanComplete }: any) {
 
         {/* 파일 업로드 대체 */}
         <div className="border-t pt-4">
-          <label className="flex items-center justify-center gap-2 py-4 bg-[var(--toss-gray-1)] rounded-xl cursor-pointer hover:bg-[var(--toss-gray-1)] transition-all">
+          <label className="flex items-center justify-center gap-2 py-4 bg-[var(--toss-gray-1)] rounded-[16px] cursor-pointer hover:bg-[var(--toss-gray-1)] transition-all">
             <span className="text-xs font-semibold text-[var(--toss-gray-4)]">📁 파일 업로드</span>
             <input
               type="file"
@@ -284,34 +284,34 @@ export default function InventoryScanModule({ onScanComplete }: any) {
 
       {/* 인식된 데이터 표시 */}
       {scannedData && (
-        <div className="bg-white p-8 border border-[var(--toss-border)] shadow-sm rounded-lg space-y-4">
+        <div className="bg-white p-8 border border-[var(--toss-border)] shadow-sm rounded-[12px] space-y-4">
           <h3 className="text-lg font-semibold text-[var(--foreground)]">✅ 인식된 데이터</h3>
 
           {scanMode === '바코드' ? (
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase">제품명</p>
+                  <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">제품명</p>
                   <p className="font-semibold text-[var(--foreground)] mt-1">{scannedData.product_name}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase">바코드</p>
+                  <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">바코드</p>
                   <p className="font-semibold text-[var(--foreground)] mt-1">{scannedData.barcode}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase">수량</p>
+                  <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">수량</p>
                   <p className="font-semibold text-[var(--foreground)] mt-1">{scannedData.qty}개</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase">단가</p>
+                  <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">단가</p>
                   <p className="font-semibold text-[var(--foreground)] mt-1">₩{scannedData.unit_price.toLocaleString()}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase">유효기간</p>
+                  <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">유효기간</p>
                   <p className="font-semibold text-[var(--foreground)] mt-1">{scannedData.expiry_date}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase">LOT번호</p>
+                  <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">LOT번호</p>
                   <p className="font-semibold text-[var(--foreground)] mt-1">{scannedData.lot_number}</p>
                 </div>
               </div>
@@ -322,7 +322,7 @@ export default function InventoryScanModule({ onScanComplete }: any) {
               <p className="text-sm font-bold text-[var(--toss-gray-4)]">송장일: {scannedData.invoice_date}</p>
               <div className="space-y-2">
                 {scannedData.items.map((item: any, idx: number) => (
-                  <div key={idx} className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <div key={idx} className="p-3 bg-blue-50 rounded-[12px] border border-blue-200">
                     <p className="font-semibold text-[var(--foreground)]">{item.product_name}</p>
                     <p className="text-xs text-[var(--toss-gray-4)] font-bold">
                       {item.qty}개 × ₩{item.unit_price.toLocaleString()} = ₩{(item.qty * item.unit_price).toLocaleString()}
@@ -334,15 +334,15 @@ export default function InventoryScanModule({ onScanComplete }: any) {
           )}
 
           {/* 추가 정보 입력 여부 */}
-          <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-200">
+          <div className="bg-yellow-50 p-4 rounded-[16px] border border-yellow-200">
             <p className="text-xs font-bold text-yellow-700">
               ⚠️ 스캔된 정보 외에 추가 입력이 필요한 항목이 있으신가요?
             </p>
             <div className="flex gap-2 mt-3">
-              <button className="flex-1 px-4 py-2 bg-yellow-600 text-white rounded-lg text-xs font-semibold">
+              <button className="flex-1 px-4 py-2 bg-yellow-600 text-white rounded-[12px] text-xs font-semibold">
                 수정하기
               </button>
-              <button className="flex-1 px-4 py-2 bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] rounded-lg text-xs font-semibold">
+              <button className="flex-1 px-4 py-2 bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] rounded-[12px] text-xs font-semibold">
                 그대로 진행
               </button>
             </div>
@@ -352,7 +352,7 @@ export default function InventoryScanModule({ onScanComplete }: any) {
           <button
             onClick={handleConfirmScan}
             disabled={loading}
-            className="w-full py-4 bg-green-600 text-white rounded-xl font-semibold text-sm shadow-lg hover:scale-[0.98] transition-all disabled:opacity-50"
+            className="w-full py-4 bg-green-600 text-white rounded-[16px] font-semibold text-sm shadow-lg hover:scale-[0.98] transition-all disabled:opacity-50"
           >
             ✅ 입고 처리
           </button>
@@ -361,8 +361,8 @@ export default function InventoryScanModule({ onScanComplete }: any) {
 
       {/* 인식된 텍스트 (디버그) */}
       {recognizedText && (
-        <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-          <p className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase mb-3">OCR 결과 (Raw)</p>
+        <div className="bg-gray-800 p-6 rounded-[12px] border border-gray-700">
+          <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase mb-3">OCR 결과 (Raw)</p>
           <pre className="text-xs text-[var(--toss-gray-3)] font-mono overflow-x-auto whitespace-pre-wrap break-words">
             {recognizedText}
           </pre>

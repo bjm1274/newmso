@@ -105,7 +105,7 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: any) {
             ))}
           </div>
         </div>
-        <button onClick={handleRequestSignature} disabled={loading || checkedIds.length === 0} className="px-6 py-3 bg-[var(--foreground)] text-white text-[11px] font-semibold rounded-lg shadow-xl hover:scale-[0.98] transition-all disabled:opacity-50">
+        <button onClick={handleRequestSignature} disabled={loading || checkedIds.length === 0} className="px-6 py-3 bg-[var(--foreground)] text-white text-[11px] font-semibold rounded-[12px] shadow-xl hover:scale-[0.98] transition-all disabled:opacity-50">
           {loading ? '처리 중...' : `${activeTab === '연봉계약갱신' ? '연봉 갱신 및 계약 발송' : activeTab === '신규/변경계약서' ? `${contractSubType} 계약서 발송` : '근로계약서 발송'} (${checkedIds.length}명)`}
         </button>
       </header>
@@ -114,7 +114,7 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: any) {
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
           <div className="xl:col-span-2 space-y-8">
             {activeTab === '신규/변경계약서' && (
-              <div className="p-8 bg-[var(--toss-blue)] text-white rounded-[2rem] shadow-xl space-y-6 animate-in slide-in-from-top-4 duration-500">
+              <div className="p-8 bg-[var(--toss-blue)] text-white rounded-[16px] shadow-xl space-y-6 animate-in slide-in-from-top-4 duration-500">
                 <div className="flex gap-4 items-center">
                   <h3 className="text-lg font-bold">각종 비과세 항목 등록 (신규/변경 계약서)</h3>
                   <div className="flex gap-2">
@@ -124,72 +124,72 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: any) {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-semibold uppercase opacity-90">기본급 (월)</label>
-                    <input type="number" value={salaryInfo.base_salary} onChange={(e) => setSalaryInfo({...salaryInfo, base_salary: Number(e.target.value)})} className="w-full p-3 bg-white/10 border border-white/20 rounded-lg font-semibold text-sm outline-none focus:bg-white/20 text-white" />
+                    <label className="text-[11px] font-semibold uppercase opacity-90">기본급 (월)</label>
+                    <input type="number" value={salaryInfo.base_salary} onChange={(e) => setSalaryInfo({...salaryInfo, base_salary: Number(e.target.value)})} className="w-full p-3 bg-white/10 border border-white/20 rounded-[12px] font-semibold text-sm outline-none focus:bg-white/20 text-white" />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-semibold uppercase opacity-90">식대 (비과세 한도 20만)</label>
-                    <input type="number" value={salaryInfo.meal_allowance} onChange={(e) => setSalaryInfo({...salaryInfo, meal_allowance: Number(e.target.value)})} className="w-full p-3 bg-white/10 border border-white/20 rounded-lg font-semibold text-sm outline-none focus:bg-white/20 text-white" />
+                    <label className="text-[11px] font-semibold uppercase opacity-90">식대 (비과세 한도 20만)</label>
+                    <input type="number" value={salaryInfo.meal_allowance} onChange={(e) => setSalaryInfo({...salaryInfo, meal_allowance: Number(e.target.value)})} className="w-full p-3 bg-white/10 border border-white/20 rounded-[12px] font-semibold text-sm outline-none focus:bg-white/20 text-white" />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-semibold uppercase opacity-90">자가운전 (비과세 한도 20만)</label>
-                    <input type="number" value={salaryInfo.vehicle_allowance} onChange={(e) => setSalaryInfo({...salaryInfo, vehicle_allowance: Number(e.target.value)})} className="w-full p-3 bg-white/10 border border-white/20 rounded-lg font-semibold text-sm outline-none focus:bg-white/20 text-white" />
+                    <label className="text-[11px] font-semibold uppercase opacity-90">자가운전 (비과세 한도 20만)</label>
+                    <input type="number" value={salaryInfo.vehicle_allowance} onChange={(e) => setSalaryInfo({...salaryInfo, vehicle_allowance: Number(e.target.value)})} className="w-full p-3 bg-white/10 border border-white/20 rounded-[12px] font-semibold text-sm outline-none focus:bg-white/20 text-white" />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-semibold uppercase opacity-90">보육수당 (20만원)</label>
-                    <input type="number" value={salaryInfo.childcare_allowance} onChange={(e) => setSalaryInfo({...salaryInfo, childcare_allowance: Number(e.target.value)})} className="w-full p-3 bg-white/10 border border-white/20 rounded-lg font-semibold text-sm outline-none focus:bg-white/20 text-white" />
+                    <label className="text-[11px] font-semibold uppercase opacity-90">보육수당 (20만원)</label>
+                    <input type="number" value={salaryInfo.childcare_allowance} onChange={(e) => setSalaryInfo({...salaryInfo, childcare_allowance: Number(e.target.value)})} className="w-full p-3 bg-white/10 border border-white/20 rounded-[12px] font-semibold text-sm outline-none focus:bg-white/20 text-white" />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-semibold uppercase opacity-90">직책수당</label>
-                    <input type="number" value={salaryInfo.position_allowance} onChange={(e) => setSalaryInfo({...salaryInfo, position_allowance: Number(e.target.value)})} className="w-full p-3 bg-white/10 border border-white/20 rounded-lg font-semibold text-sm outline-none focus:bg-white/20 text-white" />
+                    <label className="text-[11px] font-semibold uppercase opacity-90">직책수당</label>
+                    <input type="number" value={salaryInfo.position_allowance} onChange={(e) => setSalaryInfo({...salaryInfo, position_allowance: Number(e.target.value)})} className="w-full p-3 bg-white/10 border border-white/20 rounded-[12px] font-semibold text-sm outline-none focus:bg-white/20 text-white" />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-semibold uppercase opacity-90">연구활동비 (비과세 한도 20만)</label>
-                    <input type="number" value={salaryInfo.research_allowance} onChange={(e) => setSalaryInfo({...salaryInfo, research_allowance: Number(e.target.value)})} className="w-full p-3 bg-white/10 border border-white/20 rounded-lg font-semibold text-sm outline-none focus:bg-white/20 text-white" />
+                    <label className="text-[11px] font-semibold uppercase opacity-90">연구활동비 (비과세 한도 20만)</label>
+                    <input type="number" value={salaryInfo.research_allowance} onChange={(e) => setSalaryInfo({...salaryInfo, research_allowance: Number(e.target.value)})} className="w-full p-3 bg-white/10 border border-white/20 rounded-[12px] font-semibold text-sm outline-none focus:bg-white/20 text-white" />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-semibold uppercase opacity-90">기타 비과세</label>
-                    <input type="number" value={salaryInfo.other_taxfree} onChange={(e) => setSalaryInfo({...salaryInfo, other_taxfree: Number(e.target.value)})} className="w-full p-3 bg-white/10 border border-white/20 rounded-lg font-semibold text-sm outline-none focus:bg-white/20 text-white" />
+                    <label className="text-[11px] font-semibold uppercase opacity-90">기타 비과세</label>
+                    <input type="number" value={salaryInfo.other_taxfree} onChange={(e) => setSalaryInfo({...salaryInfo, other_taxfree: Number(e.target.value)})} className="w-full p-3 bg-white/10 border border-white/20 rounded-[12px] font-semibold text-sm outline-none focus:bg-white/20 text-white" />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-semibold uppercase opacity-90">적용 시작일</label>
-                    <input type="date" value={salaryInfo.effective_date} onChange={(e) => setSalaryInfo({...salaryInfo, effective_date: e.target.value})} className="w-full p-3 bg-white/10 border border-white/20 rounded-lg font-semibold text-sm outline-none focus:bg-white/20 text-white" />
+                    <label className="text-[11px] font-semibold uppercase opacity-90">적용 시작일</label>
+                    <input type="date" value={salaryInfo.effective_date} onChange={(e) => setSalaryInfo({...salaryInfo, effective_date: e.target.value})} className="w-full p-3 bg-white/10 border border-white/20 rounded-[12px] font-semibold text-sm outline-none focus:bg-white/20 text-white" />
                   </div>
                 </div>
                 <p className="text-[11px] opacity-90">* 발송된 계약서는 직원이 로그인 시 즉시 서명 화면으로 표시됩니다.</p>
               </div>
             )}
             {activeTab === '연봉계약갱신' && (
-              <div className="p-8 bg-[var(--toss-blue)] text-white rounded-[2rem] shadow-xl space-y-6 animate-in slide-in-from-top-4 duration-500">
+              <div className="p-8 bg-[var(--toss-blue)] text-white rounded-[16px] shadow-xl space-y-6 animate-in slide-in-from-top-4 duration-500">
                 <h3 className="text-lg font-bold">법적 비과세 항목 및 연봉 설정</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-semibold uppercase opacity-70">기본급 (월)</label>
-                    <input type="number" value={salaryInfo.base_salary} onChange={(e) => setSalaryInfo({...salaryInfo, base_salary: Number(e.target.value)})} className="w-full p-4 bg-white/10 border border-white/20 rounded-lg font-semibold text-sm outline-none focus:bg-white/20 transition-all text-white" />
+                    <label className="text-[11px] font-semibold uppercase opacity-70">기본급 (월)</label>
+                    <input type="number" value={salaryInfo.base_salary} onChange={(e) => setSalaryInfo({...salaryInfo, base_salary: Number(e.target.value)})} className="w-full p-4 bg-white/10 border border-white/20 rounded-[12px] font-semibold text-sm outline-none focus:bg-white/20 transition-all text-white" />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-semibold uppercase opacity-70">식대 (비과세 한도 20만)</label>
-                    <input type="number" value={salaryInfo.meal_allowance} onChange={(e) => setSalaryInfo({...salaryInfo, meal_allowance: Number(e.target.value)})} className="w-full p-4 bg-white/10 border border-white/20 rounded-lg font-semibold text-sm outline-none focus:bg-white/20 transition-all text-white" />
+                    <label className="text-[11px] font-semibold uppercase opacity-70">식대 (비과세 한도 20만)</label>
+                    <input type="number" value={salaryInfo.meal_allowance} onChange={(e) => setSalaryInfo({...salaryInfo, meal_allowance: Number(e.target.value)})} className="w-full p-4 bg-white/10 border border-white/20 rounded-[12px] font-semibold text-sm outline-none focus:bg-white/20 transition-all text-white" />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-semibold uppercase opacity-70">자가운전 (비과세 한도 20만)</label>
-                    <input type="number" value={salaryInfo.vehicle_allowance} onChange={(e) => setSalaryInfo({...salaryInfo, vehicle_allowance: Number(e.target.value)})} className="w-full p-4 bg-white/10 border border-white/20 rounded-lg font-semibold text-sm outline-none focus:bg-white/20 transition-all text-white" />
+                    <label className="text-[11px] font-semibold uppercase opacity-70">자가운전 (비과세 한도 20만)</label>
+                    <input type="number" value={salaryInfo.vehicle_allowance} onChange={(e) => setSalaryInfo({...salaryInfo, vehicle_allowance: Number(e.target.value)})} className="w-full p-4 bg-white/10 border border-white/20 rounded-[12px] font-semibold text-sm outline-none focus:bg-white/20 transition-all text-white" />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-semibold uppercase opacity-70">보육수당 (20만원)</label>
-                    <input type="number" value={salaryInfo.childcare_allowance} onChange={(e) => setSalaryInfo({...salaryInfo, childcare_allowance: Number(e.target.value)})} className="w-full p-4 bg-white/10 border border-white/20 rounded-lg font-semibold text-sm outline-none focus:bg-white/20 transition-all text-white" />
+                    <label className="text-[11px] font-semibold uppercase opacity-70">보육수당 (20만원)</label>
+                    <input type="number" value={salaryInfo.childcare_allowance} onChange={(e) => setSalaryInfo({...salaryInfo, childcare_allowance: Number(e.target.value)})} className="w-full p-4 bg-white/10 border border-white/20 rounded-[12px] font-semibold text-sm outline-none focus:bg-white/20 transition-all text-white" />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-semibold uppercase opacity-70">직책수당</label>
-                    <input type="number" value={salaryInfo.position_allowance} onChange={(e) => setSalaryInfo({...salaryInfo, position_allowance: Number(e.target.value)})} className="w-full p-4 bg-white/10 border border-white/20 rounded-lg font-semibold text-sm outline-none focus:bg-white/20 transition-all text-white" />
+                    <label className="text-[11px] font-semibold uppercase opacity-70">직책수당</label>
+                    <input type="number" value={salaryInfo.position_allowance} onChange={(e) => setSalaryInfo({...salaryInfo, position_allowance: Number(e.target.value)})} className="w-full p-4 bg-white/10 border border-white/20 rounded-[12px] font-semibold text-sm outline-none focus:bg-white/20 transition-all text-white" />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-semibold uppercase opacity-70">연구활동비 (비과세 한도 20만)</label>
-                    <input type="number" value={salaryInfo.research_allowance} onChange={(e) => setSalaryInfo({...salaryInfo, research_allowance: Number(e.target.value)})} className="w-full p-4 bg-white/10 border border-white/20 rounded-lg font-semibold text-sm outline-none focus:bg-white/20 transition-all text-white" />
+                    <label className="text-[11px] font-semibold uppercase opacity-70">연구활동비 (비과세 한도 20만)</label>
+                    <input type="number" value={salaryInfo.research_allowance} onChange={(e) => setSalaryInfo({...salaryInfo, research_allowance: Number(e.target.value)})} className="w-full p-4 bg-white/10 border border-white/20 rounded-[12px] font-semibold text-sm outline-none focus:bg-white/20 transition-all text-white" />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-semibold uppercase opacity-70">적용 시작일</label>
-                    <input type="date" value={salaryInfo.effective_date} onChange={(e) => setSalaryInfo({...salaryInfo, effective_date: e.target.value})} className="w-full p-4 bg-white/10 border border-white/20 rounded-lg font-semibold text-sm outline-none focus:bg-white/20 transition-all text-white" />
+                    <label className="text-[11px] font-semibold uppercase opacity-70">적용 시작일</label>
+                    <input type="date" value={salaryInfo.effective_date} onChange={(e) => setSalaryInfo({...salaryInfo, effective_date: e.target.value})} className="w-full p-4 bg-white/10 border border-white/20 rounded-[12px] font-semibold text-sm outline-none focus:bg-white/20 transition-all text-white" />
                   </div>
                 </div>
               </div>

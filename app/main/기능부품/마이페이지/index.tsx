@@ -171,18 +171,24 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
       
       {/* 상단 로고 및 헤더 */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 shrink-0">
-        <div className="text-left space-y-2">
-          <div className="flex items-center gap-3 mb-2">
+        <div className="text-left space-y-2 w-full">
+          {/* 로고 + 인사말 바로 옆에 즐겨찾기 버튼 (모바일/PC 공통) */}
+          <div className="flex flex-wrap items-center gap-2 mb-2">
             <AppLogo size={40} />
             <h1 className="page-header-title text-2xl font-semibold tracking-tight">
               반갑습니다, {user.name}님 👋
             </h1>
+            <button
+              type="button"
+              onClick={() => setShowFavPicker((v) => !v)}
+              className="ml-1 px-3 py-1.5 rounded-full text-[11px] font-semibold border border-dashed border-[var(--toss-border)] text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)] whitespace-nowrap"
+            >
+              + 즐겨찾기 추가
+            </button>
           </div>
-          <p className="caption text-xs font-bold">
-            내 정보 · 출퇴근 · 할일 · 증명서 · 급여명세서를 한 곳에서 관리합니다.
-          </p>
+
           {/* 자주 쓰는 기능 즐겨찾기 바로가기 */}
-          <div className="flex flex-col gap-2 mt-2">
+          <div className="flex flex-col gap-2 mt-1">
             <div className="flex gap-2 overflow-x-auto md:flex-wrap md:overflow-visible no-scrollbar">
               {favorites.map((id) => {
                 const opt = FAVORITE_OPTIONS.find(o => o.id === id);
@@ -205,38 +211,29 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
                 );
               })}
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setShowFavPicker((v) => !v)}
-                className="px-3 py-1.5 rounded-full text-[11px] font-semibold border border-dashed border-[var(--toss-border)] text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]"
-              >
-                + 즐겨찾기 추가
-              </button>
-              {showFavPicker && (
-                <div className="flex items-center gap-2">
-                  <select
-                    value={pendingFav}
-                    onChange={(e) => setPendingFav(e.target.value as FavoriteId | '')}
-                    className="px-3 py-1.5 rounded-full text-[11px] font-semibold border border-[var(--toss-border)] bg-[var(--toss-card)]"
-                  >
-                    <option value="">항목 선택</option>
-                    {FAVORITE_OPTIONS.filter(o => !favorites.includes(o.id)).map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={handleAddFavorite}
-                    className="px-3 py-1.5 rounded-full text-[11px] font-semibold bg-[var(--foreground)] text-white hover:opacity-90"
-                  >
-                    추가
-                  </button>
-                </div>
-              )}
-            </div>
+            {showFavPicker && (
+              <div className="flex items-center gap-2">
+                <select
+                  value={pendingFav}
+                  onChange={(e) => setPendingFav(e.target.value as FavoriteId | '')}
+                  className="px-3 py-1.5 rounded-full text-[11px] font-semibold border border-[var(--toss-border)] bg-[var(--toss-card)]"
+                >
+                  <option value="">항목 선택</option>
+                  {FAVORITE_OPTIONS.filter(o => !favorites.includes(o.id)).map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={handleAddFavorite}
+                  className="px-3 py-1.5 rounded-full text-[11px] font-semibold bg-[var(--foreground)] text-white hover:opacity-90"
+                >
+                  추가
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -332,7 +329,7 @@ function QuickFavoriteButton({ label, icon, onClick, active, onRemove }: any) {
             e.stopPropagation();
             onRemove();
           }}
-          className="ml-1 text-[10px] text-[var(--toss-gray-3)] hover:text-red-500"
+          className="ml-1 text-[11px] text-[var(--toss-gray-3)] hover:text-red-500"
         >
           ✕
         </span>

@@ -3,7 +3,7 @@ export default function DeductionSummary({ base }: { base: number }) {
   const pension = Math.floor(base * 0.045);
   const health = Math.floor(base * 0.03545);
   return (
-    <div className="border border-[var(--toss-border)] p-4 bg-[var(--toss-card)] rounded-lg shadow-sm">
+    <div className="border border-[var(--toss-border)] p-4 bg-[var(--toss-card)] rounded-[12px] shadow-sm">
       <div className="pb-2 border-b border-[var(--toss-border)] mb-3">
         <h3 className="text-sm font-semibold text-[var(--foreground)]">법정 공제</h3>
       </div>

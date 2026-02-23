@@ -114,7 +114,7 @@ export default function BoardAdvanced() {
           <button
             key={board.id}
             onClick={() => setActiveBoard(board.id)}
-            className={`px-6 py-3 font-semibold text-sm transition-all rounded-lg ${
+            className={`px-6 py-3 font-semibold text-sm transition-all rounded-[12px] ${
               activeBoard === board.id
                 ? 'bg-[var(--toss-blue)] text-white'
                 : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-gray-2)]'
@@ -129,7 +129,7 @@ export default function BoardAdvanced() {
       <div className="flex justify-end">
         <button
           onClick={() => setShowCreateModal(true)}
-          className="px-6 py-3 bg-[var(--toss-blue)] text-white rounded-lg font-semibold hover:bg-blue-700 transition-all"
+          className="px-6 py-3 bg-[var(--toss-blue)] text-white rounded-[12px] font-semibold hover:bg-blue-700 transition-all"
         >
           + 새 글 작성
         </button>
@@ -142,7 +142,7 @@ export default function BoardAdvanced() {
             <div
               key={post.id}
               onClick={() => setSelectedPost(post)}
-              className="bg-white border border-[var(--toss-border)] shadow-sm rounded-xl p-6 hover:shadow-md transition-all cursor-pointer group"
+              className="bg-white border border-[var(--toss-border)] shadow-sm rounded-[16px] p-6 hover:shadow-md transition-all cursor-pointer group"
             >
               <div className="flex justify-between items-start gap-4">
                 <div className="flex-1">
@@ -156,7 +156,7 @@ export default function BoardAdvanced() {
                   {/* 수술/MRI 상세 정보 표시 */}
                   {(activeBoard === '수술' || activeBoard === 'mri') && (
                     <div className="mt-4 grid grid-cols-2 gap-4 text-xs">
-                      <div className="bg-[var(--toss-gray-1)] p-3 rounded-lg">
+                      <div className="bg-[var(--toss-gray-1)] p-3 rounded-[12px]">
                         <p className="font-bold text-[var(--toss-gray-4)]">
                           {activeBoard === '수술' ? '수술명' : '검사명'}
                         </p>
@@ -164,25 +164,25 @@ export default function BoardAdvanced() {
                           {post.surgery_name || post.exam_name || '-'}
                         </p>
                       </div>
-                      <div className="bg-[var(--toss-gray-1)] p-3 rounded-lg">
+                      <div className="bg-[var(--toss-gray-1)] p-3 rounded-[12px]">
                         <p className="font-bold text-[var(--toss-gray-4)]">환자명</p>
                         <p className="font-semibold text-[var(--foreground)] mt-1">
                           {post.patient_name || '-'}
                         </p>
                       </div>
-                      <div className="bg-[var(--toss-gray-1)] p-3 rounded-lg">
+                      <div className="bg-[var(--toss-gray-1)] p-3 rounded-[12px]">
                         <p className="font-bold text-[var(--toss-gray-4)]">예정 시간</p>
                         <p className="font-semibold text-[var(--foreground)] mt-1">
                           {post.scheduled_time || '-'}
                         </p>
                       </div>
-                      <div className="bg-[var(--toss-gray-1)] p-3 rounded-lg">
+                      <div className="bg-[var(--toss-gray-1)] p-3 rounded-[12px]">
                         <p className="font-bold text-[var(--toss-gray-4)]">담당의</p>
                         <p className="font-semibold text-[var(--foreground)] mt-1">
                           {post.doctor_name || '-'}
                         </p>
                       </div>
-                      <div className="bg-[var(--toss-gray-1)] p-3 rounded-lg">
+                      <div className="bg-[var(--toss-gray-1)] p-3 rounded-[12px]">
                         <p className="font-bold text-[var(--toss-gray-4)]">방향</p>
                         <p className="font-semibold text-[var(--foreground)] mt-1">
                           {post.side || '-'}
@@ -190,37 +190,37 @@ export default function BoardAdvanced() {
                       </div>
                       {activeBoard === '수술' && (
                         <>
-                          <div className="bg-blue-50 p-3 rounded-lg">
+                          <div className="bg-blue-50 p-3 rounded-[12px]">
                             <p className="font-bold text-[var(--toss-blue)]">금식</p>
                             <p className="font-semibold text-blue-800 mt-1">
                               {post.fasting ? '필수' : '불필요'}
                             </p>
                           </div>
-                          <div className="bg-blue-50 p-3 rounded-lg">
+                          <div className="bg-blue-50 p-3 rounded-[12px]">
                             <p className="font-bold text-[var(--toss-blue)]">보호자</p>
                             <p className="font-semibold text-blue-800 mt-1">
                               {post.guardian ? '있음' : '없음'}
                             </p>
                           </div>
-                          <div className="bg-red-50 p-3 rounded-lg">
+                          <div className="bg-red-50 p-3 rounded-[12px]">
                             <p className="font-bold text-red-600">수혈</p>
                             <p className="font-semibold text-red-800 mt-1">
                               {post.blood_transfusion ? '필요' : '불필요'}
                             </p>
                           </div>
-                          <div className="bg-blue-50 p-3 rounded-lg">
+                          <div className="bg-blue-50 p-3 rounded-[12px]">
                             <p className="font-bold text-[var(--toss-blue)]">보호자 상주</p>
                             <p className="font-semibold text-blue-800 mt-1">
                               {post.guardian_stay ? '상주' : '비상주'}
                             </p>
                           </div>
-                          <div className="bg-blue-50 p-3 rounded-lg">
+                          <div className="bg-blue-50 p-3 rounded-[12px]">
                             <p className="font-bold text-[var(--toss-blue)]">입원 여부</p>
                             <p className="font-semibold text-blue-800 mt-1">
                               {post.hospitalization ? '입원' : '당일 퇴원'}
                             </p>
                           </div>
-                          <div className="bg-[var(--toss-gray-1)] p-3 rounded-lg">
+                          <div className="bg-[var(--toss-gray-1)] p-3 rounded-[12px]">
                             <p className="font-bold text-[var(--toss-gray-4)]">특이사항</p>
                             <p className="font-semibold text-[var(--foreground)] mt-1 text-xs">
                               {post.notes || '-'}
@@ -252,7 +252,7 @@ export default function BoardAdvanced() {
       {/* 작성 모달 */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-8 w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-[16px] p-8 w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-semibold text-[var(--foreground)] mb-6">
               {boards.find((b) => b.id === activeBoard)?.label} - 새 글 작성
             </h3>
@@ -270,7 +270,7 @@ export default function BoardAdvanced() {
                     setFormData({ ...formData, title: e.target.value })
                   }
                   placeholder="제목을 입력하세요"
-                  className="w-full px-4 py-3 border border-[var(--toss-border)] rounded-lg focus:outline-none focus:border-[var(--toss-blue)]"
+                  className="w-full px-4 py-3 border border-[var(--toss-border)] rounded-[12px] focus:outline-none focus:border-[var(--toss-blue)]"
                 />
               </div>
 
@@ -285,7 +285,7 @@ export default function BoardAdvanced() {
                   }
                   placeholder="내용을 입력하세요"
                   rows={4}
-                  className="w-full px-4 py-3 border border-[var(--toss-border)] rounded-lg focus:outline-none focus:border-[var(--toss-blue)]"
+                  className="w-full px-4 py-3 border border-[var(--toss-border)] rounded-[12px] focus:outline-none focus:border-[var(--toss-blue)]"
                 />
               </div>
 
@@ -310,7 +310,7 @@ export default function BoardAdvanced() {
                                 : 'exam_name']: v,
                             });
                           }}
-                          className="w-full px-4 py-2 border border-[var(--toss-border)] rounded-lg text-sm bg-[var(--toss-gray-1)] focus:outline-none focus:border-[var(--toss-blue)]"
+                          className="w-full px-4 py-2 border border-[var(--toss-border)] rounded-[12px] text-sm bg-[var(--toss-gray-1)] focus:outline-none focus:border-[var(--toss-blue)]"
                         >
                           <option value="">
                             자주 쓰는 {activeBoard === '수술' ? '수술명' : '검사명'} 선택
@@ -342,7 +342,7 @@ export default function BoardAdvanced() {
                             })
                           }
                           placeholder="수술명/검사명 입력"
-                          className="w-full px-4 py-3 border border-[var(--toss-border)] rounded-lg focus:outline-none focus:border-[var(--toss-blue)]"
+                          className="w-full px-4 py-3 border border-[var(--toss-border)] rounded-[12px] focus:outline-none focus:border-[var(--toss-blue)]"
                         />
                       </div>
                     </div>
@@ -360,7 +360,7 @@ export default function BoardAdvanced() {
                           })
                         }
                         placeholder="환자명 입력"
-                        className="w-full px-4 py-3 border border-[var(--toss-border)] rounded-lg focus:outline-none focus:border-[var(--toss-blue)]"
+                        className="w-full px-4 py-3 border border-[var(--toss-border)] rounded-[12px] focus:outline-none focus:border-[var(--toss-blue)]"
                       />
                     </div>
                   </div>
@@ -387,7 +387,7 @@ export default function BoardAdvanced() {
                               ),
                             });
                           }}
-                          className="w-full px-4 py-3 border border-[var(--toss-border)] rounded-lg focus:outline-none focus:border-[var(--toss-blue)]"
+                          className="w-full px-4 py-3 border border-[var(--toss-border)] rounded-[12px] focus:outline-none focus:border-[var(--toss-blue)]"
                         />
                         <select
                           value={getTimePart(formData.scheduled_time || '')}
@@ -404,7 +404,7 @@ export default function BoardAdvanced() {
                               ),
                             });
                           }}
-                          className="w-full px-3 py-3 border border-[var(--toss-border)] rounded-lg focus:outline-none focus:border-[var(--toss-blue)] text-sm"
+                          className="w-full px-3 py-3 border border-[var(--toss-border)] rounded-[12px] focus:outline-none focus:border-[var(--toss-blue)] text-sm"
                         >
                           <option value="">시간 선택</option>
                           {HALF_HOUR_TIME_OPTIONS.map((opt) => (
@@ -429,7 +429,7 @@ export default function BoardAdvanced() {
                           })
                         }
                         placeholder="담당의명 입력"
-                        className="w-full px-4 py-3 border border-[var(--toss-border)] rounded-lg focus:outline-none focus:border-[var(--toss-blue)]"
+                        className="w-full px-4 py-3 border border-[var(--toss-border)] rounded-[12px] focus:outline-none focus:border-[var(--toss-blue)]"
                       />
                     </div>
                   </div>
@@ -447,7 +447,7 @@ export default function BoardAdvanced() {
                             side: e.target.value,
                           })
                         }
-                        className="w-full px-4 py-3 border border-[var(--toss-border)] rounded-lg focus:outline-none focus:border-[var(--toss-blue)]"
+                        className="w-full px-4 py-3 border border-[var(--toss-border)] rounded-[12px] focus:outline-none focus:border-[var(--toss-blue)]"
                       >
                         <option value="">선택 안 함</option>
                         <option value="좌측">좌측</option>
@@ -459,7 +459,7 @@ export default function BoardAdvanced() {
 
                   {activeBoard === '수술' && (
                     <>
-                      <div className="space-y-3 bg-[var(--toss-gray-1)] p-4 rounded-lg">
+                      <div className="space-y-3 bg-[var(--toss-gray-1)] p-4 rounded-[12px]">
                         <label className="flex items-center gap-3 cursor-pointer">
                           <input
                             type="checkbox"
@@ -553,7 +553,7 @@ export default function BoardAdvanced() {
                           }
                           placeholder="특이사항 입력"
                           rows={3}
-                          className="w-full px-4 py-3 border border-[var(--toss-border)] rounded-lg focus:outline-none focus:border-[var(--toss-blue)]"
+                          className="w-full px-4 py-3 border border-[var(--toss-border)] rounded-[12px] focus:outline-none focus:border-[var(--toss-blue)]"
                         />
                       </div>
                     </>
@@ -568,13 +568,13 @@ export default function BoardAdvanced() {
                     setShowCreateModal(false);
                     setFormData({});
                   }}
-                  className="flex-1 py-3 bg-[var(--toss-gray-1)] text-[var(--foreground)] rounded-lg font-bold hover:bg-[var(--toss-gray-2)] transition-all"
+                  className="flex-1 py-3 bg-[var(--toss-gray-1)] text-[var(--foreground)] rounded-[12px] font-bold hover:bg-[var(--toss-gray-2)] transition-all"
                 >
                   취소
                 </button>
                 <button
                   onClick={createPost}
-                  className="flex-1 py-3 bg-[var(--toss-blue)] text-white rounded-lg font-bold hover:bg-blue-700 transition-all"
+                  className="flex-1 py-3 bg-[var(--toss-blue)] text-white rounded-[12px] font-bold hover:bg-blue-700 transition-all"
                 >
                   작성
                 </button>

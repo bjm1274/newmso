@@ -59,7 +59,7 @@ export default function OrgChart({ user, staffs, depts, selectedCo, setSelectedC
             placeholder="직원명, 직급, 부서로 검색..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-4 py-2 border border-[var(--toss-border)] rounded-lg focus:outline-none focus:border-[var(--toss-blue)]"
+            className="w-full px-4 py-2 border border-[var(--toss-border)] rounded-[12px] focus:outline-none focus:border-[var(--toss-blue)]"
           />
           {searchTerm && (
             <button
@@ -85,7 +85,7 @@ export default function OrgChart({ user, staffs, depts, selectedCo, setSelectedC
                 <div
                   key={staff.id}
                   onClick={() => setSelectedStaff(staff)}
-                  className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                  className={`p-4 rounded-[12px] border-2 cursor-pointer transition-all ${
                     selectedStaff?.id === staff.id
                       ? 'border-blue-600 bg-blue-50'
                       : 'border-[var(--toss-border)] hover:border-[var(--toss-border)]'
@@ -117,7 +117,7 @@ export default function OrgChart({ user, staffs, depts, selectedCo, setSelectedC
                 {/* 부서 헤더 */}
                 <div
                   onClick={() => toggleDept(dept.id)}
-                  className="flex items-center gap-2 cursor-pointer mb-3 p-3 rounded-lg hover:bg-[var(--toss-gray-1)] transition-all"
+                  className="flex items-center gap-2 cursor-pointer mb-3 p-3 rounded-[12px] hover:bg-[var(--toss-gray-1)] transition-all"
                 >
                   <span className={`text-lg transition-transform ${expandedDepts.includes(dept.id) ? 'rotate-90' : ''}`}>
                     ▶
@@ -135,7 +135,7 @@ export default function OrgChart({ user, staffs, depts, selectedCo, setSelectedC
                       <div
                         key={staff.id}
                         onClick={() => setSelectedStaff(staff)}
-                        className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                        className={`p-3 rounded-[12px] border-2 cursor-pointer transition-all ${
                           selectedStaff?.id === staff.id
                             ? 'border-blue-600 bg-blue-50'
                             : 'border-[var(--toss-border)] hover:border-[var(--toss-border)]'

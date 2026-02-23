@@ -96,7 +96,7 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
           <div className="flex items-center gap-4 bg-[var(--toss-gray-1)] p-3 rounded-[16px] border border-[var(--toss-border)]">
             {viewMode === 'daily' ? (
               <div className="flex items-center gap-3">
-                <span className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase">Date</span>
+                <span className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">Date</span>
                 <input 
                   type="date" 
                   value={selectedDate} 
@@ -106,7 +106,7 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
               </div>
             ) : (
               <div className="flex items-center gap-3">
-                <span className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase">Month</span>
+                <span className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">Month</span>
                 <input 
                   type="month" 
                   value={selectedMonth} 
@@ -123,7 +123,7 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
         {viewMode === 'daily' && (
           <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[2.5rem] overflow-hidden shadow-xl">
             <table className="w-full text-left border-collapse">
-              <thead className="bg-[var(--toss-gray-1)] text-[10px] font-bold text-[var(--toss-gray-3)] border-b border-[var(--toss-border)] uppercase">
+              <thead className="bg-[var(--toss-gray-1)] text-[11px] font-bold text-[var(--toss-gray-3)] border-b border-[var(--toss-border)] uppercase">
                 <tr>
                   <th className="px-8 py-5">직원 정보</th>
                   <th className="px-8 py-5">출근 시간</th>
@@ -148,16 +148,16 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                       <td className="px-8 py-5">
                         <div className="flex flex-col">
                           <span className="font-bold text-[var(--foreground)]">{s.name}</span>
-                          <span className="text-[9px] text-[var(--toss-gray-3)] font-bold uppercase">{s.department} / {s.position}</span>
+                          <span className="text-[11px] text-[var(--toss-gray-3)] font-bold uppercase">{s.department} / {s.position}</span>
                         </div>
                       </td>
                       <td className="px-8 py-5 font-mono font-bold text-[var(--toss-blue)]">{checkIn}</td>
                       <td className="px-8 py-5 font-mono font-bold text-[var(--toss-gray-3)]">{checkOut}</td>
                       <td className="px-8 py-5 font-bold text-[var(--toss-gray-4)]">{workHrs}</td>
                       <td className="px-8 py-5">
-                        <span className={`px-3 py-1 ${statusColor} text-[9px] font-bold rounded-full`}>{statusLabel}</span>
+                        <span className={`px-3 py-1 ${statusColor} text-[11px] font-bold rounded-full`}>{statusLabel}</span>
                       </td>
-                      <td className="px-8 py-5 text-right text-[var(--toss-gray-3)] text-[10px]">{att?.notes || '-'}</td>
+                      <td className="px-8 py-5 text-right text-[var(--toss-gray-3)] text-[11px]">{att?.notes || '-'}</td>
                     </tr>
                   );
                 })}
@@ -170,7 +170,7 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
           <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[2.5rem] overflow-hidden shadow-xl">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse min-w-[1200px]">
-                <thead className="bg-[var(--toss-gray-1)] text-[9px] font-bold text-[var(--toss-gray-3)] border-b border-[var(--toss-border)] uppercase">
+                <thead className="bg-[var(--toss-gray-1)] text-[11px] font-bold text-[var(--toss-gray-3)] border-b border-[var(--toss-border)] uppercase">
                   <tr>
                     <th className="px-6 py-4 sticky left-0 bg-[var(--toss-gray-1)] z-10 border-r">성명</th>
                     {daysArray.map(d => (
@@ -197,7 +197,7 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                           else if (status === 'present' || att) { label = '출'; workDays++; }
                           else label = '-';
                           return (
-                            <td key={d} className="px-3 py-4 text-center border-r text-[10px] font-bold text-[var(--toss-gray-3)]">
+                            <td key={d} className="px-3 py-4 text-center border-r text-[11px] font-bold text-[var(--toss-gray-3)]">
                               {isWeekend ? <span className="text-red-300">{label}</span> : label}
                             </td>
                           );
@@ -215,36 +215,36 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
         {viewMode === 'dashboard' && (
           <div className="space-y-8">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-lg p-6 shadow-sm">
-                <p className="text-[9px] font-bold text-[var(--toss-gray-3)] uppercase">출근률</p>
+              <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[12px] p-6 shadow-sm">
+                <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">출근률</p>
                 <p className="text-3xl font-bold text-[var(--toss-blue)] mt-1">{stats.rate}%</p>
               </div>
-              <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-lg p-6 shadow-sm">
-                <p className="text-[9px] font-bold text-[var(--toss-gray-3)] uppercase">정상 출근</p>
+              <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[12px] p-6 shadow-sm">
+                <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">정상 출근</p>
                 <p className="text-3xl font-bold text-green-600 mt-1">{stats.present}건</p>
               </div>
-              <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-lg p-6 shadow-sm">
-                <p className="text-[9px] font-bold text-[var(--toss-gray-3)] uppercase">지각</p>
+              <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[12px] p-6 shadow-sm">
+                <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">지각</p>
                 <p className="text-3xl font-bold text-orange-600 mt-1">{stats.late}건</p>
               </div>
-              <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-lg p-6 shadow-sm">
-                <p className="text-[9px] font-bold text-[var(--toss-gray-3)] uppercase">조퇴</p>
+              <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[12px] p-6 shadow-sm">
+                <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">조퇴</p>
                 <p className="text-3xl font-bold text-amber-600 mt-1">{stats.earlyLeave}건</p>
               </div>
             </div>
-            <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-lg p-8 shadow-sm">
+            <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[12px] p-8 shadow-sm">
               <h3 className="text-sm font-bold text-[var(--toss-gray-4)] mb-4">상태별 비율</h3>
               <div className="space-y-4">
                 <div>
-                  <div className="flex justify-between text-[10px] font-bold mb-1"><span>정상</span><span>{stats.total ? Math.round((stats.present / stats.total) * 100) : 0}%</span></div>
+                  <div className="flex justify-between text-[11px] font-bold mb-1"><span>정상</span><span>{stats.total ? Math.round((stats.present / stats.total) * 100) : 0}%</span></div>
                   <div className="h-3 bg-[var(--toss-gray-1)] rounded-full overflow-hidden"><div className="h-full bg-green-500 rounded-full" style={{ width: `${stats.total ? (stats.present / stats.total) * 100 : 0}%` }} /></div>
                 </div>
                 <div>
-                  <div className="flex justify-between text-[10px] font-bold mb-1"><span>지각</span><span>{stats.total ? Math.round((stats.late / stats.total) * 100) : 0}%</span></div>
+                  <div className="flex justify-between text-[11px] font-bold mb-1"><span>지각</span><span>{stats.total ? Math.round((stats.late / stats.total) * 100) : 0}%</span></div>
                   <div className="h-3 bg-[var(--toss-gray-1)] rounded-full overflow-hidden"><div className="h-full bg-orange-500 rounded-full" style={{ width: `${stats.total ? (stats.late / stats.total) * 100 : 0}%` }} /></div>
                 </div>
                 <div>
-                  <div className="flex justify-between text-[10px] font-bold mb-1"><span>조퇴</span><span>{stats.total ? Math.round((stats.earlyLeave / stats.total) * 100) : 0}%</span></div>
+                  <div className="flex justify-between text-[11px] font-bold mb-1"><span>조퇴</span><span>{stats.total ? Math.round((stats.earlyLeave / stats.total) * 100) : 0}%</span></div>
                   <div className="h-3 bg-[var(--toss-gray-1)] rounded-full overflow-hidden"><div className="h-full bg-amber-500 rounded-full" style={{ width: `${stats.total ? (stats.earlyLeave / stats.total) * 100 : 0}%` }} /></div>
                 </div>
               </div>
@@ -256,21 +256,21 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
           <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[2.5rem] p-10 shadow-xl">
             <div className="grid grid-cols-7 gap-4">
               {['일', '월', '화', '수', '목', '금', '토'].map(day => (
-                <div key={day} className="text-center text-[10px] font-bold text-[var(--toss-gray-3)] uppercase pb-4">{day}</div>
+                <div key={day} className="text-center text-[11px] font-bold text-[var(--toss-gray-3)] uppercase pb-4">{day}</div>
               ))}
               {Array.from({ length: 35 }).map((_, i) => {
                 const day = i - 1; // 데모용 날짜 오프셋
                 return (
-                  <div key={i} className={`min-h-[120px] p-4 border border-[var(--toss-border)] rounded-lg transition-all hover:shadow-lg ${day > 0 && day <= 28 ? 'bg-[var(--toss-card)]' : 'bg-[var(--toss-gray-1)]/50 opacity-30'}`}>
+                  <div key={i} className={`min-h-[120px] p-4 border border-[var(--toss-border)] rounded-[12px] transition-all hover:shadow-lg ${day > 0 && day <= 28 ? 'bg-[var(--toss-card)]' : 'bg-[var(--toss-gray-1)]/50 opacity-30'}`}>
                     {day > 0 && day <= 28 && (
                       <>
                         <span className="text-xs font-bold text-[var(--foreground)]">{day}</span>
                         <div className="mt-3 space-y-1">
-                          <div className="px-2 py-1 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] text-[8px] font-bold rounded-lg flex justify-between">
+                          <div className="px-2 py-1 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] text-[8px] font-bold rounded-[12px] flex justify-between">
                             <span>출근</span>
                             <span>{filtered.length}명</span>
                           </div>
-                          <div className="px-2 py-1 bg-orange-50 text-orange-600 text-[8px] font-bold rounded-lg flex justify-between">
+                          <div className="px-2 py-1 bg-orange-50 text-orange-600 text-[8px] font-bold rounded-[12px] flex justify-between">
                             <span>연차</span>
                             <span>2명</span>
                           </div>

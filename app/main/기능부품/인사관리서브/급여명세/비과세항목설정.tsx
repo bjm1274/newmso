@@ -70,14 +70,14 @@ export default function TaxFreeSettingsPanel({ companyName, onSaved }: { company
 
   if (loading) {
     return (
-      <div className="border border-[var(--toss-border)] p-5 bg-[var(--toss-card)] rounded-lg">
+      <div className="border border-[var(--toss-border)] p-5 bg-[var(--toss-card)] rounded-[12px]">
         <p className="text-sm font-medium text-[var(--toss-gray-3)]">로딩 중...</p>
       </div>
     );
   }
 
   return (
-    <div className="border border-[var(--toss-border)] p-5 bg-[var(--toss-card)] rounded-lg shadow-sm">
+    <div className="border border-[var(--toss-border)] p-5 bg-[var(--toss-card)] rounded-[12px] shadow-sm">
       <div className="pb-3 border-b border-[var(--toss-border)] mb-4">
         <h3 className="text-sm font-semibold text-[var(--foreground)]">비과세 항목 설정</h3>
         <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">법정 한도 내 회사별 한도 조정 [{co}]</p>
@@ -98,13 +98,13 @@ export default function TaxFreeSettingsPanel({ companyName, onSaved }: { company
           <div key={key} className="flex items-center justify-between gap-4 py-2 border-b border-[var(--toss-border)] last:border-0">
             <div>
               <p className="text-xs font-medium text-[var(--foreground)]">{label}</p>
-              <p className="text-[10px] text-[var(--toss-gray-3)]">{basis}</p>
+              <p className="text-[11px] text-[var(--toss-gray-3)]">{basis}</p>
             </div>
             <input type="number" value={settings[key]} onChange={(e) => update(key, parseInt(e.target.value) || 0)} className="w-24 h-9 px-2 border border-[var(--toss-border)] rounded-md text-sm font-medium text-right" />
           </div>
         ))}
       </div>
-      <button onClick={handleSave} disabled={saving} className="w-full mt-4 py-3 bg-[var(--toss-blue)] text-white text-sm font-medium rounded-lg hover:opacity-90 disabled:opacity-50">
+      <button onClick={handleSave} disabled={saving} className="w-full mt-4 py-3 bg-[var(--toss-blue)] text-white text-sm font-medium rounded-[12px] hover:opacity-90 disabled:opacity-50">
         {saving ? '저장 중...' : '저장하기'}
       </button>
     </div>

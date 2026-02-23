@@ -94,7 +94,7 @@ export default function TaskView({ user, tasks, subView, setSubView, onRefresh }
             <button
               key={menu}
               onClick={() => setSubView(menu)}
-              className={`px-5 py-2 rounded-lg text-xs font-bold transition-all ${
+              className={`px-5 py-2 rounded-[12px] text-xs font-bold transition-all ${
                 subView === menu ? 'bg-[var(--foreground)] text-white shadow-lg' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]'
               }`}
             >
@@ -105,7 +105,7 @@ export default function TaskView({ user, tasks, subView, setSubView, onRefresh }
       </header>
 
       <main className="flex-1 overflow-y-auto p-10 custom-scrollbar space-y-6">
-        <div className="bg-[var(--toss-card)] p-4 rounded-[2rem] shadow-sm border border-[var(--toss-border)] flex items-center gap-4">
+        <div className="bg-[var(--toss-card)] p-4 rounded-[16px] shadow-sm border border-[var(--toss-border)] flex items-center gap-4">
           <input
             value={newTask}
             onChange={(e) => setNewTask(e.target.value)}
@@ -116,7 +116,7 @@ export default function TaskView({ user, tasks, subView, setSubView, onRefresh }
           <select
             value={newPriority}
             onChange={(e) => setNewPriority(e.target.value)}
-            className="px-3 py-2 rounded-xl border border-[var(--toss-border)] text-xs font-bold"
+            className="px-3 py-2 rounded-[16px] border border-[var(--toss-border)] text-xs font-bold"
           >
             <option value="low">낮음</option>
             <option value="medium">보통</option>
@@ -142,7 +142,7 @@ export default function TaskView({ user, tasks, subView, setSubView, onRefresh }
               return (
                 <div
                   key={t.id}
-                  className={`p-6 rounded-[2rem] border flex items-center justify-between transition-all ${
+                  className={`p-6 rounded-[16px] border flex items-center justify-between transition-all ${
                     t.status === 'completed'
                       ? 'bg-[var(--toss-gray-1)] border-[var(--toss-border)] opacity-60'
                       : 'bg-[var(--toss-card)] border-[var(--toss-border)] shadow-sm hover:border-[var(--toss-blue)]'
@@ -165,12 +165,12 @@ export default function TaskView({ user, tasks, subView, setSubView, onRefresh }
                       >
                         {t.title}
                       </span>
-                      <span className={`px-2 py-0.5 rounded text-[9px] font-bold border ${pr.color}`}>
+                      <span className={`px-2 py-0.5 rounded text-[11px] font-bold border ${pr.color}`}>
                         {pr.label}
                       </span>
                     </div>
                   </div>
-                  <span className="text-[10px] text-[var(--toss-gray-3)]">
+                  <span className="text-[11px] text-[var(--toss-gray-3)]">
                     {new Date(t.created_at).toLocaleDateString()}
                   </span>
                 </div>

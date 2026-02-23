@@ -109,20 +109,20 @@ export function InventoryAlertBadge({ lowCount, expiryCount }: { lowCount: numbe
   return (
     <div className="fixed top-20 right-8 z-50 space-y-2">
       {lowCount > 0 && (
-        <div className="bg-red-600 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-pulse">
+        <div className="bg-red-600 text-white px-4 py-3 rounded-[16px] shadow-2xl flex items-center gap-3 animate-pulse">
           <div className="w-2 h-2 bg-white rounded-full animate-ping"></div>
           <div>
-            <p className="text-[10px] font-semibold">재고 부족</p>
-            <p className="text-[9px] font-bold">{lowCount}건 발생</p>
+            <p className="text-[11px] font-semibold">재고 부족</p>
+            <p className="text-[11px] font-bold">{lowCount}건 발생</p>
           </div>
         </div>
       )}
       {expiryCount > 0 && (
-        <div className="bg-orange-500 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-pulse">
+        <div className="bg-orange-500 text-white px-4 py-3 rounded-[16px] shadow-2xl flex items-center gap-3 animate-pulse">
           <div className="w-2 h-2 bg-white rounded-full animate-ping"></div>
           <div>
-            <p className="text-[10px] font-semibold">유효기간 임박</p>
-            <p className="text-[9px] font-bold">{expiryCount}건 발생</p>
+            <p className="text-[11px] font-semibold">유효기간 임박</p>
+            <p className="text-[11px] font-bold">{expiryCount}건 발생</p>
           </div>
         </div>
       )}

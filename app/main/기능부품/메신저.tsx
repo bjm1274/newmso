@@ -930,7 +930,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
           <div className="flex gap-1 bg-[var(--toss-gray-1)] md:bg-slate-800 p-1 rounded-[12px]">
             <button
               onClick={() => setViewMode('chat')}
-              className={`flex-1 py-2 text-[10px] font-bold rounded-[12px] transition-all ${
+              className={`flex-1 py-2 text-[11px] font-bold rounded-[12px] transition-all ${
                 viewMode === 'chat'
                   ? 'bg-[var(--toss-card)] text-[var(--toss-blue)] shadow-sm md:bg-slate-50 md:text-slate-900'
                   : 'text-[var(--toss-gray-3)] hover:bg-[var(--toss-card)]/80 md:text-slate-300 md:hover:bg-slate-700/80'
@@ -940,7 +940,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
             </button>
             <button
               onClick={() => setViewMode('org')}
-              className={`flex-1 py-2 text-[10px] font-bold rounded-[12px] transition-all ${
+              className={`flex-1 py-2 text-[11px] font-bold rounded-[12px] transition-all ${
                 viewMode === 'org'
                   ? 'bg-[var(--toss-card)] text-[var(--toss-blue)] shadow-sm md:bg-slate-50 md:text-slate-900'
                   : 'text-[var(--toss-gray-3)] hover:bg-[var(--toss-card)]/80 md:text-slate-300 md:hover:bg-slate-700/80'
@@ -962,7 +962,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowSearchPanel(!showSearchPanel)}
-                  className="flex-1 py-2 text-[10px] font-bold text-[var(--toss-blue)] bg-[var(--toss-blue-light)] md:text-blue-300 md:bg-slate-800 md:hover:bg-slate-700 hover:bg-[var(--toss-blue-light)] rounded-[12px] transition-colors"
+                  className="flex-1 py-2 text-[11px] font-bold text-[var(--toss-blue)] bg-[var(--toss-blue-light)] md:text-blue-300 md:bg-slate-800 md:hover:bg-slate-700 hover:bg-[var(--toss-blue-light)] rounded-[12px] transition-colors"
                   aria-label="메시지 검색 패널 열기"
                 >
                   🔍 메시지 검색
@@ -970,7 +970,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                 <button
                   type="button"
                   onClick={() => setShowUnreadOnly((v) => !v)}
-                  className={`px-3 py-2 text-[10px] font-bold rounded-[12px] border transition-colors ${
+                  className={`px-3 py-2 text-[11px] font-bold rounded-[12px] border transition-colors ${
                     showUnreadOnly
                       ? 'bg-rose-100 border-rose-200 text-rose-600 md:bg-rose-500/20 md:border-rose-300 md:text-rose-200'
                       : 'bg-[var(--toss-gray-1)] border-[var(--toss-border)] text-[var(--toss-gray-4)] md:bg-slate-800 md:border-slate-700 md:text-slate-300'
@@ -1002,12 +1002,12 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                       }
                     }}
                   />
-                  <span className="text-[10px] font-bold text-[var(--toss-gray-4)] md:text-slate-200">일반 채팅방 전체 선택</span>
+                  <span className="text-[11px] font-bold text-[var(--toss-gray-4)] md:text-slate-200">일반 채팅방 전체 선택</span>
                 </label>
                 <button
                   type="button"
                   onClick={handleBulkLeaveRooms}
-                  className="px-3 py-2 text-[10px] font-bold rounded-[12px] bg-rose-100 text-rose-600 hover:bg-rose-200 md:bg-rose-500/20 md:text-rose-100 md:hover:bg-rose-500/40 disabled:opacity-40"
+                  className="px-3 py-2 text-[11px] font-bold rounded-[12px] bg-rose-100 text-rose-600 hover:bg-rose-200 md:bg-rose-500/20 md:text-rose-100 md:hover:bg-rose-500/40 disabled:opacity-40"
                   disabled={selectedRoomIdsForLeave.length === 0}
                 >
                   선택 방 나가기
@@ -1080,7 +1080,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                       </div>
                       {unread > 0 && (
                         <span
-                          className={`ml-2 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full text-[10px] font-bold ${
+                          className={`ml-2 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full text-[11px] font-bold ${
                             isSelected ? 'bg-[var(--toss-blue)] text-white' : 'bg-rose-500 text-white'
                           }`}
                         >
@@ -1094,13 +1094,13 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
           ) : (
             <div className="space-y-1">
               {filteredStaffs.map((s: any) => (
-                <div key={s.id} className="flex items-center gap-3 p-3 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-xl hover:border-[var(--toss-blue)] cursor-pointer transition-all">
-                  <div className="w-8 h-8 bg-[var(--toss-gray-1)] rounded-lg flex items-center justify-center text-xs font-semibold text-[var(--toss-gray-3)] overflow-hidden">
+                <div key={s.id} className="flex items-center gap-3 p-3 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] hover:border-[var(--toss-blue)] cursor-pointer transition-all">
+                  <div className="w-8 h-8 bg-[var(--toss-gray-1)] rounded-[12px] flex items-center justify-center text-xs font-semibold text-[var(--toss-gray-3)] overflow-hidden">
                     {s.photo_url ? <img src={s.photo_url} alt={s.name ?? '직원 사진'} className="w-full h-full object-cover" /> : s.name[0]}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-[var(--foreground)] truncate">{s.name}</p>
-                    <p className="text-[9px] font-bold text-[var(--toss-gray-3)] truncate">{s.department} · {s.position}</p>
+                    <p className="text-[11px] font-bold text-[var(--toss-gray-3)] truncate">{s.department} · {s.position}</p>
                   </div>
                   <button onClick={async () => {
                     const otherId = s.id;
@@ -1121,7 +1121,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                     }
                     setViewMode('chat');
                     fetchData();
-                  }} className="px-3 py-1.5 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] rounded-[12px] text-[10px] font-bold hover:bg-[var(--toss-blue)] hover:text-white transition-all">대화</button>
+                  }} className="px-3 py-1.5 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] rounded-[12px] text-[11px] font-bold hover:bg-[var(--toss-blue)] hover:text-white transition-all">대화</button>
                 </div>
               ))}
             </div>
@@ -1143,7 +1143,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
               ←
             </button>
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wide">
+              <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wide">
                 현재 채팅방
               </p>
               <div className="flex items-center gap-1.5 mt-0.5">
@@ -1167,18 +1167,18 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
         )}
         {showSearchPanel && (
           <div className="shrink-0 p-4 bg-[var(--toss-gray-1)] border-b border-[var(--toss-border)] space-y-3">
-            <p className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">메시지 검색</p>
+            <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">메시지 검색</p>
             <div className="flex flex-wrap gap-2">
               <input
                 value={msgSearchKeyword}
                 onChange={(e) => setMsgSearchKeyword(e.target.value)}
                 placeholder="키워드"
-                className="flex-1 min-w-[120px] p-2 text-xs font-bold border border-[var(--toss-border)] rounded-lg outline-none focus:ring-2 focus:ring-blue-200"
+                className="flex-1 min-w-[120px] p-2 text-xs font-bold border border-[var(--toss-border)] rounded-[12px] outline-none focus:ring-2 focus:ring-blue-200"
                 aria-label="검색 키워드"
               />
-              <input type="date" value={searchDateFrom} onChange={(e) => setSearchDateFrom(e.target.value)} className="p-2 text-[10px] font-bold border rounded-lg" aria-label="시작일" />
-              <input type="date" value={searchDateTo} onChange={(e) => setSearchDateTo(e.target.value)} className="p-2 text-[10px] font-bold border rounded-lg" aria-label="종료일" />
-              <label className="flex items-center gap-2 text-[10px] font-bold">
+              <input type="date" value={searchDateFrom} onChange={(e) => setSearchDateFrom(e.target.value)} className="p-2 text-[11px] font-bold border rounded-[12px]" aria-label="시작일" />
+              <input type="date" value={searchDateTo} onChange={(e) => setSearchDateTo(e.target.value)} className="p-2 text-[11px] font-bold border rounded-[12px]" aria-label="종료일" />
+              <label className="flex items-center gap-2 text-[11px] font-bold">
                 <input type="checkbox" checked={searchFileOnly} onChange={(e) => setSearchFileOnly(e.target.checked)} className="rounded" />
                 파일만
               </label>
@@ -1225,7 +1225,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                   <div key={msg.id} className="space-y-1">
                     {showDateDivider && (
                       <div className="flex justify-center my-2">
-                        <span className="px-3 py-1 rounded-full bg-[var(--toss-gray-1)] text-[10px] font-bold text-[var(--toss-gray-3)]">
+                        <span className="px-3 py-1 rounded-full bg-[var(--toss-gray-1)] text-[11px] font-bold text-[var(--toss-gray-3)]">
                           {dateLabel}
                         </span>
                       </div>
@@ -1245,13 +1245,13 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                       onMouseLeave={() => setToolbarMsgId(prev => prev === msg.id ? null : prev)}
                     >
                       {!isMine && (
-                        <span className="text-[10px] text-[var(--toss-gray-3)] px-2 mb-1 font-bold">
+                        <span className="text-[11px] text-[var(--toss-gray-3)] px-2 mb-1 font-bold">
                           {msg.staff?.name} {msg.staff?.position}
                         </span>
                       )}
                       <div 
                         onClick={(e) => { e.stopPropagation(); setToolbarMsgId(msg.id); markMessageRead(msg); }}
-                        className={`group relative px-3 py-2 rounded-lg text-sm shadow-sm cursor-pointer transition-all max-w-[70%] ${
+                        className={`group relative px-3 py-2 rounded-[12px] text-sm shadow-sm cursor-pointer transition-all max-w-[70%] ${
                           isMine
                             ? 'bg-emerald-600 text-white rounded-tr-none'
                             : 'bg-[var(--toss-card)] border border-slate-200 rounded-tl-none hover:border-emerald-400 text-slate-900'
@@ -1264,7 +1264,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                         {msg.reply_to_id && (() => {
                           const parent = messages.find((m: any) => m.id === msg.reply_to_id);
                           return parent ? (
-                            <div className={`mb-2 p-2 rounded-lg text-[10px] border-l-2 ${
+                            <div className={`mb-2 p-2 rounded-[12px] text-[11px] border-l-2 ${
                               isMine ? 'bg-white/10 border-white/30' : 'bg-[var(--toss-gray-1)] border-[var(--toss-border)]'
                             }`}>
                               <span className="font-bold opacity-80">↩️ {parent.staff?.name}: </span>
@@ -1280,7 +1280,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                                 <img
                                   src={msg.file_url}
                                   alt="첨부 이미지"
-                                  className="max-w-[200px] max-h-[150px] rounded-lg object-cover border border-[var(--toss-border)]"
+                                  className="max-w-[200px] max-h-[150px] rounded-[12px] object-cover border border-[var(--toss-border)]"
                                 />
                               </a>
                             ) : null}
@@ -1289,7 +1289,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                               target="_blank"
                               rel="noopener noreferrer"
                               download
-                              className={`block p-2 rounded-lg text-[10px] font-bold border flex items-center gap-2 hover:opacity-80 transition-opacity ${
+                              className={`block p-2 rounded-[12px] text-[11px] font-bold border flex items-center gap-2 hover:opacity-80 transition-opacity ${
                                 isMine ? 'bg-white/10 border-white/20' : 'bg-[var(--toss-gray-1)] border-[var(--toss-border)] text-[var(--toss-blue)]'
                               }`}
                             >
@@ -1299,14 +1299,14 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                         )}
 
                         {(hasReacts || (readCount > 0 && !isMine)) && (
-                          <div className="mt-2 flex items-center gap-2 text-[10px] flex-wrap">
+                          <div className="mt-2 flex items-center gap-2 text-[11px] flex-wrap">
                             {hasReacts && (
                               <span className="flex gap-1 flex-wrap">
                                 {Object.entries(msgReacts).map(([emoji, cnt]) =>
                                   ((cnt as number) > 0 ? (
                                     <span
                                       key={emoji}
-                                      className={`px-1.5 py-0.5 rounded text-[9px] ${
+                                      className={`px-1.5 py-0.5 rounded text-[11px] ${
                                         isMine ? 'bg-white/20' : 'bg-[var(--toss-gray-1)]'
                                       }`}
                                     >
@@ -1332,7 +1332,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                       </div>
                       {showToolbar && (
                         <div 
-                          className={`flex items-center gap-1 px-3 py-2 mt-1 rounded-lg bg-[var(--toss-card)]/95 backdrop-blur border border-[var(--toss-border)] shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200 ${
+                          className={`flex items-center gap-1 px-3 py-2 mt-1 rounded-[12px] bg-[var(--toss-card)]/95 backdrop-blur border border-[var(--toss-border)] shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200 ${
                             isMine ? 'flex-row-reverse' : ''
                           }`}
                           onClick={e => e.stopPropagation()}
@@ -1340,7 +1340,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                           <button
                             type="button"
                             onClick={() => { setReplyTo(msg); setToolbarMsgId(null); }}
-                            className="p-1.5 rounded-xl hover:bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] transition-colors"
+                            className="p-1.5 rounded-[16px] hover:bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] transition-colors"
                             title="답글"
                           >
                             ↩️
@@ -1350,7 +1350,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                               key={emoji}
                               type="button"
                               onClick={() => toggleReaction(msg.id, emoji)}
-                              className="p-1.5 rounded-xl hover:bg-[var(--toss-gray-1)] text-lg transition-colors"
+                              className="p-1.5 rounded-[16px] hover:bg-[var(--toss-gray-1)] text-lg transition-colors"
                               title={emoji}
                             >
                               {emoji}
@@ -1359,7 +1359,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                           <button
                             type="button"
                             onClick={() => { setActiveActionMsg(msg); setToolbarMsgId(null); }}
-                            className="p-1.5 rounded-xl hover:bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] transition-colors ml-0.5"
+                            className="p-1.5 rounded-[16px] hover:bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] transition-colors ml-0.5"
                             title="더보기"
                           >
                             ⋯
@@ -1386,9 +1386,9 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
               return (
                 <div
                   key={poll.id}
-                  className="max-w-[70%] bg-[var(--toss-card)] border border-[var(--toss-blue-light)] rounded-lg p-4 shadow-sm text-xs font-bold text-[var(--foreground)]"
+                  className="max-w-[70%] bg-[var(--toss-card)] border border-[var(--toss-blue-light)] rounded-[12px] p-4 shadow-sm text-xs font-bold text-[var(--foreground)]"
                 >
-                  <p className="text-[10px] font-semibold text-[var(--toss-blue)] mb-2">📊 투표</p>
+                  <p className="text-[11px] font-semibold text-[var(--toss-blue)] mb-2">📊 투표</p>
                   <p className="mb-3 text-sm">{poll.question}</p>
                   <div className="space-y-1">
                     {poll.options.map((opt: string, idx: number) => (
@@ -1396,13 +1396,13 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                         key={idx}
                         type="button"
                         onClick={() => handleVote(poll.id, idx)}
-                        className="w-full flex justify-between items-center px-3 py-2 rounded-xl bg-[var(--toss-blue-light)] hover:bg-[var(--toss-blue-light)] text-[11px]"
+                        className="w-full flex justify-between items-center px-3 py-2 rounded-[16px] bg-[var(--toss-blue-light)] hover:bg-[var(--toss-blue-light)] text-[11px]"
                       >
                         <span>{opt}</span>
                         <span className="text-[var(--toss-blue)]">
                           {(votes[idx] || 0)}표
                           {totalVotes > 0 && (
-                            <span className="ml-1 text-[9px] text-[var(--toss-blue)]">
+                            <span className="ml-1 text-[11px] text-[var(--toss-blue)]">
                               ({Math.round(((votes[idx] || 0) / totalVotes) * 100)}%)
                             </span>
                           )}
@@ -1420,17 +1420,17 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
         {/* 입력창 — 모바일에서 하단 네비 위에 고정 */}
         <div className="absolute left-0 right-0 bottom-0 md:relative p-4 md:p-6 bg-[var(--toss-card)] border-t border-[var(--toss-border)] shrink-0 safe-area-pb">
            {replyTo && (
-             <div className="mb-3 flex items-center justify-between bg-[var(--toss-blue-light)] p-3 rounded-xl border border-[var(--toss-blue-light)] animate-in slide-in-from-bottom-2">
-               <p className="text-[10px] font-bold text-[var(--toss-blue)]">@{replyTo.staff?.name}님에게 답글 작성 중...</p>
+             <div className="mb-3 flex items-center justify-between bg-[var(--toss-blue-light)] p-3 rounded-[16px] border border-[var(--toss-blue-light)] animate-in slide-in-from-bottom-2">
+               <p className="text-[11px] font-bold text-[var(--toss-blue)]">@{replyTo.staff?.name}님에게 답글 작성 중...</p>
                <button onClick={()=>setReplyTo(null)} className="text-[var(--toss-blue)] hover:text-[var(--toss-blue)] font-semibold">✕</button>
              </div>
            )}
            {selectedRoomId === NOTICE_ROOM_ID && user?.position && !CAN_WRITE_NOTICE_POSITIONS.includes(user.position) && (
-             <div className="mb-3 py-2 px-4 bg-amber-50 border border-amber-200 rounded-xl text-[11px] font-bold text-amber-800">
+             <div className="mb-3 py-2 px-4 bg-amber-50 border border-amber-200 rounded-[16px] text-[11px] font-bold text-amber-800">
                📢 공지메시지 방에는 부서장(팀장·부장·원장 등) 이상만 작성할 수 있습니다.
              </div>
            )}
-           <div className={`flex items-center gap-3 p-3 rounded-[2rem] border transition-all ${
+           <div className={`flex items-center gap-3 p-3 rounded-[16px] border transition-all ${
              selectedRoomId === NOTICE_ROOM_ID && user?.position && !CAN_WRITE_NOTICE_POSITIONS.includes(user.position)
                ? 'bg-[var(--toss-gray-1)] border-[var(--toss-border)] opacity-80 pointer-events-none'
                : 'bg-[var(--toss-gray-1)] border-[var(--toss-border)] focus-within:bg-[var(--toss-card)] focus-within:ring-4 focus-within:ring-[var(--toss-blue)]'
@@ -1466,7 +1466,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                  onKeyDown={e=>e.key==='Enter'&&handleSendMessage()} 
                />
                {showMentionList && mentionCandidates.length > 0 && (
-                 <div className="absolute left-0 bottom-full mb-1 w-full max-h-48 overflow-y-auto bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-lg shadow-lg z-20 text-xs">
+                 <div className="absolute left-0 bottom-full mb-1 w-full max-h-48 overflow-y-auto bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[12px] shadow-lg z-20 text-xs">
                    {mentionCandidates.map((m: any) => (
                      <button
                        key={m.id}
@@ -1485,7 +1485,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                        className="w-full px-3 py-2 flex items-center gap-2 hover:bg-[var(--toss-blue-light)] text-left"
                      >
                        <span className="text-[11px] font-semibold text-[var(--foreground)] truncate">{m.name}</span>
-                       <span className="text-[10px] text-[var(--toss-gray-3)] truncate">
+                       <span className="text-[11px] text-[var(--toss-gray-3)] truncate">
                          {(m.department || '')}{m.position ? ` · ${m.position}` : ''}
                        </span>
                      </button>
@@ -1508,7 +1508,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
             <aside className="absolute top-0 right-0 bottom-0 w-80 bg-[var(--toss-card)] border-l border-[var(--toss-border)] shadow-2xl z-50 flex flex-col animate-in slide-in-from-right duration-300">
               <div className="p-4 border-b border-[var(--toss-border)] flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
+                  <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
                     파일·사진·링크
                   </p>
                   <p className="text-xs font-semibold text-[var(--foreground)] mt-0.5 line-clamp-1">
@@ -1532,7 +1532,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                   <button
                     type="button"
                     onClick={toggleRoomNotify}
-                    className="px-2.5 py-1 text-[10px] font-semibold rounded-xl border border-[var(--toss-border)] hover:bg-[var(--toss-gray-1)] transition-colors"
+                    className="px-2.5 py-1 text-[11px] font-semibold rounded-[16px] border border-[var(--toss-border)] hover:bg-[var(--toss-gray-1)] transition-colors"
                   >
                     {roomNotifyOn ? '🔔 알림 on' : '🔕 알림 off'}
                   </button>
@@ -1546,7 +1546,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                         setAddMemberSearch('');
                         setAddMemberSelectingIds([]);
                       }}
-                      className="px-3 py-1.5 text-[10px] font-semibold text-[var(--toss-blue)] border border-[var(--toss-blue-light)] rounded-xl hover:bg-[var(--toss-blue-light)] transition-colors"
+                      className="px-3 py-1.5 text-[11px] font-semibold text-[var(--toss-blue)] border border-[var(--toss-blue-light)] rounded-[16px] hover:bg-[var(--toss-blue-light)] transition-colors"
                     >
                       대화상대 추가
                     </button>
@@ -1556,7 +1556,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                         setRoomNameDraft(selectedRoom?.name || '채팅방');
                         setEditingRoomName(true);
                       }}
-                      className="px-3 py-1.5 text-[10px] font-semibold text-[var(--toss-gray-4)] border border-[var(--toss-border)] rounded-xl hover:bg-[var(--toss-gray-1)] transition-colors"
+                      className="px-3 py-1.5 text-[11px] font-semibold text-[var(--toss-gray-4)] border border-[var(--toss-border)] rounded-[16px] hover:bg-[var(--toss-gray-1)] transition-colors"
                     >
                       채팅방 이름 변경
                     </button>
@@ -1566,7 +1566,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                         setShowMediaPanel(false);
                         setShowPollModal(true);
                       }}
-                      className="px-3 py-1.5 text-[10px] font-semibold text-[var(--toss-blue)] border border-[var(--toss-blue-light)] rounded-xl hover:bg-[var(--toss-blue-light)] transition-colors"
+                      className="px-3 py-1.5 text-[11px] font-semibold text-[var(--toss-blue)] border border-[var(--toss-blue-light)] rounded-[16px] hover:bg-[var(--toss-blue-light)] transition-colors"
                     >
                       📊 투표 만들기
                     </button>
@@ -1576,14 +1576,14 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                         setShowMediaPanel(false);
                         handleLeaveRoom();
                       }}
-                      className="px-3 py-1.5 text-[10px] font-semibold text-red-600 border border-red-100 rounded-xl hover:bg-red-50 transition-colors"
+                      className="px-3 py-1.5 text-[11px] font-semibold text-red-600 border border-red-100 rounded-[16px] hover:bg-red-50 transition-colors"
                     >
                       채팅방 나가기
                     </button>
                   </div>
                 )}
               </div>
-              <div className="px-3 py-2 border-b border-[var(--toss-border)] flex flex-wrap gap-2 text-[10px] font-semibold">
+              <div className="px-3 py-2 border-b border-[var(--toss-border)] flex flex-wrap gap-2 text-[11px] font-semibold">
                 <button
                   type="button"
                   onClick={() => setMediaFilter('all')}
@@ -1632,7 +1632,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
               {/* 채팅방 설정 (이름 변경) - 보기 좋게 사이드 패널 안에서 처리 */}
               {editingRoomName && selectedRoom?.id !== NOTICE_ROOM_ID && (
                 <div className="px-3 pt-3 pb-1 border-b border-[var(--toss-border)] space-y-2">
-                  <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">채팅방 이름 변경</p>
+                  <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">채팅방 이름 변경</p>
                   <div className="flex items-center gap-2">
                     <input
                       value={roomNameDraft}
@@ -1655,14 +1655,14 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                             setEditingRoomName(false);
                           });
                       }}
-                      className="px-3 py-1.5 text-[10px] font-semibold text-[var(--toss-blue)] border border-[var(--toss-blue)]/40 rounded-xl hover:bg-[var(--toss-blue)]/5 transition-colors"
+                      className="px-3 py-1.5 text-[11px] font-semibold text-[var(--toss-blue)] border border-[var(--toss-blue)]/40 rounded-[16px] hover:bg-[var(--toss-blue)]/5 transition-colors"
                     >
                       저장
                     </button>
                     <button
                       type="button"
                       onClick={() => setEditingRoomName(false)}
-                      className="px-3 py-1.5 text-[10px] font-semibold text-[var(--toss-gray-3)] border border-[var(--toss-border)] rounded-xl hover:bg-[var(--toss-gray-1)] transition-colors"
+                      className="px-3 py-1.5 text-[11px] font-semibold text-[var(--toss-gray-3)] border border-[var(--toss-border)] rounded-[16px] hover:bg-[var(--toss-gray-1)] transition-colors"
                     >
                       취소
                     </button>
@@ -1688,13 +1688,13 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                     return (
                       <div
                         key={msg.id}
-                        className="border border-[var(--toss-border)] rounded-lg p-3 bg-[var(--toss-gray-1)] hover:bg-[var(--toss-gray-1)] transition-colors text-[11px] space-y-2"
+                        className="border border-[var(--toss-border)] rounded-[12px] p-3 bg-[var(--toss-gray-1)] hover:bg-[var(--toss-gray-1)] transition-colors text-[11px] space-y-2"
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="font-bold text-[var(--foreground)] truncate">
                             {msg.staff?.name || '알 수 없음'}
                           </span>
-                          <span className="text-[10px] text-[var(--toss-gray-3)]">
+                          <span className="text-[11px] text-[var(--toss-gray-3)]">
                             {createdAt.toLocaleDateString('ko-KR')}{' '}
                             {createdAt.toLocaleTimeString('ko-KR', {
                               hour: '2-digit',
@@ -1704,7 +1704,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                         </div>
                         {hasFile && (
                           <div className="space-y-1">
-                            <p className="text-[10px] font-semibold text-[var(--toss-gray-3)]">
+                            <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
                               {isImage
                                 ? '📷 이미지'
                                 : isVideo
@@ -1721,7 +1721,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                                 <img
                                   src={msg.file_url}
                                   alt="첨부 이미지"
-                                  className="w-full max-h-40 object-cover rounded-xl border border-[var(--toss-border)]"
+                                  className="w-full max-h-40 object-cover rounded-[16px] border border-[var(--toss-border)]"
                                 />
                               </a>
                             )}
@@ -1730,7 +1730,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                                 href={msg.file_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="block px-3 py-2 rounded-xl bg-[var(--toss-card)] border border-[var(--toss-border)] text-[var(--toss-blue)] font-bold hover:bg-[var(--toss-blue-light)] truncate"
+                                className="block px-3 py-2 rounded-[16px] bg-[var(--toss-card)] border border-[var(--toss-border)] text-[var(--toss-blue)] font-bold hover:bg-[var(--toss-blue-light)] truncate"
                               >
                                 파일 열기 / 다운로드
                               </a>
@@ -1739,14 +1739,14 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                         )}
                         {hasLink && firstLink && (
                           <div className="space-y-1">
-                            <p className="text-[10px] font-semibold text-[var(--toss-gray-3)]">
+                            <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
                               🔗 링크
                             </p>
                             <a
                               href={firstLink}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="block px-3 py-2 rounded-xl bg-[var(--toss-card)] border border-[var(--toss-border)] text-[10px] text-[var(--toss-blue)] font-bold hover:bg-[var(--toss-blue-light)] break-all"
+                              className="block px-3 py-2 rounded-[16px] bg-[var(--toss-card)] border border-[var(--toss-border)] text-[11px] text-[var(--toss-blue)] font-bold hover:bg-[var(--toss-blue-light)] break-all"
                             >
                               {firstLink}
                             </a>
@@ -1765,7 +1765,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                 {/* 참여 멤버 목록 */}
                 {roomMembers.length > 0 && (
                   <div className="pt-3 border-t border-[var(--toss-border)] space-y-2">
-                    <p className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
+                    <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
                       참여 멤버 ({roomMembers.length})
                     </p>
                     <div className="space-y-1">
@@ -1785,7 +1785,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                         return (
                           <div
                             key={m.id}
-                            className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-[var(--toss-gray-1)] transition-colors"
+                            className="flex items-center gap-3 px-2 py-2 rounded-[16px] hover:bg-[var(--toss-gray-1)] transition-colors"
                           >
                             <div className="w-8 h-8 rounded-full bg-[var(--toss-gray-1)] flex items-center justify-center text-[11px] font-semibold text-[var(--toss-gray-3)] overflow-hidden">
                               {m.photo_url ? (
@@ -1802,7 +1802,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                               <p className="text-[11px] font-semibold text-[var(--foreground)] truncate">
                                 {m.name}
                               </p>
-                              <p className="text-[10px] font-bold text-[var(--toss-gray-3)] truncate">
+                              <p className="text-[11px] font-bold text-[var(--toss-gray-3)] truncate">
                                 {(m.position || '')}{" "}
                                 {m.company || m.department
                                   ? `· ${m.company || m.department}`
@@ -1811,7 +1811,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                             </div>
                             <div className="flex items-center gap-1 shrink-0">
                               <span className={`w-2 h-2 rounded-full ${presenceColor}`} />
-                              <span className="text-[9px] font-bold text-[var(--toss-gray-3)]">
+                              <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">
                                 {presenceLabel}
                               </span>
                             </div>
@@ -1832,11 +1832,11 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
             <div className="absolute inset-0 bg-black/10 z-30 animate-in fade-in duration-200" onClick={()=>{setActiveActionMsg(null); setEditingMsg(null);}} aria-hidden="true" />
             <div className="absolute top-0 right-0 bottom-0 w-72 bg-[var(--toss-card)] border-l border-[var(--toss-border)] shadow-2xl z-40 flex flex-col animate-in slide-in-from-right duration-300">
               <div className="p-4 border-b border-[var(--toss-border)] flex items-center justify-between">
-                <span className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">메시지 액션</span>
+                <span className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">메시지 액션</span>
                 <button onClick={()=>{setActiveActionMsg(null); setEditingMsg(null)}} className="p-2 text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] rounded-[12px] hover:bg-[var(--toss-gray-1)]">✕</button>
               </div>
               <div className="p-4 space-y-4 overflow-y-auto flex-1">
-                <p className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">감정 표현</p>
+                <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">감정 표현</p>
                 <div className="flex gap-2 flex-wrap">
                   {['👍','😂','❤️','😮','😢'].map(emoji => (
                     <button key={emoji} onClick={()=>{toggleReaction(activeActionMsg.id, emoji);}} className="w-11 h-11 flex items-center justify-center rounded-[12px] bg-[var(--toss-gray-1)] hover:bg-[var(--toss-blue-light)] text-xl transition-colors" title={emoji}>
@@ -1844,7 +1844,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                     </button>
                   ))}
                 </div>
-                <p className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase pt-2">기능</p>
+                <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase pt-2">기능</p>
                 <div className="space-y-1">
                   <button onClick={()=>{setReplyTo(activeActionMsg); setActiveActionMsg(null)}} className="w-full p-3 text-left hover:bg-[var(--toss-blue-light)] rounded-[12px] text-xs font-semibold text-[var(--toss-blue)] transition-colors">↩️ 답글 달기</button>
                   {activeActionMsg.sender_id === user.id && (
@@ -1964,12 +1964,12 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
         {/* 수정 모달 */}
         {editingMsg && (
           <div className="absolute inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-30" onClick={()=>{setEditingMsg(null); setEditContent('');}}>
-            <div className="bg-[var(--toss-card)] p-6 rounded-lg w-80 shadow-2xl" onClick={e=>e.stopPropagation()}>
+            <div className="bg-[var(--toss-card)] p-6 rounded-[12px] w-80 shadow-2xl" onClick={e=>e.stopPropagation()}>
               <p className="text-xs font-semibold text-[var(--toss-gray-3)] mb-2">메시지 수정</p>
-              <input value={editContent} onChange={e=>setEditContent(e.target.value)} className="w-full p-3 border rounded-xl text-sm mb-4" />
+              <input value={editContent} onChange={e=>setEditContent(e.target.value)} className="w-full p-3 border rounded-[16px] text-sm mb-4" />
               <div className="flex gap-2">
-                <button onClick={()=>{setEditingMsg(null); setEditContent('');}} className="flex-1 py-2 bg-[var(--toss-gray-1)] rounded-xl text-xs font-semibold">취소</button>
-                <button onClick={saveEditMessage} className="flex-1 py-2 bg-[var(--toss-blue)] text-white rounded-xl text-xs font-semibold">저장</button>
+                <button onClick={()=>{setEditingMsg(null); setEditContent('');}} className="flex-1 py-2 bg-[var(--toss-gray-1)] rounded-[16px] text-xs font-semibold">취소</button>
+                <button onClick={saveEditMessage} className="flex-1 py-2 bg-[var(--toss-blue)] text-white rounded-[16px] text-xs font-semibold">저장</button>
               </div>
             </div>
           </div>
@@ -1982,14 +1982,14 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
               <h3 className="text-xl font-semibold text-[var(--foreground)] italic">새 단체 채팅방</h3>
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest ml-1">방 이름</label>
-                  <input value={groupName} onChange={e => setGroupName(e.target.value)} className="w-full p-4 bg-[var(--input-bg)] rounded-lg border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]" placeholder="예: 행정팀 단체방" />
+                  <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest ml-1">방 이름</label>
+                  <input value={groupName} onChange={e => setGroupName(e.target.value)} className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]" placeholder="예: 행정팀 단체방" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest ml-1">멤버 선택 ({selectedMembers.length}명)</label>
-                  <div className="h-48 overflow-y-auto border border-[var(--toss-border)] rounded-lg p-4 space-y-2 custom-scrollbar bg-[var(--toss-gray-1)]/30">
+                  <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest ml-1">멤버 선택 ({selectedMembers.length}명)</label>
+                  <div className="h-48 overflow-y-auto border border-[var(--toss-border)] rounded-[12px] p-4 space-y-2 custom-scrollbar bg-[var(--toss-gray-1)]/30">
                     {staffs.filter((s:any) => s.id !== user.id).map((s: any) => (
-                      <label key={s.id} className="flex items-center gap-3 p-3 bg-[var(--toss-card)] rounded-xl border border-[var(--toss-border)] cursor-pointer hover:border-[var(--toss-blue)] transition-all">
+                      <label key={s.id} className="flex items-center gap-3 p-3 bg-[var(--toss-card)] rounded-[16px] border border-[var(--toss-border)] cursor-pointer hover:border-[var(--toss-blue)] transition-all">
                         <input type="checkbox" checked={selectedMembers.includes(s.id)} onChange={e => {
                           if (e.target.checked) setSelectedMembers([...selectedMembers, s.id]);
                           else setSelectedMembers(selectedMembers.filter(id => id !== s.id));
@@ -2000,8 +2000,8 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                   </div>
                 </div>
                 <div className="flex gap-3">
-                  <button onClick={() => setShowGroupModal(false)} className="flex-1 py-4 bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] rounded-lg font-semibold text-xs">취소</button>
-                  <button onClick={createGroupChat} className="flex-2 py-4 bg-[var(--toss-blue)] text-white rounded-lg font-semibold text-xs shadow-lg shadow-[var(--toss-blue)]">채팅방 생성</button>
+                  <button onClick={() => setShowGroupModal(false)} className="flex-1 py-4 bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] rounded-[12px] font-semibold text-xs">취소</button>
+                  <button onClick={createGroupChat} className="flex-2 py-4 bg-[var(--toss-blue)] text-white rounded-[12px] font-semibold text-xs shadow-lg shadow-[var(--toss-blue)]">채팅방 생성</button>
                 </div>
               </div>
             </div>
@@ -2014,25 +2014,25 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4">
           <div className="bg-[var(--toss-card)] w-full max-w-md rounded-3xl p-6 space-y-4 shadow-2xl border border-[var(--toss-border)]">
             <h3 className="text-lg font-semibold text-[var(--foreground)]">새 투표 만들기</h3>
-            <p className="text-[10px] text-[var(--toss-gray-3)] font-bold">
+            <p className="text-[11px] text-[var(--toss-gray-3)] font-bold">
               질문과 선택지를 입력하세요. 선택지는 콤마(,)로 구분합니다.
             </p>
             <div className="space-y-3">
               <div>
-                <label className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">질문</label>
+                <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">질문</label>
                 <input
                   value={pollQuestion}
                   onChange={(e) => setPollQuestion(e.target.value)}
-                  className="w-full mt-1 p-3 bg-[var(--input-bg)] border border-[var(--toss-border)] rounded-xl text-xs font-bold outline-none focus:border-[var(--toss-blue)]"
+                  className="w-full mt-1 p-3 bg-[var(--input-bg)] border border-[var(--toss-border)] rounded-[16px] text-xs font-bold outline-none focus:border-[var(--toss-blue)]"
                   placeholder="예: 이번 주 회의 시간은 언제가 좋을까요?"
                 />
               </div>
               <div>
-                <label className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">선택지 (쉼표로 구분)</label>
+                <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">선택지 (쉼표로 구분)</label>
                 <input
                   value={pollOptions}
                   onChange={(e) => setPollOptions(e.target.value)}
-                  className="w-full mt-1 p-3 bg-[var(--input-bg)] border border-[var(--toss-border)] rounded-xl text-xs font-bold outline-none focus:border-[var(--toss-blue)]"
+                  className="w-full mt-1 p-3 bg-[var(--input-bg)] border border-[var(--toss-border)] rounded-[16px] text-xs font-bold outline-none focus:border-[var(--toss-blue)]"
                   placeholder="찬성, 반대"
                 />
               </div>
@@ -2041,14 +2041,14 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
               <button
                 type="button"
                 onClick={() => setShowPollModal(false)}
-                className="flex-1 py-3 rounded-xl text-[10px] font-semibold text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]"
+                className="flex-1 py-3 rounded-[16px] text-[11px] font-semibold text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]"
               >
                 취소
               </button>
               <button
                 type="button"
                 onClick={handleCreatePoll}
-                className="flex-1 py-3 rounded-xl text-[10px] font-semibold bg-[var(--toss-blue)] text-white hover:bg-[var(--toss-blue)] shadow-md"
+                className="flex-1 py-3 rounded-[16px] text-[11px] font-semibold bg-[var(--toss-blue)] text-white hover:bg-[var(--toss-blue)] shadow-md"
               >
                 투표 생성
               </button>
@@ -2066,38 +2066,38 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
             </h3>
             {slashCommand === 'annual_leave' ? (
               <>
-                <p className="text-[10px] text-[var(--toss-gray-3)] font-bold">
+                <p className="text-[11px] text-[var(--toss-gray-3)] font-bold">
                   시작일/종료일과 사유를 입력하면 전자결재에 연차/휴가 기안 초안이 생성됩니다.
                 </p>
                 <div className="space-y-3 text-xs font-bold">
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-[10px] text-[var(--toss-gray-3)] mb-1">시작일</label>
+                      <label className="block text-[11px] text-[var(--toss-gray-3)] mb-1">시작일</label>
                       <input
                         type="date"
                         value={slashForm.startDate}
                         onChange={e => setSlashForm((f: any) => ({ ...f, startDate: e.target.value }))}
-                        className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-xl text-xs"
+                        className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[16px] text-xs"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] text-[var(--toss-gray-3)] mb-1">종료일</label>
+                      <label className="block text-[11px] text-[var(--toss-gray-3)] mb-1">종료일</label>
                       <input
                         type="date"
                         value={slashForm.endDate}
                         onChange={e => setSlashForm((f: any) => ({ ...f, endDate: e.target.value }))}
-                        className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-xl text-xs"
+                        className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[16px] text-xs"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-[10px] text-[var(--toss-gray-3)] mb-1">사유(선택)</label>
+                    <label className="block text-[11px] text-[var(--toss-gray-3)] mb-1">사유(선택)</label>
                     <input
                       type="text"
                       value={slashForm.reason}
                       onChange={e => setSlashForm((f: any) => ({ ...f, reason: e.target.value }))}
                       placeholder="예: 개인 일정, 병원 방문 등"
-                      className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-xl text-xs"
+                      className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[16px] text-xs"
                     />
                   </div>
                 </div>
@@ -2105,7 +2105,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                   <button
                     type="button"
                     onClick={() => setShowSlashModal(false)}
-                    className="flex-1 py-3 rounded-xl text-[10px] font-semibold text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]"
+                    className="flex-1 py-3 rounded-[16px] text-[11px] font-semibold text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]"
                   >
                     취소
                   </button>
@@ -2143,7 +2143,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                         setShowSlashModal(false);
                       }
                     }}
-                    className="flex-1 py-3 rounded-xl text-[10px] font-semibold bg-[var(--toss-blue)] text-white hover:bg-[var(--toss-blue)] shadow-md"
+                    className="flex-1 py-3 rounded-[16px] text-[11px] font-semibold bg-[var(--toss-blue)] text-white hover:bg-[var(--toss-blue)] shadow-md"
                   >
                     전자결재 초안 생성
                   </button>
@@ -2151,39 +2151,39 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
               </>
             ) : (
               <>
-                <p className="text-[10px] text-[var(--toss-gray-3)] font-bold">
+                <p className="text-[11px] text-[var(--toss-gray-3)] font-bold">
                   품목명과 수량을 입력하면 비품구매(발주) 결재 초안이 생성됩니다.
                 </p>
                 <div className="space-y-3 text-xs font-bold">
                   <div>
-                    <label className="block text-[10px] text-[var(--toss-gray-3)] mb-1">품목명</label>
+                    <label className="block text-[11px] text-[var(--toss-gray-3)] mb-1">품목명</label>
                     <input
                       type="text"
                       value={slashForm.itemName}
                       onChange={e => setSlashForm((f: any) => ({ ...f, itemName: e.target.value }))}
                       placeholder="예: A사 프린터 토너"
-                      className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-xl text-xs"
+                      className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[16px] text-xs"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-[10px] text-[var(--toss-gray-3)] mb-1">수량</label>
+                      <label className="block text-[11px] text-[var(--toss-gray-3)] mb-1">수량</label>
                       <input
                         type="number"
                         min={1}
                         value={slashForm.quantity}
                         onChange={e => setSlashForm((f: any) => ({ ...f, quantity: Number(e.target.value) || 1 }))}
-                        className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-xl text-xs"
+                        className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[16px] text-xs"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] text-[var(--toss-gray-3)] mb-1">비고(선택)</label>
+                      <label className="block text-[11px] text-[var(--toss-gray-3)] mb-1">비고(선택)</label>
                       <input
                         type="text"
                         value={slashForm.reason}
                         onChange={e => setSlashForm((f: any) => ({ ...f, reason: e.target.value }))}
                         placeholder="예: 재고 부족, 교체 주기 도래 등"
-                        className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-xl text-xs"
+                        className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[16px] text-xs"
                       />
                     </div>
                   </div>
@@ -2192,7 +2192,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                   <button
                     type="button"
                     onClick={() => setShowSlashModal(false)}
-                    className="flex-1 py-3 rounded-xl text-[10px] font-semibold text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]"
+                    className="flex-1 py-3 rounded-[16px] text-[11px] font-semibold text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]"
                   >
                     취소
                   </button>
@@ -2231,7 +2231,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                         setShowSlashModal(false);
                       }
                     }}
-                    className="flex-1 py-3 rounded-xl text-[10px] font-semibold bg-[var(--toss-blue)] text-white hover:bg-[var(--toss-blue)] shadow-md"
+                    className="flex-1 py-3 rounded-[16px] text-[11px] font-semibold bg-[var(--toss-blue)] text-white hover:bg-[var(--toss-blue)] shadow-md"
                   >
                     전자결재 초안 생성
                   </button>
@@ -2253,7 +2253,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
           <aside className="absolute top-0 right-0 bottom-0 w-80 bg-[var(--toss-card)] border-l border-[var(--toss-border)] shadow-2xl z-50 flex flex-col animate-in slide-in-from-right duration-300">
             <div className="p-4 border-b border-[var(--toss-border)] flex items-center justify-between">
               <div className="min-w-0">
-                <p className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
+                <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
                   스레드
                 </p>
                 <p className="text-xs font-semibold text-[var(--foreground)] mt-0.5 line-clamp-2">
@@ -2280,7 +2280,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                   return (
                     <div
                       key={m.id}
-                      className={`border rounded-lg p-3 text-[11px] space-y-1 ${
+                      className={`border rounded-[12px] p-3 text-[11px] space-y-1 ${
                         isRoot ? 'bg-[var(--toss-blue-light)] border-[var(--toss-blue)]' : 'bg-[var(--toss-gray-1)] border-[var(--toss-border)]'
                       }`}
                     >
@@ -2288,7 +2288,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                         <span className="font-semibold text-[var(--foreground)] truncate">
                           {staff?.name || '알 수 없음'} {staff?.position || ''}
                         </span>
-                        <span className="text-[9px] text-[var(--toss-gray-3)]">
+                        <span className="text-[11px] text-[var(--toss-gray-3)]">
                           {createdAt.toLocaleDateString('ko-KR', {
                             month: 'numeric',
                             day: 'numeric',
@@ -2307,7 +2307,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                           href={m.file_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 px-2 py-1 mt-1 rounded-lg bg-[var(--toss-card)] border border-[var(--toss-border)] text-[10px] font-bold text-[var(--toss-blue)] hover:bg-[var(--toss-blue-light)]"
+                          className="inline-flex items-center gap-1 px-2 py-1 mt-1 rounded-[12px] bg-[var(--toss-card)] border border-[var(--toss-border)] text-[11px] font-bold text-[var(--toss-blue)] hover:bg-[var(--toss-blue-light)]"
                         >
                           📎 파일 열기
                         </a>
@@ -2327,7 +2327,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
           <div className="bg-[var(--toss-card)] w-full max-w-md rounded-3xl p-6 space-y-4 shadow-2xl border border-[var(--toss-border)]" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
+                <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
                   공지 미열람 대상자
                 </p>
                 <p className="text-xs font-semibold text-[var(--foreground)] mt-0.5 line-clamp-2">
@@ -2355,17 +2355,17 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                   {unreadUsers.map((u: any) => (
                     <div
                       key={u.id}
-                      className="flex items-center justify-between px-3 py-2 rounded-xl bg-[var(--toss-gray-1)] hover:bg-[var(--toss-gray-1)] text-[11px]"
+                      className="flex items-center justify-between px-3 py-2 rounded-[16px] bg-[var(--toss-gray-1)] hover:bg-[var(--toss-gray-1)] text-[11px]"
                     >
                       <div className="min-w-0">
                         <p className="font-semibold text-[var(--foreground)] truncate">
                           {u.name}
                         </p>
-                        <p className="text-[10px] font-bold text-[var(--toss-gray-3)] truncate">
+                        <p className="text-[11px] font-bold text-[var(--toss-gray-3)] truncate">
                           {(u.department || '')} {u.position ? `· ${u.position}` : ''}
                         </p>
                       </div>
-                      <span className="text-[9px] font-bold text-[var(--toss-gray-3)]">
+                      <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">
                         미열람
                       </span>
                     </div>
@@ -2412,13 +2412,13 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                         setForwardSourceMsg(null);
                       }
                     }}
-                    className="w-full flex items-center justify-between px-4 py-3 rounded-lg border border-[var(--toss-border)] hover:bg-[var(--toss-blue-light)] text-left text-xs font-bold text-[var(--foreground)]"
+                    className="w-full flex items-center justify-between px-4 py-3 rounded-[12px] border border-[var(--toss-border)] hover:bg-[var(--toss-blue-light)] text-left text-xs font-bold text-[var(--foreground)]"
                   >
                     <span className="truncate">
                       {room.id === NOTICE_ROOM_ID ? '📢 ' : '👥 '}
                       {room.name || '채팅방'}
                     </span>
-                    <span className="text-[10px] text-[var(--toss-gray-3)]">
+                    <span className="text-[11px] text-[var(--toss-gray-3)]">
                       {roomUnreadCounts[room.id] ? `안읽음 ${roomUnreadCounts[room.id]}건` : ''}
                     </span>
                   </button>
@@ -2428,7 +2428,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
               <button
                 type="button"
                 onClick={() => { setShowForwardModal(false); setForwardSourceMsg(null); }}
-                className="flex-1 py-3 rounded-xl text-[10px] font-semibold text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]"
+                className="flex-1 py-3 rounded-[16px] text-[11px] font-semibold text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]"
               >
                 닫기
               </button>
@@ -2460,7 +2460,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
               type="text"
               value={addMemberSearch}
               onChange={(e) => setAddMemberSearch(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-[var(--toss-border)] text-xs font-bold outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+              className="w-full px-3 py-2 rounded-[16px] border border-[var(--toss-border)] text-xs font-bold outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30"
               placeholder="이름, 부서, 직급으로 검색"
             />
             <div className="max-h-64 overflow-y-auto custom-scrollbar space-y-1">
@@ -2474,7 +2474,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                   return (
                     <label
                       key={s.id}
-                      className="flex items-center gap-3 px-3 py-2 rounded-xl border border-[var(--toss-border)] hover:bg-[var(--toss-gray-1)] cursor-pointer text-[11px]"
+                      className="flex items-center gap-3 px-3 py-2 rounded-[16px] border border-[var(--toss-border)] hover:bg-[var(--toss-gray-1)] cursor-pointer text-[11px]"
                     >
                       <input
                         type="checkbox"
@@ -2515,7 +2515,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                   setShowAddMemberModal(false);
                   setAddMemberSelectingIds([]);
                 }}
-                className="flex-1 py-3 rounded-xl text-[10px] font-semibold text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]"
+                className="flex-1 py-3 rounded-[16px] text-[11px] font-semibold text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]"
               >
                 취소
               </button>
@@ -2570,7 +2570,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                     alert('대화상대 추가 중 오류가 발생했습니다.');
                   }
                 }}
-                className="flex-1 py-3 rounded-xl text-[10px] font-semibold text-white bg-[var(--toss-blue)] disabled:bg-[var(--toss-gray-3)] hover:bg-[var(--toss-blue)]"
+                className="flex-1 py-3 rounded-[16px] text-[11px] font-semibold text-white bg-[var(--toss-blue)] disabled:bg-[var(--toss-gray-3)] hover:bg-[var(--toss-blue)]"
               >
                 추가하기
               </button>

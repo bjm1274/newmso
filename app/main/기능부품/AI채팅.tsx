@@ -50,7 +50,7 @@ export default function AIChatView() {
         <h2 className="text-xl md:text-2xl font-semibold text-[var(--foreground)] tracking-tighter italic">
           AI 업무 도우미
         </h2>
-        <p className="text-[10px] md:text-xs text-[var(--toss-gray-3)] font-bold uppercase mt-1 tracking-widest">
+        <p className="text-[11px] md:text-xs text-[var(--toss-gray-3)] font-bold uppercase mt-1 tracking-widest">
           인사·급여·근태·전자결재 문의
         </p>
       </header>

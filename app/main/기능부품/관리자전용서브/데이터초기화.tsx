@@ -74,7 +74,7 @@ export default function DataReseter({ onRefresh }: { onRefresh: () => void }) {
       {!isUnlocked ? (
         <div className="bg-white p-12 border border-red-100 shadow-2xl text-center space-y-6 max-w-sm w-full">
           <h3 className="font-semibold text-xl text-red-600 tracking-tighter uppercase">시스템 보안 인증</h3>
-          <p className="text-[10px] text-[var(--toss-gray-3)] font-bold tracking-widest uppercase">보안 구역 접근을 위해 암호를 입력하세요</p>
+          <p className="text-[11px] text-[var(--toss-gray-3)] font-bold tracking-widest uppercase">보안 구역 접근을 위해 암호를 입력하세요</p>
           <input 
             type="password" 
             value={password} 
@@ -88,7 +88,7 @@ export default function DataReseter({ onRefresh }: { onRefresh: () => void }) {
         <div className="w-full max-w-2xl space-y-4">
           <div className="bg-red-50 p-6 border border-red-100 text-center mb-6">
             <h3 className="text-red-600 font-semibold text-sm mb-1 tracking-tighter uppercase">통합 데이터 초기화 관리</h3>
-            <p className="text-[10px] text-red-400 font-bold uppercase tracking-widest">항목별 실행 버튼을 누르면 즉시 영구 삭제됩니다.</p>
+            <p className="text-[11px] text-red-400 font-bold uppercase tracking-widest">항목별 실행 버튼을 누르면 즉시 영구 삭제됩니다.</p>
           </div>
 
           <div className="grid grid-cols-1 gap-3">
@@ -108,13 +108,13 @@ export default function DataReseter({ onRefresh }: { onRefresh: () => void }) {
               className="p-6 bg-white border-2 border-red-50 hover:border-red-600 hover:bg-red-50 text-left font-semibold text-xs text-red-600 flex justify-between items-center transition-all group"
             >
               <span>👤 관리자 제외 전 직원 계정 및 데이터 삭제</span>
-              <span className="text-[9px] font-bold px-2 py-1 bg-red-600 text-white uppercase">관리자 유지</span>
+              <span className="text-[11px] font-bold px-2 py-1 bg-red-600 text-white uppercase">관리자 유지</span>
             </button>
           </div>
           
           <button 
             onClick={() => setIsUnlocked(false)}
-            className="w-full py-3 text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest hover:text-[var(--toss-gray-4)] transition-colors"
+            className="w-full py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest hover:text-[var(--toss-gray-4)] transition-colors"
           >
             관리자 모드 종료 및 화면 잠금
           </button>
@@ -129,7 +129,7 @@ function ResetButton({ onClick, label }: { onClick: () => void, label: string })
   return (
     <button onClick={onClick} className="p-5 bg-white border border-[var(--toss-border)] hover:border-red-500 hover:text-red-600 text-left font-semibold text-xs flex justify-between items-center transition-all group">
       <span>{label}</span>
-      <span className="text-[9px] opacity-0 group-hover:opacity-100 transition-opacity font-bold uppercase text-red-500">실행하기</span>
+      <span className="text-[11px] opacity-0 group-hover:opacity-100 transition-opacity font-bold uppercase text-red-500">실행하기</span>
     </button>
   );
 }

@@ -28,9 +28,9 @@ export default function PayrollLockPanel({ yearMonth, companyName, onLockChange 
   };
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-[var(--page-bg)] rounded-lg border border-[var(--toss-border)]">
+    <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-[var(--page-bg)] rounded-[12px] border border-[var(--toss-border)]">
       <span className="text-sm font-medium text-[var(--foreground)]">{yearMonth} 급여 마감</span>
-      <button onClick={toggle} disabled={loading} className={`px-4 py-2 text-xs font-medium rounded-lg disabled:opacity-50 ${locked ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}`}>
+      <button onClick={toggle} disabled={loading} className={`px-4 py-2 text-xs font-medium rounded-[12px] disabled:opacity-50 ${locked ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}`}>
         {locked ? '잠금됨' : '잠금하기'}
       </button>
     </div>

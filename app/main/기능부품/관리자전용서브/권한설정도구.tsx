@@ -84,7 +84,7 @@ export default function PermissionTool() {
       <div className="w-1/3 border-r border-gray-50 flex flex-col">
         <div className="p-6 border-b border-gray-50 bg-gray-25">
           <h3 className="text-sm font-semibold text-[var(--foreground)]">직원 명단</h3>
-          <p className="text-[10px] text-[var(--toss-gray-3)] font-bold">권한을 설정할 직원을 선택하세요</p>
+          <p className="text-[11px] text-[var(--toss-gray-3)] font-bold">권한을 설정할 직원을 선택하세요</p>
         </div>
         <div className="flex-1 overflow-y-auto">
           {staffs.map(staff => (
@@ -95,9 +95,9 @@ export default function PermissionTool() {
             >
               <div className="flex justify-between items-center">
                 <span className="text-xs font-semibold text-[var(--foreground)]">{staff.name}</span>
-                <span className="text-[10px] font-bold text-[var(--toss-gray-3)]">사번: {staff.employee_no}</span>
+                <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">사번: {staff.employee_no}</span>
               </div>
-              <p className="text-[10px] text-[var(--toss-gray-3)] mt-1">{staff.department} / {staff.position}</p>
+              <p className="text-[11px] text-[var(--toss-gray-3)] mt-1">{staff.department} / {staff.position}</p>
             </button>
           ))}
         </div>
@@ -112,21 +112,21 @@ export default function PermissionTool() {
               <p className="text-xs font-bold text-[var(--toss-blue)] mt-1">사번 {selectedStaff.employee_no} (로그인 아이디) | {selectedStaff.department} {selectedStaff.position}</p>
             </div>
 
-            <div className="bg-white p-6 rounded-lg shadow-sm border border-[var(--toss-border)]">
+            <div className="bg-white p-6 rounded-[12px] shadow-sm border border-[var(--toss-border)]">
               <p className="text-sm font-semibold text-[var(--foreground)] mb-2">🔑 비밀번호 설정</p>
-              <p className="text-[10px] text-[var(--toss-gray-3)] font-bold mb-3">해당 직원의 로그인 비밀번호를 설정·변경합니다. 미설정 시 로그인할 수 없습니다.</p>
+              <p className="text-[11px] text-[var(--toss-gray-3)] font-bold mb-3">해당 직원의 로그인 비밀번호를 설정·변경합니다. 미설정 시 로그인할 수 없습니다.</p>
               <div className="flex gap-2">
                 <input
                   type="password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="새 비밀번호"
-                  className="flex-1 px-4 py-2.5 border border-[var(--toss-border)] rounded-xl text-sm"
+                  className="flex-1 px-4 py-2.5 border border-[var(--toss-border)] rounded-[16px] text-sm"
                 />
                 <button
                   onClick={setPassword}
                   disabled={passwordSaving || !newPassword.trim()}
-                  className="px-4 py-2.5 bg-gray-900 text-white rounded-xl text-xs font-bold hover:bg-black disabled:opacity-50"
+                  className="px-4 py-2.5 bg-gray-900 text-white rounded-[16px] text-xs font-bold hover:bg-black disabled:opacity-50"
                 >
                   {passwordSaving ? '저장 중…' : '비밀번호 변경'}
                 </button>
@@ -135,10 +135,10 @@ export default function PermissionTool() {
 
             <div className="space-y-4">
               {Object.keys(permissionLabels).map(key => (
-                <div key={key} className="flex justify-between items-center bg-white p-6 rounded-lg shadow-sm border border-[var(--toss-border)]">
+                <div key={key} className="flex justify-between items-center bg-white p-6 rounded-[12px] shadow-sm border border-[var(--toss-border)]">
                   <div>
                     <span className="text-sm font-semibold text-[var(--foreground)]">{permissionLabels[key]}</span>
-                    <p className="text-[10px] text-[var(--toss-gray-3)] font-bold mt-1">해당 메뉴에 대한 접근 및 조작 권한을 설정합니다.</p>
+                    <p className="text-[11px] text-[var(--toss-gray-3)] font-bold mt-1">해당 메뉴에 대한 접근 및 조작 권한을 설정합니다.</p>
                   </div>
                   <button
                     onClick={() => togglePermission(selectedStaff.id, key)}
@@ -150,17 +150,17 @@ export default function PermissionTool() {
               ))}
             </div>
 
-            <div className="bg-amber-50 p-6 rounded-lg border border-amber-100">
-              <p className="text-[10px] font-semibold text-amber-800">📌 권한 설명</p>
-              <ul className="text-[10px] text-amber-700 font-bold mt-2 space-y-1 list-disc list-inside leading-relaxed">
+            <div className="bg-amber-50 p-6 rounded-[12px] border border-amber-100">
+              <p className="text-[11px] font-semibold text-amber-800">📌 권한 설명</p>
+              <ul className="text-[11px] text-amber-700 font-bold mt-2 space-y-1 list-disc list-inside leading-relaxed">
                 <li><strong>MSO 전용</strong>: 관리자 메뉴·회사 선택 등 전체 기능 사용 (MSO 소속만 표시)</li>
                 <li><strong>인사관리 조회</strong>: 부서장 등 인사 메뉴 접근 허용</li>
                 <li><strong>MSO+전체회사</strong>: MSO와 다른 회사 데이터를 한 번에 관리 가능한 특별 관리자</li>
               </ul>
             </div>
-            <div className="bg-blue-50 p-6 rounded-lg border border-blue-100">
-              <p className="text-[10px] font-semibold text-blue-700">💡 안내</p>
-              <p className="text-[10px] text-[var(--toss-blue)] font-bold mt-1 leading-relaxed">
+            <div className="bg-blue-50 p-6 rounded-[12px] border border-blue-100">
+              <p className="text-[11px] font-semibold text-blue-700">💡 안내</p>
+              <p className="text-[11px] text-[var(--toss-blue)] font-bold mt-1 leading-relaxed">
                 권한 설정은 즉시 반영됩니다. 해당 직원이 로그인 중인 경우, 다음 페이지 이동 시부터 적용된 권한이 활성화됩니다.
               </p>
             </div>

@@ -58,7 +58,7 @@ export default function WeeklyHoursMonitor({ selectedCo, yearMonth: initialYm }:
   }, [yearMonth, selectedCo]);
 
   return (
-    <div className="border border-[var(--toss-border)] p-5 bg-[var(--toss-card)] rounded-lg shadow-sm">
+    <div className="border border-[var(--toss-border)] p-5 bg-[var(--toss-card)] rounded-[12px] shadow-sm">
       <div className="pb-2 border-b border-[var(--toss-border)] mb-3">
         <h3 className="text-sm font-semibold text-[var(--foreground)]">주 52시간 모니터링</h3>
       </div>

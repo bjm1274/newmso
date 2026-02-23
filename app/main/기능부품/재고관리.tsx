@@ -131,7 +131,7 @@ export default function IntegratedInventoryManagement({ user }: any) {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
+            className={`flex items-center gap-2 px-5 py-3 rounded-[16px] text-sm font-semibold transition-all whitespace-nowrap ${
               activeTab === tab.id
                 ? 'bg-[var(--toss-blue)] text-white shadow-lg'
                 : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]/80'
@@ -153,20 +153,20 @@ export default function IntegratedInventoryManagement({ user }: any) {
           <div className="max-w-6xl mx-auto space-y-6">
             {/* 행정팀 물품이동 알림 섹션 */}
             {user.department === '행정팀' && notifications.length > 0 && (
-              <div className="bg-orange-50 border-2 border-orange-200 rounded-lg p-6 space-y-4">
+              <div className="bg-orange-50 border-2 border-orange-200 rounded-[12px] p-6 space-y-4">
                 <h3 className="font-semibold text-orange-700 flex items-center gap-2">🚚 물품 이동 대기 중 ({notifications.length})</h3>
                 <div className="space-y-3">
                   {notifications.map(n => (
-                    <div key={n.id} className="bg-[var(--toss-card)] p-4 rounded-xl shadow-sm border border-orange-100 flex justify-between items-center">
+                    <div key={n.id} className="bg-[var(--toss-card)] p-4 rounded-[16px] shadow-sm border border-orange-100 flex justify-between items-center">
                       <div>
                         <p className="text-xs font-semibold text-[var(--foreground)]">{n.body}</p>
-                        <p className="text-[10px] text-[var(--toss-gray-3)] font-bold mt-1">
+                        <p className="text-[11px] text-[var(--toss-gray-3)] font-bold mt-1">
                           {n.metadata.items.map((i:any) => `${i.name}(${i.qty}개/수령:${i.dept})`).join(', ')}
                         </p>
                       </div>
                       <button 
                         onClick={() => handleMoveComplete(n)}
-                        className="px-4 py-2 bg-orange-600 text-white text-[10px] font-semibold rounded-lg shadow-md hover:bg-orange-700 transition-all"
+                        className="px-4 py-2 bg-orange-600 text-white text-[11px] font-semibold rounded-[12px] shadow-md hover:bg-orange-700 transition-all"
                       >
                         이동 완료 처리
                       </button>
@@ -179,24 +179,24 @@ export default function IntegratedInventoryManagement({ user }: any) {
             {activeTab === '현황' && (
               <div className="space-y-6">
                 {/* 필터 섹션 */}
-                <div className="flex gap-4 items-center bg-[var(--toss-card)] p-4 rounded-lg border border-[var(--toss-border)] shadow-sm overflow-x-auto">
+                <div className="flex gap-4 items-center bg-[var(--toss-card)] p-4 rounded-[12px] border border-[var(--toss-border)] shadow-sm overflow-x-auto">
                   <div className="flex gap-2 shrink-0">
-                    <span className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase self-center mr-2">🏢 회사별</span>
+                    <span className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase self-center mr-2">🏢 회사별</span>
                     {companies.map(co => (
-                      <button key={co} onClick={() => { setSelectedCo(co); setSelectedDept('전체'); }} className={`px-4 py-2 rounded-xl text-[10px] font-semibold transition-all ${selectedCo === co ? 'bg-[var(--toss-blue)] text-white shadow-md' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]'}`}>{co}</button>
+                      <button key={co} onClick={() => { setSelectedCo(co); setSelectedDept('전체'); }} className={`px-4 py-2 rounded-[16px] text-[11px] font-semibold transition-all ${selectedCo === co ? 'bg-[var(--toss-blue)] text-white shadow-md' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]'}`}>{co}</button>
                     ))}
                   </div>
                   {selectedCo === '박철홍정형외과' && (
                     <div className="flex gap-2 shrink-0 border-l pl-4">
-                      <span className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase self-center mr-2">🏥 부서별</span>
+                      <span className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase self-center mr-2">🏥 부서별</span>
                       {hospitalDepts.map(dept => (
-                        <button key={dept} onClick={() => setSelectedDept(dept)} className={`px-4 py-2 rounded-xl text-[10px] font-semibold transition-all ${selectedDept === dept ? 'bg-green-600 text-white shadow-md' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]'}`}>{dept}</button>
+                        <button key={dept} onClick={() => setSelectedDept(dept)} className={`px-4 py-2 rounded-[16px] text-[11px] font-semibold transition-all ${selectedDept === dept ? 'bg-green-600 text-white shadow-md' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]'}`}>{dept}</button>
                       ))}
                     </div>
                   )}
                 </div>
 
-                <div className="bg-[var(--toss-card)] p-8 border border-[var(--toss-border)] shadow-sm rounded-lg">
+                <div className="bg-[var(--toss-card)] p-8 border border-[var(--toss-border)] shadow-sm rounded-[12px]">
                   <div className="flex justify-between items-center mb-6">
                     <h2 className="text-2xl font-semibold text-[var(--foreground)]">📊 {selectedCo} {selectedDept !== '전체' ? `[${selectedDept}]` : ''} 재고 현황</h2>
                     <button onClick={fetchInventory} className="p-2 hover:bg-[var(--toss-gray-1)] rounded-full transition-all">🔄</button>
@@ -222,9 +222,9 @@ export default function IntegratedInventoryManagement({ user }: any) {
                             <td className="py-4 px-4 text-sm font-bold text-[var(--toss-gray-3)]">{item.min_stock}</td>
                             <td className="py-4 px-4">
                               {item.stock <= item.min_stock ? (
-                                <span className="px-3 py-1 bg-red-100 text-red-600 rounded-lg text-[10px] font-semibold">발주필요</span>
+                                <span className="px-3 py-1 bg-red-100 text-red-600 rounded-[12px] text-[11px] font-semibold">발주필요</span>
                               ) : (
-                                <span className="px-3 py-1 bg-green-100 text-green-600 rounded-lg text-[10px] font-semibold">정상</span>
+                                <span className="px-3 py-1 bg-green-100 text-green-600 rounded-[12px] text-[11px] font-semibold">정상</span>
                               )}
                             </td>
                             <td className="py-4 px-4">

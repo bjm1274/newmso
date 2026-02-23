@@ -42,7 +42,7 @@ export default function EducationMain({ staffs, selectedCo }: any) {
       {notifications.length > 0 && (
         <div className="bg-red-600 text-white px-8 py-2 flex justify-between items-center animate-pulse">
           <p className="text-[11px] font-semibold">⚠️ 법정 의무 교육 이수 기한이 7일 이내인 직원이 {notifications.filter(n => n.type === 'URGENT').length}명 있습니다. 즉시 독려가 필요합니다.</p>
-          <button onClick={() => setShowNoti(!showNoti)} className="text-[10px] font-semibold underline">상세보기</button>
+          <button onClick={() => setShowNoti(!showNoti)} className="text-[11px] font-semibold underline">상세보기</button>
         </div>
       )}
 
@@ -52,7 +52,7 @@ export default function EducationMain({ staffs, selectedCo }: any) {
           <h2 className="text-xl font-semibold text-[var(--foreground)] tracking-tighter">
             법정 의무 교육 관리 <span className="text-sm text-[var(--toss-blue)] ml-2">[{selectedCo}]</span>
           </h2>
-          <p className="text-[10px] text-[var(--toss-gray-3)] font-bold mt-1 uppercase tracking-widest">Mandatory Compliance Training Dashboard</p>
+          <p className="text-[11px] text-[var(--toss-gray-3)] font-bold mt-1 uppercase tracking-widest">Mandatory Compliance Training Dashboard</p>
         </div>
         <div className="flex gap-2">
           <button className="px-6 py-3 bg-[var(--toss-card)] border border-[var(--toss-border)] text-[var(--toss-gray-4)] text-[11px] font-semibold shadow-sm hover:bg-[var(--toss-gray-1)] transition-all">
@@ -75,8 +75,8 @@ export default function EducationMain({ staffs, selectedCo }: any) {
             {notifications.map((n, i) => (
               <div key={i} className={`p-3 border-l-4 ${n.type === 'URGENT' ? 'border-red-500 bg-red-50' : 'border-orange-400 bg-orange-50'}`}>
                 <p className="text-[11px] font-semibold text-[var(--foreground)]">{n.name} ({n.education})</p>
-                <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mt-1">만료까지 {n.daysLeft}일 남음</p>
-                <button className="mt-2 text-[9px] font-semibold text-[var(--toss-blue)] uppercase tracking-tighter">알림톡 발송 →</button>
+                <p className="text-[11px] font-bold text-[var(--toss-gray-3)] mt-1">만료까지 {n.daysLeft}일 남음</p>
+                <button className="mt-2 text-[11px] font-semibold text-[var(--toss-blue)] uppercase tracking-tighter">알림톡 발송 →</button>
               </div>
             ))}
           </div>

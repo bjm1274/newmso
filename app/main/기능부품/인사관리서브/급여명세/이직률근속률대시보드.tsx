@@ -22,20 +22,20 @@ export default function TurnoverDashboard({ staffs = [] }: any) {
   const avgYears = (avgTenure / 365).toFixed(1);
 
   return (
-    <div className="border border-[var(--toss-border)] p-4 bg-[var(--toss-card)] rounded-lg shadow-sm">
+    <div className="border border-[var(--toss-border)] p-4 bg-[var(--toss-card)] rounded-[12px] shadow-sm">
       <div className="pb-2 border-b border-[var(--toss-border)] mb-3">
         <h3 className="text-sm font-semibold text-[var(--foreground)]">이직률 · 근속률</h3>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <div className="p-3 bg-[var(--page-bg)] rounded-lg border border-[var(--toss-border)]">
+        <div className="p-3 bg-[var(--page-bg)] rounded-[12px] border border-[var(--toss-border)]">
           <p className="text-xs font-medium text-[var(--toss-gray-3)]">이직률</p>
           <p className="text-lg font-bold text-red-600 mt-0.5">{turnover}%</p>
-          <p className="text-[10px] text-[var(--toss-gray-3)] mt-1">퇴사 {resigned}명 / 전체 {total}명</p>
+          <p className="text-[11px] text-[var(--toss-gray-3)] mt-1">퇴사 {resigned}명 / 전체 {total}명</p>
         </div>
-        <div className="p-3 bg-[var(--page-bg)] rounded-lg border border-[var(--toss-border)]">
+        <div className="p-3 bg-[var(--page-bg)] rounded-[12px] border border-[var(--toss-border)]">
           <p className="text-xs font-medium text-[var(--toss-gray-3)]">평균 근속</p>
           <p className="text-lg font-bold text-[var(--toss-blue)] mt-0.5">{avgYears}년</p>
-          <p className="text-[10px] text-[var(--toss-gray-3)] mt-1">재직 {active}명 기준</p>
+          <p className="text-[11px] text-[var(--toss-gray-3)] mt-1">재직 {active}명 기준</p>
         </div>
       </div>
     </div>

@@ -14,16 +14,16 @@ export default function DeptSalaryDistribution({ staffs = [], selectedCo }: any)
   const list = Object.entries(map).map(([dept, v]) => ({ dept, ...v, avg: v.count ? Math.round(v.sum / v.count) : 0 }));
 
   return (
-    <div className="border border-[var(--toss-border)] p-4 bg-[var(--toss-card)] rounded-lg shadow-sm">
+    <div className="border border-[var(--toss-border)] p-4 bg-[var(--toss-card)] rounded-[12px] shadow-sm">
       <div className="pb-2 border-b border-[var(--toss-border)] mb-3">
         <h3 className="text-sm font-semibold text-[var(--foreground)]">부서별 급여 분포</h3>
       </div>
       <div className="space-y-2">
         {list.map((x) => (
-          <div key={x.dept} className="p-3 bg-[var(--page-bg)] rounded-lg border border-[var(--toss-border)]">
+          <div key={x.dept} className="p-3 bg-[var(--page-bg)] rounded-[12px] border border-[var(--toss-border)]">
             <div className="flex justify-between items-center mb-1">
               <span className="text-sm font-semibold text-[var(--foreground)]">{x.dept}</span>
-              <span className="text-[10px] text-[var(--toss-gray-3)]">{x.count}명</span>
+              <span className="text-[11px] text-[var(--toss-gray-3)]">{x.count}명</span>
             </div>
             <div className="flex justify-between text-xs">
               <span className="text-[var(--toss-gray-4)]">총 인건비</span>

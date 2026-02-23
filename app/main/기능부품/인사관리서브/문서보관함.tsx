@@ -262,7 +262,7 @@ export default function DocumentRepository({
               <button
                 type="button"
                 onClick={() => setStaffFilterName(null)}
-                className="px-2 py-1 rounded-full bg-[var(--toss-blue-light)] text-[10px] font-bold text-[var(--toss-blue)] hover:bg-[var(--toss-blue-light)] whitespace-nowrap"
+                className="px-2 py-1 rounded-full bg-[var(--toss-blue-light)] text-[11px] font-bold text-[var(--toss-blue)] hover:bg-[var(--toss-blue-light)] whitespace-nowrap"
               >
                 직원: {staffFilterName} ✕
               </button>
@@ -281,7 +281,7 @@ export default function DocumentRepository({
                       {cat.label} ({folderDocs.length})
                     </div>
                     {folderDocs.length === 0 ? (
-                      <p className="px-4 py-2 text-[10px] text-[var(--toss-gray-3)]">문서 없음</p>
+                      <p className="px-4 py-2 text-[11px] text-[var(--toss-gray-3)]">문서 없음</p>
                     ) : (
                       folderDocs.map((d) => (
                         <div
@@ -297,7 +297,7 @@ export default function DocumentRepository({
                             <p className="font-semibold text-[var(--foreground)] truncate text-sm">
                               {d.title}
                             </p>
-                            <p className="text-[10px] text-[var(--toss-gray-3)] mt-0.5">
+                            <p className="text-[11px] text-[var(--toss-gray-3)] mt-0.5">
                               v{d.version} ·{' '}
                               {new Date(d.updated_at).toLocaleDateString('ko-KR')}
                             </p>

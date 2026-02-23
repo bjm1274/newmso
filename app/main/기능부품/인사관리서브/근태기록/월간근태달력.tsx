@@ -29,18 +29,18 @@ export default function MonthlyCalendar({ calendarData, targetMonth, onCellClick
       <div className="p-5 border-b bg-[var(--toss-gray-1)] flex justify-between items-center shrink-0">
         <div className="flex items-center gap-6">
             <h3 className="font-semibold text-[var(--foreground)] text-lg">🗓️ {targetMonth} 월간 근태 현황</h3>
-            <div className="flex p-1.5 bg-[var(--toss-gray-2)] rounded-lg gap-1 shadow-inner">
+            <div className="flex p-1.5 bg-[var(--toss-gray-2)] rounded-[12px] gap-1 shadow-inner">
                 {Array.from({ length: totalWeeks }, (_, i) => i + 1).map(week => {
                     const range = getWeekRange(week);
                     return (
                         <button 
                             key={week}
                             onClick={() => setActiveWeek(week)}
-                            className={`px-5 py-2 rounded-xl text-sm font-bold transition-all flex flex-col items-center
+                            className={`px-5 py-2 rounded-[16px] text-sm font-bold transition-all flex flex-col items-center
                                 ${activeWeek === week ? 'bg-white shadow-md text-[var(--toss-blue)]' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'}`}
                         >
                             <span>{week}주차</span>
-                            <span className="text-[9px] opacity-60">{range.start}~{range.end}일</span>
+                            <span className="text-[11px] opacity-60">{range.start}~{range.end}일</span>
                         </button>
                     );
                 })}
@@ -56,10 +56,10 @@ export default function MonthlyCalendar({ calendarData, targetMonth, onCellClick
         <table className="w-full border-collapse table-fixed">
           <thead>
             <tr className="bg-[var(--toss-gray-1)]/50">
-              <th className="w-32 p-4 border-b border-r font-semibold text-[var(--toss-gray-3)] text-[10px] uppercase tracking-tighter">직원명</th>
+              <th className="w-32 p-4 border-b border-r font-semibold text-[var(--toss-gray-3)] text-[11px] uppercase tracking-tighter">직원명</th>
               {daysArray.map(d => (
                 <th key={d} className="p-3 border-b text-center">
-                    <span className="text-[10px] text-[var(--toss-gray-3)] font-bold block mb-0.5">{targetMonth}</span>
+                    <span className="text-[11px] text-[var(--toss-gray-3)] font-bold block mb-0.5">{targetMonth}</span>
                     <span className="text-base font-semibold text-[var(--foreground)]">{d}일</span>
                 </th>
               ))}
@@ -93,12 +93,12 @@ export default function MonthlyCalendar({ calendarData, targetMonth, onCellClick
                     <td key={i} className="p-2 h-28">
                       <div 
                         onClick={(e) => onCellClick(e, d, row.staff)}
-                        className={`w-full h-full rounded-[1.5rem] border flex flex-col items-center justify-center cursor-pointer hover:shadow-lg transition-all p-2 ${statusStyle}`}
+                        className={`w-full h-full rounded-[16px] border flex flex-col items-center justify-center cursor-pointer hover:shadow-lg transition-all p-2 ${statusStyle}`}
                       >
                         {d.status !== 'none' ? (
                           <>
                             <div className="text-xs font-semibold mb-2">{d.status}</div>
-                            <div className="text-[10px] font-mono font-bold opacity-60 leading-tight text-center">
+                            <div className="text-[11px] font-mono font-bold opacity-60 leading-tight text-center">
                                 {d.check_in?.slice(11, 16) || '--:--'}<br/>
                                 ~ {d.check_out?.slice(11, 16) || '--:--'}
                             </div>

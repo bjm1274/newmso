@@ -193,13 +193,13 @@ export default function MyTodoList({ user: initialUser }: any) {
         <div className="flex justify-between items-center flex-wrap gap-2">
           <h3 className="text-xs font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">나의 할일 관리</h3>
           <div className="flex items-center gap-2">
-            <div className="flex gap-1 bg-[var(--toss-gray-1)] p-1 rounded-lg">
+            <div className="flex gap-1 bg-[var(--toss-gray-1)] p-1 rounded-[12px]">
               {(['day', 'week', 'month'] as const).map((r) => (
                 <button
                   key={r}
                   type="button"
                   onClick={() => setViewRange(r)}
-                  className={`px-3 py-1.5 rounded-md text-[10px] font-bold ${viewRange === r ? 'bg-[var(--toss-card)] text-[var(--toss-blue)] shadow-sm' : 'text-[var(--toss-gray-3)]'}`}
+                  className={`px-3 py-1.5 rounded-md text-[11px] font-bold ${viewRange === r ? 'bg-[var(--toss-card)] text-[var(--toss-blue)] shadow-sm' : 'text-[var(--toss-gray-3)]'}`}
                 >
                   {r === 'day' ? '일별' : r === 'week' ? '주간별' : '월별'}
                 </button>
@@ -209,12 +209,12 @@ export default function MyTodoList({ user: initialUser }: any) {
               type={viewRange === 'month' ? 'month' : 'date'}
               value={viewRange === 'month' ? selectedDate.slice(0, 7) : selectedDate}
               onChange={(e) => setSelectedDate(viewRange === 'month' ? e.target.value + '-01' : e.target.value)}
-              className="bg-[var(--input-bg)] border border-[var(--toss-border)] rounded-lg px-3 py-1.5 text-xs font-semibold text-[var(--foreground)] outline-none focus:border-[var(--toss-blue)] cursor-pointer"
+              className="bg-[var(--input-bg)] border border-[var(--toss-border)] rounded-[12px] px-3 py-1.5 text-xs font-semibold text-[var(--foreground)] outline-none focus:border-[var(--toss-blue)] cursor-pointer"
             />
           </div>
         </div>
         {viewRange !== 'day' && (
-          <p className="text-[10px] text-[var(--toss-gray-3)] font-bold">
+          <p className="text-[11px] text-[var(--toss-gray-3)] font-bold">
             {viewRange === 'week' && (() => {
               const { start, end } = getDateRange();
               return `${start} ~ ${end}`;
@@ -232,12 +232,12 @@ export default function MyTodoList({ user: initialUser }: any) {
           onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}
           placeholder={user?.id ? `${selectedDate}의 할일을 입력하세요...` : (recoverAttempted ? "직원 계정으로 로그인하면 할일을 등록할 수 있습니다." : "사용자 정보 확인 중...")}
           disabled={!user?.id}
-          className="flex-1 bg-[var(--input-bg)] border border-[var(--toss-border)] rounded-xl px-4 py-3 text-sm font-bold outline-none focus:bg-[var(--toss-card)] focus:border-[var(--toss-blue)] transition-all disabled:bg-[var(--toss-gray-1)]"
+          className="flex-1 bg-[var(--input-bg)] border border-[var(--toss-border)] rounded-[16px] px-4 py-3 text-sm font-bold outline-none focus:bg-[var(--toss-card)] focus:border-[var(--toss-blue)] transition-all disabled:bg-[var(--toss-gray-1)]"
         />
         <button
           onClick={handleAddTask}
           disabled={!user?.id || !newTask.trim()}
-          className="bg-[var(--foreground)] text-white rounded-xl px-6 py-3 text-sm font-semibold hover:opacity-90 transition-all shadow-md disabled:opacity-50"
+          className="bg-[var(--foreground)] text-white rounded-[16px] px-6 py-3 text-sm font-semibold hover:opacity-90 transition-all shadow-md disabled:opacity-50"
         >
           등록
         </button>
@@ -252,24 +252,24 @@ export default function MyTodoList({ user: initialUser }: any) {
            <div className="h-60 flex flex-col items-center justify-center text-[var(--toss-gray-3)] gap-3 px-4 text-center">
              <span className="text-3xl">📋</span>
              <p className="text-xs font-bold">할일은 직원 계정(이름으로 로그인)으로 이용해 주세요.</p>
-             <p className="text-[10px] text-[var(--toss-gray-3)]">MSO 관리자 계정은 이 기능을 사용할 수 없습니다.</p>
+             <p className="text-[11px] text-[var(--toss-gray-3)]">MSO 관리자 계정은 이 기능을 사용할 수 없습니다.</p>
            </div>
         ) : tasks.length > 0 ? (
           <>
             <section className="space-y-3">
-              <h4 className="text-[10px] font-semibold text-[var(--toss-blue)] uppercase flex items-center gap-2">
+              <h4 className="text-[11px] font-semibold text-[var(--toss-blue)] uppercase flex items-center gap-2">
                 <span className="w-1.5 h-1.5 bg-[var(--toss-blue)] rounded-full animate-pulse"></span>
                 진행 중 ({inProgressTasks.length})
               </h4>
               {inProgressTasks.map(task => (
                 <TodoItem key={task.id} task={task} onToggle={toggleTask} onDelete={deleteTask} />
               ))}
-              {inProgressTasks.length === 0 && <p className="text-[10px] text-[var(--toss-gray-3)] italic pl-3">진행 중인 일이 없습니다.</p>}
+              {inProgressTasks.length === 0 && <p className="text-[11px] text-[var(--toss-gray-3)] italic pl-3">진행 중인 일이 없습니다.</p>}
             </section>
 
             {completedTasks.length > 0 && (
               <section className="space-y-3 opacity-60">
-                <h4 className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase flex items-center gap-2">
+                <h4 className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase flex items-center gap-2">
                   <span className="w-1.5 h-1.5 bg-[var(--toss-gray-3)] rounded-full"></span>
                   완료 내역 ({completedTasks.length})
                 </h4>
@@ -280,7 +280,7 @@ export default function MyTodoList({ user: initialUser }: any) {
             )}
           </>
         ) : (
-          <div className="h-60 flex flex-col items-center justify-center text-[var(--toss-gray-3)] gap-3 border-2 border-dashed border-[var(--toss-border)] rounded-[2rem]">
+          <div className="h-60 flex flex-col items-center justify-center text-[var(--toss-gray-3)] gap-3 border-2 border-dashed border-[var(--toss-border)] rounded-[16px]">
             <span className="text-4xl grayscale opacity-50">📝</span>
             <p className="text-xs font-bold">{selectedDate}의 일정이 비어있습니다.</p>
           </div>
@@ -292,21 +292,21 @@ export default function MyTodoList({ user: initialUser }: any) {
 
 function TodoItem({ task, onToggle, onDelete }: any) {
   return (
-    <div className="group flex items-center gap-3 p-4 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-lg hover:border-[var(--toss-blue)] hover:shadow-sm transition-all animate-fade-in-up">
-      <button onClick={() => onToggle(task.id, task.is_complete)} className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all flex-shrink-0 ${task.is_complete ? 'bg-green-500 border-green-500 text-white' : 'border-[var(--toss-border)] hover:border-[var(--toss-blue)]'}`}>
-        {task.is_complete && <span className="text-[10px] font-bold">V</span>}
+    <div className="group flex items-center gap-3 p-4 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[12px] hover:border-[var(--toss-blue)] hover:shadow-sm transition-all animate-fade-in-up">
+      <button onClick={() => onToggle(task.id, task.is_complete)} className={`w-6 h-6 rounded-[12px] border-2 flex items-center justify-center transition-all flex-shrink-0 ${task.is_complete ? 'bg-green-500 border-green-500 text-white' : 'border-[var(--toss-border)] hover:border-[var(--toss-blue)]'}`}>
+        {task.is_complete && <span className="text-[11px] font-bold">V</span>}
       </button>
       <div className="flex-1 flex items-center gap-2 min-w-0">
         <span className={`flex-1 text-sm font-bold truncate ${task.is_complete ? 'text-[var(--toss-gray-3)] line-through decoration-2' : 'text-[var(--foreground)]'}`}>
           {task.content}
         </span>
         {task.task_date && (
-          <span className="shrink-0 text-[10px] font-bold text-[var(--toss-gray-3)]">
+          <span className="shrink-0 text-[11px] font-bold text-[var(--toss-gray-3)]">
             {task.task_date}
           </span>
         )}
       </div>
-      <button onClick={() => onDelete(task.id)} className="opacity-0 group-hover:opacity-100 text-[var(--toss-gray-3)] hover:text-red-500 transition-all text-[10px] font-semibold px-2 py-1 bg-[var(--toss-gray-1)] hover:bg-red-50 rounded-md">삭제</button>
+      <button onClick={() => onDelete(task.id)} className="opacity-0 group-hover:opacity-100 text-[var(--toss-gray-3)] hover:text-red-500 transition-all text-[11px] font-semibold px-2 py-1 bg-[var(--toss-gray-1)] hover:bg-red-50 rounded-md">삭제</button>
     </div>
   );
 }

@@ -110,22 +110,22 @@ export default function ExpirationAlert() {
     <div className="space-y-6">
       {/* 상단 통계 */}
       <div className="grid grid-cols-4 gap-4">
-        <div className="bg-yellow-50 p-6 rounded-xl border border-yellow-200">
+        <div className="bg-yellow-50 p-6 rounded-[16px] border border-yellow-200">
           <p className="text-xs font-bold text-yellow-600 mb-2">⚠️ 임박 제품</p>
           <p className="text-2xl font-semibold text-yellow-800">{expiringItems.length}개</p>
           <p className="text-xs text-yellow-600 mt-2">6개월 이내 만료</p>
         </div>
-        <div className="bg-red-50 p-6 rounded-xl border border-red-200">
+        <div className="bg-red-50 p-6 rounded-[16px] border border-red-200">
           <p className="text-xs font-bold text-red-600 mb-2">🚨 만료됨</p>
           <p className="text-2xl font-semibold text-red-800">{expiredItems.length}개</p>
           <p className="text-xs text-red-600 mt-2">즉시 폐기 필요</p>
         </div>
-        <div className="bg-blue-50 p-6 rounded-xl border border-blue-200">
+        <div className="bg-blue-50 p-6 rounded-[16px] border border-blue-200">
           <p className="text-xs font-bold text-[var(--toss-blue)] mb-2">📢 알림 발송</p>
           <p className="text-2xl font-semibold text-blue-800">{alertsSent}건</p>
           <p className="text-xs text-[var(--toss-blue)] mt-2">행정팀에 알림 완료</p>
         </div>
-        <div className="bg-green-50 p-6 rounded-xl border border-green-200">
+        <div className="bg-green-50 p-6 rounded-[16px] border border-green-200">
           <p className="text-xs font-bold text-green-600 mb-2">🔄 마지막 확인</p>
           <p className="text-sm font-semibold text-green-800">{lastCheckTime || '확인 대기중'}</p>
           <p className="text-xs text-green-600 mt-2">24시간마다 자동 확인</p>
@@ -133,12 +133,12 @@ export default function ExpirationAlert() {
       </div>
 
       {/* 유효기간 임박 제품 */}
-      <div className="bg-white border border-[var(--toss-border)] shadow-sm rounded-xl overflow-hidden">
+      <div className="bg-white border border-[var(--toss-border)] shadow-sm rounded-[16px] overflow-hidden">
         <div className="p-6 border-b border-[var(--toss-border)] flex justify-between items-center">
           <h3 className="text-lg font-semibold text-[var(--foreground)]">⏰ 유효기간 6개월 이내 제품</h3>
           <button
             onClick={downloadExpirationReport}
-            className="px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-semibold hover:bg-gray-700 transition-all"
+            className="px-4 py-2 bg-gray-600 text-white rounded-[12px] text-sm font-semibold hover:bg-gray-700 transition-all"
           >
             📥 보고서 다운로드
           </button>
@@ -198,7 +198,7 @@ export default function ExpirationAlert() {
 
       {/* 만료된 제품 */}
       {expiredItems.length > 0 && (
-        <div className="bg-white border border-red-200 shadow-sm rounded-xl overflow-hidden">
+        <div className="bg-white border border-red-200 shadow-sm rounded-[16px] overflow-hidden">
           <div className="p-6 border-b border-red-200 bg-red-50">
             <h3 className="text-lg font-semibold text-red-800">🚨 유효기간 만료 제품 (즉시 폐기)</h3>
           </div>
@@ -242,7 +242,7 @@ export default function ExpirationAlert() {
       )}
 
       {/* 알림 설정 */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+      <div className="bg-blue-50 border border-blue-200 rounded-[16px] p-6">
         <h4 className="font-semibold text-blue-800 mb-4">🔔 알림 설정</h4>
         <div className="space-y-3">
           <label className="flex items-center gap-3 cursor-pointer">

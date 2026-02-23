@@ -75,7 +75,7 @@ export default function PermissionPromptModal() {
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-[var(--toss-card)] rounded-lg shadow-xl max-w-sm w-full p-6 border border-[var(--toss-border)]">
+      <div className="bg-[var(--toss-card)] rounded-[12px] shadow-xl max-w-sm w-full p-6 border border-[var(--toss-border)]">
         <h3 className="text-lg font-semibold text-[var(--foreground)] mb-2">권한 안내</h3>
         <p className="text-sm text-[var(--toss-gray-4)] mb-5">
           서비스 이용을 위해 아래 권한 허용을 권장합니다.
@@ -89,7 +89,7 @@ export default function PermissionPromptModal() {
             type="button"
             onClick={requestNotification}
             disabled={notifying}
-            className="w-full py-3 px-4 rounded-xl bg-[var(--toss-blue)] text-white text-sm font-bold disabled:opacity-60"
+            className="w-full py-3 px-4 rounded-[16px] bg-[var(--toss-blue)] text-white text-sm font-bold disabled:opacity-60"
           >
             {notifying ? '요청 중…' : '🔔 알림 허용'}
           </button>
@@ -97,14 +97,14 @@ export default function PermissionPromptModal() {
             type="button"
             onClick={requestLocation}
             disabled={gpsing}
-            className="w-full py-3 px-4 rounded-xl bg-[#00C48C] text-white text-sm font-bold disabled:opacity-60"
+            className="w-full py-3 px-4 rounded-[16px] bg-[#00C48C] text-white text-sm font-bold disabled:opacity-60"
           >
             {gpsing ? '요청 중…' : '📍 위치(GPS) 허용'}
           </button>
           <button
             type="button"
             onClick={close}
-            className="w-full py-2.5 px-4 rounded-xl border border-[var(--toss-border)] text-[var(--toss-gray-4)] text-sm font-bold mt-1"
+            className="w-full py-2.5 px-4 rounded-[16px] border border-[var(--toss-border)] text-[var(--toss-gray-4)] text-sm font-bold mt-1"
           >
             나중에 하기
           </button>

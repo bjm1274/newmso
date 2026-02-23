@@ -83,10 +83,10 @@ export default function TaxInsuranceRatesPanel({ companyName }: { companyName?: 
   const toPercent = (v: number) => (v * 100).toFixed(2);
 
   return (
-    <div className="border border-[var(--toss-border)] p-4 bg-[var(--toss-card)] rounded-lg shadow-sm">
+    <div className="border border-[var(--toss-border)] p-4 bg-[var(--toss-card)] rounded-[12px] shadow-sm">
       <div className="flex justify-between items-center pb-2 border-b border-[var(--toss-border)] mb-3">
         <h3 className="text-sm font-semibold text-[var(--foreground)]">세율·보험요율 (연도별)</h3>
-        <button onClick={openAdd} className="px-2.5 py-1.5 bg-[var(--toss-blue)] text-white text-xs font-medium rounded-lg hover:opacity-90">
+        <button onClick={openAdd} className="px-2.5 py-1.5 bg-[var(--toss-blue)] text-white text-xs font-medium rounded-[12px] hover:opacity-90">
           + 연도 추가
         </button>
       </div>
@@ -97,10 +97,10 @@ export default function TaxInsuranceRatesPanel({ companyName }: { companyName?: 
         <>
           <div className="space-y-2 mb-4">
             {list.map((r) => (
-              <div key={r.id} className="p-3 bg-[var(--page-bg)] rounded-lg border border-[var(--toss-border)] flex justify-between items-start gap-3">
+              <div key={r.id} className="p-3 bg-[var(--page-bg)] rounded-[12px] border border-[var(--toss-border)] flex justify-between items-start gap-3">
                 <div>
                   <p className="text-sm font-semibold text-[var(--foreground)]">{r.effective_year}년</p>
-                  <div className="grid grid-cols-2 gap-1 text-[10px] mt-1.5 text-[var(--toss-gray-4)]">
+                  <div className="grid grid-cols-2 gap-1 text-[11px] mt-1.5 text-[var(--toss-gray-4)]">
                     <span>국민연금 {toPercent(Number(r.national_pension_rate))}%</span>
                     <span>건강 {toPercent(Number(r.health_insurance_rate))}%</span>
                     <span>장기요양 {toPercent(Number(r.long_term_care_rate))}%</span>
@@ -140,10 +140,10 @@ export default function TaxInsuranceRatesPanel({ companyName }: { companyName?: 
               </div>
             </div>
             <div className="flex gap-2">
-              <button onClick={handleSave} disabled={saving} className="px-3 py-2 bg-[var(--toss-blue)] text-white text-xs font-medium rounded-lg hover:opacity-90 disabled:opacity-50">
+              <button onClick={handleSave} disabled={saving} className="px-3 py-2 bg-[var(--toss-blue)] text-white text-xs font-medium rounded-[12px] hover:opacity-90 disabled:opacity-50">
                 {saving ? '저장 중...' : editing ? '수정 저장' : '연도 추가'}
               </button>
-              {editing && <button onClick={() => setEditing(null)} className="px-3 py-2 bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] text-xs font-medium rounded-lg hover:opacity-90">취소</button>}
+              {editing && <button onClick={() => setEditing(null)} className="px-3 py-2 bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] text-xs font-medium rounded-[12px] hover:opacity-90">취소</button>}
             </div>
           </div>
         </>

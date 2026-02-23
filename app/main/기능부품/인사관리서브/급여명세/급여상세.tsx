@@ -62,7 +62,7 @@ export default function SalaryDetail({ record, staff }: any) {
   const advancePayAmount = record ? Number(record.advance_pay) || 0 : 0;
 
   return (
-    <div className="bg-[var(--toss-card)] rounded-lg border border-[var(--toss-border)] shadow-sm overflow-hidden animate-in fade-in duration-300">
+    <div className="bg-[var(--toss-card)] rounded-[12px] border border-[var(--toss-border)] shadow-sm overflow-hidden animate-in fade-in duration-300">
       {/* 명세서 헤더 – 메디플로우 스타일: 연한 띠 + 제목 */}
       <div className="px-6 py-5 bg-[var(--tab-bg)] border-b border-[var(--toss-border)]">
         <p className="text-xs font-medium text-[var(--toss-gray-3)] mb-1">{companyName}</p>
@@ -73,7 +73,7 @@ export default function SalaryDetail({ record, staff }: any) {
 
       <div className="p-6 space-y-6">
         {/* 인적 사항 */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-[var(--page-bg)] rounded-lg border border-[var(--toss-border)]">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-[var(--page-bg)] rounded-[12px] border border-[var(--toss-border)]">
           <div>
             <p className="text-xs font-medium text-[var(--toss-gray-3)] mb-0.5">성명</p>
             <p className="text-sm font-semibold text-[var(--foreground)]">{staff?.name}</p>
@@ -95,7 +95,7 @@ export default function SalaryDetail({ record, staff }: any) {
         {/* 지급/공제 상세 내역 – 선지급 건은 본급·공제 0원, 선지급 금액만 표시 */}
         {isAdvancePay ? (
           <div className="space-y-4">
-            <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-[12px]">
               <p className="text-xs font-medium text-amber-800 mb-2">선지급 (본 건은 선지급 건입니다. 본급·공제·차인 0원)</p>
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium text-[var(--foreground)]">선지급</span>
@@ -111,7 +111,7 @@ export default function SalaryDetail({ record, staff }: any) {
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* 지급 내역 */}
-              <div className="space-y-3 border border-[var(--toss-border)] rounded-lg overflow-hidden">
+              <div className="space-y-3 border border-[var(--toss-border)] rounded-[12px] overflow-hidden">
                 <div className="flex justify-between items-center px-4 py-2.5 bg-[var(--tab-bg)] border-b border-[var(--toss-border)]">
                   <h4 className="text-xs font-semibold text-[var(--foreground)]">지급 내역</h4>
                   <span className="text-xs font-medium text-[var(--toss-blue)]">지급합계 ₩{calc.totalPayment.toLocaleString()}</span>
@@ -121,7 +121,7 @@ export default function SalaryDetail({ record, staff }: any) {
                   {data.extra_allowance > 0 && <SalaryRow label="기타 수당" value={data.extra_allowance} />}
                   {data.overtime_pay > 0 && <SalaryRow label="연장근로수당" value={data.overtime_pay} />}
                   <div className="pt-2 mt-2 border-t border-[var(--toss-border)] space-y-2">
-                    <p className="text-[10px] font-medium text-green-700">비과세 항목</p>
+                    <p className="text-[11px] font-medium text-green-700">비과세 항목</p>
                     <SalaryRow label="식대" value={data.meal_allowance} isTaxFree />
                     {(data.night_duty_allowance || 0) > 0 && <SalaryRow label="당직수당(야간)" value={data.night_duty_allowance} isTaxFree />}
                     {data.vehicle_allowance > 0 && <SalaryRow label="자가운전보조금" value={data.vehicle_allowance} isTaxFree />}
@@ -132,7 +132,7 @@ export default function SalaryDetail({ record, staff }: any) {
               </div>
 
               {/* 공제 내역 */}
-              <div className="space-y-3 border border-[var(--toss-border)] rounded-lg overflow-hidden">
+              <div className="space-y-3 border border-[var(--toss-border)] rounded-[12px] overflow-hidden">
                 <div className="flex justify-between items-center px-4 py-2.5 bg-[#fef2f2] border-b border-red-100">
                   <h4 className="text-xs font-semibold text-[var(--foreground)]">공제 내역</h4>
                   <span className="text-xs font-medium text-red-600">공제합계 ₩{calc.totalDeduction.toLocaleString()}</span>
@@ -163,7 +163,7 @@ export default function SalaryDetail({ record, staff }: any) {
           </p>
           <div className="flex items-center gap-3">
             <span className="text-xs font-medium text-[var(--toss-gray-4)]">{staff?.company || 'SY INC.'} 대표원장</span>
-            <span className="w-10 h-10 border-2 border-[var(--toss-border)] rounded flex items-center justify-center text-[10px] text-[var(--toss-gray-3)] font-medium">(인)</span>
+            <span className="w-10 h-10 border-2 border-[var(--toss-border)] rounded flex items-center justify-center text-[11px] text-[var(--toss-gray-3)] font-medium">(인)</span>
           </div>
         </div>
       </div>
@@ -176,7 +176,7 @@ function SalaryRow({ label, value, isDeduction, isTaxFree }: any) {
     <div className="flex justify-between items-center py-1">
       <div className="flex items-center gap-2">
         <span className="text-xs font-medium text-[var(--toss-gray-4)]">{label}</span>
-        {isTaxFree && <span className="text-[10px] font-medium text-[var(--toss-blue)] bg-[var(--toss-blue-light)] px-1.5 py-0.5 rounded">비과세</span>}
+        {isTaxFree && <span className="text-[11px] font-medium text-[var(--toss-blue)] bg-[var(--toss-blue-light)] px-1.5 py-0.5 rounded">비과세</span>}
       </div>
       <span className={`text-sm font-medium ${isDeduction ? 'text-red-600' : 'text-[var(--foreground)]'}`}>
         {isDeduction ? '-' : ''} ₩{(Number(value) || 0).toLocaleString()}

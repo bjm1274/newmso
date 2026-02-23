@@ -23,7 +23,7 @@ export default function StaffManager({ staffs, onRefresh }: any) {
         <h3 className="font-semibold text-[var(--foreground)] text-sm italic">👤 등록 직원 권한 설정</h3>
       </div>
       <table className="w-full text-left border-collapse">
-        <thead className="bg-white text-[10px] font-semibold text-[var(--toss-gray-3)] border-b uppercase">
+        <thead className="bg-white text-[11px] font-semibold text-[var(--toss-gray-3)] border-b uppercase">
           <tr>
             <th className="p-4 border-r">사번</th>
             <th className="p-4 border-r">성명</th>
@@ -36,12 +36,12 @@ export default function StaffManager({ staffs, onRefresh }: any) {
             <tr key={s.id} className="hover:bg-gray-25 transition-colors">
               <td className="p-4 text-xs font-mono font-bold text-[var(--toss-gray-3)] border-r">{s.employee_no}</td>
               <td className="p-4 text-xs font-semibold text-[var(--foreground)] border-r">{s.name}</td>
-              <td className="p-4 text-[10px] font-bold text-[var(--toss-gray-3)] border-r">{s.company || '박철홍정형외과'}</td>
+              <td className="p-4 text-[11px] font-bold text-[var(--toss-gray-3)] border-r">{s.company || '박철홍정형외과'}</td>
               <td className="p-4">
                 <select 
                   value={s.role} 
                   onChange={(e) => handleRoleChange(s.id, e.target.value)}
-                  className={`p-2 text-[10px] font-semibold border outline-none ${
+                  className={`p-2 text-[11px] font-semibold border outline-none ${
                     s.role === 'admin' ? 'border-red-200 text-red-600 bg-red-50' : 'border-[var(--toss-border)] text-[var(--toss-gray-4)] bg-white'
                   }`}
                 >
