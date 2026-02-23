@@ -2,8 +2,21 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
+// base64 VAPID 키를 ArrayBuffer로 변환
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
 // [핵심] 웹 푸시 알림 서비스 워커 등록 및 관리
-export async function initNotificationService() {
+export async function initNotificationService(staffId?: string) {
+  if (typeof window === 'undefined') return;
   if (!('serviceWorker' in navigator) || !('Notification' in window)) {
     console.log('이 브라우저는 푸시 알림을 지원하지 않습니다.');
     return;
@@ -20,15 +33,34 @@ export async function initNotificationService() {
       console.log('알림 권한:', permission);
     }
 
-    // 3. 푸시 구독 토큰 생성 (선택사항: FCM 연동 시)
-    if (registration.pushManager) {
-      const subscription = await registration.pushManager.getSubscription();
+    // 3. 푸시 구독 (VAPID 사용)
+    const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    if (registration.pushManager && Notification.permission === 'granted' && vapidPublicKey) {
+      let subscription = await registration.pushManager.getSubscription();
       if (!subscription) {
-        console.log('푸시 구독 설정 완료');
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) as any,
+        });
+      }
+
+      if (subscription) {
+        const json = subscription.toJSON();
+        const { endpoint, keys } = json;
+        if (endpoint && keys?.p256dh && keys?.auth) {
+          await supabase.from('push_subscriptions').upsert({
+            staff_id: staffId || null,
+            endpoint,
+            p256dh: keys.p256dh,
+            auth: keys.auth,
+            created_at: new Date().toISOString()
+          }, { onConflict: 'staff_id,endpoint' });
+          console.log('✅ 푸시 구독 정보 DB 저장 완료');
+        }
       }
     }
   } catch (error) {
-    console.error('Service Worker 등록 실패:', error);
+    console.error('Service Worker 등록/구독 실패:', error);
   }
 }
 
@@ -216,44 +248,83 @@ export default function NotificationSystem({ user }: any) {
   };
 
   return (
-    <div className="fixed top-6 right-6 z-[9999] space-y-3 w-80 pointer-events-none">
-      {notifications.map((notif) => (
-        <div
-          key={notif.id}
-          className="pointer-events-auto bg-white/95 backdrop-blur-md border border-slate-200 shadow-2xl rounded-2xl p-4 flex items-center gap-4 animate-in slide-in-from-right-10 fade-in duration-500 cursor-pointer hover:scale-[1.02] transition-all relative overflow-hidden group"
-          onClick={() => markAsRead(notif.id)}
-        >
-          {/* 장식 바 */}
-          <div className={`absolute left-0 top-0 bottom-0 w-1 ${notif.type === 'chat' ? 'bg-yellow-400' :
+    <>
+      <div className="fixed top-6 right-6 z-[9999] space-y-3 w-80 pointer-events-none">
+        {notifications.map((notif) => (
+          <div
+            key={notif.id}
+            className="pointer-events-auto glass card-premium p-4 flex items-center gap-4 animate-premium-fade cursor-pointer relative overflow-hidden group shadow-premium"
+            onClick={() => markAsRead(notif.id)}
+          >
+            {/* 장식 바 (미니멀) */}
+            <div className={`absolute left-0 top-0 bottom-0 w-1 ${notif.type === 'chat' || notif.type === 'message' ? 'bg-yellow-400' :
               notif.type === 'approval' ? 'bg-blue-600' :
                 notif.type === 'inventory' ? 'bg-orange-500' : 'bg-primary'
-            }`}></div>
+              }`}></div>
 
-          <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-lg shrink-0 overflow-hidden shadow-inner">
-            {notif.data?.sender_id ? (
-              <div className="w-full h-full bg-slate-200 flex items-center justify-center text-xs font-black text-slate-400">
-                {notif.data?.sender_name?.[0] || '💬'}
-              </div>
-            ) : (
-              <span>{notif.type === 'chat' ? '💬' : '🔔'}</span>
-            )}
-          </div>
-
-          <div className="flex-1 min-w-0">
-            <div className="flex justify-between items-center mb-0.5">
-              <h4 className="font-black text-[11px] text-slate-900 truncate">
-                {notif.type === 'chat' ? (notif.data?.sender_name || '새 메시지') : notif.title}
-              </h4>
-              <span className="text-[8px] font-bold text-slate-400">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+            <div className="w-10 h-10 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-lg shrink-0 overflow-hidden shadow-inner border border-zinc-200/50">
+              {notif.data?.sender_id ? (
+                <div className="w-full h-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-xs font-bold text-zinc-500">
+                  {notif.data?.sender_name?.[0] || '💬'}
+                </div>
+              ) : (
+                <span>{notif.type === 'chat' || notif.type === 'message' ? '💬' : '🔔'}</span>
+              )}
             </div>
-            <p className="text-[10px] font-medium text-slate-600 truncate leading-tight">
-              {notif.body}
-            </p>
-          </div>
 
-          <button className="text-slate-300 hover:text-slate-900 p-1 opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
+            <div className="flex-1 min-w-0">
+              <div className="flex justify-between items-center mb-0.5">
+                <h4 className="font-bold text-[12px] text-foreground tracking-tight truncate">
+                  {notif.type === 'chat' || notif.type === 'message' ? (notif.data?.sender_name || '새 메시지') : notif.title}
+                </h4>
+                <span className="text-[9px] font-medium text-zinc-400">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+              </div>
+              <p className="text-[11px] font-normal text-zinc-600 dark:text-zinc-400 truncate leading-tight">
+                {notif.body}
+              </p>
+            </div>
+
+            <button className="text-zinc-300 hover:text-zinc-900 dark:hover:text-white p-1 opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
+          </div>
+        ))}
+      </div>
+
+      {/* 푸시 구독 관리 & 테스트 UI (플로팅 버튼 스타일) */}
+      <div className="fixed bottom-24 right-6 z-[9998] flex flex-col gap-2 items-end">
+        {Notification.permission !== 'granted' && (
+          <button
+            onClick={() => initNotificationService(user?.id)}
+            className="btn-premium-primary shadow-premium py-2 px-4 text-xs animate-bounce"
+          >
+            🔔 알림 구독하고 실시간 푸시 받기
+          </button>
+        )}
+
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              sendNotification("테스트 알림", {
+                body: "백그라운드 푸시가 정상 작동합니다.",
+                icon: "/sy-logo.png"
+              });
+              alert("테스트 알림을 보냈습니다. 브라우저 알림 권한을 확인해 주세요.");
+            }}
+            className="btn-premium-secondary shadow-sm py-2 px-3 text-[10px] glass"
+          >
+            🧪 알림 테스트
+          </button>
+
+          <button
+            onClick={() => {
+              const info = "아이폰(iOS) 유저는 '공유 > 홈 화면에 추가'를 통해 앱을 설치해야 백그라운드 알림을 받을 수 있습니다.\n\n안드로이드 유저는 지금 바로 실시간 알림을 받을 수 있습니다.";
+              alert(info);
+            }}
+            className="btn-premium-secondary shadow-sm py-2 px-3 text-[10px] glass"
+          >
+            📱 모바일 가이드
+          </button>
         </div>
-      ))}
-    </div>
+      </div>
+    </>
   );
 }

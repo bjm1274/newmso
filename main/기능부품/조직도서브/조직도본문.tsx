@@ -67,11 +67,11 @@ export default function MainContent({ user, mainMenu, data, subView, setSubView,
   const hospitalCompanies = (companies || []).filter((c: any) => c.type !== 'MSO');
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden relative bg-background">
+    <div className="flex-1 flex flex-col overflow-hidden relative bg-page-bg">
       {isMso && hospitalCompanies.length > 0 && setSelectedCompanyId && (
-        <div className="shrink-0 px-8 py-5 flex items-center justify-between border-b border-slate-200/50 bg-white/50 backdrop-blur-md sticky top-0 z-30">
+        <div className="shrink-0 px-8 py-4 flex items-center justify-between border-b border-zinc-200/50 dark:border-zinc-800/50 glass sticky top-0 z-30 animate-premium-fade">
           <div className="flex items-center gap-4">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Agency</span>
+            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Active Agency</span>
             <select
               value={selectedCo}
               onChange={(e) => {
@@ -83,7 +83,7 @@ export default function MainContent({ user, mainMenu, data, subView, setSubView,
                   if (c) setSelectedCompanyId(c.id);
                 }
               }}
-              className="text-xs font-black text-slate-800 bg-white border border-slate-200 rounded-xl px-4 py-2 hover:border-primary transition-colors focus:ring-4 focus:ring-primary/10 outline-none cursor-pointer shadow-sm"
+              className="premium text-[11px] font-bold py-1.5 px-3 shadow-premium cursor-pointer"
             >
               <option value="전체">전체 (All Organizations)</option>
               {hospitalCompanies.map((c: any) => (
@@ -92,73 +92,62 @@ export default function MainContent({ user, mainMenu, data, subView, setSubView,
             </select>
           </div>
           <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full bg-success animate-pulse`}></div>
-            <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">System Live</span>
+            <div className={`w-1.5 h-1.5 rounded-full bg-success animate-pulse`}></div>
+            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-tighter">System Live</span>
           </div>
         </div>
       )}
 
-      <main className="flex-1 overflow-hidden flex flex-col animate-soft-fade">
-        {mainMenu === '내정보' && <div className="w-full h-full"><MyPage user={user} /></div>}
-        {mainMenu === '조직도' && <div className="w-full h-full"><OrgChart staffs={data.staffs} selectedCo={selectedCo} setSelectedCo={setSelectedCo} /></div>}
-        {mainMenu === '채팅' && <div className="w-full h-full bg-white"><ChatView user={user} onRefresh={onRefresh} staffs={data.staffs} /></div>}
-        {mainMenu === '게시판' && <div className="w-full h-full"><BoardView user={user} posts={data.posts?.filter((p: any) => p.board_type === subView) || []} subView={subView} setSubView={setSubView} surgeries={data.surgeries} mris={data.mris} onRefresh={onRefresh} /></div>}
-        {mainMenu === '전자결재' && <div className="w-full h-full"><ApprovalView user={user} staffs={data.staffs} selectedCo={selectedCo} setSelectedCo={setSelectedCo} selectedCompanyId={selectedCompanyId} onRefresh={onRefresh} /></div>}
-        {mainMenu === '근태관리' && <div className="w-full h-full"><AttendanceView user={user} staffs={data.staffs} selectedCo={selectedCo} /></div>}
-        {mainMenu === '인사관리' && <div className="w-full h-full"><HRView user={user} staffs={data.staffs} selectedCo={selectedCo} onRefresh={onRefresh} /></div>}
-        {mainMenu === '재고관리' && <div className="w-full h-full"><InventoryView user={user} onRefresh={onRefresh} /></div>}
-        {mainMenu === '관리자' && <div className="w-full h-full"><AdminView user={user} /></div>}
-      </main>
-
-      {/* 근로계약서 서명 팝업 - 모바일 최적화 */}
-      {pendingContract && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[9999] flex items-end md:items-center justify-center p-0 md:p-4">
-          <div className="bg-white w-full max-w-2xl rounded-t-[2.5rem] md:rounded-[3rem] shadow-2xl border-t-8 border-blue-600 flex flex-col animate-in slide-in-from-bottom duration-300 max-h-[90vh] overflow-y-auto">
-            <div className="p-8 md:p-10 border-b border-gray-50">
-              <h2 className="text-2xl font-black text-gray-900 tracking-tighter italic">근로계약서 서명 요청</h2>
-              <p className="text-xs text-blue-600 font-bold mt-1 uppercase tracking-widest">본 계약서는 법적 효력을 갖는 전자 문서입니다.</p>
-            </div>
-            <div className="p-8 md:p-10 space-y-8">
-              <div className="bg-gray-50 p-6 md:p-8 rounded-2xl border border-gray-100 text-xs leading-relaxed text-gray-600 font-medium">
-                <h3 className="text-sm font-black text-gray-800 mb-6 text-center underline underline-offset-8">표준 근로계약서 (요약)</h3>
-                <div className="space-y-3">
-                  <p>1. 근로계약기간: 입사일로부터 정함이 없는 기간</p>
-                  <p>2. 근무장소: 소속 병원 내 지정 장소</p>
-                  <p>3. 업무내용: 채용 시 결정된 직무 및 부수 업무</p>
-                  <p>4. 소정근로시간: 주 40시간 (운영 스케줄에 따름)</p>
-                  <p>5. 임금: 연봉계약서 및 급여 규정에 따름</p>
+      <div className="flex-1 overflow-y-auto no-scrollbar p-6 safe-pb">
+        <div className="max-w-7xl mx-auto space-y-6 animate-premium-fade">
+          {/* 전자결재 대기 알림 (프리미엄 배너) */}
+          {pendingContract && (
+            <div className="p-5 glass card-premium border-blue-100 dark:border-blue-900/30 bg-blue-50/30 flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center text-white text-xl shadow-lg shadow-blue-600/20">📜</div>
+                <div>
+                  <h3 className="font-bold text-[14px] text-zinc-900 dark:text-zinc-100 italic tracking-tight">근로계약서 확인 요청</h3>
+                  <p className="text-[11px] font-medium text-zinc-500 mt-0.5">아직 서명되지 않은 계약서가 있습니다. 본인 성함을 입력하여 서명을 완료해주세요.</p>
                 </div>
-                <p className="mt-8 text-center font-black text-gray-400 italic">[상기 내용을 확인하였으며 이에 동의합니다]</p>
               </div>
-              <div className="space-y-4">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">전자 서명 (성함 입력)</label>
-                <input type="text" value={signature} onChange={(e) => setSignature(e.target.value)} placeholder="본인의 성함을 정자로 입력해주세요" className="w-full p-5 bg-blue-50/50 border-2 border-blue-100 rounded-2xl outline-none focus:border-blue-600 font-black text-xl text-center transition-all" />
+              <div className="flex items-center gap-2 w-full md:w-auto">
+                <input
+                  type="text"
+                  placeholder="본인 성함 입력"
+                  value={signature}
+                  onChange={(e) => setSignature(e.target.value)}
+                  className="premium flex-1 md:w-40 py-2.5 text-xs shadow-inner"
+                />
+                <button onClick={handleSignContract} className="btn-premium-primary text-xs py-2.5 shadow-premium">서명하기</button>
               </div>
-              <button onClick={handleSignContract} className="w-full py-5 bg-blue-600 text-white font-black rounded-2xl text-sm shadow-xl shadow-blue-100 hover:scale-[0.99] active:scale-95 transition-all">확인 및 전자서명 완료</button>
             </div>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* 연차 촉진 알림 - 모바일 대응 */}
-      {annualLeaveNotice && !pendingContract && (
-        <div className="fixed bottom-24 right-4 left-4 md:left-auto md:right-10 z-[9998] animate-in slide-in-from-bottom-10">
-          <div className="bg-white border-2 border-gray-900 p-6 md:p-8 shadow-2xl rounded-[2rem] w-full md:w-80 space-y-4">
-            <div className="flex justify-between items-start">
-              <h3 className="text-lg font-black text-gray-800 italic tracking-tighter">연차 사용 촉진 알림</h3>
-              <button onClick={() => setAnnualLeaveNotice(null)} className="text-gray-400 hover:text-gray-900 text-xl">✕</button>
+          {/* 연차 촉진 알림 (프리미엄 플로팅 형태) */}
+          {annualLeaveNotice && !pendingContract && (
+            <div className="p-5 glass card-premium border-orange-100 dark:border-orange-900/30 bg-orange-50/30 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-full bg-orange-500 flex items-center justify-center text-white">📅</div>
+                <div>
+                  <h3 className="font-bold text-[13px] text-zinc-900 dark:text-zinc-100">연차 사용 권고</h3>
+                  <p className="text-[11px] text-zinc-500">{user?.name}님, 잔여 연차가 {annualLeaveNotice.remaining}일 남았습니다. 근로기준법에 따라 사용을 권장합니다.</p>
+                </div>
+              </div>
+              <button onClick={() => setAnnualLeaveNotice(null)} className="btn-premium-secondary py-1.5 px-3 text-[10px]">확인함</button>
             </div>
-            <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
-              <p className="text-[10px] font-black text-orange-600 uppercase mb-1 tracking-widest">법적 준수 사항</p>
-              <p className="text-xs font-bold text-gray-700 leading-relaxed">
-                {user.name}님, 현재 잔여 연차가 <span className="text-orange-600 font-black">{annualLeaveNotice.remaining}일</span> 남았습니다.
-                근로기준법 제61조에 의거하여 연차 사용을 권고드립니다.
-              </p>
-            </div>
-            <button onClick={() => setAnnualLeaveNotice(null)} className="w-full py-4 bg-gray-900 text-white text-[11px] font-black rounded-xl hover:bg-black transition-all">확인했습니다</button>
-          </div>
+          )}
+
+          {mainMenu === 'org' && <OrgChart user={user} data={data} subView={subView} setSubView={setSubView} />}
+          {mainMenu === 'mypage' && <MyPage user={user} onRefresh={() => onRefresh && onRefresh()} />}
+          {mainMenu === 'messenger' && <ChatView user={user} staffs={data?.staffs || []} onRefresh={() => onRefresh && onRefresh()} />}
+          {mainMenu === 'board' && <BoardView user={user} staffs={data?.staffs || []} />}
+          {mainMenu === 'approval' && <ApprovalView user={user} staffs={data?.staffs || []} />}
+          {mainMenu === 'hr' && <HRView user={user} staffs={data?.staffs || []} />}
+          {mainMenu === 'inventory' && <InventoryView user={user} />}
+          {mainMenu === 'admin' && <AdminView user={user} staffs={data?.staffs || []} />}
+          {mainMenu === 'at' && <AttendanceView user={user} staffs={data?.staffs || []} />}
         </div>
-      )}
+      </div>
     </div>
   );
 }
