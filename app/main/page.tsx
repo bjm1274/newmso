@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { setSelectedCompanyId as persistSelectedCompanyId, getSelectedCompanyId } from '@/lib/useCompany';
 
-import Sidebar from './기능부품/조직도서브/조직도측면창';
+import Sidebar, { SUB_MENUS } from './기능부품/조직도서브/조직도측면창';
 import MainContent from './기능부품/조직도서브/조직도본문';
 import NotificationSystem from './기능부품/알림시스템';
 import ChatAlertBanner from './기능부품/채팅알림배너';
@@ -200,6 +200,17 @@ function MainPageContent() {
     }
   };
 
+  // 현재 메인 메뉴에 해당하는 서브메뉴 목록
+  const currentSubMenus = mainMenu === '인사관리' ? [] : (SUB_MENUS[mainMenu] || []);
+
+  // 메인 메뉴가 바뀌었는데 현재 subView가 해당 메뉴의 서브메뉴에 없다면, 첫 번째 서브메뉴로 보정
+  useEffect(() => {
+    if (!currentSubMenus.length) return;
+    if (!currentSubMenus.some((s) => s.id === subView)) {
+      setSubView(currentSubMenus[0].id);
+    }
+  }, [mainMenu]);
+
   // user 없으면 로그인 페이지로 리다이렉트 (초기 로드 시)
   if (!user) {
     return (
@@ -219,12 +230,35 @@ function MainPageContent() {
       <Sidebar
         user={user}
         mainMenu={mainMenu}
-        onMenuChange={(menu: string) => setMainMenu(menu)}
+        subView={subView}
+        onMenuChange={(menu: string, sub?: string) => {
+          setMainMenu(menu);
+          if (sub !== undefined) setSubView(sub);
+        }}
         onOpenNotifications={() => {
           setMainMenu('내정보');
           setInitialMyPageTab('notifications');
         }}
       />
+
+      {/* PC 서브메뉴 컬럼: 게시판·전자결재·인사관리·재고관리·관리자 등 */}
+      {currentSubMenus.length > 0 && (
+        <aside className="hidden md:flex w-44 bg-[var(--toss-card)] border-r border-[var(--toss-border)] flex-col py-4 px-3 space-y-1 shrink-0">
+          {currentSubMenus.map((sub) => (
+            <button
+              key={sub.id}
+              onClick={() => setSubView(sub.id)}
+              className={`w-full text-left px-3 py-2.5 text-[11px] font-semibold rounded-[12px] transition-all ${
+                subView === sub.id
+                  ? 'bg-[var(--toss-blue)] text-white shadow-md'
+                  : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
+              }`}
+            >
+              {sub.label}
+            </button>
+          ))}
+        </aside>
+      )}
 
       <div className="flex-1 flex flex-col overflow-hidden min-h-0 pb-[72px] md:pb-0 relative">
         {/* 접속 시 한 번 알림·GPS 권한 요청 모달 */}

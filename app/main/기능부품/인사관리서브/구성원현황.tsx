@@ -8,7 +8,7 @@ import CertTransferPanel from './교육자격인사이동패널';
 // ESLint가 React 컴포넌트로 인식하도록 함수 이름을
 // 영문 대문자로 시작하는 형태로 지정합니다.
 // default export이므로 외부 import 이름(구성원관리 등)은 그대로 사용 가능합니다.
-export default function StaffListManager({ 직원목록 = [], 부서목록 = [], 선택사업체, 보기상태 = '재직', 새로고침, 창상태, 창닫기, onOpenDocumentRepoForStaff }: any) {
+export default function StaffListManager({ 직원목록 = [], 부서목록 = [], 선택사업체, 보기상태 = '재직', 새로고침, 창상태, 창닫기, onOpenDocumentRepoForStaff, onOpenNewStaff }: any) {
   const [편집모드, 편집모드설정] = useState(false);
   const [선택된직원ID, 선택된직원ID설정] = useState<number | null>(null);
   const [근무형태목록, 근무형태목록설정] = useState<any[]>([]);
@@ -147,16 +147,25 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
   return (
     <div className="flex flex-col h-full app-page">
-      <header className="p-6 md:p-8 border-b border-[var(--toss-border)] bg-[var(--toss-card)] shrink-0 flex items-center justify-between">
-        <h2 className="text-lg font-bold text-[var(--foreground)] tracking-tighter italic">
-          {보기상태 === '퇴사' ? '퇴사자 현황' : '실시간 구성원 현황'}{' '}
-          <span className="text-sm text-[var(--toss-blue)]">[{선택사업체}]</span>
-        </h2>
-        <p className="text-[10px] md:text-xs text-[var(--toss-gray-3)] font-bold">
-          {보기상태 === '퇴사'
-            ? '퇴사 처리된 직원만 표시됩니다.'
-            : '재직 중인 직원만 표시됩니다.'}
-        </p>
+      <header className="p-6 md:p-8 border-b border-[var(--toss-border)] bg-[var(--toss-card)] shrink-0 flex items-center justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-lg font-bold text-[var(--foreground)] tracking-tighter italic">
+            {보기상태 === '퇴사' ? '퇴사자 현황' : '실시간 구성원 현황'}{' '}
+            <span className="text-sm text-[var(--toss-blue)]">[{선택사업체}]</span>
+          </h2>
+          <p className="text-[10px] md:text-xs text-[var(--toss-gray-3)] font-bold">
+            {보기상태 === '퇴사'
+              ? '퇴사 처리된 직원만 표시됩니다.'
+              : '재직 중인 직원만 표시됩니다.'}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => onOpenNewStaff && onOpenNewStaff()}
+          className="shrink-0 bg-[var(--toss-blue)] text-white px-5 py-2.5 text-[11px] font-bold rounded-[12px] shadow-md hover:opacity-95 transition-all"
+        >
+          신규 직원 등록
+        </button>
       </header>
 
       <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">

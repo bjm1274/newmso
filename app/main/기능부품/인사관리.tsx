@@ -21,8 +21,10 @@ const HR_COMPANY_KEY = 'erp_hr_company';
 const HR_STATUS_KEY = 'erp_hr_status';
 const HR_ATT_VIEW_KEY = 'erp_hr_att_view';
 
-export default function HRMainView({ user, staffs, depts, onRefresh }: any) {
-  const [현재메뉴, 메뉴설정] = useState('구성원');
+const HR_MENU_IDS = ['구성원', '계약', '문서보관함', '교육', '근태', '급여', '연차/휴가', '캘린더', '비품대여', '증명서'];
+
+export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu }: any) {
+  const [현재메뉴, 메뉴설정] = useState(initialMenu && HR_MENU_IDS.includes(initialMenu) ? initialMenu : '구성원');
   const [선택사업체, 사업체설정] = useState('전체');
   const [등록창상태, 창상태설정] = useState(false);
   const [근태뷰, 근태뷰설정] = useState<'실시간' | '월별'>('실시간'); 
@@ -48,7 +50,14 @@ export default function HRMainView({ user, staffs, depts, onRefresh }: any) {
   const visibleHrTabs = HR_TABS.filter(t => p[t.perm] !== false);
   const activeMenu = visibleHrTabs.some(t => t.id === 현재메뉴) ? 현재메뉴 : (visibleHrTabs[0]?.id || '구성원');
 
-  // 새로고침해도 HR 내에서 보던 탭·필터를 유지
+  // initialMenu가 바뀌면 현재 메뉴 동기화 (사이드바 플라이아웃에서 선택한 하위 메뉴 반영)
+  useEffect(() => {
+    if (initialMenu && HR_MENU_IDS.includes(initialMenu)) {
+      메뉴설정(initialMenu);
+    }
+  }, [initialMenu]);
+
+  // 새로고침해도 HR 내에서 보던 탭·필터를 유지 (initialMenu 없을 때만 탭 복원)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
@@ -57,7 +66,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh }: any) {
       const savedStatus = window.localStorage.getItem(HR_STATUS_KEY) as '재직' | '퇴사' | null;
       const savedAtt = window.localStorage.getItem(HR_ATT_VIEW_KEY) as '실시간' | '월별' | null;
 
-      if (savedTab && HR_TABS.some(t => t.id === savedTab)) {
+      if (!initialMenu && savedTab && HR_TABS.some(t => t.id === savedTab)) {
         메뉴설정(savedTab);
       }
       if (savedCo) {
@@ -104,68 +113,71 @@ export default function HRMainView({ user, staffs, depts, onRefresh }: any) {
 
   return (
     <div className="flex flex-row h-full min-h-0 app-page overflow-hidden">
-      {/* 좌측: 메뉴(세로) + 사업자 필터 + 직원 상태 - 관리자/재고/게시판과 동일 사이즈 */}
-      <aside className="flex flex-col gap-1.5 p-3 md:p-4 bg-[var(--toss-card)] border-r border-[var(--toss-border)] shrink-0 w-[72px] md:w-44 overflow-y-auto">
-        {/* 신규 직원 등록 - 구성원 위 */}
-        <button onClick={() => 창상태설정(true)} className="w-full px-3 py-2.5 text-[10px] md:text-[11px] font-semibold rounded-[12px] bg-[var(--toss-blue)] text-white shadow-md hover:opacity-95 transition-all text-left">
-          신규 직원 등록
-        </button>
-        {/* 메뉴 탭 */}
-        {visibleHrTabs.map(({ id }) => (
-          <button
-            key={id}
-            onClick={() => 메뉴설정(id)}
-            className={`w-full px-3 py-2.5 text-[10px] md:text-[11px] font-semibold rounded-[12px] transition-all text-left ${
-              activeMenu === id ? 'bg-[var(--toss-blue)] text-white shadow-md' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
-            }`}
-          >
-            {id}
-          </button>
-        ))}
-        {/* 사업자 필터 - 메뉴 아래 */}
-        {사업체목록.map(회사 => (
-          <button
-            key={회사}
-            onClick={() => 사업체설정(회사)}
-            className={`w-full px-3 py-2.5 text-[10px] md:text-[11px] font-semibold rounded-[12px] transition-all text-left ${
-              선택사업체 === 회사 ? 'bg-[var(--toss-blue)] text-white shadow-md' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
-            }`}
-          >
-            {회사}
-          </button>
-        ))}
-        {/* 직원 상태 */}
-        <button
-          onClick={() => 직원상태필터설정('재직')}
-          className={`w-full px-3 py-2.5 text-[10px] md:text-[11px] font-semibold rounded-[12px] transition-all text-left ${
-            직원상태필터 === '재직' ? 'bg-[var(--toss-blue)] text-white shadow-md' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
-          }`}
-        >
-          재직자
-        </button>
-        <button
-          onClick={() => 직원상태필터설정('퇴사')}
-          className={`w-full px-3 py-2.5 text-[10px] md:text-[11px] font-semibold rounded-[12px] transition-all text-left ${
-            직원상태필터 === '퇴사' ? 'bg-[var(--toss-blue)] text-white shadow-md' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
-          }`}
-        >
-          퇴사자
-        </button>
+      {/* 좌측: 인사관리 서브메뉴 + 하단 사업자/직원상태 필터 */}
+      <aside className="flex flex-col h-full p-3 md:p-4 bg-[var(--toss-card)] border-r border-[var(--toss-border)] shrink-0 w-[72px] md:w-44 overflow-hidden">
+        {/* 상단: 구성원/계약/문서보관함 등 메뉴 */}
+        <div className="flex flex-col gap-1.5 overflow-y-auto min-h-0">
+          {visibleHrTabs.map(({ id }) => (
+            <button
+              key={id}
+              onClick={() => 메뉴설정(id)}
+              className={`w-full px-3 py-2.5 text-[10px] md:text-[11px] font-semibold rounded-[12px] transition-all text-left shrink-0 ${
+                activeMenu === id
+                  ? 'bg-[var(--toss-blue)] text-white shadow-md'
+                  : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
+              }`}
+            >
+              {id}
+            </button>
+          ))}
+        </div>
+        {/* 하단: 사업자 드롭다운 + 직원상태 드롭다운 */}
+        <div className="flex flex-col gap-3 mt-auto pt-4 shrink-0 border-t border-[var(--toss-border)]">
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-semibold text-[var(--toss-gray-4)]">사업자</label>
+            <select
+              value={선택사업체}
+              onChange={(e) => 사업체설정(e.target.value)}
+              className="w-full px-3 py-2.5 text-[10px] md:text-[11px] font-semibold rounded-[12px] border border-[var(--toss-border)] bg-emerald-50 dark:bg-emerald-950/20 text-[var(--foreground)] focus:ring-2 focus:ring-emerald-500/30 outline-none"
+            >
+              {사업체목록.map(회사 => (
+                <option key={회사} value={회사}>{회사}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-semibold text-[var(--toss-gray-4)]">직원 상태</label>
+            <select
+              value={직원상태필터}
+              onChange={(e) => 직원상태필터설정(e.target.value as '재직' | '퇴사')}
+              className="w-full px-3 py-2.5 text-[10px] md:text-[11px] font-semibold rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-blue-light)]/30 text-[var(--foreground)] focus:ring-2 focus:ring-[var(--toss-blue)]/30 outline-none"
+            >
+              <option value="재직">재직자</option>
+              <option value="퇴사">퇴사자</option>
+            </select>
+          </div>
+        </div>
       </aside>
 
+      {/* 우측: 실제 인사관리 콘텐츠 */}
       <main className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden">
         <section className="flex-1 overflow-y-auto bg-[var(--page-bg)] custom-scrollbar p-4 md:p-0">
           {activeMenu === '구성원' && (
-            <구성원관리 
-              직원목록={staffs}
-              부서목록={depts}
-              선택사업체={선택사업체}
-              보기상태={직원상태필터}
-              on문서보기={퇴사서류보기}
-              새로고침={onRefresh}
-              창상태={등록창상태}
-              창닫기={() => 창상태설정(false)} 
-            />
+            <div className="flex flex-col h-full">
+              <div className="flex-1 min-h-0 overflow-y-auto">
+                <구성원관리
+                  직원목록={staffs}
+                  부서목록={depts}
+                  선택사업체={선택사업체}
+                  보기상태={직원상태필터}
+                  on문서보기={퇴사서류보기}
+                  새로고침={onRefresh}
+                  창상태={등록창상태}
+                  창닫기={() => 창상태설정(false)}
+                  onOpenNewStaff={() => 창상태설정(true)}
+                />
+              </div>
+            </div>
           )}
           {activeMenu === '계약' && <ContractMain staffs={staffs} selectedCo={선택사업체} onRefresh={onRefresh} />}
           {activeMenu === '문서보관함' && (
@@ -183,22 +195,56 @@ export default function HRMainView({ user, staffs, depts, onRefresh }: any) {
           {activeMenu === '근태' && (
             <div className="flex flex-col h-full">
               <div className="flex gap-0.5 p-1 app-tab-bar w-fit mb-4">
-                <button onClick={() => 근태뷰설정('실시간')} className={`px-4 py-2 text-[10px] md:text-[11px] font-semibold rounded-[12px] transition-all ${근태뷰 === '실시간' ? 'bg-[var(--toss-card)] shadow-md text-[var(--toss-blue)]' : 'text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]'}`}>실시간 출퇴근</button>
-                <button onClick={() => 근태뷰설정('월별')} className={`px-4 py-2 text-[10px] md:text-[11px] font-semibold rounded-[12px] transition-all ${근태뷰 === '월별' ? 'bg-[var(--toss-card)] shadow-md text-[var(--toss-blue)]' : 'text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]'}`}>월별/일별 대장</button>
+                <button
+                  onClick={() => 근태뷰설정('실시간')}
+                  className={`px-4 py-2 text-[10px] md:text-[11px] font-semibold rounded-[12px] transition-all ${
+                    근태뷰 === '실시간'
+                      ? 'bg-[var(--toss-card)] shadow-md text-[var(--toss-blue)]'
+                      : 'text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]'
+                  }`}
+                >
+                  실시간 출퇴근
+                </button>
+                <button
+                  onClick={() => 근태뷰설정('월별')}
+                  className={`px-4 py-2 text-[10px] md:text-[11px] font-semibold rounded-[12px] transition-all ${
+                    근태뷰 === '월별'
+                      ? 'bg-[var(--toss-card)] shadow-md text-[var(--toss-blue)]'
+                      : 'text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]'
+                  }`}
+                >
+                  월별/일별 대장
+                </button>
               </div>
-              {근태뷰 === '실시간' ? <AttendanceSystem user={user} staffs={staffs} selectedCo={선택사업체} isAdminView={true} /> : <AttendanceMain staffs={staffs} selectedCo={선택사업체} />}
+              {근태뷰 === '실시간' ? (
+                <AttendanceSystem user={user} staffs={staffs} selectedCo={선택사업체} isAdminView={true} />
+              ) : (
+                <AttendanceMain staffs={staffs} selectedCo={선택사업체} />
+              )}
             </div>
           )}
           {activeMenu === '급여' && <PayrollMain staffs={staffs} selectedCo={선택사업체} />}
           {activeMenu === '연차/휴가' && <LeaveManagement staffs={staffs} selectedCo={선택사업체} />}
           {activeMenu === '캘린더' && (
             <div className="p-4 md:p-10 flex flex-col lg:flex-row gap-8">
-              <div className="flex-1"><SharedCalendarView user={user} /></div>
-              <div className="lg:w-80 shrink-0"><CalendarSync /></div>
+              <div className="flex-1">
+                <SharedCalendarView user={user} />
+              </div>
+              <div className="lg:w-80 shrink-0">
+                <CalendarSync />
+              </div>
             </div>
           )}
-          {activeMenu === '비품대여' && <div className="p-4 md:p-10"><AssetLoanManager staffs={staffs} selectedCo={선택사업체} /></div>}
-          {activeMenu === '증명서' && <div className="p-4 md:p-10"><CertificateGenerator staffs={staffs} /></div>}
+          {activeMenu === '비품대여' && (
+            <div className="p-4 md:p-10">
+              <AssetLoanManager staffs={staffs} selectedCo={선택사업체} />
+            </div>
+          )}
+          {activeMenu === '증명서' && (
+            <div className="p-4 md:p-10">
+              <CertificateGenerator staffs={staffs} />
+            </div>
+          )}
         </section>
       </main>
     </div>
