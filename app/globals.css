@@ -178,7 +178,13 @@ body {
 .app-page { background: var(--page-bg); color: var(--foreground); }
 .app-card { background: var(--toss-card); border: 1px solid var(--toss-border); border-radius: 8px; }
 .app-header { background: var(--toss-card); border-bottom: 1px solid var(--toss-border); }
-.app-tab-bar { background: var(--tab-bg); border-radius: 8px; }
+/* 메뉴 내 상단 탭 통일: 배경·모서리 */
+.app-tab-bar { background: var(--tab-bg); border-radius: 12px; }
+/* 탭 버튼 공통 (선택: bg-[var(--toss-card)] shadow-md text-[var(--toss-blue)] / 미선택: text-[var(--toss-gray-3)]) */
+.app-tab-bar button.selected,
+.app-tab-bar .tab-selected { background: var(--toss-card); box-shadow: 0 1px 3px rgba(0,0,0,.08); color: var(--toss-blue); }
+.app-tab-bar button:not(.selected),
+.app-tab-bar .tab-default { color: var(--toss-gray-3); }
 
 .no-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
 .no-scrollbar::-webkit-scrollbar-track { background: transparent; }

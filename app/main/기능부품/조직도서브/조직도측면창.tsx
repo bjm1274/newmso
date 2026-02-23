@@ -1,10 +1,10 @@
 'use client';
 import { useState } from 'react';
-import AppLogo from '@/app/components/AppLogo';
+import GlobalNotificationBell from '@/app/components/GlobalNotificationBell';
 
 const MYPAGE_TAB_KEY = 'erp_mypage_tab';
 
-export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
+export default function Sidebar({ user, mainMenu, onMenuChange, onOpenNotifications }: any) {
   const [showMore, setShowMore] = useState(false);
 
   /* 토스 스타일 통일: 단순 아이콘 + 동일 라운드/색상 */
@@ -63,10 +63,14 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
 
   return (
     <>
-      {/* PC 사이드바 — 토스 스타일 통일 */}
-      <aside className="hidden md:flex w-[72px] bg-[var(--toss-card)] border-r border-[var(--toss-border)] flex-col items-center py-6 space-y-2 shrink-0 z-50 h-screen shadow-sm">
-        <div className="mb-4 shrink-0">
-          <AppLogo size={40} />
+      {/* PC 사이드바 — 알림 상단, 메뉴 아래 */}
+      <aside className="hidden md:flex w-[72px] bg-[var(--toss-card)] border-r border-[var(--toss-border)] flex-col items-center py-4 space-y-1 shrink-0 z-50 h-screen shadow-sm">
+        <div className="flex flex-col items-center shrink-0 w-full px-2 mb-3">
+          {onOpenNotifications && (
+            <div className="w-full flex justify-center">
+              <GlobalNotificationBell user={user} onOpenFull={onOpenNotifications} />
+            </div>
+          )}
         </div>
         <div className="flex-1 flex flex-col space-y-1 overflow-y-auto no-scrollbar w-full px-2">
           {visibleMenus.map(m => (
@@ -111,11 +115,15 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
         </button>
       </nav>
 
-      {/* 모바일 더보기 — 토스 스타일 */}
+      {/* 모바일 더보기 — 알림·모드·검색 + 전체 메뉴 */}
       {showMore && (
         <div className="md:hidden fixed inset-0 bg-black/20 z-[90] animate-in fade-in duration-200" onClick={() => setShowMore(false)}>
-          <div className="absolute bottom-20 left-4 right-4 bg-[var(--toss-card)] rounded-[16px] p-6 shadow-[0_4px_20px_rgba(0,0,0,0.08)] border border-[var(--toss-border)] animate-in slide-in-from-bottom-10 duration-300" onClick={e => e.stopPropagation()}>
-            <h3 className="text-[13px] font-semibold text-[var(--toss-gray-4)] mb-4 pb-3 border-b border-[var(--toss-border)]">전체 메뉴</h3>
+          <div className="absolute bottom-20 left-4 right-4 bg-[var(--toss-card)] rounded-[16px] p-6 shadow-[0_4px_20px_rgba(0,0,0,0.08)] border border-[var(--toss-border)] animate-in slide-in-from-bottom-10 duration-300 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between gap-3 mb-4 pb-3 border-b border-[var(--toss-border)]">
+              <h3 className="text-[13px] font-semibold text-[var(--toss-gray-4)]">알림</h3>
+              {onOpenNotifications && <GlobalNotificationBell user={user} onOpenFull={() => { onOpenNotifications(); setShowMore(false); }} />}
+            </div>
+            <h3 className="text-[13px] font-semibold text-[var(--toss-gray-4)] mb-3">전체 메뉴</h3>
             <div className="grid grid-cols-3 gap-3">
               {secondaryMenus.map(m => (
                 <button 

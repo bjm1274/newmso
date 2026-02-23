@@ -294,34 +294,33 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const listForView = viewMode === '기안함' ? draftBoxList : approvalBoxList;
 
   return (
-    <div className="flex flex-col md:flex-row h-full min-h-0 app-page overflow-hidden">
-      <aside className="w-full md:w-64 bg-[var(--toss-card)] border-b md:border-r border-[var(--toss-border)] shrink-0 z-10 flex-shrink-0">
-        <div className="p-4 md:p-8">
-          <nav className="flex md:flex-col gap-2 overflow-x-auto no-scrollbar">
-            {['기안함', '결재함', '작성하기'].map(m => (
-              <button
-                type="button"
-                key={m}
-                onClick={() => {
-                  setViewMode(m);
-                  if (typeof window !== 'undefined') {
-                    window.localStorage.setItem(APPROVAL_VIEW_KEY, m);
-                  }
-                }}
-                className={`flex-1 md:w-full text-center md:text-left px-4 md:px-6 py-3 md:py-4 rounded-[12px] md:rounded-[16px] text-[11px] md:text-xs font-bold transition-all whitespace-nowrap ${viewMode === m ? 'bg-[var(--toss-blue)] text-white shadow-sm' : 'bg-[var(--toss-gray-1)] md:bg-transparent text-[var(--toss-gray-3)] hover:bg-[var(--toss-card)] hover:shadow-sm'}`}
-              >
-                {m === '기안함' && '📥 '}
-                {m === '결재함' && '📤 '}
-                {m === '작성하기' && '✍️ '}
-                {m}
-              </button>
-            ))}
-          </nav>
-        </div>
+    <div className="flex flex-row h-full min-h-0 app-page overflow-hidden">
+      {/* 좌측 세로 탭 - 관리자 메뉴와 동일 스타일 */}
+      <aside className="flex flex-col gap-1.5 p-3 md:p-4 bg-[var(--toss-card)] border-r border-[var(--toss-border)] shrink-0 w-[72px] md:w-44 overflow-y-auto">
+        {['기안함', '결재함', '작성하기'].map(m => (
+          <button
+            type="button"
+            key={m}
+            onClick={() => {
+              setViewMode(m);
+              if (typeof window !== 'undefined') {
+                window.localStorage.setItem(APPROVAL_VIEW_KEY, m);
+              }
+            }}
+            className={`w-full px-3 py-2.5 text-[10px] md:text-[11px] font-semibold rounded-[12px] transition-all text-left ${
+              viewMode === m ? 'bg-[var(--toss-blue)] text-white shadow-md' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
+            }`}
+          >
+            {m === '기안함' && '📥 '}
+            {m === '결재함' && '📤 '}
+            {m === '작성하기' && '✍️ '}
+            {m}
+          </button>
+        ))}
       </aside>
 
       {/* 메인 콘텐츠 */}
-      <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 md:p-10 bg-[var(--page-bg)] custom-scrollbar">
+      <main className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden p-4 md:p-10 bg-[var(--page-bg)] custom-scrollbar">
         {viewMode === '작성하기' ? (
           <div className="max-w-4xl mx-auto space-y-6 md:space-y-8">
             <div className="bg-[var(--toss-card)] p-6 md:p-10 rounded-[16px] md:rounded-[20px] border border-[var(--toss-border)] shadow-sm space-y-8 md:space-y-10">
