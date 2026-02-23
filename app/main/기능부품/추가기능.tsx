@@ -14,7 +14,19 @@ const EXTERNAL_LINKS = [
 // 컴포넌트 이름을 영문 대문자로 시작하는 형태로 지정하여
 // React ESLint 규칙을 만족시킵니다. default export 이므로
 // 외부에서의 import 이름(추가기능)은 그대로 사용할 수 있습니다.
-export default function ExtraFeatures({ user, staffs = [], posts = [], onSearchSelect }: { user?: any; staffs?: any[]; posts?: any[]; onSearchSelect?: (type: string, id: string) => void }) {
+export default function ExtraFeatures({
+  user,
+  staffs = [],
+  posts = [],
+  onSearchSelect,
+  onOpenOrgChart,
+}: {
+  user?: any;
+  staffs?: any[];
+  posts?: any[];
+  onSearchSelect?: (type: string, id: string) => void;
+  onOpenOrgChart?: () => void;
+}) {
   const [subView, setSubView] = useState<string | null>(null);
 
   return (
@@ -67,13 +79,29 @@ export default function ExtraFeatures({ user, staffs = [], posts = [], onSearchS
 
         {!subView && (
           <div className="grid gap-3 md:grid-cols-2">
+            {onOpenOrgChart && (
+              <button
+                type="button"
+                onClick={onOpenOrgChart}
+                className="flex items-center gap-3 p-4 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] shadow-sm hover:bg-[var(--toss-blue-light)]/50 hover:border-[var(--toss-blue)]/30 transition-all group text-left w-full"
+              >
+                <div className="w-12 h-12 bg-[var(--toss-gray-1)] group-hover:bg-[var(--toss-blue-light)] rounded-[12px] flex items-center justify-center text-xl transition-colors">
+                  🏢
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-[var(--foreground)] text-sm">조직도</h3>
+                  <p className="text-[11px] text-[var(--toss-gray-3)] mt-0.5">조직 구성 및 연락처 보기</p>
+                </div>
+                <span className="text-[var(--toss-gray-3)] group-hover:text-[var(--toss-blue)]">→</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setSubView('부서별재고')}
               className="flex items-center gap-3 p-4 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] shadow-sm hover:bg-[var(--toss-blue-light)]/50 hover:border-[var(--toss-blue)]/30 transition-all group text-left w-full"
             >
               <div className="w-12 h-12 bg-[var(--toss-gray-1)] group-hover:bg-[var(--toss-blue-light)] rounded-[12px] flex items-center justify-center text-xl transition-colors">
-                🏢
+                📦
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="font-semibold text-[var(--foreground)] text-sm">부서별 재고</h3>

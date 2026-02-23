@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import 구성원관리 from './인사관리서브/구성원현황'; 
+import 구성원관리 from './인사관리서브/구성원현황';
 import CertificateGenerator from './인사관리서브/증명서발급';
 import PayrollMain from './인사관리서브/급여관리';
 import AttendanceSystem from './근태시스템';
@@ -10,7 +10,7 @@ import ShiftManagement from './인사관리서브/근무형태관리';
 export default function 인사관리({ user, staffs, depts, onRefresh }: any) {
   const [현재메뉴, 메뉴설정] = useState('구성원');
   const [선택사업체, 사업체설정] = useState('전체');
-  const [등록창상태, 창상태설정] = useState(false); 
+  const [등록창상태, 창상태설정] = useState(false);
 
   const 사업체목록 = ["전체", "SY INC.", "박철홍정형외과", "수연의원"];
 
@@ -27,51 +27,91 @@ export default function 인사관리({ user, staffs, depts, onRefresh }: any) {
   }
 
   return (
-    <div className="flex flex-col h-full bg-[#F8FAFC] overflow-hidden">
-      {/* 헤더 - 모바일 대응 */}
-      <header className="bg-white border-b border-gray-100 p-4 md:p-8 shrink-0 z-20 shadow-sm">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div className="flex flex-col h-full bg-background overflow-hidden animate-soft-fade">
+      {/* 헤더 - 프리미엄 스타일 적용 */}
+      <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/50 p-6 md:p-10 shrink-0 z-20 shadow-sm relative">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div>
-            <h1 className="text-xl md:text-2xl font-black text-gray-800 tracking-tight italic">SY INC. 인사 통합 제어</h1>
-            <p className="text-[10px] md:text-xs text-blue-600 font-bold mt-1 uppercase tracking-widest">MSO Integrated HR Engine</p>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="bg-primary/10 text-primary text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">HR Management Engine</span>
+              <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">v3.0 Sovereign</span>
+            </div>
+            <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tighter">인사 통합 제어 시스템</h1>
           </div>
-          
-          <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
-            <button onClick={() => 창상태설정(true)} className="w-full md:w-auto bg-[#1E293B] text-white px-6 py-2.5 text-[11px] font-black rounded-xl shadow-md hover:bg-black transition-all">신규 직원 등록</button>
-            
-            <div className="flex gap-1 bg-gray-100 p-1 rounded-xl border border-gray-200 overflow-x-auto no-scrollbar">
+
+          <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
+            <div className="flex bg-slate-100 p-1 rounded-2xl overflow-x-auto no-scrollbar">
               {['구성원', '근무형태', '근태', '급여', '휴가', '증명서'].map(이름 => (
-                <button key={이름} onClick={() => 메뉴설정(이름)} className={`flex-1 px-4 py-2 text-[10px] font-black transition-all rounded-lg whitespace-nowrap ${현재메뉴 === 이름 ? 'bg-white shadow-md text-blue-600' : 'text-gray-400'}`}>{이름}</button>
+                <button
+                  key={이름}
+                  onClick={() => 메뉴설정(이름)}
+                  className={`px-5 py-2.5 text-[11px] font-black transition-all rounded-xl whitespace-nowrap ${현재메뉴 === 이름 ? 'bg-white shadow-sm text-primary' : 'text-slate-500 hover:text-slate-800'}`}
+                >
+                  {이름}
+                </button>
               ))}
             </div>
+            <button
+              onClick={() => 창상태설정(true)}
+              className="bg-primary text-white px-8 py-3 text-[11px] font-black rounded-2xl shadow-lg shadow-blue-900/20 hover:scale-105 active:scale-95 transition-all"
+            >
+              신규 직원 등록
+            </button>
           </div>
         </div>
       </header>
 
       <main className="flex-1 flex flex-col md:flex-row overflow-hidden">
-        <aside className="w-full md:w-64 bg-white border-b md:border-r border-gray-100 flex flex-col shrink-0">
-          <div className="p-4 md:p-8">
-            <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-3 md:mb-4 italic tracking-widest">사업자 필터</p>
-            <div className="flex md:flex-col gap-1 overflow-x-auto no-scrollbar">
+        {/* 사이드 필터 - 프리미엄 세로 탭 스타일 */}
+        <aside className="w-full md:w-72 bg-white/50 backdrop-blur-sm border-b md:border-b-0 md:border-r border-slate-200/50 flex flex-col shrink-0">
+          <div className="p-8">
+            <p className="text-[10px] font-black text-slate-400 uppercase mb-6 tracking-[0.2em] italic">Organizational Scope</p>
+            <div className="flex md:flex-col gap-2 overflow-x-auto no-scrollbar">
               {사업체목록.map(회사 => (
-                <button key={회사} onClick={() => 사업체설정(회사)} className={`flex-1 md:w-full text-center md:text-left px-4 py-2.5 md:py-3 text-[10px] md:text-xs font-black border-b-2 md:border-b-0 md:border-l-4 transition-all whitespace-nowrap ${선택사업체 === 회사 ? 'bg-blue-50 border-blue-600 text-blue-600' : 'border-transparent text-gray-400 hover:bg-gray-50'}`}>{회사}</button>
+                <button
+                  key={회사}
+                  onClick={() => 사업체설정(회사)}
+                  className={`flex-1 md:w-full text-left px-5 py-4 text-[11px] font-black rounded-2xl transition-all duration-300 relative group ${선택사업체 === 회사
+                    ? 'bg-primary text-white shadow-xl shadow-blue-900/20 scale-[1.02] z-10'
+                    : 'text-slate-500 hover:bg-white hover:text-slate-900 hover:shadow-md'
+                    }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span>{회사}</span>
+                    {선택사업체 === 회사 && <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></div>}
+                  </div>
+                </button>
               ))}
+            </div>
+          </div>
+          <div className="mt-auto p-8 hidden md:block">
+            <div className="premium-card p-5 bg-slate-900 border-none text-white overflow-hidden relative">
+              <div className="absolute top-0 right-0 w-16 h-16 bg-blue-500/20 blur-2xl rounded-full"></div>
+              <p className="text-[10px] font-black opacity-50 uppercase tracking-widest mb-1">HR Insights</p>
+              <p className="text-xs font-bold leading-relaxed mb-3">전체 인원 현황 및 급여 마감 주기를 확인하세요.</p>
+              <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
+                <div className="w-3/4 h-full bg-primary rounded-full"></div>
+              </div>
             </div>
           </div>
         </aside>
 
-        <section className="flex-1 overflow-y-auto bg-[#F8FAFC] custom-scrollbar p-4 md:p-0">
-          {현재메뉴 === '구성원' && (
-            <구성원관리 
-              직원목록={staffs} 부서목록={depts} 선택사업체={선택사업체} 새로고침={onRefresh}
-              창상태={등록창상태} 창닫기={() => 창상태설정(false)} 
-            />
-          )}
-          {현재메뉴 === '근무형태' && <ShiftManagement selectedCo={선택사업체} />}
-          {현재메뉴 === '근태' && <AttendanceSystem user={user} staffs={staffs} selectedCo={선택사업체} isAdminView={true} />}
-          {현재메뉴 === '급여' && <PayrollMain staffs={staffs} selectedCo={선택사업체} />}
-          {현재메뉴 === '휴가' && <LeaveManagement staffs={staffs} selectedCo={선택사업체} />}
-          {현재메뉴 === '증명서' && <div className="p-4 md:p-10"><CertificateGenerator staffs={staffs} /></div>}
+        {/* 본문 영역 */}
+        <section className="flex-1 overflow-y-auto bg-background custom-scrollbar p-0">
+          <div className="h-full animate-soft-fade">
+            {현재메뉴 === '구성원' && (
+              <구성원관리
+                직원목록={staffs} 부서목록={depts} 선택사업체={선택사업체} 새로고침={onRefresh}
+                창상태={등록창상태} 창닫기={() => 창상태설정(false)}
+              />
+            )}
+            {현재메뉴 === '근무형태' && <ShiftManagement selectedCo={선택사업체} />}
+            {현재메뉴 === '근태' && <AttendanceSystem user={user} staffs={staffs} selectedCo={선택사업체} isAdminView={true} />}
+            {현재메뉴 === '급여' && <PayrollMain staffs={staffs} selectedCo={선택사업체} />}
+            {현재메뉴 === '휴가' && <LeaveManagement staffs={staffs} selectedCo={선택사업체} />}
+            {현재메뉴 === '증명서' && <div className="p-10"><CertificateGenerator staffs={staffs} /></div>}
+          </div>
         </section>
       </main>
     </div>

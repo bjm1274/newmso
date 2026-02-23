@@ -13,7 +13,7 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
   const [replyTo, setReplyTo] = useState<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const msgRefs = useRef<any>({}); 
+  const msgRefs = useRef<any>({});
 
   // 추가된 상태
   const [viewMode, setViewMode] = useState<'chat' | 'org'>('chat');
@@ -34,13 +34,13 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
 
     // 공지사항 로드
     const { data: notice } = await supabase
-      .from('posts')
+      .from('board_posts')
       .select('*')
       .eq('board_type', '공지사항')
       .order('created_at', { ascending: false })
       .limit(1)
-      .single();
-    setLatestNotice(notice || null);
+      .maybeSingle();
+    setLatestNotice(notice);
 
     // 채팅방 목록 로드
     const { data: rooms } = await supabase
@@ -50,31 +50,41 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
     setChatRooms(rooms || []);
   };
 
+  // 추가된 UI 상태
+  const [activeTab, setActiveTab] = useState<'friends' | 'chat' | 'more'>('chat');
+
   useEffect(() => {
     fetchData();
-    const channel = supabase.channel(`chat-v3`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => fetchData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => fetchData())
+    const channel = supabase.channel(`chat-kakao`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+        if (payload.new.room_id === selectedRoomId) {
+          fetchData();
+        }
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_rooms' }, () => fetchData())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [selectedRoomId]);
 
-  useEffect(() => { scrollRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages.length]);
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages.length]);
 
   const handleSendMessage = async (fileUrl?: string) => {
     if (!inputMsg.trim() && !fileUrl) return;
-    const { error } = await supabase.from('messages').insert([{ 
-      room_id: selectedRoomId, 
-      sender_id: user.id, 
-      content: inputMsg, 
-      file_url: fileUrl, 
-      reply_to_id: replyTo?.id 
+    const { error } = await supabase.from('messages').insert([{
+      room_id: selectedRoomId,
+      sender_id: user.id,
+      content: inputMsg,
+      file_url: fileUrl,
+      reply_to_id: replyTo?.id
     }]);
     if (!error) {
-      setInputMsg(''); 
+      setInputMsg('');
       setReplyTo(null);
-      fetchData();
+      // fetchData(); // Handled by real-time subscription
     }
   };
 
@@ -89,20 +99,22 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
   const handleAction = async (type: 'task' | 'notice') => {
     if (!activeActionMsg) return;
     if (type === 'task') {
-      const { error } = await supabase.from('tasks').insert([{ 
-        assignee_id: user.id, 
-        title: `[채팅] ${activeActionMsg.content}`, 
-        status: 'pending' 
+      const { error } = await supabase.from('todos').insert([{
+        user_id: user.id,
+        content: `[채팅] ${activeActionMsg.content}`,
+        is_complete: false,
+        task_date: new Date().toISOString().split('T')[0]
       }]);
-      if (!error) { alert("할일 등록 완료"); if(onRefresh) onRefresh(); }
+      if (!error) { alert("할일 등록 완료 (마이페이지에서 확인 가능)"); if (onRefresh) onRefresh(); }
     } else {
-      const { error } = await supabase.from('posts').insert([{ 
-        board_type: '공지사항', 
-        sender_id: user.id, 
-        title: '채팅 공지', 
-        content: activeActionMsg.content 
+      const { error } = await supabase.from('board_posts').insert([{
+        board_type: '공지사항',
+        author_name: user?.name || '익명',
+        title: '채팅 공지',
+        content: activeActionMsg.content,
+        created_at: new Date().toISOString()
       }]);
-      if (!error) fetchData();
+      if (!error) { alert("공지 등록 완료 (게시판에서 확인 가능)"); fetchData(); }
     }
     setActiveActionMsg(null);
   };
@@ -110,7 +122,7 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
   const removeNotice = async () => {
     if (!latestNotice) return;
     if (!confirm("공지를 내리시겠습니까?")) return;
-    const { error } = await supabase.from('posts').delete().eq('id', latestNotice.id);
+    const { error } = await supabase.from('board_posts').delete().eq('id', latestNotice.id);
     if (!error) fetchData();
   };
 
@@ -133,61 +145,128 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
   };
 
   const filteredStaffs = useMemo(() => {
-    return staffs.filter((s: any) => 
+    return staffs.filter((s: any) =>
       s.name.includes(searchTerm) || s.department?.includes(searchTerm)
     );
   }, [staffs, searchTerm]);
 
+  // 7. 결과 렌더링
   return (
-    <div className="flex flex-1 overflow-hidden relative font-sans h-full bg-white">
-      {/* 좌측 사이드바: 검색 및 목록 */}
-      <aside className="w-80 border-r bg-gray-50 flex flex-col shrink-0">
-        <div className="p-6 space-y-4">
-          <div className="flex gap-2 bg-white p-1 rounded-xl shadow-sm">
-            <button onClick={() => setViewMode('chat')} className={`flex-1 py-2 text-[10px] font-black rounded-lg transition-all ${viewMode === 'chat' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-400'}`}>채팅목록</button>
-            <button onClick={() => setViewMode('org')} className={`flex-1 py-2 text-[10px] font-black rounded-lg transition-all ${viewMode === 'org' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-400'}`}>조직도검색</button>
+    <div className="flex h-full w-full bg-white overflow-hidden animate-soft-fade select-none">
+
+      {/* 1. 좌측 초슬림 내비게이션 바 (카카오톡 스타일) */}
+      <nav className="w-16 bg-[#f2f2f2] border-r border-gray-200 flex flex-col items-center py-10 space-y-8 shrink-0">
+        <div
+          onClick={() => setActiveTab('friends')}
+          className={`cursor-pointer group relative ${activeTab === 'friends' ? 'text-gray-900' : 'text-gray-400'}`}
+        >
+          <span className="text-2xl">👤</span>
+          {activeTab === 'friends' && <div className="absolute -left-4 top-1/2 -translate-y-1/2 w-1 h-6 bg-gray-800 rounded-r-full"></div>}
+        </div>
+        <div
+          onClick={() => setActiveTab('chat')}
+          className={`cursor-pointer group relative ${activeTab === 'chat' ? 'text-gray-900' : 'text-gray-400'}`}
+        >
+          <span className="text-2xl">💬</span>
+          {activeTab === 'chat' && <div className="absolute -left-4 top-1/2 -translate-y-1/2 w-1 h-6 bg-gray-800 rounded-r-full"></div>}
+          <div className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] font-black px-1 rounded-full border border-white">N</div>
+        </div>
+        <div className="flex-1"></div>
+        <div
+          onClick={() => setActiveTab('more')}
+          className={`cursor-pointer group relative ${activeTab === 'more' ? 'text-gray-900' : 'text-gray-400'}`}
+        >
+          <span className="text-2xl">⋯</span>
+        </div>
+      </nav>
+
+      {/* 2. 리스트 사이드바 (친구/채팅 목록) */}
+      <aside className="w-80 flex flex-col border-r border-gray-200">
+        <div className="p-6 pb-2">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-black text-gray-900 tracking-tight">
+              {activeTab === 'friends' ? '친구' : activeTab === 'chat' ? '채팅' : '더보기'}
+            </h2>
+            <div className="flex gap-4 text-gray-400">
+              <button className="hover:text-gray-900 underline underline-offset-4 decoration-dotted">🔍</button>
+              {activeTab === 'chat' && <button onClick={() => setShowGroupModal(true)} className="hover:text-gray-900">💬+</button>}
+              <button className="hover:text-gray-900">⚙️</button>
+            </div>
           </div>
-          
-          <input 
-            className="w-full p-4 bg-white border border-gray-100 rounded-2xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-100" 
-            placeholder={viewMode === 'chat' ? "채팅방 검색..." : "이름 또는 부서 검색..."}
-            value={searchTerm} 
-            onChange={e => setSearchTerm(e.target.value)} 
-          />
+
+          <div className="relative mb-4">
+            <input
+              type="text"
+              placeholder="이름, 부서 검색"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-gray-100 border-none rounded-lg p-2 px-4 text-xs font-medium focus:ring-1 focus:ring-gray-300 outline-none"
+            />
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-2 custom-scrollbar">
-          {viewMode === 'chat' ? (
-            <>
-              <div 
-                onClick={() => setSelectedRoomId(NOTICE_ROOM_ID)}
-                className={`p-4 rounded-2xl cursor-pointer transition-all ${selectedRoomId === NOTICE_ROOM_ID ? 'bg-blue-600 text-white shadow-lg' : 'bg-white border hover:border-blue-200'}`}
-              >
-                <p className="text-xs font-black">📢 전직원 공지방</p>
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
+          {activeTab === 'friends' && (
+            <div className="space-y-1">
+              <div className="px-6 py-2 text-[10px] font-black text-gray-400 uppercase tracking-widest">내 프로필</div>
+              <div className="px-5 py-3 flex items-center gap-4 hover:bg-gray-50 cursor-pointer group">
+                <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center text-lg shadow-sm border border-gray-100 overflow-hidden">
+                  {user.avatar_url ? <img src={user.avatar_url} className="w-full h-full object-cover" /> : (user.name?.[0] || 'U')}
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-black text-gray-900">{user.name}</p>
+                  <p className="text-[10px] font-bold text-gray-400">{user.department} · {user.position}</p>
+                </div>
               </div>
-              <button onClick={() => setShowGroupModal(true)} className="w-full p-4 bg-gray-900 text-white rounded-2xl text-[10px] font-black shadow-md hover:scale-[0.98] transition-all">+ 단체 채팅방 생성</button>
-              {chatRooms.filter(r => r.name.includes(searchTerm)).map(room => (
-                <div 
-                  key={room.id}
-                  onClick={() => setSelectedRoomId(room.id)}
-                  className={`p-4 rounded-2xl cursor-pointer transition-all ${selectedRoomId === room.id ? 'bg-blue-600 text-white shadow-lg' : 'bg-white border hover:border-blue-200'}`}
-                >
-                  <p className="text-xs font-black">👥 {room.name}</p>
+
+              <div className="px-6 py-2 pt-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">동료 ({filteredStaffs.length})</div>
+              {filteredStaffs.map((s: any) => (
+                <div key={s.id} onClick={() => { setViewMode('chat'); setActiveTab('chat'); /* 여기에 해당 유저와의 1:1 방 찾기/생성 로직 추가 가능 */ }} className="px-5 py-3 flex items-center gap-4 hover:bg-gray-50 cursor-pointer transition-colors">
+                  <div className="w-10 h-10 rounded-xl bg-gray-200 flex items-center justify-center text-sm shadow-sm border border-gray-100 overflow-hidden text-gray-400">
+                    {s.photo_url ? <img src={s.photo_url} className="w-full h-full object-cover" /> : (s.name?.[0] || '?')}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-gray-800">{s.name}</p>
+                    <p className="text-[10px] text-gray-400">{s.department}</p>
+                  </div>
                 </div>
               ))}
-            </>
-          ) : (
-            <div className="space-y-1">
-              {filteredStaffs.map((s: any) => (
-                <div key={s.id} className="flex items-center gap-3 p-3 bg-white border border-gray-100 rounded-xl hover:border-blue-300 cursor-pointer transition-all">
-                  <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center text-xs font-black text-gray-400 overflow-hidden">
-                    {s.photo_url ? <img src={s.photo_url} className="w-full h-full object-cover" /> : s.name[0]}
+            </div>
+          )}
+
+          {activeTab === 'chat' && (
+            <div className="space-y-0">
+              {/* 공지방 */}
+              <div
+                onClick={() => setSelectedRoomId(NOTICE_ROOM_ID)}
+                className={`px-5 py-4 flex items-center gap-4 cursor-pointer transition-colors ${selectedRoomId === NOTICE_ROOM_ID ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
+              >
+                <div className="w-12 h-12 rounded-2xl bg-gray-800 flex items-center justify-center text-xl shadow-md shrink-0">📢</div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-center mb-1">
+                    <p className="text-sm font-black text-gray-900 truncate">전직원 공지방</p>
+                    <span className="text-[9px] text-gray-400">오전 9:10</span>
                   </div>
+                  <p className="text-xs text-gray-400 truncate font-medium">SY Connect 공식 공지사항입니다.</p>
+                </div>
+              </div>
+
+              {chatRooms.map(room => (
+                <div
+                  key={room.id}
+                  onClick={() => setSelectedRoomId(room.id)}
+                  className={`px-5 py-4 flex items-center gap-4 cursor-pointer transition-colors ${selectedRoomId === room.id ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-600 flex items-center justify-center text-xl shadow-sm border border-blue-500/5 shrink-0">👥</div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-black text-gray-800 truncate">{s.name}</p>
-                    <p className="text-[9px] font-bold text-gray-400 truncate">{s.department} · {s.position}</p>
+                    <div className="flex justify-between items-center mb-1">
+                      <p className="text-sm font-black text-gray-900 truncate">{room.name}</p>
+                      <span className="text-[9px] text-gray-400">최근</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <p className="text-xs text-gray-400 truncate font-medium">대화에 참여해보세요.</p>
+                    </div>
                   </div>
-                  <button onClick={() => {/* 1:1 채팅 로직 */}} className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-[9px] font-black hover:bg-blue-600 hover:text-white transition-all">대화</button>
                 </div>
               ))}
             </div>
@@ -195,125 +274,185 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
         </div>
       </aside>
 
-      {/* 우측: 채팅창 본문 */}
-      <main className="flex-1 flex flex-col bg-[#FDFDFD] h-full relative">
-        {/* 공지 상단 바 */}
-        {latestNotice && (
-          <div className="w-full bg-orange-50 border-b border-orange-100 p-4 px-8 z-20 flex items-center justify-between shadow-sm shrink-0 animate-in slide-in-from-top duration-300">
-            <div className="flex items-center gap-3 flex-1 min-w-0">
-              <span className="text-lg">📢</span>
-              <span className="text-sm font-black text-orange-800 truncate">{latestNotice.content}</span>
-            </div>
-            {(user.role === 'admin' || user.id === latestNotice.sender_id) && (
-              <button onClick={removeNotice} className="ml-4 px-3 py-1.5 bg-white border border-orange-200 text-orange-600 rounded-lg text-[10px] font-black hover:bg-orange-600 hover:text-white transition-all shadow-sm">공지 내리기</button>
-            )}
+      {/* 3. 우측 메인 채팅창 (카카오톡 특유의 색감) */}
+      <main className="flex-1 flex flex-col bg-[#bacEE0] relative">
+        <header className="h-16 px-6 flex items-center justify-between border-b border-gray-200/50 bg-[#bacEE0]/80 backdrop-blur-md shrink-0 z-10 sticky top-0">
+          <div className="flex items-center gap-3">
+            <h3 className="text-sm font-black text-gray-800">
+              {selectedRoomId === NOTICE_ROOM_ID ? '전직원 공지방' : (chatRooms.find(r => r.id === selectedRoomId)?.name || '채팅')}
+            </h3>
+            <span className="text-[10px] font-bold text-gray-500 opacity-60">👥 그룹</span>
           </div>
-        )}
+          <div className="flex gap-5 text-gray-600">
+            <button className="hover:text-gray-900">🔍</button>
+            <button className="hover:text-gray-900 text-xl">≡</button>
+          </div>
+        </header>
 
-        <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
+        <div
+          className="flex-1 overflow-y-auto px-4 py-6 space-y-6 custom-scrollbar scroll-smooth"
+        >
+          <div ref={scrollRef as any} />
+          {latestNotice && (
+            <div className="mx-2 mb-6 bg-white/70 backdrop-blur-sm rounded-2xl p-4 border border-white/50 flex items-center gap-4 shadow-sm animate-in slide-in-from-top-4 relative z-10">
+              <span className="text-lg">📢</span>
+              <p className="text-xs font-bold text-gray-700 flex-1 truncate">{latestNotice.content}</p>
+              <button
+                onClick={removeNotice}
+                className="text-[10px] font-black text-gray-400 hover:text-red-500"
+              >✕</button>
+            </div>
+          )}
+
           {messages.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center opacity-20">
-              <span className="text-6xl mb-4">💬</span>
-              <p className="font-black text-sm">대화 내용이 없습니다.</p>
+            <div className="h-full flex flex-col items-center justify-center text-white/50 space-y-2 py-20">
+              <span className="text-4xl text-white/30">💬</span>
+              <p className="text-xs font-black italic tracking-widest">메시지를 시작하세요</p>
             </div>
           ) : (
-            messages.filter(m => (m.content||'').includes(searchTerm)).map((msg) => {
+            messages.map((msg, idx) => {
               const isMine = msg.sender_id === user.id;
+              const showProfile = !isMine && (idx === 0 || messages[idx - 1].sender_id !== msg.sender_id);
+
               return (
-                <div
-                  key={msg.id}
-                  ref={el => { msgRefs.current[msg.id] = el; }}
-                  className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}
-                >
-                  {!isMine && <span className="text-[10px] text-gray-400 px-2 mb-1 font-bold">{msg.staff?.name} {msg.staff?.position}</span>}
-                  <div 
-                    onClick={() => setActiveActionMsg(msg)} 
-                    className={`group relative p-4 rounded-2xl text-sm shadow-sm cursor-pointer transition-all max-w-[70%] ${isMine ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white border rounded-tl-none hover:border-blue-200'}`}
-                  >
-                    {msg.content}
-                    {msg.file_url && (
-                      <a href={msg.file_url} target="_blank" className={`block mt-2 p-2 rounded-lg text-[10px] font-bold border flex items-center gap-2 ${isMine ? 'bg-white/10 border-white/20' : 'bg-gray-50 border-gray-100 text-blue-600'}`}>
-                        📎 파일 첨부됨
-                      </a>
-                    )}
-                    <span className={`absolute bottom-0 ${isMine ? 'right-full mr-2' : 'left-full ml-2'} text-[8px] font-bold text-gray-300 whitespace-nowrap`}>
-                      {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
+                <div key={msg.id} className={`flex gap-2 ${isMine ? 'flex-row-reverse' : 'flex-row'} items-start animate-in fade-in-up duration-300`}>
+                  {!isMine && (
+                    <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-gray-400 text-xs shadow-sm shrink-0 mt-1">
+                      {showProfile ? (msg.staff?.photo_url ? <img src={msg.staff.photo_url} className="w-full h-full object-cover rounded-xl" /> : (msg.staff?.name?.[0] || '?')) : ''}
+                    </div>
+                  )}
+
+                  <div className={`flex flex-col ${isMine ? 'items-end' : 'items-start'} max-w-[70%]`}>
+                    {showProfile && <span className="text-[10px] font-bold text-gray-600 mb-1 ml-1">{msg.staff?.name}</span>}
+
+                    <div className="flex items-end gap-1.5">
+                      <div
+                        onClick={() => setActiveActionMsg(msg)}
+                        className={`p-3 rounded-2xl text-[13px] font-medium leading-relaxed shadow-sm cursor-pointer hover:brightness-95 transition-all
+                          ${isMine ? 'bg-[#fee500] text-gray-900 rounded-tr-none' : 'bg-white text-gray-800 rounded-tl-none'}
+                        `}
+                      >
+                        {msg.content}
+                        {msg.file_url && (
+                          <a target="_blank" href={msg.file_url} className="mt-2 block p-2 bg-black/5 rounded-lg text-[10px] font-black border border-black/5 flex items-center gap-2">
+                            📎 파일 첨부
+                          </a>
+                        )}
+                      </div>
+                      <span className="text-[8px] font-bold text-gray-500/60 pb-1 shrink-0">
+                        {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
                   </div>
                 </div>
               );
             })
           )}
-          <div ref={scrollRef} />
         </div>
 
-        {/* 입력창 */}
-        <div className="p-6 bg-white border-t shrink-0">
-           {replyTo && (
-             <div className="mb-3 flex items-center justify-between bg-blue-50 p-3 rounded-xl border border-blue-100 animate-in slide-in-from-bottom-2">
-               <p className="text-[10px] font-bold text-blue-600">@{replyTo.staff?.name}님에게 답글 작성 중...</p>
-               <button onClick={()=>setReplyTo(null)} className="text-blue-400 hover:text-blue-600 font-black">✕</button>
-             </div>
-           )}
-           <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-[2rem] border border-gray-100 focus-within:bg-white focus-within:ring-4 focus-within:ring-blue-50 transition-all">
-             <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
-             <button onClick={()=>fileInputRef.current?.click()} className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-blue-600 transition-colors">📎</button>
-             <input 
-               className="flex-1 bg-transparent p-2 outline-none text-sm font-bold" 
-               placeholder="메시지를 입력하세요..."
-               value={inputMsg} 
-               onChange={e=>setInputMsg(e.target.value)} 
-               onKeyDown={e=>e.key==='Enter'&&handleSendMessage()} 
-             />
-             <button onClick={()=>handleSendMessage()} className="bg-blue-600 text-white w-10 h-10 rounded-full shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center justify-center">↑</button>
-           </div>
-        </div>
-
-        {/* 액션 모달 */}
-        {activeActionMsg && (
-          <div className="absolute inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-30 animate-in fade-in duration-200" onClick={()=>setActiveActionMsg(null)}>
-            <div className="bg-white p-6 rounded-[2.5rem] space-y-2 w-64 shadow-2xl animate-in zoom-in-95 duration-200" onClick={e=>e.stopPropagation()}>
-              <button onClick={()=>{setReplyTo(activeActionMsg); setActiveActionMsg(null)}} className="w-full p-4 text-left hover:bg-blue-50 rounded-2xl text-xs font-black text-blue-600 transition-colors">↩️ 답글 달기</button>
-              <button onClick={()=>handleAction('task')} className="w-full p-4 text-left hover:bg-gray-50 rounded-2xl text-xs font-black transition-colors">✅ 할일로 등록</button>
-              <button onClick={()=>handleAction('notice')} className="w-full p-4 text-left hover:bg-orange-50 rounded-2xl text-xs font-black text-orange-500 transition-colors">📢 공지로 등록</button>
-              <button onClick={()=>setActiveActionMsg(null)} className="w-full p-4 text-center text-gray-400 text-[10px] font-black pt-4">닫기</button>
+        <div className="p-4 bg-white border-t border-gray-200">
+          {replyTo && (
+            <div className="mb-2 p-2 bg-gray-50 rounded-lg flex items-center justify-between text-[10px] text-gray-500 font-bold border-l-4 border-yellow-400">
+              <span>@{replyTo.staff?.name}에게 답장 중</span>
+              <button onClick={() => setReplyTo(null)}>✕</button>
             </div>
+          )}
+          <div className="flex items-end gap-2 bg-gray-50 p-2 rounded-xl focus-within:bg-white border border-transparent focus-within:border-gray-200 transition-all">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="p-2 text-gray-400 hover:text-gray-900 text-xl"
+            >+</button>
+            <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
+            <textarea
+              rows={1}
+              value={inputMsg}
+              onChange={(e) => setInputMsg(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
+                }
+              }}
+              placeholder="메시지를 입력하세요"
+              className="flex-1 bg-transparent p-2 outline-none text-[13px] font-medium resize-none max-h-32"
+            />
+            <button className="p-2 text-gray-400 hover:text-yellow-500 text-xl">😊</button>
+            <button
+              onClick={() => handleSendMessage()}
+              disabled={!inputMsg.trim()}
+              className={`px-4 py-2 rounded-lg text-xs font-black transition-all ${inputMsg.trim() ? 'bg-[#fee500] text-gray-900 shadow-md' : 'bg-gray-200 text-gray-400'}`}
+            >
+              전송
+            </button>
           </div>
-        )}
+        </div>
 
-        {/* 단체방 생성 모달 */}
-        {showGroupModal && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setShowGroupModal(false)}>
-            <div className="bg-white w-full max-w-md rounded-[3rem] p-10 shadow-2xl space-y-8" onClick={e => e.stopPropagation()}>
-              <h3 className="text-xl font-black text-gray-800 italic">새 단체 채팅방</h3>
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">방 이름</label>
-                  <input value={groupName} onChange={e => setGroupName(e.target.value)} className="w-full p-4 bg-gray-50 rounded-2xl border-none outline-none font-bold text-sm focus:ring-2 focus:ring-blue-100" placeholder="예: 행정팀 단체방" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">멤버 선택 ({selectedMembers.length}명)</label>
-                  <div className="h-48 overflow-y-auto border border-gray-100 rounded-2xl p-4 space-y-2 custom-scrollbar bg-gray-50/30">
-                    {staffs.filter((s:any) => s.id !== user.id).map((s: any) => (
-                      <label key={s.id} className="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-100 cursor-pointer hover:border-blue-300 transition-all">
-                        <input type="checkbox" checked={selectedMembers.includes(s.id)} onChange={e => {
-                          if (e.target.checked) setSelectedMembers([...selectedMembers, s.id]);
-                          else setSelectedMembers(selectedMembers.filter(id => id !== s.id));
-                        }} className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                        <span className="text-xs font-bold text-gray-700">{s.name} ({s.position})</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex gap-3">
-                  <button onClick={() => setShowGroupModal(false)} className="flex-1 py-4 bg-gray-100 text-gray-400 rounded-2xl font-black text-xs">취소</button>
-                  <button onClick={createGroupChat} className="flex-2 py-4 bg-blue-600 text-white rounded-2xl font-black text-xs shadow-lg shadow-blue-200">채팅방 생성</button>
-                </div>
+        {/* 액션 모달 (카카오톡 스타일) */}
+        {activeActionMsg && (
+          <div className="absolute inset-0 bg-black/10 backdrop-blur-sm z-50 flex items-center justify-center p-6 animate-in fade-in transition-all" onClick={() => setActiveActionMsg(null)}>
+            <div className="bg-white rounded-3xl w-full max-w-xs overflow-hidden shadow-2xl animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
+              <div className="p-6 border-b border-gray-100 bg-gray-50/50">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Message Action</p>
+                <p className="text-xs font-bold text-gray-800 line-clamp-2 italic">"{activeActionMsg.content}"</p>
+              </div>
+              <div className="p-2">
+                <button onClick={() => { setReplyTo(activeActionMsg); setActiveActionMsg(null) }} className="w-full text-left p-4 hover:bg-yellow-50 rounded-2xl text-xs font-bold text-gray-700 transition-all flex items-center gap-3">
+                  <span>↩️</span> 답장하기
+                </button>
+                <button onClick={() => handleAction('task')} className="w-full text-left p-4 hover:bg-gray-50 rounded-2xl text-xs font-bold text-gray-700 transition-all flex items-center gap-3">
+                  <span>✅</span> 할일로 등록
+                </button>
+                {(user.role === 'admin') && (
+                  <button onClick={() => handleAction('notice')} className="w-full text-left p-4 hover:bg-gray-50 rounded-2xl text-xs font-bold text-gray-700 transition-all flex items-center gap-3">
+                    <span>📢</span> 채팅방 공지로 설정
+                  </button>
+                )}
+              </div>
+              <div className="p-4 border-t border-gray-50 text-center">
+                <button onClick={() => setActiveActionMsg(null)} className="text-[10px] font-black text-gray-400 hover:text-gray-900 uppercase">닫기</button>
               </div>
             </div>
           </div>
         )}
       </main>
+
+      {/* 단체 채팅방 생성 모달 */}
+      {showGroupModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[100] p-4 animate-in fade-in" onClick={() => setShowGroupModal(false)}>
+          <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl space-y-6 animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-black text-gray-900 italic tracking-tighter">새로운 대화 시작</h3>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase ml-1">채팅방 이름</label>
+                <input
+                  value={groupName}
+                  onChange={e => setGroupName(e.target.value)}
+                  className="w-full p-4 bg-gray-100 rounded-2xl border-none outline-none font-bold text-sm focus:ring-2 focus:ring-yellow-400"
+                  placeholder="프로젝트, 모임 이름 등"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase ml-1">초대할 동료 ({selectedMembers.length}명)</label>
+                <div className="h-40 overflow-y-auto border border-gray-100 rounded-2xl p-2 space-y-1 custom-scrollbar bg-gray-50/50">
+                  {staffs.filter((s: any) => s.id !== user.id).map((s: any) => (
+                    <label key={s.id} className="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-50 cursor-pointer hover:border-yellow-400 transition-all">
+                      <input type="checkbox" checked={selectedMembers.includes(s.id)} onChange={e => {
+                        if (e.target.checked) setSelectedMembers([...selectedMembers, s.id]);
+                        else setSelectedMembers(selectedMembers.filter(id => id !== s.id));
+                      }} className="w-4 h-4 rounded border-gray-300 text-yellow-500 focus:ring-yellow-400" />
+                      <span className="text-xs font-bold text-gray-700">{s.name} ({s.position})</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setShowGroupModal(false)} className="flex-1 py-4 bg-gray-100 text-gray-400 rounded-2xl font-black text-xs">취소</button>
+                <button onClick={createGroupChat} className="flex-2 py-4 bg-[#fee500] text-gray-900 rounded-2xl font-black text-xs shadow-xl shadow-yellow-900/10 active:scale-95 transition-all">개설하기</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

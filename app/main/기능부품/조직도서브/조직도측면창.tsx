@@ -57,10 +57,11 @@ export const SUB_MENUS: Record<string, { id: string; label: string }[]> = {
 export default function Sidebar({ user, mainMenu, subView, onMenuChange, onOpenNotifications }: any) {
   const [showMore, setShowMore] = useState(false);
 
-  /* 토스 스타일 통일: 단순 아이콘 + 동일 라운드/색상 */
+  /* 토스 스타일 통일: 단순 아이콘 + 동일 라운드/색상
+   * 조직도는 메인 메뉴에서 제거하고, 추가기능 내부 카드로 진입하도록 구성
+   */
   const menus = [
     { id: '내정보', icon: '👤', label: '내 정보' },
-    { id: '조직도', icon: '🏢', label: '조직도' },
     { id: '추가기능', icon: '➕', label: '추가기능' },
     { id: '채팅', icon: '💬', label: '채팅' },
     { id: '게시판', icon: '📌', label: '게시판' },
@@ -127,8 +128,8 @@ export default function Sidebar({ user, mainMenu, subView, onMenuChange, onOpenN
         </div>
       </aside>
 
-      {/* 모바일 하단 탭바 — 토스 스타일 통일 */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[var(--toss-card)] border-t border-[var(--toss-border)] flex justify-around items-center py-2 px-2 z-[100] shadow-[0_-2px_8px_rgba(0,0,0,0.04)] safe-area-pb">
+      {/* 모바일 하단 탭바 — 토스 스타일, 좌우 슬라이드 가능 */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[var(--toss-card)] border-t border-[var(--toss-border)] flex items-center gap-1 py-2 px-2 z-[100] shadow-[0_-2px_8px_rgba(0,0,0,0.04)] safe-area-pb overflow-x-auto no-scrollbar">
         {primaryMenus.map(m => (
           <button
             key={m.id}
@@ -136,7 +137,7 @@ export default function Sidebar({ user, mainMenu, subView, onMenuChange, onOpenN
               handleMenuClick(m.id);
               setShowMore(false);
             }}
-            className={`flex flex-col items-center justify-center min-h-[44px] touch-manipulation py-2 px-2 min-w-0 flex-1 transition-all rounded-[12px] ${
+            className={`flex flex-col items-center justify-center min-h-[44px] touch-manipulation py-2 px-3 min-w-[72px] flex-none transition-all rounded-[12px] ${
               mainMenu === m.id && !showMore ? 'text-[var(--toss-blue)]' : 'text-[var(--toss-gray-3)]'
             }`}
           >
@@ -146,7 +147,7 @@ export default function Sidebar({ user, mainMenu, subView, onMenuChange, onOpenN
         ))}
         <button
           onClick={() => setShowMore(!showMore)}
-          className={`flex flex-col items-center justify-center min-h-[44px] touch-manipulation py-2 px-2 min-w-0 flex-1 transition-all rounded-[12px] ${
+          className={`flex flex-col items-center justify-center min-h-[44px] touch-manipulation py-2 px-3 min-w-[72px] flex-none transition-all rounded-[12px] ${
             showMore ? 'text-[var(--toss-blue)]' : 'text-[var(--toss-gray-3)]'
           }`}
         >

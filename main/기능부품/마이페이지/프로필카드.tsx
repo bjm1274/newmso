@@ -98,12 +98,12 @@ export default function MyProfileCard({ user: initialUser }: any) {
 
       // 4. 화면 반영
       setAvatarUrl(newUrl);
-      
+
       // 5. 세션 강제 동기화 (새로고침 방어)
       const updatedUser = { ...user, avatar_url: newUrl };
       setUser(updatedUser);
       localStorage.setItem('user_session', JSON.stringify(updatedUser));
-      
+
       alert('사진이 정상적으로 등록되었습니다!');
 
     } catch (error: any) {
@@ -115,61 +115,90 @@ export default function MyProfileCard({ user: initialUser }: any) {
 
   if (!user) return <div className="p-10">로딩 중...</div>;
 
+  // 근태 통계 상태 추가
+  const [stats, setStats] = useState({ late: 0, normal: 0, overtime: 0 });
+
+  useEffect(() => {
+    if (user?.id) fetchStats();
+  }, [user]);
+
+  const fetchStats = async () => {
+    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+    const { data } = await supabase.from('attendance').select('*').eq('staff_id', user.id).gte('date', startOfMonth);
+    if (data) {
+      setStats({
+        late: data.filter(l => l.status === '지각').length,
+        normal: data.filter(l => l.status === '정상').length,
+        overtime: data.reduce((acc, l) => acc + (l.overtime_hours || 0), 0)
+      });
+    }
+  };
+
   return (
-    <div className="bg-white border border-gray-100 shadow-sm rounded-[2.5rem] p-12 flex flex-col h-full space-y-12">
-      
-      {/* 프로필 헤더 */}
-      <div className="flex items-center gap-10 pb-10 border-b border-gray-50">
-        <div className="relative group">
-          <div className="w-32 h-32 rounded-full bg-gray-50 flex items-center justify-center overflow-hidden border-4 border-white shadow-2xl">
-            {avatarUrl ? (
-              <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
-            ) : (
-              <span className="text-5xl font-black text-gray-200">👤</span>
-            )}
+    <div className="bg-white border border-gray-100 shadow-sm rounded-[2.5rem] p-10 h-full flex flex-col space-y-10 relative overflow-hidden group">
+      {/* 장식 요소 */}
+      <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 blur-3xl group-hover:bg-primary/10 transition-colors"></div>
+
+      <div className="flex items-start gap-10">
+        <div className="relative">
+          <div className="w-32 h-32 bg-slate-100 rounded-[2.5rem] flex items-center justify-center text-4xl shadow-inner relative overflow-hidden ring-8 ring-slate-50">
+            {avatarUrl ? <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" /> : user.name?.[0]}
+            {uploading && <div className="absolute inset-0 bg-black/50 flex items-center justify-center"><span className="animate-spin text-white">⏳</span></div>}
           </div>
-          <label className="absolute bottom-1 right-1 w-10 h-10 bg-gray-900 text-white rounded-full flex items-center justify-center cursor-pointer hover:bg-blue-600 transition-all shadow-lg z-10" htmlFor="profiles-upload">
-            {uploading ? '⏳' : '📷'}
-          </label>
-          <input
-            style={{ display: 'none' }}
-            type="file"
-            id="profiles-upload"
-            accept="image/*"
-            onChange={uploadAvatar}
-            disabled={uploading}
-          />
+          <button onClick={() => document.getElementById('avatar-upload')?.click()} className="absolute -bottom-2 -right-2 bg-white w-10 h-10 rounded-2xl shadow-lg border border-slate-100 flex items-center justify-center hover:scale-110 active:scale-95 transition-all text-lg">📸</button>
+          <input id="avatar-upload" type="file" className="hidden" onChange={uploadAvatar} />
         </div>
 
-        <div className="flex-1">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-4xl font-black text-gray-900 tracking-tighter">{user.name} {user.position}</h2>
-            <button onClick={() => setShowSecret(!showSecret)} className="text-[11px] font-black px-4 py-2 bg-gray-50 rounded-full text-gray-400 hover:text-blue-600 border border-transparent hover:border-blue-100">
-              {showSecret ? '민감 정보 숨기기 🔒' : '보안 정보 보기 👁️'}
-            </button>
+        <div className="flex-1 space-y-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-3">
+              <h2 className="text-3xl font-black text-slate-900 tracking-tighter">{user.name || '사용자'}</h2>
+              <span className="px-3 py-1 bg-blue-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest">{user.position || '직급'}</span>
+            </div>
+            <p className="text-sm font-bold text-slate-400">{user.department || '부서'} · 사번 {user.employee_no || '-'}</p>
           </div>
-          <p className="text-lg font-bold text-blue-600 underline decoration-blue-100 underline-offset-8">{user.department} 소속</p>
-          {/* 디버깅용 메시지 (작게 표시, 문제 해결 후 삭제 가능) */}
-          {/* <p className="text-[10px] text-gray-300 mt-2">시스템 상태: {debugMsg || '정상'}</p> */}
+
+          <div className="flex gap-4">
+            <div className="bg-slate-50 px-5 py-3 rounded-2xl border border-slate-100/50">
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Remaining Annual Leave</p>
+              <p className="text-xl font-black text-blue-600">{user.annual_leave || 0} <span className="text-xs text-slate-400 ml-1">Days</span></p>
+            </div>
+            <div className="bg-slate-50 px-5 py-3 rounded-2xl border border-slate-100/50">
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Company</p>
+              <p className="text-sm font-bold text-slate-700">{user.company || '-'}</p>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* 상세 정보 */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar pr-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-16 gap-y-10">
-          <div className="space-y-7">
-            <h3 className="text-[11px] font-black text-gray-300 uppercase tracking-widest border-l-2 border-blue-500 pl-3">인사 관리 정보</h3>
-            <InfoItem label="사번" value={user.employee_no} />
-            <InfoItem label="입사일" value={user.join_date} />
-            <InfoItem label="이메일" value={user.email} />
-            <InfoItem label="연락처" value={user.phone} />
+      <div className="grid grid-cols-2 gap-6">
+        <div className="space-y-4">
+          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Private Information</h4>
+          <div className="space-y-3">
+            <InfoRow label="생년월일" value={user.birth_date || '-'} />
+            <InfoRow label="연락처" value={user.phone || '-'} isSecret={!showSecret} />
+            <InfoRow label="비밀번호" value="••••••••" isSecret={!showSecret} />
+            <button onClick={() => setShowSecret(!showSecret)} className="text-[10px] font-black text-blue-600 hover:underline mt-2 ml-1">{showSecret ? '비공개 정보 숨기기' : '비공개 정보 보기'}</button>
           </div>
-          <div className="space-y-7">
-            <h3 className="text-[11px] font-black text-gray-300 uppercase tracking-widest border-l-2 border-red-500 pl-3">보안 및 급여</h3>
-            <InfoItem label="거주지" value={user.address} />
-            <InfoItem label="기본급" value={showSecret ? `₩ ${(user.base_salary || 0).toLocaleString()}` : '••••••••'} isMasked={!showSecret} />
-            <InfoItem label="계좌정보" value={showSecret ? `${user.bank_name || ''} ${user.account_no || ''}` : '••••••••'} isMasked={!showSecret} />
+        </div>
+
+        <div className="space-y-4">
+          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Monthly Work Stats</h4>
+          <div className="bg-slate-50/50 border border-slate-100 p-6 rounded-[2rem] grid grid-cols-3 gap-4">
+            <div className="text-center">
+              <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Late</p>
+              <p className="text-lg font-black text-red-500">{stats.late}</p>
+            </div>
+            <div className="text-center border-x border-slate-100">
+              <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Normal</p>
+              <p className="text-lg font-black text-blue-600">{stats.normal}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-[8px] font-black text-slate-400 uppercase mb-1">OT(h)</p>
+              <p className="text-lg font-black text-emerald-500">{stats.overtime}</p>
+            </div>
           </div>
+          <button onClick={fetchStats} className="w-full py-3 bg-white border border-slate-200 rounded-xl text-[9px] font-black text-slate-400 hover:text-blue-600 hover:border-blue-600 transition-all uppercase tracking-widest">Refresh Statistics</button>
         </div>
       </div>
 
@@ -184,11 +213,11 @@ export default function MyProfileCard({ user: initialUser }: any) {
   );
 }
 
-function InfoItem({ label, value, isMasked }: any) {
+function InfoRow({ label, value, isSecret }: any) {
   return (
-    <div className="flex flex-col gap-2">
-      <span className="text-[12px] font-black text-gray-400">{label}</span>
-      <span className={`text-[16px] font-black ${isMasked ? 'text-gray-200 tracking-widest' : 'text-gray-800'}`}>
+    <div className="flex flex-col gap-1">
+      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</span>
+      <span className={`text-sm font-bold ${isSecret ? 'text-slate-200 tracking-widest' : 'text-slate-800'}`}>
         {value || '-'}
       </span>
     </div>

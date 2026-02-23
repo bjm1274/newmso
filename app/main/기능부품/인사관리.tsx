@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react';
 import 구성원관리 from './인사관리서브/구성원현황'; 
 import CertificateGenerator from './인사관리서브/증명서발급';
 import PayrollMain from './인사관리서브/급여관리';
-import AttendanceSystem from './근태시스템';
 import AttendanceMain from './인사관리서브/근태기록/근태관리메인';
 import LeaveManagement from './인사관리서브/휴가신청/휴가관리메인';
 import SharedCalendarView from './공유캘린더';
@@ -19,7 +18,6 @@ import EducationMain from './인사관리서브/교육관리';
 const HR_TAB_KEY = 'erp_hr_tab';
 const HR_COMPANY_KEY = 'erp_hr_company';
 const HR_STATUS_KEY = 'erp_hr_status';
-const HR_ATT_VIEW_KEY = 'erp_hr_att_view';
 
 const HR_MENU_IDS = ['구성원', '계약', '문서보관함', '교육', '근태', '급여', '연차/휴가', '캘린더', '비품대여', '증명서'];
 
@@ -27,7 +25,6 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
   const [현재메뉴, 메뉴설정] = useState(initialMenu && HR_MENU_IDS.includes(initialMenu) ? initialMenu : '구성원');
   const [선택사업체, 사업체설정] = useState('전체');
   const [등록창상태, 창상태설정] = useState(false);
-  const [근태뷰, 근태뷰설정] = useState<'실시간' | '월별'>('실시간'); 
   const [직원상태필터, 직원상태필터설정] = useState<'재직' | '퇴사'>('재직');
   const [문서연결대상, 문서연결대상설정] = useState<{ id?: string; name?: string } | undefined>(undefined);
 
@@ -64,7 +61,6 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
       const savedTab = window.localStorage.getItem(HR_TAB_KEY);
       const savedCo = window.localStorage.getItem(HR_COMPANY_KEY);
       const savedStatus = window.localStorage.getItem(HR_STATUS_KEY) as '재직' | '퇴사' | null;
-      const savedAtt = window.localStorage.getItem(HR_ATT_VIEW_KEY) as '실시간' | '월별' | null;
 
       if (!initialMenu && savedTab && HR_TABS.some(t => t.id === savedTab)) {
         메뉴설정(savedTab);
@@ -74,9 +70,6 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
       }
       if (savedStatus === '재직' || savedStatus === '퇴사') {
         직원상태필터설정(savedStatus);
-      }
-      if (savedAtt === '실시간' || savedAtt === '월별') {
-        근태뷰설정(savedAtt);
       }
     } catch {
       // ignore
@@ -89,11 +82,10 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
       window.localStorage.setItem(HR_TAB_KEY, activeMenu);
       window.localStorage.setItem(HR_COMPANY_KEY, 선택사업체);
       window.localStorage.setItem(HR_STATUS_KEY, 직원상태필터);
-      window.localStorage.setItem(HR_ATT_VIEW_KEY, 근태뷰);
     } catch {
       // ignore
     }
-  }, [activeMenu, 선택사업체, 직원상태필터, 근태뷰]);
+  }, [activeMenu, 선택사업체, 직원상태필터]);
 
   const 퇴사서류보기 = (직원: any) => {
     문서연결대상설정({ id: 직원.id, name: 직원.name });
@@ -194,33 +186,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
           )}
           {activeMenu === '근태' && (
             <div className="flex flex-col h-full">
-              <div className="flex gap-0.5 p-1 app-tab-bar w-fit mb-4">
-                <button
-                  onClick={() => 근태뷰설정('실시간')}
-                  className={`px-4 py-2 text-[11px] md:text-[11px] font-semibold rounded-[12px] transition-all ${
-                    근태뷰 === '실시간'
-                      ? 'bg-[var(--toss-card)] shadow-md text-[var(--toss-blue)]'
-                      : 'text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]'
-                  }`}
-                >
-                  실시간 출퇴근
-                </button>
-                <button
-                  onClick={() => 근태뷰설정('월별')}
-                  className={`px-4 py-2 text-[11px] md:text-[11px] font-semibold rounded-[12px] transition-all ${
-                    근태뷰 === '월별'
-                      ? 'bg-[var(--toss-card)] shadow-md text-[var(--toss-blue)]'
-                      : 'text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]'
-                  }`}
-                >
-                  월별/일별 대장
-                </button>
-              </div>
-              {근태뷰 === '실시간' ? (
-                <AttendanceSystem user={user} staffs={staffs} selectedCo={선택사업체} isAdminView={true} />
-              ) : (
-                <AttendanceMain staffs={staffs} selectedCo={선택사업체} />
-              )}
+              <AttendanceMain staffs={staffs} selectedCo={선택사업체} />
             </div>
           )}
           {activeMenu === '급여' && <PayrollMain staffs={staffs} selectedCo={선택사업체} />}

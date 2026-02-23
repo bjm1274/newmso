@@ -2,11 +2,11 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
-import OrgChart from './조직도그림'; 
-import MyPage from '../마이페이지'; 
-import ChatView from '../메신저'; 
+import OrgChart from './조직도그림';
+import MyPage from '../마이페이지';
+import ChatView from '../메신저';
 import BoardView from '../게시판';
-import ApprovalView from '../전자결재'; 
+import ApprovalView from '../전자결재';
 import HRView from '../인사관리';
 import InventoryView from '../재고관리_통합완성';
 import AdminView from '../관리자전용';
@@ -27,7 +27,7 @@ export default function MainContent({ user, mainMenu, data, subView, setSubView,
         .eq('staff_id', user.id)
         .eq('status', '서명대기')
         .single();
-      
+
       if (contract) setPendingContract(contract);
 
       const { data: staff } = await supabase
@@ -67,40 +67,48 @@ export default function MainContent({ user, mainMenu, data, subView, setSubView,
   const hospitalCompanies = (companies || []).filter((c: any) => c.type !== 'MSO');
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden relative bg-[#F8FAFC]">
+    <div className="flex-1 flex flex-col overflow-hidden relative bg-background">
       {isMso && hospitalCompanies.length > 0 && setSelectedCompanyId && (
-        <div className="shrink-0 px-4 py-2 bg-white border-b border-gray-100 flex items-center gap-3">
-          <span className="text-xs font-bold text-gray-500">회사 선택</span>
-          <select
-            value={selectedCo}
-            onChange={(e) => {
-              const v = e.target.value;
-              setSelectedCo(v);
-              if (v === '전체') setSelectedCompanyId(null);
-              else {
-                const c = hospitalCompanies.find((x: any) => x.name === v);
-                if (c) setSelectedCompanyId(c.id);
-              }
-            }}
-            className="text-sm font-bold text-gray-800 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-100"
-          >
-            <option value="전체">전체</option>
-            {hospitalCompanies.map((c: any) => (
-              <option key={c.id} value={c.name}>{c.name}</option>
-            ))}
-          </select>
+        <div className="shrink-0 px-8 py-5 flex items-center justify-between border-b border-slate-200/50 bg-white/50 backdrop-blur-md sticky top-0 z-30">
+          <div className="flex items-center gap-4">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Agency</span>
+            <select
+              value={selectedCo}
+              onChange={(e) => {
+                const v = e.target.value;
+                setSelectedCo(v);
+                if (v === '전체') setSelectedCompanyId(null);
+                else {
+                  const c = hospitalCompanies.find((x: any) => x.name === v);
+                  if (c) setSelectedCompanyId(c.id);
+                }
+              }}
+              className="text-xs font-black text-slate-800 bg-white border border-slate-200 rounded-xl px-4 py-2 hover:border-primary transition-colors focus:ring-4 focus:ring-primary/10 outline-none cursor-pointer shadow-sm"
+            >
+              <option value="전체">전체 (All Organizations)</option>
+              {hospitalCompanies.map((c: any) => (
+                <option key={c.id} value={c.name}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full bg-success animate-pulse`}></div>
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">System Live</span>
+          </div>
         </div>
       )}
 
-      {mainMenu === '내정보' && <div className="w-full flex-1 overflow-hidden"><MyPage user={user} /></div>}
-      {mainMenu === '조직도' && <div className="flex-1 overflow-hidden"><OrgChart staffs={data.staffs} selectedCo={selectedCo} setSelectedCo={setSelectedCo} /></div>}
-      {mainMenu === '채팅' && <div className="flex-1 overflow-hidden bg-white z-20"><ChatView user={user} onRefresh={onRefresh} staffs={data.staffs} /></div>}
-      {mainMenu === '게시판' && <div className="flex-1 overflow-hidden"><BoardView user={user} posts={data.posts?.filter((p:any) => p.board_type === subView) || []} subView={subView} setSubView={setSubView} surgeries={data.surgeries} mris={data.mris} onRefresh={onRefresh} /></div>}
-      {mainMenu === '전자결재' && <div className="flex-1 overflow-hidden"><ApprovalView user={user} staffs={data.staffs} selectedCo={selectedCo} setSelectedCo={setSelectedCo} selectedCompanyId={selectedCompanyId} onRefresh={onRefresh} /></div>}
-      {mainMenu === '근태관리' && <div className="flex-1 overflow-hidden"><AttendanceView user={user} staffs={data.staffs} selectedCo={selectedCo} /></div>}
-      {mainMenu === '인사관리' && <div className="flex-1 overflow-hidden"><HRView user={user} staffs={data.staffs} depts={data.depts} selectedCo={selectedCo} onRefresh={onRefresh} /></div>}
-      {mainMenu === '재고관리' && <div className="flex-1 overflow-hidden"><InventoryView user={user} depts={data.depts} onRefresh={onRefresh} selectedCo={selectedCo} /></div>}
-      {mainMenu === '관리자' && <div className="flex-1 overflow-hidden"><AdminView user={user} staffs={data.staffs} depts={data.depts} onRefresh={onRefresh} /></div>}
+      <main className="flex-1 overflow-hidden flex flex-col animate-soft-fade">
+        {mainMenu === '내정보' && <div className="w-full h-full"><MyPage user={user} /></div>}
+        {mainMenu === '조직도' && <div className="w-full h-full"><OrgChart staffs={data.staffs} selectedCo={selectedCo} setSelectedCo={setSelectedCo} /></div>}
+        {mainMenu === '채팅' && <div className="w-full h-full bg-white"><ChatView user={user} onRefresh={onRefresh} staffs={data.staffs} /></div>}
+        {mainMenu === '게시판' && <div className="w-full h-full"><BoardView user={user} posts={data.posts?.filter((p: any) => p.board_type === subView) || []} subView={subView} setSubView={setSubView} surgeries={data.surgeries} mris={data.mris} onRefresh={onRefresh} /></div>}
+        {mainMenu === '전자결재' && <div className="w-full h-full"><ApprovalView user={user} staffs={data.staffs} selectedCo={selectedCo} setSelectedCo={setSelectedCo} selectedCompanyId={selectedCompanyId} onRefresh={onRefresh} /></div>}
+        {mainMenu === '근태관리' && <div className="w-full h-full"><AttendanceView user={user} staffs={data.staffs} selectedCo={selectedCo} /></div>}
+        {mainMenu === '인사관리' && <div className="w-full h-full"><HRView user={user} staffs={data.staffs} selectedCo={selectedCo} onRefresh={onRefresh} /></div>}
+        {mainMenu === '재고관리' && <div className="w-full h-full"><InventoryView user={user} onRefresh={onRefresh} /></div>}
+        {mainMenu === '관리자' && <div className="w-full h-full"><AdminView user={user} /></div>}
+      </main>
 
       {/* 근로계약서 서명 팝업 - 모바일 최적화 */}
       {pendingContract && (
@@ -143,7 +151,7 @@ export default function MainContent({ user, mainMenu, data, subView, setSubView,
             <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
               <p className="text-[10px] font-black text-orange-600 uppercase mb-1 tracking-widest">법적 준수 사항</p>
               <p className="text-xs font-bold text-gray-700 leading-relaxed">
-                {user.name}님, 현재 잔여 연차가 <span className="text-orange-600 font-black">{annualLeaveNotice.remaining}일</span> 남았습니다. 
+                {user.name}님, 현재 잔여 연차가 <span className="text-orange-600 font-black">{annualLeaveNotice.remaining}일</span> 남았습니다.
                 근로기준법 제61조에 의거하여 연차 사용을 권고드립니다.
               </p>
             </div>

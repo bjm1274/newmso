@@ -66,6 +66,12 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
   // 댓글 대댓글용 부모 댓글 ID
   const [replyParentId, setReplyParentId] = useState<string | null>(null);
 
+  // 근무형태별 오늘 근무 현황 (경조사 아래 블록용, 인사 근태에서 미리 입력한 편성 실시간 열람)
+  const [workShifts, setWorkShifts] = useState<any[]>([]);
+  const [staffsForShift, setStaffsForShift] = useState<any[]>([]);
+  const [todayAssignments, setTodayAssignments] = useState<any[]>([]); // { staff_id, shift_id } 오늘 날짜 편성
+  const [hoverShiftId, setHoverShiftId] = useState<string | null>(null);
+
   const boards = [
     { id: '공지사항', label: '📢 공지사항', icon: '📢' },
     { id: '자유게시판', label: '💬 자유게시판', icon: '💬' },
@@ -169,6 +175,66 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
     }
   }, [activeBoard]);
 
+  // 경조사 탭일 때 근무형태·직원·오늘 편성 로드 (인사 근태에서 미리 입력한 근무표 실시간 열람)
+  useEffect(() => {
+    if (activeBoard !== '경조사') return;
+    const today = new Date().toISOString().slice(0, 10);
+    const load = async () => {
+      try {
+        const [resShifts, resStaffs, resAssign] = await Promise.allSettled([
+          supabase.from('work_shifts').select('id, name, start_time, end_time').eq('is_active', true),
+          supabase.from('staff_members').select('id, name, shift_id, department, position, status'),
+          supabase.from('shift_assignments').select('staff_id, shift_id').eq('work_date', today),
+        ]);
+        const shifts = resShifts.status === 'fulfilled' ? resShifts.value.data : null;
+        const staffs = resStaffs.status === 'fulfilled' ? resStaffs.value.data : null;
+        const assignments = resAssign.status === 'fulfilled' ? resAssign.value.data : [];
+        setWorkShifts(shifts || []);
+        setStaffsForShift(staffs || []);
+        setTodayAssignments(Array.isArray(assignments) ? assignments : []);
+      } catch {
+        setWorkShifts([]);
+        setStaffsForShift([]);
+        setTodayAssignments([]);
+      }
+    };
+    load();
+  }, [activeBoard]);
+
+  // 근무형태별로 직원 그룹 (오늘 편성 있으면 편성 기준, 없으면 기본 shift_id 기준)
+  const todayByShift = useMemo(() => {
+    const list = staffsForShift.filter((s: any) => s.status !== '퇴사');
+    const assignmentMap = new Map(todayAssignments.map((a: any) => [a.staff_id, a.shift_id]));
+    const grouped = new Map<string | 'none', any[]>();
+    list.forEach((s: any) => {
+      const key = assignmentMap.has(s.id) ? (assignmentMap.get(s.id) || 'none') : (s.shift_id || 'none');
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key)!.push(s);
+    });
+    const byShift: { shiftId: string | null; shiftName: string; timeRange: string; staffs: any[] }[] = [];
+    workShifts.forEach((shift: any) => {
+      const staffsInShift = grouped.get(shift.id) || [];
+      const start = shift.start_time ? String(shift.start_time).slice(0, 5) : '09:00';
+      const end = shift.end_time ? String(shift.end_time).slice(0, 5) : '18:00';
+      byShift.push({
+        shiftId: shift.id,
+        shiftName: shift.name || '근무',
+        timeRange: `${start}-${end}`,
+        staffs: staffsInShift,
+      });
+    });
+    const noShift = grouped.get('none') || [];
+    if (noShift.length > 0) {
+      byShift.push({
+        shiftId: 'none',
+        shiftName: '일정 미등록',
+        timeRange: '-',
+        staffs: noShift,
+      });
+    }
+    return byShift.sort((a, b) => b.staffs.length - a.staffs.length);
+  }, [workShifts, staffsForShift, todayAssignments]);
+
   useEffect(() => {
     const channel = supabase
       .channel('board-posts-realtime')
@@ -177,6 +243,21 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
+  }, [activeBoard]);
+
+  // 경조사: 인사 근태에서 근무표 편성 변경 시 오늘 근무 현황 블록 갱신
+  useEffect(() => {
+    if (activeBoard !== '경조사') return;
+    const today = new Date().toISOString().slice(0, 10);
+    const ch = supabase
+      .channel('board-shift-assignments')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shift_assignments' }, () => {
+        void supabase.from('shift_assignments').select('staff_id, shift_id').eq('work_date', today).then(({ data }) => {
+          setTodayAssignments(data || []);
+        });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
   }, [activeBoard]);
 
   const fetchComments = async (postId: string) => {
@@ -487,6 +568,27 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
         setShowNewPost(false);
         setPosts((prev) => [insertedPost, ...prev]);
         setSelectedPostId(insertedPost.id);
+
+        // 공지사항·경조사 글 작성 시 전 직원에게 알림
+        if (activeBoard === '공지사항' || activeBoard === '경조사') {
+          try {
+            const { data: staffList } = await supabase.from('staff_members').select('id');
+            const staffIds = (staffList || []).map((s: any) => s.id).filter(Boolean);
+            if (staffIds.length > 0) {
+              const label = activeBoard === '공지사항' ? '📢 새 공지사항' : '🎉 새 경조사';
+              const body = (insertedPost.title || '(제목 없음)').slice(0, 80);
+              const rows = staffIds.map((userId: string) => ({
+                user_id: userId,
+                type: 'board',
+                title: label,
+                body,
+              }));
+              await supabase.from('notifications').insert(rows);
+            }
+          } catch (e) {
+            console.warn('게시판 전 직원 알림 발송 실패:', e);
+          }
+        }
       } else {
         const hint = (activeBoard === '수술일정' || activeBoard === 'MRI일정') && (error.message?.includes('column') || error.code === '42703')
           ? '\n\n수술일정/MRI일정용 컬럼이 없을 수 있습니다. Supabase에 board_posts_schedule_columns.sql 마이그레이션을 적용해 주세요.'
@@ -1212,6 +1314,42 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
           </div>
         )}
       </div>
+      )}
+
+      {/* 경조사: 오늘 근무형태별 근무 현황 */}
+      {activeBoard === '경조사' && todayByShift.length > 0 && (
+        <section className="mt-6 rounded-2xl border border-[var(--toss-border)] bg-[var(--toss-card)] p-4 md:p-5">
+          <h3 className="text-sm font-bold text-[var(--foreground)] mb-1">
+            오늘 근무형태별 근무 현황
+          </h3>
+          <p className="text-[11px] text-[var(--toss-gray-3)] mb-4">
+            {new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {todayByShift.map((row) => (
+              <div
+                key={row.shiftId}
+                className="relative inline-flex items-center gap-2 rounded-xl border border-[var(--toss-border)] bg-[var(--toss-gray-0)] px-3 py-2 text-[12px]"
+                onMouseEnter={() => setHoverShiftId(row.shiftId)}
+                onMouseLeave={() => setHoverShiftId(null)}
+              >
+                <span className="font-semibold text-[var(--foreground)]">{row.shiftName}</span>
+                <span className="text-[11px] text-[var(--toss-gray-3)]">{row.timeRange}</span>
+                <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[var(--toss-blue)] text-[10px] font-bold text-white">
+                  {row.staffs.length}
+                </span>
+                {hoverShiftId === row.shiftId && row.staffs.length > 0 && (
+                  <div className="absolute left-0 top-full z-10 mt-1 w-max max-w-[280px] rounded-lg border border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-2 shadow-lg">
+                    <p className="text-[11px] font-semibold text-[var(--toss-gray-4)] mb-1">근무자</p>
+                    <p className="text-[12px] font-medium text-[var(--foreground)]">
+                      {row.staffs.map((s: any) => s.name).join(' · ')}
+                    </p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
       )}
 
       {/* 게시글 상세 보기 모달 */}

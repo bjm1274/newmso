@@ -9,8 +9,8 @@ import PhotoModule from './재고관리서브/촬영모듈';
 import ProductRegistration from './재고관리서브/물품등록';
 
 export default function IntegratedInventoryManagement({ user, selectedCo }: any) {
-  const [activeView, setActiveView] = useState('현황'); 
-  const [selectedDept, setSelectedDept] = useState('전체'); 
+  const [activeView, setActiveView] = useState('현황');
+  const [selectedDept, setSelectedDept] = useState('전체');
   const [inventory, setInventory] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,108 +89,153 @@ export default function IntegratedInventoryManagement({ user, selectedCo }: any)
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#F8FAFC] overflow-hidden">
-      <header className="bg-white border-b border-gray-100 p-4 md:p-8 shrink-0 z-20 shadow-sm">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div className="flex flex-col h-full bg-background overflow-hidden animate-soft-fade">
+      <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/50 p-6 md:p-10 shrink-0 z-20 shadow-sm relative">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div>
-            <h1 className="text-xl md:text-2xl font-black text-gray-800 tracking-tight italic">SY INC. 재고 통합 제어</h1>
-            <p className="text-[10px] md:text-xs text-blue-600 font-bold mt-1 uppercase tracking-widest">MSO Integrated Inventory Engine</p>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="bg-primary/10 text-primary text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">Inventory Engine</span>
+              <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">v2.5 Premium</span>
+            </div>
+            <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tighter">재고 통합 제어 시스템</h1>
           </div>
-          <div className="flex gap-2 w-full md:w-auto overflow-x-auto no-scrollbar pb-1">
-            <button onClick={() => setActiveView('UDI')} className={`px-4 py-2 rounded-xl text-[10px] font-black whitespace-nowrap transition-all ${activeView === 'UDI' ? 'bg-[#A11DFF] text-white shadow-lg' : 'bg-gray-100 text-gray-600'}`}>📡 UDI</button>
-            <button onClick={() => setActiveView('명세서')} className={`px-4 py-2 rounded-xl text-[10px] font-black whitespace-nowrap transition-all ${activeView === '명세서' ? 'bg-[#00B44E] text-white shadow-lg' : 'bg-gray-100 text-gray-600'}`}>📄 명세서</button>
-            <button onClick={() => setActiveView('발주')} className={`px-4 py-2 rounded-xl text-[10px] font-black whitespace-nowrap transition-all ${activeView === '발주' ? 'bg-[#FF6B00] text-white shadow-lg' : 'bg-gray-100 text-gray-600'}`}>📝 발주</button>
-            <button onClick={() => setActiveView('스캔')} className={`px-4 py-2 rounded-xl text-[10px] font-black whitespace-nowrap transition-all ${activeView === '스캔' ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-100 text-gray-600'}`}>🔍 스캔</button>
-            <button onClick={() => setActiveView('촬영')} className={`px-4 py-2 rounded-xl text-[10px] font-black whitespace-nowrap transition-all ${activeView === '촬영' ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-100 text-gray-600'}`}>📸 촬영</button>
-            <button onClick={() => setActiveView('등록')} className={`px-4 py-2 rounded-xl text-[10px] font-black whitespace-nowrap transition-all ${activeView === '등록' ? 'bg-blue-500 text-white shadow-lg' : 'bg-gray-100 text-gray-600'}`}>+ 등록</button>
-            <button onClick={() => setActiveView('현황')} className={`px-4 py-2 rounded-xl text-[10px] font-black whitespace-nowrap transition-all ${activeView === '현황' ? 'bg-gray-800 text-white shadow-lg' : 'bg-gray-100 text-gray-600'}`}>📊 현황</button>
+          <div className="flex bg-slate-100 p-1 rounded-2xl w-full md:w-auto overflow-x-auto no-scrollbar">
+            <button onClick={() => setActiveView('현황')} className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl text-[11px] font-black transition-all ${activeView === '현황' ? 'bg-white text-primary shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>📊 현황</button>
+            <button onClick={() => setActiveView('등록')} className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl text-[11px] font-black transition-all ${activeView === '등록' ? 'bg-white text-primary shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>➕ 등록</button>
+            <button onClick={() => setActiveView('UDI')} className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl text-[11px] font-black transition-all ${activeView === 'UDI' ? 'bg-white text-secondary shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>📡 UDI</button>
+            <button onClick={() => setActiveView('명세서')} className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl text-[11px] font-black transition-all ${activeView === '명세서' ? 'bg-white text-success shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>📄 명세서</button>
+            <button onClick={() => setActiveView('발주')} className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl text-[11px] font-black transition-all ${activeView === '발주' ? 'bg-white text-warning shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>📦 발주</button>
+            <button onClick={() => setActiveView('스캔')} className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl text-[11px] font-black transition-all ${activeView === '스캔' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>🔍 스캔</button>
+            <button onClick={() => setActiveView('촬영')} className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl text-[11px] font-black transition-all ${activeView === '촬영' ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>📸 촬영</button>
           </div>
         </div>
       </header>
 
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-        <main className="flex-1 p-4 md:p-10 bg-[#F8FAFC] overflow-y-auto custom-scrollbar">
+        <main className="flex-1 p-6 md:p-10 overflow-y-auto custom-scrollbar bg-background">
           {activeView === '현황' && (
             loading ? (
-              <div className="h-full flex items-center justify-center font-black text-gray-300">데이터 동기화 중...</div>
+              <div className="h-full flex flex-col items-center justify-center space-y-4">
+                <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+                <p className="font-black text-slate-300 tracking-widest uppercase text-[10px]">Synchronizing Logic Engine...</p>
+              </div>
             ) : (
-              <div className="space-y-6">
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm text-center">
-                    <p className="text-[9px] font-bold text-gray-400 uppercase">전체 품목</p>
-                    <p className="text-2xl font-black text-blue-600 mt-1">{inventory.length}</p>
+              <div className="space-y-10 max-w-[1600px] mx-auto">
+                {/* Summary Cards with Premium Look */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div className="premium-card p-8 group overflow-hidden relative">
+                    <div className="absolute -right-4 -top-4 w-20 h-20 bg-primary/5 rounded-full group-hover:scale-150 transition-transform duration-700"></div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Total Inventory Items</p>
+                    <div className="flex items-end gap-2">
+                      <p className="text-4xl font-black text-slate-900">{inventory.length}</p>
+                      <p className="text-xs font-bold text-slate-400 mb-1">Items</p>
+                    </div>
                   </div>
-                  <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm text-center">
-                    <p className="text-[9px] font-bold text-gray-400 uppercase">안전재고 미달</p>
-                    <p className="text-2xl font-black text-red-600 mt-1">{inventory.filter(i => i.quantity <= i.min_quantity).length}</p>
+                  <div className="premium-card p-8 group border-danger/10 overflow-hidden relative">
+                    <div className="absolute -right-4 -top-4 w-20 h-20 bg-danger/5 rounded-full group-hover:scale-150 transition-transform duration-700"></div>
+                    <p className="text-[10px] font-black text-danger/60 uppercase tracking-widest mb-2">Low Stock Alert</p>
+                    <div className="flex items-end gap-2">
+                      <p className="text-4xl font-black text-danger">{inventory.filter(i => i.quantity <= i.min_quantity).length}</p>
+                      <p className="text-xs font-bold text-danger/40 mb-1">Critical</p>
+                    </div>
                   </div>
-                  <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm text-center">
-                    <p className="text-[9px] font-bold text-gray-400 uppercase">유효기간 임박</p>
-                    <p className="text-2xl font-black text-orange-600 mt-1">
-                      {inventory.filter(i => i.expiry_date && new Date(i.expiry_date).getTime() < new Date().getTime() + 30 * 24 * 60 * 60 * 1000).length}
-                    </p>
+                  <div className="premium-card p-8 group border-warning/10 overflow-hidden relative">
+                    <div className="absolute -right-4 -top-4 w-20 h-20 bg-warning/5 rounded-full group-hover:scale-150 transition-transform duration-700"></div>
+                    <p className="text-[10px] font-black text-warning/60 uppercase tracking-widest mb-2">Expiring Soon (30d)</p>
+                    <div className="flex items-end gap-2">
+                      <p className="text-4xl font-black text-warning">
+                        {inventory.filter(i => i.expiry_date && new Date(i.expiry_date).getTime() < new Date().getTime() + 30 * 24 * 60 * 60 * 1000).length}
+                      </p>
+                      <p className="text-xs font-bold text-warning/40 mb-1">Batch</p>
+                    </div>
                   </div>
-                  <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm text-center">
-                    <p className="text-[9px] font-bold text-gray-400 uppercase">선택 회사</p>
-                    <p className="text-xs font-black text-gray-800 mt-1 truncate">{selectedCo}</p>
+                  <div className="premium-card p-8 group overflow-hidden relative">
+                    <div className="absolute -right-4 -top-4 w-20 h-20 bg-slate-50 rounded-full group-hover:scale-150 transition-transform duration-700"></div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Selected Scope</p>
+                    <div className="flex items-end gap-2">
+                      <p className="text-xl font-black text-slate-800 truncate max-w-full">{selectedCo || 'Total Enterprise'}</p>
+                    </div>
                   </div>
                 </div>
 
-                <div className="bg-white rounded-[1.5rem] md:rounded-[2.5rem] border border-gray-100 shadow-xl overflow-hidden">
-                  <div className="overflow-x-auto no-scrollbar">
-                    <table className="w-full text-left border-collapse min-w-[1000px]">
+                {/* Data Table with Premium Styling */}
+                <div className="premium-card overflow-hidden border-none shadow-2xl shadow-slate-200/50 bg-white">
+                  <div className="overflow-x-auto custom-scrollbar">
+                    <table className="w-full text-left border-collapse min-w-[1100px]">
                       <thead>
-                        <tr className="bg-gray-50/50 border-b border-gray-100">
-                          <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase">회사/분류</th>
-                          <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase">품목명/LOT</th>
-                          <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase text-center">현재고</th>
-                          <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase text-center">단가</th>
-                          <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase text-center">유효기간</th>
-                          <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase">상태</th>
-                          <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase text-right">관리</th>
+                        <tr className="bg-slate-50/50 border-b border-slate-100">
+                          <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Organization & Category</th>
+                          <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Product Information</th>
+                          <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Current Stock</th>
+                          <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Financials</th>
+                          <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Expiry Status</th>
+                          <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+                          <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-50">
+                      <tbody className="divide-y divide-slate-50">
                         {inventory.map(item => {
                           const isExpiryImminent = item.expiry_date && new Date(item.expiry_date).getTime() < new Date().getTime() + 30 * 24 * 60 * 60 * 1000;
+                          const isLowStock = item.quantity <= item.min_quantity;
                           return (
-                            <tr key={item.id} className="hover:bg-blue-50/30 transition-all group">
-                              <td className="px-6 py-4">
-                                <p className="text-[9px] font-black text-blue-600">{item.company}</p>
-                                <p className="text-[8px] font-bold text-gray-400">{item.category}</p>
+                            <tr key={item.id} className="hover:bg-slate-50/80 transition-all group animate-in fade-in duration-300">
+                              <td className="px-8 py-6">
+                                <p className="text-[10px] font-black text-primary mb-0.5">{item.company}</p>
+                                <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full uppercase tracking-tighter">{item.category}</span>
                               </td>
-                              <td className="px-6 py-4">
-                                <p className="text-xs font-black text-gray-800 group-hover:text-blue-600 transition-colors">{item.item_name}</p>
-                                <div className="flex gap-1 mt-0.5">
-                                  {item.lot_number && <span className="text-[7px] font-black bg-gray-100 text-gray-500 px-1 py-0.5 rounded">LOT: {item.lot_number}</span>}
-                                  {item.is_udi && <span className="text-[7px] font-black bg-purple-50 text-purple-500 px-1 py-0.5 rounded uppercase">UDI</span>}
+                              <td className="px-8 py-6">
+                                <p className="text-sm font-black text-slate-800 group-hover:text-primary transition-colors">{item.item_name}</p>
+                                <div className="flex gap-1.5 mt-1.5">
+                                  {item.lot_number && <span className="text-[8px] font-black bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md"># {item.lot_number}</span>}
+                                  {item.is_udi && <span className="text-[8px] font-black bg-secondary-soft text-secondary px-2 py-0.5 rounded-md border border-secondary/10 uppercase tracking-widest">UDI certified</span>}
                                 </div>
                               </td>
-                              <td className="px-6 py-4 text-center">
-                                <span className={`text-xs font-black ${item.quantity <= item.min_quantity ? 'text-red-600' : 'text-gray-800'}`}>{item.quantity}</span>
-                                <p className="text-[8px] font-bold text-gray-300">안전: {item.min_quantity}</p>
+                              <td className="px-8 py-6 text-center">
+                                <div className="flex flex-col items-center">
+                                  <span className={`text-lg font-black ${isLowStock ? 'text-danger' : 'text-slate-800'}`}>{item.quantity?.toLocaleString()}</span>
+                                  <div className="flex items-center gap-1 mt-0.5">
+                                    <span className="text-[8px] font-bold text-slate-400 uppercase">Min:</span>
+                                    <span className="text-[8px] font-black text-slate-600">{item.min_quantity}</span>
+                                  </div>
+                                </div>
                               </td>
-                              <td className="px-6 py-4 text-center">
-                                <p className="text-xs font-black text-gray-700">{item.unit_price?.toLocaleString()}원</p>
-                                <p className="text-[8px] font-bold text-gray-300">총액: {(item.unit_price * item.quantity)?.toLocaleString()}원</p>
+                              <td className="px-8 py-6 text-center">
+                                <p className="text-[11px] font-black text-slate-700">{item.unit_price?.toLocaleString()} ₩</p>
+                                <p className="text-[9px] font-bold text-slate-400 mt-0.5 italic">Total: {(item.unit_price * item.quantity)?.toLocaleString()} ₩</p>
                               </td>
-                              <td className="px-6 py-4 text-center">
-                                <p className={`text-[10px] font-black ${isExpiryImminent ? 'text-orange-600' : 'text-gray-500'}`}>
-                                  {item.expiry_date || '-'}
-                                </p>
-                                {isExpiryImminent && <p className="text-[7px] font-black text-orange-400 animate-pulse">임박</p>}
+                              <td className="px-8 py-6 text-center">
+                                <div className="flex flex-col items-center">
+                                  <p className={`text-[10px] font-black ${isExpiryImminent ? 'text-warning' : 'text-slate-500'}`}>
+                                    {item.expiry_date || 'N/A'}
+                                  </p>
+                                  {isExpiryImminent && (
+                                    <span className="mt-1 text-[7px] font-black bg-warning-soft text-warning px-1.5 py-0.5 rounded uppercase animate-pulse border border-warning/10">Expiry imminent</span>
+                                  )}
+                                </div>
                               </td>
-                              <td className="px-6 py-4">
-                                <span className={`px-2 py-0.5 rounded-full text-[8px] font-black ${item.quantity <= item.min_quantity ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
-                                  {item.quantity <= item.min_quantity ? '재고부족' : '정상'}
-                                </span>
+                              <td className="px-8 py-6">
+                                <div className="flex items-center gap-2">
+                                  <div className={`w-1.5 h-1.5 rounded-full ${isLowStock ? 'bg-danger shadow-sm shadow-danger/40' : 'bg-success shadow-sm shadow-success/40'}`}></div>
+                                  <span className={`text-[10px] font-black uppercase tracking-tight ${isLowStock ? 'text-danger' : 'text-success'}`}>
+                                    {isLowStock ? 'Low Stock' : 'Optimized'}
+                                  </span>
+                                </div>
                               </td>
-                              <td className="px-6 py-4 text-right space-x-1">
-                                <button onClick={() => handleStockUpdate(item, 'in', 1)} className="px-2 py-1 bg-blue-50 text-blue-600 text-[9px] font-black rounded-md">입고</button>
-                                <button onClick={() => handleStockUpdate(item, 'out', 1)} className="px-2 py-1 bg-gray-50 text-gray-600 text-[9px] font-black rounded-md">출고</button>
-                                {item.quantity <= item.min_quantity && (
-                                  <button onClick={() => handleAutoApprovalRequest(item)} className="px-2 py-1 bg-orange-600 text-white text-[9px] font-black rounded-md shadow-sm">발주</button>
-                                )}
+                              <td className="px-8 py-6 text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  <button onClick={() => handleStockUpdate(item, 'in', 1)} className="p-2.5 bg-slate-100 hover:bg-primary hover:text-white text-slate-600 rounded-xl transition-all duration-300" title="Receive Stock">
+                                    <span className="text-xs font-black">IN</span>
+                                  </button>
+                                  <button onClick={() => handleStockUpdate(item, 'out', 1)} className="p-2.5 bg-slate-100 hover:bg-slate-800 hover:text-white text-slate-600 rounded-xl transition-all duration-300" title="Release Stock">
+                                    <span className="text-xs font-black">OUT</span>
+                                  </button>
+                                  {isLowStock && (
+                                    <button onClick={() => handleAutoApprovalRequest(item)} className="p-2.5 bg-danger/10 text-danger hover:bg-danger hover:text-white rounded-xl transition-all duration-300 shadow-sm border border-danger/20" title="Auto Reorder">
+                                      <span className="text-xs font-black">REORDER</span>
+                                    </button>
+                                  )}
+                                </div>
                               </td>
                             </tr>
                           );

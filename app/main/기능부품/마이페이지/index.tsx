@@ -237,8 +237,8 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
           </div>
         </div>
 
-        {/* 통합 탭 네비게이션 */}
-        <div className="flex bg-[var(--toss-card)] p-1.5 rounded-full shadow-sm border border-[var(--toss-border)] overflow-x-auto max-w-full">
+        {/* 통합 탭 네비게이션 (슬라이드 없이 줄바꿈) */}
+        <div className="flex flex-wrap bg-[var(--toss-card)] p-1.5 rounded-full shadow-sm border border-[var(--toss-border)] gap-1 w-full">
           <TabButton 
             isActive={activeTab === 'profile'} 
             onClick={() => setActiveTab('profile')} 
