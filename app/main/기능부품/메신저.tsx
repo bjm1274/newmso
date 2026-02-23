@@ -236,19 +236,50 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       setPollVotes(vMap);
     } catch (_) { /* 테이블 없으면 무시 */ }
 
-    // 마지막 읽은 시점 업데이트 (현재 방만)
-    lastReadAtRef.current = new Date().toISOString();
-    await supabase.from('room_read_cursors').upsert(
-      {
-        user_id: user?.id,
-        room_id: selectedRoomId,
-        last_read_at: lastReadAtRef.current,
-      },
-      { onConflict: 'user_id,room_id' }
-    );
-
-    // 모든 방에 대해 안읽은 개수 갱신
+    // 모든 방에 대해 안 읽은 개수 갱신
     await updateUnreadForRooms(list);
+
+    // [추가] 채팅방 진입 시 현재 방의 안 읽은 메시지 자동 읽음 처리
+    if (selectedRoomId && msgs?.length) {
+      const unreadMsgIds = msgs
+        .filter((m: any) => m.sender_id !== user?.id) // 내가 보낸 게 아닌 것
+        .filter((m: any) => {
+          // 이미 읽었는지 확인 (readCounts는 message_id 별 전체 읽음 수이므로, 
+          // 정확히 내가 읽었는지는 message_reads 테이블 조회가 필요하지만 
+          // 성능상 룸 진입 시 전체 upsert 처리)
+          return true;
+        })
+        .map((m: any) => m.id);
+
+      if (unreadMsgIds.length > 0) {
+        try {
+          // message_reads에 내 읽음 기록 추가
+          const readPayloads = unreadMsgIds.map(id => ({
+            user_id: user.id,
+            message_id: id,
+            read_at: new Date().toISOString()
+          }));
+
+          await supabase.from('message_reads').upsert(readPayloads, { onConflict: 'user_id,message_id' });
+
+          // 읽음 수 로컬 상태 갱신 (즉시 반영 목적)
+          setReadCounts(prev => {
+            const next = { ...prev };
+            unreadMsgIds.forEach(id => {
+              if (!next[id]) next[id] = 0;
+              // 내가 읽은 기록이 추가되었으므로 +1 (중복 합산 방지 로직은 upsert가 처리)
+              // 여기서는 단순 fetchData 호출로 동기화하는 것이 안전함
+            });
+            return next;
+          });
+
+          // 전역 안읽음 카운트 갱신
+          setRoomUnreadCounts(prev => ({ ...prev, [selectedRoomId]: 0 }));
+        } catch (e) {
+          console.error('자동 읽음 처리 실패:', e);
+        }
+      }
+    }
   }, [selectedRoomId, user?.id, updateUnreadForRooms]);
 
   const roomNotifyRef = useRef(true);
@@ -434,37 +465,55 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       );
   }, [threadRoot, messages]);
 
-  // 특정 메시지의 미열람자 목록 불러오기
-  const loadUnreadUsersForMessage = useCallback(
+  // 특정 메시지의 열람/미열람자 목록 불러오기
+  const [readUsers, setReadUsers] = useState<any[]>([]);
+  const loadReadStatusForMessage = useCallback(
     async (msg: any) => {
-      if (!msg?.id) return;
+      if (!msg?.id || !selectedRoom) return;
       setUnreadLoading(true);
       setUnreadUsers([]);
+      setReadUsers([]);
       setUnreadModalMsg(msg);
       try {
+        // 1. 해당 메시지를 읽은 기록 가져오기
         const { data: reads } = await supabase
           .from('message_reads')
           .select('user_id')
           .eq('message_id', msg.id);
-        const readIds = new Set((reads || []).map((r: any) => r.user_id));
-        const { data: staff } = await supabase
-          .from('staff_members')
-          .select('id, name, department, position, company')
-          .order('name', { ascending: true });
-        const base = (staff || []).filter((s: any) =>
-          user?.company ? s.company === user.company : true
-        );
-        const notRead = base.filter((s: any) => !readIds.has(s.id));
-        notRead.sort((a: any, b: any) => (a.department || '').localeCompare(b.department || '') || (a.name || '').localeCompare(b.name || ''));
-        setUnreadUsers(notRead);
+        const readUserIds = new Set((reads || []).map((r: any) => r.user_id));
+
+        // 2. 현재 채팅방 멤버 목록 가져오기 (selectedRoom.members 기반)
+        const roomMemberIds = Array.isArray(selectedRoom.members)
+          ? selectedRoom.members.map((id: string) => String(id))
+          : [];
+
+        // 3. 멤버 정보 매칭
+        const allRoomStaffs = staffs.filter((s: any) => roomMemberIds.includes(String(s.id)));
+
+        const readers: any[] = [];
+        const nonReaders: any[] = [];
+
+        allRoomStaffs.forEach((s: any) => {
+          if (s.id === msg.sender_id) return; // 보낸 사람은 제외
+          if (readUserIds.has(s.id)) {
+            readers.push(s);
+          } else {
+            nonReaders.push(s);
+          }
+        });
+
+        // 정렬
+        const sorter = (a: any, b: any) => (a.department || '').localeCompare(b.department || '') || (a.name || '').localeCompare(b.name || '');
+        setReadUsers(readers.sort(sorter));
+        setUnreadUsers(nonReaders.sort(sorter));
       } catch (e) {
-        console.error('loadUnreadUsersForMessage error', e);
-        alert('미열람자 목록을 불러오지 못했습니다.');
+        console.error('loadReadStatusForMessage error', e);
+        alert('열람 현황을 불러오지 못했습니다.');
       } finally {
         setUnreadLoading(false);
       }
     },
-    [user?.company]
+    [selectedRoom, staffs]
   );
 
   const handleLeaveRoom = async () => {
@@ -1098,7 +1147,13 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                 const isMine = msg.sender_id === user.id;
                 const msgReacts = reactions[msg.id] || {};
                 const hasReacts = Object.keys(msgReacts).some(e => (msgReacts[e] || 0) > 0);
-                const readCount = readCounts[msg.id] || 0;
+
+                // [수정] 참여자 수 기반 안 읽음 숫자 계산 (카카오톡 스타일)
+                // 참여자 수 - 1(본인) - 읽은 사람 수
+                const totalParticipants = selectedRoom?.members?.length || 0;
+                const readersCount = readCounts[msg.id] || 0;
+                const unreadCount = Math.max(0, totalParticipants - 1 - readersCount);
+
                 const TOOLBAR_EMOJIS = ['👍', '👌', '😎', '😍', '😂', '😕', '😢', '😠'];
 
                 const created = new Date(msg.created_at);
@@ -1189,7 +1244,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                             </div>
                           )}
 
-                          {(hasReacts || (readCount > 0 && !isMine)) && (
+                          {(hasReacts || unreadCount > 0) && (
                             <div className="mt-2 flex items-center gap-2 text-[11px] flex-wrap">
                               {hasReacts && (
                                 <span className="flex gap-1 flex-wrap">
@@ -1206,8 +1261,10 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                                   )}
                                 </span>
                               )}
-                              {readCount > 0 && !isMine && (
-                                <span className="text-[var(--toss-gray-4)] font-bold">{readCount}명이 읽음</span>
+                              {unreadCount > 0 && (
+                                <span className={`font-bold ${isMine ? 'text-yellow-300' : 'text-blue-500'}`}>
+                                  {unreadCount}
+                                </span>
                               )}
                             </div>
                           )}
@@ -1548,17 +1605,15 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                     📢 공지로 등록
                   </button>
                   <button onClick={() => { handleAction('task'); setActiveActionMsg(null) }} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">✅ 할일로 등록</button>
-                  {selectedRoom?.id === NOTICE_ROOM_ID && (
-                    <button
-                      onClick={() => {
-                        loadUnreadUsersForMessage(activeActionMsg);
-                        setActiveActionMsg(null);
-                      }}
-                      className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors"
-                    >
-                      👀 아직 안 읽은 사람 보기
-                    </button>
-                  )}
+                  <button
+                    onClick={() => {
+                      loadReadStatusForMessage(activeActionMsg);
+                      setActiveActionMsg(null);
+                    }}
+                    className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors"
+                  >
+                    👀 읽음 확인
+                  </button>
                   <button
                     onClick={() => {
                       setForwardSourceMsg(activeActionMsg);
@@ -1972,17 +2027,17 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
         </>
       )}
 
-      {/* 공지/중요 메시지 미열람자 목록 모달 */}
+      {/* 읽음 확인 상세 모달 */}
       {unreadModalMsg && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4" onClick={() => setUnreadModalMsg(null)}>
           <div className="bg-[var(--toss-card)] w-full max-w-md rounded-3xl p-6 space-y-4 shadow-2xl border border-[var(--toss-border)]" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
-                  공지 미열람 대상자
+                  읽음 확인 상세
                 </p>
-                <p className="text-xs font-semibold text-[var(--foreground)] mt-0.5 line-clamp-2">
-                  {unreadModalMsg.content || '📎 파일 공지'}
+                <p className="text-xs font-semibold text-[var(--foreground)] mt-0.5 line-clamp-1 opacity-60">
+                  {unreadModalMsg.content || '📎 파일 메시지'}
                 </p>
               </div>
               <button
@@ -1992,36 +2047,62 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                 ✕
               </button>
             </div>
-            <div className="border-t border-[var(--toss-border)] pt-3">
+
+            <div className="border-t border-[var(--toss-border)] pt-3 max-h-[60vh] overflow-y-auto custom-scrollbar space-y-6">
               {unreadLoading ? (
                 <div className="py-8 flex justify-center">
                   <div className="w-6 h-6 border-2 border-[var(--toss-border)] border-t-[var(--toss-blue)] rounded-full animate-spin" />
                 </div>
-              ) : unreadUsers.length === 0 ? (
-                <p className="text-[11px] text-[var(--toss-gray-3)] font-bold py-4 text-center">
-                  모든 대상자가 이 공지를 읽었습니다.
-                </p>
               ) : (
-                <div className="max-h-64 overflow-y-auto custom-scrollbar space-y-1">
-                  {unreadUsers.map((u: any) => (
-                    <div
-                      key={u.id}
-                      className="flex items-center justify-between px-3 py-2 rounded-[16px] bg-[var(--toss-gray-1)] hover:bg-[var(--toss-gray-1)] text-[11px]"
-                    >
-                      <div className="min-w-0">
-                        <p className="font-semibold text-[var(--foreground)] truncate">
-                          {u.name}
-                        </p>
-                        <p className="text-[11px] font-bold text-[var(--toss-gray-3)] truncate">
-                          {(u.department || '')} {u.position ? `· ${u.position}` : ''}
-                        </p>
-                      </div>
-                      <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">
-                        미열람
-                      </span>
+                <>
+                  {/* 안 읽은 멤버 섹션 */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between px-1">
+                      <p className="text-[11px] font-bold text-red-500 uppercase tracking-wider">읽지 않음 ({unreadUsers.length})</p>
                     </div>
-                  ))}
-                </div>
+                    {unreadUsers.length === 0 ? (
+                      <p className="text-[10px] text-zinc-400 font-bold py-2 px-1">모두가 읽었습니다.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-1">
+                        {unreadUsers.map((u: any) => (
+                          <div key={u.id} className="flex items-center gap-3 p-2 rounded-xl bg-zinc-50 dark:bg-zinc-800/30">
+                            <div className="w-7 h-7 rounded-lg bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-[10px] font-bold text-zinc-400 overflow-hidden">
+                              {u.photo_url ? <img src={u.photo_url} className="w-full h-full object-cover" /> : u.name[0]}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[11px] font-bold text-foreground truncate">{u.name}</p>
+                              <p className="text-[9px] font-bold text-zinc-400 truncate">{(u.department || '')} {u.position}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 읽은 멤버 섹션 */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between px-1">
+                      <p className="text-[11px] font-bold text-emerald-500 uppercase tracking-wider">읽음 ({readUsers.length})</p>
+                    </div>
+                    {readUsers.length === 0 ? (
+                      <p className="text-[10px] text-zinc-400 font-bold py-2 px-1">아직 읽은 사람이 없습니다.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-1">
+                        {readUsers.map((u: any) => (
+                          <div key={u.id} className="flex items-center gap-3 p-2 rounded-xl bg-zinc-50 dark:bg-zinc-800/30">
+                            <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-[10px] font-bold text-emerald-600 overflow-hidden">
+                              {u.photo_url ? <img src={u.photo_url} className="w-full h-full object-cover" /> : u.name[0]}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[11px] font-bold text-foreground truncate">{u.name}</p>
+                              <p className="text-[9px] font-bold text-zinc-400 truncate">{(u.department || '')} {u.position}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
             </div>
           </div>
