@@ -6,6 +6,7 @@ import { setSelectedCompanyId as persistSelectedCompanyId, getSelectedCompanyId 
 
 import Sidebar from './기능부품/조직도서브/조직도측면창';
 import MainContent from './기능부품/조직도서브/조직도본문';
+import NotificationSystem from './기능부품/알림시스템';
 
 type ERPData = {
   staffs: any[];
@@ -26,7 +27,7 @@ export default function MainPage() {
   // 초기 상태를 로컬 스토리지에서 시도
   const [mainMenu, setMainMenu] = useState('조직도');
   const [subView, setSubView] = useState('전체');
-  const [selectedCo, setSelectedCo] = useState('전체'); 
+  const [selectedCo, setSelectedCo] = useState('전체');
 
   const [data, setData] = useState<ERPData>({
     staffs: [],
@@ -46,7 +47,7 @@ export default function MainPage() {
     }
     const parsedUser = JSON.parse(storedUser);
     setUser(parsedUser);
-    
+
     // 이전 메뉴 상태 복구
     const savedMenu = localStorage.getItem('erp_last_menu');
     const savedSubView = localStorage.getItem('erp_last_subview');
@@ -54,7 +55,7 @@ export default function MainPage() {
 
     if (savedMenu) setMainMenu(savedMenu);
     if (savedSubView) setSubView(savedSubView);
-    
+
     if (parsedUser.company !== 'SY INC.' && !parsedUser.permissions?.mso) {
       setSelectedCo(parsedUser.company);
     } else if (savedCo) {
@@ -98,7 +99,7 @@ export default function MainPage() {
 
       let postQuery = supabase.from('board_posts').select('*').order('created_at', { ascending: false });
       if (filterCompanyId) {
-        try { postQuery = postQuery.eq('company_id', filterCompanyId); } catch (_) {}
+        try { postQuery = postQuery.eq('company_id', filterCompanyId); } catch (_) { }
       }
       const { data: postData } = await postQuery;
 
@@ -136,18 +137,21 @@ export default function MainPage() {
 
   return (
     <div className="flex flex-col md:flex-row h-screen w-full bg-[#F5F6F8] overflow-hidden">
-      <Sidebar 
-        user={user} 
-        mainMenu={mainMenu} 
+      {/* 전역 알림 시스템 */}
+      <NotificationSystem user={user} />
+
+      <Sidebar
+        user={user}
+        mainMenu={mainMenu}
         onMenuChange={(menu: string) => {
           setMainMenu(menu);
           // 메뉴 변경 시 서브뷰 초기화 (선택 사항)
           // setSubView('전체'); 
-        }} 
+        }}
       />
 
       <div className="flex-1 flex flex-col overflow-hidden pb-[70px] md:pb-0">
-        <MainContent 
+        <MainContent
           user={user}
           mainMenu={mainMenu}
           data={data}

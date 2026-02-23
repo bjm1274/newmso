@@ -392,6 +392,7 @@ export default function MainContent({
               else if (type === 'approval') setMainMenu('전자결재');
               else if (type === 'message') setMainMenu('채팅');
             }}
+            onOpenOrgChart={() => setMainMenu('조직도')}
           />
         </div>
       )}

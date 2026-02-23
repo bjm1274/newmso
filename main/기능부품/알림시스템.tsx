@@ -147,11 +147,33 @@ export default function NotificationSystem({ user }: any) {
         )
         .subscribe();
 
+      // E. 실시간 메시지 알림 (카카오톡 스타일)
+      const messagesChannel = supabase
+        .channel('messages-realtime')
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'messages' },
+          (payload: any) => {
+            if (payload.new.sender_id !== user.id) {
+              const notif = {
+                id: payload.new.id,
+                title: `💬 새 메시지`,
+                body: payload.new.content || '사진을 보냈습니다.',
+                type: 'chat',
+                data: payload.new
+              };
+              handleNotification(notif);
+            }
+          }
+        )
+        .subscribe();
+
       return () => {
         supabase.removeChannel(approvalsChannel);
         supabase.removeChannel(inventoryChannel);
         supabase.removeChannel(payrollChannel);
         supabase.removeChannel(educationChannel);
+        supabase.removeChannel(messagesChannel);
       };
     };
 
@@ -189,34 +211,47 @@ export default function NotificationSystem({ user }: any) {
   };
 
   const markAsRead = (id: string) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    setNotifications(prev => prev.filter(n => n.id !== id));
     setUnreadCount(prev => Math.max(0, prev - 1));
   };
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 space-y-2 max-w-sm">
-      {/* 읽지 않은 알림 배지 */}
-      {unreadCount > 0 && (
-        <div className="absolute -top-2 -right-2 bg-red-600 text-white px-2 py-1 rounded-full text-xs font-black">
-          {unreadCount}
-        </div>
-      )}
-
-      {/* 최근 알림 표시 */}
-      {notifications.slice(0, 3).map((notif, idx) => (
+    <div className="fixed top-6 right-6 z-[9999] space-y-3 w-80 pointer-events-none">
+      {notifications.map((notif) => (
         <div
           key={notif.id}
-          className={`p-4 rounded-2xl shadow-2xl border-l-4 animate-in slide-in-from-right duration-300 cursor-pointer ${
-            notif.type === 'approval' ? 'bg-blue-50 border-blue-600' :
-            notif.type === 'inventory' ? 'bg-orange-50 border-orange-600' :
-            notif.type === 'payroll' ? 'bg-green-50 border-green-600' :
-            'bg-purple-50 border-purple-600'
-          }`}
+          className="pointer-events-auto bg-white/95 backdrop-blur-md border border-slate-200 shadow-2xl rounded-2xl p-4 flex items-center gap-4 animate-in slide-in-from-right-10 fade-in duration-500 cursor-pointer hover:scale-[1.02] transition-all relative overflow-hidden group"
           onClick={() => markAsRead(notif.id)}
         >
-          <h4 className="font-black text-sm mb-1">{notif.title}</h4>
-          <p className="text-xs text-gray-600">{notif.body}</p>
-          <p className="text-[10px] text-gray-400 mt-2">{new Date().toLocaleTimeString()}</p>
+          {/* 장식 바 */}
+          <div className={`absolute left-0 top-0 bottom-0 w-1 ${notif.type === 'chat' ? 'bg-yellow-400' :
+              notif.type === 'approval' ? 'bg-blue-600' :
+                notif.type === 'inventory' ? 'bg-orange-500' : 'bg-primary'
+            }`}></div>
+
+          <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-lg shrink-0 overflow-hidden shadow-inner">
+            {notif.data?.sender_id ? (
+              <div className="w-full h-full bg-slate-200 flex items-center justify-center text-xs font-black text-slate-400">
+                {notif.data?.sender_name?.[0] || '💬'}
+              </div>
+            ) : (
+              <span>{notif.type === 'chat' ? '💬' : '🔔'}</span>
+            )}
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex justify-between items-center mb-0.5">
+              <h4 className="font-black text-[11px] text-slate-900 truncate">
+                {notif.type === 'chat' ? (notif.data?.sender_name || '새 메시지') : notif.title}
+              </h4>
+              <span className="text-[8px] font-bold text-slate-400">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+            </div>
+            <p className="text-[10px] font-medium text-slate-600 truncate leading-tight">
+              {notif.body}
+            </p>
+          </div>
+
+          <button className="text-slate-300 hover:text-slate-900 p-1 opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
         </div>
       ))}
     </div>

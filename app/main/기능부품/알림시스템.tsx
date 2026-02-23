@@ -161,7 +161,7 @@ export default function NotificationSystem({
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'approvals' },
         (payload: any) => {
-          if (String(payload.new.approver_id) === uid && payload.new.status === '대기') {
+          if (String(payload.new.current_approver_id) === uid && payload.new.status === '대기') {
             fireNotif({
               id: payload.new.id,
               title: `📋 새 결재 요청: ${payload.new.title}`,
@@ -176,7 +176,7 @@ export default function NotificationSystem({
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'approvals' },
         (payload: any) => {
-          if (String(payload.new.approver_id) === uid && payload.new.status === '대기') {
+          if (String(payload.new.current_approver_id) === uid && payload.new.status === '대기') {
             fireNotif({
               id: payload.new.id,
               title: `📋 결재 차례 도착: ${payload.new.title}`,

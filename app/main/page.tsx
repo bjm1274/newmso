@@ -40,8 +40,8 @@ function MainPageContent() {
   const [companies, setCompanies] = useState<{ id: string; name: string; type: string }[]>([]);
   const [selectedCompanyId, setSelectedCompanyIdState] = useState<string | null>(null);
 
-  // 초기 상태를 로컬 스토리지에서 시도
-  const [mainMenu, setMainMenu] = useState('조직도');
+  // 초기 상태를 로컬 스토리지에서 시도 (기본: 내 정보)
+  const [mainMenu, setMainMenu] = useState('내정보');
   const [subView, setSubView] = useState('전체');
   const [selectedCo, setSelectedCo] = useState('전체');
   const [initialMyPageTab, setInitialMyPageTab] = useState<string | null>(null);

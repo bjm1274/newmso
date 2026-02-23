@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -1130,7 +1130,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       </aside>
 
       {/* 우측: 채팅창 본문 — 모바일에서는 채팅방 선택 시에만 표시 */}
-      <main className={`${!selectedRoomId ? 'hidden md:flex' : 'flex'} flex-1 min-h-0 flex-col bg-[var(--toss-gray-1)] md:bg-slate-100 relative pb-20 md:pb-0`}>
+      <main className={`${!selectedRoomId ? 'hidden md:flex' : 'flex'} flex-1 min-h-0 flex-col bg-[var(--toss-gray-1)] relative pb-20 md:pb-0`}>
         {/* 선택된 채팅방 정보 및 액션 버튼들 */}
         {selectedRoomId && selectedRoom && (
           <header className="px-4 md:px-6 pt-3 md:pt-4 pb-3 flex items-center gap-3 border-b border-[var(--toss-border)] bg-[var(--toss-card)] shrink-0">
@@ -1245,7 +1245,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                       onMouseLeave={() => setToolbarMsgId(prev => prev === msg.id ? null : prev)}
                     >
                       {!isMine && (
-                        <span className="text-[11px] text-[var(--toss-gray-3)] px-2 mb-1 font-bold">
+                        <span className="text-[11px] text-[var(--toss-gray-4)] px-2 mb-1 font-bold">
                           {msg.staff?.name} {msg.staff?.position}
                         </span>
                       )}
@@ -1254,7 +1254,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                         className={`group relative px-3 py-2 rounded-[12px] text-sm shadow-sm cursor-pointer transition-all max-w-[70%] ${
                           isMine
                             ? 'bg-emerald-600 text-white rounded-tr-none'
-                            : 'bg-[var(--toss-card)] border border-slate-200 rounded-tl-none hover:border-emerald-400 text-slate-900'
+                            : 'bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-tl-none hover:border-emerald-400 text-[var(--foreground)]'
                         }`}
                         role="button"
                         tabIndex={0}
@@ -1265,7 +1265,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                           const parent = messages.find((m: any) => m.id === msg.reply_to_id);
                           return parent ? (
                             <div className={`mb-2 p-2 rounded-[12px] text-[11px] border-l-2 ${
-                              isMine ? 'bg-white/10 border-white/30' : 'bg-[var(--toss-gray-1)] border-[var(--toss-border)]'
+                              isMine ? 'bg-white/10 border-white/30 text-white' : 'bg-[var(--toss-gray-1)] border-[var(--toss-border)] text-[var(--foreground)]'
                             }`}>
                               <span className="font-bold opacity-80">↩️ {parent.staff?.name}: </span>
                               <span className="truncate">{parent.content || '📎 파일'}</span>
@@ -1290,7 +1290,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                               rel="noopener noreferrer"
                               download
                               className={`block p-2 rounded-[12px] text-[11px] font-bold border flex items-center gap-2 hover:opacity-80 transition-opacity ${
-                                isMine ? 'bg-white/10 border-white/20' : 'bg-[var(--toss-gray-1)] border-[var(--toss-border)] text-[var(--toss-blue)]'
+                                isMine ? 'bg-white/10 border-white/20 text-white' : 'bg-[var(--toss-gray-1)] border-[var(--toss-border)] text-[var(--toss-blue)]'
                               }`}
                             >
                               📎 파일 첨부됨 — 다운로드
@@ -1317,7 +1317,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                               </span>
                             )}
                             {readCount > 0 && !isMine && (
-                              <span className="text-[var(--toss-gray-3)] font-bold">{readCount}명이 읽음</span>
+                              <span className="text-[var(--toss-gray-4)] font-bold">{readCount}명이 읽음</span>
                             )}
                           </div>
                         )}
@@ -1325,7 +1325,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                         <span
                           className={`absolute bottom-0 ${
                             isMine ? 'right-full mr-2' : 'left-full ml-2'
-                          } text-[8px] font-bold text-[var(--toss-gray-3)] whitespace-nowrap`}
+                          } text-[8px] font-bold text-[var(--toss-gray-4)] whitespace-nowrap`}
                         >
                           {created.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>

@@ -3,11 +3,19 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 
 export default function AttendanceMain({ staffs, selectedCo }: any) {
-  const [viewMode, setViewMode] = useState<'daily' | 'monthly' | 'calendar' | 'dashboard'>('monthly');
+  const [viewMode, setViewMode] = useState<'daily' | 'monthly' | 'calendar' | 'dashboard' | 'schedule'>('monthly');
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
   const [attendanceData, setAttendanceData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [workShifts, setWorkShifts] = useState<any[]>([]);
+  const [shiftAssignments, setShiftAssignments] = useState<Record<string, string>>({}); // key: `${staff_id}_${work_date}` -> shift_id or ''
+  const [bulkEditOpen, setBulkEditOpen] = useState(false);
+  const [bulkRangeType, setBulkRangeType] = useState<'day' | 'week' | 'month' | 'custom'>('day');
+  const [bulkStartDate, setBulkStartDate] = useState(new Date().toISOString().slice(0, 10));
+  const [bulkEndDate, setBulkEndDate] = useState(new Date().toISOString().slice(0, 10));
+  const [bulkStatus, setBulkStatus] = useState<string>('present');
+  const [bulkSaving, setBulkSaving] = useState(false);
 
   const filtered = selectedCo === '전체' ? staffs : staffs.filter((s: any) => s.company === selectedCo);
 
@@ -44,6 +52,49 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
     fetchAttendance();
   }, [selectedMonth, selectedDate, selectedCo, viewMode, filtered]);
 
+  // 근무표 편성: work_shifts 로드
+  useEffect(() => {
+    if (viewMode !== 'schedule') return;
+    supabase.from('work_shifts').select('id, name, start_time, end_time').eq('is_active', true).then(({ data }) => {
+      setWorkShifts(data || []);
+    });
+  }, [viewMode]);
+
+  // 근무표 편성: 선택 월의 shift_assignments 로드
+  useEffect(() => {
+    if (viewMode !== 'schedule' || filtered.length === 0) return;
+    const [y, m] = selectedMonth.split('-').map(Number);
+    const lastDay = new Date(y, m, 0).getDate();
+    const start = `${selectedMonth}-01`;
+    const end = `${selectedMonth}-${String(lastDay).padStart(2, '0')}`;
+    supabase
+      .from('shift_assignments')
+      .select('staff_id, work_date, shift_id')
+      .in('staff_id', filtered.map((s: any) => s.id))
+      .gte('work_date', start)
+      .lte('work_date', end)
+      .then(({ data }) => {
+        const map: Record<string, string> = {};
+        (data || []).forEach((r: any) => {
+          map[`${r.staff_id}_${r.work_date}`] = r.shift_id || '';
+        });
+        setShiftAssignments(map);
+      });
+  }, [viewMode, selectedMonth, filtered]);
+
+  const setAssignment = (staffId: string, workDate: string, shiftId: string | null) => {
+    const key = `${staffId}_${workDate}`;
+    setShiftAssignments((prev) => ({ ...prev, [key]: shiftId || '' }));
+    const companyName = filtered.find((s: any) => s.id === staffId)?.company;
+    supabase
+      .from('shift_assignments')
+      .upsert(
+        { staff_id: staffId, work_date: workDate, shift_id: shiftId || null, company_name: companyName },
+        { onConflict: 'staff_id,work_date' }
+      )
+      .then(() => {});
+  };
+
   // 월별 일수 계산
   const getDaysInMonth = (monthStr: string) => {
     const [year, month] = monthStr.split('-').map(Number);
@@ -71,10 +122,11 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
             <h2 className="text-2xl font-bold text-[var(--foreground)] tracking-tighter italic">
               전문 근태 통합 관리 <span className="text-sm text-[var(--toss-blue)] ml-2">[{selectedCo}]</span>
             </h2>
-            <div className="flex gap-2 mt-4">
+            <div className="flex flex-wrap items-center gap-2 mt-4">
               {[
                 { id: 'daily', label: '일별 현황' },
                 { id: 'monthly', label: '월별 대장' },
+                { id: 'schedule', label: '근무표 편성' },
                 { id: 'calendar', label: '근태 달력' },
                 { id: 'dashboard', label: '대시보드' }
               ].map(mode => (
@@ -90,6 +142,13 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                   {mode.label}
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={() => setBulkEditOpen(true)}
+                className="px-4 py-2 rounded-[12px] text-[11px] font-bold border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-all"
+              >
+                출퇴근 상태 일괄 수정
+              </button>
             </div>
           </div>
 
@@ -106,7 +165,7 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
               </div>
             ) : (
               <div className="flex items-center gap-3">
-                <span className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">Month</span>
+                <span className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">{viewMode === 'schedule' ? '편성 월' : 'Month'}</span>
                 <input 
                   type="month" 
                   value={selectedMonth} 
@@ -166,43 +225,117 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
           </div>
         )}
 
+        {viewMode === 'schedule' && (
+          <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[2.5rem] overflow-hidden shadow-xl">
+            <p className="p-4 text-[11px] text-[var(--toss-gray-3)] border-b border-[var(--toss-border)]">
+              해당 월의 날짜별 근무형태를 지정하면 게시판 경조사에서 오늘 근무형태별 근무 현황으로 실시간 열람됩니다.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[800px]">
+                <thead className="bg-[var(--toss-gray-1)] text-[11px] font-bold text-[var(--toss-gray-3)] border-b border-[var(--toss-border)] uppercase">
+                  <tr>
+                    <th className="px-4 py-3 sticky left-0 bg-[var(--toss-gray-1)] z-10 border-r">성명</th>
+                    {daysArray.map((d) => {
+                      const dStr = `${selectedMonth}-${String(d).padStart(2, '0')}`;
+                      const dayOfWeek = new Date(dStr).getDay();
+                      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                      return (
+                        <th key={d} className={`px-2 py-3 text-center border-r min-w-[100px] ${isWeekend ? 'text-red-400' : ''}`}>
+                          {d}일
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {filtered.map((s: any) => (
+                    <tr key={s.id} className="hover:bg-[var(--toss-gray-1)]/50">
+                      <td className="px-4 py-2 sticky left-0 bg-[var(--toss-card)] z-10 border-r font-bold text-xs text-[var(--foreground)]">{s.name}</td>
+                      {daysArray.map((d) => {
+                        const dStr = `${selectedMonth}-${String(d).padStart(2, '0')}`;
+                        const key = `${s.id}_${dStr}`;
+                        const value = shiftAssignments[key] ?? '';
+                        return (
+                          <td key={d} className="px-2 py-1 border-r">
+                            <select
+                              value={value}
+                              onChange={(e) => setAssignment(s.id, dStr, e.target.value || null)}
+                              className="w-full text-[10px] font-bold border border-[var(--toss-border)] rounded px-1 py-1 bg-[var(--toss-card)] outline-none"
+                            >
+                              <option value="">미지정</option>
+                              {workShifts.map((sh: any) => (
+                                <option key={sh.id} value={sh.id}>
+                                  {sh.name}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {viewMode === 'monthly' && (
           <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[2.5rem] overflow-hidden shadow-xl">
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[1200px]">
+              <table className="w-full text-left border-collapse min-w-[800px]">
                 <thead className="bg-[var(--toss-gray-1)] text-[11px] font-bold text-[var(--toss-gray-3)] border-b border-[var(--toss-border)] uppercase">
                   <tr>
-                    <th className="px-6 py-4 sticky left-0 bg-[var(--toss-gray-1)] z-10 border-r">성명</th>
-                    {daysArray.map(d => (
-                      <th key={d} className="px-3 py-4 text-center border-r min-w-[45px]">{d}</th>
-                    ))}
-                    <th className="px-6 py-4 text-center bg-[var(--toss-blue-light)] text-[var(--toss-blue)]">출근일수</th>
+                    <th className="px-4 py-3 sticky left-0 bg-[var(--toss-gray-1)] z-10 border-r">성명</th>
+                    {daysArray.map((d) => {
+                      const dStr = `${selectedMonth}-${String(d).padStart(2, '0')}`;
+                      const dayOfWeek = new Date(dStr).getDay();
+                      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                      return (
+                        <th
+                          key={d}
+                          className={`px-2 py-3 text-center border-r min-w-[100px] ${isWeekend ? 'text-red-400' : ''}`}
+                        >
+                          {d}일
+                        </th>
+                      );
+                    })}
+                    <th className="px-6 py-3 text-center bg-[var(--toss-blue-light)] text-[var(--toss-blue)]">출근일수</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {filtered.map((s: any) => {
                     let workDays = 0;
                     return (
-                      <tr key={s.id} className="hover:bg-[var(--toss-gray-1)] transition-all">
-                        <td className="px-6 py-4 sticky left-0 bg-[var(--toss-card)] z-10 border-r font-bold text-xs text-[var(--foreground)]">{s.name}</td>
+                      <tr key={s.id} className="hover:bg-[var(--toss-gray-1)]/50 transition-all">
+                        <td className="px-4 py-2 sticky left-0 bg-[var(--toss-card)] z-10 border-r font-bold text-xs text-[var(--foreground)]">
+                          {s.name}
+                        </td>
                         {daysArray.map((d) => {
                           const dStr = `${selectedMonth}-${String(d).padStart(2, '0')}`;
                           const att = attendanceData.find((a: any) => a.staff_id === s.id && a.work_date === dStr);
-                          const dayOfWeek = new Date(selectedMonth + '-' + d).getDay();
+                          const dayOfWeek = new Date(dStr).getDay();
                           const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
                           const status = att?.status || (isWeekend ? 'holiday' : '');
                           let label = '';
                           if (status === 'annual_leave' || status === 'sick_leave') label = '휴';
                           else if (status === 'holiday' || isWeekend) label = '휴';
-                          else if (status === 'present' || att) { label = '출'; workDays++; }
-                          else label = '-';
+                          else if (status === 'present' || att) {
+                            label = '출';
+                            workDays++;
+                          } else label = '-';
                           return (
-                            <td key={d} className="px-3 py-4 text-center border-r text-[11px] font-bold text-[var(--toss-gray-3)]">
+                            <td
+                              key={d}
+                              className="px-2 py-2 text-center border-r text-[11px] font-bold text-[var(--toss-gray-3)]"
+                            >
                               {isWeekend ? <span className="text-red-300">{label}</span> : label}
                             </td>
                           );
                         })}
-                        <td className="px-6 py-4 text-center bg-[var(--toss-blue-light)]/50 font-bold text-[var(--toss-blue)] text-xs">{workDays}일</td>
+                        <td className="px-6 py-3 text-center bg-[var(--toss-blue-light)]/50 font-bold text-[var(--toss-blue)] text-xs">
+                          {workDays}일
+                        </td>
                       </tr>
                     );
                   })}
@@ -247,6 +380,147 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                   <div className="flex justify-between text-[11px] font-bold mb-1"><span>조퇴</span><span>{stats.total ? Math.round((stats.earlyLeave / stats.total) * 100) : 0}%</span></div>
                   <div className="h-3 bg-[var(--toss-gray-1)] rounded-full overflow-hidden"><div className="h-full bg-amber-500 rounded-full" style={{ width: `${stats.total ? (stats.earlyLeave / stats.total) * 100 : 0}%` }} /></div>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 출퇴근 상태 일괄 수정 모달 */}
+        {bulkEditOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+            <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[24px] shadow-2xl max-w-md w-full p-6 space-y-4">
+              <h3 className="text-lg font-bold text-[var(--foreground)]">출퇴근 상태 일괄 수정</h3>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase mb-1">기간 유형</p>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { id: 'day', label: '일별(하루)' },
+                      { id: 'week', label: '주간별(7일)' },
+                      { id: 'month', label: '월별' },
+                      { id: 'custom', label: '날짜 선택(기간)' }
+                    ].map((o) => (
+                      <button
+                        key={o.id}
+                        type="button"
+                        onClick={() => setBulkRangeType(o.id as any)}
+                        className={`px-3 py-1.5 rounded-[10px] text-[11px] font-bold ${
+                          bulkRangeType === o.id ? 'bg-[var(--toss-blue)] text-white' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]'
+                        }`}
+                      >
+                        {o.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                  <div className="flex gap-3 flex-wrap">
+                  <div>
+                    <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase mb-1">시작일</p>
+                    <input
+                      type="date"
+                      value={bulkStartDate}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setBulkStartDate(v);
+                        if (bulkRangeType === 'week') {
+                          const d = new Date(v);
+                          d.setDate(d.getDate() + 6);
+                          setBulkEndDate(d.toISOString().slice(0, 10));
+                        }
+                      }}
+                      className="bg-[var(--toss-card)] border border-[var(--toss-border)] px-3 py-2 rounded-[12px] text-xs font-bold"
+                    />
+                  </div>
+                  {(bulkRangeType === 'custom' || bulkRangeType === 'week') && (
+                    <div>
+                      <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase mb-1">종료일</p>
+                      <input
+                        type="date"
+                        value={bulkEndDate}
+                        onChange={(e) => setBulkEndDate(e.target.value)}
+                        className="bg-[var(--toss-card)] border border-[var(--toss-border)] px-3 py-2 rounded-[12px] text-xs font-bold"
+                      />
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase mb-1">변경할 상태</p>
+                  <select
+                    value={bulkStatus}
+                    onChange={(e) => setBulkStatus(e.target.value)}
+                    className="w-full border border-[var(--toss-border)] rounded-[12px] px-3 py-2 text-xs font-bold bg-[var(--toss-card)]"
+                  >
+                    <option value="present">정상</option>
+                    <option value="late">지각</option>
+                    <option value="early_leave">조퇴</option>
+                    <option value="absent">결근</option>
+                    <option value="annual_leave">연차</option>
+                    <option value="sick_leave">병가</option>
+                    <option value="holiday">휴일</option>
+                    <option value="half_leave">반차</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-2 justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => setBulkEditOpen(false)}
+                  className="px-4 py-2 rounded-[12px] text-[11px] font-bold border border-[var(--toss-border)] text-[var(--toss-gray-3)]"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    let start = bulkStartDate;
+                    let end = bulkStartDate;
+                    if (bulkRangeType === 'week') {
+                      const d = new Date(bulkStartDate);
+                      d.setDate(d.getDate() + 6);
+                      end = d.toISOString().slice(0, 10);
+                    } else if (bulkRangeType === 'month') {
+                      const [y, m] = bulkStartDate.split('-').map(Number);
+                      end = `${y}-${String(m).padStart(2, '0')}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`;
+                      start = `${y}-${String(m).padStart(2, '0')}-01`;
+                    } else if (bulkRangeType === 'custom') {
+                      start = bulkStartDate <= bulkEndDate ? bulkStartDate : bulkEndDate;
+                      end = bulkStartDate <= bulkEndDate ? bulkEndDate : bulkStartDate;
+                    }
+                    setBulkSaving(true);
+                    try {
+                      const staffIds = filtered.map((s: any) => s.id);
+                      const dates: string[] = [];
+                      const cur = new Date(start);
+                      const endD = new Date(end);
+                      while (cur <= endD) {
+                        dates.push(cur.toISOString().slice(0, 10));
+                        cur.setDate(cur.getDate() + 1);
+                      }
+                      const rows = staffIds.flatMap((staffId: string) =>
+                        dates.map((work_date) => ({
+                          staff_id: staffId,
+                          work_date,
+                          status: bulkStatus,
+                        }))
+                      );
+                      for (const row of rows) {
+                        await supabase.from('attendances').upsert(row, { onConflict: 'staff_id,work_date' });
+                      }
+                      alert(`적용 완료: ${dates.length}일 × ${staffIds.length}명 = ${rows.length}건을 "${bulkStatus === 'present' ? '정상' : bulkStatus}"으로 수정했습니다.`);
+                      setBulkEditOpen(false);
+                      fetchAttendance();
+                    } catch (e) {
+                      console.error(e);
+                      alert('일괄 수정 중 오류가 발생했습니다.');
+                    } finally {
+                      setBulkSaving(false);
+                    }
+                  }}
+                  disabled={bulkSaving}
+                  className="px-4 py-2 rounded-[12px] text-[11px] font-bold bg-[var(--toss-blue)] text-white disabled:opacity-50"
+                >
+                  {bulkSaving ? '적용 중…' : '일괄 적용'}
+                </button>
               </div>
             </div>
           </div>

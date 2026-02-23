@@ -251,7 +251,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       sender_id: user.id,
       sender_name: user.name || '이름 없음',
       sender_company: user.company || '',
-      approver_id: approverLine[0].id,
+      current_approver_id: approverLine[0].id,
       approver_line: approverLine.map((a: any) => a.id),
       type: formType,
       title: formTitle,
@@ -449,7 +449,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                   const steps = lineIds.map((id: string, i: number) => {
                     const staff = Array.isArray(staffs) ? staffs.find((s: any) => s.id === id) : null;
                     const name = staff?.name || '?';
-                    const isCurrent = id === item.approver_id;
+                    const isCurrent = id === item.current_approver_id;
                     return { step: i + 1, name, isCurrent };
                   });
                   return (
@@ -486,7 +486,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                         </div>
                     </div>
                     
-                    {(viewMode === '결재함' || (viewMode === '기안함' && item.status === '대기')) && item.status === '대기' && String(item.approver_id) === String(user?.id) && (
+                    {(viewMode === '결재함' || (viewMode === '기안함' && item.status === '대기')) && item.status === '대기' && String(item.current_approver_id) === String(user?.id) && (
                       <div className="flex gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                         <button type="button" onClick={() => handleApproveAction(item)} className="px-5 py-3 bg-[var(--toss-blue)] text-white rounded-[12px] text-[11px] font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all">승인</button>
                         <button type="button" onClick={() => handleRejectAction(item)} className="px-5 py-3 bg-[var(--toss-danger)] text-white rounded-[12px] text-[11px] font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all">반려</button>
@@ -525,7 +525,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
               </div>
               {item.status === '대기' && (
                 <div className="p-4 md:p-6 border-t border-[var(--toss-border)] safe-area-pb">
-                  {String(item.approver_id) === String(user?.id) ? (
+                  {String(item.current_approver_id) === String(user?.id) ? (
                     <div className="flex gap-3">
                       <button type="button" onClick={async () => { await handleApproveAction(item); setSelectedApprovalId(null); }} className="flex-1 py-3 bg-[var(--toss-blue)] text-white rounded-[16px] text-sm font-bold">승인</button>
                       <button type="button" onClick={async () => { await handleRejectAction(item); setSelectedApprovalId(null); }} className="flex-1 py-3 bg-[var(--toss-danger)] text-white rounded-[16px] text-sm font-bold">반려</button>
