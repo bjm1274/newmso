@@ -185,7 +185,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
           <button
             key={co}
             onClick={() => setSelectedCo(co)}
-            className={`w-full px-3 py-2.5 text-[10px] md:text-[11px] font-semibold rounded-[12px] transition-all text-left ${selectedCo === co ? 'bg-[var(--toss-blue)] text-white shadow-md' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'}`}
+            className={`w-full px-3 py-2.5 text-[11px] md:text-[11px] font-semibold rounded-[12px] transition-all text-left ${selectedCo === co ? 'bg-[var(--toss-blue)] text-white shadow-md' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'}`}
           >
             {co}
           </button>
@@ -200,7 +200,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
               <select
                 value={selectedTeamFilter}
                 onChange={(e) => setSelectedTeamFilter(e.target.value)}
-                className="px-4 py-2.5 bg-[var(--input-bg)] border border-[var(--toss-border)] rounded-xl text-[11px] font-semibold text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+                className="px-4 py-2.5 bg-[var(--input-bg)] border border-[var(--toss-border)] rounded-[16px] text-[11px] font-semibold text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30"
               >
                 <option value="">팀 선택 안함 (전체)</option>
                 {allTeamOptions.map(team => (
@@ -214,7 +214,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                 placeholder="성함 또는 부서 검색..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full px-5 py-2.5 bg-[var(--input-bg)] border border-[var(--toss-border)] rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 text-[var(--foreground)]"
+                className="w-full px-5 py-2.5 bg-[var(--input-bg)] border border-[var(--toss-border)] rounded-[16px] text-xs font-bold outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 text-[var(--foreground)]"
               />
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--toss-gray-3)]">🔍</span>
             </div>
@@ -253,7 +253,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                             <div key={dIdx} className={`flex flex-col min-w-0 ${dept.deptName === '진료부' ? 'flex-grow-0 min-w-[11rem] max-w-[12rem] items-start' : dept.deptName === '총무부' ? 'flex-grow-0 min-w-0 items-center ml-auto' : 'flex-1 items-center'}`}>
                               <div className={`flex flex-row items-end gap-2 w-full mb-12 relative z-10 min-h-[88px] ${dept.deptName === '간호부' ? 'justify-start' : 'justify-center'}`}>
                                 <div className="relative shrink-0 self-center">
-                                  <div className="bg-[#1E293B] text-white px-8 py-3 rounded-lg text-[11px] font-semibold shadow-xl whitespace-nowrap">{dept.deptName}</div>
+                                  <div className="bg-[#1E293B] text-white px-8 py-3 rounded-[12px] text-[11px] font-semibold shadow-xl whitespace-nowrap">{dept.deptName}</div>
                                   <div className="absolute left-1/2 -bottom-12 w-0.5 h-12 bg-[var(--toss-border)] -translate-x-1/2"></div>
                                 </div>
                                 {dept.heads?.length > 0 && (
@@ -267,7 +267,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                               <div className={`flex flex-row gap-6 items-start justify-start w-full pb-2 ${dept.deptName === '총무부' ? 'flex-wrap' : 'overflow-x-auto no-scrollbar'}`}>
                                 {dept.teams?.map((team: any, tIdx: number) => (
                                   <div key={tIdx} className="flex flex-col gap-4 bg-white/40 p-5 rounded-[2.5rem] border border-dashed border-[var(--toss-border)] shrink-0">
-                                    <p className="text-[10px] font-semibold text-[var(--toss-gray-3)] text-center mb-1">[{team.teamName}]</p>
+                                    <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] text-center mb-1">[{team.teamName}]</p>
                                     <div className="flex flex-col gap-3">
                                       {team.members.map((m: any) => (
                                         <StaffCardRow key={m.id} staff={m} onClick={() => setSelectedMember(m)} />
@@ -297,7 +297,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                             <div className="flex flex-row gap-4 overflow-x-auto pb-2 no-scrollbar">
                               {dept.teams?.map((t: any, tIdx: number) => (
                                 <div key={tIdx} className="flex flex-col gap-3 shrink-0 min-w-[140px]">
-                                  <p className="text-[10px] font-semibold text-[var(--toss-gray-3)] text-center">[{t.teamName}]</p>
+                                  <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] text-center">[{t.teamName}]</p>
                                   {t.members.map((m: any) => (
                                     <StaffCardRow key={m.id} staff={m} onClick={() => setSelectedMember(m)} />
                                   ))}
@@ -335,7 +335,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                     <div key={dIdx} className={`flex flex-col min-w-0 ${dept.deptName === '진료부' ? 'flex-grow-0 min-w-[11rem] max-w-[12rem] items-start' : dept.deptName === '총무부' ? 'flex-grow-0 min-w-0 items-center ml-auto' : 'flex-1 items-center'}`}>
                       <div className={`flex flex-row items-end gap-2 w-full mb-12 relative z-10 min-h-[88px] ${dept.deptName === '간호부' ? 'justify-start' : 'justify-center'}`}>
                         <div className="relative shrink-0 self-center">
-                          <div className="bg-[#1E293B] text-white px-8 py-3 rounded-lg text-[11px] font-semibold shadow-xl whitespace-nowrap">
+                          <div className="bg-[#1E293B] text-white px-8 py-3 rounded-[12px] text-[11px] font-semibold shadow-xl whitespace-nowrap">
                             {dept.deptName}
                           </div>
                           <div className="absolute left-1/2 -bottom-12 w-0.5 h-12 bg-[var(--toss-border)] -translate-x-1/2"></div>
@@ -352,7 +352,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                       <div className={`flex flex-row gap-6 items-start justify-start w-full pb-2 ${dept.deptName === '총무부' ? 'flex-wrap' : 'overflow-x-auto no-scrollbar'}`}>
                         {dept.teams.map((team: any, tIdx: number) => (
                           <div key={tIdx} className="flex flex-col gap-4 bg-white/40 p-5 rounded-[2.5rem] border border-dashed border-[var(--toss-border)] shrink-0">
-                            <p className="text-[10px] font-semibold text-[var(--toss-gray-3)] text-center mb-1">[{team.teamName}]</p>
+                            <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] text-center mb-1">[{team.teamName}]</p>
                             <div className="flex flex-col gap-3">
                               {team.members.map((m: any) => (
                                 <StaffCardRow key={m.id} staff={m} onClick={() => setSelectedMember(m)} />
@@ -388,7 +388,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                     <div className="flex flex-row gap-4 overflow-x-auto pb-2 no-scrollbar">
                       {dept.teams.map((t: any, tIdx: number) => (
                         <div key={tIdx} className="flex flex-col gap-3 shrink-0 min-w-[140px]">
-                          <p className="text-[10px] font-semibold text-[var(--toss-gray-3)] text-center">[{t.teamName}]</p>
+                          <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] text-center">[{t.teamName}]</p>
                           {t.members.map((m: any) => (
                             <StaffCardRow key={m.id} staff={m} onClick={() => setSelectedMember(m)} />
                           ))}
@@ -426,7 +426,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[110] flex items-end md:items-center justify-center p-0 md:p-4 animate-in fade-in duration-200" onClick={() => setSelectedMember(null)}>
           <div className="bg-[var(--toss-card)] w-full max-w-sm rounded-t-[2.5rem] md:rounded-[3rem] p-8 md:p-10 shadow-2xl animate-in slide-in-from-bottom md:zoom-in-95 duration-300" onClick={e => e.stopPropagation()}>
             <div className="flex flex-col items-center text-center">
-              <div className="w-24 h-24 md:w-28 md:h-28 bg-[var(--toss-gray-1)] rounded-[2rem] md:rounded-[2.5rem] mb-6 flex items-center justify-center text-5xl border-4 border-[var(--toss-card)] shadow-lg overflow-hidden">
+              <div className="w-24 h-24 md:w-28 md:h-28 bg-[var(--toss-gray-1)] rounded-[16px] md:rounded-[2.5rem] mb-6 flex items-center justify-center text-5xl border-4 border-[var(--toss-card)] shadow-lg overflow-hidden">
                 {(selectedMember.photo_url || selectedMember.avatar_url) ? (
                   <img
                     src={selectedMember.photo_url || selectedMember.avatar_url}
@@ -440,7 +440,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
               <h4 className="text-xl md:text-2xl font-semibold text-[var(--foreground)] tracking-tight">{selectedMember.name}</h4>
               <p className="text-[var(--toss-blue)] text-sm font-bold mt-2">{selectedMember.company} · {selectedMember.position}</p>
               
-              <div className="w-full mt-8 p-6 bg-[var(--toss-gray-1)] rounded-[1.5rem] md:rounded-[2rem] border border-[var(--toss-border)] space-y-4">
+              <div className="w-full mt-8 p-6 bg-[var(--toss-gray-1)] rounded-[16px] md:rounded-[16px] border border-[var(--toss-border)] space-y-4">
                 <div className="flex justify-between items-center text-xs">
                     <span className="font-semibold text-[var(--toss-gray-3)]">소속 부서</span>
                     <span className="font-semibold text-[var(--foreground)]">{selectedMember.department || '-'}</span>
@@ -458,7 +458,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                   </div>
                 )}
               </div>
-              <button onClick={() => setSelectedMember(null)} className="w-full py-4 md:py-5 bg-[#1E293B] text-white rounded-lg font-semibold text-xs mt-8 shadow-xl transition-all active:scale-95">닫기</button>
+              <button onClick={() => setSelectedMember(null)} className="w-full py-4 md:py-5 bg-[#1E293B] text-white rounded-[12px] font-semibold text-xs mt-8 shadow-xl transition-all active:scale-95">닫기</button>
             </div>
           </div>
         </div>
@@ -477,14 +477,14 @@ function StaffCardRow({ staff, onClick }: any) {
     <div
       onClick={onClick}
       className={`
-        relative flex flex-row items-center gap-3.5 p-2.5 pr-4 bg-[var(--toss-card)] border rounded-xl cursor-pointer transition-all group min-w-0
+        relative flex flex-row items-center gap-3.5 p-2.5 pr-4 bg-[var(--toss-card)] border rounded-[16px] cursor-pointer transition-all group min-w-0
         border-[var(--toss-border)] shadow-sm hover:shadow-lg hover:border-[var(--toss-blue)] hover:-translate-y-0.5
         ${isAdmin ? 'border-l-4 border-l-[var(--toss-danger)]' : ''}
       `}
     >
-      <div className={`w-[42px] h-[42px] shrink-0 rounded-lg flex items-center justify-center text-base overflow-hidden ${isAdmin ? 'bg-red-50 text-red-400' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] group-hover:bg-[var(--toss-blue-light)] group-hover:text-[var(--toss-blue)]'}`}>
+      <div className={`w-[42px] h-[42px] shrink-0 rounded-[12px] flex items-center justify-center text-base overflow-hidden ${isAdmin ? 'bg-red-50 text-red-400' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] group-hover:bg-[var(--toss-blue-light)] group-hover:text-[var(--toss-blue)]'}`}>
         {photoUrl ? (
-          <img src={photoUrl} alt={staff.name ?? ''} className="w-full h-full object-cover rounded-lg" />
+          <img src={photoUrl} alt={staff.name ?? ''} className="w-full h-full object-cover rounded-[12px]" />
         ) : (
           <span className="text-sm">印</span>
         )}

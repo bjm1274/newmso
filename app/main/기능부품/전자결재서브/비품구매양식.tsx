@@ -62,15 +62,15 @@ export default function SuppliesForm({ setExtraData, initialItems }: any) {
   return (
     <div className="border-t-2 border-b border-[var(--toss-border)] overflow-hidden bg-white rounded-none">
       <div className="p-4 bg-blue-50/50 border-b border-blue-100 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <p className="text-[10px] font-semibold text-[var(--toss-blue)] uppercase tracking-widest flex items-center gap-2">
+        <p className="text-[11px] font-semibold text-[var(--toss-blue)] uppercase tracking-widest flex items-center gap-2">
           <span className="w-2 h-2 bg-[var(--toss-blue)] rounded-full animate-pulse"></span> 실시간 재고 연동 모드 활성화
         </p>
-        <div className="flex items-center gap-2 text-[10px] font-semibold text-[var(--toss-gray-3)]">
+        <div className="flex items-center gap-2 text-[11px] font-semibold text-[var(--toss-gray-3)]">
           <span>수령부서 일괄 적용</span>
           <select
             value={bulkDept}
             onChange={e => setBulkDept(e.target.value)}
-            className="px-2 py-1 border border-[var(--toss-border)] rounded-lg bg-white text-[10px] font-bold"
+            className="px-2 py-1 border border-[var(--toss-border)] rounded-[12px] bg-white text-[11px] font-bold"
           >
             <option value="">선택...</option>
             {departments.map(d => (
@@ -81,14 +81,14 @@ export default function SuppliesForm({ setExtraData, initialItems }: any) {
             type="button"
             onClick={applyBulkDept}
             disabled={!bulkDept}
-            className="px-3 py-1 rounded-lg bg-gray-900 text-white text-[10px] font-semibold disabled:opacity-40"
+            className="px-3 py-1 rounded-[12px] bg-gray-900 text-white text-[11px] font-semibold disabled:opacity-40"
           >
             전체 적용
           </button>
         </div>
       </div>
       <table className="w-full text-left border-collapse">
-        <thead className="bg-[var(--toss-gray-1)] text-[10px] font-semibold text-[var(--toss-gray-3)] border-b border-[var(--toss-border)]">
+        <thead className="bg-[var(--toss-gray-1)] text-[11px] font-semibold text-[var(--toss-gray-3)] border-b border-[var(--toss-border)]">
           <tr>
             <th className="p-4">품목명 (재고 검색)</th>
             <th className="p-4 w-24 text-center">현재고</th>
@@ -116,7 +116,7 @@ export default function SuppliesForm({ setExtraData, initialItems }: any) {
                         className="p-3 text-[11px] font-bold hover:bg-blue-50 cursor-pointer border-b last:border-none flex justify-between items-center"
                       >
                         <span>{s.name}</span>
-                        <span className={`px-2 py-0.5 text-[9px] font-semibold rounded ${s.stock <= s.min_stock ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+                        <span className={`px-2 py-0.5 text-[11px] font-semibold rounded ${s.stock <= s.min_stock ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
                           재고: {s.stock}
                         </span>
                       </div>

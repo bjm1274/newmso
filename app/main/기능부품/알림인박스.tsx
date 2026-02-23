@@ -99,7 +99,7 @@ export default function NotificationInbox({ user, onRefresh }: any) {
         <h2 className="text-xl md:text-2xl font-semibold text-[var(--foreground)] tracking-tighter italic">
           알림 센터
         </h2>
-        <p className="text-[10px] md:text-xs text-[var(--toss-gray-3)] font-bold uppercase mt-1 tracking-widest">
+        <p className="text-[11px] md:text-xs text-[var(--toss-gray-3)] font-bold uppercase mt-1 tracking-widest">
           전체 알림 · 읽음/안읽음 필터
         </p>
 
@@ -109,7 +109,7 @@ export default function NotificationInbox({ user, onRefresh }: any) {
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                className={`px-4 py-2 rounded-[16px] text-xs font-bold transition-all ${
                   filter === f
                     ? 'bg-[var(--toss-blue)] text-white'
                     : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] hover:bg-[var(--toss-border)]'
@@ -157,7 +157,7 @@ export default function NotificationInbox({ user, onRefresh }: any) {
                 <div
                   key={n.id}
                   onClick={() => handleNotificationClick(n)}
-                  className={`p-4 rounded-lg border cursor-pointer transition-all ${
+                  className={`p-4 rounded-[12px] border cursor-pointer transition-all ${
                     n.is_read
                       ? 'bg-[var(--toss-card)] border-[var(--toss-border)] opacity-70'
                       : `border-l-4 ${style.color}`
@@ -176,7 +176,7 @@ export default function NotificationInbox({ user, onRefresh }: any) {
                       <p className="text-xs text-[var(--toss-gray-3)] mt-1 line-clamp-2">
                         {n.body}
                       </p>
-                      <p className="text-[10px] text-[var(--toss-gray-3)] mt-2">
+                      <p className="text-[11px] text-[var(--toss-gray-3)] mt-2">
                         {new Date(n.created_at).toLocaleString('ko-KR')}
                       </p>
                     </div>

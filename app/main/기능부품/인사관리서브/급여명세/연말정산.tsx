@@ -147,31 +147,31 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: any) {
       </div>
 
       <div className="grid grid-cols-4 gap-3">
-        <div className="bg-[var(--page-bg)] p-4 rounded-lg border border-[var(--toss-border)]">
+        <div className="bg-[var(--page-bg)] p-4 rounded-[12px] border border-[var(--toss-border)]">
           <p className="text-xs font-medium text-[var(--toss-gray-3)] mb-1">총 급여액</p>
           <p className="text-lg font-semibold text-[var(--foreground)]">
             ₩{settlementData.reduce((sum, item) => sum + item.total_salary, 0).toLocaleString()}
           </p>
         </div>
-        <div className="bg-[var(--page-bg)] p-4 rounded-lg border border-[var(--toss-border)]">
+        <div className="bg-[var(--page-bg)] p-4 rounded-[12px] border border-[var(--toss-border)]">
           <p className="text-xs font-medium text-emerald-600 mb-1">총 환급액</p>
           <p className="text-lg font-semibold text-emerald-700">
             ₩{settlementData.filter(item => item.refund_or_additional > 0).reduce((sum, item) => sum + item.refund_or_additional, 0).toLocaleString()}
           </p>
         </div>
-        <div className="bg-[var(--page-bg)] p-4 rounded-lg border border-[var(--toss-border)]">
+        <div className="bg-[var(--page-bg)] p-4 rounded-[12px] border border-[var(--toss-border)]">
           <p className="text-xs font-medium text-red-600 mb-1">총 추가납부</p>
           <p className="text-lg font-semibold text-red-700">
             ₩{Math.abs(settlementData.filter(item => item.refund_or_additional < 0).reduce((sum, item) => sum + item.refund_or_additional, 0)).toLocaleString()}
           </p>
         </div>
-        <div className="bg-[var(--page-bg)] p-4 rounded-lg border border-[var(--toss-border)]">
+        <div className="bg-[var(--page-bg)] p-4 rounded-[12px] border border-[var(--toss-border)]">
           <p className="text-xs font-medium text-[var(--toss-gray-3)] mb-1">정산 대상</p>
           <p className="text-lg font-semibold text-[var(--foreground)]">{settlementData.length}명</p>
         </div>
       </div>
 
-      <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-lg overflow-hidden">
+      <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-[12px] overflow-hidden">
         <div className="p-4 border-b border-[var(--toss-border)] bg-[var(--tab-bg)]">
           <h3 className="text-sm font-semibold text-[var(--foreground)]">연말정산 현황</h3>
         </div>
@@ -252,7 +252,7 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: any) {
 
       {showCertificate && selectedStaff && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]">
-          <div className="bg-[var(--toss-card)] rounded-lg p-6 w-full max-w-2xl shadow-xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-[var(--toss-card)] rounded-[12px] p-6 w-full max-w-2xl shadow-xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-base font-semibold text-[var(--foreground)]">근로소득 원천징수영수증</h3>
               <button
@@ -263,26 +263,26 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: any) {
               </button>
             </div>
 
-            <div className="bg-[var(--page-bg)] p-4 rounded-lg font-mono text-sm whitespace-pre-wrap mb-4 border border-[var(--toss-border)]">
+            <div className="bg-[var(--page-bg)] p-4 rounded-[12px] font-mono text-sm whitespace-pre-wrap mb-4 border border-[var(--toss-border)]">
               {generateWithholdingCertificate(selectedStaff)}
             </div>
 
             <div className="flex gap-2">
               <button
                 onClick={() => setShowCertificate(false)}
-                className="flex-1 py-2.5 bg-[var(--toss-gray-1)] text-[var(--foreground)] rounded-lg text-sm font-medium hover:opacity-90"
+                className="flex-1 py-2.5 bg-[var(--toss-gray-1)] text-[var(--foreground)] rounded-[12px] text-sm font-medium hover:opacity-90"
               >
                 닫기
               </button>
               <button
                 onClick={() => downloadCertificate(selectedStaff)}
-                className="flex-1 py-2.5 bg-[var(--foreground)] text-white rounded-lg text-sm font-medium hover:opacity-90"
+                className="flex-1 py-2.5 bg-[var(--foreground)] text-white rounded-[12px] text-sm font-medium hover:opacity-90"
               >
                 다운로드
               </button>
               <button
                 onClick={() => sendCertificateEmail(selectedStaff)}
-                className="flex-1 py-2.5 bg-[var(--toss-blue)] text-white rounded-lg text-sm font-medium hover:opacity-90"
+                className="flex-1 py-2.5 bg-[var(--toss-blue)] text-white rounded-[12px] text-sm font-medium hover:opacity-90"
               >
                 이메일 발송
               </button>

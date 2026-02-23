@@ -29,7 +29,7 @@ export default function SeveranceLeaveDashboard({ staffs = [] }: any) {
   });
 
   return (
-    <div className="border border-[var(--toss-border)] p-4 bg-[var(--toss-card)] rounded-lg shadow-sm">
+    <div className="border border-[var(--toss-border)] p-4 bg-[var(--toss-card)] rounded-[12px] shadow-sm">
       <div className="pb-2 border-b border-[var(--toss-border)] mb-3">
         <h3 className="text-sm font-semibold text-[var(--foreground)]">예상 퇴직금 · 연차</h3>
       </div>
@@ -43,10 +43,10 @@ export default function SeveranceLeaveDashboard({ staffs = [] }: any) {
       </div>
       <div className="max-h-[320px] overflow-y-auto space-y-2 custom-scrollbar">
         {items.map((x: any) => (
-          <div key={x.id} className="p-3 bg-[var(--page-bg)] rounded-lg border border-[var(--toss-border)]">
+          <div key={x.id} className="p-3 bg-[var(--page-bg)] rounded-[12px] border border-[var(--toss-border)]">
             <div className="flex justify-between items-start mb-1.5">
               <span className="text-sm font-semibold text-[var(--foreground)]">{x.name}</span>
-              <span className="text-[10px] text-[var(--toss-gray-3)]">{formatWorkPeriod(x.workDays)}</span>
+              <span className="text-[11px] text-[var(--toss-gray-3)]">{formatWorkPeriod(x.workDays)}</span>
             </div>
             <div className="flex justify-between text-xs">
               <span className="font-medium text-[var(--toss-gray-4)]">예상 퇴직금</span>

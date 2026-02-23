@@ -523,7 +523,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
         <header className="flex justify-between items-end shrink-0">
           <div>
             <h2 className="text-xl md:text-2xl font-bold text-[var(--foreground)] tracking-tight">게시판</h2>
-            <p className="text-[10px] md:text-xs text-[var(--toss-gray-3)] font-bold uppercase mt-1">병원 공지 및 일정 관리</p>
+            <p className="text-[11px] md:text-xs text-[var(--toss-gray-3)] font-bold uppercase mt-1">병원 공지 및 일정 관리</p>
           </div>
         </header>
 
@@ -601,7 +601,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
                 </div>
               ) : (
                 <>
-                  <label className="text-[10px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">제목</label>
+                  <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">제목</label>
                   <input
                     value={title}
                     onChange={e => setTitle(e.target.value)}
@@ -616,7 +616,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-[10px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">날짜 (YYYY-MM-DD)</label>
+                    <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">날짜 (YYYY-MM-DD)</label>
                     <input
                       type="text"
                       value={scheduleDate}
@@ -637,7 +637,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">시간</label>
+                    <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">시간</label>
                     <div className="grid grid-cols-3 gap-2">
                       <select
                         value={schedulePeriod}
@@ -688,11 +688,11 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-[10px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">수술실/검사실</label>
+                    <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">수술실/검사실</label>
                     <input value={scheduleRoom} onChange={e => setScheduleRoom(e.target.value)} placeholder="예: 수술실 1" className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20" />
                   </div>
                   <div>
-                    <label className="text-[10px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">환자명</label>
+                    <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">환자명</label>
                     <input value={schedulePatient} onChange={e => setSchedulePatient(e.target.value)} placeholder="환자명 입력" className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20" />
                   </div>
                 </div>
@@ -756,7 +756,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
             ) : (
               <>
                 <div>
-                  <label className="text-[10px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">태그 (쉼표로 구분)</label>
+                  <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">태그 (쉼표로 구분)</label>
                   <input
                     value={tagsInput}
                     onChange={(e) => setTagsInput(e.target.value)}
@@ -765,7 +765,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">내용</label>
+                  <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">내용</label>
                   <textarea
                   value={content}
                   onChange={e => setContent(e.target.value)}
@@ -774,7 +774,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
                 />
                 </div>
                 <div>
-                  <label className="text-[10px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">사진·동영상·파일 첨부</label>
+                  <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">사진·동영상·파일 첨부</label>
                   <input
                     type="file"
                     multiple
@@ -784,7 +784,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
                       setAttachmentFiles((prev) => [...prev, ...files].slice(0, 10));
                       e.target.value = '';
                     }}
-                    className="w-full text-sm font-bold text-[var(--toss-gray-4)] file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-[var(--toss-blue-light)] file:text-[var(--toss-blue)] file:font-bold"
+                    className="w-full text-sm font-bold text-[var(--toss-gray-4)] file:mr-3 file:py-2 file:px-4 file:rounded-[12px] file:border-0 file:bg-[var(--toss-blue-light)] file:text-[var(--toss-blue)] file:font-bold"
                   />
                   {attachmentFiles.length > 0 && (
                     <div className="mt-3 space-y-3">
@@ -796,13 +796,13 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
                           return (
                             <div key={i} className="relative group">
                               {isImg && (
-                                <img src={url} alt={f.name} className="w-24 h-24 object-cover rounded-xl border border-[var(--toss-border)]" />
+                                <img src={url} alt={f.name} className="w-24 h-24 object-cover rounded-[16px] border border-[var(--toss-border)]" />
                               )}
                               {isVideo && (
-                                <video src={url} className="w-40 h-24 object-cover rounded-xl border border-[var(--toss-border)]" muted playsInline />
+                                <video src={url} className="w-40 h-24 object-cover rounded-[16px] border border-[var(--toss-border)]" muted playsInline />
                               )}
                               {!isImg && !isVideo && (
-                                <div className="w-24 h-24 rounded-xl border border-[var(--toss-border)] bg-[var(--toss-gray-1)] flex items-center justify-center text-[10px] font-bold text-[var(--toss-gray-4)] truncate px-1">
+                                <div className="w-24 h-24 rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] flex items-center justify-center text-[11px] font-bold text-[var(--toss-gray-4)] truncate px-1">
                                   📎 {f.name}
                                 </div>
                               )}
@@ -824,7 +824,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
                             <button
                               type="button"
                               onClick={() => setAttachmentFiles((prev) => prev.filter((_, idx) => idx !== i))}
-                              className="shrink-0 px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 text-[10px]"
+                              className="shrink-0 px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 text-[11px]"
                             >
                               삭제
                             </button>
@@ -918,7 +918,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
             <div className="flex-1 flex flex-col">
               <div className="flex items-center justify-between mb-2">
                 <div>
-                  <p className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
+                  <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
                     {activeBoard === '수술일정' ? '수술명 선택' : '검사명 선택'}
                   </p>
                   <p className="text-xs font-bold text-[var(--toss-gray-4)] mt-1">
@@ -928,7 +928,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
                 <button
                   type="button"
                   onClick={() => setShowBodyPicker(false)}
-                  className="px-3 py-1.5 rounded-full border border-[var(--toss-border)] text-[10px] font-bold text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]"
+                  className="px-3 py-1.5 rounded-full border border-[var(--toss-border)] text-[11px] font-bold text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]"
                 >
                   닫기
                 </button>
@@ -969,7 +969,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
         <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] shadow-sm p-4 md:p-6 space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
+              <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
                 {activeBoard === '수술일정' ? '수술 일정 캘린더' : 'MRI 일정 캘린더'}
               </p>
               <h3 className="text-lg md:text-xl font-semibold text-[var(--foreground)] mt-1">
@@ -1041,7 +1041,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
 
               return (
                 <div className="border border-[var(--toss-border)] rounded-[16px] overflow-hidden">
-                  <div className="grid grid-cols-7 bg-[var(--toss-gray-1)] text-[10px] font-semibold text-[var(--toss-gray-3)]">
+                  <div className="grid grid-cols-7 bg-[var(--toss-gray-1)] text-[11px] font-semibold text-[var(--toss-gray-3)]">
                     {['일', '월', '화', '수', '목', '금', '토'].map((d) => (
                       <div key={d} className="px-2 py-2 text-center">
                         {d}
@@ -1062,7 +1062,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
                         >
                           <div className="flex items-center justify-between mb-1">
                             <span
-                              className={`text-[10px] font-semibold ${
+                              className={`text-[11px] font-semibold ${
                                 !inMonth ? 'text-[var(--toss-gray-3)]' : d.getDay() === 0
                                 ? 'text-red-500'
                                 : d.getDay() === 6
@@ -1076,7 +1076,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
                               <button
                                 type="button"
                                 onClick={() => events[0] && setSelectedPostId(events[0].id)}
-                                className="text-[9px] font-semibold text-[var(--toss-blue)] px-1 py-0.5 rounded-full hover:bg-[var(--toss-blue-light)]"
+                                className="text-[11px] font-semibold text-[var(--toss-blue)] px-1 py-0.5 rounded-full hover:bg-[var(--toss-blue-light)]"
                               >
                                 {events.length}건
                               </button>
@@ -1088,13 +1088,13 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
                                 key={ev.id}
                                 type="button"
                                 onClick={() => setSelectedPostId(ev.id)}
-                                className="w-full text-left px-1 py-0.5 rounded-[6px] bg-[var(--toss-blue-light)] text-[9px] font-bold text-[var(--toss-blue)] truncate hover:bg-[var(--toss-blue-light)]"
+                                className="w-full text-left px-1 py-0.5 rounded-[6px] bg-[var(--toss-blue-light)] text-[11px] font-bold text-[var(--toss-blue)] truncate hover:bg-[var(--toss-blue-light)]"
                               >
                                 {ev.schedule_time || ''} {ev.title}
                               </button>
                             ))}
                             {events.length > 3 && (
-                              <p className="text-[9px] text-[var(--toss-gray-3)] font-bold">
+                              <p className="text-[11px] text-[var(--toss-gray-3)] font-bold">
                                 + {events.length - 3}건 더보기
                               </p>
                             )}
@@ -1130,7 +1130,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
                       <h3 className="font-bold text-[var(--foreground)] text-base md:text-lg line-clamp-1">{post.title}</h3>
                       <p className="text-[11px] text-[var(--toss-blue)] font-bold mt-1 uppercase tracking-widest">{post.patient_name || '환자명 미지정'}</p>
                     </div>
-                    <span className={`px-2 py-1 rounded-lg text-[8px] font-semibold shrink-0 ${
+                    <span className={`px-2 py-1 rounded-[12px] text-[11px] font-semibold shrink-0 ${
                       activeBoard === '수술일정' ? 'bg-red-100 text-red-600' : 'bg-purple-100 text-purple-600'
                     }`}>
                       {activeBoard === '수술일정' ? '🏥 수술' : '🔬 MRI'}
@@ -1138,42 +1138,42 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
                   </div>
                   <div className="grid grid-cols-3 gap-2 pt-4 border-t border-[var(--toss-border)]">
                     <div>
-                      <p className="text-[8px] font-bold text-[var(--toss-gray-3)] uppercase">날짜</p>
+                      <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">날짜</p>
                       <p className="text-[11px] font-semibold text-[var(--foreground)]">{post.schedule_date}</p>
                     </div>
                     <div>
-                      <p className="text-[8px] font-bold text-[var(--toss-gray-3)] uppercase">시간</p>
+                      <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">시간</p>
                       <p className="text-[11px] font-semibold text-[var(--foreground)]">{post.schedule_time}</p>
                     </div>
                     <div>
-                      <p className="text-[8px] font-bold text-[var(--toss-gray-3)] uppercase">위치</p>
+                      <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">위치</p>
                       <p className="text-[11px] font-semibold text-[var(--foreground)] line-clamp-1">{post.schedule_room}</p>
                     </div>
                   </div>
                   {(post.surgery_fasting || post.surgery_inpatient || post.surgery_guardian || post.surgery_caregiver || post.surgery_transfusion) && (
                     <div className="pt-2 flex flex-wrap gap-1 items-center">
                       {post.surgery_fasting && (
-                        <span className="px-2 py-1 rounded-full bg-red-50 text-red-600 text-[9px] font-semibold">
+                        <span className="px-2 py-1 rounded-full bg-red-50 text-red-600 text-[11px] font-semibold">
                           금식
                         </span>
                       )}
                       {post.surgery_inpatient && (
-                        <span className="px-2 py-1 rounded-full bg-[var(--toss-blue-light)] text-[var(--toss-blue)] text-[9px] font-semibold">
+                        <span className="px-2 py-1 rounded-full bg-[var(--toss-blue-light)] text-[var(--toss-blue)] text-[11px] font-semibold">
                           입원
                         </span>
                       )}
                       {post.surgery_guardian && (
-                        <span className="px-2 py-1 rounded-full bg-emerald-50 text-emerald-600 text-[9px] font-semibold">
+                        <span className="px-2 py-1 rounded-full bg-emerald-50 text-emerald-600 text-[11px] font-semibold">
                           보호자 동반
                         </span>
                       )}
                       {post.surgery_caregiver && (
-                        <span className="px-2 py-1 rounded-full bg-purple-50 text-purple-600 text-[9px] font-semibold">
+                        <span className="px-2 py-1 rounded-full bg-purple-50 text-purple-600 text-[11px] font-semibold">
                           간병인
                         </span>
                       )}
                       {post.surgery_transfusion && (
-                        <span className="px-2 py-1 rounded-full bg-red-50 text-red-700 text-[9px] font-semibold ml-auto">
+                        <span className="px-2 py-1 rounded-full bg-red-50 text-red-700 text-[11px] font-semibold ml-auto">
                           수혈
                         </span>
                       )}
@@ -1182,7 +1182,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
                 </div>
               ) : (
                 <div className="flex items-center gap-3 text-[11px] md:text-xs">
-                  <div className="w-8 text-center text-[10px] font-bold text-[var(--toss-gray-3)] shrink-0">
+                  <div className="w-8 text-center text-[11px] font-bold text-[var(--toss-gray-3)] shrink-0">
                     {rowNumber}
                   </div>
                   <div className="flex-1 min-w-0 flex items-center gap-1.5">
@@ -1193,13 +1193,13 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
                       <span className="shrink-0 text-[var(--toss-gray-3)]" title="첨부파일 있음">📎</span>
                     )}
                   </div>
-                  <div className="hidden md:flex w-32 text-[10px] font-bold text-[var(--toss-gray-3)] justify-center shrink-0">
+                  <div className="hidden md:flex w-32 text-[11px] font-bold text-[var(--toss-gray-3)] justify-center shrink-0">
                     {post.author_name || '익명'}
                   </div>
-                  <div className="w-20 md:w-24 text-[10px] font-bold text-[var(--toss-gray-3)] text-center shrink-0">
+                  <div className="w-20 md:w-24 text-[11px] font-bold text-[var(--toss-gray-3)] text-center shrink-0">
                     {new Date(post.created_at).toLocaleDateString()}
                   </div>
-                  <div className="w-14 text-[10px] font-bold text-[var(--toss-gray-3)] text-center shrink-0">
+                  <div className="w-14 text-[11px] font-bold text-[var(--toss-gray-3)] text-center shrink-0">
                     조회 {post.views ?? 0}
                   </div>
                 </div>
@@ -1255,17 +1255,17 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
             <div className="space-y-4 border-t border-[var(--toss-border)] pt-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-[11px] font-bold text-[var(--toss-gray-4)]">
                 <div>
-                  <p className="text-[9px] font-semibold text-[var(--toss-gray-3)] uppercase">수술/검사명</p>
+                  <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">수술/검사명</p>
                   <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">{selectedPost.title}</p>
                 </div>
                 <div>
-                  <p className="text-[9px] font-semibold text-[var(--toss-gray-3)] uppercase">날짜·시간</p>
+                  <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">날짜·시간</p>
                   <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">
                     {selectedPost.schedule_date} {selectedPost.schedule_time}
                   </p>
                 </div>
                 <div>
-                  <p className="text-[9px] font-semibold text-[var(--toss-gray-3)] uppercase">위치 / 환자명</p>
+                  <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">위치 / 환자명</p>
                   <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">
                     {selectedPost.schedule_room || '-'} / {selectedPost.patient_name || '-'}
                   </p>
@@ -1278,30 +1278,30 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
                 selectedPost.surgery_caregiver ||
                 selectedPost.surgery_transfusion) && (
                 <div className="bg-[var(--page-bg)] border border-[var(--toss-border)] rounded-[12px] p-3 space-y-1 text-[11px] font-bold text-[var(--toss-gray-4)]">
-                  <p className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">수술/검사 준비 상태</p>
+                  <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">수술/검사 준비 상태</p>
                   <div className="flex flex-wrap gap-1 pt-1">
                     {selectedPost.surgery_fasting && (
-                      <span className="px-2 py-1 rounded-full bg-red-50 text-red-600 text-[9px] font-semibold">
+                      <span className="px-2 py-1 rounded-full bg-red-50 text-red-600 text-[11px] font-semibold">
                         금식
                       </span>
                     )}
                     {selectedPost.surgery_inpatient && (
-                      <span className="px-2 py-1 rounded-full bg-[var(--toss-blue-light)] text-[var(--toss-blue)] text-[9px] font-semibold">
+                      <span className="px-2 py-1 rounded-full bg-[var(--toss-blue-light)] text-[var(--toss-blue)] text-[11px] font-semibold">
                         입원
                       </span>
                     )}
                     {selectedPost.surgery_guardian && (
-                      <span className="px-2 py-1 rounded-full bg-emerald-50 text-emerald-600 text-[9px] font-semibold">
+                      <span className="px-2 py-1 rounded-full bg-emerald-50 text-emerald-600 text-[11px] font-semibold">
                         보호자 동반
                       </span>
                     )}
                     {selectedPost.surgery_caregiver && (
-                      <span className="px-2 py-1 rounded-full bg-purple-50 text-purple-600 text-[9px] font-semibold">
+                      <span className="px-2 py-1 rounded-full bg-purple-50 text-purple-600 text-[11px] font-semibold">
                         간병인
                       </span>
                     )}
                     {selectedPost.surgery_transfusion && (
-                      <span className="px-2 py-1 rounded-full bg-red-100 text-red-700 text-[9px] font-semibold">
+                      <span className="px-2 py-1 rounded-full bg-red-100 text-red-700 text-[11px] font-semibold">
                         수혈 필요
                       </span>
                     )}
@@ -1311,7 +1311,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
 
               {/* 같은 날짜의 전체 일정 목록 */}
               <div className="bg-[var(--page-bg)] border border-[var(--toss-border)] rounded-[12px] p-3 space-y-2">
-                <p className="text-[10px] font-semibold text-[var(--toss-gray-4)] flex items-center gap-2">
+                <p className="text-[11px] font-semibold text-[var(--toss-gray-4)] flex items-center gap-2">
                   📅 {selectedPost.schedule_date || '날짜 미지정'} 의 전체 일정
                 </p>
                 <div className="max-h-40 overflow-y-auto custom-scrollbar space-y-1 text-[11px]">
@@ -1330,13 +1330,13 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
                           p.id === selectedPost.id ? 'bg-[var(--toss-card)] shadow-sm border border-[var(--toss-border)]' : ''
                         }`}
                       >
-                        <span className="text-[10px] font-bold text-[var(--toss-gray-3)] w-14 shrink-0">
+                        <span className="text-[11px] font-bold text-[var(--toss-gray-3)] w-14 shrink-0">
                           {p.schedule_time || ''}
                         </span>
                         <span className="flex-1 truncate font-bold text-[var(--foreground)]">
                           {p.title}
                         </span>
-                        <span className="text-[10px] font-bold text-[var(--toss-blue)] shrink-0">
+                        <span className="text-[11px] font-bold text-[var(--toss-blue)] shrink-0">
                           {p.patient_name || ''}
                         </span>
                       </button>
@@ -1356,7 +1356,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
 
           {(Array.isArray(selectedPost.attachments) ? selectedPost.attachments : []).length > 0 && (
             <div className="pt-4 border-t border-[var(--toss-border)]">
-              <p className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-2">첨부파일 ({(Array.isArray(selectedPost.attachments) ? selectedPost.attachments : []).length}개)</p>
+              <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-2">첨부파일 ({(Array.isArray(selectedPost.attachments) ? selectedPost.attachments : []).length}개)</p>
               <div className="flex flex-wrap gap-4">
                 {(Array.isArray(selectedPost.attachments) ? selectedPost.attachments : []).map((att: any, i: number) =>
                   att.type === 'image' ? (
@@ -1367,7 +1367,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
                         loading="eager"
                         decoding="async"
                         referrerPolicy="no-referrer"
-                        className="max-w-[280px] max-h-[280px] rounded-xl border border-[var(--toss-border)] object-cover shadow-sm bg-[var(--toss-gray-1)]"
+                        className="max-w-[280px] max-h-[280px] rounded-[16px] border border-[var(--toss-border)] object-cover shadow-sm bg-[var(--toss-gray-1)]"
                         onError={(e) => {
                           const el = e.target as HTMLImageElement;
                           el.alt = '이미지를 불러올 수 없습니다.';
@@ -1376,12 +1376,12 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
                       />
                     </a>
                   ) : att.type === 'video' ? (
-                    <div key={i} className="rounded-xl border border-[var(--toss-border)] overflow-hidden bg-black max-w-[320px]">
+                    <div key={i} className="rounded-[16px] border border-[var(--toss-border)] overflow-hidden bg-black max-w-[320px]">
                       <video src={att.url} controls className="w-full max-h-[240px]" preload="metadata" />
                       <p className="text-[11px] font-bold text-[var(--toss-gray-4)] p-2 bg-[var(--page-bg)] truncate">{att.name}</p>
                     </div>
                   ) : (
-                    <a key={i} href={att.url} target="_blank" rel="noopener noreferrer" download={att.name} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--toss-gray-1)] border border-[var(--toss-border)] text-sm font-bold text-[var(--toss-blue)] hover:bg-[var(--toss-blue-light)]">
+                    <a key={i} href={att.url} target="_blank" rel="noopener noreferrer" download={att.name} className="inline-flex items-center gap-2 px-3 py-2 rounded-[16px] bg-[var(--toss-gray-1)] border border-[var(--toss-border)] text-sm font-bold text-[var(--toss-blue)] hover:bg-[var(--toss-blue-light)]">
                       📎 {att.name}
                     </a>
                   )
@@ -1396,7 +1396,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
                 (tag: string, i: number) => (
                   <span
                     key={i}
-                    className="px-2 py-0.5 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] rounded-full text-[9px] font-bold"
+                    className="px-2 py-0.5 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] rounded-full text-[11px] font-bold"
                   >
                     #{tag}
                   </span>
@@ -1409,7 +1409,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
           <div className="pt-4 border-t border-[var(--toss-border)] space-y-3">
             <p className="text-[11px] font-semibold text-[var(--toss-gray-4)] flex items-center gap-2">
               💬 댓글
-              <span className="text-[10px] text-[var(--toss-gray-3)] font-bold">
+              <span className="text-[11px] text-[var(--toss-gray-3)] font-bold">
                 {(comments[selectedPost.id] || []).length}개
               </span>
             </p>
@@ -1438,7 +1438,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
                                 setReplyParentId(c.id);
                                 setNewComment('');
                               }}
-                              className="text-[10px] text-[var(--toss-gray-3)] hover:text-[var(--toss-blue)]"
+                              className="text-[11px] text-[var(--toss-gray-3)] hover:text-[var(--toss-blue)]"
                             >
                               답글
                             </button>
@@ -1447,7 +1447,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
                             <button
                               type="button"
                               onClick={() => handleDeleteComment(selectedPost.id, c.id)}
-                              className="text-[10px] text-[var(--toss-gray-3)] hover:text-[#F04452]"
+                              className="text-[11px] text-[var(--toss-gray-3)] hover:text-[#F04452]"
                             >
                               삭제
                             </button>
@@ -1462,7 +1462,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
                             <button
                               type="button"
                               onClick={() => handleDeleteComment(selectedPost.id, r.id)}
-                              className="text-[10px] text-[var(--toss-gray-3)] hover:text-[#F04452] shrink-0"
+                              className="text-[11px] text-[var(--toss-gray-3)] hover:text-[#F04452] shrink-0"
                             >
                               삭제
                             </button>
@@ -1483,7 +1483,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
                 onChange={(e) => setNewComment(e.target.value)}
                 placeholder={user?.id ? '댓글을 입력하세요.' : '로그인한 후 댓글을 입력할 수 있습니다.'}
                 disabled={!user?.id}
-                className="flex-1 px-3 py-2 border border-[var(--toss-border)] rounded-lg text-xs disabled:bg-[var(--page-bg)] disabled:text-[var(--toss-gray-3)]"
+                className="flex-1 px-3 py-2 border border-[var(--toss-border)] rounded-[12px] text-xs disabled:bg-[var(--page-bg)] disabled:text-[var(--toss-gray-3)]"
               />
               <button
                 type="button"

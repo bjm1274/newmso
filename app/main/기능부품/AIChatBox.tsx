@@ -56,7 +56,7 @@ export function AIChatBox({
 
   return (
     <div
-      className={`flex flex-col bg-white border border-[var(--toss-border)] rounded-lg shadow-sm overflow-hidden ${className}`}
+      className={`flex flex-col bg-white border border-[var(--toss-border)] rounded-[12px] shadow-sm overflow-hidden ${className}`}
       style={{ height }}
     >
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
@@ -71,7 +71,7 @@ export function AIChatBox({
                     key={i}
                     onClick={() => onSendMessage(prompt)}
                     disabled={isLoading}
-                    className="px-4 py-2 text-xs font-bold bg-[var(--toss-gray-1)] hover:bg-[var(--toss-gray-2)] rounded-xl transition-colors disabled:opacity-50"
+                    className="px-4 py-2 text-xs font-bold bg-[var(--toss-gray-1)] hover:bg-[var(--toss-gray-2)] rounded-[16px] transition-colors disabled:opacity-50"
                   >
                     {prompt}
                   </button>
@@ -86,7 +86,7 @@ export function AIChatBox({
               className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               <div
-                className={`max-w-[85%] px-4 py-2.5 rounded-lg text-sm ${
+                className={`max-w-[85%] px-4 py-2.5 rounded-[12px] text-sm ${
                   msg.role === 'user'
                     ? 'bg-[var(--toss-blue)] text-white'
                     : 'bg-[var(--toss-gray-1)] text-[var(--foreground)]'
@@ -100,7 +100,7 @@ export function AIChatBox({
 
         {isLoading && (
           <div className="flex justify-start">
-            <div className="px-4 py-2.5 rounded-lg bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] text-sm">
+            <div className="px-4 py-2.5 rounded-[12px] bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] text-sm">
               <span className="animate-pulse">답변 생성 중...</span>
             </div>
           </div>
@@ -117,12 +117,12 @@ export function AIChatBox({
           onChange={(e) => setInput(e.target.value)}
           placeholder={placeholder}
           disabled={isLoading}
-          className="flex-1 px-4 py-3 rounded-xl border border-[var(--toss-border)] bg-white text-sm font-medium outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
+          className="flex-1 px-4 py-3 rounded-[16px] border border-[var(--toss-border)] bg-white text-sm font-medium outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
         />
         <button
           type="submit"
           disabled={!input.trim() || isLoading}
-          className="px-5 py-3 bg-[var(--toss-blue)] text-white rounded-xl font-bold text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          className="px-5 py-3 bg-[var(--toss-blue)] text-white rounded-[16px] font-bold text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
         >
           전송
         </button>

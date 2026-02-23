@@ -153,7 +153,7 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
             )}
           </>
         ) : (
-          <div className="h-full flex items-center justify-center bg-[var(--toss-card)] border border-dashed border-[var(--toss-border)] rounded-[2rem] p-20">
+          <div className="h-full flex items-center justify-center bg-[var(--toss-card)] border border-dashed border-[var(--toss-border)] rounded-[16px] p-20">
             <p className="text-sm font-medium text-[var(--toss-gray-3)]">
               &quot;{selectedCo}&quot; 소속 인원이 없습니다.
             </p>
@@ -179,7 +179,7 @@ function BenefitSummary({ staff }: { staff: Staff }) {
         <div className="flex justify-between"><span>국민연금 회사부담</span><span className="text-red-600">-{pension.toLocaleString()}원</span></div>
         <div className="flex justify-between"><span>건강보험 회사부담</span><span className="text-red-600">-{health.toLocaleString()}원</span></div>
       </div>
-      <p className="mt-2 text-[10px] text-[var(--toss-gray-3)]">* Supabase 연동 후 자동 반영 예정</p>
+      <p className="mt-2 text-[11px] text-[var(--toss-gray-3)]">* Supabase 연동 후 자동 반영 예정</p>
     </div>
   );
 }
@@ -204,7 +204,7 @@ function SalarySimulationSummary({ staff }: { staff: Staff }) {
           </div>
         ))}
       </div>
-      <p className="mt-2 text-[10px] text-[var(--toss-gray-3)]">* 시나리오 저장/비교 연동 예정</p>
+      <p className="mt-2 text-[11px] text-[var(--toss-gray-3)]">* 시나리오 저장/비교 연동 예정</p>
     </div>
   );
 }

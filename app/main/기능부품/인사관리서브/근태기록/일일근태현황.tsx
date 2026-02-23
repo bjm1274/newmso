@@ -1,7 +1,7 @@
 'use client';
 export default function DailyView({ date, dailyData, onEdit }: any) {
   return (
-    <div className="bg-white rounded-[2rem] border border-[var(--toss-border)] shadow-sm overflow-hidden h-full">
+    <div className="bg-white rounded-[16px] border border-[var(--toss-border)] shadow-sm overflow-hidden h-full">
       <div className="p-6 border-b border-gray-50 sticky top-0 bg-white z-10"><h3 className="font-bold text-lg">📅 {date} 근태 현황</h3></div>
       <div className="overflow-y-auto h-full pb-20 custom-scrollbar">
         <table className="w-full text-sm text-left">

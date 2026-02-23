@@ -47,10 +47,10 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
   }, [filteredStaffs, currentUser]);
 
   return (
-    <div className="border border-[var(--toss-border)] p-4 bg-[var(--toss-card)] rounded-lg shadow-sm">
+    <div className="border border-[var(--toss-border)] p-4 bg-[var(--toss-card)] rounded-[12px] shadow-sm">
       <div className="flex items-center justify-between mb-3 pb-2 border-b border-[var(--toss-border)]">
         <h3 className="text-sm font-semibold text-[var(--foreground)]">연차 종합 대시보드</h3>
-        <div className="flex gap-0.5 bg-[var(--tab-bg)] rounded-lg p-0.5">
+        <div className="flex gap-0.5 bg-[var(--tab-bg)] rounded-[12px] p-0.5">
           <button
             type="button"
             onClick={() => setViewMode('dept')}
@@ -75,7 +75,7 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
       {viewMode === 'dept' ? (
         <div className="space-y-3">
           {byDept.map((x) => (
-            <div key={x.dept} className="p-3 bg-[var(--page-bg)] rounded-lg border border-[var(--toss-border)]">
+            <div key={x.dept} className="p-3 bg-[var(--page-bg)] rounded-[12px] border border-[var(--toss-border)]">
               <p className="text-sm font-semibold text-[var(--foreground)] mb-2">{x.dept}</p>
               <div className="grid grid-cols-3 gap-2 text-xs">
                 <div>
@@ -109,16 +109,16 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
             return (
               <div
                 key={s.id}
-                className="p-3 bg-[var(--page-bg)] rounded-lg border border-[var(--toss-border)] flex items-center justify-between text-xs"
+                className="p-3 bg-[var(--page-bg)] rounded-[12px] border border-[var(--toss-border)] flex items-center justify-between text-xs"
               >
                 <div>
                   <p className="font-semibold text-[var(--foreground)]">
                     {s.name}{' '}
-                    <span className="text-[10px] text-[var(--toss-gray-3)] font-normal">
+                    <span className="text-[11px] text-[var(--toss-gray-3)] font-normal">
                       ({s.department || '미지정'})
                     </span>
                   </p>
-                  <p className="text-[10px] text-[var(--toss-gray-3)]">
+                  <p className="text-[11px] text-[var(--toss-gray-3)]">
                     총 {total}일 · 사용 {used}일 · 잔여{' '}
                     <span className="font-semibold text-emerald-600">{remain}일</span>
                   </p>

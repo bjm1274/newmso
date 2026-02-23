@@ -35,7 +35,7 @@ export default function SalarySlipUI({ user, currentDate, salaryData, totalPayme
       {/* 3. 상세 내역 (가변 높이) */}
       <div className="flex gap-6 mb-8 flex-1">
         {/* 지급 내역 */}
-        <div className="flex-1 border-2 border-[var(--toss-blue)] rounded-lg overflow-hidden flex flex-col">
+        <div className="flex-1 border-2 border-[var(--toss-blue)] rounded-[12px] overflow-hidden flex flex-col">
           <div className="bg-[var(--toss-blue)] p-2.5 text-center text-white font-semibold text-sm">지급 내역 (EARNINGS)</div>
           <div className="flex-1 p-4 bg-white">
             <table className="w-full text-sm">
@@ -54,7 +54,7 @@ export default function SalarySlipUI({ user, currentDate, salaryData, totalPayme
         </div>
 
         {/* 공제 내역 */}
-        <div className="flex-1 border-2 border-red-900 rounded-lg overflow-hidden flex flex-col">
+        <div className="flex-1 border-2 border-red-900 rounded-[12px] overflow-hidden flex flex-col">
           <div className="bg-red-900 p-2.5 text-center text-white font-semibold text-sm">공제 내역 (DEDUCTIONS)</div>
           <div className="flex-1 p-4 bg-white">
             <table className="w-full text-sm">
@@ -74,7 +74,7 @@ export default function SalarySlipUI({ user, currentDate, salaryData, totalPayme
       </div>
 
       {/* 4. 실 수령액 */}
-      <div className="mb-10 p-6 bg-[var(--foreground)] text-white rounded-xl flex justify-between items-center shadow-lg border-l-[12px] border-[var(--toss-blue)]">
+      <div className="mb-10 p-6 bg-[var(--foreground)] text-white rounded-[16px] flex justify-between items-center shadow-lg border-l-[12px] border-[var(--toss-blue)]">
         <div>
           <p className="text-xs font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">Total Net Pay</p>
           <p className="text-sm font-semibold text-[var(--toss-gray-1)]">차인 지급액 (실 수령액)</p>
@@ -92,7 +92,7 @@ export default function SalarySlipUI({ user, currentDate, salaryData, totalPayme
             {user.company || '박철홍정형외과'} 대표원장
           </h2>
           <div className="relative w-20 h-20 border-[5px] border-red-600 rounded-full flex items-center justify-center text-red-600 font-semibold text-base rotate-12 opacity-80 border-double">
-            <span className="text-[10px] leading-tight text-center">
+            <span className="text-[11px] leading-tight text-center">
               {user.company || '박철홍정형외과'}
               <br />
               (인)

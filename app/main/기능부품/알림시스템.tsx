@@ -479,7 +479,7 @@ export default function NotificationSystem({
           key={notif.id}
           role="button"
           tabIndex={0}
-          className={`p-4 rounded-lg shadow-2xl border-l-4 animate-in slide-in-from-right duration-300 cursor-pointer ${
+          className={`p-4 rounded-[12px] shadow-2xl border-l-4 animate-in slide-in-from-right duration-300 cursor-pointer ${
             notif.type === 'approval' ? 'bg-[var(--toss-blue-light)] border-[var(--toss-blue)]' :
             notif.type === 'inventory' ? 'bg-orange-50 border-orange-600 dark:bg-orange-950/30 dark:border-orange-500' :
             notif.type === 'payroll' ? 'bg-green-50 border-green-600 dark:bg-green-950/30 dark:border-green-500' :
@@ -496,7 +496,7 @@ export default function NotificationSystem({
         >
           <h4 className="font-semibold text-sm mb-1">{notif.title}</h4>
           <p className="text-xs text-[var(--toss-gray-4)]">{notif.body}</p>
-          <p className="text-[10px] text-[var(--toss-gray-3)] mt-2">{new Date().toLocaleTimeString()}</p>
+          <p className="text-[11px] text-[var(--toss-gray-3)] mt-2">{new Date().toLocaleTimeString()}</p>
         </div>
       ))}
     </div>

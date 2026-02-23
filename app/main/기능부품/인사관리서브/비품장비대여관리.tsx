@@ -44,15 +44,15 @@ export default function AssetLoanManager({ staffs = [], selectedCo }: any) {
       <div className="flex justify-between items-center mb-8">
         <div>
           <h3 className="text-xl font-semibold text-[var(--foreground)] tracking-tighter">비품/장비 대여 관리</h3>
-          <p className="text-[10px] text-[var(--toss-blue)] font-bold uppercase tracking-widest">입퇴사 시 장비 지급·반납 추적</p>
+          <p className="text-[11px] text-[var(--toss-blue)] font-bold uppercase tracking-widest">입퇴사 시 장비 지급·반납 추적</p>
         </div>
-        <button onClick={() => setAdding(true)} className="px-5 py-2.5 bg-[var(--toss-blue)] text-white text-xs font-semibold rounded-xl">+ 대여 등록</button>
+        <button onClick={() => setAdding(true)} className="px-5 py-2.5 bg-[var(--toss-blue)] text-white text-xs font-semibold rounded-[16px]">+ 대여 등록</button>
       </div>
 
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-[var(--toss-border)] text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">
+            <tr className="border-b border-[var(--toss-border)] text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">
               <th className="p-4 text-left">직원</th>
               <th className="p-4 text-left">장비</th>
               <th className="p-4 text-left">대여일</th>
@@ -69,7 +69,7 @@ export default function AssetLoanManager({ staffs = [], selectedCo }: any) {
                 <td className="p-4">{r.returned_at ? r.returned_at : <span className="text-orange-600 font-bold">미반납</span>}</td>
                 <td className="p-4 text-right">
                   {!r.returned_at && (
-                    <button onClick={() => handleReturn(r.id)} className="px-3 py-1 bg-green-100 text-green-700 text-[10px] font-semibold rounded-lg">반납</button>
+                    <button onClick={() => handleReturn(r.id)} className="px-3 py-1 bg-green-100 text-green-700 text-[11px] font-semibold rounded-[12px]">반납</button>
                   )}
                 </td>
               </tr>
@@ -80,24 +80,24 @@ export default function AssetLoanManager({ staffs = [], selectedCo }: any) {
 
       {adding && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]" onClick={() => setAdding(false)}>
-          <div className="bg-white p-8 rounded-lg max-w-md w-full space-y-4" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white p-8 rounded-[12px] max-w-md w-full space-y-4" onClick={(e) => e.stopPropagation()}>
             <h4 className="font-semibold">장비 대여 등록</h4>
-            <select value={form.staffId} onChange={(e) => setForm({ ...form, staffId: e.target.value })} className="w-full p-3 border rounded-xl">
+            <select value={form.staffId} onChange={(e) => setForm({ ...form, staffId: e.target.value })} className="w-full p-3 border rounded-[16px]">
               <option value="">직원 선택</option>
               {filtered.map((s: any) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
-            <select value={form.assetType} onChange={(e) => setForm({ ...form, assetType: e.target.value })} className="w-full p-3 border rounded-xl">
+            <select value={form.assetType} onChange={(e) => setForm({ ...form, assetType: e.target.value })} className="w-full p-3 border rounded-[16px]">
               {ASSET_TYPES.map((t) => (
                 <option key={t} value={t}>{t}</option>
               ))}
             </select>
-            <input type="text" value={form.assetName} onChange={(e) => setForm({ ...form, assetName: e.target.value })} placeholder="장비명 (선택)" className="w-full p-3 border rounded-xl" />
-            <input type="date" value={form.loanedAt} onChange={(e) => setForm({ ...form, loanedAt: e.target.value })} className="w-full p-3 border rounded-xl" />
+            <input type="text" value={form.assetName} onChange={(e) => setForm({ ...form, assetName: e.target.value })} placeholder="장비명 (선택)" className="w-full p-3 border rounded-[16px]" />
+            <input type="date" value={form.loanedAt} onChange={(e) => setForm({ ...form, loanedAt: e.target.value })} className="w-full p-3 border rounded-[16px]" />
             <div className="flex gap-2">
-              <button onClick={handleAdd} className="flex-1 py-3 bg-[var(--toss-blue)] text-white font-semibold rounded-xl">등록</button>
-              <button onClick={() => setAdding(false)} className="flex-1 py-3 bg-[var(--toss-gray-2)] font-semibold rounded-xl">취소</button>
+              <button onClick={handleAdd} className="flex-1 py-3 bg-[var(--toss-blue)] text-white font-semibold rounded-[16px]">등록</button>
+              <button onClick={() => setAdding(false)} className="flex-1 py-3 bg-[var(--toss-gray-2)] font-semibold rounded-[16px]">취소</button>
             </div>
           </div>
         </div>

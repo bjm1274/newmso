@@ -121,7 +121,7 @@ export default function Sidebar({ user, mainMenu, subView, onMenuChange, onOpenN
               }`}
             >
               <span className="text-lg leading-none">{m.icon}</span>
-              <span className="text-[10px] font-medium mt-1">{m.label}</span>
+              <span className="text-[11px] font-medium mt-1">{m.label}</span>
             </button>
           ))}
         </div>
@@ -141,7 +141,7 @@ export default function Sidebar({ user, mainMenu, subView, onMenuChange, onOpenN
             }`}
           >
             <span className="text-xl leading-none">{m.icon}</span>
-            <span className="text-[10px] font-medium mt-1 truncate w-full text-center">{m.label}</span>
+            <span className="text-[11px] font-medium mt-1 truncate w-full text-center">{m.label}</span>
           </button>
         ))}
         <button
@@ -151,7 +151,7 @@ export default function Sidebar({ user, mainMenu, subView, onMenuChange, onOpenN
           }`}
         >
           <span className="text-xl leading-none">{showMore ? '✕' : '⋯'}</span>
-          <span className="text-[10px] font-medium mt-1">{showMore ? '닫기' : '더보기'}</span>
+          <span className="text-[11px] font-medium mt-1">{showMore ? '닫기' : '더보기'}</span>
         </button>
       </nav>
 

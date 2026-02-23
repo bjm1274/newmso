@@ -22,7 +22,7 @@ export default function StaffHistoryTimeline({ staffId, staffName }: { staffId: 
   }, [staffId]);
 
   return (
-    <div className="bg-white p-6 border border-[var(--toss-border)] rounded-lg shadow-xl">
+    <div className="bg-white p-6 border border-[var(--toss-border)] rounded-[12px] shadow-xl">
       <h3 className="text-lg font-semibold text-[var(--foreground)] mb-4">{staffName} 인사 이력</h3>
       <div className="space-y-3">
         {events.length === 0 ? <p className="text-[var(--toss-gray-3)] text-sm">이력이 없습니다.</p> : events.map((e, i) => (
@@ -31,7 +31,7 @@ export default function StaffHistoryTimeline({ staffId, staffName }: { staffId: 
             <div>
               <p className="text-xs font-semibold text-[var(--toss-gray-4)]">{e.date}</p>
               <p className="text-sm font-bold text-[var(--foreground)]">{e.desc}</p>
-              <span className="text-[9px] font-semibold text-[var(--toss-gray-3)]">{e.type}</span>
+              <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">{e.type}</span>
             </div>
           </div>
         ))}

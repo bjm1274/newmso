@@ -142,7 +142,7 @@ export default function StatusPanel({ user, tasks, surgeries, mris, attStatus, o
               <div
                 key={notif.id || idx}
                 onClick={() => markAsRead(notif.id)}
-                className={`p-3 rounded-lg border-2 cursor-pointer transition-all hover:shadow-md ${getNotificationColor(
+                className={`p-3 rounded-[12px] border-2 cursor-pointer transition-all hover:shadow-md ${getNotificationColor(
                   notif.type
                 )} ${notif.is_read ? 'opacity-60' : 'opacity-100'}`}
               >
@@ -150,7 +150,7 @@ export default function StatusPanel({ user, tasks, surgeries, mris, attStatus, o
                   <span className="text-lg">{getNotificationIcon(notif.type)}</span>
                   <div className="flex-1 min-w-0">
                     <h4 className="font-semibold text-xs text-[var(--foreground)] line-clamp-2">{notif.title}</h4>
-                    <p className="text-[9px] text-[var(--toss-gray-4)] font-bold mt-0.5 line-clamp-2">{notif.body}</p>
+                    <p className="text-[11px] text-[var(--toss-gray-4)] font-bold mt-0.5 line-clamp-2">{notif.body}</p>
                     <p className="text-[8px] text-[var(--toss-gray-3)] font-bold mt-1">
                       {new Date(notif.created_at).toLocaleTimeString()}
                     </p>
@@ -173,40 +173,40 @@ export default function StatusPanel({ user, tasks, surgeries, mris, attStatus, o
       {activeTab === '일정' && (
         <div className="space-y-4 flex-1 overflow-y-auto">
           <div className="space-y-3">
-            <p className="px-2 text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">오늘 수술</p>
-            <div className="bg-[var(--toss-gray-1)] rounded-lg p-4 space-y-3 shadow-inner">
+            <p className="px-2 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">오늘 수술</p>
+            <div className="bg-[var(--toss-gray-1)] rounded-[12px] p-4 space-y-3 shadow-inner">
               {surgeries && surgeries.length > 0 ? (
                 surgeries.map((s: any, i: number) => (
                   <div key={i} className="flex flex-col border-b border-[var(--toss-border)] pb-2">
-                    <span className="text-[10px] font-semibold text-orange-600">{s.surgery_time?.slice(0, 5)}</span>
+                    <span className="text-[11px] font-semibold text-orange-600">{s.surgery_time?.slice(0, 5)}</span>
                     <span className="text-[11px] font-semibold text-[var(--foreground)]">{s.patient_name} ({s.surgery_name})</span>
                   </div>
                 ))
               ) : (
-                <p className="text-[10px] text-[var(--toss-gray-3)] font-bold">일정이 없습니다.</p>
+                <p className="text-[11px] text-[var(--toss-gray-3)] font-bold">일정이 없습니다.</p>
               )}
             </div>
           </div>
 
           <div className="space-y-3">
-            <p className="px-2 text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">오늘 MRI</p>
-            <div className="bg-[var(--toss-gray-1)] rounded-lg p-4 space-y-3 shadow-inner">
+            <p className="px-2 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">오늘 MRI</p>
+            <div className="bg-[var(--toss-gray-1)] rounded-[12px] p-4 space-y-3 shadow-inner">
               {mris && mris.length > 0 ? (
                 mris.map((m: any, i: number) => (
                   <div
                     key={i}
-                    className={`p-3 rounded-lg border ${
+                    className={`p-3 rounded-[12px] border ${
                       m.is_fasting ? 'border-[var(--toss-blue)]/30 bg-[var(--toss-blue-light)]/50' : 'bg-[var(--toss-card)] border-[var(--toss-border)]'
                     }`}
                   >
-                    <span className="text-[10px] font-semibold text-[var(--toss-blue)]">{m.mri_time?.slice(0, 5)}</span>
+                    <span className="text-[11px] font-semibold text-[var(--toss-blue)]">{m.mri_time?.slice(0, 5)}</span>
                     <p className="text-[11px] font-semibold text-[var(--foreground)]">
                       {m.patient_name} {m.is_fasting && '(금식)'}
                     </p>
                   </div>
                 ))
               ) : (
-                <p className="text-[10px] text-[var(--toss-gray-3)] font-bold">일정이 없습니다.</p>
+                <p className="text-[11px] text-[var(--toss-gray-3)] font-bold">일정이 없습니다.</p>
               )}
             </div>
           </div>
@@ -216,7 +216,7 @@ export default function StatusPanel({ user, tasks, surgeries, mris, attStatus, o
       {/* 근태 탭 */}
       {activeTab === '근태' && (
         <div className="space-y-4 flex-1">
-          <p className="px-2 text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">실시간 근태 현황</p>
+          <p className="px-2 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">실시간 근태 현황</p>
           <div className="grid grid-cols-2 gap-2">
             <button
               disabled={attStatus !== 'none' || loading}

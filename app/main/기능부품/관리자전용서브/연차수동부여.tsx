@@ -61,18 +61,18 @@ export default function AnnualLeaveManualGrant({ staffs = [], onRefresh }: { sta
   };
 
   return (
-    <div className="bg-white border border-[var(--toss-border)] rounded-[2rem] p-8 shadow-xl max-w-5xl">
+    <div className="bg-white border border-[var(--toss-border)] rounded-[16px] p-8 shadow-xl max-w-5xl">
       <h3 className="text-xl font-semibold text-[var(--foreground)] mb-2">연차 개수 수동 부여</h3>
-      <p className="text-[10px] text-[var(--toss-gray-3)] font-bold mb-6">
+      <p className="text-[11px] text-[var(--toss-gray-3)] font-bold mb-6">
         신규입사자 포함 모든 직원의 연차 부여일·사용일을 직접 설정할 수 있습니다. 자동 부여 규칙과 무관하게 반영됩니다.
       </p>
 
       <div className="flex items-center gap-4 mb-6">
-        <label className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">회사</label>
+        <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">회사</label>
         <select
           value={companyFilter}
           onChange={e => setCompanyFilter(e.target.value)}
-          className="border border-[var(--toss-border)] rounded-xl px-4 py-2 text-sm font-bold"
+          className="border border-[var(--toss-border)] rounded-[16px] px-4 py-2 text-sm font-bold"
         >
           <option value="전체">전체</option>
           {companies.map(c => (
@@ -82,7 +82,7 @@ export default function AnnualLeaveManualGrant({ staffs = [], onRefresh }: { sta
       </div>
 
       {message && (
-        <div className={`mb-4 p-3 rounded-xl text-sm font-bold ${message.includes('실패') ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>
+        <div className={`mb-4 p-3 rounded-[16px] text-sm font-bold ${message.includes('실패') ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>
           {message}
         </div>
       )}
@@ -91,12 +91,12 @@ export default function AnnualLeaveManualGrant({ staffs = [], onRefresh }: { sta
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="border-b border-[var(--toss-border)]">
-              <th className="pb-3 text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">이름</th>
-              <th className="pb-3 text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">회사/부서</th>
-              <th className="pb-3 text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">입사일</th>
-              <th className="pb-3 text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">부여 연차(일)</th>
-              <th className="pb-3 text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">사용 연차(일)</th>
-              <th className="pb-3 text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">동작</th>
+              <th className="pb-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">이름</th>
+              <th className="pb-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">회사/부서</th>
+              <th className="pb-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">입사일</th>
+              <th className="pb-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">부여 연차(일)</th>
+              <th className="pb-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">사용 연차(일)</th>
+              <th className="pb-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">동작</th>
             </tr>
           </thead>
           <tbody>
@@ -112,7 +112,7 @@ export default function AnnualLeaveManualGrant({ staffs = [], onRefresh }: { sta
                     step={0.5}
                     value={getTotal(s)}
                     onChange={e => setTotal(s.id, Number(e.target.value) || 0)}
-                    className="w-20 p-2 border border-[var(--toss-border)] rounded-lg text-sm font-bold"
+                    className="w-20 p-2 border border-[var(--toss-border)] rounded-[12px] text-sm font-bold"
                   />
                 </td>
                 <td className="py-3">
@@ -122,7 +122,7 @@ export default function AnnualLeaveManualGrant({ staffs = [], onRefresh }: { sta
                     step={0.5}
                     value={getUsed(s)}
                     onChange={e => setUsed(s.id, Number(e.target.value) || 0)}
-                    className="w-20 p-2 border border-[var(--toss-border)] rounded-lg text-sm font-bold"
+                    className="w-20 p-2 border border-[var(--toss-border)] rounded-[12px] text-sm font-bold"
                   />
                 </td>
                 <td className="py-3">
@@ -130,7 +130,7 @@ export default function AnnualLeaveManualGrant({ staffs = [], onRefresh }: { sta
                     type="button"
                     onClick={() => handleSaveOne(s)}
                     disabled={saving}
-                    className="px-3 py-1.5 bg-[var(--toss-blue)] text-white text-xs font-bold rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                    className="px-3 py-1.5 bg-[var(--toss-blue)] text-white text-xs font-bold rounded-[12px] hover:bg-blue-700 disabled:opacity-50"
                   >
                     저장
                   </button>
@@ -150,7 +150,7 @@ export default function AnnualLeaveManualGrant({ staffs = [], onRefresh }: { sta
           type="button"
           onClick={handleSaveAll}
           disabled={saving}
-          className="mt-6 w-full py-4 bg-teal-600 text-white font-semibold rounded-lg text-sm hover:bg-teal-700 disabled:opacity-50"
+          className="mt-6 w-full py-4 bg-teal-600 text-white font-semibold rounded-[12px] text-sm hover:bg-teal-700 disabled:opacity-50"
         >
           {saving ? '저장 중...' : `위 ${filtered.length}명 일괄 저장`}
         </button>

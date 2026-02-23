@@ -142,39 +142,39 @@ export default function TaxAutoReport() {
 
       {/* 통계 */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="bg-[var(--page-bg)] p-4 rounded-lg border border-[var(--toss-border)]">
+        <div className="bg-[var(--page-bg)] p-4 rounded-[12px] border border-[var(--toss-border)]">
           <p className="text-xs font-medium text-[var(--toss-gray-3)] mb-1">총 급여액</p>
           <p className="text-lg font-semibold text-[var(--foreground)]">
             ₩{taxData.reduce((sum, item) => sum + item.total_salary, 0).toLocaleString()}
           </p>
         </div>
-        <div className="bg-[var(--page-bg)] p-4 rounded-lg border border-[var(--toss-border)]">
+        <div className="bg-[var(--page-bg)] p-4 rounded-[12px] border border-[var(--toss-border)]">
           <p className="text-xs font-medium text-[var(--toss-gray-3)] mb-1">총 세금/보험료</p>
           <p className="text-lg font-semibold text-red-600">
             ₩{taxData.reduce((sum, item) => sum + item.total_deduction, 0).toLocaleString()}
           </p>
         </div>
-        <div className="bg-[var(--page-bg)] p-4 rounded-lg border border-[var(--toss-border)]">
+        <div className="bg-[var(--page-bg)] p-4 rounded-[12px] border border-[var(--toss-border)]">
           <p className="text-xs font-medium text-[var(--toss-gray-3)] mb-1">신고 대상</p>
           <p className="text-lg font-semibold text-[var(--foreground)]">{taxData.length}명</p>
         </div>
       </div>
 
       {/* 세금 신고 테이블 */}
-      <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-lg overflow-hidden">
+      <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-[12px] overflow-hidden">
         <div className="p-4 border-b border-[var(--toss-border)] bg-[var(--tab-bg)] flex justify-between items-center">
           <h3 className="text-sm font-semibold text-[var(--foreground)]">세금 신고 현황</h3>
           <div className="flex gap-2">
             <button
               onClick={downloadTaxReport}
-              className="px-3 py-2 bg-[var(--foreground)] text-white rounded-lg text-xs font-medium hover:opacity-90"
+              className="px-3 py-2 bg-[var(--foreground)] text-white rounded-[12px] text-xs font-medium hover:opacity-90"
             >
               CSV 다운로드
             </button>
             <button
               onClick={submitTaxReport}
               disabled={reportStatus === '신고완료'}
-              className="px-3 py-2 bg-[var(--toss-blue)] text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50"
+              className="px-3 py-2 bg-[var(--toss-blue)] text-white rounded-[12px] text-xs font-medium hover:opacity-90 disabled:opacity-50"
             >
               {reportStatus === '신고완료' ? '신고완료' : '신고 제출'}
             </button>
@@ -236,7 +236,7 @@ export default function TaxAutoReport() {
       </div>
 
       {/* 4대보험 설명 */}
-      <div className="bg-[var(--page-bg)] border border-[var(--toss-border)] rounded-lg p-4">
+      <div className="bg-[var(--page-bg)] border border-[var(--toss-border)] rounded-[12px] p-4">
         <h4 className="text-sm font-semibold text-[var(--foreground)] mb-3">4대보험료 자동 계산</h4>
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div>

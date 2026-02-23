@@ -79,7 +79,7 @@ export default function SalarySlipContainer({ user }: any) {
   /* 암호 미확인 시 비밀번호 입력 화면 */
   if (!unlocked) {
     return (
-      <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-2xl overflow-hidden flex flex-col items-center justify-center min-h-[320px] p-8 sm:p-10">
+      <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-[16px] overflow-hidden flex flex-col items-center justify-center min-h-[320px] p-8 sm:p-10">
         <h3 className="text-xl font-bold text-[var(--foreground)] mb-2">급여 명세서 조회</h3>
         <p className="text-[13px] text-[var(--toss-gray-4)] mb-8">본인 확인을 위해 비밀번호를 입력해 주세요.</p>
         <form onSubmit={handlePasswordVerify} className="w-full max-w-sm space-y-5">
@@ -88,7 +88,7 @@ export default function SalarySlipContainer({ user }: any) {
             value={passwordInput}
             onChange={(e) => { setPasswordInput(e.target.value); setVerifyError(''); }}
             placeholder="비밀번호"
-            className="w-full px-4 py-3.5 rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] placeholder:text-[var(--toss-gray-3)] focus:outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)]"
+            className="w-full px-4 py-3.5 rounded-[16px] border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] placeholder:text-[var(--toss-gray-3)] focus:outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)]"
             autoComplete="current-password"
             disabled={verifying}
           />
@@ -96,7 +96,7 @@ export default function SalarySlipContainer({ user }: any) {
           <button
             type="submit"
             disabled={verifying}
-            className="w-full py-3.5 bg-[var(--toss-blue)] text-white font-semibold rounded-xl hover:opacity-95 disabled:opacity-50 transition-all"
+            className="w-full py-3.5 bg-[var(--toss-blue)] text-white font-semibold rounded-[16px] hover:opacity-95 disabled:opacity-50 transition-all"
           >
             {verifying ? '확인 중...' : '확인'}
           </button>
@@ -107,7 +107,7 @@ export default function SalarySlipContainer({ user }: any) {
 
   if (!user?.base_salary || user.base_salary <= 0) {
     return (
-      <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-2xl p-8 sm:p-10 text-sm font-semibold text-[var(--toss-gray-4)] leading-relaxed">
+      <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] p-8 sm:p-10 text-sm font-semibold text-[var(--toss-gray-4)] leading-relaxed">
         아직 <span className="text-[var(--toss-blue)]">기본급여</span>가 등록되지 않아 급여명세서를 생성할 수 없습니다.
         <br className="my-2" />
         인사 담당자에게 직원 기본급을 먼저 등록해 달라고 요청해 주세요.
@@ -163,7 +163,7 @@ export default function SalarySlipContainer({ user }: any) {
         }
       `}</style>
 
-      <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-2xl overflow-hidden flex flex-col h-full">
+      <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-[16px] overflow-hidden flex flex-col h-full">
         <div className="px-5 py-4 sm:px-6 sm:py-5 bg-[var(--toss-gray-1)] border-b border-[var(--toss-border)] flex flex-wrap justify-between items-center gap-4 shrink-0">
           <div className="flex items-center gap-4 sm:gap-6">
             <div className="flex gap-2">
@@ -172,7 +172,7 @@ export default function SalarySlipContainer({ user }: any) {
             </div>
             <h3 className="text-lg sm:text-xl font-semibold text-[var(--foreground)]">{currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월 내역</h3>
           </div>
-          <button type="button" onClick={handlePrint} className="px-6 py-3 sm:px-8 sm:py-4 bg-[var(--foreground)] text-white text-sm font-semibold rounded-xl hover:opacity-95 transition-all flex items-center gap-2 shadow-lg">
+          <button type="button" onClick={handlePrint} className="px-6 py-3 sm:px-8 sm:py-4 bg-[var(--foreground)] text-white text-sm font-semibold rounded-[16px] hover:opacity-95 transition-all flex items-center gap-2 shadow-lg">
             🖨️ A4 한 장에 맞춰 인쇄
           </button>
         </div>

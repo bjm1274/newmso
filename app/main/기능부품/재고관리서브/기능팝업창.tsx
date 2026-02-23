@@ -20,7 +20,7 @@ export function POModal({ isOpen, onClose, inventory }: any) {
             <tbody>{lowStockItems.map((item:any, idx:number) => (<tr key={idx} className="text-center"><td className="border p-2 text-left">{item.name}</td><td className="border p-2 font-bold text-red-600">{item.quantity}</td><td className="border p-2">{item.safety_stock}</td><td className="border p-2 font-bold">{item.safety_stock - item.quantity}</td><td className="border p-2">{item.supplier}</td></tr>))}</tbody>
           </table>
         ) : <div className="text-center py-10 text-[var(--toss-gray-3)] font-bold">부족한 품목이 없습니다.</div>}
-        <div className="flex justify-end gap-2 print:hidden"><button onClick={() => window.print()} className="px-6 py-3 bg-[var(--toss-blue)] text-white rounded-lg font-bold">🖨️ 인쇄</button><button onClick={onClose} className="px-6 py-3 bg-[var(--toss-gray-2)] rounded-lg font-bold">닫기</button></div>
+        <div className="flex justify-end gap-2 print:hidden"><button onClick={() => window.print()} className="px-6 py-3 bg-[var(--toss-blue)] text-white rounded-[12px] font-bold">🖨️ 인쇄</button><button onClick={onClose} className="px-6 py-3 bg-[var(--toss-gray-2)] rounded-[12px] font-bold">닫기</button></div>
       </div>
     </div>
   );
@@ -76,15 +76,15 @@ export function BillModal({ isOpen, onClose, inventory }: any) {
           <div className="absolute inset-0 bg-white/95 z-50 flex flex-col items-center justify-center p-10 backdrop-blur-md rounded-[1rem]">
             <div className="w-full max-w-md space-y-4">
               <h2 className="text-2xl font-semibold text-[var(--foreground)] border-b pb-4 mb-6">🏢 신규 업체 등록</h2>
-              <div><label className="text-xs font-bold text-[var(--toss-blue)] ml-1">별칭</label><input className="w-full p-3 bg-blue-50 border border-blue-100 rounded-xl font-bold" placeholder="예: 거래처A" value={newPartner.alias} onChange={e=>setNewPartner({...newPartner, alias: e.target.value})} /></div>
+              <div><label className="text-xs font-bold text-[var(--toss-blue)] ml-1">별칭</label><input className="w-full p-3 bg-blue-50 border border-blue-100 rounded-[16px] font-bold" placeholder="예: 거래처A" value={newPartner.alias} onChange={e=>setNewPartner({...newPartner, alias: e.target.value})} /></div>
               <div className="grid grid-cols-2 gap-3">
-                <div><label className="text-xs font-bold text-[var(--toss-gray-3)] ml-1">등록번호</label><input className="w-full p-3 bg-[var(--toss-gray-1)] rounded-xl text-sm" value={newPartner.reg_num} onChange={e=>setNewPartner({...newPartner, reg_num: e.target.value})} /></div>
-                <div><label className="text-xs font-bold text-[var(--toss-gray-3)] ml-1">상호</label><input className="w-full p-3 bg-[var(--toss-gray-1)] rounded-xl text-sm" value={newPartner.sangho} onChange={e=>setNewPartner({...newPartner, sangho: e.target.value})} /></div>
-                <div><label className="text-xs font-bold text-[var(--toss-gray-3)] ml-1">대표자</label><input className="w-full p-3 bg-[var(--toss-gray-1)] rounded-xl text-sm" value={newPartner.ceo} onChange={e=>setNewPartner({...newPartner, ceo: e.target.value})} /></div>
-                <div><label className="text-xs font-bold text-[var(--toss-gray-3)] ml-1">전화번호</label><input className="w-full p-3 bg-[var(--toss-gray-1)] rounded-xl text-sm" value={newPartner.phone} onChange={e=>setNewPartner({...newPartner, phone: e.target.value})} /></div>
+                <div><label className="text-xs font-bold text-[var(--toss-gray-3)] ml-1">등록번호</label><input className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[16px] text-sm" value={newPartner.reg_num} onChange={e=>setNewPartner({...newPartner, reg_num: e.target.value})} /></div>
+                <div><label className="text-xs font-bold text-[var(--toss-gray-3)] ml-1">상호</label><input className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[16px] text-sm" value={newPartner.sangho} onChange={e=>setNewPartner({...newPartner, sangho: e.target.value})} /></div>
+                <div><label className="text-xs font-bold text-[var(--toss-gray-3)] ml-1">대표자</label><input className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[16px] text-sm" value={newPartner.ceo} onChange={e=>setNewPartner({...newPartner, ceo: e.target.value})} /></div>
+                <div><label className="text-xs font-bold text-[var(--toss-gray-3)] ml-1">전화번호</label><input className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[16px] text-sm" value={newPartner.phone} onChange={e=>setNewPartner({...newPartner, phone: e.target.value})} /></div>
               </div>
-              <div><label className="text-xs font-bold text-[var(--toss-gray-3)] ml-1">주소</label><input className="w-full p-3 bg-[var(--toss-gray-1)] rounded-xl text-sm" value={newPartner.addr} onChange={e=>setNewPartner({...newPartner, addr: e.target.value})} /></div>
-              <div className="flex gap-2 mt-6 pt-4 border-t"><button onClick={() => setIsRegisterMode(false)} className="flex-1 py-4 bg-[var(--toss-gray-2)] text-[var(--toss-gray-4)] rounded-xl font-bold">취소</button><button onClick={handleSavePartner} className="flex-1 py-4 bg-[var(--toss-blue)] text-white rounded-xl font-bold shadow-lg">저장하기</button></div>
+              <div><label className="text-xs font-bold text-[var(--toss-gray-3)] ml-1">주소</label><input className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[16px] text-sm" value={newPartner.addr} onChange={e=>setNewPartner({...newPartner, addr: e.target.value})} /></div>
+              <div className="flex gap-2 mt-6 pt-4 border-t"><button onClick={() => setIsRegisterMode(false)} className="flex-1 py-4 bg-[var(--toss-gray-2)] text-[var(--toss-gray-4)] rounded-[16px] font-bold">취소</button><button onClick={handleSavePartner} className="flex-1 py-4 bg-[var(--toss-blue)] text-white rounded-[16px] font-bold shadow-lg">저장하기</button></div>
             </div>
           </div>
         )}
@@ -104,9 +104,9 @@ export function BillModal({ isOpen, onClose, inventory }: any) {
           {['supplier', 'receiver'].map((role) => (
             <div key={role} className={`p-2 relative group ${role==='supplier'?'border-r-2 border-red-500':''}`}>
               <div className="absolute top-2 right-2 flex flex-wrap gap-1 opacity-20 group-hover:opacity-100 transition-opacity no-print max-w-[200px] justify-end z-10">
-                 <button onClick={() => applyPreset(role, PRESET_A)} className="bg-[var(--toss-gray-1)] text-[10px] px-2 py-1 border rounded hover:bg-[var(--toss-blue-light)]">본원</button>
-                 <button onClick={() => applyPreset(role, PRESET_B)} className="bg-[var(--toss-gray-1)] text-[10px] px-2 py-1 border rounded hover:bg-[var(--toss-blue-light)]">기본</button>
-                 {customPresets.map((cp, idx) => (<button key={idx} onClick={() => applyPreset(role, cp)} className="bg-yellow-50 text-orange-700 text-[10px] px-2 py-1 border border-yellow-200 rounded hover:bg-yellow-100">{cp.alias}</button>))}
+                 <button onClick={() => applyPreset(role, PRESET_A)} className="bg-[var(--toss-gray-1)] text-[11px] px-2 py-1 border rounded hover:bg-[var(--toss-blue-light)]">본원</button>
+                 <button onClick={() => applyPreset(role, PRESET_B)} className="bg-[var(--toss-gray-1)] text-[11px] px-2 py-1 border rounded hover:bg-[var(--toss-blue-light)]">기본</button>
+                 {customPresets.map((cp, idx) => (<button key={idx} onClick={() => applyPreset(role, cp)} className="bg-yellow-50 text-orange-700 text-[11px] px-2 py-1 border border-yellow-200 rounded hover:bg-yellow-100">{cp.alias}</button>))}
               </div>
               <div className="text-center text-red-500 font-bold mb-2">[{role==='supplier'?'공급자':'공급받는자'}]</div>
               <div className="grid grid-cols-[60px_1fr] gap-1 text-sm">
@@ -155,7 +155,7 @@ export function BillModal({ isOpen, onClose, inventory }: any) {
                            <div key={s.id} onClick={() => selectItem(i, s)} 
                              className="p-2 hover:bg-blue-50 cursor-pointer border-b border-[var(--toss-border)] last:border-0">
                              <div className="font-bold text-xs">{s.name}</div>
-                             <div className="text-[10px] text-[var(--toss-gray-3)]">{s.spec} | ₩{s.price?.toLocaleString()}</div>
+                             <div className="text-[11px] text-[var(--toss-gray-3)]">{s.spec} | ₩{s.price?.toLocaleString()}</div>
                            </div>
                          ))}
                        </div>
@@ -194,16 +194,16 @@ export function ScanModals({ isOpen, onClose, onComplete, mode, inventory }: any
       <div className="w-full max-w-lg bg-white rounded-3xl overflow-hidden p-6" onClick={e => e.stopPropagation()}>
         <h3 className="font-bold text-lg mb-4">{mode === 'camera' ? '📷 카메라 촬영 (OCR)' : '📄 파일 등록 (사진/PDF/엑셀)'}</h3>
         {scannedItems.length === 0 ? (
-           <div className="aspect-video bg-[var(--toss-gray-1)] rounded-xl flex items-center justify-center mb-4 relative">
+           <div className="aspect-video bg-[var(--toss-gray-1)] rounded-[16px] flex items-center justify-center mb-4 relative">
              {isScanning ? <span className="animate-pulse font-bold text-blue-500">AI 분석 중...</span> : 
-             (mode === 'camera' ? <button onClick={handleCapture} className="bg-gray-800 text-white px-6 py-3 rounded-xl font-bold">촬영하기</button> : <label className="bg-gray-800 text-white px-6 py-3 rounded-xl font-bold cursor-pointer">파일 선택<input type="file" className="hidden" accept="image/*, application/pdf, .xls, .xlsx" onChange={handleCapture} /></label>)}
+             (mode === 'camera' ? <button onClick={handleCapture} className="bg-gray-800 text-white px-6 py-3 rounded-[16px] font-bold">촬영하기</button> : <label className="bg-gray-800 text-white px-6 py-3 rounded-[16px] font-bold cursor-pointer">파일 선택<input type="file" className="hidden" accept="image/*, application/pdf, .xls, .xlsx" onChange={handleCapture} /></label>)}
            </div>
         ) : (
            <div className="max-h-80 overflow-y-auto space-y-3 mb-4 custom-scrollbar">
-             {scannedItems.map((item, idx) => (<div key={idx} className="border p-4 rounded-xl bg-[var(--toss-gray-1)]"><p className="font-bold text-lg">{item.name}</p><div className="grid grid-cols-2 gap-2 mt-2"><div><label className="text-xs text-[var(--toss-gray-3)]">LOT</label><input className="w-full p-2 text-sm bg-white border rounded" value={item.detected_lot} onChange={e=>updateItem(idx, 'detected_lot', e.target.value)} /></div><div><label className="text-xs text-[var(--toss-gray-3)]">유효기간</label><input type="date" className="w-full p-2 text-sm bg-white border rounded" value={item.detected_exp} onChange={e=>updateItem(idx, 'detected_exp', e.target.value)} /></div><div className="col-span-2"><label className="text-xs text-[var(--toss-gray-3)]">입고수량</label><input type="number" className="w-full p-2 text-sm bg-white border rounded font-bold text-[var(--toss-blue)]" value={item.scan_qty} onChange={e=>updateItem(idx, 'scan_qty', Number(e.target.value))} /></div></div></div>))}
+             {scannedItems.map((item, idx) => (<div key={idx} className="border p-4 rounded-[16px] bg-[var(--toss-gray-1)]"><p className="font-bold text-lg">{item.name}</p><div className="grid grid-cols-2 gap-2 mt-2"><div><label className="text-xs text-[var(--toss-gray-3)]">LOT</label><input className="w-full p-2 text-sm bg-white border rounded" value={item.detected_lot} onChange={e=>updateItem(idx, 'detected_lot', e.target.value)} /></div><div><label className="text-xs text-[var(--toss-gray-3)]">유효기간</label><input type="date" className="w-full p-2 text-sm bg-white border rounded" value={item.detected_exp} onChange={e=>updateItem(idx, 'detected_exp', e.target.value)} /></div><div className="col-span-2"><label className="text-xs text-[var(--toss-gray-3)]">입고수량</label><input type="number" className="w-full p-2 text-sm bg-white border rounded font-bold text-[var(--toss-blue)]" value={item.scan_qty} onChange={e=>updateItem(idx, 'scan_qty', Number(e.target.value))} /></div></div></div>))}
            </div>
         )}
-        {scannedItems.length > 0 && <button onClick={confirm} className="w-full py-4 bg-[var(--toss-blue)] text-white rounded-xl font-bold shadow-lg">입고 정보 저장</button>}
+        {scannedItems.length > 0 && <button onClick={confirm} className="w-full py-4 bg-[var(--toss-blue)] text-white rounded-[16px] font-bold shadow-lg">입고 정보 저장</button>}
       </div>
     </div>
   );
@@ -220,11 +220,11 @@ export function UDIModal({ isOpen, onClose, inventory, user, onRefresh }: any) {
   if (!isOpen) return null;
   return (
     <div className="absolute inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white w-full max-w-4xl rounded-[2rem] p-8 shadow-2xl h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+      <div className="bg-white w-full max-w-4xl rounded-[16px] p-8 shadow-2xl h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex justify-between items-center border-b pb-4"><h2 className="text-2xl font-semibold text-purple-700">📡 공급내역보고</h2><p className="font-bold">대상: {udiItems.length}건</p></div>
-        <div className="bg-[var(--toss-gray-1)] p-4 rounded-xl mt-4 flex gap-4 items-center"><span className="text-2xl">🔫</span><input ref={inputRef} value={barcodeInput} onChange={e=>setBarcodeInput(e.target.value)} onKeyDown={handleScan} className="flex-1 p-3 rounded-xl font-bold" placeholder="바코드 스캔..." autoFocus /></div>
-        <div className="flex-1 overflow-y-auto mt-4 border rounded-lg p-4">{udiItems.map((item, i) => <div key={i} className="border-b p-2 flex justify-between"><span>{item.name}</span><span className="text-[var(--toss-blue)]">{item.lot_number}</span><span className="font-bold">{item.report_qty}</span></div>)}</div>
-        <div className="mt-4 pt-4 border-t flex justify-end gap-3"><button onClick={submit} className="px-8 py-4 bg-purple-600 text-white rounded-lg font-bold shadow-lg">NIDS 전송</button></div>
+        <div className="bg-[var(--toss-gray-1)] p-4 rounded-[16px] mt-4 flex gap-4 items-center"><span className="text-2xl">🔫</span><input ref={inputRef} value={barcodeInput} onChange={e=>setBarcodeInput(e.target.value)} onKeyDown={handleScan} className="flex-1 p-3 rounded-[16px] font-bold" placeholder="바코드 스캔..." autoFocus /></div>
+        <div className="flex-1 overflow-y-auto mt-4 border rounded-[12px] p-4">{udiItems.map((item, i) => <div key={i} className="border-b p-2 flex justify-between"><span>{item.name}</span><span className="text-[var(--toss-blue)]">{item.lot_number}</span><span className="font-bold">{item.report_qty}</span></div>)}</div>
+        <div className="mt-4 pt-4 border-t flex justify-end gap-3"><button onClick={submit} className="px-8 py-4 bg-purple-600 text-white rounded-[12px] font-bold shadow-lg">NIDS 전송</button></div>
       </div>
     </div>
   );

@@ -228,13 +228,13 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
   };
 
   return (
-    <div className="bg-[var(--toss-card)] rounded-lg border border-[var(--toss-border)] shadow-sm overflow-hidden animate-in fade-in duration-300">
+    <div className="bg-[var(--toss-card)] rounded-[12px] border border-[var(--toss-border)] shadow-sm overflow-hidden animate-in fade-in duration-300">
       <div className="bg-[var(--page-bg)] border-b border-[var(--toss-border)] px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)]">급여 정산</h2>
           <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">법적 비과세 한도 자동 반영</p>
         </div>
-        <div className="flex border border-[var(--toss-border)] rounded-lg p-0.5 bg-[var(--toss-card)]">
+        <div className="flex border border-[var(--toss-border)] rounded-[12px] p-0.5 bg-[var(--toss-card)]">
           {[
             { step: 1, label: '대상 선택' },
             { step: 2, label: '수당·공제' },
@@ -263,11 +263,11 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
                 <div
                   key={s.id}
                   onClick={() => toggleStaff(s)}
-                  className={`p-4 rounded-lg border cursor-pointer transition-colors flex items-center gap-3 ${
+                  className={`p-4 rounded-[12px] border cursor-pointer transition-colors flex items-center gap-3 ${
                     selectedStaffs.find(ts => ts.id === s.id) ? 'border-[var(--toss-blue)] bg-[var(--toss-blue-light)]/70 ring-1 ring-[var(--toss-blue)]/30' : 'border-[var(--toss-border)] bg-[var(--toss-card)] hover:bg-[var(--toss-gray-1)]'
                   }`}
                 >
-                  <div className="w-10 h-10 rounded-lg bg-[var(--tab-bg)] flex items-center justify-center text-sm font-semibold text-[var(--toss-blue)]">{s.name[0]}</div>
+                  <div className="w-10 h-10 rounded-[12px] bg-[var(--tab-bg)] flex items-center justify-center text-sm font-semibold text-[var(--toss-blue)]">{s.name[0]}</div>
                   <div>
                     <p className="text-sm font-medium text-[var(--foreground)]">{s.name}</p>
                     <p className="text-xs text-[var(--toss-gray-3)]">기본급 ₩{(s.base_salary || 0).toLocaleString()}</p>
@@ -275,7 +275,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
                 </div>
               ))}
             </div>
-            <button onClick={handleNextStep} disabled={loading} className="w-full py-3.5 bg-[var(--toss-blue)] text-white text-sm font-semibold rounded-lg hover:opacity-90 transition-colors disabled:opacity-50">{loading ? '로딩 중...' : '다음: 수당 설정 및 정산'}</button>
+            <button onClick={handleNextStep} disabled={loading} className="w-full py-3.5 bg-[var(--toss-blue)] text-white text-sm font-semibold rounded-[12px] hover:opacity-90 transition-colors disabled:opacity-50">{loading ? '로딩 중...' : '다음: 수당 설정 및 정산'}</button>
           </div>
         )}
 
@@ -288,7 +288,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
                 const isAdvanceOnly = advancePay > 0;
                 const res = isAdvanceOnly ? { net: advancePay, taxable: 0, taxfree: 0 } : calculateSalary(s.id);
                 return (
-                  <div key={s.id} className="p-5 bg-[var(--page-bg)] border border-[var(--toss-border)] rounded-lg space-y-5">
+                  <div key={s.id} className="p-5 bg-[var(--page-bg)] border border-[var(--toss-border)] rounded-[12px] space-y-5">
                     <div className="flex justify-between items-center flex-wrap gap-2">
                       <div className="flex items-center gap-2">
                         <span className="px-2 py-0.5 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] text-xs font-medium rounded">{s.company}</span>
@@ -320,7 +320,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
                       <div className="space-y-1">
                         <label className="text-xs font-medium text-amber-700">선지급 (원)</label>
                         <input type="number" min={0} value={advancePay} onChange={(e) => updateData(s.id, 'advance_pay', Number(e.target.value) || 0)} className="w-full h-9 px-3 border border-amber-200 rounded-md text-sm focus:ring-2 focus:ring-amber-400" placeholder="0" />
-                        <p className="text-[10px] text-[var(--toss-gray-3)]">0 초과 시 해당 월 선지급만 적용</p>
+                        <p className="text-[11px] text-[var(--toss-gray-3)]">0 초과 시 해당 월 선지급만 적용</p>
                       </div>
                       <div className="space-y-1">
                         <label className="text-xs font-medium text-[var(--toss-gray-4)]">비과세 합계</label>
@@ -356,8 +356,8 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
               })}
             </div>
             <div className="flex gap-3 pt-2">
-              <button onClick={() => setStep(1)} className="flex-1 py-3 bg-[var(--toss-card)] border border-[var(--toss-border)] text-[var(--toss-gray-4)] text-sm font-medium rounded-lg hover:bg-[var(--toss-gray-1)]">이전</button>
-              <button onClick={handleFinalize} disabled={loading} className="flex-[2] py-3 bg-[var(--toss-blue)] text-white text-sm font-semibold rounded-lg hover:opacity-90 disabled:opacity-50">
+              <button onClick={() => setStep(1)} className="flex-1 py-3 bg-[var(--toss-card)] border border-[var(--toss-border)] text-[var(--toss-gray-4)] text-sm font-medium rounded-[12px] hover:bg-[var(--toss-gray-1)]">이전</button>
+              <button onClick={handleFinalize} disabled={loading} className="flex-[2] py-3 bg-[var(--toss-blue)] text-white text-sm font-semibold rounded-[12px] hover:opacity-90 disabled:opacity-50">
                 {loading ? '처리 중...' : '저장하기 · 정산 확정'}
               </button>
             </div>
@@ -369,7 +369,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
             <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-3xl mx-auto">✓</div>
             <h3 className="text-xl font-bold text-[var(--foreground)]">정산이 완료되었습니다</h3>
             <p className="text-sm text-[var(--toss-gray-3)]">명세서가 생성되었습니다. 대장에서 확인하세요.</p>
-            <button onClick={() => setStep(1)} className="px-6 py-2.5 bg-[var(--toss-blue)] text-white text-sm font-medium rounded-lg hover:opacity-90">다시 정산하기</button>
+            <button onClick={() => setStep(1)} className="px-6 py-2.5 bg-[var(--toss-blue)] text-white text-sm font-medium rounded-[12px] hover:opacity-90">다시 정산하기</button>
           </div>
         )}
       </div>

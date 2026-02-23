@@ -146,7 +146,7 @@ export default function ShiftManagement({ selectedCo }: any) {
       <header className="flex justify-between items-center">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)] tracking-tighter italic">근무 형태 관리 <span className="text-sm text-[var(--toss-blue)]">[{selectedCo}]</span></h2>
-          <p className="text-[10px] text-[var(--toss-gray-3)] font-bold uppercase mt-1">3교대, 전담직 등 병원 특화 근무 스케줄 설정</p>
+          <p className="text-[11px] text-[var(--toss-gray-3)] font-bold uppercase mt-1">3교대, 전담직 등 병원 특화 근무 스케줄 설정</p>
         </div>
         <button
           type="button"
@@ -176,7 +176,7 @@ export default function ShiftManagement({ selectedCo }: any) {
         {shifts.map((shift) => (
           <div key={shift.id} className="bg-[var(--toss-card)] border-2 border-[var(--toss-border)] p-6 hover:border-[var(--toss-blue)] transition-all group relative">
             <div className="flex justify-between items-start mb-4">
-              <span className="px-2 py-1 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] text-[9px] font-semibold uppercase">{shift.company_name || '-'}</span>
+              <span className="px-2 py-1 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] text-[11px] font-semibold uppercase">{shift.company_name || '-'}</span>
               <div className="flex items-center gap-2 text-xs font-bold">
                 <button
                   onClick={() => {
@@ -206,17 +206,17 @@ export default function ShiftManagement({ selectedCo }: any) {
             <p className="text-xs text-[var(--toss-gray-3)] font-bold mb-4">{shift.description || '설명 없음'}</p>
             <div className="flex items-center gap-4 pt-4 border-t border-[var(--toss-border)]">
               <div>
-                <p className="text-[9px] font-semibold text-[var(--toss-gray-3)] uppercase">출근</p>
+                <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">출근</p>
                 <p className="text-sm font-semibold text-[var(--foreground)]">{shift.start_time}</p>
               </div>
               <div className="text-[var(--toss-gray-3)]">→</div>
               <div>
-                <p className="text-[9px] font-semibold text-[var(--toss-gray-3)] uppercase">퇴근</p>
+                <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">퇴근</p>
                 <p className="text-sm font-semibold text-[var(--foreground)]">{shift.end_time}</p>
               </div>
               {shift.break_start_time && shift.break_end_time && (
                 <div className="ml-auto text-right">
-                  <p className="text-[9px] font-semibold text-[var(--toss-gray-3)] uppercase">휴게/점심</p>
+                  <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">휴게/점심</p>
                   <p className="text-sm font-semibold text-[var(--foreground)]">
                     {shift.break_start_time} ~ {shift.break_end_time}
                   </p>
@@ -224,7 +224,7 @@ export default function ShiftManagement({ selectedCo }: any) {
               )}
             </div>
             {(shift.shift_type || shift.weekly_work_days || shift.is_weekend_work) && (
-              <div className="mt-2 text-[10px] font-bold text-[var(--toss-gray-3)] flex flex-wrap gap-2">
+              <div className="mt-2 text-[11px] font-bold text-[var(--toss-gray-3)] flex flex-wrap gap-2">
                 {shift.shift_type && <span className="px-2 py-0.5 rounded-full bg-[var(--toss-gray-1)] border border-[var(--toss-border)]">{shift.shift_type}</span>}
                 {shift.weekly_work_days && (
                   <span className="px-2 py-0.5 rounded-full bg-[var(--toss-gray-1)] border border-[var(--toss-border)]">
@@ -332,7 +332,7 @@ export default function ShiftManagement({ selectedCo }: any) {
                       className="w-16 p-2 bg-[var(--input-bg)] border border-[var(--toss-border)] font-semibold text-xs text-center radius-toss"
                     />
                     <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">일 / 주</span>
-                    <label className="ml-2 text-[10px] font-bold text-[var(--toss-gray-4)] flex items-center gap-1">
+                    <label className="ml-2 text-[11px] font-bold text-[var(--toss-gray-4)] flex items-center gap-1">
                       <input
                         type="checkbox"
                         checked={newShift.is_weekend_work}
@@ -345,8 +345,8 @@ export default function ShiftManagement({ selectedCo }: any) {
               </div>
             </div>
             <div className="flex gap-2 pt-4">
-              <button type="button" onClick={() => { setShowAddModal(false); setEditingShiftId(null); }} className="flex-1 py-4 text-[10px] font-semibold btn-toss-secondary">취소</button>
-              <button type="button" onClick={handleSaveShift} className="flex-[2] py-4 btn-toss-primary text-[10px]">
+              <button type="button" onClick={() => { setShowAddModal(false); setEditingShiftId(null); }} className="flex-1 py-4 text-[11px] font-semibold btn-toss-secondary">취소</button>
+              <button type="button" onClick={handleSaveShift} className="flex-[2] py-4 btn-toss-primary text-[11px]">
                 {editingShiftId ? '수정 완료' : '생성 완료'}
               </button>
             </div>

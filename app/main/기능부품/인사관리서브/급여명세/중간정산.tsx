@@ -113,7 +113,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
   };
 
   return (
-    <div className="bg-[var(--toss-card)] p-6 md:p-8 rounded-lg border border-[var(--toss-border)] shadow-sm animate-in fade-in duration-300">
+    <div className="bg-[var(--toss-card)] p-6 md:p-8 rounded-[12px] border border-[var(--toss-border)] shadow-sm animate-in fade-in duration-300">
       <div className="mb-6 pb-4 border-b border-[var(--toss-border)]">
         <h2 className="text-lg font-bold text-[var(--foreground)]">중간정산</h2>
         <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">퇴직·중도 퇴사자 급여 일할 계산</p>
@@ -183,7 +183,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
           )}
         </div>
 
-        <div className="bg-[var(--tab-bg)] p-6 rounded-lg border border-[var(--toss-border)] flex flex-col justify-center">
+        <div className="bg-[var(--tab-bg)] p-6 rounded-[12px] border border-[var(--toss-border)] flex flex-col justify-center">
           {result ? (
             <div className="space-y-4">
               <div className="flex justify-between items-end">
@@ -212,7 +212,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
                   </div>
                 )}
               </div>
-              <button onClick={handleConfirm} disabled={loading} className="w-full py-3 bg-[var(--toss-blue)] text-white text-sm font-semibold rounded-lg hover:opacity-90 disabled:opacity-50">
+              <button onClick={handleConfirm} disabled={loading} className="w-full py-3 bg-[var(--toss-blue)] text-white text-sm font-semibold rounded-[12px] hover:opacity-90 disabled:opacity-50">
                 {loading ? '저장 중...' : '저장하기'}
               </button>
             </div>

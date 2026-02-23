@@ -199,7 +199,7 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
 
       {activeTab === 'company' && (
         <div className="space-y-8">
-          <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-lg shadow-sm overflow-hidden">
+          <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[12px] shadow-sm overflow-hidden">
             <div className="p-6 border-b border-[var(--toss-border)]">
               <h3 className="text-base font-bold text-[var(--foreground)]">회사(병원) 목록</h3>
               <p className="text-xs text-[var(--toss-gray-3)] mt-1">
@@ -222,7 +222,7 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
                       <td className="px-6 py-4 font-bold text-[var(--foreground)]">{c.name}</td>
                       <td className="px-6 py-4">
                         <span
-                          className={`px-2 py-1 rounded-lg text-xs font-bold ${
+                          className={`px-2 py-1 rounded-[12px] text-xs font-bold ${
                             c.type === 'MSO' ? 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)]' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'
                           }`}
                         >
@@ -245,7 +245,7 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
             </div>
           </div>
 
-          <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-lg shadow-sm p-6">
+          <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[12px] shadow-sm p-6">
             <h3 className="text-base font-bold text-[var(--foreground)] mb-4">{editing ? '회사 수정' : '회사 추가'}</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -262,7 +262,7 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
                 <select
                   value={form.type}
                   onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as CompanyType }))}
-                  className="w-full px-4 py-3 border border-[var(--toss-border)] rounded-xl focus:ring-2 focus:ring-[var(--toss-blue)]/20"
+                  className="w-full px-4 py-3 border border-[var(--toss-border)] rounded-[16px] focus:ring-2 focus:ring-[var(--toss-blue)]/20"
                 >
                   <option value="MSO">경영지원(MSO)</option>
                   <option value="HOSPITAL">병원</option>
@@ -357,7 +357,7 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
       {activeTab === 'contract' && <ContractManager />}
 
       {activeTab === 'forms' && (
-        <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-lg shadow-sm p-6">
+        <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[12px] shadow-sm p-6">
           <ApprovalFormTypesManager />
         </div>
       )}

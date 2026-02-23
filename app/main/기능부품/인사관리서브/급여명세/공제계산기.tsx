@@ -17,7 +17,7 @@ export default function DeductionCalculator({ grossSalary: initialGross }: { gro
   ];
 
   return (
-    <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] p-4 rounded-lg shadow-sm">
+    <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] p-4 rounded-[12px] shadow-sm">
       <h2 className="text-sm font-semibold text-[var(--foreground)] mb-3 flex items-center gap-2">
         <span className="w-1 h-4 bg-red-500 rounded" /> 법정 공제 계산기 (2026)
       </h2>
@@ -33,7 +33,7 @@ export default function DeductionCalculator({ grossSalary: initialGross }: { gro
       </div>
       <div className="grid grid-cols-2 gap-2">
         {taxRates.map((t, i) => (
-          <div key={i} className="p-3 border border-[var(--toss-border)] bg-[var(--page-bg)] rounded-lg">
+          <div key={i} className="p-3 border border-[var(--toss-border)] bg-[var(--page-bg)] rounded-[12px]">
             <p className="text-xs font-medium text-[var(--toss-gray-3)]">{t.name}</p>
             <p className="text-sm font-semibold text-[var(--foreground)]">
               {result && t.key in result
@@ -44,7 +44,7 @@ export default function DeductionCalculator({ grossSalary: initialGross }: { gro
         ))}
       </div>
       {result && (
-        <div className="mt-3 p-3 bg-[var(--tab-bg)] border border-[var(--toss-border)] rounded-lg">
+        <div className="mt-3 p-3 bg-[var(--tab-bg)] border border-[var(--toss-border)] rounded-[12px]">
           <p className="text-xs font-medium text-[var(--toss-gray-3)]">실급여</p>
           <p className="text-base font-bold text-[var(--toss-blue)]">{result.netSalary.toLocaleString()}원</p>
         </div>

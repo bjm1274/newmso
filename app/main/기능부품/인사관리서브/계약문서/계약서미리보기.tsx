@@ -176,10 +176,10 @@ export default function ContractPreview({ staff, contract }: Props) {
   const sig = contract?.signature_data as string | undefined;
 
   return (
-    <div className="bg-white border border-[var(--toss-border)] shadow-2xl p-10 flex flex-col h-[800px] overflow-y-auto rounded-lg relative custom-scrollbar print:shadow-none">
+    <div className="bg-white border border-[var(--toss-border)] shadow-2xl p-10 flex flex-col h-[800px] overflow-y-auto rounded-[12px] relative custom-scrollbar print:shadow-none">
       <div className="flex items-start justify-between mb-6">
         <div>
-          <p className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">
+          <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">
             근로계약서 미리보기
           </p>
           <h1 className="text-lg font-bold text-[var(--foreground)] mt-1">표준 근로계약서</h1>
@@ -190,7 +190,7 @@ export default function ContractPreview({ staff, contract }: Props) {
         <div className="flex flex-col items-end gap-2">
           {contract?.status && (
             <span
-              className={`px-3 py-1 text-[10px] font-semibold rounded-full border ${
+              className={`px-3 py-1 text-[11px] font-semibold rounded-full border ${
                 contract.status === '서명완료'
                   ? 'bg-green-50 text-green-600 border-green-100'
                   : 'bg-orange-50 text-orange-600 border-orange-100'
@@ -200,14 +200,14 @@ export default function ContractPreview({ staff, contract }: Props) {
             </span>
           )}
           {sig && (
-            <div className="text-[10px] text-[var(--toss-gray-3)]">
+            <div className="text-[11px] text-[var(--toss-gray-3)]">
               전자 서명 완료
             </div>
           )}
         </div>
       </div>
 
-      <div className="flex-1 mt-4 p-6 bg-[var(--toss-gray-1)] border border-[var(--toss-border)] rounded-xl font-mono text-[11px] leading-relaxed text-[var(--foreground)] whitespace-pre-wrap">
+      <div className="flex-1 mt-4 p-6 bg-[var(--toss-gray-1)] border border-[var(--toss-border)] rounded-[16px] font-mono text-[11px] leading-relaxed text-[var(--foreground)] whitespace-pre-wrap">
         {loading
           ? '계약서 내용을 불러오는 중입니다...'
           : text || '이 회사에 설정된 표준 근로계약서 양식이 없습니다.'}
@@ -215,11 +215,11 @@ export default function ContractPreview({ staff, contract }: Props) {
 
       {sig && (
         <div className="mt-6 pt-4 border-t border-[var(--toss-border)] flex justify-between items-center">
-          <p className="text-[10px] text-[var(--toss-gray-3)]">
+          <p className="text-[11px] text-[var(--toss-gray-3)]">
             위 내용은 전자 서명을 통해 동의된 근로계약 내용입니다.
           </p>
           <div className="flex items-center gap-3">
-            <span className="text-[10px] text-[var(--toss-gray-3)] font-semibold">근로자 서명</span>
+            <span className="text-[11px] text-[var(--toss-gray-3)] font-semibold">근로자 서명</span>
             {sig.startsWith('data:image') ? (
               <img
                 src={sig}

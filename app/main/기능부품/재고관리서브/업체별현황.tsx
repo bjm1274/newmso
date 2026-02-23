@@ -144,16 +144,16 @@ export default function VendorAnalysis() {
           type="month"
           value={selectedMonth}
           onChange={(e) => setSelectedMonth(e.target.value)}
-          className="px-4 py-2 border border-[var(--toss-border)] rounded-lg focus:outline-none focus:border-[var(--toss-blue)]"
+          className="px-4 py-2 border border-[var(--toss-border)] rounded-[12px] focus:outline-none focus:border-[var(--toss-blue)]"
         />
       </div>
 
       {/* 탭 */}
       <div className="flex gap-3 border-b border-[var(--toss-border)] pb-4">
-        <button className="px-6 py-3 font-semibold text-sm bg-[var(--toss-blue)] text-white rounded-lg">
+        <button className="px-6 py-3 font-semibold text-sm bg-[var(--toss-blue)] text-white rounded-[12px]">
           🏢 업체별 현황
         </button>
-        <button className="px-6 py-3 font-semibold text-sm bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] rounded-lg hover:bg-[var(--toss-gray-2)]">
+        <button className="px-6 py-3 font-semibold text-sm bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] rounded-[12px] hover:bg-[var(--toss-gray-2)]">
           👥 환자 처방
         </button>
       </div>
@@ -161,17 +161,17 @@ export default function VendorAnalysis() {
       {/* 업체별 현황 */}
       <div className="space-y-6">
         <div className="grid grid-cols-3 gap-4">
-          <div className="bg-[var(--toss-blue-light)] p-6 rounded-xl border border-[var(--toss-blue)]/30">
+          <div className="bg-[var(--toss-blue-light)] p-6 rounded-[16px] border border-[var(--toss-blue)]/30">
             <p className="text-xs font-bold text-[var(--toss-blue)] mb-2">총 구매액</p>
             <p className="text-2xl font-semibold text-[var(--foreground)]">
               ₩{vendorData.reduce((sum, v) => sum + v.total_purchase_amount, 0).toLocaleString()}
             </p>
           </div>
-          <div className="bg-purple-50 p-6 rounded-xl border border-purple-200">
+          <div className="bg-purple-50 p-6 rounded-[16px] border border-purple-200">
             <p className="text-xs font-bold text-purple-600 mb-2">거래 업체</p>
             <p className="text-2xl font-semibold text-purple-800">{vendorData.length}개</p>
           </div>
-          <div className="bg-green-50 p-6 rounded-xl border border-green-200">
+          <div className="bg-green-50 p-6 rounded-[16px] border border-green-200">
             <p className="text-xs font-bold text-green-600 mb-2">총 품목 수</p>
             <p className="text-2xl font-semibold text-green-800">
               {vendorData.reduce((sum, v) => sum + v.item_count, 0)}개
@@ -180,12 +180,12 @@ export default function VendorAnalysis() {
         </div>
 
         {/* 업체별 테이블 */}
-        <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-xl overflow-hidden">
+        <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-[16px] overflow-hidden">
           <div className="p-6 border-b border-[var(--toss-border)] flex justify-between items-center">
             <h3 className="text-lg font-semibold text-[var(--foreground)]">🏢 업체별 구매 현황</h3>
             <button
               onClick={downloadVendorReport}
-              className="px-4 py-2 bg-[var(--foreground)] text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-all"
+              className="px-4 py-2 bg-[var(--foreground)] text-white rounded-[12px] text-sm font-semibold hover:opacity-90 transition-all"
             >
               📥 CSV 다운로드
             </button>
@@ -246,38 +246,38 @@ export default function VendorAnalysis() {
           <h3 className="text-lg font-semibold text-[var(--foreground)]">👥 환자 처방 금액 현황</h3>
           <button
             onClick={() => setShowUploadModal(true)}
-            className="px-4 py-2 bg-[var(--toss-blue)] text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-all"
+            className="px-4 py-2 bg-[var(--toss-blue)] text-white rounded-[12px] text-sm font-semibold hover:opacity-90 transition-all"
           >
             📤 엑셀 업로드
           </button>
         </div>
 
         <div className="grid grid-cols-3 gap-4">
-          <div className="bg-green-50 p-6 rounded-xl border border-green-200">
+          <div className="bg-green-50 p-6 rounded-[16px] border border-green-200">
             <p className="text-xs font-bold text-green-600 mb-2">총 처방액</p>
             <p className="text-2xl font-semibold text-green-800">
               ₩{prescriptionData.reduce((sum, p) => sum + (p.total_amount || 0), 0).toLocaleString()}
             </p>
           </div>
-          <div className="bg-orange-50 p-6 rounded-xl border border-orange-200">
+          <div className="bg-orange-50 p-6 rounded-[16px] border border-orange-200">
             <p className="text-xs font-bold text-orange-600 mb-2">환자 수</p>
             <p className="text-2xl font-semibold text-orange-800">
               {new Set(prescriptionData.map(p => p.patient_id)).size}명
             </p>
           </div>
-          <div className="bg-pink-50 p-6 rounded-xl border border-pink-200">
+          <div className="bg-pink-50 p-6 rounded-[16px] border border-pink-200">
             <p className="text-xs font-bold text-pink-600 mb-2">처방 건수</p>
             <p className="text-2xl font-semibold text-pink-800">{prescriptionData.length}건</p>
           </div>
         </div>
 
         {/* 환자 처방 테이블 */}
-        <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-xl overflow-hidden">
+        <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-[16px] overflow-hidden">
           <div className="p-6 border-b border-[var(--toss-border)] flex justify-between items-center">
             <h4 className="font-semibold text-[var(--foreground)]">처방 내역</h4>
             <button
               onClick={downloadPrescriptionReport}
-              className="px-4 py-2 bg-[var(--foreground)] text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-all"
+              className="px-4 py-2 bg-[var(--foreground)] text-white rounded-[12px] text-sm font-semibold hover:opacity-90 transition-all"
             >
               📥 CSV 다운로드
             </button>
@@ -323,18 +323,18 @@ export default function VendorAnalysis() {
       {/* 엑셀 업로드 모달 */}
       {showUploadModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]">
-          <div className="bg-[var(--toss-card)] rounded-xl p-8 w-full max-w-md shadow-2xl">
+          <div className="bg-[var(--toss-card)] rounded-[16px] p-8 w-full max-w-md shadow-2xl">
             <h3 className="text-xl font-semibold text-[var(--foreground)] mb-6">📤 환자 처방 데이터 업로드</h3>
 
             <div className="space-y-4 mb-6">
-              <div className="bg-[var(--toss-blue-light)] p-4 rounded-lg border border-[var(--toss-blue)]/30">
+              <div className="bg-[var(--toss-blue-light)] p-4 rounded-[12px] border border-[var(--toss-blue)]/30">
                 <p className="text-sm font-bold text-[var(--toss-blue)] mb-2">📋 파일 형식</p>
                 <p className="text-xs text-[var(--toss-gray-4)]">
                   CSV 또는 엑셀 파일 (환자명, 환자ID, 품목명, 수량, 단가)
                 </p>
               </div>
 
-              <div className="border-2 border-dashed border-[var(--toss-border)] rounded-lg p-6 text-center">
+              <div className="border-2 border-dashed border-[var(--toss-border)] rounded-[12px] p-6 text-center">
                 <input
                   type="file"
                   accept=".csv,.xlsx,.xls"
@@ -355,7 +355,7 @@ export default function VendorAnalysis() {
             <div className="flex gap-3">
               <button
                 onClick={() => setShowUploadModal(false)}
-                className="flex-1 py-3 bg-[var(--toss-gray-1)] text-[var(--foreground)] rounded-lg font-bold hover:opacity-90 transition-all"
+                className="flex-1 py-3 bg-[var(--toss-gray-1)] text-[var(--foreground)] rounded-[12px] font-bold hover:opacity-90 transition-all"
               >
                 취소
               </button>
@@ -367,7 +367,7 @@ export default function VendorAnalysis() {
                   }
                 }}
                 disabled={!uploadFile}
-                className="flex-1 py-3 bg-[var(--toss-blue)] text-white rounded-lg font-bold hover:opacity-90 transition-all disabled:opacity-50"
+                className="flex-1 py-3 bg-[var(--toss-blue)] text-white rounded-[12px] font-bold hover:opacity-90 transition-all disabled:opacity-50"
               >
                 업로드
               </button>

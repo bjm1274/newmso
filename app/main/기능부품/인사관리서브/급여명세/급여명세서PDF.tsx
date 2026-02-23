@@ -120,7 +120,7 @@ export default function PayrollSlipPDF({ staff, record, yearMonth }: any) {
   const showSignArea = design?.showSignArea ?? true;
 
   return (
-    <div className="p-5 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-lg shadow-sm">
+    <div className="p-5 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[12px] shadow-sm">
       <div ref={printRef} className="relative min-h-[220px]">
         {/* 제목 – 회사명 + 해당 월 급여명세서 (위치는 디자인 설정 사용) */}
         <div
@@ -218,7 +218,7 @@ export default function PayrollSlipPDF({ staff, record, yearMonth }: any) {
           </div>
         )}
       </div>
-      <button onClick={handlePrint} className="mt-4 w-full py-2.5 bg-[var(--toss-blue)] text-white text-sm font-medium rounded-lg hover:opacity-90">
+      <button onClick={handlePrint} className="mt-4 w-full py-2.5 bg-[var(--toss-blue)] text-white text-sm font-medium rounded-[12px] hover:opacity-90">
         PDF 인쇄
       </button>
     </div>

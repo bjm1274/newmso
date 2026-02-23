@@ -191,43 +191,39 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
   };
 
   return (
-    <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-[2.5rem] p-10 h-full flex flex-col space-y-10">
+    <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-[2.5rem] px-6 py-7 sm:p-8 h-full flex flex-col space-y-7">
       
       {/* 실시간 상태 카드 */}
-      <div className="flex justify-between items-center bg-[var(--foreground)] p-8 rounded-[2rem] text-white shadow-2xl relative overflow-hidden">
+      <div className="flex justify-between items-center bg-[var(--foreground)] px-6 py-6 sm:px-8 sm:py-7 rounded-[16px] text-white shadow-2xl relative overflow-hidden">
         {/* 배경 장식 */}
         <div className="absolute -right-10 -top-10 w-40 h-40 bg-[var(--toss-card)] opacity-5 rounded-full blur-3xl"></div>
         
         <div className="space-y-2 z-10">
-          <p className="text-xs font-bold text-[var(--toss-gray-3)] uppercase tracking-widest flex items-center gap-2">
-            Real-time Status 
-            {/* 거리 표시 (테스트용) */}
+          <h2 className="text-3xl sm:text-4xl font-semibold tracking-tighter">{currentTime.toLocaleTimeString('ko-KR')}</h2>
+          <div className="flex flex-wrap items-center gap-2 mt-1">
+            <span className={`w-2 h-2 rounded-full animate-pulse ${todayLog ? (todayLog.check_out ? 'bg-[var(--toss-gray-3)]' : 'bg-green-500') : 'bg-red-500'}`}></span>
+            <span className="text-sm font-bold mr-1">
+              {todayLog ? (todayLog.check_out ? '퇴근 완료' : '근무 중') : '출근 전'}
+            </span>
             {distance !== null && (
-              <span className={`px-2 py-0.5 rounded-full text-[10px] ${distance <= ALLOWED_RADIUS_METER ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+              <span className={`px-2 py-0.5 rounded-full text-[11px] ${distance <= ALLOWED_RADIUS_METER ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
                 병원 거리: {distance}m {distance <= ALLOWED_RADIUS_METER ? '✅' : '❌'}
               </span>
             )}
-          </p>
-          <h2 className="text-4xl font-semibold tracking-tighter">{currentTime.toLocaleTimeString('ko-KR')}</h2>
-          <div className="flex items-center gap-2 mt-2">
-            <span className={`w-2 h-2 rounded-full animate-pulse ${todayLog ? (todayLog.check_out ? 'bg-[var(--toss-gray-3)]' : 'bg-green-500') : 'bg-red-500'}`}></span>
-            <span className="text-sm font-bold">
-              {todayLog ? (todayLog.check_out ? '퇴근 완료' : '근무 중') : '출근 전'}
-            </span>
           </div>
         </div>
 
         <div className="flex gap-4 z-10">
           {!todayLog && (
-            <button onClick={() => handleCommute('in')} className="px-10 py-5 bg-[var(--toss-blue)] hover:opacity-90 rounded-lg font-semibold text-lg shadow-lg active:scale-95 transition-all flex flex-col items-center leading-none gap-1">
+            <button onClick={() => handleCommute('in')} className="px-10 py-5 bg-[var(--toss-blue)] hover:opacity-90 rounded-[12px] font-semibold text-lg shadow-lg active:scale-95 transition-all flex flex-col items-center leading-none gap-1">
               <span>출근하기 ☀️</span>
-              <span className="text-[10px] font-normal opacity-70">GPS 인증 필요</span>
+              <span className="text-[11px] font-normal opacity-70">GPS 인증 필요</span>
             </button>
           )}
           {todayLog && !todayLog.check_out && (
-            <button onClick={() => handleCommute('out')} className="px-10 py-5 bg-red-600 hover:bg-red-500 rounded-lg font-semibold text-lg shadow-lg active:scale-95 transition-all flex flex-col items-center leading-none gap-1">
+            <button onClick={() => handleCommute('out')} className="px-10 py-5 bg-red-600 hover:bg-red-500 rounded-[12px] font-semibold text-lg shadow-lg active:scale-95 transition-all flex flex-col items-center leading-none gap-1">
               <span>퇴근하기 🌙</span>
-              <span className="text-[10px] font-normal opacity-70">GPS 인증 필요</span>
+              <span className="text-[11px] font-normal opacity-70">GPS 인증 필요</span>
             </button>
           )}
         </div>
@@ -257,15 +253,15 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
             return (
               <div
                 key={log.id}
-                className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-5 bg-[var(--toss-gray-1)] rounded-lg border border-transparent hover:border-[var(--toss-border)] transition-all"
+                className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-5 bg-[var(--toss-gray-1)] rounded-[12px] border border-transparent hover:border-[var(--toss-border)] transition-all"
               >
                 <div className="flex items-center gap-6">
                   <div
-                    className={`w-14 h-14 rounded-lg flex flex-col items-center justify-center font-semibold ${
+                    className={`w-14 h-14 rounded-[12px] flex flex-col items-center justify-center font-semibold ${
                       log.status === '지각' ? 'bg-red-100 text-red-600' : 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)]'
                     }`}
                   >
-                    <span className="text-[10px] opacity-60">{workDate.getMonth() + 1}월</span>
+                    <span className="text-[11px] opacity-60">{workDate.getMonth() + 1}월</span>
                     <span className="text-lg leading-tight">{workDate.getDate()}일</span>
                   </div>
                   <div>
@@ -284,7 +280,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
                     <button
                       type="button"
                       onClick={() => onRequestCorrection(log)}
-                      className="px-3 py-2 rounded-xl text-[11px] font-semibold border border-[var(--toss-blue-light)] text-[var(--toss-blue)] bg-[var(--toss-card)] hover:bg-[var(--toss-blue-light)] shrink-0"
+                      className="px-3 py-2 rounded-[16px] text-[11px] font-semibold border border-[var(--toss-blue-light)] text-[var(--toss-blue)] bg-[var(--toss-card)] hover:bg-[var(--toss-blue-light)] shrink-0"
                     >
                       정정 요청
                     </button>
@@ -301,7 +297,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
 
 function StatItem({ label, value, isWarning, isSuccess }: any) {
   return (
-    <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] p-6 rounded-[2rem] text-center shadow-sm">
+    <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] p-6 rounded-[16px] text-center shadow-sm">
       <p className="text-[11px] font-bold text-[var(--toss-gray-3)] mb-2 uppercase">{label}</p>
       <p className={`text-2xl font-semibold ${isWarning ? 'text-red-500' : isSuccess ? 'text-[var(--toss-blue)]' : 'text-[var(--foreground)]'}`}>{value}</p>
     </div>
@@ -311,7 +307,7 @@ function StatItem({ label, value, isWarning, isSuccess }: any) {
 function TimeBox({ label, time }: any) {
   return (
     <div className="text-right">
-      <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mb-1">{label}</p>
+      <p className="text-[11px] font-bold text-[var(--toss-gray-3)] mb-1">{label}</p>
       <p className="text-base font-semibold text-[var(--foreground)]">{time}</p>
     </div>
   );

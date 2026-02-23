@@ -97,8 +97,9 @@ body {
  * - 메인 액션: --toss-blue (#3182F6)
  * - 보조/비활성: --toss-gray-1~4
  * - 위험: --toss-danger (#F04452)
- * - 카드: border 1px --toss-border, rounded-lg(8px)
- * - 버튼/입력: rounded-lg, h-9/h-10
+ * - 카드/패널: border 1px --toss-border, rounded-[16px]
+ * - 버튼/입력: rounded-[12px], 작은 버튼 px-3 py-2.5, 큰 버튼 px-4 py-3
+ * - 보조 글자: text-[11px], 본문 text-xs/text-sm
  * - 탭: .tab-bar + .tab-btn / .tab-btn-active
  * - 페이지 제목: .page-title (text-lg font-semibold)
  * ======================================================== */
@@ -176,7 +177,7 @@ body {
 
 /* 레이아웃용 유틸 (전체 프로그램 통일) */
 .app-page { background: var(--page-bg); color: var(--foreground); }
-.app-card { background: var(--toss-card); border: 1px solid var(--toss-border); border-radius: 8px; }
+.app-card { background: var(--toss-card); border: 1px solid var(--toss-border); border-radius: 16px; }
 .app-header { background: var(--toss-card); border-bottom: 1px solid var(--toss-border); }
 /* 메뉴 내 상단 탭 통일: 배경·모서리 */
 .app-tab-bar { background: var(--tab-bg); border-radius: 12px; }

@@ -29,11 +29,11 @@ export default function LaborCostSimulation({ staffs, selectedCo }: any) {
   const grandTotal = filtered.reduce((s: number, st: any) => s + (Number(st.base_salary) || 0), 0);
 
   return (
-    <div className="bg-white border border-[var(--toss-border)] rounded-lg p-6 shadow-sm">
+    <div className="bg-white border border-[var(--toss-border)] rounded-[12px] p-6 shadow-sm">
       <h3 className="text-sm font-semibold text-[var(--foreground)] mb-4">💰 인건비 예측 (부서·직급별)</h3>
       <div className="space-y-4">
         <div>
-          <p className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase mb-2">부서별</p>
+          <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase mb-2">부서별</p>
           <div className="space-y-2 max-h-40 overflow-y-auto">
             {Object.entries(byDept).map(([dept, v]) => (
               <div key={dept} className="flex justify-between text-xs">
@@ -44,7 +44,7 @@ export default function LaborCostSimulation({ staffs, selectedCo }: any) {
           </div>
         </div>
         <div>
-          <p className="text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase mb-2">직급별</p>
+          <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase mb-2">직급별</p>
           <div className="space-y-2 max-h-40 overflow-y-auto">
             {Object.entries(byPosition).map(([pos, v]) => (
               <div key={pos} className="flex justify-between text-xs">

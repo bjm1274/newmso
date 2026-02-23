@@ -28,8 +28,8 @@ export default function PayrollPage() {
           <p className="text-xs text-[var(--toss-blue)] font-medium mt-0.5">Park Cheol Hong Orthopedic x SY Medical</p>
         </div>
         <div className="flex gap-2">
-          <button className="px-4 py-2.5 bg-[var(--foreground)] text-white text-xs font-medium rounded-lg hover:opacity-90">은행 이체 데이터 생성</button>
-          <button className="px-4 py-2.5 bg-[var(--toss-blue)] text-white text-xs font-medium rounded-lg hover:opacity-90">명세서 일괄 발송</button>
+          <button className="px-4 py-2.5 bg-[var(--foreground)] text-white text-xs font-medium rounded-[12px] hover:opacity-90">은행 이체 데이터 생성</button>
+          <button className="px-4 py-2.5 bg-[var(--toss-blue)] text-white text-xs font-medium rounded-[12px] hover:opacity-90">명세서 일괄 발송</button>
         </div>
       </header>
 
@@ -84,7 +84,7 @@ export default function PayrollPage() {
               <TaxReporter employees={employees} />
               <MessageTemplate />
               <div className="p-8 bg-[var(--toss-blue)] shadow-2xl">
-                <p className="text-[10px] font-semibold text-white/80 uppercase tracking-widest mb-4">Final Approval</p>
+                <p className="text-[11px] font-semibold text-white/80 uppercase tracking-widest mb-4">Final Approval</p>
                 <button className="w-full py-4 bg-white/10 text-white text-xs font-semibold hover:bg-white/20 transition-all">
                   2월 급여 최종 마감
                 </button>

@@ -36,10 +36,10 @@ export default function WorkforcePrediction({ staffs }: any) {
       <div className="flex justify-between items-center border-b pb-4">
         <div>
           <h3 className="text-lg font-semibold text-[var(--foreground)] tracking-tighter italic">AI Workforce Forecaster</h3>
-          <p className="text-[10px] text-[var(--toss-blue)] font-bold uppercase tracking-widest mt-1">Next Week Demand Prediction</p>
+          <p className="text-[11px] text-[var(--toss-blue)] font-bold uppercase tracking-widest mt-1">Next Week Demand Prediction</p>
         </div>
-        <div className="bg-blue-50 px-4 py-2 rounded-xl border border-blue-100">
-          <span className="text-[10px] font-semibold text-[var(--toss-blue)]">AI Confidence: 94.2%</span>
+        <div className="bg-blue-50 px-4 py-2 rounded-[16px] border border-blue-100">
+          <span className="text-[11px] font-semibold text-[var(--toss-blue)]">AI Confidence: 94.2%</span>
         </div>
       </div>
 
@@ -52,7 +52,7 @@ export default function WorkforcePrediction({ staffs }: any) {
               <span className="text-xs font-semibold text-[var(--toss-gray-3)]">{data.day}요일</span>
               <div className="flex flex-col items-center">
                 <span className={`text-2xl font-semibold ${data.status === 'SHORTAGE' ? 'text-red-600' : 'text-[var(--foreground)]'}`}>{data.predictedDemand}</span>
-                <span className="text-[9px] font-bold text-[var(--toss-gray-3)] uppercase">Need</span>
+                <span className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">Need</span>
               </div>
               <div className="w-full h-1.5 bg-[var(--toss-gray-1)] rounded-full mt-2 overflow-hidden">
                 <div 
@@ -61,22 +61,22 @@ export default function WorkforcePrediction({ staffs }: any) {
                 />
               </div>
               {data.status === 'SHORTAGE' && (
-                <span className="text-[9px] font-semibold text-red-500 animate-bounce mt-1">+{data.gap}명 필요</span>
+                <span className="text-[11px] font-semibold text-red-500 animate-bounce mt-1">+{data.gap}명 필요</span>
               )}
             </div>
           ))}
         </div>
       )}
 
-      <div className="bg-[#232933] p-6 rounded-[2rem] flex justify-between items-center shadow-xl">
+      <div className="bg-[#232933] p-6 rounded-[16px] flex justify-between items-center shadow-xl">
         <div className="flex gap-4 items-center">
-          <div className="w-12 h-12 bg-white/10 rounded-lg flex items-center justify-center text-2xl">💡</div>
+          <div className="w-12 h-12 bg-white/10 rounded-[12px] flex items-center justify-center text-2xl">💡</div>
           <div>
             <p className="text-white text-xs font-semibold">AI 추천 근무 편성</p>
-            <p className="text-[var(--toss-gray-3)] text-[10px] font-bold">화요일 수술팀 인력을 2명 보강하고, 금요일 연차 신청을 제한할 것을 권장합니다.</p>
+            <p className="text-[var(--toss-gray-3)] text-[11px] font-bold">화요일 수술팀 인력을 2명 보강하고, 금요일 연차 신청을 제한할 것을 권장합니다.</p>
           </div>
         </div>
-        <button className="px-6 py-3 bg-[var(--toss-blue)] text-white text-[11px] font-semibold rounded-lg shadow-lg hover:scale-105 transition-all">
+        <button className="px-6 py-3 bg-[var(--toss-blue)] text-white text-[11px] font-semibold rounded-[12px] shadow-lg hover:scale-105 transition-all">
           추천 근무표 적용
         </button>
       </div>

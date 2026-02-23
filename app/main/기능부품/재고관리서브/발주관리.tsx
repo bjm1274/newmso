@@ -88,32 +88,32 @@ export default function PurchaseOrderManagement({ user, inventory, suppliers, fe
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tighter italic">스마트 발주 제어 시스템</h2>
-            <p className="text-[10px] text-orange-600 font-bold mt-1 uppercase tracking-widest">Smart Purchase Order Engine</p>
+            <p className="text-[11px] text-orange-600 font-bold mt-1 uppercase tracking-widest">Smart Purchase Order Engine</p>
           </div>
           <button
             onClick={handleAutoGeneratePurchaseOrder}
             disabled={loading || lowStockItems.length === 0}
-            className="w-full md:w-auto px-8 py-4 bg-orange-600 text-white rounded-lg text-sm font-semibold shadow-xl shadow-orange-100 hover:scale-[0.98] transition-all disabled:opacity-50"
+            className="w-full md:w-auto px-8 py-4 bg-orange-600 text-white rounded-[12px] text-sm font-semibold shadow-xl shadow-orange-100 hover:scale-[0.98] transition-all disabled:opacity-50"
           >
             🚨 자동 발주 생성 ({lowStockItems.length})
           </button>
         </div>
 
         {lowStockItems.length === 0 ? (
-          <div className="text-center py-20 bg-green-50 rounded-[2rem] border border-dashed border-green-200">
+          <div className="text-center py-20 bg-green-50 rounded-[16px] border border-dashed border-green-200">
             <p className="text-sm font-semibold text-green-600">✅ 모든 품목이 안전재고 이상입니다.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
             {lowStockItems.map((item: any) => (
-              <div key={item.id} className="p-6 bg-orange-50 border border-orange-100 rounded-lg flex justify-between items-center">
+              <div key={item.id} className="p-6 bg-orange-50 border border-orange-100 rounded-[12px] flex justify-between items-center">
                 <div>
                   <p className="text-sm font-semibold text-[var(--foreground)]">{item.item_name}</p>
-                  <p className="text-[10px] font-bold text-orange-600 mt-1">
+                  <p className="text-[11px] font-bold text-orange-600 mt-1">
                     현재: {item.quantity}개 / 최소: {item.min_quantity}개
                   </p>
                 </div>
-                <span className="px-3 py-1 bg-orange-600 text-white rounded-full text-[9px] font-semibold">재고부족</span>
+                <span className="px-3 py-1 bg-orange-600 text-white rounded-full text-[11px] font-semibold">재고부족</span>
               </div>
             ))}
           </div>
@@ -123,27 +123,27 @@ export default function PurchaseOrderManagement({ user, inventory, suppliers, fe
       <div className="bg-white p-6 md:p-10 border border-[var(--toss-border)] shadow-xl rounded-[2.5rem]">
         <h3 className="text-xl font-semibold text-[var(--foreground)] tracking-tighter italic mb-8">발주 이력 및 상태</h3>
         {purchaseOrders.length === 0 ? (
-          <div className="text-center py-20 bg-[var(--toss-gray-1)] rounded-[2rem] border border-dashed border-[var(--toss-border)]">
+          <div className="text-center py-20 bg-[var(--toss-gray-1)] rounded-[16px] border border-dashed border-[var(--toss-border)]">
             <p className="text-sm font-semibold text-[var(--toss-gray-3)]">발주 이력이 없습니다.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-6">
             {purchaseOrders.map((order: any) => (
-              <div key={order.id} className="p-8 border border-[var(--toss-border)] rounded-[2rem] hover:shadow-lg transition-all bg-white">
+              <div key={order.id} className="p-8 border border-[var(--toss-border)] rounded-[16px] hover:shadow-lg transition-all bg-white">
                 <div className="flex justify-between items-start mb-6">
                   <div>
                     <p className="text-lg font-semibold text-[var(--foreground)]">발주서 #{order.id?.toString().slice(0, 8)}</p>
-                    <p className="text-[10px] text-[var(--toss-gray-3)] font-bold mt-1 uppercase tracking-widest">
+                    <p className="text-[11px] text-[var(--toss-gray-3)] font-bold mt-1 uppercase tracking-widest">
                       {new Date(order.created_at).toLocaleDateString()} | {order.supplier_name || '미지정'}
                     </p>
                   </div>
-                  <span className={`px-4 py-2 rounded-xl text-[10px] font-semibold ${
+                  <span className={`px-4 py-2 rounded-[16px] text-[11px] font-semibold ${
                     order.status === '승인' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'
                   }`}>
                     {order.status}
                   </span>
                 </div>
-                <div className="bg-[var(--toss-gray-1)] p-6 rounded-lg mb-6">
+                <div className="bg-[var(--toss-gray-1)] p-6 rounded-[12px] mb-6">
                   <div className="space-y-2">
                     {(order.items || []).map((item: any, idx: number) => (
                       <div key={idx} className="flex justify-between text-xs font-bold text-[var(--toss-gray-4)]">
@@ -158,7 +158,7 @@ export default function PurchaseOrderManagement({ user, inventory, suppliers, fe
                   </div>
                 </div>
                 {order.status === '대기' && (
-                  <button onClick={() => handleApprovePurchaseOrder(order.id)} className="w-full py-4 bg-green-600 text-white rounded-xl font-semibold text-xs shadow-lg hover:scale-[0.98] transition-all">✅ 발주 승인하기</button>
+                  <button onClick={() => handleApprovePurchaseOrder(order.id)} className="w-full py-4 bg-green-600 text-white rounded-[16px] font-semibold text-xs shadow-lg hover:scale-[0.98] transition-all">✅ 발주 승인하기</button>
                 )}
               </div>
             ))}

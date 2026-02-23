@@ -78,7 +78,7 @@ export default function PayrollExport({ staffs = [], checkedIds = [], selectedCo
   };
 
   return (
-    <div className="flex flex-col gap-4 p-4 bg-[var(--toss-card)] rounded-lg border border-[var(--toss-border)] shadow-sm">
+    <div className="flex flex-col gap-4 p-4 bg-[var(--toss-card)] rounded-[12px] border border-[var(--toss-border)] shadow-sm">
       <div className="pb-2 border-b border-[var(--toss-border)]">
         <h3 className="text-sm font-semibold text-[var(--foreground)]">대장 내보내기</h3>
         <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">엑셀 · 이체용 CSV</p>
@@ -88,10 +88,10 @@ export default function PayrollExport({ staffs = [], checkedIds = [], selectedCo
         <span className="text-xs text-[var(--toss-gray-3)] shrink-0">({records.length}건)</span>
       </div>
       <div className="flex gap-2">
-        <button onClick={exportExcel} disabled={loading || records.length === 0} className="flex-1 py-2.5 bg-[var(--toss-blue)] text-white text-xs font-medium rounded-lg hover:opacity-90 disabled:opacity-50">
+        <button onClick={exportExcel} disabled={loading || records.length === 0} className="flex-1 py-2.5 bg-[var(--toss-blue)] text-white text-xs font-medium rounded-[12px] hover:opacity-90 disabled:opacity-50">
           엑셀
         </button>
-        <button onClick={exportSAM} disabled={loading || records.length === 0} className="flex-1 py-2.5 bg-[var(--foreground)] text-white text-xs font-medium rounded-lg hover:opacity-90 disabled:opacity-50">
+        <button onClick={exportSAM} disabled={loading || records.length === 0} className="flex-1 py-2.5 bg-[var(--foreground)] text-white text-xs font-medium rounded-[12px] hover:opacity-90 disabled:opacity-50">
           이체 CSV
         </button>
       </div>
