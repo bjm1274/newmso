@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import 구성원관리 from './인사관리서브/구성원현황'; 
+import 구성원관리 from './인사관리서브/구성원현황';
 import CertificateGenerator from './인사관리서브/증명서발급';
 import PayrollMain from './인사관리서브/급여관리';
 import AttendanceMain from './인사관리서브/근태기록/근태관리메인';
@@ -105,32 +105,32 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
 
   return (
     <div className="flex flex-row h-full min-h-0 app-page overflow-hidden">
-      {/* 좌측: 인사관리 서브메뉴 + 하단 사업자/직원상태 필터 */}
-      <aside className="flex flex-col h-full p-3 md:p-4 bg-[var(--toss-card)] border-r border-[var(--toss-border)] shrink-0 w-[72px] md:w-44 overflow-hidden">
-        {/* 상단: 구성원/계약/문서보관함 등 메뉴 */}
-        <div className="flex flex-col gap-1.5 overflow-y-auto min-h-0">
+      {/* 상단/좌측: 인사관리 메뉴 + 하단 사업자/직원상태 필터 (모바일: 상단 가로 스크롤, PC: 좌측 사이드바) */}
+      <aside className="flex flex-col md:flex-col h-auto md:h-full p-2 md:p-4 bg-[var(--toss-card)] border-b md:border-b-0 md:border-r border-[var(--toss-border)] shrink-0 w-full md:w-44 overflow-hidden">
+        {/* 메뉴 영역: 모바일 가로 스크롤, PC 세로 리스트 */}
+        <div className="flex flex-row md:flex-col gap-1.5 overflow-x-auto md:overflow-y-auto no-scrollbar min-h-0 pb-2 md:pb-0">
           {visibleHrTabs.map(({ id }) => (
             <button
               key={id}
               onClick={() => 메뉴설정(id)}
-              className={`w-full px-3 py-2.5 text-[11px] md:text-[11px] font-semibold rounded-[12px] transition-all text-left shrink-0 ${
-                activeMenu === id
+              className={`flex-none md:w-full px-4 md:px-3 py-2 md:py-2.5 text-[11px] font-bold rounded-[12px] transition-all text-center md:text-left whitespace-nowrap ${activeMenu === id
                   ? 'bg-[var(--toss-blue)] text-white shadow-md'
                   : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
-              }`}
+                }`}
             >
               {id}
             </button>
           ))}
         </div>
-        {/* 하단: 사업자 드롭다운 + 직원상태 드롭다운 */}
-        <div className="flex flex-col gap-3 mt-auto pt-4 shrink-0 border-t border-[var(--toss-border)]">
+
+        {/* 필터 영역: 모바일 2열, PC 세로 적층 */}
+        <div className="grid grid-cols-2 md:grid-cols-1 gap-2 md:gap-3 mt-2 md:mt-auto pt-2 md:pt-4 shrink-0 border-t border-[var(--toss-border)]">
           <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-semibold text-[var(--toss-gray-4)]">사업자</label>
+            <label className="text-[10px] md:text-[11px] font-bold text-[var(--toss-gray-4)]">사업자</label>
             <select
               value={선택사업체}
               onChange={(e) => 사업체설정(e.target.value)}
-              className="w-full px-3 py-2.5 text-[11px] md:text-[11px] font-semibold rounded-[12px] border border-[var(--toss-border)] bg-emerald-50 dark:bg-emerald-950/20 text-[var(--foreground)] focus:ring-2 focus:ring-emerald-500/30 outline-none"
+              className="w-full px-2 py-2 md:px-3 md:py-2.5 text-[11px] font-bold rounded-[12px] border border-[var(--toss-border)] bg-emerald-50 dark:bg-emerald-950/20 text-[var(--foreground)] focus:ring-2 focus:ring-emerald-500/30 outline-none"
             >
               {사업체목록.map(회사 => (
                 <option key={회사} value={회사}>{회사}</option>
@@ -138,11 +138,11 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-semibold text-[var(--toss-gray-4)]">직원 상태</label>
+            <label className="text-[10px] md:text-[11px] font-bold text-[var(--toss-gray-4)]">직원 상태</label>
             <select
               value={직원상태필터}
               onChange={(e) => 직원상태필터설정(e.target.value as '재직' | '퇴사')}
-              className="w-full px-3 py-2.5 text-[11px] md:text-[11px] font-semibold rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-blue-light)]/30 text-[var(--foreground)] focus:ring-2 focus:ring-[var(--toss-blue)]/30 outline-none"
+              className="w-full px-2 py-2 md:px-3 md:py-2.5 text-[11px] font-bold rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-blue-light)]/30 text-[var(--foreground)] focus:ring-2 focus:ring-[var(--toss-blue)]/30 outline-none"
             >
               <option value="재직">재직자</option>
               <option value="퇴사">퇴사자</option>

@@ -143,76 +143,76 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
 
   const handleApproveAction = async (item: any) => {
     if (!confirm("승인하시겠습니까? 관련 데이터가 즉시 업데이트됩니다.")) return;
-    
+
     const { error: appError } = await supabase.from('approvals').update({ status: '승인' }).eq('id', item.id);
-    
+
     if (!appError) {
-        if (item.type === '물품신청' && item.meta_data.items) {
-            await supabase.from('notifications').insert([{
-                user_id: '00000000-0000-4000-a000-000000000001', 
-                type: '물품이동요청',
-                title: '📦 물품 부서이동 승인 알림',
-                body: `[${item.title}] 결재가 최종 승인되었습니다. 물품 이동을 완료해주세요.`,
-                metadata: { approval_id: item.id, items: item.meta_data.items }
-            }]);
-            alert("물품 신청이 승인되었습니다. 행정팀에서 물품 이동을 완료하면 재고가 반영됩니다.");
-        }
+      if (item.type === '물품신청' && item.meta_data.items) {
+        await supabase.from('notifications').insert([{
+          user_id: '00000000-0000-4000-a000-000000000001',
+          type: '물품이동요청',
+          title: '📦 물품 부서이동 승인 알림',
+          body: `[${item.title}] 결재가 최종 승인되었습니다. 물품 이동을 완료해주세요.`,
+          metadata: { approval_id: item.id, items: item.meta_data.items }
+        }]);
+        alert("물품 신청이 승인되었습니다. 행정팀에서 물품 이동을 완료하면 재고가 반영됩니다.");
+      }
 
-        if (item.type === '인사명령' && item.meta_data.orderTargetId) {
-            const { orderTargetId, newPosition, orderCategory } = item.meta_data;
-            const updateData: any = {};
-            if (newPosition) updateData.position = newPosition;
-            if (orderCategory === '부서 이동(전보)' && item.meta_data.targetDept) {
-                updateData.department = item.meta_data.targetDept;
-            }
-            if (Object.keys(updateData).length > 0) {
-                await supabase.from('staff_members').update(updateData).eq('id', orderTargetId);
-            }
+      if (item.type === '인사명령' && item.meta_data.orderTargetId) {
+        const { orderTargetId, newPosition, orderCategory } = item.meta_data;
+        const updateData: any = {};
+        if (newPosition) updateData.position = newPosition;
+        if (orderCategory === '부서 이동(전보)' && item.meta_data.targetDept) {
+          updateData.department = item.meta_data.targetDept;
         }
-
-        if (item.type === '연차/휴가') {
-            const startStr = item.meta_data?.startDate || item.meta_data?.start;
-            const endStr = item.meta_data?.endDate || item.meta_data?.end || startStr;
-            const start = new Date(startStr);
-            const end = new Date(endStr);
-            const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
-            for (let d = 0; d < days; d++) {
-                const dte = new Date(start);
-                dte.setDate(dte.getDate() + d);
-                const dateStr = dte.toISOString().split('T')[0];
-                await supabase.from('attendance').upsert({
-                    staff_id: item.sender_id,
-                    date: dateStr,
-                    status: '휴가',
-                }, { onConflict: 'staff_id,date' });
-                try {
-                    await supabase.from('attendances').upsert({
-                        staff_id: item.sender_id,
-                        work_date: dateStr,
-                        status: 'annual_leave',
-                    }, { onConflict: 'staff_id,work_date' });
-                } catch (_) {}
-            }
-            const { data: staff } = await supabase.from('staff_members').select('annual_leave_used').eq('id', item.sender_id).single();
-            const used = (Number(staff?.annual_leave_used) || 0) + days;
-            await supabase.from('staff_members').update({ annual_leave_used: used }).eq('id', item.sender_id);
+        if (Object.keys(updateData).length > 0) {
+          await supabase.from('staff_members').update(updateData).eq('id', orderTargetId);
         }
+      }
 
-        if (item.type === '양식신청' && item.meta_data?.form_type && item.meta_data?.target_staff && item.meta_data?.auto_issue) {
+      if (item.type === '연차/휴가') {
+        const startStr = item.meta_data?.startDate || item.meta_data?.start;
+        const endStr = item.meta_data?.endDate || item.meta_data?.end || startStr;
+        const start = new Date(startStr);
+        const end = new Date(endStr);
+        const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+        for (let d = 0; d < days; d++) {
+          const dte = new Date(start);
+          dte.setDate(dte.getDate() + d);
+          const dateStr = dte.toISOString().split('T')[0];
+          await supabase.from('attendance').upsert({
+            staff_id: item.sender_id,
+            date: dateStr,
+            status: '휴가',
+          }, { onConflict: 'staff_id,date' });
           try {
-            const sn = `CERT-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(Date.now()).slice(-6)}`;
-            await supabase.from('certificate_issuances').insert({
-              staff_id: item.meta_data.target_staff,
-              cert_type: item.meta_data.form_type,
-              serial_no: sn,
-              purpose: item.meta_data.purpose || '제출용',
-              issued_by: user?.id,
-            });
-          } catch (_) {}
+            await supabase.from('attendances').upsert({
+              staff_id: item.sender_id,
+              work_date: dateStr,
+              status: 'annual_leave',
+            }, { onConflict: 'staff_id,work_date' });
+          } catch (_) { }
         }
+        const { data: staff } = await supabase.from('staff_members').select('annual_leave_used').eq('id', item.sender_id).single();
+        const used = (Number(staff?.annual_leave_used) || 0) + days;
+        await supabase.from('staff_members').update({ annual_leave_used: used }).eq('id', item.sender_id);
+      }
 
-        alert("승인 처리가 완료되었습니다.");
-        fetchApprovals();
+      if (item.type === '양식신청' && item.meta_data?.form_type && item.meta_data?.target_staff && item.meta_data?.auto_issue) {
+        try {
+          const sn = `CERT-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(Date.now()).slice(-6)}`;
+          await supabase.from('certificate_issuances').insert({
+            staff_id: item.meta_data.target_staff,
+            cert_type: item.meta_data.form_type,
+            serial_no: sn,
+            purpose: item.meta_data.purpose || '제출용',
+            issued_by: user?.id,
+          });
+        } catch (_) { }
+      }
+
+      alert("승인 처리가 완료되었습니다.");
+      fetchApprovals();
     } else {
       alert("승인 처리에 실패했습니다. " + (appError?.message || ""));
     }
@@ -310,7 +310,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                     <span className="w-2 h-2 bg-[var(--toss-blue)] rounded-full animate-pulse"></span>
                     결재선 지정
                   </label>
-                  
+
                   <div className="flex gap-0.5 p-1 app-tab-bar w-full md:w-auto overflow-x-auto no-scrollbar">
                     {['전체', '박철홍정형외과', '수연의원', 'SY INC.'].map(co => (
                       <button
@@ -325,16 +325,16 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                 </div>
 
                 <select onChange={(e) => {
-                    const s = approverCandidates.find((st: any) => st.id === e.target.value);
-                    if (s && !approverLine.find(al => al.id === s.id)) setApproverLine([...approverLine, s]);
-                    e.target.value = '';
+                  const s = approverCandidates.find((st: any) => st.id === e.target.value);
+                  if (s && !approverLine.find(al => al.id === s.id)) setApproverLine([...approverLine, s]);
+                  e.target.value = '';
                 }} className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] text-xs font-bold border border-[var(--toss-border)] outline-none shadow-sm">
-                    <option value="">결재자 추가...</option>
-                    {approverCandidates.map((s: any) => (
-                      <option key={s.id} value={s.id}>{s.name} {s.position || ''} {s.company ? `(${s.company})` : ''}</option>
-                    ))}
+                  <option value="">결재자 추가...</option>
+                  {approverCandidates.map((s: any) => (
+                    <option key={s.id} value={s.id}>{s.name} {s.position || ''} {s.company ? `(${s.company})` : ''}</option>
+                  ))}
                 </select>
-                <div className="flex gap-2 flex-wrap">{approverLine.map((a, i) => <div key={i} className="bg-[var(--toss-card)] px-4 py-3 rounded-[12px] border border-[var(--toss-border)] text-[11px] font-bold shadow-sm text-[var(--toss-blue)] flex items-center gap-2">{i+1}. {a.name} {a.position} <button onClick={() => setApproverLine(approverLine.filter((_,idx)=>idx!==i))} className="ml-1 text-[var(--toss-gray-3)] hover:text-red-500">✕</button></div>)}</div>
+                <div className="flex gap-2 flex-wrap">{approverLine.map((a, i) => <div key={i} className="bg-[var(--toss-card)] px-4 py-3 rounded-[12px] border border-[var(--toss-border)] text-[11px] font-bold shadow-sm text-[var(--toss-blue)] flex items-center gap-2">{i + 1}. {a.name} {a.position} <button onClick={() => setApproverLine(approverLine.filter((_, idx) => idx !== i))} className="ml-1 text-[var(--toss-gray-3)] hover:text-red-500">✕</button></div>)}</div>
               </div>
 
               <div className="flex gap-2 p-1.5 bg-[var(--toss-gray-1)] rounded-[12px] w-full overflow-x-auto no-scrollbar">
@@ -453,46 +453,46 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                     return { step: i + 1, name, isCurrent };
                   });
                   return (
-                  <div
-                    key={item.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => setSelectedApprovalId(item.id)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedApprovalId(item.id); } }}
-                    className="bg-[var(--toss-card)] p-6 md:p-8 border border-[var(--toss-border)] rounded-[16px] shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6 group hover:border-[var(--toss-blue)]/30 hover:shadow-md transition-all animate-in fade-in-up cursor-pointer"
-                  >
-                    <div className="flex gap-4 md:gap-6 items-center flex-1 min-w-0">
+                    <div
+                      key={item.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setSelectedApprovalId(item.id)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedApprovalId(item.id); } }}
+                      className="bg-[var(--toss-card)] p-6 md:p-8 border border-[var(--toss-border)] rounded-[16px] shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6 group hover:border-[var(--toss-blue)]/30 hover:shadow-md transition-all animate-in fade-in-up cursor-pointer"
+                    >
+                      <div className="flex gap-4 md:gap-6 items-center flex-1 min-w-0">
                         <div className="w-14 h-14 md:w-16 md:h-16 bg-[var(--toss-gray-1)] shrink-0 rounded-[12px] flex items-center justify-center text-xl md:text-2xl shadow-inner group-hover:bg-[var(--toss-blue-light)] transition-colors">
-                            {item.type === '물품신청' ? '📦' : item.type === '양식신청' ? '📄' : item.type === '인사명령' ? '🎖️' : item.type === '수리요청서' ? '🔧' : '📋'}
+                          {item.type === '물품신청' ? '📦' : item.type === '양식신청' ? '📄' : item.type === '인사명령' ? '🎖️' : item.type === '수리요청서' ? '🔧' : '📋'}
                         </div>
                         <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap gap-2 mb-2 items-center">
-                                <span className="px-2 py-0.5 bg-[var(--toss-gray-1)] rounded-md text-[11px] md:text-[11px] font-semibold text-[var(--toss-gray-3)]">{item.type}</span>
-                                <span className={`px-2 py-0.5 rounded-md text-[11px] md:text-[11px] font-semibold ${item.status === '승인' ? 'bg-green-100 text-green-600' : item.status === '반려' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-500'}`}>{item.status}</span>
-                                <span className="px-2 py-0.5 bg-[var(--toss-blue-light)] rounded-md text-[11px] md:text-[11px] font-semibold text-[var(--toss-blue)]">{item.sender_company}</span>
+                          <div className="flex flex-wrap gap-2 mb-2 items-center">
+                            <span className="px-2 py-0.5 bg-[var(--toss-gray-1)] rounded-md text-[11px] md:text-[11px] font-semibold text-[var(--toss-gray-3)]">{item.type}</span>
+                            <span className={`px-2 py-0.5 rounded-md text-[11px] md:text-[11px] font-semibold ${item.status === '승인' ? 'bg-green-100 text-green-600' : item.status === '반려' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-500'}`}>{item.status}</span>
+                            <span className="px-2 py-0.5 bg-[var(--toss-blue-light)] rounded-md text-[11px] md:text-[11px] font-semibold text-[var(--toss-blue)]">{item.sender_company}</span>
+                          </div>
+                          <h3 className="font-semibold text-[var(--foreground)] text-sm md:text-base tracking-tight line-clamp-1">{item.title}</h3>
+                          <p className="text-[11px] md:text-[11px] text-[var(--toss-gray-3)] font-bold mt-1">기안자: {item.sender_name || '사용자'} | {new Date(item.created_at).toLocaleDateString()}</p>
+                          {steps.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              <span className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">결재선</span>
+                              {steps.map((s: { step: number; name: string; isCurrent: boolean }) => (
+                                <span key={s.step} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold ${item.status === '승인' ? 'bg-green-50 text-green-600' : s.isCurrent ? 'bg-amber-100 text-amber-700' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]'}`}>
+                                  {s.step}. {s.name} {item.status === '승인' ? '(승인)' : s.isCurrent ? '(결재대기)' : '(대기)'}
+                                </span>
+                              ))}
                             </div>
-                            <h3 className="font-semibold text-[var(--foreground)] text-sm md:text-base tracking-tight line-clamp-1">{item.title}</h3>
-                            <p className="text-[11px] md:text-[11px] text-[var(--toss-gray-3)] font-bold mt-1">기안자: {item.sender_name || '사용자'} | {new Date(item.created_at).toLocaleDateString()}</p>
-                            {steps.length > 0 && (
-                              <div className="mt-2 flex flex-wrap gap-1.5">
-                                <span className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">결재선</span>
-                                {steps.map((s: { step: number; name: string; isCurrent: boolean }) => (
-                                  <span key={s.step} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold ${item.status === '승인' ? 'bg-green-50 text-green-600' : s.isCurrent ? 'bg-amber-100 text-amber-700' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]'}`}>
-                                    {s.step}. {s.name} {item.status === '승인' ? '(승인)' : s.isCurrent ? '(결재대기)' : '(대기)'}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
+                          )}
                         </div>
-                    </div>
-                    
-                    {(viewMode === '결재함' || (viewMode === '기안함' && item.status === '대기')) && item.status === '대기' && String(item.current_approver_id) === String(user?.id) && (
-                      <div className="flex gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
-                        <button type="button" onClick={() => handleApproveAction(item)} className="px-5 py-3 bg-[var(--toss-blue)] text-white rounded-[12px] text-[11px] font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all">승인</button>
-                        <button type="button" onClick={() => handleRejectAction(item)} className="px-5 py-3 bg-[var(--toss-danger)] text-white rounded-[12px] text-[11px] font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all">반려</button>
                       </div>
-                    )}
-                  </div>
+
+                      {(viewMode === '결재함' || (viewMode === '기안함' && item.status === '대기')) && item.status === '대기' && String(item.current_approver_id) === String(user?.id) && (
+                        <div className="flex gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                          <button type="button" onClick={() => handleApproveAction(item)} className="px-5 py-3 bg-[var(--toss-blue)] text-white rounded-[12px] text-[11px] font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all">승인</button>
+                          <button type="button" onClick={() => handleRejectAction(item)} className="px-5 py-3 bg-[var(--toss-danger)] text-white rounded-[12px] text-[11px] font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all">반려</button>
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
               </div>
@@ -500,6 +500,17 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
           </div>
         )}
       </main>
+
+      {/* 모바일 전용 기안 작성 FAB (작성하기 아닐 때만 노출) */}
+      {viewMode !== '작성하기' && (
+        <button
+          onClick={() => setViewMode('작성하기')}
+          className="md:hidden fixed bottom-24 right-6 w-14 h-14 bg-[var(--toss-blue)] text-white rounded-full shadow-2xl flex items-center justify-center z-[80] active:scale-90 transition-transform animate-in zoom-in duration-300"
+          aria-label="기안 작성하기"
+        >
+          <span className="text-3xl">✍️</span>
+        </button>
+      )}
 
       {/* 결재 상세 모달 */}
       {selectedApprovalId && (() => {
