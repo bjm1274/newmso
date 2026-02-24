@@ -1,13 +1,23 @@
 'use client';
+import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
 
 export default function SalarySlipUI({ user, currentDate, salaryData, totalPayment, totalDeduction }: any) {
+  const [sealUrl, setSealUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user?.company) return;
+    supabase.from('contract_templates').select('seal_url').eq('company_name', user.company).maybeSingle().then(({ data }) => {
+      if (data?.seal_url) setSealUrl(data.seal_url);
+    });
+  }, [user?.company]);
   if (!salaryData) return null;
   const realPayment = totalPayment - totalDeduction;
 
   return (
     // [핵심] 고정폭(210mm) 제거 -> w-full로 변경하여 프린터 여백에 유동적 대응
     <div className="w-full max-w-[210mm] mx-auto bg-white text-black p-12 print:p-8 box-border flex flex-col h-full min-h-[280mm]">
-      
+
       {/* 1. 헤더 */}
       <div className="text-center border-b-4 border-double border-[var(--foreground)] pb-5 mb-8">
         <h1 className="text-4xl font-semibold tracking-[0.5em] text-[var(--foreground)] mb-2">급 여 명 세 서</h1>
@@ -89,15 +99,19 @@ export default function SalarySlipUI({ user, currentDate, salaryData, totalPayme
         <p className="text-sm font-bold text-[var(--toss-gray-4)] mb-6">위와 같이 급여가 정히 지급되었음을 통지합니다.</p>
         <div className="relative inline-flex items-center gap-4 justify-center">
           <h2 className="text-3xl font-semibold text-[var(--foreground)] tracking-[0.4em] relative z-10 whitespace-nowrap">
-            {user.company || '박철홍정형외과'} 대표원장
+            {user.company || '박철홍정형외과'}
           </h2>
-          <div className="relative w-20 h-20 border-[5px] border-red-600 rounded-full flex items-center justify-center text-red-600 font-semibold text-base rotate-12 opacity-80 border-double">
-            <span className="text-[11px] leading-tight text-center">
-              {user.company || '박철홍정형외과'}
-              <br />
-              (인)
-            </span>
-          </div>
+          {sealUrl ? (
+            <img src={sealUrl} alt="사업자 직인" className="absolute -right-16 -top-2 w-20 h-20 object-contain mix-blend-multiply" />
+          ) : (
+            <div className="absolute -right-16 -top-2 w-20 h-20 border-[5px] border-red-600 rounded-full flex items-center justify-center text-red-600 font-semibold text-base rotate-12 opacity-80 border-double mix-blend-multiply">
+              <span className="text-[11px] leading-tight text-center">
+                {user.company || '박철홍정형외과'}
+                <br />
+                (인)
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </div>

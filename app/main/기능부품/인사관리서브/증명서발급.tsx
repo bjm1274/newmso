@@ -16,6 +16,17 @@ export default function CertificateGenerator({ staffs = [] }: any) {
   const [showHistory, setShowHistory] = useState(false);
   const [historyList, setHistoryList] = useState<any[]>([]);
   const printRef = useRef<HTMLDivElement>(null);
+  const [seals, setSeals] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    supabase.from('contract_templates').select('company_name, seal_url').then(({ data }) => {
+      if (data) {
+        const map: Record<string, string> = {};
+        data.forEach(d => { if (d.seal_url && d.company_name) map[d.company_name] = d.seal_url; });
+        setSeals(map);
+      }
+    });
+  }, []);
 
   const joined = selectedStaff?.joined_at || selectedStaff?.join_date;
   const resigned = selectedStaff?.resigned_at;
@@ -46,7 +57,7 @@ export default function CertificateGenerator({ staffs = [] }: any) {
         purpose,
         issued_by: u.id,
       });
-    } catch (_) {}
+    } catch (_) { }
     setTimeout(() => {
       if (!printRef.current) return;
       const html = printRef.current.innerHTML.replace('제 2026-0001', `제 ${sn}`).replace(/2026-0001/g, sn);
@@ -69,7 +80,8 @@ export default function CertificateGenerator({ staffs = [] }: any) {
         #cert-print-root .cert-footer .cert-date { font-size: 12px; font-weight: 700; color: #6b7280; margin-bottom: 1.5rem; }
         #cert-print-root .cert-footer .cert-sign { font-size: 1.25rem; font-weight: 600; font-style: italic; margin-top: 2rem; position: relative; display: inline-block; }
         #cert-print-root .cert-seal { position: absolute; right: -3rem; top: -0.5rem; width: 5rem; height: 5rem; border: 4px solid rgba(220,38,38,0.8); border-radius: 50%; display: flex; align-items: center; justify-content: center; transform: rotate(12deg); opacity: 0.9; font-size: 10px; font-weight: 600; color: rgba(220,38,38,0.9); text-align: center; line-height: 1.2; }
-        @media print { body { background: #fff !important; padding: 0; } #cert-print-root { box-shadow: none; border: 1px solid #ccc; } }
+        #cert-print-root img.cert-seal-img { position: absolute; right: -4rem; top: -0.5rem; width: 6rem; height: 6rem; object-fit: contain; mix-blend-mode: multiply; }
+        @media print { body { background: #fff !important; padding: 0; } #cert-print-root { box-shadow: none; border: 1px solid #ccc; } #cert-print-root img.cert-seal-img { mix-blend-mode: multiply; } }
       `;
       w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${certType}</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600;700&display=swap" rel="stylesheet"><style>${printStyles}</style></head><body><div id="cert-print-root">${html}</div></body></html>`);
       w.document.close();
@@ -105,25 +117,25 @@ export default function CertificateGenerator({ staffs = [] }: any) {
           <div className="bg-[var(--toss-card)] p-8 rounded-[2.5rem] border border-[var(--toss-border)] shadow-xl space-y-8">
             <div className="space-y-4">
               <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">1. 발급 대상 직원</label>
-              <select 
-                onChange={(e) => setSelectedStaff(staffs.find((s:any) => s.id === e.target.value))}
+              <select
+                onChange={(e) => setSelectedStaff(staffs.find((s: any) => s.id === e.target.value))}
                 className="w-full p-5 bg-[var(--input-bg)] rounded-[12px] text-sm font-semibold border-none outline-none focus:ring-2 focus:ring-[var(--toss-blue)] transition-all"
               >
                 <option value="">직원 선택...</option>
-                {staffs.map((s:any) => <option key={s.id} value={s.id}>{s.name} ({s.department} / {s.position})</option>)}
+                {staffs.map((s: any) => <option key={s.id} value={s.id}>{s.name} ({s.department} / {s.position})</option>)}
               </select>
             </div>
 
             <div className="space-y-4">
               <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">2. 용도</label>
-              <input type="text" value={purpose} onChange={e=>setPurpose(e.target.value)} placeholder="금융기관 제출용" className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] text-sm font-bold border-none outline-none focus:ring-2 focus:ring-[var(--toss-blue)]" />
+              <input type="text" value={purpose} onChange={e => setPurpose(e.target.value)} placeholder="금융기관 제출용" className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] text-sm font-bold border-none outline-none focus:ring-2 focus:ring-[var(--toss-blue)]" />
             </div>
             <div className="space-y-4">
               <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">3. 증명서 종류</label>
               <div className="grid grid-cols-1 gap-3">
                 {CERTIFICATE_TYPES.map((c) => (
-                  <button 
-                    key={c.id} 
+                  <button
+                    key={c.id}
                     onClick={() => setCertType(c.id)}
                     className={`p-5 rounded-[12px] text-xs font-semibold border-2 text-left transition-all flex justify-between items-center ${certType === c.id ? 'border-[var(--toss-blue)] bg-[var(--toss-blue-light)] text-[var(--toss-blue)]' : 'border-[var(--toss-border)] text-[var(--toss-gray-3)] hover:border-[var(--toss-border)] bg-[var(--toss-gray-1)]/50'}`}
                   >
@@ -134,7 +146,7 @@ export default function CertificateGenerator({ staffs = [] }: any) {
               </div>
             </div>
 
-            <button 
+            <button
               onClick={handleIssue}
               className="w-full py-6 bg-[var(--toss-blue)] text-white rounded-[16px] font-semibold text-sm shadow-xl shadow-[var(--toss-blue)] hover:scale-[0.98] transition-all"
             >
@@ -153,7 +165,7 @@ export default function CertificateGenerator({ staffs = [] }: any) {
         {/* 미리보기 패널 */}
         <div className="lg:col-span-8 bg-[var(--toss-card)] rounded-[3rem] p-8 md:p-16 border border-[var(--toss-border)] shadow-2xl flex flex-col items-center justify-center relative overflow-hidden min-h-[800px]">
           <div className="absolute top-8 right-8 bg-[var(--foreground)] text-white px-4 py-1.5 text-[11px] font-semibold rounded-full tracking-widest">PREVIEW</div>
-          
+
           {selectedStaff ? (
             <div ref={printRef} className="w-full max-w-[600px] bg-[var(--toss-card)] shadow-2xl p-12 md:p-20 space-y-12 text-center border border-[var(--toss-border)] relative animate-in zoom-in-95 duration-500">
               {/* 워터마크: 발급 대상 직원 소속 회사 (인쇄창 스타일용 클래스) */}
@@ -199,14 +211,18 @@ export default function CertificateGenerator({ staffs = [] }: any) {
                 <div className="cert-footer pt-24 text-center space-y-10">
                   <p className="cert-closing text-sm font-semibold text-[var(--foreground)] tracking-widest">{certClosingText[certType] || '위와 같이 증명함.'}</p>
                   <p className="cert-date text-xs font-bold text-[var(--toss-gray-3)]">{new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-                  
+
                   <div className="cert-sign-wrap relative inline-block pt-10">
-                    <p className="cert-sign text-2xl font-semibold tracking-tighter text-[var(--foreground)] italic">{selectedStaff.company || 'SY INC.'} 대표이사 박철홍</p>
-                    <div className="cert-seal absolute -right-12 -top-2 w-20 h-20 border-4 border-red-600/80 rounded-full flex items-center justify-center rotate-12 opacity-80">
-                      <div className="text-[11px] font-semibold text-red-600/80 text-center leading-tight">
-                        {selectedStaff.company || 'SY INC.'}<br/>대표이사<br/>박철홍
+                    <p className="cert-sign text-2xl font-semibold tracking-tighter text-[var(--foreground)] italic">{selectedStaff.company || 'SY INC.'} 대표이사/원장</p>
+                    {seals[selectedStaff.company || '전체'] ? (
+                      <img src={seals[selectedStaff.company || '전체']} alt="seal" className="cert-seal-img" />
+                    ) : (
+                      <div className="cert-seal absolute -right-12 -top-2 w-20 h-20 border-4 border-red-600/80 rounded-full flex items-center justify-center rotate-12 opacity-80">
+                        <div className="text-[11px] font-semibold text-red-600/80 text-center leading-tight">
+                          {selectedStaff.company || 'SY INC.'}<br />대표이사<br />박철홍
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               </div>
