@@ -25,6 +25,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const [suppliesLoadKey, setSuppliesLoadKey] = useState(0);
   const [selectedApprovalId, setSelectedApprovalId] = useState<string | null>(null);
   const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대기' | '승인' | '반려'>('전체');
+  const [savedApproverLine, setSavedApproverLine] = useState<any[]>([]);
   const isMso = user?.company === 'SY INC.' || user?.permissions?.mso === true;
 
   const BUILTIN_FORM_TYPES = ['인사명령', '연차/휴가', '연장근무', '물품신청', '수리요청서', '업무기안', '업무협조', '양식신청', '출결정정'];
@@ -45,6 +46,15 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       setCustomFormTypes((data || []).map((r: any) => ({ name: r.name, slug: r.slug })));
     });
   }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && user?.id) {
+      try {
+        const saved = window.localStorage.getItem(`erp_fav_approveline_${user.id}`);
+        if (saved) setSavedApproverLine(JSON.parse(saved));
+      } catch { }
+    }
+  }, [user?.id]);
 
   // initialView 또는 로컬스토리지에서 탭 복구
   useEffect(() => {
@@ -324,16 +334,42 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                   </div>
                 </div>
 
-                <select onChange={(e) => {
-                  const s = approverCandidates.find((st: any) => st.id === e.target.value);
-                  if (s && !approverLine.find(al => al.id === s.id)) setApproverLine([...approverLine, s]);
-                  e.target.value = '';
-                }} className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] text-xs font-bold border border-[var(--toss-border)] outline-none shadow-sm">
-                  <option value="">결재자 추가...</option>
-                  {approverCandidates.map((s: any) => (
-                    <option key={s.id} value={s.id}>{s.name} {s.position || ''} {s.company ? `(${s.company})` : ''}</option>
-                  ))}
-                </select>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <select onChange={(e) => {
+                    const s = approverCandidates.find((st: any) => st.id === e.target.value);
+                    if (s && !approverLine.find(al => al.id === s.id)) setApproverLine([...approverLine, s]);
+                    e.target.value = '';
+                  }} className="flex-1 p-4 bg-[var(--input-bg)] rounded-[12px] text-xs font-bold border border-[var(--toss-border)] outline-none shadow-sm">
+                    <option value="">결재자 추가...</option>
+                    {approverCandidates.map((s: any) => (
+                      <option key={s.id} value={s.id}>{s.name} {s.position || ''} {s.company ? `(${s.company})` : ''}</option>
+                    ))}
+                  </select>
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSavedApproverLine(approverLine);
+                        if (typeof window !== 'undefined' && user?.id) {
+                          window.localStorage.setItem(`erp_fav_approveline_${user.id}`, JSON.stringify(approverLine));
+                        }
+                        alert('현재 결재선이 즐겨찾기로 저장되었습니다.');
+                      }}
+                      className="px-4 py-3 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[12px] text-[11px] font-bold text-[var(--toss-blue)] hover:bg-[var(--toss-gray-1)]"
+                    >
+                      ⭐ 즐겨찾기 저장
+                    </button>
+                    {savedApproverLine.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setApproverLine(savedApproverLine)}
+                        className="px-4 py-3 bg-[var(--toss-blue)] border border-[var(--toss-blue)] rounded-[12px] text-[11px] font-bold text-white shadow-sm hover:opacity-95"
+                      >
+                        ⭐ 즐겨찾기 불러오기
+                      </button>
+                    )}
+                  </div>
+                </div>
                 <div className="flex gap-2 flex-wrap">{approverLine.map((a, i) => <div key={i} className="bg-[var(--toss-card)] px-4 py-3 rounded-[12px] border border-[var(--toss-border)] text-[11px] font-bold shadow-sm text-[var(--toss-blue)] flex items-center gap-2">{i + 1}. {a.name} {a.position} <button onClick={() => setApproverLine(approverLine.filter((_, idx) => idx !== i))} className="ml-1 text-[var(--toss-gray-3)] hover:text-red-500">✕</button></div>)}</div>
               </div>
 

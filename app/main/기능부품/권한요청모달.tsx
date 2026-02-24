@@ -8,6 +8,7 @@ export default function PermissionPromptModal() {
   const [open, setOpen] = useState(false);
   const [notifying, setNotifying] = useState(false);
   const [gpsing, setGpsing] = useState(false);
+  const [actionDone, setActionDone] = useState(false);
 
   useEffect(() => {
     try {
@@ -22,7 +23,7 @@ export default function PermissionPromptModal() {
   const close = () => {
     try {
       localStorage.setItem(STORAGE_KEY, '1');
-    } catch {}
+    } catch { }
     setOpen(false);
   };
 
@@ -39,10 +40,12 @@ export default function PermissionPromptModal() {
           const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('erp_user') : null;
           const u = raw ? JSON.parse(raw) : null;
           await initNotificationService(u?.id);
-        } catch (_) {}
+        } catch (_) { }
         alert('알림이 허용되었습니다. 채팅·결재 등 푸시 알림을 받을 수 있습니다.');
+        setActionDone(true);
       } else if (permission === 'denied') {
         alert('알림이 거부되었습니다. 채팅 알림은 앱 내 배너로만 표시됩니다. 브라우저 설정에서 변경할 수 있습니다.');
+        setActionDone(true);
       }
     } catch (e) {
       console.error(e);
@@ -61,11 +64,13 @@ export default function PermissionPromptModal() {
       () => {
         alert('위치 권한이 허용되었습니다. 출퇴근 시 GPS 인증을 사용할 수 있습니다.');
         setGpsing(false);
+        setActionDone(true);
       },
       (err) => {
         if (err.code === 1) alert('위치 권한이 거부되었습니다. 출퇴근 시 브라우저에서 다시 허용할 수 있습니다.');
         else alert('위치를 가져오지 못했습니다: ' + (err.message || '알 수 없는 오류'));
         setGpsing(false);
+        setActionDone(true);
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
@@ -106,7 +111,7 @@ export default function PermissionPromptModal() {
             onClick={close}
             className="w-full py-2.5 px-4 rounded-[16px] border border-[var(--toss-border)] text-[var(--toss-gray-4)] text-sm font-bold mt-1"
           >
-            나중에 하기
+            {actionDone ? '닫기' : '나중에 하기'}
           </button>
         </div>
       </div>
