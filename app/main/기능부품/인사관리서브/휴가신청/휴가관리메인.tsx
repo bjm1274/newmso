@@ -140,14 +140,13 @@ export default function LeaveManagement({ staffs = [], selectedCo, onRefresh }: 
         </div>
         <div className="flex gap-2 w-full md:w-auto overflow-x-auto no-scrollbar">
           {['연차/휴가 신청내역', '연차 대시보드', '연차사용촉진 자동화', '연차 자동부여 설정'].map(tab => (
-            <button 
-              key={tab} 
+            <button
+              key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-6 py-3 rounded-[12px] text-[11px] font-semibold whitespace-nowrap transition-all ${
-                activeTab === tab 
-                  ? 'bg-[var(--foreground)] text-white shadow-xl' 
+              className={`px-6 py-3 rounded-[12px] text-[11px] font-semibold whitespace-nowrap transition-all ${activeTab === tab
+                  ? 'bg-[var(--foreground)] text-white shadow-xl'
                   : 'bg-[var(--toss-card)] text-[var(--toss-gray-3)] border border-[var(--toss-border)] hover:bg-[var(--toss-gray-1)]'
-              }`}
+                }`}
             >
               {tab}
             </button>
@@ -239,22 +238,20 @@ export default function LeaveManagement({ staffs = [], selectedCo, onRefresh }: 
                           </div>
                         </td>
                         <td className="px-8 py-5">
-                          <span className={`px-3 py-1 rounded-full text-[11px] font-semibold ${
-                            l.leave_type === '연차' ? 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)]' :
-                            l.leave_type === '병가' ? 'bg-red-100 text-red-600' :
-                            'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'
-                          }`}>
+                          <span className={`px-3 py-1 rounded-full text-[11px] font-semibold ${l.leave_type === '연차' ? 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)]' :
+                              l.leave_type === '병가' ? 'bg-red-100 text-red-600' :
+                                'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'
+                            }`}>
                             {l.leave_type}
                           </span>
                         </td>
                         <td className="px-8 py-5 text-[var(--toss-gray-3)]">{l.start_date} ~ {l.end_date}</td>
                         <td className="px-8 py-5 text-[var(--toss-gray-3)] max-w-xs truncate">{l.reason}</td>
                         <td className="px-8 py-5">
-                          <span className={`px-3 py-1 rounded-full text-[11px] font-semibold ${
-                            l.status === '승인' ? 'bg-green-100 text-green-600' :
-                            l.status === '반려' ? 'bg-red-100 text-red-600' :
-                            'bg-orange-100 text-orange-600'
-                          }`}>
+                          <span className={`px-3 py-1 rounded-full text-[11px] font-semibold ${l.status === '승인' ? 'bg-green-100 text-green-600' :
+                              l.status === '반려' ? 'bg-red-100 text-red-600' :
+                                'bg-orange-100 text-orange-600'
+                            }`}>
                             {l.status}
                           </span>
                         </td>
@@ -262,7 +259,7 @@ export default function LeaveManagement({ staffs = [], selectedCo, onRefresh }: 
                           {l.status === '대기' && (
                             <div className="flex justify-end gap-2">
                               <button onClick={() => handleStatusUpdate(l.id, '승인')} className="px-4 py-2 bg-[var(--toss-blue)] text-white text-[11px] font-semibold rounded-[16px] shadow-lg hover:scale-[0.98] transition-all">승인</button>
-                              <button onClick={() => handleStatusUpdate(l.id, '반려')} className="px-4 py-2 bg-[var(--toss-card)] border border-[var(--toss-border)] text-[11px] font-semibold text-[var(--toss-gray-3)] rounded-[16px] hover:text-red-600 hover:border-red-600 transition-all">반려</button>
+                              <button onClick={() => handleStatusUpdate(l.id, '반려')} className="px-4 py-2 bg-red-50 border border-red-200 text-[11px] font-semibold text-red-600 rounded-[16px] hover:bg-red-100 transition-all">반려</button>
                             </div>
                           )}
                         </td>
@@ -279,35 +276,33 @@ export default function LeaveManagement({ staffs = [], selectedCo, onRefresh }: 
           <LeaveDashboard staffs={staffList} selectedCo={selectedCo} currentUser={currentUser} />
         )}
         {activeTab === '연차사용촉진 자동화' && <AnnualLeavePromotion staffs={staffList} selectedCo={selectedCo} />}
-        
+
         {activeTab === '연차 자동부여 설정' && (
           <div className="bg-[var(--toss-card)] p-10 border border-[var(--toss-border)] shadow-xl rounded-[2.5rem] text-center max-w-2xl mx-auto">
             <p className="text-5xl mb-6">⚙️</p>
             <h3 className="text-xl font-semibold text-[var(--foreground)] mb-4">연차 자동 부여 로직 설정</h3>
             <p className="text-sm text-[var(--toss-gray-3)] font-bold mb-8 leading-relaxed">
-              근로기준법에 따른 연차 산정 방식을 선택해 주세요.<br/>
+              근로기준법에 따른 연차 산정 방식을 선택해 주세요.<br />
               현재 설정: <span className="text-[var(--toss-blue)] font-semibold underline underline-offset-4">{leaveConfig}</span>
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <button 
+              <button
                 onClick={() => handleApplyLeaveConfig('입사일 기준')}
-                className={`px-8 py-6 rounded-[16px] text-xs font-semibold transition-all ${
-                  leaveConfig === '입사일 기준' 
-                  ? 'bg-[var(--foreground)] text-white shadow-2xl scale-105' 
-                  : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] border border-[var(--toss-border)] hover:bg-[var(--toss-card)] hover:shadow-lg'
-                }`}
+                className={`px-8 py-6 rounded-[16px] text-xs font-semibold transition-all ${leaveConfig === '입사일 기준'
+                    ? 'bg-[var(--foreground)] text-white shadow-2xl scale-105'
+                    : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] border border-[var(--toss-border)] hover:bg-[var(--toss-card)] hover:shadow-lg'
+                  }`}
               >
                 <p className="text-lg mb-2">📅</p>
                 입사일 기준 적용
                 <p className="text-[11px] mt-2 font-normal opacity-60">개별 입사일로부터 1년 단위 산정</p>
               </button>
-              <button 
+              <button
                 onClick={() => handleApplyLeaveConfig('회계연도 기준')}
-                className={`px-8 py-6 rounded-[16px] text-xs font-semibold transition-all ${
-                  leaveConfig === '회계연도 기준' 
-                  ? 'bg-[var(--foreground)] text-white shadow-2xl scale-105' 
-                  : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] border border-[var(--toss-border)] hover:bg-[var(--toss-card)] hover:shadow-lg'
-                }`}
+                className={`px-8 py-6 rounded-[16px] text-xs font-semibold transition-all ${leaveConfig === '회계연도 기준'
+                    ? 'bg-[var(--foreground)] text-white shadow-2xl scale-105'
+                    : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] border border-[var(--toss-border)] hover:bg-[var(--toss-card)] hover:shadow-lg'
+                  }`}
               >
                 <p className="text-lg mb-2">🏢</p>
                 회계연도 기준 적용
@@ -322,7 +317,7 @@ export default function LeaveManagement({ staffs = [], selectedCo, onRefresh }: 
             <div className="mt-10 p-6 bg-[var(--toss-blue-light)] rounded-[12px] text-left">
               <h4 className="text-[11px] font-semibold text-[var(--toss-blue)] mb-2">💡 연차 산정 기준 안내</h4>
               <p className="text-[11px] text-[var(--toss-blue)] font-bold leading-relaxed">
-                - 입사일 기준: 근로자별 입사일에 맞춰 연차가 발생하여 관리가 정확합니다.<br/>
+                - 입사일 기준: 근로자별 입사일에 맞춰 연차가 발생하여 관리가 정확합니다.<br />
                 - 회계연도 기준: 전 직원의 연차를 특정 일자(예: 1월 1일)에 맞춰 일괄 관리하여 행정 편의성이 높습니다. (단, 퇴사 시 입사일 기준보다 불리할 경우 정산 의무 발생)
               </p>
             </div>

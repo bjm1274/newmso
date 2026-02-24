@@ -5,6 +5,7 @@ import ThemeToggle from '@/app/components/ThemeToggle';
 import GlobalSearch from '@/app/components/GlobalSearch';
 import 부서별물품장비현황 from './재고관리서브/부서별물품장비현황';
 import AIChatView from './AI채팅';
+import 근무현황 from './근무현황';
 
 const EXTERNAL_LINKS = [
   { id: 'km-park', label: 'KM Park', url: 'http://kmp0001103.iptime.org/login?redirectTo=undefined', icon: '🏥' },
@@ -62,6 +63,21 @@ export default function ExtraFeatures({
           </div>
         )}
 
+        {subView === '근무현황' && (
+          <div className="space-y-4">
+            <button
+              type="button"
+              onClick={() => setSubView(null)}
+              className="text-[11px] font-bold text-[var(--toss-blue)] hover:underline"
+            >
+              ← 목록으로
+            </button>
+            <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] p-6 shadow-sm">
+              <근무현황 user={user || {}} />
+            </div>
+          </div>
+        )}
+
         {subView === 'AI채팅' && (
           <div className="space-y-4 flex flex-col h-[calc(100vh-12rem)]">
             <button
@@ -106,6 +122,20 @@ export default function ExtraFeatures({
               <div className="flex-1 min-w-0">
                 <h3 className="font-semibold text-[var(--foreground)] text-sm">부서별 재고</h3>
                 <p className="text-[11px] text-[var(--toss-gray-3)] mt-0.5">우리 부서 물품·장비 현황</p>
+              </div>
+              <span className="text-[var(--toss-gray-3)] group-hover:text-[var(--toss-blue)]">→</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSubView('근무현황')}
+              className="flex items-center gap-3 p-4 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] shadow-sm hover:bg-[var(--toss-blue-light)]/50 hover:border-[var(--toss-blue)]/30 transition-all group text-left w-full"
+            >
+              <div className="w-12 h-12 bg-[var(--toss-gray-1)] group-hover:bg-[var(--toss-blue-light)] rounded-[12px] flex items-center justify-center text-xl transition-colors">
+                📅
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-[var(--foreground)] text-sm">근무현황</h3>
+                <p className="text-[11px] text-[var(--toss-gray-3)] mt-0.5">이번 달 직원 근무표</p>
               </div>
               <span className="text-[var(--toss-gray-3)] group-hover:text-[var(--toss-blue)]">→</span>
             </button>

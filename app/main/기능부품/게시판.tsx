@@ -190,65 +190,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
     }
   }, [activeBoard]);
 
-  // 경조사 탭일 때 근무형태·직원·오늘 편성 로드 (인사 근태에서 미리 입력한 근무표 실시간 열람)
-  useEffect(() => {
-    if (activeBoard !== '경조사') return;
-    const today = new Date().toISOString().slice(0, 10);
-    const load = async () => {
-      try {
-        const [resShifts, resStaffs, resAssign] = await Promise.allSettled([
-          supabase.from('work_shifts').select('id, name, start_time, end_time').eq('is_active', true),
-          supabase.from('staff_members').select('id, name, shift_id, department, position, status'),
-          supabase.from('shift_assignments').select('staff_id, shift_id').eq('work_date', today),
-        ]);
-        const shifts = resShifts.status === 'fulfilled' ? resShifts.value.data : null;
-        const staffs = resStaffs.status === 'fulfilled' ? resStaffs.value.data : null;
-        const assignments = resAssign.status === 'fulfilled' ? resAssign.value.data : [];
-        setWorkShifts(shifts || []);
-        setStaffsForShift(staffs || []);
-        setTodayAssignments(Array.isArray(assignments) ? assignments : []);
-      } catch {
-        setWorkShifts([]);
-        setStaffsForShift([]);
-        setTodayAssignments([]);
-      }
-    };
-    load();
-  }, [activeBoard]);
-
-  // 근무형태별로 직원 그룹 (오늘 편성 있으면 편성 기준, 없으면 기본 shift_id 기준)
-  const todayByShift = useMemo(() => {
-    const list = staffsForShift.filter((s: any) => s.status !== '퇴사');
-    const assignmentMap = new Map(todayAssignments.map((a: any) => [a.staff_id, a.shift_id]));
-    const grouped = new Map<string | 'none', any[]>();
-    list.forEach((s: any) => {
-      const key = assignmentMap.has(s.id) ? (assignmentMap.get(s.id) || 'none') : (s.shift_id || 'none');
-      if (!grouped.has(key)) grouped.set(key, []);
-      grouped.get(key)!.push(s);
-    });
-    const byShift: { shiftId: string | null; shiftName: string; timeRange: string; staffs: any[] }[] = [];
-    workShifts.forEach((shift: any) => {
-      const staffsInShift = grouped.get(shift.id) || [];
-      const start = shift.start_time ? String(shift.start_time).slice(0, 5) : '09:00';
-      const end = shift.end_time ? String(shift.end_time).slice(0, 5) : '18:00';
-      byShift.push({
-        shiftId: shift.id,
-        shiftName: shift.name || '근무',
-        timeRange: `${start}-${end}`,
-        staffs: staffsInShift,
-      });
-    });
-    const noShift = grouped.get('none') || [];
-    if (noShift.length > 0) {
-      byShift.push({
-        shiftId: 'none',
-        shiftName: '일정 미등록',
-        timeRange: '-',
-        staffs: noShift,
-      });
-    }
-    return byShift.sort((a, b) => b.staffs.length - a.staffs.length);
-  }, [workShifts, staffsForShift, todayAssignments]);
+  // 수술/검사 템플릿 필터링 로직 (유지)
 
   useEffect(() => {
     const channel = supabase
@@ -260,9 +202,9 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
     return () => { supabase.removeChannel(channel); };
   }, [activeBoard]);
 
-  // 경조사: 인사 근태에서 근무표 편성 변경 시 오늘 근무 현황 블록 갱신
+  // 근무현황: 인사 근태에서 근무표 편성 변경 시 오늘 근무 현황 블록 갱신
   useEffect(() => {
-    if (activeBoard !== '경조사') return;
+    if (activeBoard !== '근무현황') return;
     const today = new Date().toISOString().slice(0, 10);
     const ch = supabase
       .channel('board-shift-assignments')
@@ -1298,7 +1240,9 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
                               >
                                 <span className="text-[var(--toss-blue)] shrink-0">{ev.schedule_time || ''}</span>
                                 <span className="truncate opacity-80 flex-1 min-w-0">{ev.title}</span>
-                                <span className="font-semibold text-emerald-700 dark:text-emerald-400 shrink-0 max-w-[40%] truncate">{ev.patient_name || '미지정'}</span>
+                                <span className="font-semibold text-emerald-700 dark:text-emerald-400 shrink-0 max-w-[40%] truncate">
+                                  {ev.patient_name || '미지정'} {ev.content && `(${ev.content})`}
+                                </span>
                               </button>
                             ))}
                             {events.length > 4 && (
@@ -1335,7 +1279,9 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
                         <div className="flex justify-between items-start">
                           <div className="flex-1">
                             <h3 className="font-bold text-[var(--foreground)] text-base md:text-lg line-clamp-1">{post.title}</h3>
-                            <p className="text-[11px] text-[var(--toss-blue)] font-bold mt-1 uppercase tracking-widest">{post.patient_name || '환자명 미지정'}</p>
+                            <p className="text-[11px] text-[var(--toss-blue)] font-bold mt-1 uppercase tracking-widest">
+                              {post.patient_name || '환자명 미지정'} {post.content && <span className="text-[var(--toss-gray-4)] ml-1">| 차트번호: {post.content}</span>}
+                            </p>
                           </div>
                           <span className={`px-2 py-1 rounded-[12px] text-[11px] font-semibold shrink-0 ${activeBoard === '수술일정' ? 'bg-red-100 text-red-600' : 'bg-purple-100 text-purple-600'
                             }`}>
@@ -1425,41 +1371,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
           </div>
         )}
 
-        {/* 경조사: 오늘 근무형태별 근무 현황 */}
-        {activeBoard === '경조사' && todayByShift.length > 0 && (
-          <section className="mt-6 rounded-2xl border border-[var(--toss-border)] bg-[var(--toss-card)] p-4 md:p-5">
-            <h3 className="text-sm font-bold text-[var(--foreground)] mb-1">
-              오늘 근무형태별 근무 현황
-            </h3>
-            <p className="text-[11px] text-[var(--toss-gray-3)] mb-4">
-              {new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {todayByShift.map((row) => (
-                <div
-                  key={row.shiftId}
-                  className="relative inline-flex items-center gap-2 rounded-xl border border-[var(--toss-border)] bg-[var(--toss-gray-0)] px-3 py-2 text-[12px]"
-                  onMouseEnter={() => setHoverShiftId(row.shiftId)}
-                  onMouseLeave={() => setHoverShiftId(null)}
-                >
-                  <span className="font-semibold text-[var(--foreground)]">{row.shiftName}</span>
-                  <span className="text-[11px] text-[var(--toss-gray-3)]">{row.timeRange}</span>
-                  <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[var(--toss-blue)] text-[10px] font-bold text-white">
-                    {row.staffs.length}
-                  </span>
-                  {hoverShiftId === row.shiftId && row.staffs.length > 0 && (
-                    <div className="absolute left-0 top-full z-10 mt-1 w-max max-w-[280px] rounded-lg border border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-2 shadow-lg">
-                      <p className="text-[11px] font-semibold text-[var(--toss-gray-4)] mb-1">근무자</p>
-                      <p className="text-[12px] font-medium text-[var(--foreground)]">
-                        {row.staffs.map((s: any) => s.name).join(' · ')}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
+        {/* (근무현황 영역 제거됨) */}
 
         {/* 게시글 상세 보기 모달 */}
         {selectedPost && (

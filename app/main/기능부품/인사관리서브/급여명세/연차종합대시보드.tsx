@@ -28,11 +28,40 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
   }, [staffs, selectedCo]);
 
   const [viewMode, setViewMode] = useState<'dept' | 'personal'>('dept');
+  const [showPlanModal, setShowPlanModal] = useState(false);
+  const [planDates, setPlanDates] = useState('');
+  const [planReason, setPlanReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const filteredStaffs = useMemo(
     () => (selectedCo === '전체' ? staffs : staffs.filter((s: any) => s.company === selectedCo)),
     [staffs, selectedCo]
   );
+
+  const submitLeavePlan = async (staff: any, remain: number) => {
+    if (!planDates.trim()) return alert('사용 예정일(계획)을 입력해주세요.');
+    setSubmitting(true);
+    try {
+      await supabase.from('approvals').insert([{
+        sender_id: staff.id,
+        sender_name: staff.name,
+        sender_company: staff.company || '미지정',
+        type: '연차사용계획',
+        title: `[제출] ${staff.name} 연차 사용 계획서`,
+        content: `미사용 연차 ${remain}일에 대한 사용 계획서입니다.\n\n사용 예정일/계획:\n${planDates}\n\n비고:\n${planReason}`,
+        status: '대기',
+        meta_data: { type: 'annual_leave_plan', remaining: remain }
+      }]);
+      alert('연차 사용 계획서가 성공적으로 제출되었습니다. (전자결재 상신)');
+      setShowPlanModal(false);
+      setPlanDates('');
+      setPlanReason('');
+    } catch {
+      alert('제출 실패');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const personalList = useMemo(() => {
     // 팀장/관리자는 팀 전체, 일반 직원은 본인만 기본 표시
@@ -54,18 +83,16 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
           <button
             type="button"
             onClick={() => setViewMode('dept')}
-            className={`px-2.5 py-1 rounded-md text-xs font-medium ${
-              viewMode === 'dept' ? 'bg-teal-600 text-white' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'
-            }`}
+            className={`px-2.5 py-1 rounded-md text-xs font-medium ${viewMode === 'dept' ? 'bg-teal-600 text-white' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'
+              }`}
           >
             팀별
           </button>
           <button
             type="button"
             onClick={() => setViewMode('personal')}
-            className={`px-2.5 py-1 rounded-md text-xs font-medium ${
-              viewMode === 'personal' ? 'bg-teal-600 text-white' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'
-            }`}
+            className={`px-2.5 py-1 rounded-md text-xs font-medium ${viewMode === 'personal' ? 'bg-teal-600 text-white' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'
+              }`}
           >
             개인별
           </button>
@@ -101,7 +128,7 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
           ))}
         </div>
       ) : (
-        <div className="space-y-2 max-h-[320px] overflow-y-auto custom-scrollbar">
+        <div className="space-y-3 max-h-[320px] overflow-y-auto custom-scrollbar pr-1">
           {personalList.map((s: any) => {
             const total = s.annual_leave_total ?? 0;
             const used = s.annual_leave_used ?? 0;
@@ -109,26 +136,94 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
             return (
               <div
                 key={s.id}
-                className="p-3 bg-[var(--page-bg)] rounded-[12px] border border-[var(--toss-border)] flex items-center justify-between text-xs"
+                className="p-4 bg-[var(--page-bg)] rounded-[12px] border border-[var(--toss-border)] flex flex-col gap-3"
               >
-                <div>
-                  <p className="font-semibold text-[var(--foreground)]">
-                    {s.name}{' '}
-                    <span className="text-[11px] text-[var(--toss-gray-3)] font-normal">
-                      ({s.department || '미지정'})
-                    </span>
-                  </p>
-                  <p className="text-[11px] text-[var(--toss-gray-3)]">
-                    총 {total}일 · 사용 {used}일 · 잔여{' '}
-                    <span className="font-semibold text-emerald-600">{remain}일</span>
-                  </p>
+                <div className="flex items-center justify-between text-xs">
+                  <div>
+                    <p className="font-semibold text-[var(--foreground)]">
+                      {s.name}{' '}
+                      <span className="text-[11px] text-[var(--toss-gray-3)] font-normal">
+                        ({s.department || '미지정'})
+                      </span>
+                    </p>
+                    <p className="text-[11px] text-[var(--toss-gray-3)] mt-0.5">
+                      총 {total}일 · 사용 {used}일 · <span className="text-[var(--foreground)]">잔여 <span className="font-semibold text-emerald-600">{remain}일</span></span>
+                    </p>
+                  </div>
+                  <div className="w-24 h-1.5 bg-[var(--toss-gray-1)] rounded-full overflow-hidden shrink-0">
+                    <div
+                      className="h-full bg-emerald-500 rounded-full transition-all"
+                      style={{ width: `${total ? (remain / total) * 100 : 0}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="w-20 h-1.5 bg-[var(--toss-gray-1)] rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-emerald-500 rounded-full"
-                    style={{ width: `${total ? (remain / total) * 100 : 0}%` }}
-                  />
-                </div>
+
+                {/* 연차 사용 계획서 작성 모달 */}
+                {showPlanModal && (
+                  <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-4">
+                    <div className="w-full max-w-md bg-[var(--toss-card)] rounded-[16px] shadow-2xl overflow-hidden border border-[var(--toss-border)] animate-in fade-in slide-in-from-bottom-4">
+                      <div className="p-6 border-b border-[var(--toss-border)]">
+                        <h3 className="text-lg font-bold text-[var(--foreground)] tracking-tight">연차 사용 계획서 제출</h3>
+                        <p className="text-xs text-red-500 font-semibold mt-1">잔여 연차 {remain}일에 대한 사용 계획을 등록합니다.</p>
+                      </div>
+                      <div className="p-6 space-y-4">
+                        <div className="flex flex-col gap-2">
+                          <label className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-widest">사용 목표 일정 (월/일)</label>
+                          <textarea
+                            value={planDates}
+                            onChange={(e) => setPlanDates(e.target.value)}
+                            placeholder="예: \n8월 15일, 16일 (2일)\n9월 추석 연휴 전후 (3일)\n11월 개인일정 (남은 일수)"
+                            className="w-full h-24 p-3 text-sm font-medium border border-[var(--toss-border)] rounded-[12px] bg-[var(--page-bg)] focus:ring-2 focus:ring-[var(--toss-blue)] focus:border-transparent outline-none resize-none"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <label className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-widest">추가 메모 (선택)</label>
+                          <input
+                            type="text"
+                            value={planReason}
+                            onChange={(e) => setPlanReason(e.target.value)}
+                            placeholder="업무 인수 인계 등 특이사항 기재"
+                            className="w-full p-3 text-sm font-medium border border-[var(--toss-border)] rounded-[12px] bg-[var(--page-bg)] focus:ring-2 focus:ring-[var(--toss-blue)] focus:border-transparent outline-none"
+                          />
+                        </div>
+                      </div>
+                      <div className="p-4 bg-[var(--page-bg)] border-t border-[var(--toss-border)] flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowPlanModal(false)}
+                          className="px-4 py-2 rounded-[8px] border border-[var(--toss-border)] text-xs font-bold text-[var(--toss-gray-4)] hover:bg-[var(--toss-gray-1)]"
+                        >
+                          취소
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => submitLeavePlan(s, remain)}
+                          disabled={submitting}
+                          className="px-4 py-2 rounded-[8px] bg-[var(--toss-blue)] text-white text-xs font-bold hover:opacity-90 disabled:opacity-50"
+                        >
+                          {submitting ? '제출 중...' : '계획서 제출 (전자결재)'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 연차 촉진 알림 연동 배너 (개인별 뷰에서 잔여 연차가 있을 때) */}
+                {remain > 0 && s.id && currentUser?.id === s.id && (
+                  <div className="px-4 py-3 bg-red-50/50 border-t border-red-100 flex items-center justify-between text-xs mt-3 rounded-[12px]">
+                    <div>
+                      <span className="font-semibold text-red-600">🚨 연차 사용 촉진 안내</span>
+                      <p className="text-[11px] text-red-500 font-medium mt-0.5">미사용 연차 {remain}일에 대해 연차사용계획서를 의무 제출해야 합니다.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowPlanModal(true)}
+                      className="px-3 py-1.5 bg-red-600 text-white font-semibold rounded-lg text-[11px] hover:bg-red-700 transition-colors shrink-0 shadow-sm"
+                    >
+                      계획서 제출
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}

@@ -525,7 +525,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                       {(viewMode === '결재함' || (viewMode === '기안함' && item.status === '대기')) && item.status === '대기' && String(item.current_approver_id) === String(user?.id) && (
                         <div className="flex gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                           <button type="button" onClick={() => handleApproveAction(item)} className="px-5 py-3 bg-[var(--toss-blue)] text-white rounded-[12px] text-[11px] font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all">승인</button>
-                          <button type="button" onClick={() => handleRejectAction(item)} className="px-5 py-3 bg-[var(--toss-danger)] text-white rounded-[12px] text-[11px] font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all">반려</button>
+                          <button type="button" onClick={() => handleRejectAction(item)} className="px-5 py-3 bg-red-50 text-red-600 border border-red-200 rounded-[12px] text-[11px] font-bold shadow-sm hover:bg-red-100 active:scale-[0.98] transition-all">반려</button>
                         </div>
                       )}
                     </div>
@@ -575,7 +575,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                   {String(item.current_approver_id) === String(user?.id) ? (
                     <div className="flex gap-3">
                       <button type="button" onClick={async () => { await handleApproveAction(item); setSelectedApprovalId(null); }} className="flex-1 py-3 bg-[var(--toss-blue)] text-white rounded-[16px] text-sm font-bold">승인</button>
-                      <button type="button" onClick={async () => { await handleRejectAction(item); setSelectedApprovalId(null); }} className="flex-1 py-3 bg-[var(--toss-danger)] text-white rounded-[16px] text-sm font-bold">반려</button>
+                      <button type="button" onClick={async () => { await handleRejectAction(item); setSelectedApprovalId(null); }} className="flex-1 py-3 bg-red-50 border border-red-200 text-red-600 rounded-[16px] text-sm font-bold hover:bg-red-100 transition-all">반려</button>
                     </div>
                   ) : (
                     <p className="text-[11px] text-[var(--toss-gray-3)] text-center py-2">승인·반려는 <strong className="text-[var(--toss-blue)]">결재함</strong>에서 결재자 계정으로만 할 수 있습니다. 왼쪽 메뉴에서 <strong>결재함</strong>을 눌러 주세요.</p>

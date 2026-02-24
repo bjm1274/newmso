@@ -34,6 +34,7 @@ function isVideoUrl(url: string): boolean {
 export default function ChatView({ user, onRefresh, staffs = [], initialOpenChatRoomId, onConsumeOpenChatRoomId }: any) {
   const [messages, setMessages] = useState<any[]>([]);
   const [omniSearch, setOmniSearch] = useState(''); // 통합 검색 (Omni-Search)
+  const [chatSearch, setChatSearch] = useState(''); // 대화 내용 검색
   const [inputMsg, setInputMsg] = useState('');
   const [activeActionMsg, setActiveActionMsg] = useState<any>(null);
   const [replyTo, setReplyTo] = useState<any>(null);
@@ -95,6 +96,12 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   const [roomNotifyOn, setRoomNotifyOn] = useState(true);
   const [editingRoomName, setEditingRoomName] = useState(false);
   const [roomNameDraft, setRoomNameDraft] = useState('');
+
+  // 통합 메시지 검색
+  const [showGlobalSearch, setShowGlobalSearch] = useState(false);
+  const [globalSearchQuery, setGlobalSearchQuery] = useState('');
+  const [globalSearchResults, setGlobalSearchResults] = useState<any[]>([]);
+  const [globalSearchLoading, setGlobalSearchLoading] = useState(false);
 
 
   const chatRoomsRef = useRef<any[]>([]);
@@ -683,12 +690,11 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     return 'file';
   };
   const CHAT_BUCKET = 'pchos-files';
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const [isDragging, setIsDragging] = useState(false);
+
+  const processFileUpload = async (file: File) => {
     if (file.size > MAX_FILE_SIZE_BYTES) {
       alert('파일 크기는 100MB 이하여야 합니다.');
-      e.target.value = '';
       return;
     }
     setFileUploading(true);
@@ -712,8 +718,14 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       alert(`파일 업로드에 실패했습니다.\n\n${hint}`);
     } finally {
       setFileUploading(false);
-      e.target.value = '';
     }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await processFileUpload(file);
+    e.target.value = '';
   };
 
   const handleAction = async (type: 'task') => {
@@ -864,11 +876,38 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     } catch (_) { }
   };
 
+  const handleGlobalSearch = async () => {
+    if (!globalSearchQuery.trim()) return;
+    setGlobalSearchLoading(true);
+    try {
+      // 본인이 열람 가능한(참여중인) 방들의 아이디 목록
+      const roomIds = visibleRooms.map(r => r.id);
+      if (roomIds.length === 0) {
+        setGlobalSearchResults([]);
+        return;
+      }
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*, staff:staff_members!left(name, photo_url), chat_rooms!inner(name, type, members)')
+        .in('room_id', roomIds)
+        .ilike('content', `%${globalSearchQuery}%`)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      setGlobalSearchResults(data || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setGlobalSearchLoading(false);
+    }
+  };
+
   const combinedTimeline = useMemo(() => {
     const msgs = messages.filter((m: any) => !m.is_deleted);
     let filtered = msgs;
-    if (omniSearch.trim()) {
-      const q = omniSearch.toLowerCase();
+    if (chatSearch.trim()) {
+      const q = chatSearch.toLowerCase();
       filtered = msgs.filter((m) =>
         (m.content || '').toLowerCase().includes(q) ||
         (m.staff?.name || '').toLowerCase().includes(q)
@@ -880,7 +919,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       .map(p => ({ ...p, type: 'poll', created_at: p.created_at || new Date().toISOString() }));
 
     return [...ms, ...ps].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-  }, [messages, omniSearch, polls, selectedRoomId]);
+  }, [messages, chatSearch, polls, selectedRoomId]);
 
   useEffect(() => {
     const load = async () => {
@@ -987,6 +1026,15 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
             <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest leading-none">
               {viewMode === 'chat' ? '최근 대화' : '조직도'}
             </span>
+            {viewMode === 'chat' && (
+              <button
+                onClick={() => setShowGlobalSearch(true)}
+                className="text-[12px] text-zinc-400 hover:text-blue-500 transition-colors p-1 flex items-center justify-center shrink-0"
+                title="채팅 내용 전체 검색"
+              >
+                🔍
+              </button>
+            )}
           </div>
         </div>
 
@@ -1245,8 +1293,8 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                             setActiveActionMsg(msg); // [복구] 메시지 클릭 시 액션 메뉴 표시
                           }}
                           className={`group relative ${!msg.content ? 'p-0 bg-transparent shadow-none border-none' : 'px-3 py-2 shadow-sm border'} rounded-[12px] text-[13px] md:text-sm cursor-pointer transition-all max-w-[75%] md:max-w-[70%] ${!msg.content ? '' : isMine
-                              ? 'bg-emerald-600 text-white border-transparent rounded-tr-none'
-                              : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 rounded-tl-none hover:border-emerald-400 text-foreground'
+                            ? 'bg-emerald-600 text-white border-transparent rounded-tr-none'
+                            : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 rounded-tl-none hover:border-emerald-400 text-foreground'
                             }`}
                           role="button"
                           tabIndex={0}
@@ -1273,15 +1321,22 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                             {renderMessageContent(msg.content)}
                           </div>
                           {msg.file_url && (
-                            <div className="space-y-1" onClick={(e) => e.stopPropagation()}>
+                            <div className="space-y-1 mt-2" onClick={(e) => e.stopPropagation()}>
                               {isImageUrl(msg.file_url) ? (
-                                <a href={msg.file_url} target="_blank" rel="noopener noreferrer" className="block">
-                                  <img
-                                    src={msg.file_url}
-                                    alt="첨부 이미지"
-                                    className={`max-w-[200px] md:max-w-[240px] max-h-[200px] rounded-[12px] object-cover ${msg.content ? 'border border-[var(--toss-border)]' : 'shadow-sm'}`}
-                                  />
-                                </a>
+                                <div className="relative group inline-block">
+                                  <a href={msg.file_url} target="_blank" rel="noopener noreferrer" className="block">
+                                    <img
+                                      src={msg.file_url}
+                                      alt="첨부 이미지"
+                                      className={`max-w-[200px] md:max-w-[240px] max-h-[200px] rounded-[12px] object-cover ${msg.content ? 'border border-[var(--toss-border)]' : 'shadow-sm'}`}
+                                    />
+                                  </a>
+                                  <div className="absolute opacity-0 group-hover:opacity-100 transition-opacity inset-0 flex items-center justify-center bg-black/40 rounded-[12px] gap-2 pointer-events-none">
+                                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(msg.file_url, '_blank') }} className="pointer-events-auto p-1.5 bg-white/20 hover:bg-white/40 rounded-full text-white" title="미리보기">👁️</button>
+                                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigator.clipboard.writeText(msg.file_url).then(() => alert('안전하게 링크가 복사되었습니다.')) }} className="pointer-events-auto p-1.5 bg-white/20 hover:bg-white/40 rounded-full text-white" title="공유">🔗</button>
+                                    <a href={msg.file_url} download target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="pointer-events-auto p-1.5 bg-white/20 hover:bg-white/40 rounded-full text-white" title="저장">💾</a>
+                                  </div>
+                                </div>
                               ) : isVideoUrl(msg.file_url) ? (
                                 <div className="block">
                                   <video controls className={`max-w-[200px] md:max-w-[240px] max-h-[200px] rounded-[12px] bg-black ${msg.content ? 'border border-[var(--toss-border)]' : 'shadow-sm'}`}>
@@ -1289,16 +1344,17 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                                   </video>
                                 </div>
                               ) : (
-                                <a
-                                  href={msg.file_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  download
-                                  className={`block p-3 rounded-[12px] text-[12px] font-bold border flex items-center justify-center gap-2 hover:opacity-80 transition-opacity shadow-sm ${isMine ? (!msg.content ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-white/10 border-white/20 text-white') : (!msg.content ? 'bg-white dark:bg-zinc-800 border-zinc-200 text-foreground' : 'bg-[var(--toss-gray-1)] border-[var(--toss-border)] text-[var(--toss-blue)]')
-                                    }`}
-                                >
-                                  📎 첨부 파일
-                                </a>
+                                <div className={`p-3 rounded-[12px] border ${isMine ? 'bg-white/10 border-white/20 text-white' : 'bg-[var(--toss-gray-0)] border-[var(--toss-border)] text-[var(--foreground)]'} flex items-start gap-3 shadow-sm min-w-[200px]`}>
+                                  <div className="text-3xl">📄</div>
+                                  <div className="flex-1 min-w-0 pt-0.5">
+                                    <p className={`font-bold text-[12px] truncate mb-1`}>첨부 파일</p>
+                                    <div className="flex items-center gap-1.5 mt-2">
+                                      <button onClick={() => window.open(msg.file_url, '_blank')} className="text-[10px] font-bold text-[var(--toss-blue)] hover:text-blue-600 px-2 py-1 bg-blue-50 dark:bg-blue-900/30 rounded-md">미리보기</button>
+                                      <button onClick={() => { navigator.clipboard.writeText(msg.file_url).then(() => alert('공유 링크가 복사되었습니다.')) }} className="text-[10px] font-bold text-zinc-500 hover:text-zinc-600 px-2 py-1 bg-zinc-100 dark:bg-zinc-800 rounded-md">공유</button>
+                                      <a href={msg.file_url} download target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 px-2 py-1 bg-emerald-50 dark:bg-emerald-900/30 rounded-md inline-block">저장</a>
+                                    </div>
+                                  </div>
+                                </div>
                               )}
                             </div>
                           )}
@@ -1366,7 +1422,16 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
         </div>
 
         {/* 입력창 — 모바일에서 하단 네비 위에 고정 */}
-        <div className="absolute left-0 right-0 bottom-0 md:relative p-4 md:p-6 bg-[var(--toss-card)] border-t border-[var(--toss-border)] shrink-0 safe-area-pb">
+        <div
+          className={`absolute left-0 right-0 bottom-0 md:relative p-4 md:p-6 bg-[var(--toss-card)] shrink-0 safe-area-pb transition-all z-10 ${isDragging ? 'border-t-2 border-[var(--toss-blue)] border-dashed bg-blue-50 dark:bg-blue-900/20' : 'border-t border-[var(--toss-border)]'}`}
+          onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
+          onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }}
+          onDrop={async (e) => {
+            e.preventDefault(); e.stopPropagation(); setIsDragging(false);
+            const file = e.dataTransfer.files?.[0];
+            if (file) await processFileUpload(file);
+          }}
+        >
           {replyTo && (
             <div className="mb-3 flex items-center justify-between bg-[var(--toss-blue-light)] p-3 rounded-[16px] border border-[var(--toss-blue-light)] animate-in slide-in-from-bottom-2">
               <p className="text-[11px] font-bold text-[var(--toss-blue)]">@{replyTo.staff?.name}님에게 답글 작성 중...</p>
@@ -2484,6 +2549,74 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
             >
               투표 만들기
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* 전역 메시지 검색 모달 */}
+      {showGlobalSearch && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-start md:items-center justify-center p-4 pt-12 md:p-6 animate-in fade-in" onClick={() => setShowGlobalSearch(false)}>
+          <div className="bg-white dark:bg-zinc-900 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh] md:max-h-[85vh] border border-zinc-200 dark:border-zinc-800" onClick={e => e.stopPropagation()}>
+            <div className="p-4 md:p-6 border-b border-zinc-100 dark:border-zinc-800 flex items-center gap-3">
+              <span className="text-xl">🔍</span>
+              <input
+                autoFocus
+                value={globalSearchQuery}
+                onChange={e => setGlobalSearchQuery(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleGlobalSearch()}
+                placeholder="전체 채팅방 내용 검색..."
+                className="flex-1 bg-transparent text-foreground text-sm font-bold outline-none placeholder:text-zinc-400"
+              />
+              <button
+                onClick={handleGlobalSearch}
+                className="px-4 py-2 bg-[var(--toss-blue)] text-white font-bold text-xs rounded-xl shadow-sm hover:opacity-90 transition-opacity whitespace-nowrap"
+              >
+                {globalSearchLoading ? '검색중...' : '검색'}
+              </button>
+              <button onClick={() => setShowGlobalSearch(false)} className="ml-2 text-zinc-400 hover:text-zinc-600 text-lg font-bold">✕</button>
+            </div>
+            <div className="flex-1 overflow-y-auto custom-scrollbar bg-zinc-50 dark:bg-zinc-950 p-4 md:p-6">
+              {!globalSearchLoading && globalSearchResults.length === 0 && globalSearchQuery.trim() && (
+                <div className="h-40 flex flex-col items-center justify-center text-zinc-400">
+                  <span className="text-3xl mb-2">🤔</span>
+                  <p className="text-sm font-bold">검색 결과가 없습니다.</p>
+                </div>
+              )}
+              <div className="space-y-3">
+                {globalSearchResults.map((msg: any) => {
+                  let roomName = msg.chat_rooms?.name || '채팅방';
+                  if (msg.chat_rooms?.type === 'direct' && Array.isArray(msg.chat_rooms?.members)) {
+                    const otherStaff = staffs.find((s: any) => msg.chat_rooms.members.includes(String(s.id)) && String(s.id) !== String(user?.id));
+                    if (otherStaff) roomName = otherStaff.name;
+                  }
+                  return (
+                    <div
+                      key={msg.id}
+                      onClick={() => {
+                        setRoom(msg.room_id);
+                        setShowGlobalSearch(false);
+                      }}
+                      className="group p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl cursor-pointer hover:border-[var(--toss-blue)] hover:shadow-md transition-all"
+                    >
+                      <div className="flex items-center justify-between mb-2 gap-4">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="px-2 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 rounded text-[10px] font-bold truncate shrink-0 max-w-[120px]">
+                            {roomName}
+                          </span>
+                          <span className="text-[11px] font-bold text-foreground truncate">{msg.staff?.name || '알 수 없음'}</span>
+                        </div>
+                        <span className="text-[10px] font-bold text-zinc-400 shrink-0">
+                          {new Date(msg.created_at).toLocaleDateString()} {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <p className="text-[12px] font-semibold text-zinc-700 dark:text-zinc-300 line-clamp-2 leading-relaxed">
+                        {msg.content || (msg.file_url ? '📎 첨부 파일' : '')}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
       )}
