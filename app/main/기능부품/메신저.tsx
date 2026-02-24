@@ -1088,28 +1088,13 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
             </div>
 
             <div className="flex items-center gap-2">
-              <div className="relative">
-                <button
-                  onClick={() => setShowSettings(!showSettings)}
-                  className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${showSettings ? 'bg-zinc-200 dark:bg-zinc-800' : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
-                >
-                  <span className="text-sm">⚙️</span>
-                </button>
-                {showSettings && (
-                  <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-premium z-50 p-1 animate-premium-fade">
-                    <button onClick={() => { setShowAddMemberModal(true); setShowSettings(false); }} className="w-full text-left px-3 py-2 text-[11px] font-bold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg">대화상대 초대</button>
-                    <button onClick={() => { setEditingRoomName(true); setShowSettings(false); }} className="w-full text-left px-3 py-2 text-[11px] font-bold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg">채팅방 이름 변경</button>
-                    <button onClick={() => { toggleRoomNotify(); setShowSettings(false); }} className="w-full text-left px-3 py-2 text-[11px] font-bold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg">
-                      {roomNotifyOn ? '알림 끄기' : '알림 켜기'}
-                    </button>
-                    <div className="h-[1px] bg-zinc-100 dark:bg-zinc-800 my-1"></div>
-                    <button onClick={() => { setShowMediaPanel(true); setShowSettings(false); }} className="w-full text-left px-3 py-2 text-[11px] font-bold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg">📎 파일/링크 내역</button>
-                    <button onClick={() => { setShowPollModal(true); setShowSettings(false); }} className="w-full text-left px-3 py-2 text-[11px] font-bold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg">📊 투표 만들기</button>
-                    <div className="h-[1px] bg-zinc-100 dark:bg-zinc-800 my-1"></div>
-                    <button onClick={() => { handleLeaveRoom(); setShowSettings(false); }} className="w-full text-left px-3 py-2 text-[11px] font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg">채팅방 나가기</button>
-                  </div>
-                )}
-              </div>
+              <button
+                onClick={() => setShowDrawer(true)}
+                className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-foreground"
+                title="채팅방 정보 및 대화상대 보기"
+              >
+                <span className="text-xl">☰</span>
+              </button>
             </div>
           </header>
         )}
@@ -1421,6 +1406,15 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                     <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${roomNotifyOn ? 'right-1' : 'left-1'}`} />
                   </button>
                 </div>
+
+                {/* 투표 액션 버튼 */}
+                <button onClick={() => { setShowPollModal(true); setShowDrawer(false); }} className="w-full flex items-center justify-between p-3.5 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800/50 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors group">
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg">📊</span>
+                    <span className="text-xs font-bold text-blue-700 dark:text-blue-300">새로운 투표 만들기</span>
+                  </div>
+                  <span className="text-[10px] text-blue-400 font-bold group-hover:translate-x-1 transition-transform">＞</span>
+                </button>
 
                 {/* 공지사항 섹션 */}
                 <div className="space-y-3">
