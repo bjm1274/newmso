@@ -143,7 +143,7 @@ export default function NotificationSystem({
   user: any;
   onOpenChatRoom?: (roomId: string) => void;
   onOpenApproval?: () => void;
-  onOpenBoard?: () => void;
+  onOpenBoard?: (boardId?: string) => void;
 }) {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -504,11 +504,11 @@ export default function NotificationSystem({
         <div
           key={notif.id}
           className={`relative p-4 rounded-[12px] shadow-2xl border-l-4 animate-in slide-in-from-right duration-300 ${notif.type === 'approval' ? 'bg-[var(--toss-blue-light)] border-[var(--toss-blue)]' :
-              notif.type === 'inventory' ? 'bg-orange-50 border-orange-600 dark:bg-orange-950/30 dark:border-orange-500' :
-                notif.type === 'payroll' ? 'bg-green-50 border-green-600 dark:bg-green-950/30 dark:border-green-500' :
-                  notif.type === 'message' ? 'bg-indigo-50 border-indigo-600 dark:bg-indigo-950/30 dark:border-indigo-500' :
-                    notif.type === 'board' ? 'bg-pink-50 border-pink-500 dark:bg-pink-950/30 dark:border-pink-500' :
-                      'bg-purple-50 border-purple-600 dark:bg-purple-950/30 dark:border-purple-500'
+            notif.type === 'inventory' ? 'bg-orange-50 border-orange-600 dark:bg-orange-950/30 dark:border-orange-500' :
+              notif.type === 'payroll' ? 'bg-green-50 border-green-600 dark:bg-green-950/30 dark:border-green-500' :
+                notif.type === 'message' ? 'bg-indigo-50 border-indigo-600 dark:bg-indigo-950/30 dark:border-indigo-500' :
+                  notif.type === 'board' ? 'bg-pink-50 border-pink-500 dark:bg-pink-950/30 dark:border-pink-500' :
+                    'bg-purple-50 border-purple-600 dark:bg-purple-950/30 dark:border-purple-500'
             }`}
         >
           <button

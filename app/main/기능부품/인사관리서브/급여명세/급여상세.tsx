@@ -1,6 +1,6 @@
 'use client';
 import React from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis } from 'recharts';
 
 export default function SalaryDetail({ record, staff }: any) {
   // record가 없을 경우 staff 정보를 기반으로 가상 계산 (미리보기용)
@@ -110,6 +110,78 @@ export default function SalaryDetail({ record, staff }: any) {
           </div>
         ) : (
           <>
+            {/* VIP 명세서 시각화 차트 대시보드 */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border border-[var(--toss-border)] rounded-[16px] bg-[var(--page-bg)] p-4 md:p-6 mb-6 shadow-sm">
+              <div className="flex flex-col items-center justify-center space-y-2">
+                <h3 className="text-[13px] font-bold text-[var(--toss-gray-4)] uppercase tracking-widest text-center w-full">급여 구성 비율</h3>
+                <div className="h-40 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={[
+                          { name: '기본급', value: Number(data.base_salary) || 0, fill: '#3B82F6' },
+                          { name: '제수당', value: calc.totalPayment - (Number(data.base_salary) || 0), fill: '#10B981' },
+                          { name: '공제액', value: calc.totalDeduction, fill: '#EF4444' }
+                        ].filter(d => d.value > 0)}
+                        cx="50%" cy="50%" innerRadius={45} outerRadius={65} paddingAngle={3} dataKey="value" stroke="none"
+                      >
+                        {[
+                          { name: '기본급', value: Number(data.base_salary) || 0, fill: '#3B82F6' },
+                          { name: '제수당', value: calc.totalPayment - (Number(data.base_salary) || 0), fill: '#10B981' },
+                          { name: '공제액', value: calc.totalDeduction, fill: '#EF4444' }
+                        ].filter(d => d.value > 0).map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Pie>
+                      <RechartsTooltip
+                        formatter={(value: any) => `₩${Number(value || 0).toLocaleString()}`}
+                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '12px', fontWeight: 'bold' }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="flex gap-4 justify-center text-[11px] font-bold text-[var(--toss-gray-4)]">
+                  <span className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[#3B82F6]" /> 기본급</span>
+                  <span className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[#10B981]" /> 수당합계</span>
+                  <span className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[#EF4444]" /> 공제합계</span>
+                </div>
+              </div>
+
+              <div className="flex flex-col items-center justify-center space-y-2 mt-4 md:mt-0 border-t md:border-t-0 md:border-l border-[var(--toss-border)] pt-4 md:pt-0 md:pl-4">
+                <h3 className="text-[13px] font-bold text-[var(--toss-gray-4)] uppercase tracking-widest text-center w-full">지급액 분석</h3>
+                <div className="h-40 w-full flex items-center">
+                  <ResponsiveContainer width="100%" height="80%">
+                    <BarChart
+                      layout="vertical"
+                      data={[
+                        { name: '총 지급액', 금액: calc.totalPayment, fill: 'var(--toss-blue)' },
+                        { name: '총 공제액', 금액: calc.totalDeduction, fill: '#EF4444' },
+                        { name: '차인지급액', 금액: calc.net, fill: '#10B981' }
+                      ]}
+                      margin={{ top: 0, right: 30, left: -20, bottom: 0 }}
+                    >
+                      <XAxis type="number" hide />
+                      <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 'bold', fill: 'var(--toss-gray-4)' }} width={80} />
+                      <RechartsTooltip
+                        cursor={{ fill: 'transparent' }}
+                        formatter={(value: any) => `₩${Number(value || 0).toLocaleString()}`}
+                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '12px', fontWeight: 'bold' }}
+                      />
+                      <Bar dataKey="금액" radius={[0, 6, 6, 0]} barSize={16}>
+                        {[
+                          { name: '총 지급액', 금액: calc.totalPayment, fill: 'var(--toss-blue)' },
+                          { name: '총 공제액', 금액: calc.totalDeduction, fill: '#EF4444' },
+                          { name: '차인지급액', 금액: calc.net, fill: '#10B981' }
+                        ].map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* 지급 내역 */}
               <div className="space-y-3 border border-[var(--toss-border)] rounded-[12px] overflow-hidden">

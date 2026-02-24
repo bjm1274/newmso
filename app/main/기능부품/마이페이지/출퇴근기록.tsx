@@ -89,10 +89,10 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
         },
         (error) => {
           console.warn('위치 확인 실패:', error && (error as any).message ? (error as any).message : error);
-          alert('위치 정보를 가져올 수 없습니다. 브라우저의 위치 권한을 허용해 주세요.');
+          alert('위치 정보를 정확히 가져올 수 없습니다. 다시 시도하거나 브라우저 위치 권한을 확인해 주세요.');
           resolve(false);
         },
-        { enableHighAccuracy: true } // GPS 정밀 모드 사용
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 } // GPS 정밀 모드 + 시간초과 + 캐시사용안함
       );
     });
   };
@@ -106,8 +106,8 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
     const Δλ = ((lon2 - lon1) * Math.PI) / 180;
 
     const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-              Math.cos(φ1) * Math.cos(φ2) *
-              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+      Math.cos(φ1) * Math.cos(φ2) *
+      Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
     return R * c; // 거리 (m)
@@ -129,7 +129,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
         status: attStatus,
         work_hours_minutes: mins ?? undefined,
       }, { onConflict: 'staff_id,work_date' });
-    } catch (_) {}
+    } catch (_) { }
   };
 
   // 출퇴근 처리 (위치 검증 포함)
@@ -150,19 +150,19 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
         if (user.department === '의료진') { lateThreshold = 8; lateMinute = 30; }
 
         const isLate = now.getHours() > lateThreshold || (now.getHours() === lateThreshold && now.getMinutes() > lateMinute);
-        
+
         const { data, error } = await supabase.from('attendance').upsert([{
           staff_id: user.id,
           date: today,
           check_in: timeString,
           status: isLate ? '지각' : '정상'
         }], { onConflict: 'staff_id,date' }).select().single();
-        
+
         if (error) throw error;
         await syncToAttendances(today, timeString, null, isLate ? '지각' : '정상');
         setTodayLog(data);
         alert(isLate ? `지각 처리되었습니다. (기준: ${lateThreshold}:${lateMinute})` : '정상 출근되었습니다. 오늘도 화이팅!');
-      
+
       } else {
         if (!todayLog) return;
         const { data, error } = await supabase
@@ -192,12 +192,12 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
 
   return (
     <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-[2.5rem] px-6 py-7 sm:p-8 h-full flex flex-col space-y-7">
-      
+
       {/* 실시간 상태 카드 */}
       <div className="flex justify-between items-center bg-[var(--foreground)] px-6 py-6 sm:px-8 sm:py-7 rounded-[16px] text-white shadow-2xl relative overflow-hidden">
         {/* 배경 장식 */}
         <div className="absolute -right-10 -top-10 w-40 h-40 bg-[var(--toss-card)] opacity-5 rounded-full blur-3xl"></div>
-        
+
         <div className="space-y-2 z-10">
           <h2 className="text-3xl sm:text-4xl font-semibold tracking-tighter">{currentTime.toLocaleTimeString('ko-KR')}</h2>
           <div className="flex flex-wrap items-center gap-2 mt-1">
@@ -257,9 +257,8 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
               >
                 <div className="flex items-center gap-6">
                   <div
-                    className={`w-14 h-14 rounded-[12px] flex flex-col items-center justify-center font-semibold ${
-                      log.status === '지각' ? 'bg-red-100 text-red-600' : 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)]'
-                    }`}
+                    className={`w-14 h-14 rounded-[12px] flex flex-col items-center justify-center font-semibold ${log.status === '지각' ? 'bg-red-100 text-red-600' : 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)]'
+                      }`}
                   >
                     <span className="text-[11px] opacity-60">{workDate.getMonth() + 1}월</span>
                     <span className="text-lg leading-tight">{workDate.getDate()}일</span>

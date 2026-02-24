@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 const TYPE_ICONS: Record<string, string> = {
@@ -18,6 +19,7 @@ export default function GlobalNotificationBell({ user, onOpenFull }: { user: any
   const [list, setList] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   useEffect(() => {
     if (!user?.id) return;
@@ -54,6 +56,27 @@ export default function GlobalNotificationBell({ user, onOpenFull }: { user: any
     setUnreadCount(prev => Math.max(0, prev - 1));
   };
 
+  const handleNotificationClick = (n: any) => {
+    if (!n.is_read) markRead(n.id);
+    setOpen(false);
+
+    if (n.metadata?.room_id) {
+      router.push(`/main?open_chat_room=${n.metadata.room_id}`);
+    } else if (n.type === 'approval') {
+      router.push(`/main?open_menu=전자결재`);
+    } else if (n.type === 'inventory') {
+      router.push(`/main?open_menu=재고관리`);
+    } else if (n.type === 'payroll' || n.type === 'education' || n.type === '인사' || n.type === 'attendance') {
+      router.push(`/main?open_menu=인사관리`);
+    } else if (n.type === 'board') {
+      if ((n.title || '').includes('경조사') || (n.body || '').includes('경조사')) {
+        router.push(`/main?open_menu=게시판&open_board=경조사`);
+      } else {
+        router.push(`/main?open_menu=게시판`);
+      }
+    }
+  };
+
   return (
     <div className="relative" ref={ref}>
       <button
@@ -83,7 +106,7 @@ export default function GlobalNotificationBell({ user, onOpenFull }: { user: any
                 <button
                   key={n.id}
                   type="button"
-                  onClick={() => { if (!n.is_read) markRead(n.id); setOpen(false); }}
+                  onClick={() => handleNotificationClick(n)}
                   className={`w-full text-left px-3 py-2.5 border-b border-[var(--toss-gray-1)] transition-colors hover:bg-[var(--toss-gray-1)] ${!n.is_read ? 'bg-[var(--toss-blue-light)]/50' : ''}`}
                 >
                   <div className="flex gap-2">

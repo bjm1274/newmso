@@ -19,6 +19,7 @@ export const SUB_MENUS: Record<string, { id: string; label: string }[]> = {
     { id: '공지사항', label: '📢 공지사항' },
     { id: '자유게시판', label: '💬 자유게시판' },
     { id: '경조사', label: '🎉 경조사' },
+    { id: '근무현황', label: '👥 근무현황' },
     { id: '수술일정', label: '🏥 수술일정' },
     { id: 'MRI일정', label: '🔬 MRI일정' },
   ],

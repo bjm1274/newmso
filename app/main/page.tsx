@@ -45,6 +45,7 @@ function MainPageContent() {
   const [subView, setSubView] = useState('전체');
   const [selectedCo, setSelectedCo] = useState('전체');
   const [initialMyPageTab, setInitialMyPageTab] = useState<string | null>(null);
+  const [initialBoardView, setInitialBoardView] = useState<string | null>(null);
   const [initialOpenChatRoomId, setInitialOpenChatRoomId] = useState<string | null>(null);
 
   const [data, setData] = useState<ERPData>({
@@ -105,6 +106,19 @@ function MainPageContent() {
     if (roomId) {
       setMainMenu('채팅');
       setInitialOpenChatRoomId(roomId);
+      router.replace('/main', { scroll: false });
+    }
+  }, [searchParams, router]);
+
+  // 페이지 이동 처리 (알림 인박스에서 메뉴 오픈용)
+  useEffect(() => {
+    const targetMenu = searchParams.get('open_menu')?.trim();
+    if (targetMenu) {
+      setMainMenu(targetMenu);
+      const openBoard = searchParams.get('open_board')?.trim();
+      if (openBoard) {
+        setInitialBoardView(openBoard);
+      }
       router.replace('/main', { scroll: false });
     }
   }, [searchParams, router]);
@@ -273,7 +287,7 @@ function MainPageContent() {
           user={user}
           onOpenChatRoom={(roomId) => { setMainMenu('채팅'); setInitialOpenChatRoomId(roomId); }}
           onOpenApproval={() => setMainMenu('전자결재')}
-          onOpenBoard={() => setMainMenu('게시판')}
+          onOpenBoard={(boardId) => { setMainMenu('게시판'); if (boardId) setInitialBoardView(boardId); }}
         />
 
         {loading && (
@@ -298,6 +312,7 @@ function MainPageContent() {
           onRefresh={() => fetchERPData(user, selectedCompanyId)}
           initialMyPageTab={initialMyPageTab}
           onConsumeMyPageInitialTab={() => setInitialMyPageTab(null)}
+          initialBoard={initialBoardView}
           initialOpenChatRoomId={initialOpenChatRoomId}
           onConsumeOpenChatRoomId={() => setInitialOpenChatRoomId(null)}
           setMainMenu={setMainMenu}

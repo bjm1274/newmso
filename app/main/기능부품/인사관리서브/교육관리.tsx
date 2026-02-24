@@ -1,5 +1,5 @@
-'use client';
 import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 import EducationList from './교육내역/교육내역명단';
 import EducationStatus from './교육내역/교육이수현황';
 
@@ -17,11 +17,11 @@ export default function EducationMain({ staffs, selectedCo }: any) {
       // 가상 데이터: 교육 만료일 시뮬레이션 (실제로는 DB의 교육 이수 테이블에서 가져옴)
       // 예시: 개인정보보호 교육 만료일이 7일 남은 경우
       const mockExpiry = new Date();
-      mockExpiry.setDate(today.getDate() + 7); 
-      
+      mockExpiry.setDate(today.getDate() + 7);
+
       // 만료 30일 전, 7일 전 알림 생성
       const diffDays = Math.ceil((mockExpiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-      
+
       if (diffDays <= 30) {
         urgentNotis.push({
           id: staff.id,
@@ -76,7 +76,28 @@ export default function EducationMain({ staffs, selectedCo }: any) {
               <div key={i} className={`p-3 border-l-4 ${n.type === 'URGENT' ? 'border-red-500 bg-red-50' : 'border-orange-400 bg-orange-50'}`}>
                 <p className="text-[11px] font-semibold text-[var(--foreground)]">{n.name} ({n.education})</p>
                 <p className="text-[11px] font-bold text-[var(--toss-gray-3)] mt-1">만료까지 {n.daysLeft}일 남음</p>
-                <button className="mt-2 text-[11px] font-semibold text-[var(--toss-blue)] uppercase tracking-tighter">알림톡 발송 →</button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!confirm(`${n.name}님에게 알림 발송을 하시겠습니까?`)) return;
+                    const { error } = await supabase.from('notifications').insert({
+                      user_id: n.id,
+                      type: 'education',
+                      title: '🚨 법정의무교육 이수 독촉',
+                      body: `${n.education} 의무교육 이수 기한이 ${n.daysLeft}일 남았습니다. 신속히 교육을 수료하시고 이수증을 등록해 주세요.`,
+                      is_read: false
+                    });
+                    if (!error) {
+                      alert(`${n.name}님에게 독촉 알림이 성공적으로 전송되었습니다.`);
+                    } else {
+                      alert('알림 전송 중 오류가 발생했습니다.');
+                      console.error(error);
+                    }
+                  }}
+                  className="mt-2 text-[11px] font-semibold text-[var(--toss-blue)] uppercase tracking-tighter hover:opacity-70"
+                >
+                  알림톡 발송 →
+                </button>
               </div>
             ))}
           </div>
@@ -87,7 +108,7 @@ export default function EducationMain({ staffs, selectedCo }: any) {
       <div className="flex-1 p-8 overflow-y-auto space-y-8 custom-scrollbar">
         {/* 요약 현황 패널 (KPI) - 알림 데이터 전달 */}
         <EducationStatus selectedCo={selectedCo} urgentCount={notifications.length} />
-        
+
         {/* 상세 이수 명단 테이블 */}
         <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] p-8 shadow-sm">
           <EducationList selectedCo={selectedCo} staffs={staffs} notifications={notifications} />
