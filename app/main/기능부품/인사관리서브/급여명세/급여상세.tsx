@@ -1,5 +1,6 @@
 'use client';
 import React from 'react';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 
 export default function SalaryDetail({ record, staff }: any) {
   // record가 없을 경우 staff 정보를 기반으로 가상 계산 (미리보기용)
@@ -21,17 +22,17 @@ export default function SalaryDetail({ record, staff }: any) {
   const calculateTotals = () => {
     const taxable = Number(data.base_salary) + Number(data.extra_allowance) + Number(data.overtime_pay) + Number(data.bonus);
     const taxfree = Number(data.meal_allowance) + Number(data.night_duty_allowance || 0) + Number(data.vehicle_allowance) + Number(data.childcare_allowance) + Number(data.research_allowance) + Number(data.other_taxfree);
-    
+
     const pension = Math.floor(taxable * 0.045);
     const health = Math.floor(taxable * 0.03545);
     const longTerm = Math.floor(health * 0.1295);
     const employment = Math.floor(taxable * 0.009);
     const incomeTax = Math.floor(taxable * 0.03);
     const localTax = Math.floor(incomeTax * 0.1);
-    
+
     const totalDeduction = pension + health + longTerm + employment + incomeTax + localTax;
     const totalPayment = taxable + taxfree;
-    
+
     return {
       taxable, taxfree, totalPayment, totalDeduction,
       pension, health, longTerm, employment, incomeTax, localTax,

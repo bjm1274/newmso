@@ -639,7 +639,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
         return;
       }
     }
-    const content = trimmed || (fileUrl ? '📎 파일을 공유했습니다' : '');
+    const content = trimmed;
     const payload: Record<string, unknown> = {
       room_id: selectedRoomId,
       sender_id: user.id,
@@ -647,8 +647,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       file_url: fileUrl || null,
       reply_to_id: replyTo?.id || null,
     };
-    if (fileSizeBytes != null) payload.file_size_bytes = fileSizeBytes;
-    if (fileKind) payload.file_kind = fileKind;
+    // file_size_bytes, file_kind 컬럼 미존재로 인한 에러 방지를 위해 Payload에서 제거
     const { data: inserted, error } = await supabase.from('messages').insert([payload]).select().single();
     if (!error && inserted) {
       setInputMsg('');
@@ -694,7 +693,9 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     }
     setFileUploading(true);
     try {
-      const path = `chat/${Date.now()}_${encodeURIComponent(file.name)}`;
+      const ext = file.name.split('.').pop() || 'bin';
+      const randomStr = Math.random().toString(36).substring(2, 10);
+      const path = `chat/${Date.now()}_${randomStr}.${ext}`;
       const { error } = await supabase.storage.from(CHAT_BUCKET).upload(path, file, { upsert: false });
       if (error) throw error;
       const publicUrl = supabase.storage.from(CHAT_BUCKET).getPublicUrl(path).data.publicUrl;
@@ -1243,9 +1244,9 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                             markMessageRead(msg);
                             setActiveActionMsg(msg); // [복구] 메시지 클릭 시 액션 메뉴 표시
                           }}
-                          className={`group relative px-3 py-2 rounded-[12px] text-[13px] md:text-sm shadow-sm cursor-pointer transition-all max-w-[75%] md:max-w-[70%] ${isMine
-                            ? 'bg-emerald-600 text-white rounded-tr-none'
-                            : 'bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-tl-none hover:border-emerald-400 text-foreground'
+                          className={`group relative ${!msg.content ? 'p-0 bg-transparent shadow-none border-none' : 'px-3 py-2 shadow-sm border'} rounded-[12px] text-[13px] md:text-sm cursor-pointer transition-all max-w-[75%] md:max-w-[70%] ${!msg.content ? '' : isMine
+                              ? 'bg-emerald-600 text-white border-transparent rounded-tr-none'
+                              : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 rounded-tl-none hover:border-emerald-400 text-foreground'
                             }`}
                           role="button"
                           tabIndex={0}
@@ -1268,30 +1269,37 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                               </div>
                             ) : null;
                           })()}
-                          <div className="leading-relaxed">
+                          <div className={`leading-relaxed ${msg.content ? 'mb-1' : ''}`}>
                             {renderMessageContent(msg.content)}
                           </div>
                           {msg.file_url && (
-                            <div className="mt-2 space-y-1" onClick={(e) => e.stopPropagation()}>
+                            <div className="space-y-1" onClick={(e) => e.stopPropagation()}>
                               {isImageUrl(msg.file_url) ? (
                                 <a href={msg.file_url} target="_blank" rel="noopener noreferrer" className="block">
                                   <img
                                     src={msg.file_url}
                                     alt="첨부 이미지"
-                                    className="max-w-[200px] max-h-[150px] rounded-[12px] object-cover border border-[var(--toss-border)]"
+                                    className={`max-w-[200px] md:max-w-[240px] max-h-[200px] rounded-[12px] object-cover ${msg.content ? 'border border-[var(--toss-border)]' : 'shadow-sm'}`}
                                   />
                                 </a>
-                              ) : null}
-                              <a
-                                href={msg.file_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                download
-                                className={`block p-2 rounded-[12px] text-[11px] font-bold border flex items-center gap-2 hover:opacity-80 transition-opacity ${isMine ? 'bg-white/10 border-white/20 text-white' : 'bg-[var(--toss-gray-1)] border-[var(--toss-border)] text-[var(--toss-blue)]'
-                                  }`}
-                              >
-                                📎 파일 첨부됨 — 다운로드
-                              </a>
+                              ) : isVideoUrl(msg.file_url) ? (
+                                <div className="block">
+                                  <video controls className={`max-w-[200px] md:max-w-[240px] max-h-[200px] rounded-[12px] bg-black ${msg.content ? 'border border-[var(--toss-border)]' : 'shadow-sm'}`}>
+                                    <source src={msg.file_url} />
+                                  </video>
+                                </div>
+                              ) : (
+                                <a
+                                  href={msg.file_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  download
+                                  className={`block p-3 rounded-[12px] text-[12px] font-bold border flex items-center justify-center gap-2 hover:opacity-80 transition-opacity shadow-sm ${isMine ? (!msg.content ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-white/10 border-white/20 text-white') : (!msg.content ? 'bg-white dark:bg-zinc-800 border-zinc-200 text-foreground' : 'bg-[var(--toss-gray-1)] border-[var(--toss-border)] text-[var(--toss-blue)]')
+                                    }`}
+                                >
+                                  📎 첨부 파일
+                                </a>
+                              )}
                             </div>
                           )}
 
