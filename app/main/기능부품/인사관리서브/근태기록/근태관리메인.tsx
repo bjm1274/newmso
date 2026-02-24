@@ -10,6 +10,7 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
   const [loading, setLoading] = useState(false);
   const [workShifts, setWorkShifts] = useState<any[]>([]);
   const [shiftAssignments, setShiftAssignments] = useState<Record<string, string>>({}); // key: `${staff_id}_${work_date}` -> shift_id or ''
+  const [activeTool, setActiveTool] = useState<string | null>(null);
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const [bulkRangeType, setBulkRangeType] = useState<'day' | 'week' | 'month' | 'custom'>('day');
   const [bulkStartDate, setBulkStartDate] = useState(new Date().toISOString().slice(0, 10));
@@ -92,7 +93,7 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
         { staff_id: staffId, work_date: workDate, shift_id: shiftId || null, company_name: companyName },
         { onConflict: 'staff_id,work_date' }
       )
-      .then(() => {});
+      .then(() => { });
   };
 
   // 월별 일수 계산
@@ -130,14 +131,13 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                 { id: 'calendar', label: '근태 달력' },
                 { id: 'dashboard', label: '대시보드' }
               ].map(mode => (
-                <button 
+                <button
                   key={mode.id}
                   onClick={() => setViewMode(mode.id as any)}
-                  className={`px-6 py-2.5 rounded-[12px] text-[11px] font-bold transition-all ${
-                    viewMode === mode.id 
-                      ? 'bg-[var(--toss-blue)] text-white shadow-sm' 
+                  className={`px-6 py-2.5 rounded-[12px] text-[11px] font-bold transition-all ${viewMode === mode.id
+                      ? 'bg-[var(--toss-blue)] text-white shadow-sm'
                       : 'bg-[var(--toss-card)] text-[var(--toss-gray-3)] border border-[var(--toss-border)] hover:bg-[var(--toss-gray-1)]'
-                  }`}
+                    }`}
                 >
                   {mode.label}
                 </button>
@@ -156,9 +156,9 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
             {viewMode === 'daily' ? (
               <div className="flex items-center gap-3">
                 <span className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">Date</span>
-                <input 
-                  type="date" 
-                  value={selectedDate} 
+                <input
+                  type="date"
+                  value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
                   className="bg-[var(--toss-card)] border border-[var(--toss-border)] px-4 py-2 rounded-[12px] text-xs font-bold outline-none focus:ring-2 focus:ring-[var(--toss-blue)]"
                 />
@@ -166,9 +166,9 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
             ) : (
               <div className="flex items-center gap-3">
                 <span className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">{viewMode === 'schedule' ? '편성 월' : 'Month'}</span>
-                <input 
-                  type="month" 
-                  value={selectedMonth} 
+                <input
+                  type="month"
+                  value={selectedMonth}
                   onChange={(e) => setSelectedMonth(e.target.value)}
                   className="bg-[var(--toss-card)] border border-[var(--toss-border)] px-4 py-2 rounded-[12px] text-xs font-bold outline-none focus:ring-2 focus:ring-[var(--toss-blue)]"
                 />
@@ -227,9 +227,66 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
 
         {viewMode === 'schedule' && (
           <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[2.5rem] overflow-hidden shadow-xl">
-            <p className="p-4 text-[11px] text-[var(--toss-gray-3)] border-b border-[var(--toss-border)]">
-              해당 월의 날짜별 근무형태를 지정하면 게시판 경조사에서 오늘 근무형태별 근무 현황으로 실시간 열람됩니다.
-            </p>
+            <div className="p-4 md:p-6 border-b border-[var(--toss-border)] flex flex-col gap-4 bg-[var(--page-bg)]/50">
+              <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
+                <p className="text-[11px] text-[var(--toss-gray-3)] font-semibold">
+                  근무 툴을 선택하고 표의 빈칸을 클릭/드래그하여 스마트하게 듀티를 채워보세요. 게시판-경조사 탭의 금일 근무 현황과 실시간 연동됩니다.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const standardShift = workShifts.find(sh => sh.name.includes('통상') || sh.name.includes('일반') || sh.name.includes('주간') || sh.name.includes('9to6'));
+                    if (!standardShift) {
+                      alert('통상/일반/주간 이라는 이름이 포함된 근무형태가 부재합니다.');
+                      return;
+                    }
+                    if (!confirm('현재 화면의 모든 직원에 대해 평일(월~금)을 모두 통상근무로 채우시겠습니까? (기존 데이터에 덮어씁니다)')) return;
+                    filtered.forEach((s: any) => {
+                      daysArray.forEach((d) => {
+                        const dStr = `${selectedMonth}-${String(d).padStart(2, '0')}`;
+                        const dayOfWeek = new Date(dStr).getDay();
+                        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                          setAssignment(s.id, dStr, standardShift.id);
+                        }
+                      });
+                    });
+                  }}
+                  className="px-4 py-2 border border-blue-200 bg-blue-50 text-blue-600 font-bold text-[11px] rounded-[12px] shadow-sm hover:bg-blue-100 transition-all self-start md:self-auto shrink-0"
+                >
+                  🏢 통상근무(평일) 일괄 채우기
+                </button>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-bold text-[var(--foreground)] mr-2">빠른 입력 툴바:</span>
+                {workShifts.map((sh: any) => {
+                  const isActive = activeTool === sh.id;
+                  let colorClass = 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200';
+                  if (sh.name.includes('Day') || sh.name.includes('데이') || sh.name === 'D') colorClass = 'bg-green-100 text-green-700 border-green-200 hover:bg-green-200';
+                  if (sh.name.includes('Evening') || sh.name.includes('이브') || sh.name === 'E') colorClass = 'bg-orange-100 text-orange-700 border-orange-200 hover:bg-orange-200';
+                  if (sh.name.includes('Night') || sh.name.includes('나이트') || sh.name === 'N') colorClass = 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200';
+                  if (sh.name.includes('Off') || sh.name.includes('오프') || sh.name === 'O') colorClass = 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100';
+
+                  return (
+                    <button
+                      key={sh.id}
+                      onClick={() => setActiveTool(isActive ? null : sh.id)}
+                      className={`px-4 py-2 rounded-[12px] text-[11px] font-bold transition-all border shadow-sm ${isActive ? 'ring-2 ring-offset-1 ring-[var(--toss-blue)] scale-105 ' + colorClass : colorClass}`}
+                    >
+                      {sh.name}
+                    </button>
+                  );
+                })}
+                <div className="w-px h-6 bg-[var(--toss-border)] mx-1"></div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTool(activeTool === 'eraser' ? null : 'eraser')}
+                  className={`px-4 py-2 rounded-[12px] text-[11px] font-bold transition-all border shadow-sm ${activeTool === 'eraser' ? 'bg-red-500 text-white ring-2 ring-offset-1 ring-red-500 scale-105' : 'bg-white text-red-500 border-red-200 hover:bg-red-50'}`}
+                >
+                  지우개
+                </button>
+              </div>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse min-w-[800px]">
                 <thead className="bg-[var(--toss-gray-1)] text-[11px] font-bold text-[var(--toss-gray-3)] border-b border-[var(--toss-border)] uppercase">
@@ -255,20 +312,34 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                         const dStr = `${selectedMonth}-${String(d).padStart(2, '0')}`;
                         const key = `${s.id}_${dStr}`;
                         const value = shiftAssignments[key] ?? '';
+                        const shiftObj = workShifts.find(w => w.id === value);
+
+                        let cellColor = 'hover:bg-gray-50';
+                        if (shiftObj) {
+                          if (shiftObj.name.includes('Day') || shiftObj.name.includes('데이') || shiftObj.name === 'D') cellColor = 'bg-green-50 text-green-700 font-bold';
+                          else if (shiftObj.name.includes('Evening') || shiftObj.name.includes('이브') || shiftObj.name === 'E') cellColor = 'bg-orange-50 text-orange-700 font-bold';
+                          else if (shiftObj.name.includes('Night') || shiftObj.name.includes('나이트') || shiftObj.name === 'N') cellColor = 'bg-blue-50 text-blue-700 font-bold';
+                          else if (shiftObj.name.includes('Off') || shiftObj.name.includes('오프') || shiftObj.name === 'O') cellColor = 'bg-red-50 text-red-600 font-bold';
+                          else cellColor = 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] font-bold';
+                        }
                         return (
-                          <td key={d} className="px-2 py-1 border-r">
-                            <select
-                              value={value}
-                              onChange={(e) => setAssignment(s.id, dStr, e.target.value || null)}
-                              className="w-full text-[10px] font-bold border border-[var(--toss-border)] rounded px-1 py-1 bg-[var(--toss-card)] outline-none"
-                            >
-                              <option value="">미지정</option>
-                              {workShifts.map((sh: any) => (
-                                <option key={sh.id} value={sh.id}>
-                                  {sh.name}
-                                </option>
-                              ))}
-                            </select>
+                          <td
+                            key={d}
+                            className="p-0 border-r min-w-[36px] cursor-pointer select-none"
+                            onMouseDown={() => {
+                              if (activeTool === 'eraser') setAssignment(s.id, dStr, null);
+                              else if (activeTool) setAssignment(s.id, dStr, activeTool);
+                            }}
+                            onMouseEnter={(e) => {
+                              if (e.buttons === 1) { // 1 is left click drag
+                                if (activeTool === 'eraser') setAssignment(s.id, dStr, null);
+                                else if (activeTool) setAssignment(s.id, dStr, activeTool);
+                              }
+                            }}
+                          >
+                            <div className={`w-full h-10 flex items-center justify-center text-[11px] md:text-sm transition-colors border-2 border-transparent active:border-[var(--toss-blue)]/50 ${cellColor}`}>
+                              {shiftObj ? (shiftObj.name.replace('근무', '').slice(0, 3)) : <span className="opacity-0 group-hover:opacity-30 text-[9px]">+</span>}
+                            </div>
                           </td>
                         );
                       })}
@@ -404,16 +475,15 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                         key={o.id}
                         type="button"
                         onClick={() => setBulkRangeType(o.id as any)}
-                        className={`px-3 py-1.5 rounded-[10px] text-[11px] font-bold ${
-                          bulkRangeType === o.id ? 'bg-[var(--toss-blue)] text-white' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]'
-                        }`}
+                        className={`px-3 py-1.5 rounded-[10px] text-[11px] font-bold ${bulkRangeType === o.id ? 'bg-[var(--toss-blue)] text-white' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]'
+                          }`}
                       >
                         {o.label}
                       </button>
                     ))}
                   </div>
                 </div>
-                  <div className="flex gap-3 flex-wrap">
+                <div className="flex gap-3 flex-wrap">
                   <div>
                     <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase mb-1">시작일</p>
                     <input

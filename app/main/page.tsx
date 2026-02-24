@@ -249,8 +249,8 @@ function MainPageContent() {
               key={sub.id}
               onClick={() => setSubView(sub.id)}
               className={`flex-none md:w-full text-center md:text-left px-4 md:px-3 py-2 md:py-2.5 text-[11px] font-bold rounded-[12px] transition-all whitespace-nowrap ${subView === sub.id
-                  ? 'bg-[var(--toss-blue)] text-white shadow-md'
-                  : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
+                ? 'bg-[var(--toss-blue)] text-white shadow-md'
+                : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
                 }`}
             >
               {sub.label}
@@ -273,6 +273,7 @@ function MainPageContent() {
           user={user}
           onOpenChatRoom={(roomId) => { setMainMenu('채팅'); setInitialOpenChatRoomId(roomId); }}
           onOpenApproval={() => setMainMenu('전자결재')}
+          onOpenBoard={() => setMainMenu('게시판')}
         />
 
         {loading && (

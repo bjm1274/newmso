@@ -517,7 +517,11 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   );
 
   const handleLeaveRoom = async () => {
-    if (!selectedRoom || selectedRoom.id === NOTICE_ROOM_ID) return;
+    if (!selectedRoom) return;
+    if (selectedRoom.id === NOTICE_ROOM_ID && !isMso) {
+      alert('공지메시지 방은 관리자 승인 없이 직원 임의로 나갈 수 없습니다.');
+      return;
+    }
     if (!confirm('이 채팅방에서 나가시겠습니까? 나간 후에는 다시 초대 받아야 합니다.')) return;
 
     try {
@@ -960,7 +964,17 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                   const unread = roomUnreadCounts[room.id] || 0;
                   const isSelected = selectedRoomId === room.id;
                   const isNoticeChannel = room.id === NOTICE_ROOM_ID;
-                  const label = room.id === NOTICE_ROOM_ID ? NOTICE_ROOM_NAME : room.name || '채팅방';
+
+                  let label = room.name || '채팅방';
+                  if (isNoticeChannel) {
+                    label = NOTICE_ROOM_NAME;
+                  } else if (room.type === 'direct' && Array.isArray(room.members)) {
+                    // 1:1 채팅방의 경우 내 이름이 아닌 상대방 이름으로 보이도록 (이름이 'A,B' 형태로 되어있을 때)
+                    // 현재 DB에 저장된 name이 있으면 그걸 쓰되, 상대방 이름을 추출하려는 시도
+                    const otherStaff = staffs.find((s: any) => room.members.includes(String(s.id)) && String(s.id) !== String(user?.id));
+                    if (otherStaff) label = otherStaff.name;
+                  }
+
                   return (
                     <div
                       key={room.id}
@@ -1148,11 +1162,11 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                 const msgReacts = reactions[msg.id] || {};
                 const hasReacts = Object.keys(msgReacts).some(e => (msgReacts[e] || 0) > 0);
 
-                // [수정] 참여자 수 기반 안 읽음 숫자 계산 (카카오톡 스타일)
-                // 참여자 수 - 1(본인) - 읽은 사람 수
-                const totalParticipants = selectedRoom?.members?.length || 0;
+                // 라인/텔레그램 스타일 계산: 읽은 사람 수 직접 카운트
+                // 본인이 보낸 메시지도 0부터 시작하게 설정, 총 참여자 수는 드로어에서 확인 가능
                 const readersCount = readCounts[msg.id] || 0;
-                const unreadCount = Math.max(0, totalParticipants - 1 - readersCount);
+                // UI 표기를 '읽은 사람 수'로 변경
+                const displayReadCount = Math.max(0, readersCount);
 
                 const TOOLBAR_EMOJIS = ['👍', '👌', '😎', '😍', '😂', '😕', '😢', '😠'];
 
@@ -1244,7 +1258,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                             </div>
                           )}
 
-                          {(hasReacts || unreadCount > 0) && (
+                          {(hasReacts || displayReadCount > 0) && (
                             <div className="mt-2 flex items-center gap-2 text-[11px] flex-wrap">
                               {hasReacts && (
                                 <span className="flex gap-1 flex-wrap">
@@ -1261,9 +1275,9 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                                   )}
                                 </span>
                               )}
-                              {unreadCount > 0 && (
-                                <span className={`font-bold ${isMine ? 'text-yellow-300' : 'text-blue-500'}`}>
-                                  {unreadCount}
+                              {displayReadCount > 0 && (
+                                <span className={`font-bold ${isMine ? 'text-emerald-500' : 'text-blue-500'}`}>
+                                  {displayReadCount}
                                 </span>
                               )}
                             </div>

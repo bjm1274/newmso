@@ -138,13 +138,19 @@ export default function NotificationSystem({
   user,
   onOpenChatRoom,
   onOpenApproval,
-}: { user: any; onOpenChatRoom?: (roomId: string) => void; onOpenApproval?: () => void }) {
+  onOpenBoard,
+}: {
+  user: any;
+  onOpenChatRoom?: (roomId: string) => void;
+  onOpenApproval?: () => void;
+  onOpenBoard?: () => void;
+}) {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const shownNotifIdsRef = useRef<Set<string>>(new Set());
   const lastHiddenAtRef = useRef<number>(0);
-  const handleNotificationRef = useRef<(notif: any) => void>(() => {});
-  const handleNotificationFromServerRef = useRef<(notif: any) => void>(() => {});
+  const handleNotificationRef = useRef<(notif: any) => void>(() => { });
+  const handleNotificationFromServerRef = useRef<(notif: any) => void>(() => { });
 
   useEffect(() => {
     if (!user?.id) return;
@@ -460,9 +466,29 @@ export default function NotificationSystem({
   handleNotificationRef.current = handleNotification;
 
   const markAsRead = (id: string) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n).filter(n => n.id !== id));
     setUnreadCount(prev => Math.max(0, prev - 1));
   };
+
+  // 알림 5초 후 자동 삭제 로직
+  useEffect(() => {
+    if (notifications.length === 0) return;
+    const toRemove = notifications.filter(n => Date.now() - new Date(n.created_at || Date.now()).getTime() > 5000);
+    if (toRemove.length > 0) {
+      setNotifications(prev => prev.filter(n => !toRemove.find(r => r.id === n.id)));
+      setUnreadCount(prev => Math.max(0, prev - toRemove.length));
+    }
+    const timer = setInterval(() => {
+      setNotifications(prev => {
+        const remaining = prev.filter(n => Date.now() - new Date(n.created_at || Date.now()).getTime() <= 5000);
+        if (remaining.length !== prev.length) {
+          setUnreadCount(count => Math.max(0, count - (prev.length - remaining.length)));
+        }
+        return remaining;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [notifications]);
 
   return (
     <div className="fixed bottom-20 right-4 md:bottom-4 z-50 space-y-2 max-w-sm">
@@ -473,30 +499,50 @@ export default function NotificationSystem({
         </div>
       )}
 
-      {/* 최근 알림 표시 */}
+      {/* 최근 알림 표시 (5초 자동 사라짐) */}
       {notifications.slice(0, 3).map((notif, idx) => (
         <div
           key={notif.id}
-          role="button"
-          tabIndex={0}
-          className={`p-4 rounded-[12px] shadow-2xl border-l-4 animate-in slide-in-from-right duration-300 cursor-pointer ${
-            notif.type === 'approval' ? 'bg-[var(--toss-blue-light)] border-[var(--toss-blue)]' :
-            notif.type === 'inventory' ? 'bg-orange-50 border-orange-600 dark:bg-orange-950/30 dark:border-orange-500' :
-            notif.type === 'payroll' ? 'bg-green-50 border-green-600 dark:bg-green-950/30 dark:border-green-500' :
-            notif.type === 'message' ? 'bg-indigo-50 border-indigo-600 dark:bg-indigo-950/30 dark:border-indigo-500' :
-            'bg-purple-50 border-purple-600 dark:bg-purple-950/30 dark:border-purple-500'
-          }`}
-          onClick={() => {
-            markAsRead(notif.id);
-            if ((notif.type === 'message' || notif.type === 'mention') && notif.data?.room_id && onOpenChatRoom) {
-              onOpenChatRoom(notif.data.room_id);
-            }
-            if (notif.type === 'approval' && onOpenApproval) onOpenApproval();
-          }}
+          className={`relative p-4 rounded-[12px] shadow-2xl border-l-4 animate-in slide-in-from-right duration-300 ${notif.type === 'approval' ? 'bg-[var(--toss-blue-light)] border-[var(--toss-blue)]' :
+              notif.type === 'inventory' ? 'bg-orange-50 border-orange-600 dark:bg-orange-950/30 dark:border-orange-500' :
+                notif.type === 'payroll' ? 'bg-green-50 border-green-600 dark:bg-green-950/30 dark:border-green-500' :
+                  notif.type === 'message' ? 'bg-indigo-50 border-indigo-600 dark:bg-indigo-950/30 dark:border-indigo-500' :
+                    notif.type === 'board' ? 'bg-pink-50 border-pink-500 dark:bg-pink-950/30 dark:border-pink-500' :
+                      'bg-purple-50 border-purple-600 dark:bg-purple-950/30 dark:border-purple-500'
+            }`}
         >
-          <h4 className="font-semibold text-sm mb-1">{notif.title}</h4>
-          <p className="text-xs text-[var(--toss-gray-4)]">{notif.body}</p>
-          <p className="text-[11px] text-[var(--toss-gray-3)] mt-2">{new Date().toLocaleTimeString()}</p>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              markAsRead(notif.id);
+            }}
+            className="absolute top-2 right-2 text-[var(--toss-gray-3)] hover:text-red-500 text-lg transition-colors"
+          >
+            ✕
+          </button>
+          <div
+            role="button"
+            tabIndex={0}
+            className="cursor-pointer pr-6"
+            onClick={() => {
+              markAsRead(notif.id);
+              if ((notif.type === 'message' || notif.type === 'mention') && notif.data?.room_id && onOpenChatRoom) {
+                onOpenChatRoom(notif.data.room_id);
+              } else if (notif.type === 'approval' && onOpenApproval) {
+                onOpenApproval();
+              } else if (notif.type === 'board' && onOpenBoard) {
+                onOpenBoard();
+              } else if (notif.type === 'notification' && notif.body?.includes('게시물')) {
+                if (onOpenBoard) onOpenBoard();
+              } else {
+                // 일반 알림은 특별한 이동 처리가 필요하지 않으면 클릭 시 닫기만 수행
+              }
+            }}
+          >
+            <h4 className="font-semibold text-sm mb-1">{notif.title}</h4>
+            <p className="text-xs text-[var(--toss-gray-4)]">{notif.body}</p>
+            <p className="text-[11px] text-[var(--toss-gray-3)] mt-2">{new Date().toLocaleTimeString()}</p>
+          </div>
         </div>
       ))}
     </div>

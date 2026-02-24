@@ -1,10 +1,12 @@
 ﻿'use client';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 
 type EduItem = { name: string; category: 'hospital' | 'company' | 'common' };
 
 export default function EducationList({ selectedCo, staffs, notifications = [] }: any) {
   const filtered = selectedCo === '전체' ? staffs : staffs.filter((s: any) => s.company === selectedCo);
-  
+
   // 법정 의무 교육 전체 목록 (병원 / 일반사업장 / 공통)
   const eduItems: EduItem[] = [
     // 공통 (일반 회사)
@@ -22,6 +24,30 @@ export default function EducationList({ selectedCo, staffs, notifications = [] }
     { name: '아동학대신고', category: 'hospital' },
     { name: '노인학대신고', category: 'hospital' },
   ];
+
+  const [completions, setCompletions] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    supabase.from('education_completions').select('staff_id, education_name').then(({ data, error }) => {
+      if (!error && data) {
+        const map: Record<string, boolean> = {};
+        data.forEach((r: any) => { map[`${r.staff_id}_${r.education_name}`] = true; });
+        setCompletions(map);
+      }
+    });
+  }, []);
+
+  const toggleStatus = async (staffId: string, eduName: string) => {
+    const key = `${staffId}_${eduName}`;
+    const nextStatus = !completions[key];
+    setCompletions(prev => ({ ...prev, [key]: nextStatus }));
+
+    if (nextStatus) {
+      await supabase.from('education_completions').insert([{ staff_id: staffId, education_name: eduName }]);
+    } else {
+      await supabase.from('education_completions').delete().eq('staff_id', staffId).eq('education_name', eduName);
+    }
+  };
 
   return (
     <div className="bg-white border border-[var(--toss-border)] shadow-sm overflow-hidden">
@@ -55,8 +81,8 @@ export default function EducationList({ selectedCo, staffs, notifications = [] }
                       {item.category === 'hospital'
                         ? '병원'
                         : item.category === 'company'
-                        ? '일반'
-                        : '공통'}
+                          ? '일반'
+                          : '공통'}
                     </span>
                   </div>
                 </th>
@@ -76,21 +102,28 @@ export default function EducationList({ selectedCo, staffs, notifications = [] }
                   </td>
                   {eduItems.map((item, idx) => {
                     const isUrgent = staffNotis.some((n: any) => n.education === item.name);
-                    const isCompleted = idx < 3; // 시뮬레이션용 로직
+                    const isCompleted = !!completions[`${s.id}_${item.name}`];
 
                     return (
                       <td key={idx} className="p-4 text-center">
                         {isUrgent ? (
-                          <div className="flex flex-col items-center gap-1">
-                            <span className="px-2 py-1 text-[11px] font-semibold border bg-orange-50 text-orange-600 border-orange-100 animate-pulse">
+                          <div
+                            className="flex flex-col items-center gap-1 cursor-pointer"
+                            onClick={() => toggleStatus(s.id, item.name)}
+                          >
+                            <span className="px-2 py-1 text-[11px] font-semibold border bg-orange-50 text-orange-600 border-orange-100 animate-pulse hover:opacity-80 transition-opacity">
                               기한임박
                             </span>
                             <span className="text-[8px] font-bold text-orange-400">7일 남음</span>
                           </div>
                         ) : (
-                          <span className={`px-2 py-1 text-[11px] font-semibold border ${isCompleted ? 'bg-green-50 text-green-600 border-green-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
+                          <button
+                            type="button"
+                            onClick={() => toggleStatus(s.id, item.name)}
+                            className={`px-2 py-1 text-[11px] font-semibold border rounded-md transition-all hover:scale-105 active:scale-95 ${isCompleted ? 'bg-green-50 text-green-600 border-green-100' : 'bg-red-50 text-red-600 border-red-100 hover:bg-red-100'}`}
+                          >
                             {isCompleted ? '이수완료' : '미이수'}
-                          </span>
+                          </button>
                         )}
                       </td>
                     );

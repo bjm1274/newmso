@@ -54,7 +54,7 @@ export default function MyCertificates({ user }: any) {
     <div className="space-y-6">
       <div className="bg-white p-8 border border-[var(--toss-border)] shadow-sm rounded-[16px]">
         <h3 className="text-xs font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-6">발급된 증명서</h3>
-        
+
         {loading ? (
           <div className="text-center py-10">로딩 중...</div>
         ) : issuedCerts.length === 0 && approvedDocs.length === 0 ? (
@@ -75,7 +75,7 @@ export default function MyCertificates({ user }: any) {
                 <button onClick={() => handlePrint({ title: c.cert_type, content: `${c.staff_members?.name || ''} ${c.cert_type}\n발급번호: ${c.serial_no}\n용도: ${c.purpose || ''}` })} className="mt-4 w-full py-3 bg-gray-900 text-white rounded-[16px] text-xs font-semibold">🖨️ 인쇄</button>
               </div>
             ))}
-            {approvedDocs.filter((d: any) => d.meta_data?.target_staff !== user?.id).map((doc) => (
+            {approvedDocs.map((doc) => (
               <div key={doc.id} className="p-6 border border-[var(--toss-border)] rounded-[12px] hover:shadow-md transition-all flex flex-col justify-between bg-white group">
                 <div>
                   <span className="px-2 py-1 bg-green-100 text-green-600 rounded text-[11px] font-semibold">승인완료</span>
