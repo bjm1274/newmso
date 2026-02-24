@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 const CHAT_ROOM_KEY = 'erp_chat_last_room';
 const CHAT_FOCUS_KEY = 'erp_chat_focus_keyword';
 
-const BOARD_IDS = ['공지사항', '자유게시판', '경조사', '수술일정', 'MRI일정'];
+const BOARD_IDS = ['공지사항', '자유게시판', '익명소리함', '경조사', '수술일정', 'MRI일정'];
 
 export default function BoardView({ user, subView, setSubView, initialBoard, surgeries, mris, onRefresh, setMainMenu }: any) {
   const [activeBoard, setActiveBoard] = useState(initialBoard && BOARD_IDS.includes(initialBoard) ? initialBoard : (subView && BOARD_IDS.includes(subView) ? subView : '공지사항'));
@@ -75,6 +75,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
   const boards = [
     { id: '공지사항', label: '📢 공지사항', icon: '📢' },
     { id: '자유게시판', label: '💬 자유게시판', icon: '💬' },
+    { id: '익명소리함', label: '💌 익명 소리함', icon: '💌' },
     { id: '경조사', label: '🎉 경조사', icon: '🎉' },
     { id: '수술일정', label: '🏥 수술일정표', icon: '🏥' },
     { id: 'MRI일정', label: '🔬 MRI일정표', icon: '🔬' }
@@ -104,7 +105,18 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
 
   const fetchPosts = async () => {
     const { data } = await supabase.from('board_posts').select('*').eq('board_type', activeBoard).order('created_at', { ascending: false });
-    if (data) setPosts(data as any);
+    if (data) {
+      if (activeBoard === '익명소리함') {
+        const isAdmin = user?.permissions?.mso || user?.role === 'admin' || user?.permissions?.hr;
+        if (!isAdmin) {
+          setPosts([]);
+        } else {
+          setPosts(data as any);
+        }
+      } else {
+        setPosts(data as any);
+      }
+    }
   };
 
   // 메인 사이드바 플라이아웃에서 선택한 게시판 반영
@@ -482,8 +494,8 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
         schedule_time: scheduleTime || null,
         schedule_room: scheduleRoom || null,
         patient_name: schedulePatient || null,
-        author_name: user?.name || '익명',
-        author_id: user?.id,
+        author_name: activeBoard === '익명소리함' ? '익명' : (user?.name || '익명'),
+        author_id: activeBoard === '익명소리함' ? null : user?.id,
         likes_count: 0,
         created_at: new Date().toISOString(),
       };
@@ -499,8 +511,8 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
         postData.title = sidePrefix + (postData.title || '');
       }
 
-      // 공지/자유/경조사: 사진·동영상·파일 첨부 업로드 (Storage 키는 영문/숫자만 사용, 한글 파일명은 Invalid key 방지)
-      const boardWithAttach = ['공지사항', '자유게시판', '경조사'];
+      // 공지/자유/경조사/소리함: 사진·동영상·파일 첨부 업로드 (Storage 키는 영문/숫자만 사용, 한글 파일명은 Invalid key 방지)
+      const boardWithAttach = ['공지사항', '자유게시판', '경조사', '익명소리함'];
       if (boardWithAttach.includes(activeBoard) && attachmentFiles.length > 0) {
         const BUCKET = 'board-attachments';
         const safeExt = (name: string) => {
@@ -1165,10 +1177,10 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
                             <div className="flex items-center justify-between mb-1">
                               <span
                                 className={`text-[11px] font-semibold ${!inMonth ? 'text-[var(--toss-gray-3)]' : d.getDay() === 0
-                                    ? 'text-red-500'
-                                    : d.getDay() === 6
-                                      ? 'text-[var(--toss-blue)]'
-                                      : 'text-[var(--foreground)]'
+                                  ? 'text-red-500'
+                                  : d.getDay() === 6
+                                    ? 'text-[var(--toss-blue)]'
+                                    : 'text-[var(--foreground)]'
                                   }`}
                               >
                                 {d.getDate()}
@@ -1309,7 +1321,11 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
               })
             ) : (
               <div className="text-center py-20 text-[var(--toss-gray-3)]">
-                <p className="font-semibold text-sm italic">게시물이 없습니다.</p>
+                <p className="font-semibold text-sm italic">
+                  {activeBoard === '익명소리함' && !(user?.permissions?.mso || user?.role === 'admin' || user?.permissions?.hr)
+                    ? '🙌 작성된 소중한 의견은 인사팀 및 경영진에게만 안전하게 익명으로 전달됩니다.'
+                    : '게시물이 없습니다.'}
+                </p>
               </div>
             )}
           </div>
