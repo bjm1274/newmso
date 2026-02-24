@@ -18,12 +18,15 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
   const [scheduleTime, setScheduleTime] = useState('');
   const [scheduleRoom, setScheduleRoom] = useState('');
   const [schedulePatient, setSchedulePatient] = useState('');
+  const [scheduleChartNo, setScheduleChartNo] = useState('');
   const [scheduleFasting, setScheduleFasting] = useState(false);
   const [scheduleInpatient, setScheduleInpatient] = useState(false);
   const [scheduleGuardian, setScheduleGuardian] = useState(false);
   const [scheduleCaregiver, setScheduleCaregiver] = useState(false);
   const [scheduleTransfusion, setScheduleTransfusion] = useState(false);
   const [scheduleSide, setScheduleSide] = useState<'좌' | '우' | ''>('');
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
   const [schedulePeriod, setSchedulePeriod] = useState('');
   const [scheduleHour, setScheduleHour] = useState('');
@@ -451,15 +454,16 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
     })();
   }, [selectedPostId]);
 
-  const canDeletePost = (post: any) => {
+  const isDepartmentHead = ['팀장', '과장', '실장', '부장', '이사', '원장', '병원장'].some(p => user?.position?.includes(p)) || user?.permissions?.mso || user?.role === 'admin';
+
+  const canEditPost = (post: any) => {
     if (!user) return false;
-    const isAuthor = post.author_id && String(post.author_id) === String(user.id);
-    const isAdmin = user.permissions?.mso || user.role === 'admin';
-    return !!(isAuthor || isAdmin);
+    if (activeBoard === '수술일정' || activeBoard === 'MRI일정') return isDepartmentHead;
+    return (post.author_id && String(post.author_id) === String(user.id)) || isDepartmentHead;
   };
 
   const handleDeletePost = async (post: any) => {
-    if (!canDeletePost(post)) {
+    if (!canEditPost(post)) {
       alert('이 게시물을 삭제할 권한이 없습니다.');
       return;
     }
@@ -474,10 +478,83 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
     alert('게시물이 삭제되었습니다.');
   };
 
+  const handleEditPostStart = (post: any) => {
+    if (!canEditPost(post)) {
+      alert('수정 권한이 없습니다.');
+      return;
+    }
+    setEditingPostId(post.id);
+    setTitle(post.title || '');
+    if (activeBoard === '수술일정' || activeBoard === 'MRI일정') {
+      const parts = (post.title || '').split(' ');
+      if (['좌측', '우측'].includes(parts[0])) {
+        setScheduleSide(parts[0] === '좌측' ? '좌' : '우');
+        setTitle(parts.slice(1).join(' ')); // '좌측 ' 제거
+      } else {
+        setScheduleSide('');
+      }
+      setScheduleDate(post.schedule_date || '');
+      setScheduleTime(post.schedule_time || '');
+      // 시간 파싱 (오전/오후 분기)
+      if (post.schedule_time) {
+        const [hh, mm] = post.schedule_time.split(':');
+        const h = parseInt(hh, 10);
+        if (!isNaN(h)) {
+          if (h >= 12) {
+            setSchedulePeriod('오후');
+            setScheduleHour(h === 12 ? '12' : String(h - 12).padStart(2, '0'));
+          } else {
+            setSchedulePeriod('오전');
+            setScheduleHour(h === 0 ? '12' : String(h).padStart(2, '0'));
+          }
+        }
+        setScheduleMinute(mm || '00');
+      }
+
+      setScheduleRoom(post.schedule_room || '');
+      setSchedulePatient(post.patient_name || '');
+      setScheduleChartNo(post.content || ''); // 차트번호는 content 컬럼에 저장됨
+      setScheduleFasting(!!post.surgery_fasting);
+      setScheduleInpatient(!!post.surgery_inpatient);
+      setScheduleGuardian(!!post.surgery_guardian);
+      setScheduleCaregiver(!!post.surgery_caregiver);
+      setScheduleTransfusion(!!post.surgery_transfusion);
+    } else {
+      setContent(post.content || '');
+      setTagsInput((post.tags || []).join(', '));
+      // 첨부파일 복구 로직 (단순 파일 목록 복구는 File 객체가 아니므로 어려움, 기존 유지)
+      setAttachmentFiles([]);
+    }
+    setShowNewPost(true);
+    setSelectedPostId(null);
+  };
+
+  const resetForm = () => {
+    setTitle('');
+    setContent('');
+    setScheduleDate('');
+    setScheduleTime('');
+    setSchedulePeriod('');
+    setScheduleHour('');
+    setScheduleMinute('');
+    setScheduleRoom('');
+    setSchedulePatient('');
+    setScheduleChartNo('');
+    setScheduleFasting(false);
+    setScheduleInpatient(false);
+    setScheduleGuardian(false);
+    setScheduleCaregiver(false);
+    setScheduleTransfusion(false);
+    setScheduleSide('');
+    setAttachmentFiles([]);
+    setTagsInput('');
+    setEditingPostId(null);
+  };
+
   const handleNewPost = async () => {
     if (!title) return alert('제목을 입력해주세요.');
     if (activeBoard === '수술일정' || activeBoard === 'MRI일정') {
-      if (!scheduleDate || !scheduleTime || !scheduleRoom) return alert('필수 정보를 입력해주세요.');
+      if (!scheduleDate || !scheduleTime) return alert('필수 정보를 입력해주세요.');
     } else if (!content) {
       return alert('내용을 입력해주세요.');
     }
@@ -555,34 +632,32 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
         postData.attachments = uploaded;
       }
 
+      // 수정 모드인 경우 업데이트
+      if (editingPostId) {
+        const { error: updateError } = await supabase.from('board_posts').update(postData).eq('id', editingPostId);
+        if (!updateError) {
+          alert('게시물이 수정되었습니다.');
+          setPosts((prev) => prev.map(p => p.id === editingPostId ? { ...p, ...postData } : p));
+          setSelectedPostId(editingPostId);
+          resetForm();
+          setShowNewPost(false);
+        } else {
+          alert('게시물 수정 중 오류가 발생했습니다.');
+        }
+        setLoading(false);
+        return;
+      }
+
       const { data: insertedPost, error } = await supabase.from('board_posts').insert([postData]).select().single();
       if (!error) {
         if (attachmentFiles.length > 0 && (!insertedPost.attachments || (Array.isArray(insertedPost.attachments) && insertedPost.attachments.length === 0))) {
           console.warn('첨부파일이 저장되지 않았을 수 있습니다. Supabase에 board_posts_attachments.sql 적용 및 board-attachments 버킷 생성 여부를 확인하세요.');
         }
         alert('게시물이 등록되었습니다.');
-        setTitle('');
-        setContent('');
-        setScheduleDate('');
-        setScheduleTime('');
-        setSchedulePeriod('');
-        setScheduleHour('');
-        setScheduleMinute('');
-        setScheduleRoom('');
-        setSchedulePatient('');
-        setScheduleFasting(false);
-        setScheduleInpatient(false);
-        setScheduleGuardian(false);
-        setScheduleCaregiver(false);
-        setScheduleTransfusion(false);
-        setScheduleSide('');
-        setAttachmentFiles([]);
-        setTagsInput('');
+        resetForm();
         setShowNewPost(false);
         setPosts((prev) => [insertedPost, ...prev]);
         setSelectedPostId(insertedPost.id);
-
-        // 공지사항·경조사 글 작성 시 전 직원에게 알림
         if (activeBoard === '공지사항' || activeBoard === '경조사') {
           try {
             const { data: staffList } = await supabase.from('staff_members').select('id');
@@ -801,7 +876,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
                       </div>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">수술실/검사실</label>
                       <input value={scheduleRoom} onChange={e => setScheduleRoom(e.target.value)} placeholder="예: 수술실 1" className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20" />
@@ -809,6 +884,10 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
                     <div>
                       <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">환자명</label>
                       <input value={schedulePatient} onChange={e => setSchedulePatient(e.target.value)} placeholder="환자명 입력" className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20" />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">차트번호</label>
+                      <input value={scheduleChartNo} onChange={e => setScheduleChartNo(e.target.value)} placeholder="예: 12345" className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20" />
                     </div>
                   </div>
                   {(activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
@@ -1082,16 +1161,25 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
         {/* 수술일정·MRI일정용 달력 뷰 */}
         {(activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
           <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] shadow-sm p-4 md:p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
-                  {activeBoard === '수술일정' ? '수술 일정 캘린더' : 'MRI 일정 캘린더'}
-                </p>
-                <h3 className="text-lg md:text-xl font-semibold text-[var(--foreground)] mt-1">
-                  {calendarMonth.getFullYear()}년 {calendarMonth.getMonth() + 1}월
-                </h3>
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div>
+                  <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
+                    {activeBoard === '수술일정' ? '수술 일정 캘린더' : 'MRI 일정 캘린더'}
+                  </p>
+                  <h3 className="text-lg md:text-xl font-semibold text-[var(--foreground)] mt-1">
+                    {calendarMonth.getFullYear()}년 {calendarMonth.getMonth() + 1}월
+                  </h3>
+                </div>
               </div>
-              <div className="flex items-center gap-2 text-xs font-bold">
+
+              <div className="flex items-center gap-2 text-xs font-bold shrink-0 self-end md:self-auto w-full md:w-auto">
+                <input
+                  value={searchKeyword}
+                  onChange={e => setSearchKeyword(e.target.value)}
+                  placeholder="환자명 또는 차트번호 검색"
+                  className="flex-1 md:w-48 px-3 py-1.5 rounded-full border border-[var(--toss-border)] bg-[var(--toss-gray-1)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 font-semibold"
+                />
                 <button
                   type="button"
                   onClick={() =>
@@ -1099,14 +1187,14 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
                       new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1)
                     )
                   }
-                  className="px-3 py-1.5 rounded-full border border-[var(--toss-border)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-gray-1)]"
+                  className="shrink-0 px-3 py-1.5 rounded-full border border-[var(--toss-border)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-gray-1)] hidden min-[320px]:block"
                 >
-                  ← 이전달
+                  이전달
                 </button>
                 <button
                   type="button"
                   onClick={() => setCalendarMonth(new Date())}
-                  className="px-3 py-1.5 rounded-full border border-[var(--toss-border)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-gray-1)]"
+                  className="shrink-0 px-3 py-1.5 rounded-full border border-[var(--toss-border)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-gray-1)]"
                 >
                   오늘
                 </button>
@@ -1117,109 +1205,115 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
                       new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1)
                     )
                   }
-                  className="px-3 py-1.5 rounded-full border border-[var(--toss-border)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-gray-1)]"
+                  className="shrink-0 px-3 py-1.5 rounded-full border border-[var(--toss-border)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-gray-1)] hidden min-[320px]:block"
                 >
-                  다음달 →
+                  다음달
                 </button>
               </div>
             </div>
 
-            {posts.length === 0 ? (
-              <div className="py-10 text-center text-xs text-[var(--toss-gray-3)] font-bold">
-                등록된 일정이 없습니다.
-              </div>
-            ) : (
-              (() => {
-                // 날짜별 일정 매핑 (YYYY-MM-DD → 배열)
-                const eventsByDate: Record<string, any[]> = {};
-                (posts || []).forEach((p: any) => {
-                  const d = p.schedule_date;
-                  if (!d) return;
-                  eventsByDate[d] = eventsByDate[d] ? [...eventsByDate[d], p] : [p];
-                });
+            {(() => {
+              const searchLower = searchKeyword.trim().toLowerCase();
+              const filteredPosts = searchLower ? posts.filter((p: any) =>
+                (p.patient_name || '').toLowerCase().includes(searchLower) ||
+                (p.content || '').toLowerCase().includes(searchLower)
+              ) : posts;
 
-                const year = calendarMonth.getFullYear();
-                const month = calendarMonth.getMonth();
-                const firstOfMonth = new Date(year, month, 1);
-                const startDay = firstOfMonth.getDay(); // 0:일 ~ 6:토
-                const startDate = new Date(year, month, 1 - startDay);
-                const days: Date[] = [];
-                for (let i = 0; i < 42; i += 1) {
-                  days.push(new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + i));
-                }
+              if (filteredPosts.length === 0) {
+                return <div className="py-10 text-center text-xs text-[var(--toss-gray-3)] font-bold">등록된 일정이 없습니다.</div>;
+              }
 
-                const toKey = (d: Date) =>
-                  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
-                    d.getDate(),
-                  )
-                    .padStart(2, '0')}`;
+              // 날짜별 일정 매핑 (YYYY-MM-DD → 배열)
+              const eventsByDate: Record<string, any[]> = {};
+              (filteredPosts).forEach((p: any) => {
+                const d = p.schedule_date;
+                if (!d) return;
+                eventsByDate[d] = eventsByDate[d] ? [...eventsByDate[d], p] : [p];
+              });
 
-                return (
-                  <div className="border border-[var(--toss-border)] rounded-[16px] overflow-hidden">
-                    <div className="grid grid-cols-7 bg-[var(--toss-gray-1)] text-[11px] font-semibold text-[var(--toss-gray-3)]">
-                      {['일', '월', '화', '수', '목', '금', '토'].map((d) => (
-                        <div key={d} className="px-2 py-2 text-center">
-                          {d}
-                        </div>
-                      ))}
-                    </div>
-                    <div className="grid grid-cols-7 bg-[var(--toss-card)] text-[11px]">
-                      {days.map((d, idx) => {
-                        const key = toKey(d);
-                        const inMonth = d.getMonth() === month;
-                        const events = eventsByDate[key] || [];
-                        return (
-                          <div
-                            key={key + idx}
-                            className={`min-h-[80px] border border-[var(--toss-border)] p-1.5 align-top ${inMonth ? 'bg-[var(--toss-card)]' : 'bg-[var(--tab-bg)]'
-                              }`}
-                          >
-                            <div className="flex items-center justify-between mb-1">
-                              <span
-                                className={`text-[11px] font-semibold ${!inMonth ? 'text-[var(--toss-gray-3)]' : d.getDay() === 0
-                                  ? 'text-red-500'
-                                  : d.getDay() === 6
-                                    ? 'text-[var(--toss-blue)]'
-                                    : 'text-[var(--foreground)]'
-                                  }`}
-                              >
-                                {d.getDate()}
-                              </span>
-                              {events.length > 0 && (
-                                <button
-                                  type="button"
-                                  onClick={() => events[0] && setSelectedPostId(events[0].id)}
-                                  className="text-[11px] font-semibold text-[var(--toss-blue)] px-1 py-0.5 rounded-full hover:bg-[var(--toss-blue-light)]"
-                                >
-                                  {events.length}건
-                                </button>
-                              )}
-                            </div>
-                            <div className="space-y-1">
-                              {events.slice(0, 3).map((ev: any) => (
-                                <button
-                                  key={ev.id}
-                                  type="button"
-                                  onClick={() => setSelectedPostId(ev.id)}
-                                  className="w-full text-left px-1 py-0.5 rounded-[6px] bg-[var(--toss-blue-light)] text-[11px] font-bold text-[var(--toss-blue)] truncate hover:bg-[var(--toss-blue-light)]"
-                                >
-                                  {ev.schedule_time || ''} {ev.title}
-                                </button>
-                              ))}
-                              {events.length > 3 && (
-                                <p className="text-[11px] text-[var(--toss-gray-3)] font-bold">
-                                  + {events.length - 3}건 더보기
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+              const year = calendarMonth.getFullYear();
+              const month = calendarMonth.getMonth();
+              const firstOfMonth = new Date(year, month, 1);
+              const startDay = firstOfMonth.getDay(); // 0:일 ~ 6:토
+              const startDate = new Date(year, month, 1 - startDay);
+              const days: Date[] = [];
+              for (let i = 0; i < 42; i += 1) {
+                days.push(new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + i));
+              }
+
+              const toKey = (d: Date) =>
+                `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
+                  d.getDate(),
+                )
+                  .padStart(2, '0')}`;
+
+              return (
+                <div className="border border-[var(--toss-border)] rounded-[16px] overflow-hidden">
+                  <div className="grid grid-cols-7 bg-[var(--toss-gray-1)] text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                    {['일', '월', '화', '수', '목', '금', '토'].map((d) => (
+                      <div key={d} className="px-2 py-2 text-center">
+                        {d}
+                      </div>
+                    ))}
                   </div>
-                );
-              })()
-            )}
+                  <div className="grid grid-cols-7 bg-[var(--toss-card)] text-[11px]">
+                    {days.map((d, idx) => {
+                      const key = toKey(d);
+                      const inMonth = d.getMonth() === month;
+                      const events = eventsByDate[key] || [];
+                      return (
+                        <div
+                          key={key + idx}
+                          className={`min-h-[80px] border border-[var(--toss-border)] p-1.5 align-top ${inMonth ? 'bg-[var(--toss-card)]' : 'bg-[var(--tab-bg)]'
+                            }`}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span
+                              className={`text-[11px] font-semibold ${!inMonth ? 'text-[var(--toss-gray-3)]' : d.getDay() === 0
+                                ? 'text-red-500'
+                                : d.getDay() === 6
+                                  ? 'text-[var(--toss-blue)]'
+                                  : 'text-[var(--foreground)]'
+                                }`}
+                            >
+                              {d.getDate()}
+                            </span>
+                            {events.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => events[0] && setSelectedPostId(events[0].id)}
+                                className="text-[11px] font-semibold text-[var(--toss-blue)] px-1 py-0.5 rounded-full hover:bg-[var(--toss-blue-light)]"
+                              >
+                                {events.length}건
+                              </button>
+                            )}
+                          </div>
+                          <div className="space-y-1">
+                            {events.slice(0, 4).map((ev: any) => (
+                              <button
+                                key={ev.id}
+                                type="button"
+                                onClick={() => setSelectedPostId(ev.id)}
+                                className="w-full text-left px-1.5 py-1 rounded-[6px] bg-[var(--toss-blue-light)]/50 text-[10px] md:text-[11px] font-bold text-[var(--foreground)] hover:bg-[var(--toss-blue-light)] flex flex-row items-center gap-1 leading-[1.2] overflow-hidden"
+                              >
+                                <span className="text-[var(--toss-blue)] shrink-0">{ev.schedule_time || ''}</span>
+                                <span className="truncate opacity-80 flex-1 min-w-0">{ev.title}</span>
+                                <span className="font-semibold text-emerald-700 dark:text-emerald-400 shrink-0 max-w-[40%] truncate">{ev.patient_name || '미지정'}</span>
+                              </button>
+                            ))}
+                            {events.length > 4 && (
+                              <p className="text-[10px] text-[var(--toss-gray-3)] font-bold text-center mt-0.5">
+                                + {events.length - 4}건 더보기
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -1385,14 +1479,23 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  {canDeletePost(selectedPost) && (
-                    <button
-                      type="button"
-                      onClick={() => handleDeletePost(selectedPost)}
-                      className="px-3 py-1.5 rounded-full border border-red-100 text-[11px] font-bold text-red-600 hover:bg-red-50"
-                    >
-                      삭제
-                    </button>
+                  {canEditPost(selectedPost) && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleEditPostStart(selectedPost)}
+                        className="px-3 py-1.5 rounded-full border border-blue-100 text-[11px] font-bold text-blue-600 hover:bg-blue-50"
+                      >
+                        수정
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeletePost(selectedPost)}
+                        className="px-3 py-1.5 rounded-full border border-red-100 text-[11px] font-bold text-red-600 hover:bg-red-50"
+                      >
+                        삭제
+                      </button>
+                    </>
                   )}
                   <button
                     type="button"
@@ -1418,9 +1521,9 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
                       </p>
                     </div>
                     <div>
-                      <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">위치 / 환자명</p>
+                      <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">위치 / 환자명 (차트번호)</p>
                       <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">
-                        {selectedPost.schedule_room || '-'} / {selectedPost.patient_name || '-'}
+                        {selectedPost.schedule_room || '위치 미지정'} / {selectedPost.patient_name || '환자 미지정'} {selectedPost.content ? `(${selectedPost.content})` : ''}
                       </p>
                     </div>
                   </div>

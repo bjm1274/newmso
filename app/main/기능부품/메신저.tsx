@@ -40,6 +40,43 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const msgRefs = useRef<any>({});
+
+  // 메시지 스크롤 이동을 위한 참조 (답글 클릭 시 원문 이동)
+  const scrollToMessage = (messageId: string) => {
+    const el = msgRefs.current[messageId];
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const origClass = el.className;
+      el.classList.add('bg-[var(--toss-blue-light)]', 'rounded-xl', 'transition-colors', 'duration-500');
+      setTimeout(() => {
+        el.className = origClass;
+      }, 2000);
+    }
+  };
+
+  const renderMessageContent = (content: string) => {
+    if (!content) return null;
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = content.split(urlRegex);
+    return parts.map((part, i) => {
+      if (part.match(urlRegex)) {
+        return (
+          <a
+            key={i}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-500 underline hover:text-blue-600 break-words"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {part}
+          </a>
+        );
+      }
+      return <span key={i} className="break-words whitespace-pre-wrap">{part}</span>;
+    });
+  };
+
   const lastReadAtRef = useRef<string | null>(null);
   const isFocusedRef = useRef(true);
 
@@ -261,6 +298,13 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
           }));
 
           await supabase.from('message_reads').upsert(readPayloads, { onConflict: 'user_id,message_id' });
+
+          // [추가] 채팅방 전체 안읽음 개수 캐시인 room_read_cursors 업데이트
+          await supabase.from('room_read_cursors').upsert({
+            user_id: user.id,
+            room_id: selectedRoomId,
+            last_read_at: new Date().toISOString()
+          }, { onConflict: 'user_id,room_id' });
 
           // 읽음 수 로컬 상태 갱신 (즉시 반영 목적)
           setReadCounts(prev => {
@@ -1199,7 +1243,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                             markMessageRead(msg);
                             setActiveActionMsg(msg); // [복구] 메시지 클릭 시 액션 메뉴 표시
                           }}
-                          className={`group relative px-3 py-2 rounded-[12px] text-sm shadow-sm cursor-pointer transition-all max-w-[70%] ${isMine
+                          className={`group relative px-3 py-2 rounded-[12px] text-[13px] md:text-sm shadow-sm cursor-pointer transition-all max-w-[75%] md:max-w-[70%] ${isMine
                             ? 'bg-emerald-600 text-white rounded-tr-none'
                             : 'bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-tl-none hover:border-emerald-400 text-foreground'
                             }`}
@@ -1211,14 +1255,22 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                           {msg.reply_to_id && (() => {
                             const parent = messages.find((m: any) => m.id === msg.reply_to_id);
                             return parent ? (
-                              <div className={`mb-2 p-2 rounded-[12px] text-[11px] border-l-2 ${isMine ? 'bg-white/10 border-white/30 text-white' : 'bg-[var(--toss-gray-1)] border-[var(--toss-border)] text-[var(--foreground)]'
-                                }`}>
+                              <div
+                                className={`mb-2 p-2 rounded-[10px] text-[11px] border-l-2 cursor-pointer hover:opacity-80 transition-opacity ${isMine ? 'bg-white/10 border-white/30 text-white' : 'bg-[var(--toss-gray-1)] border-[var(--toss-border)] text-[var(--foreground)]'
+                                  }`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  scrollToMessage(msg.reply_to_id);
+                                }}
+                              >
                                 <span className="font-bold opacity-80">↩️ {parent.staff?.name}: </span>
-                                <span className="truncate">{parent.content || '📎 파일'}</span>
+                                <span className="truncate block mt-0.5">{parent.content || '📎 파일'}</span>
                               </div>
                             ) : null;
                           })()}
-                          {msg.content}
+                          <div className="leading-relaxed">
+                            {renderMessageContent(msg.content)}
+                          </div>
                           {msg.file_url && (
                             <div className="mt-2 space-y-1" onClick={(e) => e.stopPropagation()}>
                               {isImageUrl(msg.file_url) ? (
@@ -1243,37 +1295,37 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                             </div>
                           )}
 
-                          {(hasReacts || displayReadCount > 0) && (
+                          {hasReacts && (
                             <div className="mt-2 flex items-center gap-2 text-[11px] flex-wrap">
-                              {hasReacts && (
-                                <span className="flex gap-1 flex-wrap">
-                                  {Object.entries(msgReacts).map(([emoji, cnt]) =>
-                                  ((cnt as number) > 0 ? (
-                                    <span
-                                      key={emoji}
-                                      className={`px-1.5 py-0.5 rounded text-[11px] ${isMine ? 'bg-white/20' : 'bg-[var(--toss-gray-1)]'
-                                        }`}
-                                    >
-                                      {emoji} {cnt as number}
-                                    </span>
-                                  ) : null)
-                                  )}
-                                </span>
-                              )}
-                              {displayReadCount > 0 && (
-                                <span className={`font-bold ${isMine ? 'text-emerald-500' : 'text-blue-500'}`}>
-                                  {displayReadCount}
-                                </span>
-                              )}
+                              <span className="flex gap-1 flex-wrap">
+                                {Object.entries(msgReacts).map(([emoji, cnt]) =>
+                                ((cnt as number) > 0 ? (
+                                  <span
+                                    key={emoji}
+                                    className={`px-1.5 py-0.5 rounded text-[11px] ${isMine ? 'bg-white/20' : 'bg-[var(--toss-gray-1)]'
+                                      }`}
+                                  >
+                                    {emoji} {cnt as number}
+                                  </span>
+                                ) : null)
+                                )}
+                              </span>
                             </div>
                           )}
 
-                          <span
-                            className={`absolute bottom-0 ${isMine ? 'right-full mr-2' : 'left-full ml-2'
-                              } text-[8px] font-bold text-[var(--toss-gray-4)] whitespace-nowrap`}
+                          <div
+                            className={`absolute bottom-0 ${isMine ? 'right-full mr-2 items-end' : 'left-full ml-2 items-start'
+                              } flex flex-col gap-0.5 whitespace-nowrap`}
                           >
-                            {created.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
+                            {displayReadCount > 0 && (
+                              <span className={`text-[10px] font-bold ${isMine ? 'text-emerald-500' : 'text-emerald-500'}`}>
+                                {displayReadCount}
+                              </span>
+                            )}
+                            <span className="text-[8px] font-bold text-[var(--toss-gray-4)]">
+                              {created.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
                         </div>
                         <div
                           className={`flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity ${isMine ? 'flex-row-reverse' : ''}`}

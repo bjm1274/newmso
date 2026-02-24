@@ -14,6 +14,7 @@ export default function MyProfileCard({ user: initialUser }: any) {
   const [editForm, setEditForm] = useState({
     email: initialUser?.email || '',
     phone: initialUser?.phone || '',
+    extension: initialUser?.extension || '',
     address: initialUser?.address || '',
     bank_name: initialUser?.bank_name || '',
     account_no: initialUser?.account_no || '',
@@ -35,6 +36,7 @@ export default function MyProfileCard({ user: initialUser }: any) {
       setEditForm({
         email: user.email || '',
         phone: user.phone || '',
+        extension: user.extension || '',
         address: user.address || '',
         bank_name: user.bank_name || '',
         account_no: user.account_no || '',
@@ -123,7 +125,7 @@ export default function MyProfileCard({ user: initialUser }: any) {
         try {
           const stored = localStorage.getItem('erp_user');
           if (stored) currentUser = JSON.parse(stored);
-        } catch (_) {}
+        } catch (_) { }
       }
       if (!currentUser?.id) {
         alert('사진 등록은 직원 계정(이름으로 로그인)으로 이용해 주세요. MSO 관리자 계정에는 프로필 사진 기능을 사용할 수 없습니다.');
@@ -162,13 +164,13 @@ export default function MyProfileCard({ user: initialUser }: any) {
 
       // 4. 화면 반영
       setAvatarUrl(newUrl);
-      
+
       // 5. 세션 강제 동기화 (새로고침 방어)
       const updatedUser = { ...currentUser, avatar_url: newUrl };
       setUser(updatedUser);
       localStorage.setItem('user_session', JSON.stringify(updatedUser));
       localStorage.setItem('erp_user', JSON.stringify(updatedUser));
-      
+
       alert('사진이 정상적으로 등록되었습니다!');
 
     } catch (error: any) {
@@ -192,7 +194,7 @@ export default function MyProfileCard({ user: initialUser }: any) {
         try {
           const stored = localStorage.getItem('erp_user');
           if (stored) currentUser = JSON.parse(stored);
-        } catch (_) {}
+        } catch (_) { }
       }
       if (!currentUser?.id) {
         alert('내 정보 수정은 직원 계정(이름으로 로그인)에서만 가능합니다.');
@@ -204,6 +206,7 @@ export default function MyProfileCard({ user: initialUser }: any) {
         .update({
           email: editForm.email || null,
           phone: editForm.phone || null,
+          extension: editForm.extension || null,
           address: editForm.address || null,
           bank_name: editForm.bank_name || null,
           account_no: editForm.account_no || null,
@@ -212,7 +215,7 @@ export default function MyProfileCard({ user: initialUser }: any) {
 
       if (error) {
         console.error(error);
-        alert('내 정보 저장 중 오류가 발생했습니다.');
+        alert(`내 정보 저장 중 오류가 발생했습니다.\n상세: ${error.message || JSON.stringify(error)}`);
         return;
       }
 
@@ -220,6 +223,7 @@ export default function MyProfileCard({ user: initialUser }: any) {
         ...currentUser,
         email: editForm.email,
         phone: editForm.phone,
+        extension: editForm.extension,
         address: editForm.address,
         bank_name: editForm.bank_name,
         account_no: editForm.account_no,
@@ -240,7 +244,7 @@ export default function MyProfileCard({ user: initialUser }: any) {
 
   return (
     <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-[16px] p-5 sm:p-6 lg:p-8 flex flex-col h-full">
-      
+
       {/* 프로필 헤더 */}
       <div className="flex flex-row items-center sm:items-start gap-4 sm:gap-6 pb-6 sm:pb-7 border-b border-[var(--toss-border)] shrink-0">
         <div className="relative group shrink-0">
@@ -293,11 +297,10 @@ export default function MyProfileCard({ user: initialUser }: any) {
               <button
                 type="button"
                 onClick={() => verifyPasswordAndRun(() => setIsEditing((v) => !v))}
-                className={`text-[11px] sm:text-[11px] font-bold px-3 py-1.5 sm:px-4 sm:py-2 rounded-full border transition-all ${
-                  isEditing
-                    ? 'bg-red-50 text-red-500 border-red-100 hover:bg-red-100'
-                    : 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)] border-[var(--toss-blue-light)] hover:bg-[var(--toss-blue-light)]'
-                }`}
+                className={`text-[11px] sm:text-[11px] font-bold px-3 py-1.5 sm:px-4 sm:py-2 rounded-full border transition-all ${isEditing
+                  ? 'bg-red-50 text-red-500 border-red-100 hover:bg-red-100'
+                  : 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)] border-[var(--toss-blue-light)] hover:bg-[var(--toss-blue-light)]'
+                  }`}
               >
                 {isEditing ? '수정 취소' : '내 정보 수정'}
               </button>
@@ -334,11 +337,18 @@ export default function MyProfileCard({ user: initialUser }: any) {
                   onChange={(v: string) => setEditForm((f) => ({ ...f, phone: v }))}
                   placeholder="'-' 없이 숫자만 입력"
                 />
+                <EditableItem
+                  label="내선번호"
+                  value={editForm.extension}
+                  onChange={(v: string) => setEditForm((f) => ({ ...f, extension: v }))}
+                  placeholder="내선번호 입력"
+                />
               </div>
             ) : (
               <div className="grid grid-cols-1 min-[480px]:grid-cols-2 gap-x-6 gap-y-5 pt-1">
                 <InfoItem label="이메일" value={user.email} />
                 <InfoItem label="연락처" value={user.phone} />
+                <InfoItem label="내선번호" value={user.extension} />
               </div>
             )}
           </div>
@@ -522,11 +532,11 @@ function LeaveAndCommuteSummary({ user }: any) {
 
       const { data: commute } = staffId
         ? await supabase
-            .from('attendance')
-            .select('date,status')
-            .eq('staff_id', staffId)
-            .order('date', { ascending: false })
-            .limit(60)
+          .from('attendance')
+          .select('date,status')
+          .eq('staff_id', staffId)
+          .order('date', { ascending: false })
+          .limit(60)
         : { data: null as any };
 
       const lateDays =
