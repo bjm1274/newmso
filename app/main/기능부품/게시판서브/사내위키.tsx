@@ -35,7 +35,7 @@ export default function WikiDashboard() {
             {/* Sidebar Tree (노션 스타일) */}
             <div className="w-64 md:w-80 border-r border-slate-100 bg-slate-50/50 flex flex-col shrink-0">
                 <div className="p-6 border-b border-slate-100">
-                    <h3 className="text-sm font-black text-slate-800 mb-4 tracking-tighter">📖 SY Knowledge Base</h3>
+                    <h3 className="text-sm font-black text-slate-800 mb-4 tracking-tight">📖 SY Knowledge Base</h3>
                     <input
                         type="text"
                         placeholder="위키 문서 검색..."
@@ -93,7 +93,7 @@ export default function WikiDashboard() {
                 <div className="p-10 md:p-16 max-w-4xl mx-auto space-y-8 pb-32">
                     {selectedDoc ? (
                         <>
-                            <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tighter leading-tight mb-8">
+                            <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight mb-8">
                                 {selectedDoc.name}
                             </h1>
                             {/* Dummy markdown renderer approach handling new lines */}

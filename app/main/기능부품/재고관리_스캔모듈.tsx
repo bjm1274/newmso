@@ -191,7 +191,7 @@ export default function InventoryScanModule({ onScanComplete }: any) {
   return (
     <div className="flex flex-col h-full bg-[var(--toss-gray-1)]/30 overflow-y-auto custom-scrollbar space-y-6 p-8">
       <header>
-        <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tighter italic">스캔 입고</h2>
+        <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tight">스캔 입고</h2>
         <p className="text-xs text-[var(--toss-gray-3)] font-bold uppercase mt-1">바코드 또는 명세서 스캔</p>
       </header>
 

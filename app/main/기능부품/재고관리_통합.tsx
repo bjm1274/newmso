@@ -10,7 +10,7 @@ export default function IntegratedInventorySystem({ user, staffs }: any) {
     <div className="flex flex-col h-full bg-[var(--toss-gray-1)]/30 overflow-hidden">
       {/* 헤더 */}
       <div className="p-8 border-b border-[var(--toss-border)] bg-white shadow-sm">
-        <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tighter italic">재고관리 시스템</h2>
+        <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tight">재고관리 시스템</h2>
         <p className="text-xs text-[var(--toss-gray-3)] font-bold uppercase mt-1">UDI, 명세서, 발주, 스캔 통합</p>
       </div>
 

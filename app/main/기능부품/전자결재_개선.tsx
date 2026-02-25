@@ -257,7 +257,7 @@ export default function ApprovalSystemImproved({ user, onRefresh }: any) {
     <div className="space-y-6 p-8 bg-[var(--toss-card)] h-full overflow-y-auto custom-scrollbar">
       <header className="flex justify-between items-center mb-8">
         <div>
-          <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tighter italic">전자결재</h2>
+          <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tight">전자결재</h2>
           <p className="text-xs text-[var(--toss-blue)] font-bold mt-1">통합 행정 승인 시스템</p>
         </div>
         <div className="bg-[var(--toss-blue-light)] px-4 py-2 border border-[var(--toss-blue)]/20 rounded-[16px]">
@@ -326,7 +326,7 @@ export default function ApprovalSystemImproved({ user, onRefresh }: any) {
       {showDraftModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="bg-[var(--toss-card)] w-full max-w-xl p-10 rounded-[2.5rem] shadow-2xl space-y-6">
-            <h3 className="text-2xl font-semibold text-[var(--foreground)] italic tracking-tighter border-b-4 border-[var(--toss-blue)] pb-2 inline-block">새 기안 작성</h3>
+            <h3 className="text-2xl font-semibold text-[var(--foreground)] tracking-tight border-b-4 border-[var(--toss-blue)] pb-2 inline-block">새 기안 작성</h3>
             
             <div className="space-y-4">
               <div>

@@ -75,7 +75,7 @@ export default function TeamManager({ onRefresh }: { onRefresh?: () => void }) {
     <div className="bg-white rounded-3xl border border-[var(--toss-border)] shadow-sm p-8 animate-in fade-in">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h3 className="text-xl font-semibold text-[var(--foreground)] tracking-tighter">팀 관리</h3>
+          <h3 className="text-xl font-semibold text-[var(--foreground)] tracking-tight">팀 관리</h3>
           <p className="text-[11px] text-[var(--toss-blue)] font-bold uppercase tracking-widest">병원장 → 진료부/간호부/총무부 → 팀</p>
         </div>
         <div className="flex gap-2">

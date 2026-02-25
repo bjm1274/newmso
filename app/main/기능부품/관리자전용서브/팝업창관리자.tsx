@@ -52,7 +52,7 @@ export default function PopupManager() {
     <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
       <div className="bg-white p-10 border border-[var(--toss-border)] shadow-sm space-y-8">
         <div className="flex justify-between items-center border-b border-gray-50 pb-6">
-          <h3 className="font-semibold text-xl text-[var(--foreground)] tracking-tighter">홈페이지 팝업 설정</h3>
+          <h3 className="font-semibold text-xl text-[var(--foreground)] tracking-tight">홈페이지 팝업 설정</h3>
         </div>
 
         <div className="grid grid-cols-2 gap-6">

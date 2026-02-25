@@ -102,7 +102,7 @@ export default function CertificateGenerator({ staffs = [] }: any) {
     <div className="app-page p-4 md:p-10 space-y-10 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tighter italic">디지털 증명서 발급 센터</h2>
+          <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tight">디지털 증명서 발급 센터</h2>
           <p className="text-[11px] text-[var(--toss-blue)] font-bold mt-1 tracking-widest">직원 증명서 발급 허브</p>
         </div>
         <div className="flex gap-2">
@@ -213,7 +213,7 @@ export default function CertificateGenerator({ staffs = [] }: any) {
                   <p className="cert-date text-xs font-bold text-[var(--toss-gray-3)]">{new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
 
                   <div className="cert-sign-wrap relative inline-block pt-10">
-                    <p className="cert-sign text-2xl font-semibold tracking-tighter text-[var(--foreground)] italic">{selectedStaff.company || 'SY INC.'} 대표이사/원장</p>
+                    <p className="cert-sign text-2xl font-semibold tracking-tight text-[var(--foreground)] italic">{selectedStaff.company || 'SY INC.'} 대표이사/원장</p>
                     {seals[selectedStaff.company || '전체'] ? (
                       <img src={seals[selectedStaff.company || '전체']} alt="seal" className="cert-seal-img" />
                     ) : (

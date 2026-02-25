@@ -178,7 +178,7 @@ export default function AttendanceCorrectionForm({ user, staffs }: any) {
   return (
     <div className="flex flex-col h-full bg-[var(--tab-bg)]/30 overflow-y-auto custom-scrollbar space-y-8 p-8">
       <header>
-        <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tighter italic">출결 정정 신청</h2>
+        <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tight">출결 정정 신청</h2>
         <p className="text-xs text-[var(--toss-gray-3)] font-bold uppercase mt-1">지각 또는 미기록 사유 제출 및 결재</p>
       </header>
 

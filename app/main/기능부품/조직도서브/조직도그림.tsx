@@ -711,7 +711,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                 {(Array.isArray(viewData) ? viewData : [{ members: (viewData as any).members }]).map((group: any, idx: number) => (
                   <div key={idx} className="mb-12 md:mb-16 last:mb-0">
                     {group.companyName && (
-                      <h3 className="text-sm font-semibold text-[var(--foreground)] border-l-4 border-[var(--foreground)] pl-4 mb-6 md:mb-8 uppercase tracking-tighter">
+                      <h3 className="text-sm font-semibold text-[var(--foreground)] border-l-4 border-[var(--foreground)] pl-4 mb-6 md:mb-8 uppercase tracking-tight">
                         {group.companyName}
                       </h3>
                     )}

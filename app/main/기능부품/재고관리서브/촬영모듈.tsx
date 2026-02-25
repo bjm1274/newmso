@@ -85,7 +85,7 @@ export default function PhotoModule({ user, inventory, fetchInventory }: any) {
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="bg-white p-6 md:p-10 border border-[var(--toss-border)] shadow-xl rounded-[2.5rem]">
         <div className="mb-8">
-          <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tighter italic">AI 비주얼 촬영 입고</h2>
+          <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tight">AI 비주얼 촬영 입고</h2>
           <p className="text-[11px] text-green-600 font-bold mt-1 uppercase tracking-widest">AI Visual Recognition Engine</p>
         </div>
 
@@ -117,7 +117,7 @@ export default function PhotoModule({ user, inventory, fetchInventory }: any) {
       {showConfirmDialog && recognizedData && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[110] flex items-center justify-center p-4">
           <div className="bg-white rounded-[2.5rem] p-8 md:p-12 max-w-2xl w-full shadow-2xl animate-in zoom-in-95 duration-300">
-            <h3 className="text-2xl font-semibold text-[var(--foreground)] mb-8 tracking-tighter italic">인식 정보 확인</h3>
+            <h3 className="text-2xl font-semibold text-[var(--foreground)] mb-8 tracking-tight">인식 정보 확인</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
               <img
                 src={recognizedData.image_url}

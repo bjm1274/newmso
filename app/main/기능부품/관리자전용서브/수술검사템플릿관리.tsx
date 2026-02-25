@@ -125,7 +125,7 @@ export default function SurgeryExamTemplateManager() {
 
   return (
     <div className="bg-white border border-[var(--toss-border)] rounded-[16px] p-8 shadow-sm space-y-8">
-      <h2 className="text-xl font-semibold text-[var(--foreground)] tracking-tighter mb-2">
+      <h2 className="text-xl font-semibold text-[var(--foreground)] tracking-tight mb-2">
         수술 · 검사명 템플릿 관리
       </h2>
       <p className="text-[11px] text-[var(--toss-gray-3)] font-bold">

@@ -49,7 +49,7 @@ export default function EducationMain({ staffs, selectedCo }: any) {
       <header className="px-8 pt-8 pb-4 border-b border-[var(--toss-border)] bg-[var(--toss-card)] flex flex-col gap-6 shrink-0">
         <div className="flex justify-between items-center">
           <div>
-            <h2 className="text-xl font-semibold text-[var(--foreground)] tracking-tighter">
+            <h2 className="text-xl font-semibold text-[var(--foreground)] tracking-tight">
               Compliance & 자격 관리 <span className="text-sm text-[var(--toss-blue)] ml-2">[{selectedCo}]</span>
             </h2>
             <p className="text-[11px] text-[var(--toss-gray-3)] font-bold mt-1 uppercase tracking-widest">Mandatory Training & License Dashboard</p>
@@ -108,7 +108,7 @@ export default function EducationMain({ staffs, selectedCo }: any) {
                       console.error(error);
                     }
                   }}
-                  className="mt-2 text-[11px] font-semibold text-[var(--toss-blue)] uppercase tracking-tighter hover:opacity-70"
+                  className="mt-2 text-[11px] font-semibold text-[var(--toss-blue)] uppercase tracking-tight hover:opacity-70"
                 >
                   알림톡 발송 →
                 </button>

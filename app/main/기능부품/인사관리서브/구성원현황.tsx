@@ -222,7 +222,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     <div className="flex flex-col h-full app-page">
       <header className="p-6 md:p-8 border-b border-[var(--toss-border)] bg-[var(--toss-card)] shrink-0 flex items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h2 className="text-lg font-bold text-[var(--foreground)] tracking-tighter italic">
+          <h2 className="text-lg font-bold text-[var(--foreground)] tracking-tight">
             {보기상태 === '퇴사' ? '퇴사자 현황' : '실시간 구성원 현황'}{' '}
             <span className="text-sm text-[var(--toss-blue)]">[{선택사업체}]</span>
           </h2>
@@ -377,7 +377,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[110] flex items-end md:items-center justify-center p-0 md:p-4" onClick={닫기함수}>
           <div className="bg-[var(--toss-card)] w-full max-w-5xl rounded-t-[2.5rem] md:rounded-[3rem] p-6 md:p-10 shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-8 border-b-4 border-[var(--foreground)] pb-4">
-              <h3 className="text-xl md:text-2xl font-semibold text-[var(--foreground)] tracking-tighter italic">{편집모드 ? '구성원 정보 수정' : '신규 직원 등록'}</h3>
+              <h3 className="text-xl md:text-2xl font-semibold text-[var(--foreground)] tracking-tight">{편집모드 ? '구성원 정보 수정' : '신규 직원 등록'}</h3>
               <button onClick={닫기함수} className="text-[var(--toss-gray-3)] hover:text-red-500 text-2xl">✕</button>
             </div>
 

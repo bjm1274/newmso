@@ -208,7 +208,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
         <div className="absolute -right-10 -top-10 w-40 h-40 bg-[var(--toss-card)] opacity-5 rounded-full blur-3xl"></div>
 
         <div className="space-y-2 z-10">
-          <h2 className="text-3xl sm:text-4xl font-semibold tracking-tighter">{currentTime.toLocaleTimeString('ko-KR')}</h2>
+          <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight">{currentTime.toLocaleTimeString('ko-KR')}</h2>
           <div className="flex flex-wrap items-center gap-2 mt-1">
             <span className={`w-2 h-2 rounded-full animate-pulse ${todayLog ? (todayLog.check_out ? 'bg-[var(--toss-gray-3)]' : 'bg-green-500') : 'bg-red-500'}`}></span>
             <span className="text-sm font-bold mr-1">

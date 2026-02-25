@@ -406,7 +406,7 @@ export default function ChatMessenger({ user, staffs }: any) {
       {showNewGroupModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[16px] p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-300">
-            <h3 className="text-2xl font-semibold text-[var(--foreground)] mb-6 tracking-tighter italic">단체채팅방 만들기</h3>
+            <h3 className="text-2xl font-semibold text-[var(--foreground)] mb-6 tracking-tight">단체채팅방 만들기</h3>
 
             <div className="space-y-6">
               <div className="space-y-2">

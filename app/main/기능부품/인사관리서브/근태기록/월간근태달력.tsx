@@ -56,7 +56,7 @@ export default function MonthlyCalendar({ calendarData, targetMonth, onCellClick
         <table className="w-full border-collapse table-fixed">
           <thead>
             <tr className="bg-[var(--toss-gray-1)]/50">
-              <th className="w-32 p-4 border-b border-r font-semibold text-[var(--toss-gray-3)] text-[11px] uppercase tracking-tighter">직원명</th>
+              <th className="w-32 p-4 border-b border-r font-semibold text-[var(--toss-gray-3)] text-[11px] uppercase tracking-tight">직원명</th>
               {daysArray.map(d => (
                 <th key={d} className="p-3 border-b text-center">
                     <span className="text-[11px] text-[var(--toss-gray-3)] font-bold block mb-0.5">{targetMonth}</span>

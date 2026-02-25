@@ -89,7 +89,7 @@ export default function SalarySlipUI({ user, currentDate, salaryData, totalPayme
           <p className="text-xs font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">Total Net Pay</p>
           <p className="text-sm font-semibold text-[var(--toss-gray-1)]">차인 지급액 (실 수령액)</p>
         </div>
-        <p className="text-4xl font-semibold tracking-tighter">
+        <p className="text-4xl font-semibold tracking-tight">
           ₩ {realPayment.toLocaleString()}
         </p>
       </div>

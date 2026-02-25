@@ -22,6 +22,7 @@ export default function HandoverNotes({ user }: { user: any }) {
     // Calendar State
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+    const [isCalendarVisible, setIsCalendarVisible] = useState(true);
 
     // Form State
     const [isComposing, setIsComposing] = useState(false);
@@ -113,8 +114,14 @@ export default function HandoverNotes({ user }: { user: any }) {
     const currentYear = currentDate.getFullYear();
     const currentMonth = currentDate.getMonth();
 
-    const handlePrevMonth = () => setCurrentDate(new Date(currentYear, currentMonth - 1, 1));
-    const handleNextMonth = () => setCurrentDate(new Date(currentYear, currentMonth + 1, 1));
+    const handlePrevMonth = () => {
+        setCurrentDate(new Date(currentYear, currentMonth - 1, 1));
+        setIsCalendarVisible(true);
+    };
+    const handleNextMonth = () => {
+        setCurrentDate(new Date(currentYear, currentMonth + 1, 1));
+        setIsCalendarVisible(true);
+    };
 
     const isSameDate = (d1: Date, stringDate: string) => {
         const d2 = new Date(stringDate);
@@ -163,7 +170,10 @@ export default function HandoverNotes({ user }: { user: any }) {
                             type="text"
                             placeholder="내용 또는 작성자 검색..."
                             value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
+                            onChange={(e) => {
+                                setSearchQuery(e.target.value);
+                                if (e.target.value.trim().length > 0) setIsCalendarVisible(false);
+                            }}
                             className="w-full pl-9 pr-4 py-2 text-sm font-medium bg-gray-100 border-none rounded-2xl focus:ring-2 focus:ring-[var(--toss-blue)]/50 outline-none transition-all placeholder:text-gray-400"
                         />
                         {searchQuery && (
@@ -174,8 +184,8 @@ export default function HandoverNotes({ user }: { user: any }) {
             </div>
 
             <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
-                {/* 1. Calendar View (Hidden during search) */}
-                {!isSearching && (
+                {/* 1. Calendar View (Hidden during search or when a specific date is selected and expanded) */}
+                {!isSearching && isCalendarVisible && (
                     <div className="w-full md:w-1/2 lg:w-2/5 md:border-r border-[var(--toss-border)] bg-gray-50/50 flex flex-col shrink-0 overflow-y-auto custom-scrollbar">
                         <div className="p-4 md:p-6 flex-1 flex flex-col min-h-min">
                             <div className="flex justify-between items-center mb-6">
@@ -204,7 +214,10 @@ export default function HandoverNotes({ user }: { user: any }) {
                                     return (
                                         <button
                                             key={day}
-                                            onClick={() => setSelectedDate(dateObj)}
+                                            onClick={() => {
+                                                setSelectedDate(dateObj);
+                                                setIsCalendarVisible(false);
+                                            }}
                                             className={`
                                                 relative p-1 md:p-2 flex flex-col items-center md:items-start min-h-[60px] overflow-hidden rounded-2xl border transition-all
                                                 ${isSelected ? 'bg-blue-50/80 border-[var(--toss-blue)]/50 ring-1 ring-[var(--toss-blue)]/20 shadow-sm z-10' : 'bg-white border-transparent hover:border-gray-200 hover:bg-gray-50/80 hover:shadow-sm'}
@@ -243,12 +256,22 @@ export default function HandoverNotes({ user }: { user: any }) {
                                     <p className="text-sm font-semibold text-[var(--toss-blue)]">"{searchQuery}"에 대한 인계사항</p>
                                 </>
                             ) : (
-                                <>
-                                    <h3 className="text-2xl font-black text-gray-900 tracking-tight">
-                                        {selectedDate.getDate()}일 <span className="text-lg text-gray-400 font-bold ml-1">{['일', '월', '화', '수', '목', '금', '토'][selectedDate.getDay()]}요일</span>
-                                    </h3>
-                                    <p className="text-xs font-bold text-gray-400 tracking-widest uppercase">{selectedDate.getFullYear()}. {String(selectedDate.getMonth() + 1).padStart(2, '0')}</p>
-                                </>
+                                <div className="flex items-center gap-3">
+                                    {!isCalendarVisible && !isSearching && (
+                                        <button
+                                            onClick={() => setIsCalendarVisible(true)}
+                                            className="text-gray-400 hover:text-gray-700 bg-gray-100 w-8 h-8 rounded-full flex items-center justify-center transition-all hover:bg-gray-200 shrink-0 shadow-sm"
+                                        >
+                                            ⟵
+                                        </button>
+                                    )}
+                                    <div className="flex flex-col space-y-1">
+                                        <h3 className="text-2xl font-black text-gray-900 tracking-tight">
+                                            {selectedDate.getDate()}일 <span className="text-lg text-gray-400 font-bold ml-1">{['일', '월', '화', '수', '목', '금', '토'][selectedDate.getDay()]}요일</span>
+                                        </h3>
+                                        <p className="text-xs font-bold text-gray-400 tracking-widest uppercase">{selectedDate.getFullYear()}. {String(selectedDate.getMonth() + 1).padStart(2, '0')}</p>
+                                    </div>
+                                </div>
                             )}
                         </div>
                         {!isSearching && (

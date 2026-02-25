@@ -183,7 +183,7 @@ export default function AttendanceSystem({ user, staffs, selectedCo, isAdminView
     <div className="flex flex-col h-full bg-[var(--toss-gray-1)]/30 overflow-y-auto custom-scrollbar space-y-8 p-8">
       <header className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-[var(--foreground)] tracking-tighter italic">
+          <h2 className="text-2xl font-bold text-[var(--foreground)] tracking-tight">
             {isAdminView ? '근태 종합 관리 (행정팀)' : '실시간 근태 관리'}
           </h2>
           <p className="text-xs text-[var(--toss-gray-3)] font-bold uppercase mt-1">
