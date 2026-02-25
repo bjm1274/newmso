@@ -9,8 +9,6 @@ import MainContent from './기능부품/조직도서브/조직도본문';
 import NotificationSystem from './기능부품/알림시스템';
 import ChatAlertBanner from './기능부품/채팅알림배너';
 import PermissionPromptModal from './기능부품/권한요청모달';
-import HRAIChatbot from './기능부품/인사관리서브/HR챗봇';
-
 type ERPData = {
   staffs: any[];
   depts: any[];
@@ -356,7 +354,6 @@ function MainPageContent() {
           }}
           setMainMenu={setMainMenu}
         />
-        <HRAIChatbot user={user} />
       </div>
     </div>
   );

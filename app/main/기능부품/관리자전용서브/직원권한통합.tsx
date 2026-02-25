@@ -21,7 +21,6 @@ const PERM_GROUPS = [
       { key: 'menu_조직도', label: '조직도' },
       { key: 'menu_추가기능', label: '추가기능' },
       { key: 'menu_채팅', label: '채팅' },
-      { key: 'menu_AI채팅', label: 'AI채팅' },
       { key: 'menu_게시판', label: '게시판' },
       { key: 'menu_알림', label: '알림' },
       { key: 'menu_전자결재', label: '전자결재' },
