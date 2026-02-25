@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 
 const NOTICE_ROOM_ID = '00000000-0000-0000-0000-000000000000';
 const NOTICE_ROOM_NAME = '공지메시지';
-const CAN_WRITE_NOTICE_POSITIONS = ['팀장', '부장', '실장', '원장', '병원장', '대표이사'];
+const CAN_WRITE_NOTICE_POSITIONS = ['팀장', '부장', '실장', '원장', '병원장', '대표이사', '이사', '본부장', '총무부장', '진료부장', '간호부장'];
 const CHAT_ROOM_KEY = 'erp_chat_last_room';
 const CHAT_FOCUS_KEY = 'erp_chat_focus_keyword';
 
@@ -143,7 +143,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   const [pinnedIds, setPinnedIds] = useState<string[]>([]);
   const [showPollModal, setShowPollModal] = useState(false);
   const [pollQuestion, setPollQuestion] = useState('');
-  const [pollOptions, setPollOptions] = useState('찬성, 반대');
+  const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
   const [showMediaPanel, setShowMediaPanel] = useState(false);
   const [mediaFilter, setMediaFilter] = useState<'all' | 'image' | 'video' | 'file'>('all');
@@ -469,6 +469,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
 
   const roomMembers = useMemo(() => {
     if (!selectedRoomId) return [];
+    if (selectedRoomId === NOTICE_ROOM_ID) return staffs;
     const room = chatRooms.find((r: any) => r.id === selectedRoomId);
     if (!room || !Array.isArray(room.members) || !room.members.length) return [];
     const memberIds = room.members.map((id: any) => String(id));
@@ -551,9 +552,11 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
         const readUserIds = new Set((reads || []).map((r: any) => r.user_id));
 
         // 2. 현재 채팅방 멤버 목록 가져오기 (selectedRoom.members 기반)
-        const roomMemberIds = Array.isArray(selectedRoom.members)
-          ? selectedRoom.members.map((id: string) => String(id))
-          : [];
+        const roomMemberIds = selectedRoom.id === NOTICE_ROOM_ID
+          ? staffs.map((s: any) => String(s.id))
+          : Array.isArray(selectedRoom.members)
+            ? selectedRoom.members.map((id: string) => String(id))
+            : [];
 
         // 3. 멤버 정보 매칭
         const allRoomStaffs = staffs.filter((s: any) => roomMemberIds.includes(String(s.id)));
@@ -820,7 +823,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
 
   const handleCreatePoll = async () => {
     if (!pollQuestion.trim()) { alert('질문을 입력해 주세요.'); return; }
-    const options = pollOptions.split(',').map((o) => o.trim()).filter((o) => o.length > 0);
+    const options = pollOptions.map((o) => o.trim()).filter(Boolean);
     if (options.length < 2) { alert('선택지는 최소 2개 이상 입력해 주세요.'); return; }
     try {
       const { data: poll, error } = await supabase.from('polls').insert([{
@@ -829,14 +832,14 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       if (!error && poll) {
         setPolls((p: any[]) => [...p, poll]);
         setPollQuestion('');
-        setPollOptions('찬성, 반대');
+        setPollOptions(['찬성', '반대']);
         setShowPollModal(false);
       } else throw new Error();
     } catch {
       const id = Date.now().toString();
       setPolls((p: any[]) => [...p, { id, room_id: selectedRoomId, question: pollQuestion, options }]);
       setPollQuestion('');
-      setPollOptions('찬성, 반대');
+      setPollOptions(['찬성', '반대']);
       setShowPollModal(false);
     }
   };
@@ -1178,7 +1181,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       </aside>
 
       {/* 우측: 채팅창 본문 — 모바일에서는 채팅방 선택 시에만 표시 */}
-      <main className={`${!selectedRoomId ? 'hidden md:flex' : 'flex'} flex-1 min-h-0 flex-col bg-[var(--toss-gray-1)] relative pb-20 md:pb-0`}>
+      <main className={`${!selectedRoomId ? 'hidden md:flex' : 'flex'} flex-1 min-h-0 flex-col bg-[var(--toss-gray-1)] relative pb-16 md:pb-0`}>
         {/* 선택된 채팅방 정보 및 액션 버튼들 */}
         {selectedRoomId && selectedRoom && (
           <header className="px-6 py-3.5 flex items-center justify-between border-b border-zinc-200/50 dark:border-zinc-800/50 glass glass-border shrink-0 z-40">
@@ -1192,7 +1195,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                   {selectedRoom.id === NOTICE_ROOM_ID ? NOTICE_ROOM_NAME : selectedRoom.name || '채팅방'}
                 </h3>
                 <p className="text-[10px] text-zinc-500 font-medium">
-                  {selectedRoom.members?.length || 0} 참여중
+                  {roomMembers.length || 0} 참여중
                 </p>
               </div>
             </div>
@@ -1440,7 +1443,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
 
         {/* 입력창 — 모바일에서 하단 네비 위에 고정 */}
         <div
-          className={`absolute left-0 right-0 bottom-0 md:relative p-4 md:p-6 bg-[var(--toss-card)] shrink-0 safe-area-pb transition-all z-10 ${isDragging ? 'border-t-2 border-[var(--toss-blue)] border-dashed bg-blue-50 dark:bg-blue-900/20' : 'border-t border-[var(--toss-border)]'}`}
+          className={`absolute left-0 right-0 bottom-0 md:relative p-2 md:p-3 bg-[var(--toss-card)] shrink-0 transition-all z-10 ${isDragging ? 'border-t-2 border-[var(--toss-blue)] border-dashed bg-blue-50 dark:bg-blue-900/20' : 'border-t border-[var(--toss-border)]'}`}
           onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
           onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }}
           onDrop={async (e) => {
@@ -1455,11 +1458,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
               <button onClick={() => setReplyTo(null)} className="text-[var(--toss-blue)] hover:text-[var(--toss-blue)] font-semibold">✕</button>
             </div>
           )}
-          {selectedRoomId === NOTICE_ROOM_ID && user?.position && !CAN_WRITE_NOTICE_POSITIONS.includes(user.position) && (
-            <div className="mb-3 py-2 px-4 bg-amber-50 border border-amber-200 rounded-[16px] text-[11px] font-bold text-amber-800">
-              📢 공지메시지 방에는 부서장(팀장·부장·원장 등) 이상만 작성할 수 있습니다.
-            </div>
-          )}
+
           <div className={`flex items-center gap-3 p-3 rounded-[16px] border transition-all ${selectedRoomId === NOTICE_ROOM_ID && user?.position && !CAN_WRITE_NOTICE_POSITIONS.includes(user.position)
             ? 'bg-[var(--toss-gray-1)] border-[var(--toss-border)] opacity-80 pointer-events-none'
             : 'bg-[var(--toss-gray-1)] border-[var(--toss-border)] focus-within:bg-[var(--toss-card)] focus-within:ring-4 focus-within:ring-[var(--toss-blue)]'
@@ -1469,13 +1468,13 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
               onClick={() => fileInputRef.current?.click()}
               disabled={fileUploading}
               title="파일 첨부"
-              className="w-10 h-10 flex items-center justify-center text-[var(--toss-gray-3)] hover:text-[var(--toss-blue)] transition-colors disabled:opacity-50"
+              className="w-8 h-8 flex items-center justify-center text-[var(--toss-gray-3)] hover:text-[var(--toss-blue)] transition-colors disabled:opacity-50"
             >
               {fileUploading ? <span className="animate-pulse text-xs">...</span> : '📎'}
             </button>
             <div className="relative flex-1">
               <input
-                className="w-full bg-transparent p-2 outline-none text-[16px] md:text-sm font-bold min-w-0"
+                className="w-full bg-transparent p-1 px-2 outline-none text-[15px] md:text-sm font-bold min-w-0"
                 placeholder={selectedRoomId === NOTICE_ROOM_ID && user?.position && !CAN_WRITE_NOTICE_POSITIONS.includes(user.position) ? "부서장 이상만 작성 가능" : "메시지를 입력하세요... (예: @홍길동 메모) "}
                 value={inputMsg}
                 onChange={e => {
@@ -1522,7 +1521,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                 </div>
               )}
             </div>
-            <button onClick={() => handleSendMessage()} className="bg-[var(--toss-blue)] text-white w-10 h-10 rounded-full shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center justify-center">↑</button>
+            <button onClick={() => handleSendMessage()} className="bg-[var(--toss-blue)] text-white w-8 h-8 rounded-full shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center justify-center text-sm">↑</button>
           </div>
         </div>
 
@@ -1885,13 +1884,39 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                 />
               </div>
               <div>
-                <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">선택지 (쉼표로 구분)</label>
-                <input
-                  value={pollOptions}
-                  onChange={(e) => setPollOptions(e.target.value)}
-                  className="w-full mt-1 p-3 bg-[var(--input-bg)] border border-[var(--toss-border)] rounded-[16px] text-xs font-bold outline-none focus:border-[var(--toss-blue)]"
-                  placeholder="찬성, 반대"
-                />
+                <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">선택지</label>
+                <div className="mt-1 space-y-2">
+                  {pollOptions.map((opt, idx) => (
+                    <div key={idx} className="flex gap-2">
+                      <input
+                        value={opt}
+                        onChange={(e) => {
+                          const newOpts = [...pollOptions];
+                          newOpts[idx] = e.target.value;
+                          setPollOptions(newOpts);
+                        }}
+                        className="flex-1 p-3 bg-[var(--input-bg)] border border-[var(--toss-border)] rounded-[16px] text-xs font-bold outline-none focus:border-[var(--toss-blue)]"
+                        placeholder={`선택지 ${idx + 1}`}
+                      />
+                      {pollOptions.length > 2 && (
+                        <button
+                          type="button"
+                          onClick={() => setPollOptions(pollOptions.filter((_, i) => i !== idx))}
+                          className="w-10 h-10 flex items-center justify-center bg-red-50 text-red-500 rounded-xl hover:bg-red-100"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setPollOptions([...pollOptions, ''])}
+                    className="w-full py-3 border-2 border-dashed border-zinc-200 rounded-xl text-xs font-bold text-zinc-500 hover:text-blue-500 hover:border-blue-300"
+                  >
+                    + 항목 추가
+                  </button>
+                </div>
               </div>
             </div>
             <div className="flex gap-2 pt-2">
@@ -2531,33 +2556,58 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-[11px] font-black text-zinc-400 uppercase tracking-widest pl-1">선택지 (콤마로 구분)</label>
-                <input
-                  className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500/30 transition-all"
-                  placeholder="예: 찬성, 반대, 기권"
-                  value={pollOptions}
-                  onChange={e => setPollOptions(e.target.value)}
-                />
+                <label className="text-[11px] font-black text-zinc-400 uppercase tracking-widest pl-1">선택지</label>
+                <div className="space-y-2">
+                  {pollOptions.map((opt, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <input
+                        className="flex-1 px-4 py-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500/30 transition-all"
+                        placeholder={`선택지 ${idx + 1}`}
+                        value={opt}
+                        onChange={e => {
+                          const newOpts = [...pollOptions];
+                          newOpts[idx] = e.target.value;
+                          setPollOptions(newOpts);
+                        }}
+                      />
+                      {pollOptions.length > 2 && (
+                        <button
+                          onClick={() => setPollOptions(pollOptions.filter((_, i) => i !== idx))}
+                          className="w-10 h-10 flex items-center justify-center bg-red-50 dark:bg-red-900/20 text-red-500 rounded-xl hover:bg-red-100 transition-colors"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => setPollOptions([...pollOptions, ''])}
+                    className="w-full py-3 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl text-xs font-bold text-zinc-500 hover:text-blue-500 hover:border-blue-300 transition-colors"
+                  >
+                    + 항목 추가
+                  </button>
+                </div>
               </div>
             </div>
             <button
               onClick={async () => {
-                if (!pollQuestion.trim() || !pollOptions.trim()) return alert("질문과 선택지를 입력해주세요.");
-                const options = pollOptions.split(',').map(o => o.trim()).filter(Boolean);
-                if (options.length < 2) return alert("최소 2개 이상의 선택지가 필요합니다.");
+                const validOptions = pollOptions.map(o => o.trim()).filter(Boolean);
+                if (!pollQuestion.trim() || validOptions.length === 0) return alert("질문과 선택지를 입력해주세요.");
+                if (validOptions.length < 2) return alert("최소 2개 이상의 선택지가 필요합니다.");
 
                 const { error } = await supabase.from('polls').insert([{
                   room_id: selectedRoomId,
                   creator_id: user.id,
                   question: pollQuestion,
-                  options: options
+                  options: validOptions
                 }]);
 
                 if (!error) {
                   setPollQuestion('');
-                  setPollOptions('찬성, 반대');
+                  setPollOptions(['찬성', '반대']);
                   setShowPollModal(false);
                   fetchData();
+                  alert("투표가 생성되었습니다.");
                 } else {
                   alert("투표 생성에 실패했습니다.");
                 }

@@ -13,6 +13,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [distance, setDistance] = useState<number | null>(null); // 병원과의 거리
   const [loading, setLoading] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -134,9 +135,15 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
 
   // 출퇴근 처리 (위치 검증 포함)
   const handleCommute = async (type: 'in' | 'out') => {
+    if (isProcessing) return;
+    setIsProcessing(true);
+
     // 1. 위치 검증 먼저 수행
     const isLocationValid = await getCurrentLocation();
-    if (!isLocationValid) return; // 위치가 안 맞으면 여기서 중단!
+    if (!isLocationValid) {
+      setIsProcessing(false);
+      return; // 위치가 안 맞으면 여기서 중단!
+    }
 
     // 2. 위치 인증 성공 시 DB 기록 시작
     const now = new Date();
@@ -182,6 +189,8 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
       fetchMonthlyLogs();
     } catch (error: any) {
       alert('오류 발생: ' + error.message);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -215,14 +224,22 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
 
         <div className="flex gap-4 z-10">
           {!todayLog && (
-            <button onClick={() => handleCommute('in')} className="px-10 py-5 bg-[var(--toss-blue)] hover:opacity-90 rounded-[12px] font-semibold text-lg shadow-lg active:scale-95 transition-all flex flex-col items-center leading-none gap-1">
-              <span>출근하기 ☀️</span>
+            <button
+              onClick={() => handleCommute('in')}
+              disabled={isProcessing}
+              className="px-10 py-5 bg-[var(--toss-blue)] hover:opacity-90 rounded-[12px] font-semibold text-lg shadow-lg active:scale-95 transition-all flex flex-col items-center leading-none gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <span>{isProcessing ? '위치 확인 처리 중...' : '출근하기 ☀️'}</span>
               <span className="text-[11px] font-normal opacity-70">GPS 인증 필요</span>
             </button>
           )}
           {todayLog && !todayLog.check_out && (
-            <button onClick={() => handleCommute('out')} className="px-10 py-5 bg-red-600 hover:bg-red-500 rounded-[12px] font-semibold text-lg shadow-lg active:scale-95 transition-all flex flex-col items-center leading-none gap-1">
-              <span>퇴근하기 🌙</span>
+            <button
+              onClick={() => handleCommute('out')}
+              disabled={isProcessing}
+              className="px-10 py-5 bg-red-600 hover:bg-red-500 rounded-[12px] font-semibold text-lg shadow-lg active:scale-95 transition-all flex flex-col items-center leading-none gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <span>{isProcessing ? '위치 확인 처리 중...' : '퇴근하기 🌙'}</span>
               <span className="text-[11px] font-normal opacity-70">GPS 인증 필요</span>
             </button>
           )}

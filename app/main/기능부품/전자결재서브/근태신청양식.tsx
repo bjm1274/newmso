@@ -28,35 +28,44 @@ export default function AttendanceForms({ user, staffs, formType, setExtraData, 
   };
 
   return (
-    <div className="animate-in fade-in duration-300">
+    <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-3xl overflow-hidden shadow-sm animate-in fade-in duration-300">
       {/* 🏖️ 연차/휴가: 원본 3열 레이아웃 (모바일 패딩 조정) */}
       {formType === '연차/휴가' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 bg-[var(--toss-blue-light)]/50 p-6 md:p-10 rounded-[1.5rem] md:rounded-[2.5rem] border border-[var(--toss-blue-light)] shadow-inner">
-          <div className="space-y-2">
-            <label className="text-[11px] font-bold text-[var(--toss-blue)] ml-1 uppercase">휴가 종류</label>
-            <select className="w-full p-4 rounded-[12px] bg-[var(--toss-card)] font-bold text-xs border-none shadow-sm focus:ring-2 focus:ring-[var(--toss-blue)]/30"
-              onChange={e => setExtraData((prev: any) => ({ ...prev, vType: e.target.value }))}>
-              <option>연차 (1.0)</option><option>반차 (0.5)</option><option>병가</option>
-            </select>
+        <>
+          <div className="p-4 md:p-6 bg-[var(--toss-blue-light)]/40 border-b border-[var(--toss-border)]">
+            <h4 className="text-sm font-bold text-[var(--foreground)]">연차/휴가 신청</h4>
+            <p className="text-[11px] font-semibold text-[var(--toss-gray-4)] mt-1">전자결재 표준 양식</p>
           </div>
-          <div className="space-y-2">
-            <label className="text-[11px] font-bold text-[var(--toss-blue)] ml-1 uppercase">시작 일자</label>
-            <input type="date" className="w-full p-4 rounded-[12px] bg-[var(--toss-card)] font-bold text-xs shadow-sm border-none focus:ring-2 focus:ring-[var(--toss-blue)]/30"
-              onChange={e => setExtraData((prev: any) => ({ ...prev, startDate: e.target.value }))} />
+          <div className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 bg-gray-50/30">
+            <div className="space-y-2">
+              <label className="text-[11px] font-bold text-[var(--toss-blue)] ml-1 uppercase">휴가 종류</label>
+              <select className="w-full p-4 rounded-[12px] bg-[var(--toss-card)] font-bold text-xs border-none shadow-sm focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+                onChange={e => setExtraData((prev: any) => ({ ...prev, vType: e.target.value }))}>
+                <option>연차 (1.0)</option><option>반차 (0.5)</option><option>병가</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[11px] font-bold text-[var(--toss-blue)] ml-1 uppercase">시작 일자</label>
+              <input type="date" className="w-full p-4 rounded-[12px] bg-[var(--toss-card)] font-bold text-xs shadow-sm border-none focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+                onChange={e => setExtraData((prev: any) => ({ ...prev, startDate: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[11px] font-bold text-[var(--toss-blue)] ml-1 uppercase">종료 일자</label>
+              <input type="date" className="w-full p-4 rounded-[12px] bg-[var(--toss-card)] font-bold text-xs shadow-sm border-none focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+                onChange={e => setExtraData((prev: any) => ({ ...prev, endDate: e.target.value }))} />
+            </div>
           </div>
-          <div className="space-y-2">
-            <label className="text-[11px] font-bold text-[var(--toss-blue)] ml-1 uppercase">종료 일자</label>
-            <input type="date" className="w-full p-4 rounded-[12px] bg-[var(--toss-card)] font-bold text-xs shadow-sm border-none focus:ring-2 focus:ring-[var(--toss-blue)]/30"
-              onChange={e => setExtraData((prev: any) => ({ ...prev, endDate: e.target.value }))} />
-          </div>
-        </div>
+        </>
       )}
 
       {/* ⏱️ 연장근무: 원본 연동 버튼 리스트 (모바일 패딩 조정) */}
       {formType === '연장근무' && (
-        <div className="bg-orange-50/50 p-6 md:p-10 rounded-[1.5rem] md:rounded-[2.5rem] border border-orange-100 space-y-4 md:space-y-6 shadow-inner">
-          <h4 className="text-xs font-bold text-orange-600">📌 최근 초과 근무 내역 선택</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+        <>
+          <div className="p-4 md:p-6 bg-orange-50 border-b border-orange-100">
+            <h4 className="text-sm font-bold text-orange-600">📌 최근 초과 근무 내역 선택</h4>
+            <p className="text-[11px] font-semibold text-orange-500/70 mt-1">근태 데이터를 기반으로 연장수당을 자동 청구합니다.</p>
+          </div>
+          <div className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 max-h-60 overflow-y-auto pr-2 custom-scrollbar bg-gray-50/30">
             {attData.map((a, i) => {
               const ot = calculateOT(a);
               if (ot <= 0) return null;
@@ -72,7 +81,7 @@ export default function AttendanceForms({ user, staffs, formType, setExtraData, 
               );
             })}
           </div>
-        </div>
+        </>
       )}
     </div>
   );

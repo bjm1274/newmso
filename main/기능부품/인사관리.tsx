@@ -12,9 +12,9 @@ export default function 인사관리({ user, staffs, depts, onRefresh }: any) {
   const [선택사업체, 사업체설정] = useState('전체');
   const [등록창상태, 창상태설정] = useState(false);
 
-  const 사업체목록 = ["전체", "SY INC.", "박철홍정형외과", "수연의원"];
+  const 사업체목록 = ["전체", "운영본부", "박철홍정형외과", "수연의원"];
 
-  const hasAccess = user?.permissions?.mso === true || user?.company === 'SY INC.' || user?.permissions?.hr === true;
+  const hasAccess = user?.permissions?.mso === true || user?.company === '운영본부' || user?.permissions?.hr === true;
 
   if (!hasAccess) {
     return (

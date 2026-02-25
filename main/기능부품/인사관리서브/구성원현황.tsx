@@ -22,7 +22,7 @@ export default function 구성원관리({ 직원목록 = [], 부서목록 = [], 
   }, []);
 
   const 팀목록가져오기 = (회사: string) => {
-    if (회사 === 'SY INC.') return ['경영지원팀', '재무팀', '인사팀', '전략기획팀', '마케팅팀'];
+    if (회사 === '운영본부') return ['경영지원팀', '재무팀', '인사팀', '전략기획팀', '마케팅팀'];
     return ['진료부', '진료팀', '병동팀', '수술팀', '외래팀', '검사팀', '원무팀', '총무팀', '행정팀', '관리팀'];
   };
 
@@ -189,7 +189,7 @@ export default function 구성원관리({ 직원목록 = [], 부서목록 = [], 
                     <label className="text-[9px] font-black text-gray-400">사업체</label>
                     <select value={신규직원.사업체} onChange={e => 신규직원설정({...신규직원, 사업체: e.target.value, 팀: 팀목록가져오기(e.target.value)[0]})} className="w-full p-3 bg-gray-50 rounded-xl border-none outline-none font-black text-xs focus:ring-2 focus:ring-blue-100">
                       <option value="박철홍정형외과">박철홍정형외과</option>
-                      <option value="SY INC.">SY INC.</option>
+                      <option value="운영본부">운영본부</option>
                       <option value="수연의원">수연의원</option>
                     </select>
                   </div>

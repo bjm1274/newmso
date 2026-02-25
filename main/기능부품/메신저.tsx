@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 
 const NOTICE_ROOM_ID = '00000000-0000-0000-0000-000000000000';
 
-export default function ChatView({ user, onRefresh, staffs = [] }: any) {
+export default function ChatView({ user, onRefresh, staffs = [], initialOpenChatRoomId, initialOpenMessageId, onConsumeOpenChatRoomId }: any) {
   const [messages, setMessages] = useState<any[]>([]);
   const [latestNotice, setLatestNotice] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -67,10 +67,30 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
   }, [selectedRoomId]);
 
   useEffect(() => {
-    if (scrollRef.current) {
+    if (scrollRef.current && !initialOpenMessageId) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages.length]);
+  }, [messages.length, initialOpenMessageId]);
+
+  useEffect(() => {
+    if (initialOpenChatRoomId) {
+      setSelectedRoomId(initialOpenChatRoomId);
+      if (onConsumeOpenChatRoomId) onConsumeOpenChatRoomId();
+    }
+  }, [initialOpenChatRoomId]);
+
+  useEffect(() => {
+    if (initialOpenMessageId && messages.length > 0) {
+      setTimeout(() => {
+        const el = document.getElementById(`msg-${initialOpenMessageId}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.classList.add('bg-yellow-50', 'transition-colors', 'duration-1000');
+          setTimeout(() => el.classList.remove('bg-yellow-50'), 2000);
+        }
+      }, 100);
+    }
+  }, [initialOpenMessageId, messages]);
 
   const handleSendMessage = async (fileUrl?: string) => {
     if (!inputMsg.trim() && !fileUrl) return;
@@ -315,7 +335,7 @@ export default function ChatView({ user, onRefresh, staffs = [] }: any) {
               const showProfile = !isMine && (idx === 0 || messages[idx - 1].sender_id !== msg.sender_id);
 
               return (
-                <div key={msg.id} className={`flex gap-2 ${isMine ? 'flex-row-reverse' : 'flex-row'} items-start animate-in fade-in-up duration-300`}>
+                <div key={msg.id} id={`msg-${msg.id}`} className={`flex gap-2 ${isMine ? 'flex-row-reverse' : 'flex-row'} items-start animate-in fade-in-up duration-300 rounded-xl`}>
                   {!isMine && (
                     <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-gray-400 text-xs shadow-sm shrink-0 mt-1">
                       {showProfile ? (msg.staff?.photo_url ? <img src={msg.staff.photo_url} className="w-full h-full object-cover rounded-xl" /> : (msg.staff?.name?.[0] || '?')) : ''}

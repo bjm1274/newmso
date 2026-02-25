@@ -14,7 +14,7 @@ export default function AdminView({ user, staffs = [], depts = [], onRefresh }: 
   const [activeTab, setActiveTab] = useState('경영대시보드');
   const [inventory, setInventory] = useState<any[]>([]);
 
-  const isMso = user?.company === 'SY INC.' || user?.permissions?.mso === true;
+  const isMso = user?.company === '운영본부' || user?.permissions?.mso === true;
   if (!isMso) {
     return (
       <div className="h-full flex flex-col items-center justify-center bg-gray-50">
@@ -47,7 +47,7 @@ export default function AdminView({ user, staffs = [], depts = [], onRefresh }: 
     <div className="flex-1 flex flex-col bg-[#FDFDFD] h-full relative animate-in fade-in duration-500">
       <header className="px-10 py-8 flex justify-between items-center bg-white border-b border-gray-100 shrink-0 shadow-sm flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-black text-gray-800 tracking-tighter">SY INC. MSO 관리자 센터</h1>
+          <h1 className="text-2xl font-black text-gray-800 tracking-tighter">운영본부 MSO 관리자 센터</h1>
           <p className="text-[10px] text-blue-600 font-bold mt-1 uppercase tracking-widest">Integrated Admin Hub</p>
         </div>
         

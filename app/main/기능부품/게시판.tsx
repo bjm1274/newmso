@@ -1,12 +1,10 @@
 'use client';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import WikiDashboard from './게시판서브/사내위키';
-
 const CHAT_ROOM_KEY = 'erp_chat_last_room';
 const CHAT_FOCUS_KEY = 'erp_chat_focus_keyword';
 
-const BOARD_IDS = ['공지사항', '자유게시판', '익명소리함', '경조사', '수술일정', 'MRI일정', '사내위키'];
+const BOARD_IDS = ['공지사항', '자유게시판', '익명소리함', '경조사', '수술일정', 'MRI일정'];
 
 export default function BoardView({ user, subView, setSubView, initialBoard, initialPostId, onConsumePostId, surgeries, mris, onRefresh, setMainMenu }: any) {
   const [activeBoard, setActiveBoard] = useState(initialBoard && BOARD_IDS.includes(initialBoard) ? initialBoard : (subView && BOARD_IDS.includes(subView) ? subView : '공지사항'));
@@ -86,8 +84,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, ini
     { id: '익명소리함', label: '💌 익명 소리함', icon: '💌' },
     { id: '경조사', label: '🎉 경조사', icon: '🎉' },
     { id: '수술일정', label: '🏥 수술일정표', icon: '🏥' },
-    { id: 'MRI일정', label: '🔬 MRI일정표', icon: '🔬' },
-    { id: '사내위키', label: '📖 사내위키', icon: '📖' }
+    { id: 'MRI일정', label: '🔬 MRI일정표', icon: '🔬' }
   ];
 
   // 오전/오후 + 시/분 드롭다운 값을 HH:MM 문자열로 변환
@@ -1663,10 +1660,6 @@ export default function BoardView({ user, subView, setSubView, initialBoard, ini
         </div>
       )}
 
-      {/* 🚀 사내위키 독립 뷰 */}
-      {activeBoard === '사내위키' && (
-        <WikiDashboard />
-      )}
     </div>
   );
 }

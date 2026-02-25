@@ -5,6 +5,7 @@ import ThemeToggle from '@/app/components/ThemeToggle';
 import GlobalSearch from '@/app/components/GlobalSearch';
 import 부서별물품장비현황 from './재고관리서브/부서별물품장비현황';
 import 근무현황 from './근무현황';
+import 인계노트 from './인계노트';
 
 const EXTERNAL_LINKS = [
   { id: 'km-park', label: 'KM Park', url: 'http://kmp0001103.iptime.org/login?redirectTo=undefined', icon: '🏥' },
@@ -42,7 +43,13 @@ export default function ExtraFeatures({
           </div>
           {onSearchSelect && (
             <div className="flex-1 min-w-0">
-              <GlobalSearch user={user} staffs={staffs} posts={posts} onSelect={onSearchSelect} variant="input" />
+              <GlobalSearch user={user} staffs={staffs} posts={posts} onSelect={(type, id) => {
+                if (type === 'handover') {
+                  setSubView('인계노트');
+                } else if (onSearchSelect) {
+                  onSearchSelect(type, id);
+                }
+              }} variant="input" />
             </div>
           )}
         </div>
@@ -73,6 +80,21 @@ export default function ExtraFeatures({
             </button>
             <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] p-6 shadow-sm">
               <근무현황 user={user || {}} />
+            </div>
+          </div>
+        )}
+
+        {subView === '인계노트' && (
+          <div className="space-y-4">
+            <button
+              type="button"
+              onClick={() => setSubView(null)}
+              className="text-[11px] font-bold text-[var(--toss-blue)] hover:underline"
+            >
+              ← 목록으로
+            </button>
+            <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] p-6 shadow-sm">
+              <인계노트 user={user || {}} />
             </div>
           </div>
         )}
@@ -123,6 +145,23 @@ export default function ExtraFeatures({
               </div>
               <span className="text-[var(--toss-gray-3)] group-hover:text-[var(--toss-blue)]">→</span>
             </button>
+
+            {(user?.department === '병동팀' || user?.team === '병동팀') && (
+              <button
+                type="button"
+                onClick={() => setSubView('인계노트')}
+                className="flex items-center gap-3 p-4 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] shadow-sm hover:bg-[var(--toss-blue-light)]/50 hover:border-[var(--toss-blue)]/30 transition-all group text-left w-full"
+              >
+                <div className="w-12 h-12 bg-red-50 text-red-500 group-hover:bg-red-100 rounded-[12px] flex items-center justify-center text-xl transition-colors">
+                  📝
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-[var(--foreground)] text-sm">인계노트 (병동팀 전용)</h3>
+                  <p className="text-[11px] text-[var(--toss-gray-3)] mt-0.5">3교대 근무자 필수 공유사항</p>
+                </div>
+                <span className="text-[var(--toss-gray-3)] group-hover:text-[var(--toss-blue)]">→</span>
+              </button>
+            )}
 
             {EXTERNAL_LINKS.map((item) => (
               <a

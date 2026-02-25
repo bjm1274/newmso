@@ -78,7 +78,7 @@ export default function CertificateGenerator({ staffs }: any) {
             <div className="w-full max-w-[600px] bg-white shadow-2xl p-12 md:p-20 space-y-12 text-center border border-gray-100 relative animate-in zoom-in-95 duration-500">
               {/* 워터마크 */}
               <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none select-none">
-                <p className="text-9xl font-black -rotate-45">SY INC.</p>
+                <p className="text-9xl font-black -rotate-45">운영본부</p>
               </div>
 
               <div className="space-y-2">
@@ -115,11 +115,11 @@ export default function CertificateGenerator({ staffs }: any) {
                   <p className="text-xs font-bold text-gray-400">{new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
                   
                   <div className="relative inline-block pt-10">
-                    <p className="text-2xl font-black tracking-tighter text-gray-900 italic">SY INC. 대표이사 박철홍</p>
+                    <p className="text-2xl font-black tracking-tighter text-gray-900 italic">운영본부 대표이사 박철홍</p>
                     {/* 디지털 직인 */}
                     <div className="absolute -right-12 -top-2 w-20 h-20 border-4 border-red-600/80 rounded-full flex items-center justify-center rotate-12 opacity-80">
                       <div className="text-[10px] font-black text-red-600/80 text-center leading-tight">
-                        SY INC.<br/>대표이사<br/>박철홍
+                        운영본부<br/>대표이사<br/>박철홍
                       </div>
                     </div>
                   </div>

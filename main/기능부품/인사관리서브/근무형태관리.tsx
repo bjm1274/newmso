@@ -110,7 +110,7 @@ export default function ShiftManagement({ selectedCo }: any) {
                 <label className="text-[10px] font-black text-gray-400 uppercase">적용 사업체</label>
                 <select value={newShift.company} onChange={e => setNewShift({...newShift, company: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 font-black text-xs">
                   <option value="박철홍정형외과">박철홍정형외과</option>
-                  <option value="SY INC.">SY INC.</option>
+                  <option value="운영본부">운영본부</option>
                   <option value="수연의원">수연의원</option>
                 </select>
               </div>

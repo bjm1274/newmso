@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 
 const HOSPITAL_DIVISIONS = ['진료부', '간호부', '총무부'];
-const MSO_DIVISIONS = ['경영지원본부'];
+const MSO_DIVISIONS = ['운영본부', '전략기획본부'];
 const COMPANIES = ['박철홍정형외과', '수연의원', 'SY INC.'];
 
 export default function TeamManager({ onRefresh }: { onRefresh?: () => void }) {
@@ -38,9 +38,13 @@ export default function TeamManager({ onRefresh }: { onRefresh?: () => void }) {
     if (!newTeam.team_name.trim()) return alert('팀명을 입력하세요.');
     const { error } = await supabase.from('org_teams').insert({
       company_name: company,
-      division: newTeam.division,
+      division: company === 'SY INC.' ? (newTeam.division === '운영본부' ? '총무부' : '진료부') : newTeam.division,
       team_name: newTeam.team_name.trim(),
-      sort_order: teams.filter((t: any) => t.division === newTeam.division).length + 1,
+      sort_order: teams.filter((t: any) => {
+        const d = newTeam.division;
+        if (company === 'SY INC.') return d === '운영본부' ? t.division === '총무부' : t.division === '진료부';
+        return t.division === d;
+      }).length + 1,
     });
     if (!error) {
       setNewTeam({ division: currentDivisions[0], team_name: '' });
@@ -61,7 +65,10 @@ export default function TeamManager({ onRefresh }: { onRefresh?: () => void }) {
 
   const byDivision = currentDivisions.map((d) => ({
     name: d,
-    teams: teams.filter((t: any) => t.division === d),
+    teams: teams.filter((t: any) => {
+      if (company === 'SY INC.') return d === '운영본부' ? t.division === '총무부' : t.division === '진료부';
+      return t.division === d;
+    }),
   }));
 
   return (

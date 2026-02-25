@@ -23,7 +23,7 @@ export default function OffboardingView({ staffs, onRefresh }: any) {
         setLoading(true);
         try {
             // 1. Status change logic
-            await supabase.from('staff_members').update({ status: '퇴사예정', exit_date: exitDate }).eq('id', selectedStaff);
+            await supabase.from('staff_members').update({ status: '퇴사예정', resigned_at: exitDate }).eq('id', selectedStaff);
 
             // 2. Offboarding checklist tracking (create a new record in a custom table if exists, else we simulate it)
             // For this UI, we can just visually update or rely on '퇴사예정' status
@@ -39,7 +39,7 @@ export default function OffboardingView({ staffs, onRefresh }: any) {
         }
     };
 
-    const pendingList = staffs.filter((s: any) => s.status === '퇴사예정' || (s.status === '퇴사' && s.exit_date > new Date().toISOString().slice(0, 10)));
+    const pendingList = staffs.filter((s: any) => s.status === '퇴사예정' || (s.status === '퇴사' && s.resigned_at > new Date().toISOString().slice(0, 10)));
     const pastList = staffs.filter((s: any) => s.status === '퇴사');
 
     const concludeOffboarding = async (id: string, name: string) => {
@@ -127,7 +127,7 @@ export default function OffboardingView({ staffs, onRefresh }: any) {
                                             <p className="text-[10px] font-bold text-slate-400 tracking-widest uppercase">{s.department}</p>
                                         </div>
                                     </div>
-                                    <span className="bg-orange-100 text-orange-600 px-2 py-1 rounded text-[10px] font-black">D-{(new Date(s.exit_date || new Date()).getTime() - new Date().getTime()) / (1000 * 3600 * 24) | 0}</span>
+                                    <span className="bg-orange-100 text-orange-600 px-2 py-1 rounded text-[10px] font-black">D-{(new Date(s.resigned_at || new Date()).getTime() - new Date().getTime()) / (1000 * 3600 * 24) | 0}</span>
                                 </div>
 
                                 {/* Checklist */}
@@ -176,7 +176,7 @@ export default function OffboardingView({ staffs, onRefresh }: any) {
                                     <tr><td colSpan={6} className="text-center py-10 text-slate-400 font-bold">퇴사자 이력이 없습니다.</td></tr>
                                 )}
                                 {pastList.map((s: any) => {
-                                    const days = Math.floor((new Date(s.exit_date).getTime() - new Date(s.joined_at).getTime()) / (1000 * 3600 * 24));
+                                    const days = Math.floor((new Date(s.resigned_at).getTime() - new Date(s.joined_at).getTime()) / (1000 * 3600 * 24));
                                     return (
                                         <tr key={s.id} className="hover:bg-slate-50 transition-colors">
                                             <td className="px-6 py-4 font-black flex items-center gap-2 text-slate-800">
@@ -185,7 +185,7 @@ export default function OffboardingView({ staffs, onRefresh }: any) {
                                             </td>
                                             <td className="px-6 py-4 font-bold text-slate-500">{s.department} <br /> <span className="text-[9px] font-medium">{s.company}</span></td>
                                             <td className="px-6 py-4 font-mono text-slate-500">{s.joined_at}</td>
-                                            <td className="px-6 py-4 font-mono text-danger font-bold">{s.exit_date}</td>
+                                            <td className="px-6 py-4 font-mono text-danger font-bold">{s.resigned_at}</td>
                                             <td className="px-6 py-4 font-bold text-slate-700">{days > 0 ? `${days}일` : '-'}</td>
                                             <td className="px-6 py-4 text-right">
                                                 <button className="px-3 py-1.5 bg-slate-100 text-[10px] font-bold text-slate-600 rounded hover:bg-slate-200">경력증명서 📄</button>

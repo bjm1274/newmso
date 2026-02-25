@@ -15,7 +15,7 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
     { id: '관리자', icon: '⚙️', label: '관리자' }
   ];
 
-  const isMso = user?.company === 'SY INC.' || user?.permissions?.mso === true;
+  const isMso = user?.company === '운영본부' || user?.permissions?.mso === true;
   const canAccessHr = isMso || user?.permissions?.hr === true;
 
   const visibleMenus = menus.filter(m => {

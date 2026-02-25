@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 
 /** 간호과장 이상 직급만 조직도에서 개인 연락처(phone) 조회 가능 (기능 비활성화됨 - 내선번호만 표시) */
@@ -11,12 +11,56 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
   /** 팀 선택 필터: '' = 선택 안함(전체), 팀명 = 해당 팀만 표시 */
   const [selectedTeamFilter, setSelectedTeamFilter] = useState<string>('');
 
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [draggedStaff, setDraggedStaff] = useState<any>(null);
+
+  const isAdmin = user?.role === 'admin' || user?.permissions?.mso === true;
+
   const companies = ['전체', '박철홍정형외과', '수연의원', 'SY INC.'];
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [startY, setStartY] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [viewMode, setViewMode] = useState<any>('pyramid'); // 'pyramid' | 'list' | 'canvas'
+  const [canvasLayout, setCanvasLayout] = useState<any>({});
+  const [activeCompanyInfo, setActiveCompanyInfo] = useState<any>(null);
+  const [isSavingLayout, setIsSavingLayout] = useState(false);
+  const [draggedDept, setDraggedDept] = useState<string | null>(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+
+  const onMouseDown = (e: React.MouseEvent) => {
+    if (!scrollRef.current) return;
+    setIsDragging(true);
+    setStartX(e.pageX - scrollRef.current.offsetLeft);
+    setStartY(e.pageY - scrollRef.current.offsetTop);
+    setScrollLeft(scrollRef.current.scrollLeft);
+    setScrollTop(scrollRef.current.scrollTop);
+  };
+
+  const onMouseLeave = () => setIsDragging(false);
+  const onMouseUp = () => setIsDragging(false);
+  const onMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !scrollRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - scrollRef.current.offsetLeft;
+    const y = e.pageY - scrollRef.current.offsetTop;
+    const walkX = (x - startX) * 1.5;
+    const walkY = (y - startY) * 1.5;
+    scrollRef.current.scrollLeft = scrollLeft - walkX;
+    scrollRef.current.scrollTop = scrollTop - walkY;
+  };
 
   const defaultHospitalStructure = [
     { name: '진료부', teams: ['진료팀'] },
     { name: '간호부', teams: ['병동팀', '수술팀', '외래팀', '외래간호팀', '검사팀'] },
     { name: '총무부', teams: ['원무팀', '총무팀', '행정팀', '관리팀', '영양팀'] },
+  ];
+  const defaultMsoStructure = [
+    { name: '운영본부', teams: ['경영지원팀', '재무팀', '인사팀'] },
+    { name: '전략기획본부', teams: ['전략기획팀', '마케팅팀'] },
   ];
   /** 각 부(division)에 해당하는 부서장 직책 — 조직도에서 부 옆에 표시 */
   const DIVISION_HEAD_POSITIONS: Record<string, string[]> = {
@@ -25,6 +69,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
     총무부: ['총무부장'],
   };
   const [hospitalStructure, setHospitalStructure] = useState(defaultHospitalStructure);
+  const [msoStructure, setMsoStructure] = useState(defaultMsoStructure);
 
   useEffect(() => {
     setSelectedTeamFilter('');
@@ -32,27 +77,51 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
 
   useEffect(() => {
     const co = selectedCo || '';
-    if (co !== '박철홍정형외과' && co !== '수연의원') return;
+    if (co !== '박철홍정형외과' && co !== '수연의원' && co !== 'SY INC.') return;
     (async () => {
       const { data } = await supabase.from('org_teams').select('division, team_name, sort_order').eq('company_name', co).order('division').order('sort_order');
-      if (data && data.length > 0) {
-        const divs = ['진료부', '간호부', '총무부'];
-        const built = divs.map(d => ({
-          name: d,
-          teams: (data as any[]).filter((r: any) => r.division === d).map((r: any) => r.team_name)
-        })).filter(d => d.teams.length > 0);
-        if (built.length > 0) setHospitalStructure(built);
+
+      // 회사 메모(레이아웃 정보) 가져오기
+      const { data: coData } = await supabase.from('companies').select('*').eq('name', co).maybeSingle();
+      if (coData) {
+        setActiveCompanyInfo(coData);
+        if (coData.memo) {
+          try {
+            const memoObj = typeof coData.memo === 'string' ? JSON.parse(coData.memo) : coData.memo;
+            if (memoObj.canvas_layout) {
+              setCanvasLayout(memoObj.canvas_layout);
+            }
+          } catch (e) {
+            console.error('Memo parse error:', e);
+          }
+        }
+      }
+
+      if (data) {
+        if (co === 'SY INC.') {
+          const msoDivs = [
+            { name: '운영본부', dbDiv: '총무부' },
+            { name: '전략기획본부', dbDiv: '진료부' }
+          ];
+          const built = msoDivs.map(div => ({
+            name: div.name,
+            teams: (data as any[]).filter((r: any) => r.division === div.dbDiv).map((r: any) => r.team_name)
+          })).filter(d => d.teams.length > 0);
+          setMsoStructure(built.length > 0 ? built : defaultMsoStructure);
+        } else {
+          const divs = ['진료부', '간호부', '총무부'];
+          const built = divs.map(d => ({
+            name: d,
+            teams: (data as any[]).filter((r: any) => r.division === d).map((r: any) => r.team_name)
+          })).filter(d => d.teams.length > 0);
+          if (built.length > 0) setHospitalStructure(built);
+        }
       }
     })();
   }, [selectedCo]);
-
-  const msoStructure = [
-    { name: '경영지원본부', teams: ['경영지원팀', '재무팀', '인사팀'] },
-    { name: '전략기획본부', teams: ['전략기획팀', '마케팅팀'] },
-  ];
   /** MSO 본부 옆에 표시할 부서장급 직책 */
   const MSO_DIVISION_HEAD_POSITIONS: Record<string, string[]> = {
-    경영지원본부: ['팀장', '실장', '부장'],
+    운영본부: ['팀장', '실장', '부장'],
     전략기획본부: ['팀장', '실장', '부장'],
   };
 
@@ -176,6 +245,92 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
     return [];
   }, [selectedCo, hospitalStructure]);
 
+  const saveLayout = async (newLayout: any) => {
+    if (!selectedCo || !activeCompanyInfo) return;
+    setIsSavingLayout(true);
+    try {
+      const currentMemo = typeof activeCompanyInfo.memo === 'string'
+        ? JSON.parse(activeCompanyInfo.memo || '{}')
+        : (activeCompanyInfo.memo || {});
+      const updatedMemo = { ...currentMemo, canvas_layout: newLayout };
+
+      const { error } = await supabase
+        .from('companies')
+        .update({ memo: JSON.stringify(updatedMemo) })
+        .eq('id', activeCompanyInfo.id);
+
+      if (!error) {
+        setCanvasLayout(newLayout);
+        setActiveCompanyInfo({ ...activeCompanyInfo, memo: JSON.stringify(updatedMemo) });
+      }
+    } catch (e) {
+      console.error('Save layout error:', e);
+    } finally {
+      setIsSavingLayout(false);
+    }
+  };
+
+  const handleDeptDragStart = (e: React.DragEvent, deptName: string) => {
+    if (!isEditMode) return;
+    setDraggedDept(deptName);
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setDragOffset({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    });
+    // Transparent drag image
+    const img = new Image();
+    img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+    e.dataTransfer.setDragImage(img, 0, 0);
+  };
+
+  const handleCanvasDragOver = (e: React.DragEvent) => {
+    if (!isEditMode || !draggedDept) return;
+    e.preventDefault();
+    const canvasRect = scrollRef.current?.getBoundingClientRect();
+    if (!canvasRect) return;
+
+    const x = e.clientX - canvasRect.left + (scrollRef.current?.scrollLeft || 0) - dragOffset.x;
+    const y = e.clientY - canvasRect.top + (scrollRef.current?.scrollTop || 0) - dragOffset.y;
+
+    setCanvasLayout((prev: any) => ({
+      ...prev,
+      [draggedDept]: { x, y }
+    }));
+  };
+
+  const handleCanvasDrop = (e: React.DragEvent) => {
+    if (!isEditMode || !draggedDept) return;
+    e.preventDefault();
+    saveLayout(canvasLayout);
+    setDraggedDept(null);
+  };
+
+  const handleMoveStaff = async (staff: any, direction: 'up' | 'down') => {
+    const siblings = staffs
+      .filter((s: any) => s.company === staff.company && s.department === staff.department)
+      .sort((a: any, b: any) => (a.employee_no || 0) - (b.employee_no || 0));
+
+    const currentIndex = siblings.findIndex((s: any) => s.id === staff.id);
+    if (currentIndex === -1) return;
+
+    let targetIndex = -1;
+    if (direction === 'up' && currentIndex > 0) targetIndex = currentIndex - 1;
+    else if (direction === 'down' && currentIndex < siblings.length - 1) targetIndex = currentIndex + 1;
+
+    if (targetIndex !== -1) {
+      const targetStaff = siblings[targetIndex];
+      const tempNo1 = staff.employee_no;
+      const tempNo2 = targetStaff.employee_no;
+
+      const { error } = await supabase.from('staff_members').update({ employee_no: tempNo2 }).eq('id', staff.id);
+      if (error) return alert('정렬 실패: ' + error.message);
+      await supabase.from('staff_members').update({ employee_no: tempNo1 }).eq('id', targetStaff.id);
+
+      window.location.reload();
+    }
+  };
+
   return (
     <div className="flex flex-row h-full app-page font-sans overflow-hidden">
       {/* 좌측 세로 탭 - 회사 선택, 관리자 메뉴와 동일 스타일 */}
@@ -217,11 +372,114 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
               />
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--toss-gray-3)]">🔍</span>
             </div>
+            {isAdmin && (
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 p-1 bg-[var(--toss-gray-1)] rounded-xl border border-[var(--toss-border)] mr-2">
+                  <button
+                    onClick={() => setViewMode('pyramid')}
+                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${viewMode !== 'canvas' ? 'bg-white text-[var(--toss-blue)] shadow-sm' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'}`}
+                  >
+                    기본
+                  </button>
+                  <button
+                    onClick={() => setViewMode('canvas')}
+                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${viewMode === 'canvas' ? 'bg-white text-[var(--toss-blue)] shadow-sm' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'}`}
+                  >
+                    캔버스
+                  </button>
+                </div>
+                <button
+                  onClick={() => {
+                    if (selectedCo === '전체') {
+                      alert('특정 병원이나 회사를 선택해야 수정이 가능합니다.');
+                      return;
+                    }
+                    setIsEditMode(!isEditMode);
+                  }}
+                  className={`px-4 py-2 text-xs font-bold rounded-[16px] transition-all shrink-0 ${isEditMode ? 'bg-[var(--toss-danger)] text-white shadow-md' : 'bg-[var(--input-bg)] text-[var(--foreground)] border border-[var(--toss-border)]'}`}
+                >
+                  {isEditMode ? '수정 완료' : '조직도 수정하기'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
-        <main className="flex-1 overflow-auto custom-scrollbar relative bg-[var(--page-bg)]">
-          <div className="min-h-full w-full flex flex-col items-center p-6 md:p-16">
+        <main
+          ref={scrollRef}
+          onMouseDown={onMouseDown}
+          onMouseLeave={onMouseLeave}
+          onMouseUp={onMouseUp}
+          onMouseMove={onMouseMove}
+          onDragOver={viewMode === 'canvas' ? handleCanvasDragOver : undefined}
+          onDrop={viewMode === 'canvas' ? handleCanvasDrop : undefined}
+          className={`flex-1 overflow-auto custom-scrollbar relative bg-[var(--page-bg)] ${isDragging ? 'cursor-grabbing select-none' : 'cursor-grab'}`}
+        >
+          <div className={`min-h-full flex flex-col items-center ${viewMode === 'canvas' ? 'p-0 w-[4000px] h-[3000px]' : 'w-full p-6 md:p-16'}`}>
+            {viewMode === 'canvas' && viewData && !Array.isArray(viewData) ? (
+              /* 🎨 캔버스 모드 - 자유 배치 (부서 단위) */
+              <div className="relative w-full h-full bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:24px_24px]">
+                {(viewData as any).director && (
+                  <div
+                    className="absolute z-30"
+                    style={{
+                      left: canvasLayout['대표']?.x || 1800,
+                      top: canvasLayout['대표']?.y || 80
+                    }}
+                  >
+                    <div
+                      draggable={isEditMode}
+                      onDragStart={(e) => handleDeptDragStart(e, '대표')}
+                      className={`transition-all ${isEditMode ? 'cursor-move ring-2 ring-blue-400 ring-offset-4 rounded-xl shadow-2xl' : ''}`}
+                    >
+                      <StaffCardRow staff={(viewData as any).director} onClick={() => setSelectedMember((viewData as any).director)} onMoveStaff={handleMoveStaff} isEditMode={isEditMode} setDraggedStaff={setDraggedStaff} draggedStaff={draggedStaff} />
+                    </div>
+                  </div>
+                )}
+
+                {(viewData as any).departments?.map((dept: any, dIdx: number) => {
+                  const pos = canvasLayout[dept.deptName] || { x: 400 + dIdx * 600, y: 400 };
+                  return (
+                    <div
+                      key={dIdx}
+                      className="absolute z-20 bg-white/70 backdrop-blur-md border border-[var(--toss-border)] rounded-[3rem] p-10 shadow-2xl min-w-[300px]"
+                      style={{ left: pos.x, top: pos.y }}
+                    >
+                      <div className="flex flex-col items-center gap-10">
+                        <div
+                          draggable={isEditMode}
+                          onDragStart={(e) => handleDeptDragStart(e, dept.deptName)}
+                          className={`bg-[#1E293B] text-white px-12 py-4 rounded-[20px] text-[14px] font-bold shadow-xl whitespace-nowrap mb-4 ${isEditMode ? 'cursor-move hover:scale-105 active:scale-95 transition-transform' : ''}`}
+                        >
+                          {dept.deptName}
+                        </div>
+
+                        {dept.heads?.length > 0 && (
+                          <div className="flex gap-4 flex-wrap justify-center">
+                            {dept.heads.map((h: any) => (
+                              <StaffCardRow key={h.id} staff={h} onClick={() => setSelectedMember(h)} onMoveStaff={handleMoveStaff} isEditMode={isEditMode} setDraggedStaff={setDraggedStaff} draggedStaff={draggedStaff} />
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="flex gap-10 items-start">
+                          {dept.teams?.map((team: any, tIdx: number) => (
+                            <div key={tIdx} className="flex flex-col gap-6 bg-white/90 p-8 rounded-[2.5rem] border border-dashed border-[var(--toss-border)] min-w-[220px] shadow-sm">
+                              <p className="text-[12px] font-extrabold text-[var(--toss-gray-3)] text-center tracking-widest uppercase">[{team.teamName}]</p>
+                              <div className="flex flex-col gap-4">
+                                {team.members.map((m: any) => (
+                                  <StaffCardRow key={m.id} staff={m} onClick={() => setSelectedMember(m)} onMoveStaff={handleMoveStaff} isEditMode={isEditMode} setDraggedStaff={setDraggedStaff} draggedStaff={draggedStaff} />
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
 
             {(!viewData || (Array.isArray(viewData) && viewData.length === 0)) ? (
               <div className="flex flex-col items-center opacity-30 mt-20">
@@ -243,7 +501,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                         <div className="hidden md:flex flex-col items-center min-w-max w-full">
                           {group.director && (
                             <div className="relative mb-24">
-                              <StaffCardRow staff={group.director} onClick={() => setSelectedMember(group.director)} />
+                              <StaffCardRow staff={group.director} onClick={() => setSelectedMember(group.director)} onMoveStaff={handleMoveStaff} isEditMode={isEditMode} setDraggedStaff={setDraggedStaff} draggedStaff={draggedStaff} />
                               <div className="absolute left-1/2 -bottom-24 w-0.5 h-24 bg-[var(--toss-blue-light)] -translate-x-1/2"></div>
                             </div>
                           )}
@@ -258,18 +516,32 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                                   {dept.heads?.length > 0 && (
                                     <div className={`flex gap-1.5 justify-center items-end ${dept.deptName === '간호부' ? 'flex-nowrap shrink-0' : 'flex-wrap'}`}>
                                       {dept.heads.map((h: any) => (
-                                        <StaffCardRow key={h.id} staff={h} onClick={() => setSelectedMember(h)} />
+                                        <StaffCardRow key={h.id} staff={h} onClick={() => setSelectedMember(h)} onMoveStaff={handleMoveStaff} isEditMode={isEditMode} setDraggedStaff={setDraggedStaff} draggedStaff={draggedStaff} />
                                       ))}
                                     </div>
                                   )}
                                 </div>
                                 <div className={`flex flex-row gap-6 items-start justify-start w-full pb-2 ${dept.deptName === '총무부' ? 'flex-wrap' : 'overflow-x-auto no-scrollbar'}`}>
                                   {dept.teams?.map((team: any, tIdx: number) => (
-                                    <div key={tIdx} className="flex flex-col gap-4 bg-white/40 p-5 rounded-[2.5rem] border border-dashed border-[var(--toss-border)] shrink-0">
+                                    <div
+                                      key={tIdx}
+                                      className={`flex flex-col gap-4 bg-white/40 p-5 rounded-[2.5rem] border border-dashed border-[var(--toss-border)] shrink-0 transition-colors ${isEditMode ? 'hover:border-gray-400 min-h-[100px]' : ''}`}
+                                      onDragOver={isEditMode ? (e) => e.preventDefault() : undefined}
+                                      onDrop={isEditMode ? async (e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        if (!draggedStaff || draggedStaff.department === team.teamName) return;
+                                        if (confirm(`${draggedStaff.name}님을 [${team.teamName}] (으)로 이동하시겠습니까?`)) {
+                                          await supabase.from('staff_members').update({ department: team.teamName }).eq('id', draggedStaff.id);
+                                          alert('이동되었습니다.');
+                                          window.location.reload();
+                                        }
+                                      } : undefined}
+                                    >
                                       <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] text-center mb-1">[{team.teamName}]</p>
                                       <div className="flex flex-col gap-3">
                                         {team.members.map((m: any) => (
-                                          <StaffCardRow key={m.id} staff={m} onClick={() => setSelectedMember(m)} />
+                                          <StaffCardRow key={m.id} staff={m} onClick={() => setSelectedMember(m)} onMoveStaff={handleMoveStaff} isEditMode={isEditMode} setDraggedStaff={setDraggedStaff} draggedStaff={draggedStaff} />
                                         ))}
                                       </div>
                                     </div>
@@ -280,7 +552,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                           </div>
                         </div>
                         <div className="md:hidden w-full space-y-8">
-                          {group.director && <StaffCardRow staff={group.director} onClick={() => setSelectedMember(group.director)} />}
+                          {group.director && <StaffCardRow staff={group.director} onClick={() => setSelectedMember(group.director)} onMoveStaff={handleMoveStaff} isEditMode={isEditMode} setDraggedStaff={setDraggedStaff} draggedStaff={draggedStaff} />}
                           {group.departments?.map((dept: any, dIdx: number) => (
                             <div key={dIdx} className="space-y-4">
                               <div className="flex flex-wrap items-center gap-3">
@@ -288,7 +560,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                                 {dept.heads?.length > 0 && (
                                   <div className="flex flex-wrap gap-2">
                                     {dept.heads.map((h: any) => (
-                                      <StaffCardRow key={h.id} staff={h} onClick={() => setSelectedMember(h)} />
+                                      <StaffCardRow key={h.id} staff={h} onClick={() => setSelectedMember(h)} onMoveStaff={handleMoveStaff} isEditMode={isEditMode} setDraggedStaff={setDraggedStaff} draggedStaff={draggedStaff} />
                                     ))}
                                   </div>
                                 )}
@@ -298,7 +570,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                                   <div key={tIdx} className="flex flex-col gap-3 shrink-0 min-w-[140px]">
                                     <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] text-center">[{t.teamName}]</p>
                                     {t.members.map((m: any) => (
-                                      <StaffCardRow key={m.id} staff={m} onClick={() => setSelectedMember(m)} />
+                                      <StaffCardRow key={m.id} staff={m} onClick={() => setSelectedMember(m)} onMoveStaff={handleMoveStaff} isEditMode={isEditMode} setDraggedStaff={setDraggedStaff} draggedStaff={draggedStaff} />
                                     ))}
                                   </div>
                                 ))}
@@ -310,7 +582,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                     ) : (
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-6 w-full max-w-7xl">
                         {group.members?.map((m: any) => (
-                          <StaffCardRow key={m.id} staff={m} onClick={() => setSelectedMember(m)} />
+                          <StaffCardRow key={m.id} staff={m} onClick={() => setSelectedMember(m)} onMoveStaff={handleMoveStaff} isEditMode={isEditMode} setDraggedStaff={setDraggedStaff} draggedStaff={draggedStaff} />
                         ))}
                       </div>
                     )}
@@ -324,7 +596,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                 <div className="hidden md:flex flex-col items-center min-w-max">
                   {(viewData as any).director && (
                     <div className="relative mb-24">
-                      <StaffCardRow staff={(viewData as any).director} onClick={() => setSelectedMember((viewData as any).director)} />
+                      <StaffCardRow staff={(viewData as any).director} onClick={() => setSelectedMember((viewData as any).director)} onMoveStaff={handleMoveStaff} isEditMode={isEditMode} setDraggedStaff={setDraggedStaff} draggedStaff={draggedStaff} />
                       <div className="absolute left-1/2 -bottom-24 w-0.5 h-24 bg-[var(--toss-blue-light)] -translate-x-1/2"></div>
                     </div>
                   )}
@@ -342,7 +614,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                           {dept.heads?.length > 0 && (
                             <div className={`flex gap-1.5 justify-center items-end ${dept.deptName === '간호부' ? 'flex-nowrap shrink-0' : 'flex-wrap'}`}>
                               {dept.heads.map((h: any) => (
-                                <StaffCardRow key={h.id} staff={h} onClick={() => setSelectedMember(h)} />
+                                <StaffCardRow key={h.id} staff={h} onClick={() => setSelectedMember(h)} onMoveStaff={handleMoveStaff} isEditMode={isEditMode} setDraggedStaff={setDraggedStaff} draggedStaff={draggedStaff} />
                               ))}
                             </div>
                           )}
@@ -350,11 +622,25 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
 
                         <div className={`flex flex-row gap-6 items-start justify-start w-full pb-2 ${dept.deptName === '총무부' ? 'flex-wrap' : 'overflow-x-auto no-scrollbar'}`}>
                           {dept.teams.map((team: any, tIdx: number) => (
-                            <div key={tIdx} className="flex flex-col gap-4 bg-white/40 p-5 rounded-[2.5rem] border border-dashed border-[var(--toss-border)] shrink-0">
+                            <div
+                              key={tIdx}
+                              className={`flex flex-col gap-4 bg-white/40 p-5 rounded-[2.5rem] border border-dashed border-[var(--toss-border)] shrink-0 transition-colors ${isEditMode ? 'hover:border-gray-400 min-h-[100px]' : ''}`}
+                              onDragOver={isEditMode ? (e) => e.preventDefault() : undefined}
+                              onDrop={isEditMode ? async (e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (!draggedStaff || draggedStaff.department === team.teamName) return;
+                                if (confirm(`${draggedStaff.name}님을 [${team.teamName}] (으)로 이동하시겠습니까?`)) {
+                                  await supabase.from('staff_members').update({ department: team.teamName }).eq('id', draggedStaff.id);
+                                  alert('이동되었습니다.');
+                                  window.location.reload();
+                                }
+                              } : undefined}
+                            >
                               <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] text-center mb-1">[{team.teamName}]</p>
                               <div className="flex flex-col gap-3">
                                 {team.members.map((m: any) => (
-                                  <StaffCardRow key={m.id} staff={m} onClick={() => setSelectedMember(m)} />
+                                  <StaffCardRow key={m.id} staff={m} onClick={() => setSelectedMember(m)} onMoveStaff={handleMoveStaff} isEditMode={isEditMode} setDraggedStaff={setDraggedStaff} draggedStaff={draggedStaff} />
                                 ))}
                               </div>
                             </div>
@@ -369,7 +655,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                 <div className="md:hidden w-full space-y-8">
                   {(viewData as any).director && (
                     <div className="flex flex-col items-center">
-                      <StaffCardRow staff={(viewData as any).director} onClick={() => setSelectedMember((viewData as any).director)} />
+                      <StaffCardRow staff={(viewData as any).director} onClick={() => setSelectedMember((viewData as any).director)} onMoveStaff={handleMoveStaff} isEditMode={isEditMode} setDraggedStaff={setDraggedStaff} draggedStaff={draggedStaff} />
                     </div>
                   )}
                   {(viewData as any).departments.map((dept: any, dIdx: number) => (
@@ -379,17 +665,38 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                         {dept.heads?.length > 0 && (
                           <div className="flex flex-wrap gap-2">
                             {dept.heads.map((h: any) => (
-                              <StaffCardRow key={h.id} staff={h} onClick={() => setSelectedMember(h)} />
+                              <StaffCardRow key={h.id} staff={h} onClick={() => setSelectedMember(h)} onMoveStaff={handleMoveStaff} isEditMode={isEditMode} setDraggedStaff={setDraggedStaff} draggedStaff={draggedStaff} />
                             ))}
                           </div>
                         )}
                       </div>
                       <div className="flex flex-row gap-4 overflow-x-auto pb-2 no-scrollbar">
                         {dept.teams.map((t: any, tIdx: number) => (
-                          <div key={tIdx} className="flex flex-col gap-3 shrink-0 min-w-[140px]">
+                          <div
+                            key={tIdx}
+                            className={`flex flex-col gap-3 shrink-0 min-w-[140px] rounded-2xl transition-all ${isEditMode ? 'border-2 border-dashed border-transparent hover:border-gray-400 p-2 min-h-[100px]' : ''}`}
+                            onDragOver={isEditMode ? (e) => e.preventDefault() : undefined}
+                            onDrop={isEditMode ? async (e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (!draggedStaff || draggedStaff.department === t.teamName) return;
+                              if (confirm(`${draggedStaff.name}님을 [${t.teamName}] (으)로 이동하시겠습니까?`)) {
+                                await supabase.from('staff_members').update({ department: t.teamName }).eq('id', draggedStaff.id);
+                                alert('이동되었습니다.');
+                                window.location.reload();
+                              }
+                            } : undefined}
+                          >
                             <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] text-center">[{t.teamName}]</p>
                             {t.members.map((m: any) => (
-                              <StaffCardRow key={m.id} staff={m} onClick={() => setSelectedMember(m)} />
+                              <StaffCardRow
+                                key={m.id}
+                                staff={m}
+                                onMoveStaff={handleMoveStaff}
+                                isEditMode={isEditMode}
+                                setDraggedStaff={setDraggedStaff}
+                                draggedStaff={draggedStaff}
+                              />
                             ))}
                           </div>
                         ))}
@@ -410,7 +717,15 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                     )}
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-6">
                       {group.members?.map((m: any) => (
-                        <StaffCardRow key={m.id} staff={m} onClick={() => setSelectedMember(m)} />
+                        <StaffCardRow
+                          key={m.id}
+                          staff={m}
+                          onClick={!isEditMode ? () => setSelectedMember(m) : undefined}
+                          onMoveStaff={handleMoveStaff}
+                          isEditMode={isEditMode}
+                          setDraggedStaff={setDraggedStaff}
+                          draggedStaff={draggedStaff}
+                        />
                       ))}
                     </div>
                   </div>
@@ -444,10 +759,10 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                     <span className="font-semibold text-[var(--toss-gray-3)]">소속 부서</span>
                     <span className="font-semibold text-[var(--foreground)]">{selectedMember.department || '-'}</span>
                   </div>
-                  {selectedMember.extension && (
+                  {(selectedMember.extension || selectedMember.permissions?.extension) && (
                     <div className="flex justify-between items-center text-xs border-t border-[var(--toss-border)] pt-4">
                       <span className="font-semibold text-[var(--toss-gray-3)]">내선번호</span>
-                      <span className="font-semibold text-[var(--foreground)]">{selectedMember.extension}</span>
+                      <span className="font-semibold text-[var(--foreground)]">{selectedMember.extension || selectedMember.permissions?.extension}</span>
                     </div>
                   )}
                 </div>
@@ -461,18 +776,38 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
   );
 }
 
-/** 직원 카드: 사진 좌측, 이름·직책 우측 가로 배치 (약 70% 크기) */
-function StaffCardRow({ staff, onClick }: any) {
+/** 직원 카드: 사진 좌측, 이름·직책 우측 가로 배치 */
+function StaffCardRow({ staff, onClick, isEditMode, setDraggedStaff, draggedStaff, onMoveStaff }: any) {
   const isAdmin = staff.role === 'admin' || staff.permissions?.mso === true;
   const photoUrl = staff.photo_url || staff.avatar_url;
 
   return (
     <div
       onClick={onClick}
+      draggable={isEditMode}
+      onDragStart={isEditMode ? (e) => {
+        setDraggedStaff(staff);
+      } : undefined}
+      onDragOver={isEditMode ? (e) => e.preventDefault() : undefined}
+      onDrop={isEditMode ? async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!draggedStaff || draggedStaff.id === staff.id) return;
+        if (confirm(`${draggedStaff.name}님과 ${staff.name}님의 순서를 바꾸시겠습니까?`)) {
+          // Swap logic using employee_no (acting as sort index)
+          const tempNo1 = staff.employee_no;
+          const tempNo2 = draggedStaff.employee_no;
+          await supabase.from('staff_members').update({ employee_no: tempNo2 }).eq('id', staff.id);
+          await supabase.from('staff_members').update({ employee_no: tempNo1 }).eq('id', draggedStaff.id);
+          alert('변경되었습니다.');
+          window.location.reload();
+        }
+      } : undefined}
       className={`
-        relative flex flex-row items-center gap-3.5 p-2.5 pr-4 bg-[var(--toss-card)] border rounded-[16px] cursor-pointer transition-all group min-w-0
+        relative flex flex-row items-center gap-3.5 p-2.5 pr-4 bg-[var(--toss-card)] border rounded-[16px] transition-all group min-w-0
         border-[var(--toss-border)] shadow-sm hover:shadow-lg hover:border-[var(--toss-blue)] hover:-translate-y-0.5
         ${isAdmin ? 'border-l-4 border-l-[var(--toss-danger)]' : ''}
+        ${isEditMode ? 'cursor-grab active:cursor-grabbing hover:bg-zinc-50' : 'cursor-pointer'}
       `}
     >
       <div className={`w-[42px] h-[42px] shrink-0 rounded-[12px] flex items-center justify-center text-base overflow-hidden ${isAdmin ? 'bg-red-50 text-red-400' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] group-hover:bg-[var(--toss-blue-light)] group-hover:text-[var(--toss-blue)]'}`}>
@@ -482,11 +817,29 @@ function StaffCardRow({ staff, onClick }: any) {
           <span className="text-sm">印</span>
         )}
       </div>
-      <div className="flex flex-col justify-center min-w-0 text-left">
+      <div className="flex flex-col justify-center min-w-0 text-left pointer-events-none">
         <p className="font-semibold text-[var(--foreground)] text-sm truncate">{staff.name}</p>
         <p className="text-xs font-bold text-[var(--toss-gray-3)] truncate">{staff.position || '-'}</p>
       </div>
-      {isAdmin && <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-[var(--toss-danger)] rounded-full"></span>}
+      {isEditMode && (
+        <div className="flex flex-col gap-1 ml-auto pointer-events-auto">
+          <button
+            title="위로 이동"
+            onClick={(e) => { e.stopPropagation(); onMoveStaff?.(staff, 'up'); }}
+            className="w-6 h-6 flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 rounded-md hover:bg-[var(--toss-blue)] hover:text-white transition-colors text-[10px]"
+          >
+            ▲
+          </button>
+          <button
+            title="아래로 이동"
+            onClick={(e) => { e.stopPropagation(); onMoveStaff?.(staff, 'down'); }}
+            className="w-6 h-6 flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 rounded-md hover:bg-[var(--toss-blue)] hover:text-white transition-colors text-[10px]"
+          >
+            ▼
+          </button>
+        </div>
+      )}
+      {isAdmin && !isEditMode && <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-[var(--toss-danger)] rounded-full"></span>}
     </div>
   );
 }

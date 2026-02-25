@@ -97,6 +97,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
           apply_insurance: true,
           attendance_deduction: total,
           attendance_deduction_detail: { ...detail, original_deduction: total },
+          custom_deduction: 0,
           advance_pay: 0,
         };
       });
@@ -156,14 +157,16 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
       income_tax = Math.floor(total_taxable * 0.03);  // 소득세 간이세액표 근사
       local_tax = Math.floor(income_tax * 0.1 / 10) * 10; // 지방소득세 10%, 10원 단위 절사 (국고금관리법 제47조)
     }
-    const deduction = national_pension + health_insurance + long_term_care + employment_insurance + income_tax + local_tax;
+    const custom_deduction = Number(data.custom_deduction) || 0;
+    const deduction = national_pension + health_insurance + long_term_care + employment_insurance + income_tax + local_tax + custom_deduction;
     const deductionDetail = {
       national_pension,
       health_insurance,
       long_term_care,
       employment_insurance,
       income_tax,
-      local_tax
+      local_tax,
+      custom_deduction
     };
 
     return {
@@ -317,13 +320,17 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
                         <input type="number" value={Number(data.overtime_pay) + Number(data.bonus)} onChange={(e) => updateData(s.id, 'overtime_pay', e.target.value)} className="w-full h-9 px-3 border border-[var(--toss-border)] rounded-md text-sm" />
                       </div>
                       <div className="space-y-1">
+                        <label className="text-xs font-medium text-[var(--toss-gray-4)]">비과세 합계</label>
+                        <div className="h-9 px-3 flex items-center bg-[var(--toss-gray-1)] border border-[var(--toss-border)] rounded-md text-sm font-medium text-[var(--foreground)]">₩ {(isAdvanceOnly ? 0 : res.taxfree).toLocaleString()}</div>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-amber-700">기타 공제 (원)</label>
+                        <input type="number" min={0} value={Number(data.custom_deduction) || 0} onChange={(e) => updateData(s.id, 'custom_deduction', Number(e.target.value) || 0)} className="w-full h-9 px-3 border border-amber-200 rounded-md text-sm focus:ring-2 focus:ring-amber-400" placeholder="0" />
+                      </div>
+                      <div className="space-y-1">
                         <label className="text-xs font-medium text-amber-700">선지급 (원)</label>
                         <input type="number" min={0} value={advancePay} onChange={(e) => updateData(s.id, 'advance_pay', Number(e.target.value) || 0)} className="w-full h-9 px-3 border border-amber-200 rounded-md text-sm focus:ring-2 focus:ring-amber-400" placeholder="0" />
                         <p className="text-[11px] text-[var(--toss-gray-3)]">0 초과 시 해당 월 선지급만 적용</p>
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-xs font-medium text-[var(--toss-gray-4)]">비과세 합계</label>
-                        <div className="h-9 px-3 flex items-center bg-[var(--toss-gray-1)] border border-[var(--toss-border)] rounded-md text-sm font-medium text-[var(--foreground)]">₩ {(isAdvanceOnly ? 0 : res.taxfree).toLocaleString()}</div>
                       </div>
                       {(data.attendance_deduction !== undefined && (data.attendance_deduction > 0 || data.attendance_deduction_detail?.original_deduction > 0)) && (
                         <div className="sm:col-span-2 lg:col-span-3 space-y-1">

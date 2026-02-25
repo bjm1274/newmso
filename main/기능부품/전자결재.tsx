@@ -17,7 +17,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const [approverLine, setApproverLine] = useState<any[]>([]);
   const [extraData, setExtraData] = useState<any>({});
 
-  const isMso = user?.company === 'SY INC.' || user?.permissions?.mso === true;
+  const isMso = user?.company === '운영본부' || user?.permissions?.mso === true;
 
   const fetchApprovals = async () => {
     let query = supabase.from('approvals').select('*').order('created_at', { ascending: false });
@@ -291,7 +291,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
 
                     <div className="space-y-4">
                       <div className="flex bg-slate-100 p-1 rounded-xl mb-4">
-                        {['전체', 'SY INC.', '수연의원'].map(co => (
+                        {['전체', '운영본부', '수연의원'].map(co => (
                           <button
                             key={co}
                             onClick={() => setSelectedCo(co)}

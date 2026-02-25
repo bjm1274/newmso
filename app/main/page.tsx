@@ -203,6 +203,18 @@ function MainPageContent() {
       }
       const { data: postData } = await postQuery;
 
+      // 현재 사용자의 변경된 정보(팀/부서 등)가 있으면 세션 동기화
+      if (staffData && u?.id) {
+        const updatedSelf = staffData.find((s: any) => s.id === u.id);
+        if (updatedSelf && JSON.stringify(updatedSelf) !== JSON.stringify(u)) {
+          // 상태 및 스토리지 업데이트
+          setUser(updatedSelf);
+          localStorage.setItem('erp_user', JSON.stringify(updatedSelf));
+          // user_session도 같이 갱신 (호환성)
+          localStorage.setItem('user_session', JSON.stringify(updatedSelf));
+        }
+      }
+
       const uniqueDepts = Array.from(new Set((staffData || []).map((s: any) => s.department)))
         .filter(Boolean)
         .map(d => ({ name: d }));
@@ -317,8 +329,10 @@ function MainPageContent() {
         <NotificationSystem
           user={user}
           onOpenChatRoom={(roomId) => { setMainMenu('채팅'); setInitialOpenChatRoomId(roomId); }}
+          onOpenMessage={(roomId, messageId) => { setMainMenu('채팅'); setInitialOpenChatRoomId(roomId); setInitialOpenMessageId(messageId); }}
           onOpenApproval={() => setMainMenu('전자결재')}
           onOpenBoard={(boardId) => { setMainMenu('게시판'); if (boardId) setInitialBoardView(boardId); }}
+          onOpenPost={(boardId, postId) => { setMainMenu('게시판'); if (boardId) setInitialBoardView(boardId); setInitialOpenPostId(postId); }}
         />
 
         {loading && (
