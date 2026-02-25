@@ -19,10 +19,8 @@ export const SUB_MENUS: Record<string, { id: string; label: string; group?: stri
     { id: '공지사항', label: '📢 공지사항' },
     { id: '자유게시판', label: '💬 자유게시판' },
     { id: '경조사', label: '🎉 경조사' },
-    { id: '근무현황', label: '👥 근무현황' },
     { id: '수술일정', label: '🏥 수술일정' },
     { id: 'MRI일정', label: '🔬 MRI일정' },
-    { id: '사내위키', label: '📖 사내위키' },
   ],
   전자결재: [
     { id: '기안함', label: '📥 기안함' },
@@ -85,6 +83,9 @@ export default function Sidebar({ user, mainMenu, subView, onMenuChange, onOpenN
   const canSeeMenu = (menuId: string) => {
     if (menuId === '관리자') {
       return isMso || user?.role === 'admin' || p.menu_관리자 === true;
+    }
+    if (menuId === '인사관리') {
+      return isMso || p.hr === true || p.menu_인사관리 === true;
     }
     // 개별 메뉴가 명시적으로 false인 경우에만 숨김
     if (p[`menu_${menuId}`] === false) return false;

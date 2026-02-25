@@ -63,7 +63,7 @@ export default function MainContent({ user, mainMenu, data, subView, setSubView,
     }
   };
 
-  const isMso = user?.company === 'SY INC.' || user?.permissions?.mso === true;
+  const isMso = user?.company === '운영본부' || user?.permissions?.mso === true;
   const hospitalCompanies = (companies || []).filter((c: any) => c.type !== 'MSO');
 
   return (

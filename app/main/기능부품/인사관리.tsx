@@ -109,6 +109,18 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
     );
   }
 
+  if (!hasAccess) {
+    return (
+      <div className="flex w-full h-full items-center justify-center bg-[var(--background)]">
+        <div className="text-center">
+          <span className="text-4xl mb-4 block">🔒</span>
+          <h2 className="text-lg font-bold text-[var(--foreground)] mb-2">접근 권한이 없습니다</h2>
+          <p className="text-sm text-[var(--toss-gray-4)]">인사관리 기능에 접근하려면 담당자 권한이 필요합니다.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-row h-full min-h-0 app-page overflow-hidden">
       {/* 상단/좌측: 인사관리 메뉴 + 하단 사업자/직원상태 필터 (모바일: 상단 가로 스크롤, PC: 좌측 사이드바) */}

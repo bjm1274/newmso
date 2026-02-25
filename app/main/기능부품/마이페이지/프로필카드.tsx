@@ -14,10 +14,10 @@ export default function MyProfileCard({ user: initialUser, onOpenApproval }: any
   const [editForm, setEditForm] = useState({
     email: initialUser?.email || '',
     phone: initialUser?.phone || '',
-    extension: initialUser?.extension || '',
+    extension: initialUser?.extension || initialUser?.permissions?.extension || '',
     address: initialUser?.address || '',
     bank_name: initialUser?.bank_name || '',
-    account_no: initialUser?.account_no || '',
+    bank_account: initialUser?.bank_account || '',
   });
   // 다크모드 토글은 사용하지 않도록 제거 (항상 라이트 모드)
 
@@ -36,10 +36,10 @@ export default function MyProfileCard({ user: initialUser, onOpenApproval }: any
       setEditForm({
         email: user.email || '',
         phone: user.phone || '',
-        extension: user.extension || '',
+        extension: user.extension || user.permissions?.extension || '',
         address: user.address || '',
         bank_name: user.bank_name || '',
-        account_no: user.account_no || '',
+        bank_account: user.bank_account || '',
       });
     }
   }, [user]);
@@ -201,6 +201,12 @@ export default function MyProfileCard({ user: initialUser, onOpenApproval }: any
         return;
       }
 
+      const { extension, ...otherForm } = editForm;
+      const updatedPermissions = {
+        ...(currentUser.permissions || {}),
+        extension: extension || null
+      };
+
       // 내 정보를 즉시 수정하지 않고, 인사팀 승인을 받기 위한 요청(ESS) 데이터 전송
       const { error } = await supabase
         .from('audit_logs')
@@ -210,7 +216,10 @@ export default function MyProfileCard({ user: initialUser, onOpenApproval }: any
           action: '인사변경', // 임시로 인사변경 액션 사용
           target_type: 'ESS_PROFILE_UPDATE_PENDING',
           target_id: String(currentUser.id),
-          details: { requested_changes: editForm, original_data: currentUser },
+          details: {
+            requested_changes: { ...otherForm, permissions: updatedPermissions },
+            original_data: currentUser
+          },
           created_at: new Date().toISOString()
         }]);
 
@@ -336,7 +345,7 @@ export default function MyProfileCard({ user: initialUser, onOpenApproval }: any
               <div className="grid grid-cols-1 min-[480px]:grid-cols-2 gap-x-6 gap-y-5 pt-1">
                 <InfoItem label="이메일" value={user.email} />
                 <InfoItem label="연락처" value={user.phone} />
-                <InfoItem label="내선번호" value={user.extension} />
+                <InfoItem label="내선번호" value={user.extension || user.permissions?.extension} />
               </div>
             )}
           </div>
@@ -377,9 +386,9 @@ export default function MyProfileCard({ user: initialUser, onOpenApproval }: any
                       />
                       <input
                         type="text"
-                        value={editForm.account_no}
+                        value={editForm.bank_account}
                         onChange={(e) =>
-                          setEditForm((f) => ({ ...f, account_no: e.target.value }))
+                          setEditForm((f) => ({ ...f, bank_account: e.target.value }))
                         }
                         placeholder="계좌번호"
                         className="w-full px-3 py-2.5 rounded-[16px] border border-[var(--toss-border)] text-[13px] font-semibold text-[var(--foreground)] bg-[var(--input-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)]"
@@ -419,7 +428,7 @@ export default function MyProfileCard({ user: initialUser, onOpenApproval }: any
                     label="계좌정보"
                     value={
                       showSecret
-                        ? `${user.bank_name || ''} ${user.account_no || ''}`
+                        ? `${user.bank_name || ''} ${user.bank_account || ''}`
                         : '••••••••'
                     }
                     isMasked={!showSecret}

@@ -14,7 +14,7 @@ export default function FinancialDashboard() {
     const budgets = [
         { name: '마케팅본부', total: 500000000, used: 210000000 },
         { name: '개발본부', total: 800000000, used: 650000000 },
-        { name: '경영지원본부', total: 300000000, used: 120000000 },
+        { name: '운영본부', total: 300000000, used: 120000000 },
         { name: '디자인팀', total: 150000000, used: 140000000 },
     ];
 

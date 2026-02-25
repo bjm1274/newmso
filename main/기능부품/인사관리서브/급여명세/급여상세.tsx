@@ -58,7 +58,7 @@ export default function SalaryDetail({ record, staff }: any) {
       <div className="p-8 md:p-10 bg-gray-900 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <span className="px-3 py-1 bg-blue-600 text-white text-[10px] font-black rounded-lg uppercase tracking-widest">{staff?.company || 'SY INC.'}</span>
+            <span className="px-3 py-1 bg-blue-600 text-white text-[10px] font-black rounded-lg uppercase tracking-widest">{staff?.company || '운영본부'}</span>
             <h3 className="text-2xl font-black tracking-tighter italic">급여 명세서</h3>
           </div>
           <p className="text-xs font-bold text-gray-400">{data.year_month}분 (Salary Statement)</p>
@@ -131,10 +131,10 @@ export default function SalaryDetail({ record, staff }: any) {
         <div className="pt-10 border-t border-gray-100 flex flex-col md:flex-row justify-between items-center gap-6">
           <p className="text-[11px] font-bold text-gray-400 leading-relaxed text-center md:text-left">
             * 본 명세서는 법적 효력을 갖는 전자 문서입니다.<br/>
-            * 급여 관련 문의는 SY INC. 경영지원팀으로 연락 바랍니다.
+            * 급여 관련 문의는 운영본부 경영지원팀으로 연락 바랍니다.
           </p>
           <div className="relative flex items-center gap-4">
-            <p className="text-sm font-black text-gray-900 tracking-widest">{staff?.company || 'SY INC.'} 대표원장</p>
+            <p className="text-sm font-black text-gray-900 tracking-widest">{staff?.company || '운영본부'} 대표원장</p>
             <div className="w-14 h-14 border-4 border-red-600/30 rounded-full flex items-center justify-center text-red-600/50 font-black text-[10px] rotate-12 border-double">
               (인)
             </div>

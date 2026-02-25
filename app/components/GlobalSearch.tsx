@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 
 type SearchResult = {
-  type: 'staff' | 'post' | 'approval' | 'message';
+  type: 'staff' | 'post' | 'approval' | 'message' | 'handover';
   id: string;
   title: string;
   subtitle?: string;
@@ -103,6 +103,20 @@ export default function GlobalSearch({
         );
       }
 
+      // 병동팀 한정 인계노트 검색
+      if (user?.department === '병동팀') {
+        const { data: notes } = await supabase
+          .from('handover_notes')
+          .select('id, content, author_name, created_at')
+          .ilike('content', term)
+          .order('created_at', { ascending: false })
+          .limit(5);
+
+        (notes || []).forEach((n: any) =>
+          list.push({ type: 'handover', id: n.id, title: (n.content || '').slice(0, 60), subtitle: `[인계] ${n.author_name}`, meta: n.created_at.slice(0, 10).replace(/-/g, '.') })
+        );
+      }
+
       setResults(list);
       setActiveIdx(0);
     } catch (e) {
@@ -131,14 +145,13 @@ export default function GlobalSearch({
     }
   };
 
-  const typeLabel: Record<string, string> = { staff: '👤 직원', post: '📋 게시글', approval: '✍️ 결재', message: '💬 채팅' };
+  const typeLabel: Record<string, string> = { staff: '👤 직원', post: '📋 게시글', approval: '✍️ 결재', message: '💬 채팅', handover: '📝 인계' };
 
   const dropdown = open && (variant === 'icon' ? true : query.length >= 2 || results.length > 0) ? (
     <div
       ref={listRef}
-      className={`absolute z-[999] bg-[var(--toss-card)] rounded-[12px] shadow-lg border border-[var(--toss-border)] overflow-hidden max-h-[320px] overflow-y-auto ${
-        variant === 'icon' ? 'left-full top-0 ml-1 min-w-[280px]' : 'top-full left-0 right-0 mt-1'
-      }`}
+      className={`absolute z-[999] bg-[var(--toss-card)] rounded-[12px] shadow-lg border border-[var(--toss-border)] overflow-hidden max-h-[320px] overflow-y-auto ${variant === 'icon' ? 'left-full top-0 ml-1 min-w-[280px]' : 'top-full left-0 right-0 mt-1'
+        }`}
     >
       {variant === 'icon' && (
         <div className="p-2 border-b border-[var(--toss-border)]">

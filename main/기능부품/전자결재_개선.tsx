@@ -30,7 +30,7 @@ export default function ApprovalSystemImproved({ user, onRefresh }: any) {
       .order('created_at', { ascending: false });
     
     // MSO 직원이 아닌 경우 자기 회사 데이터만 조회
-    if (user.company !== 'SY INC.' && !user.permissions?.mso) {
+    if (user.company !== '운영본부' && !user.permissions?.mso) {
       query = query.eq('sender_company', user.company);
     }
 
@@ -193,7 +193,7 @@ export default function ApprovalSystemImproved({ user, onRefresh }: any) {
     <div className="space-y-6 p-8 bg-white h-full overflow-y-auto custom-scrollbar">
       <header className="flex justify-between items-center mb-8">
         <div>
-          <h2 className="text-2xl font-black text-gray-800 tracking-tighter italic">SY INC. 전자결재</h2>
+          <h2 className="text-2xl font-black text-gray-800 tracking-tighter italic">운영본부 전자결재</h2>
           <p className="text-xs text-blue-600 font-bold uppercase mt-1">MSO 통합 행정 승인 시스템</p>
         </div>
         <div className="bg-blue-50 px-4 py-2 border border-blue-100 rounded-xl">

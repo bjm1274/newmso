@@ -5,7 +5,7 @@ export default function OrgChart({ staffs = [], selectedCo, setSelectedCo }: any
   const [selectedMember, setSelectedMember] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
   
-  const companies = ['전체', 'SY INC.', '박철홍정형외과', '수연의원'];
+  const companies = ['전체', '운영본부', '박철홍정형외과', '수연의원'];
 
   const hospitalStructure = [
     { name: '진료부', teams: ['진료부', '진료팀'] },
@@ -36,7 +36,7 @@ export default function OrgChart({ staffs = [], selectedCo, setSelectedCo }: any
 
     const coStaffs = filtered.filter((s: any) => s.company === currentCo);
     
-    if (currentCo === 'SY INC.') {
+    if (currentCo === '운영본부') {
       const director = coStaffs.find((s: any) => s.position === '본부장' || s.employee_no === 100);
       const departments = msoStructure.map(dept => ({
         deptName: dept.name,

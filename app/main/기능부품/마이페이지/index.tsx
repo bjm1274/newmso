@@ -324,8 +324,8 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
           </div>
         </div>
 
-        {/* 통합 탭 네비게이션 (모바일 가로 슬라이드) */}
-        <div className="flex bg-[var(--toss-card)] p-1.5 rounded-full shadow-sm border border-[var(--toss-border)] gap-1 w-full overflow-x-auto no-scrollbar scroll-smooth">
+        {/* 통합 탭 네비게이션 (가로 스크롤 레이아웃) */}
+        <div className="flex justify-around md:justify-start bg-[var(--toss-card)] p-1 rounded-2xl shadow-sm border border-[var(--toss-border)] w-full md:w-fit">
           <TabButton
             isActive={activeTab === 'profile'}
             onClick={() => setActiveTab('profile')}
@@ -344,12 +344,12 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
           <TabButton
             isActive={activeTab === 'certificates'}
             onClick={() => setActiveTab('certificates')}
-            label="증명서" icon="📄" // [추가] 신규 탭
+            label="증명서" icon="📄"
           />
           <TabButton
             isActive={activeTab === 'salary'}
             onClick={() => setActiveTab('salary')}
-            label="급여명세서" icon="💰"
+            label="급여" icon="💰"
           />
           <TabButton
             isActive={activeTab === 'notifications'}
@@ -390,11 +390,11 @@ function TabButton({ isActive, onClick, label, icon }: any) {
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-200 whitespace-nowrap
+      className={`flex flex-col md:flex-row items-center gap-1 md:gap-2 px-1.5 md:px-5 py-2 md:py-2.5 rounded-xl md:rounded-full text-[10px] md:text-sm font-bold transition-all duration-200 whitespace-nowrap
         ${isActive ? 'bg-[var(--toss-blue)] text-white shadow-md' : 'bg-transparent text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]'}
       `}
     >
-      <span>{icon}</span>
+      <span className="text-sm md:text-base">{icon}</span>
       <span>{label}</span>
     </button>
   );

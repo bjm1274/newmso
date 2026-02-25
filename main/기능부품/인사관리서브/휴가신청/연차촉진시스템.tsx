@@ -65,7 +65,7 @@ export default function AnnualLeavePromotion({ staffs, selectedCo }: any) {
       // 2. 전자결재 양식 자동 생성 (촉진 서류)
       await supabase.from('approvals').insert([{
         sender_id: 'SYSTEM',
-        sender_name: 'SY INC. 시스템',
+        sender_name: '운영본부 시스템',
         receiver_id: staff.id,
         type: '연차촉진',
         title: `[통보] 연차사용촉진 및 사용계획 제출 요청 (${staff.name})`,

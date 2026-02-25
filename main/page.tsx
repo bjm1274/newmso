@@ -56,13 +56,13 @@ export default function MainPage() {
     if (savedMenu) setMainMenu(savedMenu);
     if (savedSubView) setSubView(savedSubView);
 
-    if (parsedUser.company !== 'SY INC.' && !parsedUser.permissions?.mso) {
+    if (parsedUser.company !== '운영본부' && !parsedUser.permissions?.mso) {
       setSelectedCo(parsedUser.company);
     } else if (savedCo) {
       setSelectedCo(savedCo);
     }
 
-    if (parsedUser?.company === 'SY INC.' || parsedUser?.permissions?.mso) {
+    if (parsedUser?.company === '운영본부' || parsedUser?.permissions?.mso) {
       supabase.from('companies').select('id, name, type').eq('is_active', true).order('type').then(({ data: list }) => {
         setCompanies(list || []);
       });
@@ -90,7 +90,7 @@ export default function MainPage() {
     setLoading(true);
     const u = currentUser ?? user;
     try {
-      const isMso = u?.company === 'SY INC.' || u?.permissions?.mso === true;
+      const isMso = u?.company === '운영본부' || u?.permissions?.mso === true;
       const filterCompanyId = isMso ? companyIdFilter : u?.company_id;
 
       let staffQuery = supabase.from('staff_members').select('*').order('employee_no', { ascending: true });
@@ -129,7 +129,7 @@ export default function MainPage() {
           <div className="absolute inset-0 border-4 border-blue-100 rounded-full"></div>
           <div className="absolute inset-0 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
         </div>
-        <h2 className="text-xl font-black text-gray-900 mb-2 tracking-tighter italic">SY INC. 통합 시스템</h2>
+        <h2 className="text-xl font-black text-gray-900 mb-2 tracking-tighter italic">운영본부 통합 시스템</h2>
         <p className="text-xs font-bold text-gray-400 animate-pulse tracking-widest">데이터를 안전하게 동기화하고 있습니다...</p>
       </div>
     );
