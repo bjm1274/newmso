@@ -11,6 +11,10 @@ import AssetLoanManager from './인사관리서브/비품장비대여관리';
 import ContractMain from './인사관리서브/계약관리';
 import 문서보관함 from './인사관리서브/문서보관함';
 import EducationMain from './인사관리서브/교육관리';
+import ShiftCalendar from './인사관리서브/시프트캘린더';
+import DocumentScanner from './인사관리서브/스마트서류제출';
+import OffboardingView from './인사관리서브/오프보딩';
+import TaxFileGenerator from './인사관리서브/원천징수파일생성';
 
 // 기본 함수 이름을 영문 대문자로 시작하도록 변경해
 // React ESLint 규칙을 만족시킵니다. default export 이므로
@@ -19,7 +23,7 @@ const HR_TAB_KEY = 'erp_hr_tab';
 const HR_COMPANY_KEY = 'erp_hr_company';
 const HR_STATUS_KEY = 'erp_hr_status';
 
-const HR_MENU_IDS = ['구성원', '계약', '문서보관함', '교육', '근태', '급여', '연차/휴가', '캘린더', '비품대여', '증명서'];
+const HR_MENU_IDS = ['구성원', '계약', '문서보관함', '교육', '근태', '교대근무', '급여', '연차/휴가', '캘린더', '비품대여', '증명서', '서류제출', '오프보딩', '원천징수파일'];
 
 export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu }: any) {
   const [현재메뉴, 메뉴설정] = useState(initialMenu && HR_MENU_IDS.includes(initialMenu) ? initialMenu : '구성원');
@@ -38,11 +42,13 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
     { id: '문서보관함', perm: 'hr_문서보관함' },
     { id: '교육', perm: 'hr_교육' },
     { id: '근태', perm: 'hr_근태' },
+    { id: '교대근무', perm: 'hr_교대근무' },
     { id: '급여', perm: 'hr_급여' },
     { id: '연차/휴가', perm: 'hr_연차휴가' },
     { id: '캘린더', perm: 'hr_캘린더' },
     { id: '비품대여', perm: 'hr_비품대여' },
-    { id: '증명서', perm: 'hr_증명서' }
+    { id: '증명서', perm: 'hr_증명서' },
+    { id: '원천징수파일', perm: 'hr_급여' }
   ];
   const visibleHrTabs = HR_TABS.filter(t => p[t.perm] !== false);
   const activeMenu = visibleHrTabs.some(t => t.id === 현재메뉴) ? 현재메뉴 : (visibleHrTabs[0]?.id || '구성원');
@@ -114,8 +120,8 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
               key={id}
               onClick={() => 메뉴설정(id)}
               className={`flex-none md:w-full px-4 md:px-3 py-2 md:py-2.5 text-[11px] font-bold rounded-[12px] transition-all text-center md:text-left whitespace-nowrap ${activeMenu === id
-                  ? 'bg-[var(--toss-blue)] text-white shadow-md'
-                  : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
+                ? 'bg-[var(--toss-blue)] text-white shadow-md'
+                : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
                 }`}
             >
               {id}
@@ -189,6 +195,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
               <AttendanceMain staffs={staffs} selectedCo={선택사업체} />
             </div>
           )}
+          {activeMenu === '교대근무' && <ShiftCalendar staffs={staffs} selectedCo={선택사업체} />}
           {activeMenu === '급여' && <PayrollMain staffs={staffs} selectedCo={선택사업체} />}
           {activeMenu === '연차/휴가' && <LeaveManagement staffs={staffs} selectedCo={선택사업체} />}
           {activeMenu === '캘린더' && (
@@ -209,6 +216,21 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
           {activeMenu === '증명서' && (
             <div className="p-4 md:p-10">
               <CertificateGenerator staffs={staffs} />
+            </div>
+          )}
+          {activeMenu === '서류제출' && (
+            <div className="p-4 md:p-10">
+              <DocumentScanner user={user} staffs={staffs} />
+            </div>
+          )}
+          {activeMenu === '오프보딩' && (
+            <div className="p-4 md:p-10">
+              <OffboardingView staffs={staffs} onRefresh={onRefresh} />
+            </div>
+          )}
+          {activeMenu === '원천징수파일' && (
+            <div className="p-4 md:p-10">
+              <TaxFileGenerator staffs={staffs} selectedCo={선택사업체} />
             </div>
           )}
         </section>

@@ -137,13 +137,17 @@ export function sendNotification(title: string, options?: NotificationOptions) {
 export default function NotificationSystem({
   user,
   onOpenChatRoom,
+  onOpenMessage,
   onOpenApproval,
   onOpenBoard,
+  onOpenPost,
 }: {
   user: any;
   onOpenChatRoom?: (roomId: string) => void;
+  onOpenMessage?: (roomId: string, messageId: string) => void;
   onOpenApproval?: () => void;
   onOpenBoard?: (boardId?: string) => void;
+  onOpenPost?: (boardId: string, postId: string) => void;
 }) {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -527,13 +531,25 @@ export default function NotificationSystem({
             onClick={() => {
               markAsRead(notif.id);
               if ((notif.type === 'message' || notif.type === 'mention') && notif.data?.room_id && onOpenChatRoom) {
-                onOpenChatRoom(notif.data.room_id);
+                if (notif.data.id && onOpenMessage) {
+                  onOpenMessage(notif.data.room_id, notif.data.id);
+                } else {
+                  onOpenChatRoom(notif.data.room_id);
+                }
               } else if (notif.type === 'approval' && onOpenApproval) {
                 onOpenApproval();
               } else if (notif.type === 'board' && onOpenBoard) {
-                onOpenBoard();
+                if (notif.data?.post_id && onOpenPost) {
+                  onOpenPost(notif.data.board_type || '공지사항', notif.data.post_id);
+                } else {
+                  onOpenBoard(notif.data?.board_type);
+                }
               } else if (notif.type === 'notification' && notif.body?.includes('게시물')) {
-                if (onOpenBoard) onOpenBoard();
+                if (notif.data?.post_id && onOpenPost) {
+                  onOpenPost(notif.data.board_type || '공지사항', notif.data.post_id);
+                } else if (onOpenBoard) {
+                  onOpenBoard(notif.data?.board_type || '공지사항');
+                }
               } else {
                 // 일반 알림은 특별한 이동 처리가 필요하지 않으면 클릭 시 닫기만 수행
               }

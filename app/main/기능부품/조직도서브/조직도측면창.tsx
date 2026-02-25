@@ -5,7 +5,7 @@ import GlobalNotificationBell from '@/app/components/GlobalNotificationBell';
 const MYPAGE_TAB_KEY = 'erp_mypage_tab';
 
 /** 상세 메뉴가 있는 메뉴 정의 (페이지 우측 본문에서 사용, 전역 상수로 export) */
-export const SUB_MENUS: Record<string, { id: string; label: string }[]> = {
+export const SUB_MENUS: Record<string, { id: string; label: string; group?: string }[]> = {
   재고관리: [
     { id: 'UDI', label: '📡 UDI' },
     { id: '명세서', label: '📄 명세서' },
@@ -22,6 +22,7 @@ export const SUB_MENUS: Record<string, { id: string; label: string }[]> = {
     { id: '근무현황', label: '👥 근무현황' },
     { id: '수술일정', label: '🏥 수술일정' },
     { id: 'MRI일정', label: '🔬 MRI일정' },
+    { id: '사내위키', label: '📖 사내위키' },
   ],
   전자결재: [
     { id: '기안함', label: '📥 기안함' },
@@ -39,19 +40,24 @@ export const SUB_MENUS: Record<string, { id: string; label: string }[]> = {
     { id: '캘린더', label: '캘린더' },
     { id: '비품대여', label: '비품대여' },
     { id: '증명서', label: '증명서' },
+    { id: '서류제출', label: '서류제출' },
+    { id: '오프보딩', label: '오프보딩' },
+    { id: '원천징수파일', label: '세무 신고 파일' },
   ],
   관리자: [
-    { id: '경영대시보드', label: '📊 대시보드' },
-    { id: '엑셀등록', label: '📁 엑셀 일괄' },
-    { id: '알림자동화', label: '🔔 알림 자동화' },
-    { id: '연차부여', label: '🏖️ 연차 부여' },
-    { id: '회사관리', label: '🏢 회사/조직' },
-    { id: '직원권한', label: '직원·권한' },
-    { id: '수술검사템플릿', label: '수술·검사명' },
-    { id: '팝업관리', label: '팝업' },
-    { id: '감사로그', label: '감사 로그' },
-    { id: '데이터백업', label: '백업/복원' },
-    { id: '데이터초기화', label: '초기화' },
+    { id: '경영대시보드', label: '분석 요약', group: '📊 대시보드' },
+    { id: '재무대시보드', label: 'C레벨 재무', group: '📊 대시보드' },
+    { id: '회사관리', label: '회사/조직', group: '👥 인사·권한' },
+    { id: '직원권한', label: '직원·권한', group: '👥 인사·권한' },
+    { id: '연차부여', label: '연차 부여', group: '👥 인사·권한' },
+    { id: '알림자동화', label: '알림 자동화', group: '🛠️ 시스템 설정' },
+    { id: '수술검사템플릿', label: '수술·검사명', group: '🛠️ 시스템 설정' },
+    { id: '팝업관리', label: '팝업', group: '🛠️ 시스템 설정' },
+    { id: '양식빌더', label: '양식 빌더', group: '🛠️ 시스템 설정' },
+    { id: '엑셀등록', label: '엑셀 일괄', group: '📁 데이터 관리' },
+    { id: '감사로그', label: '감사 로그', group: '📁 데이터 관리' },
+    { id: '데이터백업', label: '백업/복원', group: '📁 데이터 관리' },
+    { id: '데이터초기화', label: '초기화', group: '📁 데이터 관리' },
   ],
 };
 

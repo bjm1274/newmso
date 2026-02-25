@@ -21,6 +21,50 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     meal_allowance: 0, night_duty_allowance: 0, vehicle_allowance: 0, childcare_allowance: 0, research_allowance: 0, other_taxfree: 0, position_allowance: 0
   });
 
+  // ESS (직원 셀프 서비스) 승인 대기함 관련
+  const [essRequests, setEssRequests] = useState<any[]>([]);
+  const [showEssModal, setShowEssModal] = useState(false);
+
+  useEffect(() => {
+    const fetchEssRequests = async () => {
+      const { data } = await supabase
+        .from('audit_logs')
+        .select('*')
+        .eq('target_type', 'ESS_PROFILE_UPDATE_PENDING')
+        .order('created_at', { ascending: false });
+      if (data) setEssRequests(data);
+    };
+    fetchEssRequests();
+  }, [새로고침]);
+
+  const handleApproveEss = async (request: any) => {
+    if (!confirm(`${request.user_name}님의 정보 변경 요청을 승인하시겠습니까?`)) return;
+    try {
+      const updates = request.details.requested_changes;
+      // 1. 실제 직원 정보 업데이트
+      await supabase.from('staff_members').update(updates).eq('id', request.target_id);
+      // 2. 요청 상태 변경
+      await supabase.from('audit_logs').update({ target_type: 'ESS_PROFILE_UPDATE_APPROVED' }).eq('id', request.id);
+
+      alert('승인되었습니다.');
+      setEssRequests(prev => prev.filter(r => r.id !== request.id));
+      새로고침();
+    } catch (error) {
+      alert('승인 처리 중 오류 발생');
+    }
+  };
+
+  const handleRejectEss = async (request: any) => {
+    if (!confirm(`${request.user_name}님의 정보 변경 요청을 반려하시겠습니까?`)) return;
+    try {
+      await supabase.from('audit_logs').update({ target_type: 'ESS_PROFILE_UPDATE_REJECTED' }).eq('id', request.id);
+      alert('반려되었습니다.');
+      setEssRequests(prev => prev.filter(r => r.id !== request.id));
+    } catch (error) {
+      alert('반려 처리 중 오류 발생');
+    }
+  };
+
   useEffect(() => {
     const fetchShifts = async () => {
       const { data } = await supabase.from('work_shifts').select('*');
@@ -159,13 +203,26 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
               : '재직 중인 직원만 표시됩니다.'}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => onOpenNewStaff && onOpenNewStaff()}
-          className="shrink-0 bg-[var(--toss-blue)] text-white px-5 py-2.5 text-[11px] font-bold rounded-[12px] shadow-md hover:opacity-95 transition-all"
-        >
-          신규 직원 등록
-        </button>
+        <div className="flex items-center gap-3 shrink-0">
+          {essRequests.length > 0 && (
+            <button
+              onClick={() => setShowEssModal(true)}
+              className="relative bg-amber-100 text-amber-800 px-4 py-2 text-[11px] font-bold rounded-[12px] hover:bg-amber-200 transition-all shadow-sm ring-1 ring-amber-300"
+            >
+              내정보 변경 요청
+              <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white flex items-center justify-center rounded-full text-[10px] shadow-sm animate-bounce">
+                {essRequests.length}
+              </span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => onOpenNewStaff && onOpenNewStaff()}
+            className="bg-[var(--toss-blue)] text-white px-5 py-2.5 text-[11px] font-bold rounded-[12px] shadow-md hover:opacity-95 transition-all"
+          >
+            신규 직원 등록
+          </button>
+        </div>
       </header>
 
       <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
@@ -294,14 +351,14 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
               <h3 className="text-xl md:text-2xl font-semibold text-[var(--foreground)] tracking-tighter italic">{편집모드 ? '구성원 정보 수정' : '신규 직원 등록'}</h3>
               <button onClick={닫기함수} className="text-[var(--toss-gray-3)] hover:text-red-500 text-2xl">✕</button>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <div className="space-y-4">
                 <h4 className="text-[11px] font-semibold text-[var(--toss-blue)] uppercase tracking-widest">기본 인적 사항</h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-[11px] font-semibold text-[var(--toss-gray-3)]">성명 *</label>
-                    <input type="text" value={신규직원.성명} onChange={e => 신규직원설정({...신규직원, 성명: e.target.value})} className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[12px] border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-[var(--toss-blue)]/30" />
+                    <input type="text" value={신규직원.성명} onChange={e => 신규직원설정({ ...신규직원, 성명: e.target.value })} className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[12px] border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-[var(--toss-blue)]/30" />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[11px] font-semibold text-[var(--toss-gray-3)]">주민번호</label>
@@ -362,7 +419,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                 </div>
                 <div className="space-y-1">
                   <label className="text-[11px] font-semibold text-[var(--toss-gray-3)]">주소</label>
-                  <input type="text" value={신규직원.주소} onChange={e => 신규직원설정({...신규직원, 주소: e.target.value})} className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[12px] border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-[var(--toss-blue)]/30" />
+                  <input type="text" value={신규직원.주소} onChange={e => 신규직원설정({ ...신규직원, 주소: e.target.value })} className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[12px] border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-[var(--toss-blue)]/30" />
                 </div>
               </div>
 
@@ -371,7 +428,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-[11px] font-semibold text-[var(--toss-gray-3)]">사업체</label>
-                    <select value={신규직원.사업체} onChange={e => 신규직원설정({...신규직원, 사업체: e.target.value, 팀: 팀목록가져오기(e.target.value)[0] ?? ''})} className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[12px] border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-[var(--toss-blue)]/30">
+                    <select value={신규직원.사업체} onChange={e => 신규직원설정({ ...신규직원, 사업체: e.target.value, 팀: 팀목록가져오기(e.target.value)[0] ?? '' })} className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[12px] border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-[var(--toss-blue)]/30">
                       <option value="박철홍정형외과">박철홍정형외과</option>
                       <option value="수연의원">수연의원</option>
                       <option value="SY INC.">SY INC.</option>
@@ -379,7 +436,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                   </div>
                   <div className="space-y-1">
                     <label className="text-[11px] font-semibold text-[var(--toss-gray-3)]">부서/팀</label>
-                    <select value={신규직원.팀} onChange={e => 신규직원설정({...신규직원, 팀: e.target.value})} className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[12px] border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-[var(--toss-blue)]/30">
+                    <select value={신규직원.팀} onChange={e => 신규직원설정({ ...신규직원, 팀: e.target.value })} className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[12px] border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-[var(--toss-blue)]/30">
                       <option value="">팀 선택 안함</option>
                       {팀목록가져오기(신규직원.사업체).map(팀 => <option key={팀} value={팀}>{팀}</option>)}
                     </select>
@@ -388,7 +445,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-[11px] font-semibold text-[var(--toss-gray-3)]">직함</label>
-                    <select value={신규직원.직함} onChange={e => 신규직원설정({...신규직원, 직함: e.target.value})} className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[12px] border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-[var(--toss-blue)]/30">
+                    <select value={신규직원.직함} onChange={e => 신규직원설정({ ...신규직원, 직함: e.target.value })} className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[12px] border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-[var(--toss-blue)]/30">
                       <option value="">선택</option>
                       <option value="사원">사원</option>
                       <option value="주임">주임</option>
@@ -423,7 +480,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                 </div>
                 <div className="space-y-1">
                   <label className="text-[11px] font-semibold text-[var(--toss-gray-3)]">근무 형태 (근무·휴게시간)</label>
-                  <select value={신규직원.근무형태ID} onChange={e => 신규직원설정({...신규직원, 근무형태ID: e.target.value})} className="w-full p-3 bg-[var(--toss-blue-light)] rounded-[12px] border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-[var(--toss-blue)]/30">
+                  <select value={신규직원.근무형태ID} onChange={e => 신규직원설정({ ...신규직원, 근무형태ID: e.target.value })} className="w-full p-3 bg-[var(--toss-blue-light)] rounded-[12px] border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-[var(--toss-blue)]/30">
                     <option value="">기본 근무 (09:00–18:00, 휴게 60분)</option>
                     {근무형태목록.filter((s: any) => s.company_name === 신규직원.사업체 || s.company === 신규직원.사업체).map((s: any) => (
                       <option key={s.id} value={s.id}>
@@ -486,6 +543,83 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
               <button onClick={닫기함수} className="flex-1 py-4 bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] rounded-[12px] font-semibold text-sm hover:opacity-90 transition-all">취소</button>
               <button onClick={정보저장} className="flex-[2] py-4 bg-[var(--toss-blue)] text-white rounded-[12px] font-semibold text-sm shadow-xl hover:scale-[0.99] active:scale-95 transition-all">정보 저장하기</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ESS 승인 대기함 모달 */}
+      {showEssModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[120] flex items-center justify-center p-4 min-h-screen" onClick={() => setShowEssModal(false)}>
+          <div className="bg-[var(--page-bg)] w-full max-w-3xl rounded-[24px] overflow-hidden shadow-2xl flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+            <div className="p-6 border-b border-[var(--toss-border)] flex justify-between items-center bg-[var(--toss-card)]">
+              <div>
+                <h3 className="text-lg font-bold text-[var(--foreground)]">내정보 변경 요청 (ESS)</h3>
+                <p className="text-xs text-[var(--toss-gray-3)] mt-1">직원들이 요청한 프로필 변경 사항을 검토하고 승인하세요.</p>
+              </div>
+              <button onClick={() => setShowEssModal(false)} className="text-[var(--toss-gray-3)] hover:text-red-500 text-xl font-bold">✕</button>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1 bg-[var(--toss-gray-1)]">
+              {essRequests.length === 0 ? (
+                <div className="py-20 text-center text-[var(--toss-gray-3)] font-medium text-sm">
+                  대기 중인 변경 요청이 없습니다.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {essRequests.map(req => {
+                    const changes = req.details.requested_changes || {};
+                    const original = req.details.original_data || {};
+                    // 바뀐 항목만 필터링
+                    const changedKeys = Object.keys(changes).filter(k => changes[k] !== original[k]);
+
+                    const fieldLabels: Record<string, string> = {
+                      email: '이메일', phone: '연락처', extension: '내선번호',
+                      address: '거주지 주소', bank_name: '급여 은행', account_no: '급여 계좌명'
+                    };
+
+                    return (
+                      <div key={req.id} className="bg-[var(--toss-card)] rounded-[16px] border border-[var(--toss-border)] shadow-sm p-5 space-y-4">
+                        <div className="flex justify-between items-center border-b border-[var(--toss-border)] pb-3">
+                          <div className="flex items-center gap-3">
+                            <span className="w-10 h-10 rounded-full bg-[var(--toss-blue-light)] text-[var(--toss-blue)] flex items-center justify-center font-bold">{req.user_name?.[0]}</span>
+                            <div>
+                              <p className="font-bold text-[var(--foreground)] text-sm">{req.user_name} <span className="text-xs font-medium text-[var(--toss-gray-3)] ml-1">님의 변경 요청</span></p>
+                              <p className="text-[10px] text-[var(--toss-gray-3)]">{new Date(req.created_at).toLocaleString()}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {changedKeys.length === 0 ? (
+                            <p className="text-xs text-[var(--toss-gray-4)] p-2">변경된 실질 항목이 없습니다.</p>
+                          ) : (
+                            changedKeys.map(k => (
+                              <div key={k} className="p-3 bg-[var(--toss-gray-1)] rounded-[12px] flex flex-col gap-1">
+                                <span className="text-[10px] font-bold text-[var(--toss-blue)] uppercase tracking-wider">{fieldLabels[k] || k}</span>
+                                <div className="text-xs font-semibold text-[var(--foreground)] break-words">
+                                  <span className="line-through text-[var(--toss-gray-3)] text-[11px] block">{original[k] || '(빈 값)'}</span>
+                                  <span className="text-emerald-600 block mt-0.5">→ {changes[k] || '(빈 값)'}</span>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+
+                        <div className="flex justify-end gap-2 pt-2">
+                          <button onClick={() => handleRejectEss(req)} className="px-5 py-2.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-[12px] font-semibold text-[11px] transition-colors">반려</button>
+                          <button onClick={() => handleApproveEss(req)} className="px-5 py-2.5 bg-emerald-500 text-white hover:bg-emerald-600 rounded-[12px] font-semibold text-[11px] transition-colors shadow-sm">승인하기</button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+            {essRequests.length > 0 && (
+              <div className="bg-[var(--toss-card)] p-4 border-t border-[var(--toss-border)] text-center">
+                <p className="text-xs font-semibold text-[var(--toss-gray-4)]">총 <span className="text-[var(--toss-blue)]">{essRequests.length}건</span>의 리뷰 대기 건이 있습니다.</p>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -7,16 +7,18 @@ import PurchaseOrderManagement from './재고관리서브/발주관리';
 import ScanModule from './재고관리서브/스캔모듈완성';
 import ProductRegistration from './재고관리서브/물품등록';
 import ExcelBulkUpload from './관리자전용서브/엑셀일괄등록';
+import InvoiceAutoExtraction from './관리자전용서브/명세서자동추출';
 import { useInventoryAlertSystem, InventoryAlertBadge } from './재고관리서브/재고알림시스템';
+import QRAssetManager from './재고관리서브/자산QR관리';
 
 const INV_VIEW_KEY = 'erp_inventory_view';
 
-const VALID_VIEWS = ['UDI', '명세서', '발주', '스캔', '등록', '현황', '이력'];
+const VALID_VIEWS = ['UDI', '명세서', '발주', '스캔', '등록', '현황', '이력', '자산'];
 
 export default function IntegratedInventoryManagement({ user, selectedCo, onRefresh, initialView }: any) {
-  const [activeView, setActiveView] = useState(initialView && VALID_VIEWS.includes(initialView) ? initialView : '현황'); 
+  const [activeView, setActiveView] = useState(initialView && VALID_VIEWS.includes(initialView) ? initialView : '현황');
   const [viewCompany, setViewCompany] = useState<string>('전체'); // 현황 탭용 회사 선택
-  const [selectedDept, setSelectedDept] = useState('전체'); 
+  const [selectedDept, setSelectedDept] = useState('전체');
   const [inventory, setInventory] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,7 +27,7 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
   const [stockAmount, setStockAmount] = useState(1);
   const [showLogs, setShowLogs] = useState(false);
   const [logs, setLogs] = useState<any[]>([]);
-  const [registrationMode, setRegistrationMode] = useState<'form' | 'excel'>('form');
+  const [registrationMode, setRegistrationMode] = useState<'form' | 'excel' | 'auto_extract'>('form');
 
   const { lowStockItems, expiryImminentItems } = useInventoryAlertSystem(inventory, user);
 
@@ -33,7 +35,7 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
     try {
       const { data } = await supabase.from('inventory_logs').select('*').order('created_at', { ascending: false }).limit(100);
       setLogs(data || []);
-    } catch (_) {}
+    } catch (_) { }
   }, []);
 
   // 현황 탭: 회사별 부서 선택용 목록
@@ -338,24 +340,32 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
                 <button
                   type="button"
                   onClick={() => setRegistrationMode('form')}
-                  className={`flex-1 px-4 py-3 rounded-[12px] text-[11px] font-semibold transition-all ${
-                    registrationMode === 'form'
-                      ? 'bg-[var(--toss-blue)] text-white shadow-sm'
-                      : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'
-                  }`}
+                  className={`flex-1 px-4 py-3 rounded-[12px] text-[11px] font-semibold transition-all ${registrationMode === 'form'
+                    ? 'bg-[var(--toss-blue)] text-white shadow-sm'
+                    : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'
+                    }`}
                 >
                   ✏️ 일반 등록
                 </button>
                 <button
                   type="button"
                   onClick={() => setRegistrationMode('excel')}
-                  className={`flex-1 px-4 py-3 rounded-[12px] text-[11px] font-semibold transition-all ${
-                    registrationMode === 'excel'
-                      ? 'bg-emerald-600 text-white shadow-md'
-                      : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'
-                  }`}
+                  className={`flex-1 px-4 py-3 rounded-[12px] text-[11px] font-semibold transition-all ${registrationMode === 'excel'
+                    ? 'bg-emerald-600 text-white shadow-md'
+                    : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'
+                    }`}
                 >
                   📊 엑셀 일괄 등록
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRegistrationMode('auto_extract')}
+                  className={`flex-1 px-4 py-3 rounded-[12px] text-[11px] font-semibold transition-all ${registrationMode === 'auto_extract'
+                    ? 'bg-purple-600 text-white shadow-md'
+                    : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'
+                    }`}
+                >
+                  📄 명세서 자동추출 (AI)
                 </button>
               </div>
               {registrationMode === 'form' ? (
@@ -365,11 +375,14 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
                   fetchInventory={fetchInventory}
                   fetchSuppliers={fetchSuppliers}
                 />
-              ) : (
+              ) : registrationMode === 'excel' ? (
                 <ExcelBulkUpload onRefresh={fetchInventory} />
+              ) : (
+                <InvoiceAutoExtraction onRefresh={fetchInventory} user={user} />
               )}
             </div>
           )}
+          {activeView === '자산' && <QRAssetManager user={user} inventory={inventory} fetchInventory={() => fetchInventory(selectedCo)} />}
         </main>
       </div>
 

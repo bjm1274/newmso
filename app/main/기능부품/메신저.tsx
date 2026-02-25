@@ -31,8 +31,9 @@ function isVideoUrl(url: string): boolean {
   return /^(mp4|webm|mov|m4v|avi|mkv)$/.test(ext || '');
 }
 
-export default function ChatView({ user, onRefresh, staffs = [], initialOpenChatRoomId, onConsumeOpenChatRoomId }: any) {
+export default function ChatView({ user, onRefresh, staffs = [], initialOpenChatRoomId, initialOpenMessageId, onConsumeOpenChatRoomId }: any) {
   const [messages, setMessages] = useState<any[]>([]);
+  const pendingScrollMsgIdRef = useRef<string | null>(null);
   const [omniSearch, setOmniSearch] = useState(''); // 통합 검색 (Omni-Search)
   const [chatSearch, setChatSearch] = useState(''); // 대화 내용 검색
   const [inputMsg, setInputMsg] = useState('');
@@ -230,9 +231,25 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   useEffect(() => {
     if (initialOpenChatRoomId) {
       setRoom(initialOpenChatRoomId);
+      if (initialOpenMessageId) {
+        pendingScrollMsgIdRef.current = initialOpenMessageId;
+      }
       onConsumeOpenChatRoomId?.();
     }
-  }, [initialOpenChatRoomId]);
+  }, [initialOpenChatRoomId, initialOpenMessageId]);
+
+  // 특정 메시지로 스크롤 대기
+  useEffect(() => {
+    const targetMsgId = pendingScrollMsgIdRef.current;
+    if (targetMsgId && messages.length > 0) {
+      if (messages.some(m => m.id === targetMsgId)) {
+        setTimeout(() => {
+          scrollToMessage(targetMsgId);
+          pendingScrollMsgIdRef.current = null;
+        }, 500);
+      }
+    }
+  }, [messages]);
 
   const fetchData = useCallback(async () => {
     const query = supabase

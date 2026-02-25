@@ -6,6 +6,7 @@ import SuppliesForm from './전자결재서브/비품구매양식';
 import AdminForms from './전자결재서브/관리행정양식';
 import FormRequest from './전자결재서브/양식신청';
 import AttendanceCorrectionForm from './전자결재서브/출결정정양식';
+import ExpenseReportForm from './전자결재서브/지출결의서양식';
 
 export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, selectedCompanyId, onRefresh }: any) {
   const [viewMode, setViewMode] = useState('기안함');
@@ -30,84 +31,132 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
 
   useEffect(() => { fetchApprovals(); }, [selectedCompanyId, user?.id]);
 
-  const handleApproveAction = async (item: any) => {
-    if (!confirm("승인하시겠습니까? 관련 데이터가 즉시 업데이트됩니다.")) return;
+  const handleApproveAction = async (item: any, action: '승인' | '반려') => {
+    if (!confirm(`${action}하시겠습니까?`)) return;
 
-    const { error: appError } = await supabase.from('approvals').update({ status: '승인' }).eq('id', item.id);
+    // 현재 상신된 결재선
+    const line = item.approver_line || [];
+    const currentIndex = line.findIndex((id: string) => id === user.id);
+    const isFinalApprover = currentIndex === line.length - 1;
+
+    let newStatus = item.status;
+    let nextApprover = item.approver_id;
+
+    if (action === '반려') {
+      newStatus = '반려';
+    } else {
+      if (isFinalApprover) {
+        newStatus = '승인'; // 최종 결재 완료
+      } else {
+        // 다음 결재자로 넘김
+        nextApprover = line[currentIndex + 1];
+      }
+    }
+
+    const { error: appError } = await supabase
+      .from('approvals')
+      .update({ status: newStatus, approver_id: nextApprover })
+      .eq('id', item.id);
 
     if (!appError) {
-      // 1. 연차/특별휴가 승인 -> 인사정보 연차 차감 로직
-      if (item.type === '연차신청' || item.type === '특별휴가') {
-        const { data: staff } = await supabase.from('staff_members').select('annual_leave').eq('id', item.requester_id).single();
-        if (staff) {
-          const days = item.meta_data.days || 1;
-          await supabase.from('staff_members').update({ annual_leave: staff.annual_leave - days }).eq('id', item.requester_id);
+      if (newStatus === '승인') {
+        // === 1. 연차/특별휴가 승인 ===
+        if (item.type === '연차신청' || item.type === '특별휴가') {
+          const { data: staff } = await supabase.from('staff_members').select('annual_leave').eq('id', item.requester_id).single();
+          if (staff) {
+            const days = item.meta_data.days || 1;
+            await supabase.from('staff_members').update({ annual_leave: staff.annual_leave - days }).eq('id', item.requester_id);
 
-          // 근태 기록에 '휴가' 상태로 추가 (신청 기간 전체)
-          if (item.meta_data.start_date && item.meta_data.end_date) {
-            let current = new Date(item.meta_data.start_date);
-            const end = new Date(item.meta_data.end_date);
-            while (current <= end) {
-              await supabase.from('attendance').upsert([{
-                staff_id: item.requester_id,
-                date: current.toISOString().split('T')[0],
-                status: '휴가'
-              }]);
-              current.setDate(current.getDate() + 1);
+            if (item.meta_data.start_date && item.meta_data.end_date) {
+              let current = new Date(item.meta_data.start_date);
+              const end = new Date(item.meta_data.end_date);
+              while (current <= end) {
+                await supabase.from('attendance').upsert([{
+                  staff_id: item.requester_id,
+                  date: current.toISOString().split('T')[0],
+                  status: '휴가'
+                }]);
+                current.setDate(current.getDate() + 1);
+              }
             }
           }
         }
-      }
 
-      // 2. 출결정정 승인 -> 근태 기록 상태 '정상'으로 변경
-      if (item.type === '출결정정' && item.meta_data.target_date) {
-        await supabase.from('attendance').update({ status: '정상', remarks: '결재 승인에 의한 정정' })
-          .eq('staff_id', item.requester_id)
-          .eq('date', item.meta_data.target_date);
-      }
+        // === 2. 출결정정 ===
+        if (item.type === '출결정정' && item.meta_data.target_date) {
+          await supabase.from('attendance').update({ status: '정상', remarks: '결재 승인에 의한 정정' })
+            .eq('staff_id', item.requester_id || item.sender_id)
+            .eq('date', item.meta_data.target_date);
+        }
 
-      // 3. 연장근무 승인 -> 근태 기록에 연장 시간 기록
-      if (item.type === '연장근무' && item.meta_data.work_date) {
-        const overtimeHours = item.meta_data.hours || 0;
-        await supabase.from('attendance').update({ overtime_hours: overtimeHours })
-          .eq('staff_id', item.requester_id)
-          .eq('date', item.meta_data.work_date);
-      }
+        // === 3. 연장근무 ===
+        if (item.type === '연장근무' && item.meta_data.work_date) {
+          const overtimeHours = item.meta_data.hours || 0;
+          await supabase.from('attendance').update({ overtime_hours: overtimeHours })
+            .eq('staff_id', item.requester_id || item.sender_id)
+            .eq('date', item.meta_data.work_date);
+        }
 
-      // 4. 물품신청 승인 -> 알림 및 재고 로그 (기존 로직 유지 및 보완)
-      if (item.type === '물품신청' && item.meta_data.items) {
+        // === 4. 물품신청 ===
+        if (item.type === '물품신청' && item.meta_data.items) {
+          await supabase.from('notifications').insert([{
+            user_id: String(item.requester_id || item.sender_id),
+            title: '물품신청 승인',
+            message: `${item.meta_data.items[0]?.name} 외 건이 승인되었습니다.`,
+            type: 'SUCCESS',
+            is_read: false
+          }]);
+        }
+
+        // === 5. 인사명령 ===
+        if (item.type === '인사명령' && item.meta_data.orderTargetId) {
+          const { orderTargetId, newPosition, orderCategory } = item.meta_data;
+          const updateData: any = {};
+          if (newPosition) updateData.position = newPosition;
+          if (orderCategory === '부서 이동(전보)' && item.meta_data.targetDept) {
+            updateData.department = item.meta_data.targetDept;
+          }
+          if (Object.keys(updateData).length > 0) {
+            await supabase.from('staff_members').update(updateData).eq('id', orderTargetId);
+          }
+        }
+
+        // (구버전 하위호환: 연차/휴가)
+        if (item.type === '연차/휴가' && item.meta_data.startDate) {
+          await supabase.from('attendance').upsert({
+            staff_id: item.sender_id, date: item.meta_data.startDate, status: '휴가', is_approved: true
+          });
+          const { data: staff } = await supabase.from('staff_members').select('annual_leave_used, annual_leave_total').eq('id', item.sender_id).single();
+          if (staff) {
+            await supabase.from('staff_members').update({ annual_leave_used: (staff.annual_leave_used || 0) + 1 }).eq('id', item.sender_id);
+          }
+        }
+
+        // [최종 승인 알림] 상신자에게 메세지 발송
         await supabase.from('notifications').insert([{
-          user_id: item.requester_id,
-          title: '물품신청 승인',
-          content: `${item.meta_data.items[0]?.name} 외 건이 승인되었습니다.`,
-          type: 'inventory'
+          user_id: String(item.sender_id),
+          title: '전자결재 최종 승인',
+          message: `'${item.title}' 기안이 최종 승인되었습니다.`,
+          type: 'SUCCESS',
+          is_read: false
         }]);
+
+        alert("최종 승인 처리가 완료되었습니다.");
+
+      } else if (newStatus === '반려') {
+        // [반려 알림]
+        await supabase.from('notifications').insert([{
+          user_id: String(item.sender_id),
+          title: '전자결재 반려',
+          message: `'${item.title}' 기안이 관리자에 의해 반려되었습니다.`,
+          type: 'DANGER',
+          is_read: false
+        }]);
+        alert("반려 처리되었습니다.");
+      } else {
+        alert("중간 결재가 승인되어 다음 결재자에게 넘어갔습니다.");
       }
 
-      // 5. 인사명령 승인 -> 스태프 정보 업데이트
-      if (item.type === '인사명령' && item.meta_data.orderTargetId) {
-        const { orderTargetId, newPosition, orderCategory } = item.meta_data;
-        const updateData: any = {};
-        if (newPosition) updateData.position = newPosition;
-        if (orderCategory === '부서 이동(전보)' && item.meta_data.targetDept) {
-          updateData.department = item.meta_data.targetDept;
-        }
-        if (Object.keys(updateData).length > 0) {
-          await supabase.from('staff_members').update(updateData).eq('id', orderTargetId);
-        }
-      }
-
-      if (item.type === '연차/휴가') {
-        await supabase.from('attendance').upsert({
-          staff_id: item.sender_id, date: item.meta_data.startDate, status: '휴가', is_approved: true
-        });
-        const { data: staff } = await supabase.from('staff_members').select('annual_leave').eq('id', item.sender_id).single();
-        if (staff) {
-          await supabase.from('staff_members').update({ annual_leave: staff.annual_leave - 1 }).eq('id', item.sender_id);
-        }
-      }
-
-      alert("최종 승인 처리가 완료되었습니다.");
       fetchApprovals();
     }
   };
@@ -184,7 +233,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                 <div className="lg:col-span-2 space-y-8">
                   {/* Form Select */}
                   <div className="premium-card p-1.5 flex bg-slate-100 overflow-x-auto no-scrollbar">
-                    {['인사명령', '연차/휴가', '연장근무', '물품신청', '업무기안', '업무협조', '양식신청', '출결정정'].map(t => (
+                    {['인사명령', '연차/휴가', '연장근무', '지출결의', '물품신청', '업무기안', '업무협조', '양식신청', '출결정정'].map(t => (
                       <button
                         key={t}
                         onClick={() => setFormType(t)}
@@ -205,6 +254,8 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                         <SuppliesForm setExtraData={setExtraData} />
                       ) : formType === '출결정정' ? (
                         <AttendanceCorrectionForm user={user} staffs={staffs} />
+                      ) : formType === '지출결의' ? (
+                        <ExpenseReportForm setExtraData={setExtraData} setFormTitle={setFormTitle} />
                       ) : (
                         <AdminForms staffs={staffs} formType={formType} setExtraData={setExtraData} />
                       )}
@@ -304,7 +355,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                           item.status === '반려' ? 'bg-danger-soft text-danger' :
                             'bg-primary-light text-primary'
                           }`}>
-                          {item.type === '연차/휴가' ? '📅' : item.type === '물품신청' ? '🛒' : item.type === '인사명령' ? '🎗️' : '📄'}
+                          {item.type === '연차/휴가' ? '📅' : item.type === '물품신청' ? '🛒' : item.type === '인사명령' ? '🎗️' : item.type === '지출결의' ? '💸' : '📄'}
                         </div>
                         <div>
                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-tighter mb-1">{item.type} | {item.sender_name} ({item.sender_company})</p>
@@ -324,12 +375,20 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                           </span>
                         </div>
                         {viewMode === '결재함' && item.status === '대기' && (
-                          <button
-                            onClick={() => handleApproveAction(item)}
-                            className="px-6 py-3 bg-primary text-white text-[11px] font-black rounded-xl shadow-lg shadow-blue-900/10 hover:scale-105 active:scale-95 transition-all"
-                          >
-                            승인하기
-                          </button>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleApproveAction(item, '반려')}
+                              className="px-5 py-2 md:px-6 md:py-3 bg-white text-danger border border-danger/20 text-[11px] font-black rounded-xl hover:bg-danger-soft transition-all"
+                            >
+                              반려
+                            </button>
+                            <button
+                              onClick={() => handleApproveAction(item, '승인')}
+                              className="px-5 py-2 md:px-6 md:py-3 bg-primary text-white text-[11px] font-black rounded-xl shadow-lg shadow-blue-900/10 hover:scale-105 active:scale-95 transition-all"
+                            >
+                              승인
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
