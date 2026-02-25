@@ -1,13 +1,14 @@
 'use client';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import WikiDashboard from './게시판서브/사내위키';
 
 const CHAT_ROOM_KEY = 'erp_chat_last_room';
 const CHAT_FOCUS_KEY = 'erp_chat_focus_keyword';
 
-const BOARD_IDS = ['공지사항', '자유게시판', '익명소리함', '경조사', '수술일정', 'MRI일정'];
+const BOARD_IDS = ['공지사항', '자유게시판', '익명소리함', '경조사', '수술일정', 'MRI일정', '사내위키'];
 
-export default function BoardView({ user, subView, setSubView, initialBoard, surgeries, mris, onRefresh, setMainMenu }: any) {
+export default function BoardView({ user, subView, setSubView, initialBoard, initialPostId, onConsumePostId, surgeries, mris, onRefresh, setMainMenu }: any) {
   const [activeBoard, setActiveBoard] = useState(initialBoard && BOARD_IDS.includes(initialBoard) ? initialBoard : (subView && BOARD_IDS.includes(subView) ? subView : '공지사항'));
   const [posts, setPosts] = useState<any[]>([]);
   const [showNewPost, setShowNewPost] = useState(false);
@@ -69,11 +70,15 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
   // 댓글 대댓글용 부모 댓글 ID
   const [replyParentId, setReplyParentId] = useState<string | null>(null);
 
-  // 근무형태별 오늘 근무 현황 (경조사 아래 블록용, 인사 근태에서 미리 입력한 편성 실시간 열람)
-  const [workShifts, setWorkShifts] = useState<any[]>([]);
-  const [staffsForShift, setStaffsForShift] = useState<any[]>([]);
-  const [todayAssignments, setTodayAssignments] = useState<any[]>([]); // { staff_id, shift_id } 오늘 날짜 편성
-  const [hoverShiftId, setHoverShiftId] = useState<string | null>(null);
+  // 알림 등에서 딥링크 ID로 진입 시 해당 게시물 모달 즉시 열기
+  useEffect(() => {
+    if (initialPostId) {
+      setSelectedPostId(initialPostId);
+      onConsumePostId?.();
+    }
+  }, [initialPostId]);
+
+  // 근무형태별 오늘 근무 현황 및 교대근무 부분 삭제 처리됨
 
   const boards = [
     { id: '공지사항', label: '📢 공지사항', icon: '📢' },
@@ -81,7 +86,8 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
     { id: '익명소리함', label: '💌 익명 소리함', icon: '💌' },
     { id: '경조사', label: '🎉 경조사', icon: '🎉' },
     { id: '수술일정', label: '🏥 수술일정표', icon: '🏥' },
-    { id: 'MRI일정', label: '🔬 MRI일정표', icon: '🔬' }
+    { id: 'MRI일정', label: '🔬 MRI일정표', icon: '🔬' },
+    { id: '사내위키', label: '📖 사내위키', icon: '📖' }
   ];
 
   // 오전/오후 + 시/분 드롭다운 값을 HH:MM 문자열로 변환
@@ -202,20 +208,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
     return () => { supabase.removeChannel(channel); };
   }, [activeBoard]);
 
-  // 근무현황: 인사 근태에서 근무표 편성 변경 시 오늘 근무 현황 블록 갱신
-  useEffect(() => {
-    if (activeBoard !== '근무현황') return;
-    const today = new Date().toISOString().slice(0, 10);
-    const ch = supabase
-      .channel('board-shift-assignments')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'shift_assignments' }, () => {
-        void supabase.from('shift_assignments').select('staff_id, shift_id').eq('work_date', today).then(({ data }) => {
-          setTodayAssignments(data || []);
-        });
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [activeBoard]);
+  // 근무현황 Effect 제거됨
 
   const fetchComments = async (postId: string) => {
     const { data } = await supabase
@@ -640,1033 +633,1040 @@ export default function BoardView({ user, subView, setSubView, initialBoard, sur
   return (
     <div className="flex flex-col h-full min-h-0 app-page overflow-hidden">
       {/* 상세 메뉴(공지사항·자유게시판 등)는 메인 좌측 사이드바에서 게시판 호버/클릭 시 플라이아웃으로 선택 */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto custom-scrollbar p-4 md:p-8 space-y-6 md:space-y-8 pb-24 md:pb-8">
-        {/* 새 게시물 버튼을 공지사항(제목) 위에 배치 */}
-        {(activeBoard === '공지사항' || activeBoard === '자유게시판' || activeBoard === '경조사' || activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
-          <div className="shrink-0 flex justify-end">
-            <button
-              onClick={() => setShowNewPost(!showNewPost)}
-              className="px-4 md:px-6 py-2.5 md:py-3 bg-[var(--toss-blue)] text-white rounded-[12px] text-[11px] md:text-xs font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all"
-            >
-              {showNewPost ? '✕ 취소' : '+ 새 게시물'}
-            </button>
-          </div>
-        )}
-        <header className="flex justify-between items-end shrink-0">
-          <div>
-            <h2 className="text-xl md:text-2xl font-bold text-[var(--foreground)] tracking-tight">게시판</h2>
-            <p className="text-[11px] md:text-xs text-[var(--toss-gray-3)] font-bold uppercase mt-1">병원 공지 및 일정 관리</p>
-          </div>
-        </header>
-
-        {/* 새 게시물 작성 폼 */}
-        {showNewPost && (
-          <div className="bg-[var(--toss-card)] p-6 md:p-8 border border-[var(--toss-border)] shadow-sm rounded-[16px] space-y-6 animate-in fade-in slide-in-from-top-4 duration-300">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h3 className="text-lg font-bold text-[var(--foreground)]">새 게시물 작성</h3>
-              {(activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!VALID_BODY_IDS.has(selectedBodyPart)) setSelectedBodyPart('all');
-                    setShowBodyPicker(true);
-                  }}
-                  className="px-6 py-3 rounded-full bg-[var(--toss-card)] border border-[var(--toss-border)] text-base font-bold text-[var(--toss-blue)] hover:bg-[var(--toss-blue-light)] shrink-0"
-                >
-                  👤 사람 모형으로 선택
-                </button>
-              )}
+      {activeBoard !== '사내위키' && (
+        <div className="flex-1 flex flex-col min-w-0 overflow-y-auto custom-scrollbar p-4 md:p-8 space-y-6 md:space-y-8 pb-24 md:pb-8">
+          {/* 새 게시물 버튼을 공지사항(제목) 위에 배치 */}
+          {(activeBoard === '공지사항' || activeBoard === '자유게시판' || activeBoard === '경조사' || activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
+            <div className="shrink-0 flex justify-end">
+              <button
+                onClick={() => setShowNewPost(!showNewPost)}
+                className="px-4 md:px-6 py-2.5 md:py-3 bg-[var(--toss-blue)] text-white rounded-[12px] text-[11px] md:text-xs font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all"
+              >
+                {showNewPost ? '✕ 취소' : '+ 새 게시물'}
+              </button>
             </div>
+          )}
+          <header className="flex justify-between items-end shrink-0">
+            <div>
+              <h2 className="text-xl md:text-2xl font-bold text-[var(--foreground)] tracking-tight">게시판</h2>
+              <p className="text-[11px] md:text-xs text-[var(--toss-gray-3)] font-bold uppercase mt-1">병원 공지 및 일정 관리</p>
+            </div>
+          </header>
 
-            <div className="space-y-4">
-              <div>
-                {(activeBoard === '수술일정' || activeBoard === 'MRI일정') ? (
-                  <div className="space-y-3">
-                    <select
-                      value=""
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        if (!v) return;
-                        setTitle(v);
-                      }}
-                      className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] outline-none text-xs font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20"
-                    >
-                      <option value="">
-                        {activeBoard === '수술일정'
-                          ? '자주 쓰는 수술명 선택 (부위 선택 또는 사람 모형에서 선택 가능)'
-                          : '자주 쓰는 검사명 선택 (부위 선택 또는 사람 모형에서 선택 가능)'}
-                      </option>
-                      {filteredTemplates.map((t: any) => (
-                        <option key={t.id} value={t.name}>
-                          {t.name}
+          {/* 새 게시물 작성 폼 (사내위키일 때는 표시 안함) */}
+          {showNewPost && activeBoard !== '사내위키' && (
+            <div className="bg-[var(--toss-card)] p-6 md:p-8 border border-[var(--toss-border)] shadow-sm rounded-[16px] space-y-6 animate-in fade-in slide-in-from-top-4 duration-300">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h3 className="text-lg font-bold text-[var(--foreground)]">새 게시물 작성</h3>
+                {(activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!VALID_BODY_IDS.has(selectedBodyPart)) setSelectedBodyPart('all');
+                      setShowBodyPicker(true);
+                    }}
+                    className="px-6 py-3 rounded-full bg-[var(--toss-card)] border border-[var(--toss-border)] text-base font-bold text-[var(--toss-blue)] hover:bg-[var(--toss-blue-light)] shrink-0"
+                  >
+                    👤 사람 모형으로 선택
+                  </button>
+                )}
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  {(activeBoard === '수술일정' || activeBoard === 'MRI일정') ? (
+                    <div className="space-y-3">
+                      <select
+                        value=""
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          if (!v) return;
+                          setTitle(v);
+                        }}
+                        className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] outline-none text-xs font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20"
+                      >
+                        <option value="">
+                          {activeBoard === '수술일정'
+                            ? '자주 쓰는 수술명 선택 (부위 선택 또는 사람 모형에서 선택 가능)'
+                            : '자주 쓰는 검사명 선택 (부위 선택 또는 사람 모형에서 선택 가능)'}
                         </option>
-                      ))}
-                    </select>
-                    <div className="flex gap-2 items-stretch">
-                      <input
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                        placeholder={
-                          activeBoard === '수술일정'
-                            ? '수술명을 입력하거나 위에서 선택하세요.'
-                            : '검사명을 입력하거나 위에서 선택하세요.'
-                        }
-                        className="flex-1 min-w-0 p-4 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20"
-                      />
-                      <div className="flex rounded-[12px] border border-[var(--toss-border)] overflow-hidden bg-[var(--toss-gray-1)] shrink-0 min-w-[120px]">
-                        <button
-                          type="button"
-                          onClick={() => setScheduleSide(scheduleSide === '좌' ? '' : '좌')}
-                          className={`flex-1 min-w-[56px] px-6 py-3 text-sm font-bold transition-colors ${scheduleSide === '좌' ? 'bg-[var(--toss-blue)] text-white' : 'text-[var(--toss-gray-4)] hover:bg-[var(--toss-border)]'}`}
-                        >
-                          좌
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setScheduleSide(scheduleSide === '우' ? '' : '우')}
-                          className={`flex-1 min-w-[56px] px-6 py-3 text-sm font-bold transition-colors ${scheduleSide === '우' ? 'bg-[var(--toss-blue)] text-white' : 'text-[var(--toss-gray-4)] hover:bg-[var(--toss-border)]'}`}
-                        >
-                          우
-                        </button>
+                        {filteredTemplates.map((t: any) => (
+                          <option key={t.id} value={t.name}>
+                            {t.name}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="flex gap-2 items-stretch">
+                        <input
+                          value={title}
+                          onChange={(e) => setTitle(e.target.value)}
+                          placeholder={
+                            activeBoard === '수술일정'
+                              ? '수술명을 입력하거나 위에서 선택하세요.'
+                              : '검사명을 입력하거나 위에서 선택하세요.'
+                          }
+                          className="flex-1 min-w-0 p-4 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20"
+                        />
+                        <div className="flex rounded-[12px] border border-[var(--toss-border)] overflow-hidden bg-[var(--toss-gray-1)] shrink-0 min-w-[120px]">
+                          <button
+                            type="button"
+                            onClick={() => setScheduleSide(scheduleSide === '좌' ? '' : '좌')}
+                            className={`flex-1 min-w-[56px] px-6 py-3 text-sm font-bold transition-colors ${scheduleSide === '좌' ? 'bg-[var(--toss-blue)] text-white' : 'text-[var(--toss-gray-4)] hover:bg-[var(--toss-border)]'}`}
+                          >
+                            좌
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setScheduleSide(scheduleSide === '우' ? '' : '우')}
+                            className={`flex-1 min-w-[56px] px-6 py-3 text-sm font-bold transition-colors ${scheduleSide === '우' ? 'bg-[var(--toss-blue)] text-white' : 'text-[var(--toss-gray-4)] hover:bg-[var(--toss-border)]'}`}
+                          >
+                            우
+                          </button>
+                        </div>
                       </div>
                     </div>
+                  ) : (
+                    <>
+                      <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">제목</label>
+                      <input
+                        value={title}
+                        onChange={e => setTitle(e.target.value)}
+                        placeholder="게시물 제목을 입력하세요."
+                        className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20"
+                      />
+                    </>
+                  )}
+                </div>
+
+                {(activeBoard === '수술일정' || activeBoard === 'MRI일정') ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">날짜 (YYYY-MM-DD)</label>
+                        <input
+                          type="text"
+                          value={scheduleDate}
+                          onChange={e => {
+                            // 숫자만 추출 후 YYYY-MM-DD 형태로 자동 포맷팅
+                            const digits = e.target.value.replace(/[^0-9]/g, '').slice(0, 8);
+                            let formatted = '';
+                            if (digits.length <= 4) {
+                              formatted = digits;
+                            } else if (digits.length <= 6) {
+                              formatted = `${digits.slice(0, 4)}-${digits.slice(4, 6)}`;
+                            } else {
+                              formatted = `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`;
+                            }
+                            setScheduleDate(formatted);
+                          }}
+                          className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">시간</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          <select
+                            value={schedulePeriod}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setSchedulePeriod(v);
+                              updateScheduleTime(v, scheduleHour, scheduleMinute);
+                            }}
+                            className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-[var(--toss-border)] outline-none text-xs font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20"
+                          >
+                            <option value="">오전/오후</option>
+                            <option value="오전">오전</option>
+                            <option value="오후">오후</option>
+                          </select>
+                          <select
+                            value={scheduleHour}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setScheduleHour(v);
+                              updateScheduleTime(schedulePeriod, v, scheduleMinute);
+                            }}
+                            className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-[var(--toss-border)] outline-none text-xs font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20"
+                          >
+                            <option value="">시간</option>
+                            {Array.from({ length: 12 }).map((_, idx) => {
+                              const h = idx + 1;
+                              const v = String(h).padStart(2, '0');
+                              return (
+                                <option key={v} value={v}>{v}시</option>
+                              );
+                            })}
+                          </select>
+                          <select
+                            value={scheduleMinute}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setScheduleMinute(v);
+                              updateScheduleTime(schedulePeriod, scheduleHour, v);
+                            }}
+                            className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-[var(--toss-border)] outline-none text-xs font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20"
+                          >
+                            <option value="">분</option>
+                            <option value="00">00분</option>
+                            <option value="30">30분</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">수술실/검사실</label>
+                        <input value={scheduleRoom} onChange={e => setScheduleRoom(e.target.value)} placeholder="예: 수술실 1" className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20" />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">환자명</label>
+                        <input value={schedulePatient} onChange={e => setSchedulePatient(e.target.value)} placeholder="환자명 입력" className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20" />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">차트번호</label>
+                        <input value={scheduleChartNo} onChange={e => setScheduleChartNo(e.target.value)} placeholder="예: 12345" className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20" />
+                      </div>
+                    </div>
+                    {(activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
+                      <div className="space-y-3">
+                        <label className="text-[15px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-1.5 block">
+                          {activeBoard === '수술일정' ? '수술 관련 체크' : '촬영 관련 체크'}
+                        </label>
+                        <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-base font-bold text-[var(--toss-gray-4)]">
+                          <label className="inline-flex items-center gap-3 cursor-pointer shrink-0">
+                            <input
+                              type="checkbox"
+                              checked={scheduleFasting}
+                              onChange={(e) => setScheduleFasting(e.target.checked)}
+                              className="w-6 h-6 rounded border-[var(--toss-border)]"
+                            />
+                            <span>금식 필요</span>
+                          </label>
+                          <span className="inline-flex items-center gap-x-6 shrink-0 flex-nowrap">
+                            <label className="inline-flex items-center gap-3 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={scheduleInpatient}
+                                onChange={(e) => setScheduleInpatient(e.target.checked)}
+                                className="w-6 h-6 rounded border-[var(--toss-border)]"
+                              />
+                              <span>입원 예정</span>
+                            </label>
+                            <label className="inline-flex items-center gap-3 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={scheduleGuardian}
+                                onChange={(e) => setScheduleGuardian(e.target.checked)}
+                                className="w-6 h-6 rounded border-[var(--toss-border)]"
+                              />
+                              <span>보호자 동반</span>
+                            </label>
+                          </span>
+                          <label className="inline-flex items-center gap-3 cursor-pointer shrink-0">
+                            <input
+                              type="checkbox"
+                              checked={scheduleCaregiver}
+                              onChange={(e) => setScheduleCaregiver(e.target.checked)}
+                              className="w-6 h-6 rounded border-[var(--toss-border)]"
+                            />
+                            <span>간병인 배치</span>
+                          </label>
+                          <label className="inline-flex items-center gap-3 cursor-pointer shrink-0">
+                            <input
+                              type="checkbox"
+                              checked={scheduleTransfusion}
+                              onChange={(e) => setScheduleTransfusion(e.target.checked)}
+                              className="w-6 h-6 rounded border-[var(--toss-border)]"
+                            />
+                            <span>수혈 필요</span>
+                          </label>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <>
-                    <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">제목</label>
-                    <input
-                      value={title}
-                      onChange={e => setTitle(e.target.value)}
-                      placeholder="게시물 제목을 입력하세요."
-                      className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20"
-                    />
+                    <div>
+                      <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">태그 (쉼표로 구분)</label>
+                      <input
+                        value={tagsInput}
+                        onChange={(e) => setTagsInput(e.target.value)}
+                        placeholder="예: 공지, 회의, 환영"
+                        className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20 mb-4"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">내용</label>
+                      <textarea
+                        value={content}
+                        onChange={e => setContent(e.target.value)}
+                        placeholder="게시물 내용을 입력하세요."
+                        className="w-full h-32 md:h-48 p-4 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-none outline-none text-sm font-bold leading-relaxed focus:ring-2 focus:ring-[var(--toss-blue)]/20 resize-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">사진·동영상·파일 첨부</label>
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.hwp,.zip"
+                        onChange={(e) => {
+                          const files = e.target.files ? Array.from(e.target.files) : [];
+                          setAttachmentFiles((prev) => [...prev, ...files].slice(0, 10));
+                          e.target.value = '';
+                        }}
+                        className="w-full text-sm font-bold text-[var(--toss-gray-4)] file:mr-3 file:py-2 file:px-4 file:rounded-[12px] file:border-0 file:bg-[var(--toss-blue-light)] file:text-[var(--toss-blue)] file:font-bold"
+                      />
+                      {attachmentFiles.length > 0 && (
+                        <div className="mt-3 space-y-3">
+                          <div className="flex flex-wrap gap-3">
+                            {attachmentFiles.map((f, i) => {
+                              const isImg = f.type.startsWith('image/');
+                              const isVideo = f.type.startsWith('video/');
+                              const url = typeof URL !== 'undefined' ? URL.createObjectURL(f) : '';
+                              return (
+                                <div key={i} className="relative group">
+                                  {isImg && (
+                                    <img src={url} alt={f.name} className="w-24 h-24 object-cover rounded-[16px] border border-[var(--toss-border)]" />
+                                  )}
+                                  {isVideo && (
+                                    <video src={url} className="w-40 h-24 object-cover rounded-[16px] border border-[var(--toss-border)]" muted playsInline />
+                                  )}
+                                  {!isImg && !isVideo && (
+                                    <div className="w-24 h-24 rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] flex items-center justify-center text-[11px] font-bold text-[var(--toss-gray-4)] truncate px-1">
+                                      📎 {f.name}
+                                    </div>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => setAttachmentFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                                    className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-red-500 text-white text-xs font-semibold flex items-center justify-center shadow hover:bg-red-600"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <ul className="space-y-1">
+                            {attachmentFiles.map((f, i) => (
+                              <li key={i} className="flex items-center gap-2 text-xs font-bold text-[var(--toss-gray-4)]">
+                                <span className="truncate flex-1">{f.name}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setAttachmentFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                                  className="shrink-0 px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 text-[11px]"
+                                >
+                                  삭제
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
                   </>
                 )}
               </div>
 
-              {(activeBoard === '수술일정' || activeBoard === 'MRI일정') ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">날짜 (YYYY-MM-DD)</label>
-                      <input
-                        type="text"
-                        value={scheduleDate}
-                        onChange={e => {
-                          // 숫자만 추출 후 YYYY-MM-DD 형태로 자동 포맷팅
-                          const digits = e.target.value.replace(/[^0-9]/g, '').slice(0, 8);
-                          let formatted = '';
-                          if (digits.length <= 4) {
-                            formatted = digits;
-                          } else if (digits.length <= 6) {
-                            formatted = `${digits.slice(0, 4)}-${digits.slice(4, 6)}`;
-                          } else {
-                            formatted = `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`;
-                          }
-                          setScheduleDate(formatted);
-                        }}
-                        className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">시간</label>
-                      <div className="grid grid-cols-3 gap-2">
-                        <select
-                          value={schedulePeriod}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            setSchedulePeriod(v);
-                            updateScheduleTime(v, scheduleHour, scheduleMinute);
-                          }}
-                          className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-[var(--toss-border)] outline-none text-xs font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20"
-                        >
-                          <option value="">오전/오후</option>
-                          <option value="오전">오전</option>
-                          <option value="오후">오후</option>
-                        </select>
-                        <select
-                          value={scheduleHour}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            setScheduleHour(v);
-                            updateScheduleTime(schedulePeriod, v, scheduleMinute);
-                          }}
-                          className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-[var(--toss-border)] outline-none text-xs font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20"
-                        >
-                          <option value="">시간</option>
-                          {Array.from({ length: 12 }).map((_, idx) => {
-                            const h = idx + 1;
-                            const v = String(h).padStart(2, '0');
-                            return (
-                              <option key={v} value={v}>{v}시</option>
-                            );
-                          })}
-                        </select>
-                        <select
-                          value={scheduleMinute}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            setScheduleMinute(v);
-                            updateScheduleTime(schedulePeriod, scheduleHour, v);
-                          }}
-                          className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-[var(--toss-border)] outline-none text-xs font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20"
-                        >
-                          <option value="">분</option>
-                          <option value="00">00분</option>
-                          <option value="30">30분</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">수술실/검사실</label>
-                      <input value={scheduleRoom} onChange={e => setScheduleRoom(e.target.value)} placeholder="예: 수술실 1" className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20" />
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">환자명</label>
-                      <input value={schedulePatient} onChange={e => setSchedulePatient(e.target.value)} placeholder="환자명 입력" className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20" />
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">차트번호</label>
-                      <input value={scheduleChartNo} onChange={e => setScheduleChartNo(e.target.value)} placeholder="예: 12345" className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20" />
-                    </div>
-                  </div>
-                  {(activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
-                    <div className="space-y-3">
-                      <label className="text-[15px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-1.5 block">
-                        {activeBoard === '수술일정' ? '수술 관련 체크' : '촬영 관련 체크'}
-                      </label>
-                      <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-base font-bold text-[var(--toss-gray-4)]">
-                        <label className="inline-flex items-center gap-3 cursor-pointer shrink-0">
-                          <input
-                            type="checkbox"
-                            checked={scheduleFasting}
-                            onChange={(e) => setScheduleFasting(e.target.checked)}
-                            className="w-6 h-6 rounded border-[var(--toss-border)]"
-                          />
-                          <span>금식 필요</span>
-                        </label>
-                        <span className="inline-flex items-center gap-x-6 shrink-0 flex-nowrap">
-                          <label className="inline-flex items-center gap-3 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={scheduleInpatient}
-                              onChange={(e) => setScheduleInpatient(e.target.checked)}
-                              className="w-6 h-6 rounded border-[var(--toss-border)]"
-                            />
-                            <span>입원 예정</span>
-                          </label>
-                          <label className="inline-flex items-center gap-3 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={scheduleGuardian}
-                              onChange={(e) => setScheduleGuardian(e.target.checked)}
-                              className="w-6 h-6 rounded border-[var(--toss-border)]"
-                            />
-                            <span>보호자 동반</span>
-                          </label>
-                        </span>
-                        <label className="inline-flex items-center gap-3 cursor-pointer shrink-0">
-                          <input
-                            type="checkbox"
-                            checked={scheduleCaregiver}
-                            onChange={(e) => setScheduleCaregiver(e.target.checked)}
-                            className="w-6 h-6 rounded border-[var(--toss-border)]"
-                          />
-                          <span>간병인 배치</span>
-                        </label>
-                        <label className="inline-flex items-center gap-3 cursor-pointer shrink-0">
-                          <input
-                            type="checkbox"
-                            checked={scheduleTransfusion}
-                            onChange={(e) => setScheduleTransfusion(e.target.checked)}
-                            className="w-6 h-6 rounded border-[var(--toss-border)]"
-                          />
-                          <span>수혈 필요</span>
-                        </label>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <>
-                  <div>
-                    <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">태그 (쉼표로 구분)</label>
-                    <input
-                      value={tagsInput}
-                      onChange={(e) => setTagsInput(e.target.value)}
-                      placeholder="예: 공지, 회의, 환영"
-                      className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20 mb-4"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">내용</label>
-                    <textarea
-                      value={content}
-                      onChange={e => setContent(e.target.value)}
-                      placeholder="게시물 내용을 입력하세요."
-                      className="w-full h-32 md:h-48 p-4 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-none outline-none text-sm font-bold leading-relaxed focus:ring-2 focus:ring-[var(--toss-blue)]/20 resize-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">사진·동영상·파일 첨부</label>
-                    <input
-                      type="file"
-                      multiple
-                      accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.hwp,.zip"
-                      onChange={(e) => {
-                        const files = e.target.files ? Array.from(e.target.files) : [];
-                        setAttachmentFiles((prev) => [...prev, ...files].slice(0, 10));
-                        e.target.value = '';
-                      }}
-                      className="w-full text-sm font-bold text-[var(--toss-gray-4)] file:mr-3 file:py-2 file:px-4 file:rounded-[12px] file:border-0 file:bg-[var(--toss-blue-light)] file:text-[var(--toss-blue)] file:font-bold"
-                    />
-                    {attachmentFiles.length > 0 && (
-                      <div className="mt-3 space-y-3">
-                        <div className="flex flex-wrap gap-3">
-                          {attachmentFiles.map((f, i) => {
-                            const isImg = f.type.startsWith('image/');
-                            const isVideo = f.type.startsWith('video/');
-                            const url = typeof URL !== 'undefined' ? URL.createObjectURL(f) : '';
-                            return (
-                              <div key={i} className="relative group">
-                                {isImg && (
-                                  <img src={url} alt={f.name} className="w-24 h-24 object-cover rounded-[16px] border border-[var(--toss-border)]" />
-                                )}
-                                {isVideo && (
-                                  <video src={url} className="w-40 h-24 object-cover rounded-[16px] border border-[var(--toss-border)]" muted playsInline />
-                                )}
-                                {!isImg && !isVideo && (
-                                  <div className="w-24 h-24 rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] flex items-center justify-center text-[11px] font-bold text-[var(--toss-gray-4)] truncate px-1">
-                                    📎 {f.name}
-                                  </div>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => setAttachmentFiles((prev) => prev.filter((_, idx) => idx !== i))}
-                                  className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-red-500 text-white text-xs font-semibold flex items-center justify-center shadow hover:bg-red-600"
-                                >
-                                  ×
-                                </button>
-                              </div>
-                            );
-                          })}
-                        </div>
-                        <ul className="space-y-1">
-                          {attachmentFiles.map((f, i) => (
-                            <li key={i} className="flex items-center gap-2 text-xs font-bold text-[var(--toss-gray-4)]">
-                              <span className="truncate flex-1">{f.name}</span>
-                              <button
-                                type="button"
-                                onClick={() => setAttachmentFiles((prev) => prev.filter((_, idx) => idx !== i))}
-                                className="shrink-0 px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 text-[11px]"
-                              >
-                                삭제
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
+              <button
+                onClick={handleNewPost}
+                disabled={loading}
+                className="w-full py-4 bg-[var(--toss-blue)] text-white rounded-[12px] font-bold text-sm shadow-sm hover:opacity-95 active:scale-[0.99] transition-all disabled:opacity-50"
+              >
+                {loading ? '등록 중...' : '게시물 등록'}
+              </button>
             </div>
+          )}
 
-            <button
-              onClick={handleNewPost}
-              disabled={loading}
-              className="w-full py-4 bg-[var(--toss-blue)] text-white rounded-[12px] font-bold text-sm shadow-sm hover:opacity-95 active:scale-[0.99] transition-all disabled:opacity-50"
-            >
-              {loading ? '등록 중...' : '게시물 등록'}
-            </button>
-          </div>
-        )}
-
-        {/* 수술/MRI용 사람 모형 선택 모달 - 사람 이미지 + 부위 하이라이트 */}
-        {showBodyPicker && (activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
-          <div
-            className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-3 md:p-6"
-            onClick={() => {
-              setShowBodyPicker(false);
-              if (!VALID_BODY_IDS.has(selectedBodyPart)) setSelectedBodyPart('all');
-            }}
-          >
+          {/* 수술/MRI용 사람 모형 선택 모달 - 사람 이미지 + 부위 하이라이트 */}
+          {showBodyPicker && (activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
             <div
-              className="w-full max-w-7xl max-h-[94vh] bg-[var(--toss-card)] rounded-[24px] shadow-2xl border border-[var(--toss-border)] p-5 md:p-8 flex flex-col md:flex-row gap-5 md:gap-8"
-              onClick={(e) => e.stopPropagation()}
+              className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-3 md:p-6"
+              onClick={() => {
+                setShowBodyPicker(false);
+                if (!VALID_BODY_IDS.has(selectedBodyPart)) setSelectedBodyPart('all');
+              }}
             >
-              {/* 왼쪽: 생성된 전신 이미지 + 부위 클릭 (이미지와 동일 비율 박스 안에서 좌표 고정) */}
-              <div className="flex-1 flex items-center justify-center min-h-[400px] max-h-[640px] bg-[#020617] rounded-[18px] border border-slate-800 overflow-hidden p-2">
-                <div className="relative w-full max-w-[400px] aspect-[2/3] max-h-[600px] shrink-0 -translate-y-6">
-                  <img
-                    src="/human-body-mri.png"
-                    alt="사람 전신 모형"
-                    className="w-full h-full object-contain object-center pointer-events-none select-none"
-                  />
-                  {/* 부위 클릭 영역: 아래 좌표는 위 이미지(2:3 비율)에 맞춰 고정됨 */}
-                  <div className="absolute inset-0">
-                    {[
-                      { id: 'cervical', top: '13%', left: '50%' },    // 목/경추
-                      { id: 'chest', top: '24%', left: '50%' },       // 흉부
-                      { id: 'lumbar', top: '38%', left: '50%' },      // 요추/허리
-                      { id: 'hip', top: '52%', left: '50%' },         // 골반/고관절
-                      { id: 'shoulder', top: '20%', left: '30%' },    // 좌 어깨
-                      { id: 'shoulder', top: '20%', left: '70%' },    // 우 어깨
-                      { id: 'upper_arm', top: '30%', left: '26%' },   // 좌 위팔
-                      { id: 'upper_arm', top: '30%', left: '74%' },   // 우 위팔
-                      { id: 'forearm', top: '50%', left: '22%' },     // 좌 아래팔
-                      { id: 'forearm', top: '50%', left: '78%' },     // 우 아래팔
-                      { id: 'knee', top: '74%', left: '50%' },        // 무릎
-                      { id: 'ankle', top: '92%', left: '50%' },       // 발목/발
-                    ].map((spot, idx) => {
-                      const isActive = resolvedBodyPart === spot.id;
-                      return (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => setSelectedBodyPart(spot.id)}
-                          style={{ top: spot.top, left: spot.left }}
-                          className={`
+              <div
+                className="w-full max-w-7xl max-h-[94vh] bg-[var(--toss-card)] rounded-[24px] shadow-2xl border border-[var(--toss-border)] p-5 md:p-8 flex flex-col md:flex-row gap-5 md:gap-8"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* 왼쪽: 생성된 전신 이미지 + 부위 클릭 (이미지와 동일 비율 박스 안에서 좌표 고정) */}
+                <div className="flex-1 flex items-center justify-center min-h-[400px] max-h-[640px] bg-[#020617] rounded-[18px] border border-slate-800 overflow-hidden p-2">
+                  <div className="relative w-full max-w-[400px] aspect-[2/3] max-h-[600px] shrink-0 -translate-y-6">
+                    <img
+                      src="/human-body-mri.png"
+                      alt="사람 전신 모형"
+                      className="w-full h-full object-contain object-center pointer-events-none select-none"
+                    />
+                    {/* 부위 클릭 영역: 아래 좌표는 위 이미지(2:3 비율)에 맞춰 고정됨 */}
+                    <div className="absolute inset-0">
+                      {[
+                        { id: 'cervical', top: '13%', left: '50%' },    // 목/경추
+                        { id: 'chest', top: '24%', left: '50%' },       // 흉부
+                        { id: 'lumbar', top: '38%', left: '50%' },      // 요추/허리
+                        { id: 'hip', top: '52%', left: '50%' },         // 골반/고관절
+                        { id: 'shoulder', top: '20%', left: '30%' },    // 좌 어깨
+                        { id: 'shoulder', top: '20%', left: '70%' },    // 우 어깨
+                        { id: 'upper_arm', top: '30%', left: '26%' },   // 좌 위팔
+                        { id: 'upper_arm', top: '30%', left: '74%' },   // 우 위팔
+                        { id: 'forearm', top: '50%', left: '22%' },     // 좌 아래팔
+                        { id: 'forearm', top: '50%', left: '78%' },     // 우 아래팔
+                        { id: 'knee', top: '74%', left: '50%' },        // 무릎
+                        { id: 'ankle', top: '92%', left: '50%' },       // 발목/발
+                      ].map((spot, idx) => {
+                        const isActive = resolvedBodyPart === spot.id;
+                        return (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setSelectedBodyPart(spot.id)}
+                            style={{ top: spot.top, left: spot.left }}
+                            className={`
                         group absolute -translate-x-1/2 -translate-y-1/2
                         flex items-center justify-center
                         w-16 h-16 md:w-20 md:h-20 rounded-full border-none bg-transparent
                       `}
-                        >
-                          {/* 호버/선택 시에만 부위 전체가 은은하게 빛나는 하이라이트 (기본 상태에서는 사람 사진만 보임) */}
-                          <span
-                            className={`
+                          >
+                            {/* 호버/선택 시에만 부위 전체가 은은하게 빛나는 하이라이트 (기본 상태에서는 사람 사진만 보임) */}
+                            <span
+                              className={`
                           absolute inset-0 rounded-full bg-sky-400/35 blur-xl opacity-0
                           transition-opacity duration-200
                           group-hover:opacity-90
                           ${isActive ? 'opacity-90' : ''}
                         `}
-                          />
-                        </button>
-                      );
-                    })}
+                            />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 오른쪽: 선택된 부위에 해당하는 수술/검사명 목록 */}
+                <div className="flex-1 flex flex-col">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
+                        {activeBoard === '수술일정' ? '수술명 선택' : '검사명 선택'}
+                      </p>
+                      <p className="text-xs font-bold text-[var(--toss-gray-4)] mt-1">
+                        {BODY_PARTS.find((b) => b.id === resolvedBodyPart)?.label || '전체'} 기준 추천 목록
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowBodyPicker(false)}
+                      className="px-3 py-1.5 rounded-full border border-[var(--toss-border)] text-[11px] font-bold text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]"
+                    >
+                      닫기
+                    </button>
+                  </div>
+                  <div className="flex-1 mt-2 bg-[var(--page-bg)] border border-[var(--toss-border)] rounded-[12px] p-2 overflow-y-auto custom-scrollbar">
+                    {filteredTemplates.length === 0 ? (
+                      <p className="text-[11px] text-[var(--toss-gray-3)] font-bold py-4 text-center">
+                        선택한 부위에 해당하는 등록된 수술·검사명이 없습니다.<br />
+                        관리자 메뉴의 “수술·검사명”에서 템플릿을 추가해주세요.
+                      </p>
+                    ) : (
+                      <ul className="space-y-1">
+                        {filteredTemplates.map((t: any) => (
+                          <li key={t.id}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setTitle(t.name);
+                                setShowBodyPicker(false);
+                              }}
+                              className="w-full text-left px-3 py-2 rounded-[8px] text-[12px] font-bold text-[var(--foreground)] hover:bg-[var(--toss-card)] hover:shadow-sm flex items-center gap-2"
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full bg-[var(--toss-blue)]" />
+                              <span className="flex-1 truncate">{t.name}</span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 </div>
               </div>
+            </div>
+          )}
 
-              {/* 오른쪽: 선택된 부위에 해당하는 수술/검사명 목록 */}
-              <div className="flex-1 flex flex-col">
-                <div className="flex items-center justify-between mb-2">
+          {/* 수술일정·MRI일정용 달력 뷰 */}
+          {(activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
+            <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] shadow-sm p-4 md:p-6 space-y-4">
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
                   <div>
                     <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
-                      {activeBoard === '수술일정' ? '수술명 선택' : '검사명 선택'}
+                      {activeBoard === '수술일정' ? '수술 일정 캘린더' : 'MRI 일정 캘린더'}
                     </p>
-                    <p className="text-xs font-bold text-[var(--toss-gray-4)] mt-1">
-                      {BODY_PARTS.find((b) => b.id === resolvedBodyPart)?.label || '전체'} 기준 추천 목록
-                    </p>
+                    <h3 className="text-lg md:text-xl font-semibold text-[var(--foreground)] mt-1">
+                      {calendarMonth.getFullYear()}년 {calendarMonth.getMonth() + 1}월
+                    </h3>
                   </div>
+                </div>
+
+                <div className="flex items-center gap-2 text-xs font-bold shrink-0 self-end md:self-auto w-full md:w-auto">
+                  <input
+                    value={searchKeyword}
+                    onChange={e => setSearchKeyword(e.target.value)}
+                    placeholder="환자명 또는 차트번호 검색"
+                    className="flex-1 md:w-48 px-3 py-1.5 rounded-full border border-[var(--toss-border)] bg-[var(--toss-gray-1)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 font-semibold"
+                  />
                   <button
                     type="button"
-                    onClick={() => setShowBodyPicker(false)}
-                    className="px-3 py-1.5 rounded-full border border-[var(--toss-border)] text-[11px] font-bold text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]"
+                    onClick={() =>
+                      setCalendarMonth(
+                        new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1)
+                      )
+                    }
+                    className="shrink-0 px-3 py-1.5 rounded-full border border-[var(--toss-border)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-gray-1)] hidden min-[320px]:block"
                   >
-                    닫기
+                    이전달
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCalendarMonth(new Date())}
+                    className="shrink-0 px-3 py-1.5 rounded-full border border-[var(--toss-border)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-gray-1)]"
+                  >
+                    오늘
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCalendarMonth(
+                        new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1)
+                      )
+                    }
+                    className="shrink-0 px-3 py-1.5 rounded-full border border-[var(--toss-border)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-gray-1)] hidden min-[320px]:block"
+                  >
+                    다음달
                   </button>
                 </div>
-                <div className="flex-1 mt-2 bg-[var(--page-bg)] border border-[var(--toss-border)] rounded-[12px] p-2 overflow-y-auto custom-scrollbar">
-                  {filteredTemplates.length === 0 ? (
-                    <p className="text-[11px] text-[var(--toss-gray-3)] font-bold py-4 text-center">
-                      선택한 부위에 해당하는 등록된 수술·검사명이 없습니다.<br />
-                      관리자 메뉴의 “수술·검사명”에서 템플릿을 추가해주세요.
-                    </p>
-                  ) : (
-                    <ul className="space-y-1">
-                      {filteredTemplates.map((t: any) => (
-                        <li key={t.id}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setTitle(t.name);
-                              setShowBodyPicker(false);
-                            }}
-                            className="w-full text-left px-3 py-2 rounded-[8px] text-[12px] font-bold text-[var(--foreground)] hover:bg-[var(--toss-card)] hover:shadow-sm flex items-center gap-2"
-                          >
-                            <span className="w-1.5 h-1.5 rounded-full bg-[var(--toss-blue)]" />
-                            <span className="flex-1 truncate">{t.name}</span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 수술일정·MRI일정용 달력 뷰 */}
-        {(activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
-          <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] shadow-sm p-4 md:p-6 space-y-4">
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div>
-                  <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
-                    {activeBoard === '수술일정' ? '수술 일정 캘린더' : 'MRI 일정 캘린더'}
-                  </p>
-                  <h3 className="text-lg md:text-xl font-semibold text-[var(--foreground)] mt-1">
-                    {calendarMonth.getFullYear()}년 {calendarMonth.getMonth() + 1}월
-                  </h3>
-                </div>
               </div>
 
-              <div className="flex items-center gap-2 text-xs font-bold shrink-0 self-end md:self-auto w-full md:w-auto">
-                <input
-                  value={searchKeyword}
-                  onChange={e => setSearchKeyword(e.target.value)}
-                  placeholder="환자명 또는 차트번호 검색"
-                  className="flex-1 md:w-48 px-3 py-1.5 rounded-full border border-[var(--toss-border)] bg-[var(--toss-gray-1)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 font-semibold"
-                />
-                <button
-                  type="button"
-                  onClick={() =>
-                    setCalendarMonth(
-                      new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1)
-                    )
-                  }
-                  className="shrink-0 px-3 py-1.5 rounded-full border border-[var(--toss-border)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-gray-1)] hidden min-[320px]:block"
-                >
-                  이전달
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCalendarMonth(new Date())}
-                  className="shrink-0 px-3 py-1.5 rounded-full border border-[var(--toss-border)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-gray-1)]"
-                >
-                  오늘
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setCalendarMonth(
-                      new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1)
-                    )
-                  }
-                  className="shrink-0 px-3 py-1.5 rounded-full border border-[var(--toss-border)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-gray-1)] hidden min-[320px]:block"
-                >
-                  다음달
-                </button>
-              </div>
-            </div>
+              {(() => {
+                const searchLower = searchKeyword.trim().toLowerCase();
+                const filteredPosts = searchLower ? posts.filter((p: any) =>
+                  (p.patient_name || '').toLowerCase().includes(searchLower) ||
+                  (p.content || '').toLowerCase().includes(searchLower)
+                ) : posts;
 
-            {(() => {
-              const searchLower = searchKeyword.trim().toLowerCase();
-              const filteredPosts = searchLower ? posts.filter((p: any) =>
-                (p.patient_name || '').toLowerCase().includes(searchLower) ||
-                (p.content || '').toLowerCase().includes(searchLower)
-              ) : posts;
+                if (filteredPosts.length === 0) {
+                  return <div className="py-10 text-center text-xs text-[var(--toss-gray-3)] font-bold">등록된 일정이 없습니다.</div>;
+                }
 
-              if (filteredPosts.length === 0) {
-                return <div className="py-10 text-center text-xs text-[var(--toss-gray-3)] font-bold">등록된 일정이 없습니다.</div>;
-              }
+                // 날짜별 일정 매핑 (YYYY-MM-DD → 배열)
+                const eventsByDate: Record<string, any[]> = {};
+                (filteredPosts).forEach((p: any) => {
+                  const d = p.schedule_date;
+                  if (!d) return;
+                  eventsByDate[d] = eventsByDate[d] ? [...eventsByDate[d], p] : [p];
+                });
 
-              // 날짜별 일정 매핑 (YYYY-MM-DD → 배열)
-              const eventsByDate: Record<string, any[]> = {};
-              (filteredPosts).forEach((p: any) => {
-                const d = p.schedule_date;
-                if (!d) return;
-                eventsByDate[d] = eventsByDate[d] ? [...eventsByDate[d], p] : [p];
-              });
+                const year = calendarMonth.getFullYear();
+                const month = calendarMonth.getMonth();
+                const firstOfMonth = new Date(year, month, 1);
+                const startDay = firstOfMonth.getDay(); // 0:일 ~ 6:토
+                const startDate = new Date(year, month, 1 - startDay);
+                const days: Date[] = [];
+                for (let i = 0; i < 42; i += 1) {
+                  days.push(new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + i));
+                }
 
-              const year = calendarMonth.getFullYear();
-              const month = calendarMonth.getMonth();
-              const firstOfMonth = new Date(year, month, 1);
-              const startDay = firstOfMonth.getDay(); // 0:일 ~ 6:토
-              const startDate = new Date(year, month, 1 - startDay);
-              const days: Date[] = [];
-              for (let i = 0; i < 42; i += 1) {
-                days.push(new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + i));
-              }
+                const toKey = (d: Date) =>
+                  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
+                    d.getDate(),
+                  )
+                    .padStart(2, '0')}`;
 
-              const toKey = (d: Date) =>
-                `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
-                  d.getDate(),
-                )
-                  .padStart(2, '0')}`;
-
-              return (
-                <div className="border border-[var(--toss-border)] rounded-[16px] overflow-hidden">
-                  <div className="grid grid-cols-7 bg-[var(--toss-gray-1)] text-[11px] font-semibold text-[var(--toss-gray-3)]">
-                    {['일', '월', '화', '수', '목', '금', '토'].map((d) => (
-                      <div key={d} className="px-2 py-2 text-center">
-                        {d}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="grid grid-cols-7 bg-[var(--toss-card)] text-[11px]">
-                    {days.map((d, idx) => {
-                      const key = toKey(d);
-                      const inMonth = d.getMonth() === month;
-                      const events = eventsByDate[key] || [];
-                      return (
-                        <div
-                          key={key + idx}
-                          className={`min-h-[80px] border border-[var(--toss-border)] p-1.5 align-top ${inMonth ? 'bg-[var(--toss-card)]' : 'bg-[var(--tab-bg)]'
-                            }`}
-                        >
-                          <div className="flex items-center justify-between mb-1">
-                            <span
-                              className={`text-[11px] font-semibold ${!inMonth ? 'text-[var(--toss-gray-3)]' : d.getDay() === 0
-                                ? 'text-red-500'
-                                : d.getDay() === 6
-                                  ? 'text-[var(--toss-blue)]'
-                                  : 'text-[var(--foreground)]'
-                                }`}
-                            >
-                              {d.getDate()}
-                            </span>
-                            {events.length > 0 && (
-                              <button
-                                type="button"
-                                onClick={() => events[0] && setSelectedPostId(events[0].id)}
-                                className="text-[11px] font-semibold text-[var(--toss-blue)] px-1 py-0.5 rounded-full hover:bg-[var(--toss-blue-light)]"
-                              >
-                                {events.length}건
-                              </button>
-                            )}
-                          </div>
-                          <div className="space-y-1">
-                            {events.slice(0, 4).map((ev: any) => (
-                              <button
-                                key={ev.id}
-                                type="button"
-                                onClick={() => setSelectedPostId(ev.id)}
-                                className="w-full text-left px-1.5 py-1 rounded-[6px] bg-[var(--toss-blue-light)]/50 text-[10px] md:text-[11px] font-bold text-[var(--foreground)] hover:bg-[var(--toss-blue-light)] flex flex-row items-center gap-1 leading-[1.2] overflow-hidden"
-                              >
-                                <span className="text-[var(--toss-blue)] shrink-0">{ev.schedule_time || ''}</span>
-                                <span className="truncate opacity-80 flex-1 min-w-0">{ev.title}</span>
-                                <span className="font-semibold text-emerald-700 dark:text-emerald-400 shrink-0 max-w-[40%] truncate">
-                                  {ev.patient_name || '미지정'} {ev.content && `(${ev.content})`}
-                                </span>
-                              </button>
-                            ))}
-                            {events.length > 4 && (
-                              <p className="text-[10px] text-[var(--toss-gray-3)] font-bold text-center mt-0.5">
-                                + {events.length - 4}건 더보기
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
-        )}
-
-        {/* 게시물 목록 (수술일정·MRI일정은 달력으로만 표시) */}
-        {(activeBoard !== '수술일정' && activeBoard !== 'MRI일정') && (
-          <div className="space-y-2">
-            {posts.length > 0 ? (
-              posts.map((post, idx) => {
-                const rowNumber = posts.length - idx;
-                const isSchedule = activeBoard === '수술일정' || activeBoard === 'MRI일정';
                 return (
-                  <div
-                    key={post.id || idx}
-                    className={`bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-[14px] px-3 md:px-4 py-2.5 md:py-3 hover:border-[var(--toss-blue)]/40 hover:shadow-md transition-all cursor-pointer`}
-                    onClick={() => setSelectedPostId(post.id)}
-                  >
-                    {(activeBoard === '수술일정' || activeBoard === 'MRI일정') ? (
-                      <div className="space-y-2 md:space-y-1">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <h3 className="font-bold text-[var(--foreground)] text-base md:text-lg line-clamp-1">{post.title}</h3>
-                            <p className="text-[11px] text-[var(--toss-blue)] font-bold mt-1 uppercase tracking-widest">
-                              {post.patient_name || '환자명 미지정'} {post.content && <span className="text-[var(--toss-gray-4)] ml-1">| 차트번호: {post.content}</span>}
+                  <div className="border border-[var(--toss-border)] rounded-[16px] overflow-hidden">
+                    <div className="grid grid-cols-7 bg-[var(--toss-gray-1)] text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                      {['일', '월', '화', '수', '목', '금', '토'].map((d) => (
+                        <div key={d} className="px-2 py-2 text-center">
+                          {d}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-7 bg-[var(--toss-card)] text-[11px]">
+                      {days.map((d, idx) => {
+                        const key = toKey(d);
+                        const inMonth = d.getMonth() === month;
+                        const events = eventsByDate[key] || [];
+                        return (
+                          <div
+                            key={key + idx}
+                            className={`min-h-[80px] border border-[var(--toss-border)] p-1.5 align-top ${inMonth ? 'bg-[var(--toss-card)]' : 'bg-[var(--tab-bg)]'
+                              }`}
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span
+                                className={`text-[11px] font-semibold ${!inMonth ? 'text-[var(--toss-gray-3)]' : d.getDay() === 0
+                                  ? 'text-red-500'
+                                  : d.getDay() === 6
+                                    ? 'text-[var(--toss-blue)]'
+                                    : 'text-[var(--foreground)]'
+                                  }`}
+                              >
+                                {d.getDate()}
+                              </span>
+                              {events.length > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => events[0] && setSelectedPostId(events[0].id)}
+                                  className="text-[11px] font-semibold text-[var(--toss-blue)] px-1 py-0.5 rounded-full hover:bg-[var(--toss-blue-light)]"
+                                >
+                                  {events.length}건
+                                </button>
+                              )}
+                            </div>
+                            <div className="space-y-1">
+                              {events.slice(0, 4).map((ev: any) => (
+                                <button
+                                  key={ev.id}
+                                  type="button"
+                                  onClick={() => setSelectedPostId(ev.id)}
+                                  className="w-full text-left px-1.5 py-1 rounded-[6px] bg-[var(--toss-blue-light)]/50 text-[10px] md:text-[11px] font-bold text-[var(--foreground)] hover:bg-[var(--toss-blue-light)] flex flex-row items-center gap-1 leading-[1.2] overflow-hidden"
+                                >
+                                  <span className="text-[var(--toss-blue)] shrink-0">{ev.schedule_time || ''}</span>
+                                  <span className="truncate opacity-80 flex-1 min-w-0">{ev.title}</span>
+                                  <span className="font-semibold text-emerald-700 dark:text-emerald-400 shrink-0 max-w-[40%] truncate">
+                                    {ev.patient_name || '미지정'} {ev.content && `(${ev.content})`}
+                                  </span>
+                                </button>
+                              ))}
+                              {events.length > 4 && (
+                                <p className="text-[10px] text-[var(--toss-gray-3)] font-bold text-center mt-0.5">
+                                  + {events.length - 4}건 더보기
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* 게시물 목록 (수술일정·MRI일정은 달력으로만 표시) */}
+          {(activeBoard !== '수술일정' && activeBoard !== 'MRI일정') && (
+            <div className="space-y-2">
+              {posts.length > 0 ? (
+                posts.map((post, idx) => {
+                  const rowNumber = posts.length - idx;
+                  const isSchedule = activeBoard === '수술일정' || activeBoard === 'MRI일정';
+                  return (
+                    <div
+                      key={post.id || idx}
+                      className={`bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-[14px] px-3 md:px-4 py-2.5 md:py-3 hover:border-[var(--toss-blue)]/40 hover:shadow-md transition-all cursor-pointer`}
+                      onClick={() => setSelectedPostId(post.id)}
+                    >
+                      {(activeBoard === '수술일정' || activeBoard === 'MRI일정') ? (
+                        <div className="space-y-2 md:space-y-1">
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <h3 className="font-bold text-[var(--foreground)] text-base md:text-lg line-clamp-1">{post.title}</h3>
+                              <p className="text-[11px] text-[var(--toss-blue)] font-bold mt-1 uppercase tracking-widest">
+                                {post.patient_name || '환자명 미지정'} {post.content && <span className="text-[var(--toss-gray-4)] ml-1">| 차트번호: {post.content}</span>}
+                              </p>
+                            </div>
+                            <span className={`px-2 py-1 rounded-[12px] text-[11px] font-semibold shrink-0 ${activeBoard === '수술일정' ? 'bg-red-100 text-red-600' : 'bg-purple-100 text-purple-600'
+                              }`}>
+                              {activeBoard === '수술일정' ? '🏥 수술' : '🔬 MRI'}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 pt-4 border-t border-[var(--toss-border)]">
+                            <div>
+                              <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">날짜</p>
+                              <p className="text-[11px] font-semibold text-[var(--foreground)]">{post.schedule_date}</p>
+                            </div>
+                            <div>
+                              <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">시간</p>
+                              <p className="text-[11px] font-semibold text-[var(--foreground)]">{post.schedule_time}</p>
+                            </div>
+                            <div>
+                              <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">위치</p>
+                              <p className="text-[11px] font-semibold text-[var(--foreground)] line-clamp-1">{post.schedule_room}</p>
+                            </div>
+                          </div>
+                          {(post.surgery_fasting || post.surgery_inpatient || post.surgery_guardian || post.surgery_caregiver || post.surgery_transfusion) && (
+                            <div className="pt-2 flex flex-wrap gap-1 items-center">
+                              {post.surgery_fasting && (
+                                <span className="px-2 py-1 rounded-full bg-red-50 text-red-600 text-[11px] font-semibold">
+                                  금식
+                                </span>
+                              )}
+                              {post.surgery_inpatient && (
+                                <span className="px-2 py-1 rounded-full bg-[var(--toss-blue-light)] text-[var(--toss-blue)] text-[11px] font-semibold">
+                                  입원
+                                </span>
+                              )}
+                              {post.surgery_guardian && (
+                                <span className="px-2 py-1 rounded-full bg-emerald-50 text-emerald-600 text-[11px] font-semibold">
+                                  보호자 동반
+                                </span>
+                              )}
+                              {post.surgery_caregiver && (
+                                <span className="px-2 py-1 rounded-full bg-purple-50 text-purple-600 text-[11px] font-semibold">
+                                  간병인
+                                </span>
+                              )}
+                              {post.surgery_transfusion && (
+                                <span className="px-2 py-1 rounded-full bg-red-50 text-red-700 text-[11px] font-semibold ml-auto">
+                                  수혈
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-3 text-[11px] md:text-xs">
+                          <div className="w-8 text-center text-[11px] font-bold text-[var(--toss-gray-3)] shrink-0">
+                            {rowNumber}
+                          </div>
+                          <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                            <p className="font-bold text-[var(--foreground)] truncate group-hover:text-[var(--toss-blue)]">
+                              {post.title}
                             </p>
+                            {(Array.isArray(post.attachments) ? post.attachments : []).length > 0 && (
+                              <span className="shrink-0 text-[var(--toss-gray-3)]" title="첨부파일 있음">📎</span>
+                            )}
                           </div>
-                          <span className={`px-2 py-1 rounded-[12px] text-[11px] font-semibold shrink-0 ${activeBoard === '수술일정' ? 'bg-red-100 text-red-600' : 'bg-purple-100 text-purple-600'
-                            }`}>
-                            {activeBoard === '수술일정' ? '🏥 수술' : '🔬 MRI'}
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-3 gap-2 pt-4 border-t border-[var(--toss-border)]">
-                          <div>
-                            <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">날짜</p>
-                            <p className="text-[11px] font-semibold text-[var(--foreground)]">{post.schedule_date}</p>
+                          <div className="hidden md:flex w-32 text-[11px] font-bold text-[var(--toss-gray-3)] justify-center shrink-0">
+                            {post.author_name || '익명'}
                           </div>
-                          <div>
-                            <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">시간</p>
-                            <p className="text-[11px] font-semibold text-[var(--foreground)]">{post.schedule_time}</p>
+                          <div className="w-20 md:w-24 text-[11px] font-bold text-[var(--toss-gray-3)] text-center shrink-0">
+                            {new Date(post.created_at).toLocaleDateString()}
                           </div>
-                          <div>
-                            <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">위치</p>
-                            <p className="text-[11px] font-semibold text-[var(--foreground)] line-clamp-1">{post.schedule_room}</p>
+                          <div className="w-14 text-[11px] font-bold text-[var(--toss-gray-3)] text-center shrink-0">
+                            조회 {post.views ?? 0}
                           </div>
                         </div>
-                        {(post.surgery_fasting || post.surgery_inpatient || post.surgery_guardian || post.surgery_caregiver || post.surgery_transfusion) && (
-                          <div className="pt-2 flex flex-wrap gap-1 items-center">
-                            {post.surgery_fasting && (
+                      )}
+                    </div>
+                  )
+                })
+              ) : (
+                <div className="text-center py-20 text-[var(--toss-gray-3)]">
+                  <p className="font-semibold text-sm italic">
+                    {activeBoard === '익명소리함' && !(user?.permissions?.mso || user?.role === 'admin' || user?.permissions?.hr)
+                      ? '🙌 작성된 소중한 의견은 인사팀 및 경영진에게만 안전하게 익명으로 전달됩니다.'
+                      : '게시물이 없습니다.'}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* (근무현황 영역 제거됨) */}
+
+          {/* 게시글 상세 보기 모달 */}
+          {selectedPost && (
+            <div className="fixed inset-0 z-[110] flex items-end md:items-center justify-center bg-black/40 p-0 md:p-8">
+              <div className="w-full max-w-4xl max-h-[90dvh] overflow-y-auto bg-[var(--toss-card)] border-0 md:border border-[var(--toss-border)] rounded-t-[24px] md:rounded-[24px] shadow-2xl p-4 md:p-8 pb-8 space-y-5 text-[13px] md:text-[14px] safe-area-pb">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <p className="text-[11px] md:text-[12px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">
+                      {selectedPost.board_type}
+                    </p>
+                    <h3 className="text-lg md:text-2xl font-semibold text-[var(--foreground)]">
+                      {selectedPost.title}
+                    </h3>
+                    <p className="mt-2 text-[11px] md:text-[12px] text-[var(--toss-gray-3)] font-bold">
+                      👤 {selectedPost.author_name || '익명'} ·{' '}
+                      {new Date(selectedPost.created_at).toLocaleString('ko-KR')}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {canEditPost(selectedPost) && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleEditPostStart(selectedPost)}
+                          className="px-3 py-1.5 rounded-full border border-blue-100 text-[11px] font-bold text-blue-600 hover:bg-blue-50"
+                        >
+                          수정
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeletePost(selectedPost)}
+                          className="px-3 py-1.5 rounded-full border border-red-100 text-[11px] font-bold text-red-600 hover:bg-red-50"
+                        >
+                          삭제
+                        </button>
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPostId(null)}
+                      className="px-3 py-1.5 rounded-full border border-[var(--toss-border)] text-[11px] font-bold text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]"
+                    >
+                      닫기
+                    </button>
+                  </div>
+                </div>
+
+                {(selectedPost.board_type === '수술일정' || selectedPost.board_type === 'MRI일정') && (
+                  <div className="space-y-4 border-t border-[var(--toss-border)] pt-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-[11px] font-bold text-[var(--toss-gray-4)]">
+                      <div>
+                        <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">수술/검사명</p>
+                        <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">{selectedPost.title}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">날짜·시간</p>
+                        <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">
+                          {selectedPost.schedule_date} {selectedPost.schedule_time}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">위치 / 환자명 (차트번호)</p>
+                        <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">
+                          {selectedPost.schedule_room || '위치 미지정'} / {selectedPost.patient_name || '환자 미지정'} {selectedPost.content ? `(${selectedPost.content})` : ''}
+                        </p>
+                      </div>
+                    </div>
+
+                    {(selectedPost.surgery_fasting ||
+                      selectedPost.surgery_inpatient ||
+                      selectedPost.surgery_guardian ||
+                      selectedPost.surgery_caregiver ||
+                      selectedPost.surgery_transfusion) && (
+                        <div className="bg-[var(--page-bg)] border border-[var(--toss-border)] rounded-[12px] p-3 space-y-1 text-[11px] font-bold text-[var(--toss-gray-4)]">
+                          <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">수술/검사 준비 상태</p>
+                          <div className="flex flex-wrap gap-1 pt-1">
+                            {selectedPost.surgery_fasting && (
                               <span className="px-2 py-1 rounded-full bg-red-50 text-red-600 text-[11px] font-semibold">
                                 금식
                               </span>
                             )}
-                            {post.surgery_inpatient && (
+                            {selectedPost.surgery_inpatient && (
                               <span className="px-2 py-1 rounded-full bg-[var(--toss-blue-light)] text-[var(--toss-blue)] text-[11px] font-semibold">
                                 입원
                               </span>
                             )}
-                            {post.surgery_guardian && (
+                            {selectedPost.surgery_guardian && (
                               <span className="px-2 py-1 rounded-full bg-emerald-50 text-emerald-600 text-[11px] font-semibold">
                                 보호자 동반
                               </span>
                             )}
-                            {post.surgery_caregiver && (
+                            {selectedPost.surgery_caregiver && (
                               <span className="px-2 py-1 rounded-full bg-purple-50 text-purple-600 text-[11px] font-semibold">
                                 간병인
                               </span>
                             )}
-                            {post.surgery_transfusion && (
-                              <span className="px-2 py-1 rounded-full bg-red-50 text-red-700 text-[11px] font-semibold ml-auto">
-                                수혈
+                            {selectedPost.surgery_transfusion && (
+                              <span className="px-2 py-1 rounded-full bg-red-100 text-red-700 text-[11px] font-semibold">
+                                수혈 필요
                               </span>
                             )}
                           </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-3 text-[11px] md:text-xs">
-                        <div className="w-8 text-center text-[11px] font-bold text-[var(--toss-gray-3)] shrink-0">
-                          {rowNumber}
                         </div>
-                        <div className="flex-1 min-w-0 flex items-center gap-1.5">
-                          <p className="font-bold text-[var(--foreground)] truncate group-hover:text-[var(--toss-blue)]">
-                            {post.title}
-                          </p>
-                          {(Array.isArray(post.attachments) ? post.attachments : []).length > 0 && (
-                            <span className="shrink-0 text-[var(--toss-gray-3)]" title="첨부파일 있음">📎</span>
-                          )}
-                        </div>
-                        <div className="hidden md:flex w-32 text-[11px] font-bold text-[var(--toss-gray-3)] justify-center shrink-0">
-                          {post.author_name || '익명'}
-                        </div>
-                        <div className="w-20 md:w-24 text-[11px] font-bold text-[var(--toss-gray-3)] text-center shrink-0">
-                          {new Date(post.created_at).toLocaleDateString()}
-                        </div>
-                        <div className="w-14 text-[11px] font-bold text-[var(--toss-gray-3)] text-center shrink-0">
-                          조회 {post.views ?? 0}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )
-              })
-            ) : (
-              <div className="text-center py-20 text-[var(--toss-gray-3)]">
-                <p className="font-semibold text-sm italic">
-                  {activeBoard === '익명소리함' && !(user?.permissions?.mso || user?.role === 'admin' || user?.permissions?.hr)
-                    ? '🙌 작성된 소중한 의견은 인사팀 및 경영진에게만 안전하게 익명으로 전달됩니다.'
-                    : '게시물이 없습니다.'}
-                </p>
-              </div>
-            )}
-          </div>
-        )}
+                      )}
 
-        {/* (근무현황 영역 제거됨) */}
-
-        {/* 게시글 상세 보기 모달 */}
-        {selectedPost && (
-          <div className="fixed inset-0 z-[110] flex items-end md:items-center justify-center bg-black/40 p-0 md:p-8">
-            <div className="w-full max-w-4xl max-h-[90dvh] overflow-y-auto bg-[var(--toss-card)] border-0 md:border border-[var(--toss-border)] rounded-t-[24px] md:rounded-[24px] shadow-2xl p-4 md:p-8 pb-8 space-y-5 text-[13px] md:text-[14px] safe-area-pb">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
-                  <p className="text-[11px] md:text-[12px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">
-                    {selectedPost.board_type}
-                  </p>
-                  <h3 className="text-lg md:text-2xl font-semibold text-[var(--foreground)]">
-                    {selectedPost.title}
-                  </h3>
-                  <p className="mt-2 text-[11px] md:text-[12px] text-[var(--toss-gray-3)] font-bold">
-                    👤 {selectedPost.author_name || '익명'} ·{' '}
-                    {new Date(selectedPost.created_at).toLocaleString('ko-KR')}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {canEditPost(selectedPost) && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => handleEditPostStart(selectedPost)}
-                        className="px-3 py-1.5 rounded-full border border-blue-100 text-[11px] font-bold text-blue-600 hover:bg-blue-50"
-                      >
-                        수정
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeletePost(selectedPost)}
-                        className="px-3 py-1.5 rounded-full border border-red-100 text-[11px] font-bold text-red-600 hover:bg-red-50"
-                      >
-                        삭제
-                      </button>
-                    </>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setSelectedPostId(null)}
-                    className="px-3 py-1.5 rounded-full border border-[var(--toss-border)] text-[11px] font-bold text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]"
-                  >
-                    닫기
-                  </button>
-                </div>
-              </div>
-
-              {(selectedPost.board_type === '수술일정' || selectedPost.board_type === 'MRI일정') && (
-                <div className="space-y-4 border-t border-[var(--toss-border)] pt-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-[11px] font-bold text-[var(--toss-gray-4)]">
-                    <div>
-                      <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">수술/검사명</p>
-                      <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">{selectedPost.title}</p>
-                    </div>
-                    <div>
-                      <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">날짜·시간</p>
-                      <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">
-                        {selectedPost.schedule_date} {selectedPost.schedule_time}
+                    {/* 같은 날짜의 전체 일정 목록 */}
+                    <div className="bg-[var(--page-bg)] border border-[var(--toss-border)] rounded-[12px] p-3 space-y-2">
+                      <p className="text-[11px] font-semibold text-[var(--toss-gray-4)] flex items-center gap-2">
+                        📅 {selectedPost.schedule_date || '날짜 미지정'} 의 전체 일정
                       </p>
-                    </div>
-                    <div>
-                      <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">위치 / 환자명 (차트번호)</p>
-                      <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">
-                        {selectedPost.schedule_room || '위치 미지정'} / {selectedPost.patient_name || '환자 미지정'} {selectedPost.content ? `(${selectedPost.content})` : ''}
-                      </p>
-                    </div>
-                  </div>
-
-                  {(selectedPost.surgery_fasting ||
-                    selectedPost.surgery_inpatient ||
-                    selectedPost.surgery_guardian ||
-                    selectedPost.surgery_caregiver ||
-                    selectedPost.surgery_transfusion) && (
-                      <div className="bg-[var(--page-bg)] border border-[var(--toss-border)] rounded-[12px] p-3 space-y-1 text-[11px] font-bold text-[var(--toss-gray-4)]">
-                        <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">수술/검사 준비 상태</p>
-                        <div className="flex flex-wrap gap-1 pt-1">
-                          {selectedPost.surgery_fasting && (
-                            <span className="px-2 py-1 rounded-full bg-red-50 text-red-600 text-[11px] font-semibold">
-                              금식
-                            </span>
-                          )}
-                          {selectedPost.surgery_inpatient && (
-                            <span className="px-2 py-1 rounded-full bg-[var(--toss-blue-light)] text-[var(--toss-blue)] text-[11px] font-semibold">
-                              입원
-                            </span>
-                          )}
-                          {selectedPost.surgery_guardian && (
-                            <span className="px-2 py-1 rounded-full bg-emerald-50 text-emerald-600 text-[11px] font-semibold">
-                              보호자 동반
-                            </span>
-                          )}
-                          {selectedPost.surgery_caregiver && (
-                            <span className="px-2 py-1 rounded-full bg-purple-50 text-purple-600 text-[11px] font-semibold">
-                              간병인
-                            </span>
-                          )}
-                          {selectedPost.surgery_transfusion && (
-                            <span className="px-2 py-1 rounded-full bg-red-100 text-red-700 text-[11px] font-semibold">
-                              수혈 필요
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                  {/* 같은 날짜의 전체 일정 목록 */}
-                  <div className="bg-[var(--page-bg)] border border-[var(--toss-border)] rounded-[12px] p-3 space-y-2">
-                    <p className="text-[11px] font-semibold text-[var(--toss-gray-4)] flex items-center gap-2">
-                      📅 {selectedPost.schedule_date || '날짜 미지정'} 의 전체 일정
-                    </p>
-                    <div className="max-h-40 overflow-y-auto custom-scrollbar space-y-1 text-[11px]">
-                      {posts
-                        .filter(
-                          (p: any) =>
-                            p.board_type === selectedPost.board_type &&
-                            p.schedule_date === selectedPost.schedule_date
-                        )
-                        .map((p: any) => (
-                          <button
-                            key={p.id}
-                            type="button"
-                            onClick={() => setSelectedPostId(p.id)}
-                            className={`w-full flex items-center gap-2 px-2 py-1 rounded-[8px] text-left hover:bg-[var(--toss-card)] ${p.id === selectedPost.id ? 'bg-[var(--toss-card)] shadow-sm border border-[var(--toss-border)]' : ''
-                              }`}
-                          >
-                            <span className="text-[11px] font-bold text-[var(--toss-gray-3)] w-14 shrink-0">
-                              {p.schedule_time || ''}
-                            </span>
-                            <span className="flex-1 truncate font-bold text-[var(--foreground)]">
-                              {p.title}
-                            </span>
-                            <span className="text-[11px] font-bold text-[var(--toss-blue)] shrink-0">
-                              {p.patient_name || ''}
-                            </span>
-                          </button>
-                        ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {selectedPost.content && (
-                <div className="pt-4 border-t border-[var(--toss-border)]">
-                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--toss-gray-4)]">
-                    {selectedPost.content}
-                  </p>
-                </div>
-              )}
-
-              {(Array.isArray(selectedPost.attachments) ? selectedPost.attachments : []).length > 0 && (
-                <div className="pt-4 border-t border-[var(--toss-border)]">
-                  <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-2">첨부파일 ({(Array.isArray(selectedPost.attachments) ? selectedPost.attachments : []).length}개)</p>
-                  <div className="flex flex-wrap gap-4">
-                    {(Array.isArray(selectedPost.attachments) ? selectedPost.attachments : []).map((att: any, i: number) =>
-                      att.type === 'image' ? (
-                        <a key={i} href={att.url} target="_blank" rel="noopener noreferrer" className="block">
-                          <img
-                            src={att.url}
-                            alt={att.name}
-                            loading="eager"
-                            decoding="async"
-                            referrerPolicy="no-referrer"
-                            className="max-w-[280px] max-h-[280px] rounded-[16px] border border-[var(--toss-border)] object-cover shadow-sm bg-[var(--toss-gray-1)]"
-                            onError={(e) => {
-                              const el = e.target as HTMLImageElement;
-                              el.alt = '이미지를 불러올 수 없습니다.';
-                              el.classList.add('bg-red-50', 'border-red-200');
-                            }}
-                          />
-                        </a>
-                      ) : att.type === 'video' ? (
-                        <div key={i} className="rounded-[16px] border border-[var(--toss-border)] overflow-hidden bg-black max-w-[320px]">
-                          <video src={att.url} controls className="w-full max-h-[240px]" preload="metadata" />
-                          <p className="text-[11px] font-bold text-[var(--toss-gray-4)] p-2 bg-[var(--page-bg)] truncate">{att.name}</p>
-                        </div>
-                      ) : (
-                        <a key={i} href={att.url} target="_blank" rel="noopener noreferrer" download={att.name} className="inline-flex items-center gap-2 px-3 py-2 rounded-[16px] bg-[var(--toss-gray-1)] border border-[var(--toss-border)] text-sm font-bold text-[var(--toss-blue)] hover:bg-[var(--toss-blue-light)]">
-                          📎 {att.name}
-                        </a>
-                      )
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {(Array.isArray(selectedPost.tags) ? selectedPost.tags : []).length > 0 && (
-                <div className="flex flex-wrap gap-1 pt-2">
-                  {(Array.isArray(selectedPost.tags) ? selectedPost.tags : []).map(
-                    (tag: string, i: number) => (
-                      <span
-                        key={i}
-                        className="px-2 py-0.5 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] rounded-full text-[11px] font-bold"
-                      >
-                        #{tag}
-                      </span>
-                    ),
-                  )}
-                </div>
-              )}
-
-              {/* 댓글 + 대댓글 */}
-              <div className="pt-4 border-t border-[var(--toss-border)] space-y-3">
-                <p className="text-[11px] font-semibold text-[var(--toss-gray-4)] flex items-center gap-2">
-                  💬 댓글
-                  <span className="text-[11px] text-[var(--toss-gray-3)] font-bold">
-                    {(comments[selectedPost.id] || []).length}개
-                  </span>
-                </p>
-                {(() => {
-                  const list = comments[selectedPost.id] || [];
-                  const roots = list.filter((c: any) => !c.parent_comment_id);
-                  const repliesByParent: Record<string, any[]> = {};
-                  list.forEach((c: any) => {
-                    if (!c.parent_comment_id) return;
-                    const key = String(c.parent_comment_id);
-                    if (!repliesByParent[key]) repliesByParent[key] = [];
-                    repliesByParent[key].push(c);
-                  });
-                  return (
-                    <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
-                      {roots.map((c: any) => (
-                        <div key={c.id} className="space-y-1">
-                          <div className="text-xs text-[var(--toss-gray-4)] flex gap-2 items-center flex-wrap">
-                            <span className="font-bold">{c.author_name}:</span>
-                            <span className="flex-1 min-w-0">{c.content}</span>
-                            <span className="flex gap-1 shrink-0">
-                              {user?.id && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setReplyParentId(c.id);
-                                    setNewComment('');
-                                  }}
-                                  className="text-[11px] text-[var(--toss-gray-3)] hover:text-[var(--toss-blue)]"
-                                >
-                                  답글
-                                </button>
-                              )}
-                              {((user?.id && String(c.author_id) === String(user.id)) || user?.permissions?.mso || user?.role === 'admin') && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteComment(selectedPost.id, c.id)}
-                                  className="text-[11px] text-[var(--toss-gray-3)] hover:text-[#F04452]"
-                                >
-                                  삭제
-                                </button>
-                              )}
-                            </span>
-                          </div>
-                          {(repliesByParent[String(c.id)] || []).map((r: any) => (
-                            <div key={r.id} className="ml-6 text-xs text-[var(--toss-gray-4)] flex gap-2 items-center flex-wrap">
-                              <span className="font-bold">{r.author_name}:</span>
-                              <span className="flex-1 min-w-0">{r.content}</span>
-                              {((user?.id && String(r.author_id) === String(user.id)) || user?.permissions?.mso || user?.role === 'admin') && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteComment(selectedPost.id, r.id)}
-                                  className="text-[11px] text-[var(--toss-gray-3)] hover:text-[#F04452] shrink-0"
-                                >
-                                  삭제
-                                </button>
-                              )}
-                            </div>
+                      <div className="max-h-40 overflow-y-auto custom-scrollbar space-y-1 text-[11px]">
+                        {posts
+                          .filter(
+                            (p: any) =>
+                              p.board_type === selectedPost.board_type &&
+                              p.schedule_date === selectedPost.schedule_date
+                          )
+                          .map((p: any) => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => setSelectedPostId(p.id)}
+                              className={`w-full flex items-center gap-2 px-2 py-1 rounded-[8px] text-left hover:bg-[var(--toss-card)] ${p.id === selectedPost.id ? 'bg-[var(--toss-card)] shadow-sm border border-[var(--toss-border)]' : ''
+                                }`}
+                            >
+                              <span className="text-[11px] font-bold text-[var(--toss-gray-3)] w-14 shrink-0">
+                                {p.schedule_time || ''}
+                              </span>
+                              <span className="flex-1 truncate font-bold text-[var(--foreground)]">
+                                {p.title}
+                              </span>
+                              <span className="text-[11px] font-bold text-[var(--toss-blue)] shrink-0">
+                                {p.patient_name || ''}
+                              </span>
+                            </button>
                           ))}
-                        </div>
-                      ))}
-                      {roots.length === 0 && (
-                        <p className="text-[11px] text-[var(--toss-gray-3)] font-bold">첫 댓글을 남겨보세요.</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {selectedPost.content && (
+                  <div className="pt-4 border-t border-[var(--toss-border)]">
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--toss-gray-4)]">
+                      {selectedPost.content}
+                    </p>
+                  </div>
+                )}
+
+                {(Array.isArray(selectedPost.attachments) ? selectedPost.attachments : []).length > 0 && (
+                  <div className="pt-4 border-t border-[var(--toss-border)]">
+                    <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-2">첨부파일 ({(Array.isArray(selectedPost.attachments) ? selectedPost.attachments : []).length}개)</p>
+                    <div className="flex flex-wrap gap-4">
+                      {(Array.isArray(selectedPost.attachments) ? selectedPost.attachments : []).map((att: any, i: number) =>
+                        att.type === 'image' ? (
+                          <a key={i} href={att.url} target="_blank" rel="noopener noreferrer" className="block">
+                            <img
+                              src={att.url}
+                              alt={att.name}
+                              loading="eager"
+                              decoding="async"
+                              referrerPolicy="no-referrer"
+                              className="max-w-[280px] max-h-[280px] rounded-[16px] border border-[var(--toss-border)] object-cover shadow-sm bg-[var(--toss-gray-1)]"
+                              onError={(e) => {
+                                const el = e.target as HTMLImageElement;
+                                el.alt = '이미지를 불러올 수 없습니다.';
+                                el.classList.add('bg-red-50', 'border-red-200');
+                              }}
+                            />
+                          </a>
+                        ) : att.type === 'video' ? (
+                          <div key={i} className="rounded-[16px] border border-[var(--toss-border)] overflow-hidden bg-black max-w-[320px]">
+                            <video src={att.url} controls className="w-full max-h-[240px]" preload="metadata" />
+                            <p className="text-[11px] font-bold text-[var(--toss-gray-4)] p-2 bg-[var(--page-bg)] truncate">{att.name}</p>
+                          </div>
+                        ) : (
+                          <a key={i} href={att.url} target="_blank" rel="noopener noreferrer" download={att.name} className="inline-flex items-center gap-2 px-3 py-2 rounded-[16px] bg-[var(--toss-gray-1)] border border-[var(--toss-border)] text-sm font-bold text-[var(--toss-blue)] hover:bg-[var(--toss-blue-light)]">
+                            📎 {att.name}
+                          </a>
+                        )
                       )}
                     </div>
-                  );
-                })()}
-                <div className="flex gap-2">
-                  <input
-                    value={newComment}
-                    onChange={(e) => setNewComment(e.target.value)}
-                    placeholder={user?.id ? '댓글을 입력하세요.' : '로그인한 후 댓글을 입력할 수 있습니다.'}
-                    disabled={!user?.id}
-                    className="flex-1 px-3 py-2 border border-[var(--toss-border)] rounded-[12px] text-xs disabled:bg-[var(--page-bg)] disabled:text-[var(--toss-gray-3)]"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleAddComment(selectedPost.id, replyParentId)}
-                    disabled={!user?.id}
-                    className="px-3 py-2 bg-[var(--toss-blue)] text-white rounded-[12px] text-xs font-bold hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    등록
-                  </button>
-                </div>
-              </div>
+                  </div>
+                )}
 
+                {(Array.isArray(selectedPost.tags) ? selectedPost.tags : []).length > 0 && (
+                  <div className="flex flex-wrap gap-1 pt-2">
+                    {(Array.isArray(selectedPost.tags) ? selectedPost.tags : []).map(
+                      (tag: string, i: number) => (
+                        <span
+                          key={i}
+                          className="px-2 py-0.5 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] rounded-full text-[11px] font-bold"
+                        >
+                          #{tag}
+                        </span>
+                      ),
+                    )}
+                  </div>
+                )}
+
+                {/* 댓글 + 대댓글 */}
+                <div className="pt-4 border-t border-[var(--toss-border)] space-y-3">
+                  <p className="text-[11px] font-semibold text-[var(--toss-gray-4)] flex items-center gap-2">
+                    💬 댓글
+                    <span className="text-[11px] text-[var(--toss-gray-3)] font-bold">
+                      {(comments[selectedPost.id] || []).length}개
+                    </span>
+                  </p>
+                  {(() => {
+                    const list = comments[selectedPost.id] || [];
+                    const roots = list.filter((c: any) => !c.parent_comment_id);
+                    const repliesByParent: Record<string, any[]> = {};
+                    list.forEach((c: any) => {
+                      if (!c.parent_comment_id) return;
+                      const key = String(c.parent_comment_id);
+                      if (!repliesByParent[key]) repliesByParent[key] = [];
+                      repliesByParent[key].push(c);
+                    });
+                    return (
+                      <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
+                        {roots.map((c: any) => (
+                          <div key={c.id} className="space-y-1">
+                            <div className="text-xs text-[var(--toss-gray-4)] flex gap-2 items-center flex-wrap">
+                              <span className="font-bold">{c.author_name}:</span>
+                              <span className="flex-1 min-w-0">{c.content}</span>
+                              <span className="flex gap-1 shrink-0">
+                                {user?.id && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setReplyParentId(c.id);
+                                      setNewComment('');
+                                    }}
+                                    className="text-[11px] text-[var(--toss-gray-3)] hover:text-[var(--toss-blue)]"
+                                  >
+                                    답글
+                                  </button>
+                                )}
+                                {((user?.id && String(c.author_id) === String(user.id)) || user?.permissions?.mso || user?.role === 'admin') && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteComment(selectedPost.id, c.id)}
+                                    className="text-[11px] text-[var(--toss-gray-3)] hover:text-[#F04452]"
+                                  >
+                                    삭제
+                                  </button>
+                                )}
+                              </span>
+                            </div>
+                            {(repliesByParent[String(c.id)] || []).map((r: any) => (
+                              <div key={r.id} className="ml-6 text-xs text-[var(--toss-gray-4)] flex gap-2 items-center flex-wrap">
+                                <span className="font-bold">{r.author_name}:</span>
+                                <span className="flex-1 min-w-0">{r.content}</span>
+                                {((user?.id && String(r.author_id) === String(user.id)) || user?.permissions?.mso || user?.role === 'admin') && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteComment(selectedPost.id, r.id)}
+                                    className="text-[11px] text-[var(--toss-gray-3)] hover:text-[#F04452] shrink-0"
+                                  >
+                                    삭제
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                        {roots.length === 0 && (
+                          <p className="text-[11px] text-[var(--toss-gray-3)] font-bold">첫 댓글을 남겨보세요.</p>
+                        )}
+                      </div>
+                    );
+                  })()}
+                  <div className="flex gap-2">
+                    <input
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      placeholder={user?.id ? '댓글을 입력하세요.' : '로그인한 후 댓글을 입력할 수 있습니다.'}
+                      disabled={!user?.id}
+                      className="flex-1 px-3 py-2 border border-[var(--toss-border)] rounded-[12px] text-xs disabled:bg-[var(--page-bg)] disabled:text-[var(--toss-gray-3)]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleAddComment(selectedPost.id, replyParentId)}
+                      disabled={!user?.id}
+                      className="px-3 py-2 bg-[var(--toss-blue)] text-white rounded-[12px] text-xs font-bold hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      등록
+                    </button>
+                  </div>
+                </div>
+
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
+
+      {/* 🚀 사내위키 독립 뷰 */}
+      {activeBoard === '사내위키' && (
+        <WikiDashboard />
+      )}
     </div>
   );
 }

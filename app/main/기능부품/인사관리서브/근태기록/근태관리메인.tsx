@@ -112,8 +112,19 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
     const earlyLeave = attendanceData.filter((a: any) => a.status === 'early_leave').length;
     const absent = attendanceData.filter((a: any) => a.status === 'absent').length;
     const rate = total > 0 ? Math.round((present / total) * 100) : 0;
-    return { total, present, late, earlyLeave, absent, rate };
-  }, [attendanceData]);
+
+    const atRiskStaff: any[] = [];
+    filtered.forEach((s: any) => {
+      const myAtts = attendanceData.filter((a: any) => a.staff_id === s.id);
+      const lates = myAtts.filter((a: any) => a.status === 'late').length;
+      const absents = myAtts.filter((a: any) => a.status === 'absent').length;
+      if (lates >= 3 || absents >= 2) {
+        atRiskStaff.push({ name: s.name, dept: s.department, lates, absents });
+      }
+    });
+
+    return { total, present, late, earlyLeave, absent, rate, atRiskStaff };
+  }, [attendanceData, filtered]);
 
   return (
     <div className="flex flex-col h-full bg-[var(--page-bg)] animate-in fade-in duration-500">
@@ -510,7 +521,37 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
 
         {viewMode === 'dashboard' && (
           <div className="space-y-6 max-w-6xl mx-auto">
-            <h3 className="text-lg font-bold text-foreground mb-4">근태 요약 <span className="text-zinc-500 text-sm font-medium ml-2">{selectedMonth} 기준</span></h3>
+            {/* AI Attendance Alert Widget */}
+            {stats.atRiskStaff && stats.atRiskStaff.length > 0 && (
+              <div className="bg-rose-50 border border-rose-200 rounded-3xl p-6 shadow-sm flex items-start gap-4">
+                <div className="text-4xl">🚨</div>
+                <div className="flex-1">
+                  <h4 className="text-sm font-black text-rose-800 flex items-center gap-2">
+                    AI 근태 경고 알림 (Attendance Alert)
+                    <span className="px-2 py-0.5 bg-rose-200 text-rose-700 rounded-full text-[10px] animate-pulse">주의 요망</span>
+                  </h4>
+                  <p className="text-xs text-rose-600 mt-1 font-medium pb-4 border-b border-rose-200/50 mb-4">
+                    누적 지각(3회 이상) 또는 결근(2회 이상)이 발생하여 즉시 면담이 필요한 직원이 발견되었습니다.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {stats.atRiskStaff.map((risk: any, idx: number) => (
+                      <div key={idx} className="bg-white border border-rose-200 px-3 py-2 rounded-xl text-xs flex items-center gap-3">
+                        <span className="font-bold text-slate-800">{risk.name} <span className="text-[10px] text-slate-400 font-medium">({risk.dept})</span></span>
+                        <div className="flex gap-2">
+                          {risk.lates > 0 && <span className="text-orange-600 font-bold">지각 {risk.lates}회</span>}
+                          {risk.absents > 0 && <span className="text-rose-600 font-bold">결근 {risk.absents}회</span>}
+                        </div>
+                        <button className="ml-2 px-2 py-1 bg-rose-500 text-white text-[10px] rounded hover:bg-rose-600 font-bold">
+                          면담 요청
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <h3 className="text-lg font-bold text-foreground mb-4 mt-8">근태 요약 <span className="text-zinc-500 text-sm font-medium ml-2">{selectedMonth} 기준</span></h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 md:p-8 shadow-sm relative overflow-hidden group hover:border-blue-300 dark:hover:border-blue-700 transition-colors">
                 <div className="absolute top-0 right-0 p-6 text-4xl opacity-10 group-hover:scale-110 transition-transform">🎯</div>

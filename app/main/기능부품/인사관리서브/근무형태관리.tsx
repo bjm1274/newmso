@@ -14,6 +14,7 @@ type Shift = {
   shift_type?: string | null;
   weekly_work_days?: number | null;
   is_weekend_work?: boolean | null;
+  is_shift?: boolean | null;
 };
 
 export default function ShiftManagement({ selectedCo }: any) {
@@ -32,6 +33,7 @@ export default function ShiftManagement({ selectedCo }: any) {
     shift_type: '',
     weekly_work_days: 5,
     is_weekend_work: false,
+    is_shift: false,
   });
 
   const fetchShifts = async () => {
@@ -56,6 +58,7 @@ export default function ShiftManagement({ selectedCo }: any) {
         shift_type: s.shift_type || null,
         weekly_work_days: s.weekly_work_days ?? null,
         is_weekend_work: s.is_weekend_work ?? null,
+        is_shift: s.is_shift ?? false,
       }));
       if (selectedCo && selectedCo !== '전체') {
         list = list.filter((s: any) => s.company_name === selectedCo);
@@ -90,6 +93,7 @@ export default function ShiftManagement({ selectedCo }: any) {
             shift_type: newShift.shift_type || null,
             weekly_work_days: newShift.weekly_work_days ?? null,
             is_weekend_work: newShift.is_weekend_work ?? null,
+            is_shift: newShift.is_shift ?? false,
           })
           .eq('id', editingShiftId);
         if (error) throw error;
@@ -106,6 +110,7 @@ export default function ShiftManagement({ selectedCo }: any) {
           shift_type: newShift.shift_type || null,
           weekly_work_days: newShift.weekly_work_days ?? null,
           is_weekend_work: newShift.is_weekend_work ?? null,
+          is_shift: newShift.is_shift ?? false,
         }]);
         if (error) throw error;
         alert('근무 형태가 등록되었습니다.');
@@ -123,6 +128,7 @@ export default function ShiftManagement({ selectedCo }: any) {
         shift_type: '',
         weekly_work_days: 5,
         is_weekend_work: false,
+        is_shift: false,
       });
       fetchShifts();
     } catch (err) {
@@ -163,6 +169,7 @@ export default function ShiftManagement({ selectedCo }: any) {
               shift_type: '',
               weekly_work_days: 5,
               is_weekend_work: false,
+              is_shift: false,
             });
             setShowAddModal(true);
           }}
@@ -192,6 +199,7 @@ export default function ShiftManagement({ selectedCo }: any) {
                       shift_type: shift.shift_type || '',
                       weekly_work_days: shift.weekly_work_days ?? 5,
                       is_weekend_work: !!shift.is_weekend_work,
+                      is_shift: !!shift.is_shift,
                     });
                     setShowAddModal(true);
                   }}
@@ -223,16 +231,17 @@ export default function ShiftManagement({ selectedCo }: any) {
                 </div>
               )}
             </div>
-            {(shift.shift_type || shift.weekly_work_days || shift.is_weekend_work) && (
-              <div className="mt-2 text-[11px] font-bold text-[var(--toss-gray-3)] flex flex-wrap gap-2">
-                {shift.shift_type && <span className="px-2 py-0.5 rounded-full bg-[var(--toss-gray-1)] border border-[var(--toss-border)]">{shift.shift_type}</span>}
+            {(shift.shift_type || shift.weekly_work_days || shift.is_weekend_work || shift.is_shift) && (
+              <div className="mt-2 text-[11px] font-bold text-white flex flex-wrap gap-2">
+                {shift.is_shift && <span className="px-2 py-0.5 rounded-full bg-indigo-600 border border-indigo-700 shadow-sm">교대근무 전용</span>}
+                {shift.shift_type && <span className="px-2 py-0.5 rounded-full bg-slate-700 border border-slate-800 shadow-sm">{shift.shift_type}</span>}
                 {shift.weekly_work_days && (
-                  <span className="px-2 py-0.5 rounded-full bg-[var(--toss-gray-1)] border border-[var(--toss-border)]">
+                  <span className="px-2 py-0.5 rounded-full bg-slate-700 border border-slate-800 shadow-sm">
                     주 {shift.weekly_work_days}일 근무
                   </span>
                 )}
                 {shift.is_weekend_work && (
-                  <span className="px-2 py-0.5 rounded-full bg-[var(--toss-gray-1)] border border-[var(--toss-border)]">
+                  <span className="px-2 py-0.5 rounded-full bg-slate-700 border border-slate-800 shadow-sm">
                     주말 포함
                   </span>
                 )}
@@ -249,23 +258,23 @@ export default function ShiftManagement({ selectedCo }: any) {
 
       {showAddModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
-          <div className="bg-[var(--toss-card)] w-full max-w-md p-10 border-2 border-[var(--toss-border)] shadow-2xl space-y-6 radius-toss-xl">
+          <div className="bg-[var(--toss-card)] w-full max-w-md p-6 md:p-10 border-2 border-[var(--toss-border)] shadow-2xl space-y-6 radius-toss-xl max-h-[90vh] overflow-y-auto custom-scrollbar">
             <h3 className="page-title border-b-2 border-[var(--toss-border)] pb-2">
               {editingShiftId ? '근무 형태 수정' : '근무 형태 생성'}
             </h3>
             <div className="space-y-4">
               <div>
                 <label className="caption uppercase block mb-1">명칭 (예: 3교대-데이, 나이트전담)</label>
-                <input type="text" value={newShift.name} onChange={e => setNewShift({...newShift, name: e.target.value})} className="w-full p-3 bg-[var(--input-bg)] border border-[var(--toss-border)] font-semibold text-xs outline-none focus:border-[var(--foreground)] radius-toss" placeholder="근무 형태 이름을 입력하세요" />
+                <input type="text" value={newShift.name} onChange={e => setNewShift({ ...newShift, name: e.target.value })} className="w-full p-3 bg-[var(--input-bg)] border border-[var(--toss-border)] font-semibold text-xs outline-none focus:border-[var(--foreground)] radius-toss" placeholder="근무 형태 이름을 입력하세요" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="caption uppercase block mb-1">출근 시간</label>
-                  <input type="time" value={newShift.start_time} onChange={e => setNewShift({...newShift, start_time: e.target.value})} className="w-full p-3 bg-[var(--input-bg)] border border-[var(--toss-border)] font-semibold text-xs radius-toss" />
+                  <input type="time" value={newShift.start_time} onChange={e => setNewShift({ ...newShift, start_time: e.target.value })} className="w-full p-3 bg-[var(--input-bg)] border border-[var(--toss-border)] font-semibold text-xs radius-toss" />
                 </div>
                 <div>
                   <label className="caption uppercase block mb-1">퇴근 시간</label>
-                  <input type="time" value={newShift.end_time} onChange={e => setNewShift({...newShift, end_time: e.target.value})} className="w-full p-3 bg-[var(--input-bg)] border border-[var(--toss-border)] font-semibold text-xs radius-toss" />
+                  <input type="time" value={newShift.end_time} onChange={e => setNewShift({ ...newShift, end_time: e.target.value })} className="w-full p-3 bg-[var(--input-bg)] border border-[var(--toss-border)] font-semibold text-xs radius-toss" />
                 </div>
               </div>
               <div>
@@ -282,7 +291,7 @@ export default function ShiftManagement({ selectedCo }: any) {
               </div>
               <div>
                 <label className="caption uppercase block mb-1">설명</label>
-                <textarea value={newShift.description} onChange={e => setNewShift({...newShift, description: e.target.value})} className="w-full p-3 bg-[var(--input-bg)] border border-[var(--toss-border)] font-semibold text-xs h-20 radius-toss" placeholder="근무 형태에 대한 설명을 입력하세요" />
+                <textarea value={newShift.description} onChange={e => setNewShift({ ...newShift, description: e.target.value })} className="w-full p-3 bg-[var(--input-bg)] border border-[var(--toss-border)] font-semibold text-xs h-20 radius-toss" placeholder="근무 형태에 대한 설명을 입력하세요" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -342,6 +351,21 @@ export default function ShiftManagement({ selectedCo }: any) {
                     </label>
                   </div>
                 </div>
+              </div>
+
+              <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800/30">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={newShift.is_shift || false}
+                    onChange={e => setNewShift({ ...newShift, is_shift: e.target.checked })}
+                    className="mt-0.5 w-4 h-4 text-indigo-600 bg-white border-indigo-300 rounded focus:ring-indigo-500"
+                  />
+                  <div>
+                    <span className="text-xs font-bold text-indigo-900 dark:text-indigo-400 block mb-0.5">교대 근무 전용 스케줄 여부</span>
+                    <span className="text-[10px] text-indigo-700 dark:text-indigo-500 font-medium">체크 시, 교대제 캘린더 화면에서 '교대근무자'를 대상으로만 이 근무 형태가 노출됩니다.</span>
+                  </div>
+                </label>
               </div>
             </div>
             <div className="flex gap-2 pt-4">

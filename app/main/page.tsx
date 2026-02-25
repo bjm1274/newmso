@@ -9,6 +9,7 @@ import MainContent from './기능부품/조직도서브/조직도본문';
 import NotificationSystem from './기능부품/알림시스템';
 import ChatAlertBanner from './기능부품/채팅알림배너';
 import PermissionPromptModal from './기능부품/권한요청모달';
+import HRAIChatbot from './기능부품/인사관리서브/HR챗봇';
 
 type ERPData = {
   staffs: any[];
@@ -47,6 +48,8 @@ function MainPageContent() {
   const [initialMyPageTab, setInitialMyPageTab] = useState<string | null>(null);
   const [initialBoardView, setInitialBoardView] = useState<string | null>(null);
   const [initialOpenChatRoomId, setInitialOpenChatRoomId] = useState<string | null>(null);
+  const [initialOpenMessageId, setInitialOpenMessageId] = useState<string | null>(null);
+  const [initialOpenPostId, setInitialOpenPostId] = useState<string | null>(null);
 
   const [data, setData] = useState<ERPData>({
     staffs: [],
@@ -103,9 +106,11 @@ function MainPageContent() {
   // 알림 클릭 시 open_chat_room 쿼리 처리 → 채팅 메뉴 + 해당 채팅방 연동 (웹/모바일 동일)
   useEffect(() => {
     const roomId = searchParams.get('open_chat_room')?.trim();
-    if (roomId) {
+    const msgId = searchParams.get('open_msg')?.trim();
+    if (roomId || msgId) {
       setMainMenu('채팅');
-      setInitialOpenChatRoomId(roomId);
+      if (roomId) setInitialOpenChatRoomId(roomId);
+      if (msgId) setInitialOpenMessageId(msgId);
       router.replace('/main', { scroll: false });
     }
   }, [searchParams, router]);
@@ -113,11 +118,16 @@ function MainPageContent() {
   // 페이지 이동 처리 (알림 인박스에서 메뉴 오픈용)
   useEffect(() => {
     const targetMenu = searchParams.get('open_menu')?.trim();
-    if (targetMenu) {
-      setMainMenu(targetMenu);
+    const openPost = searchParams.get('open_post')?.trim();
+    if (targetMenu || openPost) {
+      if (targetMenu) setMainMenu(targetMenu);
       const openBoard = searchParams.get('open_board')?.trim();
       if (openBoard) {
         setInitialBoardView(openBoard);
+      }
+      if (openPost) {
+        setMainMenu('게시판'); // open_post가 있으면 무조건 게시판으로 이동
+        setInitialOpenPostId(openPost);
       }
       router.replace('/main', { scroll: false });
     }
@@ -255,21 +265,44 @@ function MainPageContent() {
         }}
       />
 
-      {/* 서브메뉴: 게시판·전자결재·인사관리·재고관리·관리자 등 (모바일 가로 스크롤, PC 세로 사이드바) */}
       {currentSubMenus.length > 0 && (
         <aside className="flex flex-row md:flex-col w-full md:w-44 bg-[var(--toss-card)] border-b md:border-b-0 md:border-r border-[var(--toss-border)] p-2 md:py-4 md:px-3 space-x-1 md:space-x-0 md:space-y-1 shrink-0 overflow-x-auto md:overflow-x-visible no-scrollbar">
-          {currentSubMenus.map((sub) => (
-            <button
-              key={sub.id}
-              onClick={() => setSubView(sub.id)}
-              className={`flex-none md:w-full text-center md:text-left px-4 md:px-3 py-2 md:py-2.5 text-[11px] font-bold rounded-[12px] transition-all whitespace-nowrap ${subView === sub.id
-                ? 'bg-[var(--toss-blue)] text-white shadow-md'
-                : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
-                }`}
-            >
-              {sub.label}
-            </button>
-          ))}
+          {(() => {
+            if (mainMenu === '관리자') {
+              const groups = Array.from(new Set(currentSubMenus.map(s => s.group))).filter(Boolean);
+
+              return groups.map(groupName => (
+                <div key={groupName!} className="flex flex-row md:flex-col space-x-1 md:space-x-0 md:space-y-1 mb-0 md:mb-4 shrink-0">
+                  <div className="hidden md:block px-3 py-1.5 text-[10px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">{groupName}</div>
+                  {currentSubMenus.filter(s => s.group === groupName).map(sub => (
+                    <button
+                      key={sub.id}
+                      onClick={() => setSubView(sub.id)}
+                      className={`flex-none md:w-full text-center md:text-left px-4 md:px-3 py-2 md:py-2.5 text-[11px] font-bold rounded-[12px] transition-all whitespace-nowrap ${subView === sub.id
+                        ? 'bg-[var(--foreground)] text-white shadow-md'
+                        : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
+                        }`}
+                    >
+                      {sub.label}
+                    </button>
+                  ))}
+                </div>
+              ));
+            }
+
+            return currentSubMenus.map((sub) => (
+              <button
+                key={sub.id}
+                onClick={() => setSubView(sub.id)}
+                className={`flex-none md:w-full text-center md:text-left px-4 md:px-3 py-2 md:py-2.5 text-[11px] font-bold rounded-[12px] transition-all whitespace-nowrap ${subView === sub.id
+                  ? 'bg-[var(--toss-blue)] text-white shadow-md'
+                  : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
+                  }`}
+              >
+                {sub.label}
+              </button>
+            ));
+          })()}
         </aside>
       )}
 
@@ -313,10 +346,17 @@ function MainPageContent() {
           initialMyPageTab={initialMyPageTab}
           onConsumeMyPageInitialTab={() => setInitialMyPageTab(null)}
           initialBoard={initialBoardView}
+          initialOpenPostId={initialOpenPostId}
+          onConsumeOpenPostId={() => setInitialOpenPostId(null)}
           initialOpenChatRoomId={initialOpenChatRoomId}
-          onConsumeOpenChatRoomId={() => setInitialOpenChatRoomId(null)}
+          initialOpenMessageId={initialOpenMessageId}
+          onConsumeOpenChatRoomId={() => {
+            setInitialOpenChatRoomId(null);
+            setInitialOpenMessageId(null);
+          }}
           setMainMenu={setMainMenu}
         />
+        <HRAIChatbot user={user} />
       </div>
     </div>
   );

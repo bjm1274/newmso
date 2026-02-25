@@ -176,7 +176,7 @@ export default function ContractPreview({ staff, contract }: Props) {
   const sig = contract?.signature_data as string | undefined;
 
   return (
-    <div className="bg-white border border-[var(--toss-border)] shadow-2xl p-10 flex flex-col h-[800px] overflow-y-auto rounded-[12px] relative custom-scrollbar print:shadow-none">
+    <div className="bg-[var(--page-bg)] border border-[var(--toss-border)] shadow-sm p-4 md:p-8 flex flex-col h-[900px] overflow-y-auto rounded-[16px] relative custom-scrollbar print:shadow-none">
       <div className="flex items-start justify-between mb-6">
         <div>
           <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">
@@ -190,11 +190,10 @@ export default function ContractPreview({ staff, contract }: Props) {
         <div className="flex flex-col items-end gap-2">
           {contract?.status && (
             <span
-              className={`px-3 py-1 text-[11px] font-semibold rounded-full border ${
-                contract.status === '서명완료'
+              className={`px-3 py-1 text-[11px] font-semibold rounded-full border ${contract.status === '서명완료'
                   ? 'bg-green-50 text-green-600 border-green-100'
                   : 'bg-orange-50 text-orange-600 border-orange-100'
-              }`}
+                }`}
             >
               {contract.status}
             </span>
@@ -207,7 +206,12 @@ export default function ContractPreview({ staff, contract }: Props) {
         </div>
       </div>
 
-      <div className="flex-1 mt-4 p-6 bg-[var(--toss-gray-1)] border border-[var(--toss-border)] rounded-[16px] font-mono text-[11px] leading-relaxed text-[var(--foreground)] whitespace-pre-wrap">
+      <div className="flex-1 mt-4 p-8 md:p-12 bg-white border border-[var(--toss-border)] rounded-[4px] shadow-sm mx-auto w-full max-w-[700px] font-serif text-[13px] leading-[1.8] text-[#111] whitespace-pre-wrap relative overflow-hidden">
+        {/* A4 Watermark */}
+        <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-[0.03]">
+          <span className="text-9xl font-black rotate-[-45deg] select-none text-black">CONFIDENTIAL</span>
+        </div>
+
         {loading
           ? '계약서 내용을 불러오는 중입니다...'
           : text || '이 회사에 설정된 표준 근로계약서 양식이 없습니다.'}

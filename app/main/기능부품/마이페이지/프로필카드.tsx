@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
-export default function MyProfileCard({ user: initialUser }: any) {
+export default function MyProfileCard({ user: initialUser, onOpenApproval }: any) {
   const router = useRouter();
   const [user, setUser] = useState<any>(initialUser || {});
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -201,42 +201,30 @@ export default function MyProfileCard({ user: initialUser }: any) {
         return;
       }
 
+      // 내 정보를 즉시 수정하지 않고, 인사팀 승인을 받기 위한 요청(ESS) 데이터 전송
       const { error } = await supabase
-        .from('staff_members')
-        .update({
-          email: editForm.email || null,
-          phone: editForm.phone || null,
-          extension: editForm.extension || null,
-          address: editForm.address || null,
-          bank_name: editForm.bank_name || null,
-          account_no: editForm.account_no || null,
-        })
-        .eq('id', currentUser.id);
+        .from('audit_logs')
+        .insert([{
+          user_id: currentUser.id,
+          user_name: currentUser.name,
+          action: '인사변경', // 임시로 인사변경 액션 사용
+          target_type: 'ESS_PROFILE_UPDATE_PENDING',
+          target_id: String(currentUser.id),
+          details: { requested_changes: editForm, original_data: currentUser },
+          created_at: new Date().toISOString()
+        }]);
 
       if (error) {
         console.error(error);
-        alert(`내 정보 저장 중 오류가 발생했습니다.\n상세: ${error.message || JSON.stringify(error)}`);
+        alert(`정보 변경 요청 중 오류가 발생했습니다.\n상세: ${error.message || JSON.stringify(error)}`);
         return;
       }
 
-      const updatedUser = {
-        ...currentUser,
-        email: editForm.email,
-        phone: editForm.phone,
-        extension: editForm.extension,
-        address: editForm.address,
-        bank_name: editForm.bank_name,
-        account_no: editForm.account_no,
-      };
-      setUser(updatedUser);
-      localStorage.setItem('user_session', JSON.stringify(updatedUser));
-      localStorage.setItem('erp_user', JSON.stringify(updatedUser));
-
       setIsEditing(false);
-      alert('내 정보가 저장되었습니다.');
+      alert('인사팀으로 내 정보 변경 요청(결재 대기)이 전송되었습니다. 관리자 승인 후 반영됩니다.');
     } catch (err) {
       console.error(err);
-      alert('내 정보 저장에 실패했습니다.');
+      alert('요청 전송에 실패했습니다.');
     }
   };
 
@@ -358,7 +346,7 @@ export default function MyProfileCard({ user: initialUser }: any) {
             <h3 className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest border-l-4 border-emerald-500 pl-3 mb-1">
               나의 근태 · 연차
             </h3>
-            <LeaveAndCommuteSummary user={user} />
+            <LeaveAndCommuteSummary user={user} onOpenApproval={onOpenApproval} />
           </div>
 
           {/* 보안 및 급여 */}
@@ -493,7 +481,7 @@ function EditableItem({ label, value, onChange, placeholder }: any) {
   );
 }
 
-function LeaveAndCommuteSummary({ user }: any) {
+function LeaveAndCommuteSummary({ user, onOpenApproval }: any) {
   const [summary, setSummary] = useState<{
     total: number;
     used: number;
@@ -574,16 +562,24 @@ function LeaveAndCommuteSummary({ user }: any) {
 
   return (
     <div className="bg-[var(--toss-gray-1)] border border-[var(--toss-border)] rounded-[16px] p-4 sm:p-5 space-y-4 text-[12px]">
-      <div>
-        <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1.5">
-          연차 현황
-        </p>
-        <p className="text-[14px] font-bold text-[var(--foreground)] leading-snug">
-          잔여 연차 <span className="text-emerald-600">{summary.remaining.toFixed(1)}일</span>
-        </p>
-        <p className="text-[11px] text-[var(--toss-gray-4)] mt-0.5">
-          총 {summary.total.toFixed(1)}일 중 {summary.used.toFixed(1)}일 사용
-        </p>
+      <div className="flex justify-between items-end">
+        <div>
+          <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1.5">
+            연차 현황
+          </p>
+          <p className="text-[14px] font-bold text-[var(--foreground)] leading-snug">
+            잔여 연차 <span className="text-emerald-600">{summary.remaining.toFixed(1)}일</span>
+          </p>
+          <p className="text-[11px] text-[var(--toss-gray-4)] mt-0.5">
+            총 {summary.total.toFixed(1)}일 중 {summary.used.toFixed(1)}일 사용
+          </p>
+        </div>
+        <button
+          onClick={() => onOpenApproval?.({ type: '휴가신청' })}
+          className="px-3 py-1.5 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-[8px] text-[11px] font-bold hover:bg-emerald-100 transition-colors"
+        >
+          🏖️ 연차 신청
+        </button>
       </div>
 
       <div className="border-t border-[var(--toss-border)] pt-4 space-y-2">

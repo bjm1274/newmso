@@ -9,6 +9,9 @@ import MyTodoList from './나의할일';
 import CommuteRecord from './출퇴근기록';
 import MyCertificates from './증명서관리';
 import NotificationInbox from '../알림인박스';
+import SignaturePad from '../인사관리서브/계약문서/전자서명패드';
+import ContractPreview from '../인사관리서브/계약문서/계약서미리보기';
+import { supabase } from '@/lib/supabase';
 
 const MYPAGE_TAB_KEY = 'erp_mypage_tab';
 const FAVORITES_KEY = 'erp_mypage_favorites';
@@ -58,6 +61,59 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
   const [favorites, setFavorites] = useState<FavoriteId[]>([]);
   const [showFavPicker, setShowFavPicker] = useState(false);
   const [pendingFav, setPendingFav] = useState<FavoriteId | ''>('');
+
+  const [pendingContract, setPendingContract] = useState<any>(null);
+  const [showSignaturePad, setShowSignaturePad] = useState(false);
+
+  // 미서명 계약서 확인
+  useEffect(() => {
+    if (!user?.id) return;
+    const checkPendingContracts = async () => {
+      const { data } = await supabase
+        .from('employment_contracts')
+        .select('*')
+        .eq('staff_id', user.id)
+        .eq('status', '서명대기')
+        .order('requested_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (data) {
+        setPendingContract(data);
+      } else {
+        setPendingContract(null);
+      }
+    };
+    checkPendingContracts();
+  }, [user?.id]);
+
+  const handleSignComplete = async (signatureDataUrl: string) => {
+    if (!pendingContract) return;
+    try {
+      await supabase
+        .from('employment_contracts')
+        .update({
+          status: '서명완료',
+          signed_at: new Date().toISOString(),
+          signature_data: signatureDataUrl
+        })
+        .eq('id', pendingContract.id);
+
+      // HR에게 알림 전송 (system_admin로 임시 지정)
+      await supabase.from('notifications').insert({
+        user_id: 'system_admin',
+        title: '계약서 서명 완료',
+        message: `${user.name} 님이 근로계약서에 전자서명을 완료했습니다.`,
+        type: 'SUCCESS',
+        is_read: false
+      });
+
+      alert('근로계약서 서명이 성공적으로 완료되었습니다.');
+      setPendingContract(null);
+      setShowSignaturePad(false);
+    } catch (e) {
+      alert('서명 저장 중 오류가 발생했습니다.');
+    }
+  };
 
   // 초기 탭: 알림 탭 우선, 그 외에는 이전에 보던 탭을 로컬스토리지에서 복구
   useEffect(() => {
@@ -167,7 +223,38 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
   if (!user) return <div className="p-10 text-center font-bold">사용자 정보 로딩 중...</div>;
 
   return (
-    <div className="h-full min-h-0 flex flex-col app-page px-3 py-4 md:p-6 rounded-none md:rounded-[3rem] overflow-hidden">
+    <div className="h-full min-h-0 flex flex-col app-page px-3 py-4 md:p-6 rounded-none md:rounded-[3rem] overflow-hidden relative">
+
+      {/* 서명 대기 계약서 강제 모달 */}
+      {pendingContract && !showSignaturePad && (
+        <div className="absolute inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-[24px] shadow-2xl max-w-4xl w-full flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="p-6 border-b border-[var(--toss-border)] bg-[var(--toss-blue)] text-white shrink-0">
+              <h2 className="text-xl font-bold tracking-tight">✍️ 서명 대기 중인 근로계약서가 있습니다.</h2>
+              <p className="text-sm opacity-90 mt-1">전자서명을 완료해야 시스템 전체 기능을 이용하실 수 있습니다.</p>
+            </div>
+            <div className="flex-1 overflow-y-auto bg-[var(--toss-gray-1)] p-6">
+              <ContractPreview staff={user} contract={pendingContract} />
+            </div>
+            <div className="p-6 bg-white border-t border-[var(--toss-border)] flex justify-end gap-3 shrink-0">
+              <button
+                onClick={() => setShowSignaturePad(true)}
+                className="px-8 py-3 bg-[var(--toss-blue)] text-white font-bold rounded-[12px] shadow-xl hover:scale-105 transition-transform"
+              >
+                위 내용에 동의하며 서명하기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 전자서명 패드 오버레이 */}
+      {showSignaturePad && (
+        <SignaturePad
+          onSignComplete={handleSignComplete}
+          onCancel={() => setShowSignaturePad(false)}
+        />
+      )}
 
       {/* 상단 로고 및 헤더 */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 shrink-0">
@@ -275,7 +362,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
       {/* 메인 콘텐츠 영역 */}
       <div className="flex-1 min-h-0 overflow-hidden relative">
         <div className="absolute inset-0 overflow-y-auto overflow-x-hidden transition-all duration-300">
-          {activeTab === 'profile' && <MyProfileCard user={user} />}
+          {activeTab === 'profile' && <MyProfileCard user={user} onOpenApproval={onOpenApproval} />}
           {activeTab === 'commute' && (
             <CommuteRecord
               user={user}

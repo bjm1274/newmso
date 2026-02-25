@@ -13,8 +13,10 @@ import ExcelBulkUpload from './관리자전용서브/엑셀일괄등록';
 import NotificationAutomation from './관리자전용서브/알림자동화설정';
 import 연차수동부여 from './관리자전용서브/연차수동부여';
 import SurgeryExamTemplateManager from './관리자전용서브/수술검사템플릿관리';
+import FormBuilder from './전자결재서브/양식빌더';
+import FinancialDashboard from './관리자전용서브/재무대시보드';
 
-const ADMIN_TAB_IDS = ['경영대시보드', '엑셀등록', '알림자동화', '연차부여', '회사관리', '직원권한', '수술검사템플릿', '팝업관리', '감사로그', '데이터백업', '데이터초기화'];
+const ADMIN_TAB_IDS = ['경영대시보드', '재무대시보드', '엑셀등록', '알림자동화', '연차부여', '회사관리', '직원권한', '수술검사템플릿', '팝업관리', '감사로그', '데이터백업', '데이터초기화', '양식빌더'];
 
 export default function AdminView({ user, staffs = [], depts = [], onRefresh, initialTab }: any) {
   const [activeTab, setActiveTab] = useState(initialTab && ADMIN_TAB_IDS.includes(initialTab) ? initialTab : '경영대시보드');
@@ -34,7 +36,8 @@ export default function AdminView({ user, staffs = [], depts = [], onRefresh, in
   }, [isMso]);
 
   const adminTabs = [
-    { id: '경영대시보드', label: '📊 대시보드' },
+    { id: '경영대시보드', label: '📊 일반 대시보드' },
+    { id: '재무대시보드', label: '📉 재무 대시보드' },
     { id: '엑셀등록', label: '📁 엑셀 일괄' },
     { id: '알림자동화', label: '🔔 알림 자동화' },
     { id: '연차부여', label: '🏖️ 연차 부여' },
@@ -44,7 +47,8 @@ export default function AdminView({ user, staffs = [], depts = [], onRefresh, in
     { id: '팝업관리', label: '팝업' },
     { id: '감사로그', label: '감사 로그' },
     { id: '데이터백업', label: '백업/복원' },
-    { id: '데이터초기화', label: '초기화' }
+    { id: '데이터초기화', label: '초기화' },
+    { id: '양식빌더', label: '📝 양식 빌더' }
   ];
 
   if (!isMso) {
@@ -68,6 +72,7 @@ export default function AdminView({ user, staffs = [], depts = [], onRefresh, in
         {activeTab === '경영대시보드' && (
           <BusinessDashboard staffs={staffs} inventory={inventory} />
         )}
+        {activeTab === '재무대시보드' && <FinancialDashboard />}
         {activeTab === '엑셀등록' && <ExcelBulkUpload onRefresh={onRefresh} />}
         {activeTab === '알림자동화' && <NotificationAutomation user={user} />}
         {activeTab === '연차부여' && (
@@ -82,6 +87,7 @@ export default function AdminView({ user, staffs = [], depts = [], onRefresh, in
         {activeTab === '데이터초기화' && (
           <DataReseter onRefresh={onRefresh} />
         )}
+        {activeTab === '양식빌더' && <FormBuilder user={user} />}
       </main>
     </div>
   );

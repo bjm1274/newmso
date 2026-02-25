@@ -96,7 +96,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
           apply_tax: true,
           apply_insurance: true,
           attendance_deduction: total,
-          attendance_deduction_detail: detail,
+          attendance_deduction_detail: { ...detail, original_deduction: total },
           advance_pay: 0,
         };
       });
@@ -119,7 +119,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
 
   const calculateSalary = (id: string) => {
     const data = settlementData[id];
-    
+
     // 비과세 한도 체크 및 과세 전환 계산
     const meal_tf = Math.min(Number(data.meal_allowance), TAX_FREE_LIMITS.meal);
     const meal_taxable = Math.max(0, Number(data.meal_allowance) - TAX_FREE_LIMITS.meal);
@@ -136,11 +136,11 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
     const research_taxable = Math.max(0, Number(data.research_allowance) - TAX_FREE_LIMITS.research);
 
     const total_taxfree = meal_tf + vehicle_tf + childcare_tf + research_tf + nightDuty + Number(data.other_taxfree);
-    
+
     // 과세 대상: 기본급 + 한도초과 비과세분 + 연장수당 + 상여 + 기타수당 - 근태차감
     const attendance_deduction = Number(data.attendance_deduction) || 0;
     const total_taxable = Number(data.base_salary) + meal_taxable + vehicle_taxable + childcare_taxable + research_taxable +
-                          Number(data.overtime_pay) + Number(data.bonus) + Number(data.extra_allowance) - attendance_deduction;
+      Number(data.overtime_pay) + Number(data.bonus) + Number(data.extra_allowance) - attendance_deduction;
 
     const total_payment = total_taxable + total_taxfree;
 
@@ -179,7 +179,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
 
   const handleFinalize = async () => {
     if (!confirm(`${selectedStaffs.length}명의 급여 정산을 확정하고 명세서를 생성하시겠습니까?`)) return;
-    
+
     setLoading(true);
     try {
       const advancePayAmount = (id: string) => Number(settlementData[id]?.advance_pay) || 0;
@@ -263,9 +263,8 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
                 <div
                   key={s.id}
                   onClick={() => toggleStaff(s)}
-                  className={`p-4 rounded-[12px] border cursor-pointer transition-colors flex items-center gap-3 ${
-                    selectedStaffs.find(ts => ts.id === s.id) ? 'border-[var(--toss-blue)] bg-[var(--toss-blue-light)]/70 ring-1 ring-[var(--toss-blue)]/30' : 'border-[var(--toss-border)] bg-[var(--toss-card)] hover:bg-[var(--toss-gray-1)]'
-                  }`}
+                  className={`p-4 rounded-[12px] border cursor-pointer transition-colors flex items-center gap-3 ${selectedStaffs.find(ts => ts.id === s.id) ? 'border-[var(--toss-blue)] bg-[var(--toss-blue-light)]/70 ring-1 ring-[var(--toss-blue)]/30' : 'border-[var(--toss-border)] bg-[var(--toss-card)] hover:bg-[var(--toss-gray-1)]'
+                    }`}
                 >
                   <div className="w-10 h-10 rounded-[12px] bg-[var(--tab-bg)] flex items-center justify-center text-sm font-semibold text-[var(--toss-blue)]">{s.name[0]}</div>
                   <div>
@@ -326,15 +325,43 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
                         <label className="text-xs font-medium text-[var(--toss-gray-4)]">비과세 합계</label>
                         <div className="h-9 px-3 flex items-center bg-[var(--toss-gray-1)] border border-[var(--toss-border)] rounded-md text-sm font-medium text-[var(--foreground)]">₩ {(isAdvanceOnly ? 0 : res.taxfree).toLocaleString()}</div>
                       </div>
-                      {(data.attendance_deduction || 0) > 0 && (
+                      {(data.attendance_deduction !== undefined && (data.attendance_deduction > 0 || data.attendance_deduction_detail?.original_deduction > 0)) && (
                         <div className="sm:col-span-2 lg:col-span-3 space-y-1">
-                          <label className="text-xs font-medium text-orange-700">근태 차감</label>
-                          <div className="px-3 py-2 bg-orange-50 border border-orange-200 rounded-md text-sm font-medium text-orange-800">
-                            -₩ {(data.attendance_deduction || 0).toLocaleString()}
-                            {data.attendance_deduction_detail && Object.keys(data.attendance_deduction_detail).length > 0 && (
-                              <span className="ml-2 text-xs text-orange-600">(지각/조퇴/결근)</span>
+                          <div className="flex justify-between items-center">
+                            <label className="text-xs font-bold text-orange-700">근태 차감 (지각/조퇴/결근)</label>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => {
+                                  if (confirm('이 직원의 근태 차감을 전액 면제(0원)하시겠습니까?\n사유: 관리자 재량 예외처리 / 보상휴가 전환 등')) {
+                                    updateData(s.id, 'attendance_deduction', 0);
+                                  }
+                                }}
+                                className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-1 rounded-[6px] hover:bg-emerald-200 transition-colors"
+                              >
+                                ✨ 전액 면제
+                              </button>
+                              <button
+                                onClick={() => {
+                                  const ans = prompt('수동으로 차감할 금액을 입력하세요 (원 단위):', data.attendance_deduction);
+                                  if (ans !== null && !isNaN(Number(ans))) {
+                                    updateData(s.id, 'attendance_deduction', Number(ans));
+                                  }
+                                }}
+                                className="text-[10px] font-bold bg-orange-100 text-orange-700 px-2 py-1 rounded-[6px] hover:bg-orange-200 transition-colors shadow-sm"
+                              >
+                                📝 금액 직접수정
+                              </button>
+                            </div>
+                          </div>
+                          <div className="px-3 py-2.5 bg-orange-50/80 border border-orange-200 rounded-lg text-sm font-extrabold text-orange-800 flex justify-between items-center shadow-inner">
+                            <span>-₩ {(data.attendance_deduction || 0).toLocaleString()}</span>
+                            {data.attendance_deduction_detail?.original_deduction !== undefined && data.attendance_deduction_detail.original_deduction !== data.attendance_deduction && (
+                              <span className="text-[10px] font-semibold text-orange-400/80 line-through">원래 산출액: -₩{data.attendance_deduction_detail.original_deduction.toLocaleString()}</span>
                             )}
                           </div>
+                          {data.attendance_deduction === 0 && data.attendance_deduction_detail?.original_deduction > 0 && (
+                            <p className="text-[10px] text-emerald-600 font-bold mt-1 text-right">※ 관리자 권한으로 차감이 면제되었습니다.</p>
+                          )}
                         </div>
                       )}
                     </div>

@@ -4,11 +4,11 @@ import { supabase } from '@/lib/supabase';
 import SignaturePad from '@/app/components/SignaturePad';
 import { getOrdinaryWageTable } from '@/lib/ordinary-wage';
 
-import OrgChart from './조직도그림'; 
-import MyPage from '../마이페이지'; 
-import ChatView from '../메신저'; 
+import OrgChart from './조직도그림';
+import MyPage from '../마이페이지';
+import ChatView from '../메신저';
 import BoardView from '../게시판';
-import ApprovalView from '../전자결재'; 
+import ApprovalView from '../전자결재';
 import HRView from '../인사관리';
 import InventoryView from '../재고관리_통합완성';
 import AdminView from '../관리자전용';
@@ -31,6 +31,9 @@ export default function MainContent({
   onConsumeMyPageInitialTab,
   initialOpenChatRoomId,
   onConsumeOpenChatRoomId,
+  initialOpenMessageId,
+  initialOpenPostId,
+  onConsumeOpenPostId,
   setMainMenu,
 }: any) {
   const [pendingContract, setPendingContract] = useState<any>(null);
@@ -49,7 +52,7 @@ export default function MainContent({
         .eq('staff_id', user.id)
         .eq('status', '서명대기')
         .single();
-      
+
       if (contract) {
         setPendingContract(contract);
         const companyName = user.company || '전체';
@@ -290,10 +293,10 @@ export default function MainContent({
               user?.company === '박철홍정형외과'
                 ? 'pch_ortho'
                 : user?.company === '수연의원'
-                ? 'suyeon_clinic'
-                : user?.company === 'SY INC.'
-                ? 'sy_inc'
-                : (user?.company || 'company').replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || 'company';
+                  ? 'suyeon_clinic'
+                  : user?.company === 'SY INC.'
+                    ? 'sy_inc'
+                    : (user?.company || 'company').replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || 'company';
 
             const safeStaff =
               (user?.name || 'staff').replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || 'staff';
@@ -360,7 +363,7 @@ export default function MainContent({
         </div>
       )}
       {mainMenu === '조직도' && <div className="flex-1 overflow-hidden"><OrgChart user={user} staffs={data.staffs} selectedCo={selectedCo} setSelectedCo={setSelectedCo} /></div>}
-      {mainMenu === '채팅' && <div className="flex-1 overflow-hidden bg-[var(--toss-card)] z-20"><ChatView user={user} onRefresh={onRefresh} staffs={data.staffs} initialOpenChatRoomId={initialOpenChatRoomId} onConsumeOpenChatRoomId={onConsumeOpenChatRoomId} /></div>}
+      {mainMenu === '채팅' && <div className="flex-1 overflow-hidden bg-[var(--toss-card)] z-20"><ChatView user={user} onRefresh={onRefresh} staffs={data.staffs} initialOpenChatRoomId={initialOpenChatRoomId} initialOpenMessageId={initialOpenMessageId} onConsumeOpenChatRoomId={onConsumeOpenChatRoomId} /></div>}
       {mainMenu === '게시판' && (
         <div className="flex-1 overflow-hidden">
           <BoardView
@@ -369,6 +372,8 @@ export default function MainContent({
             subView={subView || '공지사항'}
             setSubView={setSubView}
             initialBoard={subView || '공지사항'}
+            initialPostId={initialOpenPostId}
+            onConsumePostId={onConsumeOpenPostId}
             surgeries={data.surgeries}
             mris={data.mris}
             onRefresh={onRefresh}
@@ -526,7 +531,7 @@ export default function MainContent({
             <div className="bg-[#FFF8E6] p-4 rounded-[12px] border border-[#FFE4A0]">
               <p className="text-[11px] font-semibold text-[#F59E0B] uppercase mb-1 tracking-wider">법적 준수 사항</p>
               <p className="text-xs font-medium text-[var(--toss-gray-4)] leading-relaxed">
-                {user.name}님, 현재 잔여 연차가 <span className="text-[#F59E0B] font-bold">{annualLeaveNotice.remaining}일</span> 남았습니다. 
+                {user.name}님, 현재 잔여 연차가 <span className="text-[#F59E0B] font-bold">{annualLeaveNotice.remaining}일</span> 남았습니다.
                 근로기준법 제61조에 의거하여 연차 사용을 권고드립니다.
               </p>
             </div>

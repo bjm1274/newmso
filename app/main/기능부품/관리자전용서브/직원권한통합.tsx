@@ -242,9 +242,8 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
               <select
                 value={selectedStaff.role || 'staff'}
                 onChange={(e) => handleRoleChange(selectedStaff.id, e.target.value)}
-                className={`w-full p-3 border rounded-[16px] text-sm font-bold ${
-                  selectedStaff.role === 'admin' ? 'border-red-200 text-red-600 bg-red-50' : 'border-[var(--toss-border)]'
-                }`}
+                className={`w-full p-3 border rounded-[16px] text-sm font-bold ${selectedStaff.role === 'admin' ? 'border-red-200 text-red-600 bg-red-50' : 'border-[var(--toss-border)]'
+                  }`}
               >
                 <option value="staff">일반 직원 (기본)</option>
                 <option value="manager">부서장 (중간 관리)</option>
@@ -268,17 +267,26 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                 <div key={gi} className="space-y-3">
                   <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider">{group.label}</p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {group.items.map(({ key, label }) => (
-                      <div key={key} className="flex justify-between items-center bg-[var(--toss-card)] p-3 rounded-[16px] shadow-sm border border-[var(--toss-border)]">
-                        <span className="text-[11px] font-semibold text-[var(--foreground)] truncate">{label}</span>
-                        <button
-                          onClick={() => togglePermission(selectedStaff.id, key)}
-                          className={`w-12 h-6 rounded-full transition-all relative shrink-0 ${selectedStaff.permissions?.[key] ? 'bg-[var(--toss-blue)]' : 'bg-[var(--toss-gray-1)]'}`}
-                        >
-                          <div className={`absolute top-0.5 w-5 h-5 bg-[var(--toss-card)] rounded-full shadow transition-all ${selectedStaff.permissions?.[key] ? 'left-6' : 'left-0.5'}`}></div>
-                        </button>
-                      </div>
-                    ))}
+                    {group.items.map(({ key, label }) => {
+                      const isActive = selectedStaff.permissions?.[key];
+                      const isCritical = key === 'mso' || key === 'admin';
+                      const isWarning = key === 'mso_plus_all';
+                      let activeBg = 'bg-[var(--toss-blue)]';
+                      if (isCritical) activeBg = 'bg-red-500';
+                      else if (isWarning) activeBg = 'bg-amber-500';
+
+                      return (
+                        <div key={key} className={`flex justify-between items-center p-3.5 rounded-[12px] shadow-sm border transition-colors ${isActive ? (isCritical ? 'bg-red-50 border-red-200' : isWarning ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200') : 'bg-white border-slate-200 hover:border-slate-300'}`}>
+                          <span className={`text-[12px] font-bold truncate ${isActive ? (isCritical ? 'text-red-700' : isWarning ? 'text-amber-700' : 'text-blue-700') : 'text-slate-700'}`}>{label}</span>
+                          <button
+                            onClick={() => togglePermission(selectedStaff.id, key)}
+                            className={`w-12 h-6 rounded-full transition-all relative shrink-0 focus:outline-none focus:ring-4 ${isActive ? activeBg + (isCritical ? ' ring-red-100' : isWarning ? ' ring-amber-100' : ' ring-blue-100') : 'bg-slate-200 hover:bg-slate-300'}`}
+                          >
+                            <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-all ${isActive ? 'left-6' : 'left-0.5'}`}></div>
+                          </button>
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               ))}
