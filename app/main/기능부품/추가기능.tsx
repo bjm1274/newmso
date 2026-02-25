@@ -4,7 +4,6 @@ import { useState } from 'react';
 import ThemeToggle from '@/app/components/ThemeToggle';
 import GlobalSearch from '@/app/components/GlobalSearch';
 import 부서별물품장비현황 from './재고관리서브/부서별물품장비현황';
-import AIChatView from './AI채팅';
 import 근무현황 from './근무현황';
 
 const EXTERNAL_LINKS = [
@@ -34,7 +33,7 @@ export default function ExtraFeatures({
     <div className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar bg-[var(--page-bg)]">
       <div className="max-w-xl mx-auto">
         <h2 className="text-lg font-bold text-[var(--foreground)] mb-1">추가 기능</h2>
-        <p className="text-[11px] text-[var(--toss-gray-3)] mb-4">모드 선택, 검색, 외부 서비스, 부서별 재고, AI채팅</p>
+        <p className="text-[11px] text-[var(--toss-gray-3)] mb-4">모드 선택, 검색, 외부 서비스, 부서별 재고</p>
 
         <div className="flex flex-col sm:flex-row gap-3 mb-6 p-4 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] shadow-sm">
           <div className="flex items-center gap-2 shrink-0">
@@ -74,21 +73,6 @@ export default function ExtraFeatures({
             </button>
             <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] p-6 shadow-sm">
               <근무현황 user={user || {}} />
-            </div>
-          </div>
-        )}
-
-        {subView === 'AI채팅' && (
-          <div className="space-y-4 flex flex-col h-[calc(100vh-12rem)]">
-            <button
-              type="button"
-              onClick={() => setSubView(null)}
-              className="text-[11px] font-bold text-[var(--toss-blue)] hover:underline shrink-0"
-            >
-              ← 목록으로
-            </button>
-            <div className="flex-1 min-h-0 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] overflow-hidden shadow-sm">
-              <AIChatView />
             </div>
           </div>
         )}
@@ -139,20 +123,7 @@ export default function ExtraFeatures({
               </div>
               <span className="text-[var(--toss-gray-3)] group-hover:text-[var(--toss-blue)]">→</span>
             </button>
-            <button
-              type="button"
-              onClick={() => setSubView('AI채팅')}
-              className="flex items-center gap-3 p-4 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] shadow-sm hover:bg-[var(--toss-blue-light)]/50 hover:border-[var(--toss-blue)]/30 transition-all group text-left w-full"
-            >
-              <div className="w-12 h-12 bg-[var(--toss-gray-1)] group-hover:bg-[var(--toss-blue-light)] rounded-[12px] flex items-center justify-center text-xl transition-colors">
-                ✨
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-[var(--foreground)] text-sm">AI채팅</h3>
-                <p className="text-[11px] text-[var(--toss-gray-3)] mt-0.5">AI와 대화하기</p>
-              </div>
-              <span className="text-[var(--toss-gray-3)] group-hover:text-[var(--toss-blue)]">→</span>
-            </button>
+
             {EXTERNAL_LINKS.map((item) => (
               <a
                 key={item.id}
