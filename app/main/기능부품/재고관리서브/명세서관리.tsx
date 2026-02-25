@@ -173,7 +173,7 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
       <div className="bg-white p-6 md:p-10 border border-[var(--toss-border)] shadow-xl rounded-[2.5rem]">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
-            <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tighter italic">거래처 및 명세서 관리</h2>
+            <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tight">거래처 및 명세서 관리</h2>
             <p className="text-[11px] text-green-600 font-bold mt-1 uppercase tracking-widest">Supplier & Invoice Control</p>
           </div>
           <div className="flex gap-2 w-full md:w-auto">
@@ -362,7 +362,7 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
         <div className="bg-white p-6 md:p-10 border border-[var(--toss-border)] shadow-2xl rounded-[2.5rem] animate-in slide-in-from-bottom-10">
           <div className="flex justify-between items-center mb-6 border-b border-gray-50 pb-4">
             <div>
-              <h3 className="text-xl font-semibold text-[var(--foreground)] tracking-tighter italic">거래명세서 작성 엔진</h3>
+              <h3 className="text-xl font-semibold text-[var(--foreground)] tracking-tight">거래명세서 작성 엔진</h3>
               <p className="text-[11px] text-[var(--toss-gray-3)] font-bold mt-1 uppercase tracking-widest">
                 발행일자 및 공급자/공급받는자 정보를 선택하세요
               </p>
@@ -549,7 +549,7 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
             <div className="flex justify-end pt-6 border-t border-gray-50">
               <div className="text-right">
                 <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">최종 합계액</p>
-                <p className="text-2xl font-semibold text-[var(--toss-blue)] tracking-tighter">
+                <p className="text-2xl font-semibold text-[var(--toss-blue)] tracking-tight">
                   {invoiceData.items.reduce((sum, item) => sum + (item.supply_price || 0), 0).toLocaleString()}원
                 </p>
               </div>

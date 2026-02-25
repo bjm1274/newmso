@@ -192,7 +192,7 @@ export default function AdvancedInventoryManagement({ user }: any) {
   return (
     <div className="flex flex-col h-full bg-[var(--toss-gray-1)]/30 overflow-y-auto custom-scrollbar space-y-8 p-8">
       <header>
-        <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tighter italic">고급 재고 관리</h2>
+        <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tight">고급 재고 관리</h2>
         <p className="text-xs text-[var(--toss-gray-3)] font-bold uppercase mt-1">UDI, 명세서, 발주, 스캔 통합 시스템</p>
       </header>
 

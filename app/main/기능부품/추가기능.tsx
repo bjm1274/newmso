@@ -32,7 +32,7 @@ export default function ExtraFeatures({
 
   return (
     <div className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar bg-[var(--page-bg)]">
-      <div className="max-w-xl mx-auto">
+      <div className="max-w-5xl mx-auto w-full">
         <h2 className="text-lg font-bold text-[var(--foreground)] mb-1">추가 기능</h2>
         <p className="text-[11px] text-[var(--toss-gray-3)] mb-4">모드 선택, 검색, 외부 서비스, 부서별 재고</p>
 

@@ -275,7 +275,7 @@ export default function MyProfileCard({ user: initialUser, onOpenApproval }: any
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-2">
             {/* 이름 · 직책 + 소속 */}
             <div className="flex flex-col items-start gap-1">
-              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-[var(--foreground)] tracking-tighter">
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-[var(--foreground)] tracking-tight">
                 {user.name} {user.position}
               </h2>
               <p className="text-sm sm:text-base lg:text-lg font-bold text-[var(--toss-blue)] underline decoration-[var(--toss-blue-light)] underline-offset-4">

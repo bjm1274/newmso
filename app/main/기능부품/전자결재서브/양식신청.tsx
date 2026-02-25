@@ -60,7 +60,7 @@ export default function FormRequest({ user, staffs }: any) {
   return (
     <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm p-8 space-y-8 rounded-3xl animate-in fade-in duration-500">
       <header className="border-b pb-4">
-        <h3 className="text-lg font-semibold text-[var(--foreground)] tracking-tighter italic">양식 신청 시스템</h3>
+        <h3 className="text-lg font-semibold text-[var(--foreground)] tracking-tight">양식 신청 시스템</h3>
         <p className="text-[11px] text-[var(--toss-blue)] font-bold uppercase tracking-widest mt-1">최종 승인 시 자동 발급</p>
       </header>
 

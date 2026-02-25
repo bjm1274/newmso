@@ -87,7 +87,7 @@ export default function PurchaseOrderManagement({ user, inventory, suppliers, fe
       <div className="bg-white p-6 md:p-10 border border-[var(--toss-border)] shadow-xl rounded-[2.5rem]">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
-            <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tighter italic">스마트 발주 제어 시스템</h2>
+            <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tight">스마트 발주 제어 시스템</h2>
             <p className="text-[11px] text-orange-600 font-bold mt-1 uppercase tracking-widest">Smart Purchase Order Engine</p>
           </div>
           <button
@@ -121,7 +121,7 @@ export default function PurchaseOrderManagement({ user, inventory, suppliers, fe
       </div>
 
       <div className="bg-white p-6 md:p-10 border border-[var(--toss-border)] shadow-xl rounded-[2.5rem]">
-        <h3 className="text-xl font-semibold text-[var(--foreground)] tracking-tighter italic mb-8">발주 이력 및 상태</h3>
+        <h3 className="text-xl font-semibold text-[var(--foreground)] tracking-tight mb-8">발주 이력 및 상태</h3>
         {purchaseOrders.length === 0 ? (
           <div className="text-center py-20 bg-[var(--toss-gray-1)] rounded-[16px] border border-dashed border-[var(--toss-border)]">
             <p className="text-sm font-semibold text-[var(--toss-gray-3)]">발주 이력이 없습니다.</p>

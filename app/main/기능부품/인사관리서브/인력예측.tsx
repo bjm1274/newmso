@@ -35,7 +35,7 @@ export default function WorkforcePrediction({ staffs }: any) {
     <div className="bg-white border border-[var(--toss-border)] shadow-sm p-8 space-y-6">
       <div className="flex justify-between items-center border-b pb-4">
         <div>
-          <h3 className="text-lg font-semibold text-[var(--foreground)] tracking-tighter italic">AI Workforce Forecaster</h3>
+          <h3 className="text-lg font-semibold text-[var(--foreground)] tracking-tight">AI Workforce Forecaster</h3>
           <p className="text-[11px] text-[var(--toss-blue)] font-bold uppercase tracking-widest mt-1">Next Week Demand Prediction</p>
         </div>
         <div className="bg-blue-50 px-4 py-2 rounded-[16px] border border-blue-100">

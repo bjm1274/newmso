@@ -104,7 +104,7 @@ export default function NotificationInbox({ user, onRefresh }: any) {
   return (
     <div className="flex flex-col h-full app-page overflow-hidden">
       <header className="p-6 md:p-8 border-b border-[var(--toss-border)] bg-[var(--toss-card)] shrink-0">
-        <h2 className="text-xl md:text-2xl font-semibold text-[var(--foreground)] tracking-tighter italic">
+        <h2 className="text-xl md:text-2xl font-semibold text-[var(--foreground)] tracking-tight">
           알림 센터
         </h2>
         <p className="text-[11px] md:text-xs text-[var(--toss-gray-3)] font-bold uppercase mt-1 tracking-widest">

@@ -232,7 +232,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
         {selectedStaff ? (
           <div className="max-w-md space-y-8">
             <div className="border-b-4 border-[var(--foreground)] pb-4">
-              <h3 className="text-2xl font-semibold text-[var(--foreground)] italic tracking-tighter">[{selectedStaff.name}] 직원·권한 설정</h3>
+              <h3 className="text-2xl font-semibold text-[var(--foreground)] tracking-tight">[{selectedStaff.name}] 직원·권한 설정</h3>
               <p className="text-xs font-bold text-[var(--toss-blue)] mt-1">사번 {selectedStaff.employee_no} | {selectedStaff.department} {selectedStaff.position}</p>
             </div>
 

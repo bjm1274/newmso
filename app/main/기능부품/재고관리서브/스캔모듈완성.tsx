@@ -171,7 +171,7 @@ export default function ScanModule({ user, inventory, fetchInventory }: ScanModu
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="bg-white p-6 md:p-10 border border-[var(--toss-border)] shadow-xl rounded-[2.5rem]">
         <div className="mb-6">
-          <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tighter italic">
+          <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tight">
             의료기기 QR·바코드 스캔 입고
           </h2>
           <p className="text-[11px] text-[var(--toss-blue)] font-bold mt-1 uppercase tracking-widest">

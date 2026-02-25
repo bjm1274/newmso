@@ -135,7 +135,7 @@ export default function LeaveManagement({ staffs = [], selectedCo, onRefresh }: 
     <div className="flex flex-col h-full app-page animate-in fade-in duration-500">
       <div className="p-4 md:p-8 border-b border-[var(--toss-border)] bg-[var(--toss-card)] flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
         <div>
-          <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tighter italic">전문 연차/휴가 통합 관리</h2>
+          <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tight">전문 연차/휴가 통합 관리</h2>
           <p className="text-[11px] text-[var(--toss-blue)] font-bold mt-1 tracking-widest">연차·휴가 통합 관리 시스템</p>
         </div>
         <div className="flex gap-2 w-full md:w-auto overflow-x-auto no-scrollbar">

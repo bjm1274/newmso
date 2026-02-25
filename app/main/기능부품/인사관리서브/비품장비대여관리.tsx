@@ -43,7 +43,7 @@ export default function AssetLoanManager({ staffs = [], selectedCo }: any) {
     <div className="bg-white p-6 md:p-10 rounded-[2.5rem] border border-[var(--toss-border)] shadow-xl">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h3 className="text-xl font-semibold text-[var(--foreground)] tracking-tighter">비품/장비 대여 관리</h3>
+          <h3 className="text-xl font-semibold text-[var(--foreground)] tracking-tight">비품/장비 대여 관리</h3>
           <p className="text-[11px] text-[var(--toss-blue)] font-bold uppercase tracking-widest">입퇴사 시 장비 지급·반납 추적</p>
         </div>
         <button onClick={() => setAdding(true)} className="px-5 py-2.5 bg-[var(--toss-blue)] text-white text-xs font-semibold rounded-[16px]">+ 대여 등록</button>

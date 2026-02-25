@@ -117,7 +117,7 @@ export default function AnnualLeavePromotion({ staffs, selectedCo }: { staffs: S
       <div className="bg-white p-8 border border-[var(--toss-border)] shadow-xl rounded-[2.5rem]">
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tighter italic">연차사용촉진 자동화 시스템</h2>
+            <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tight">연차사용촉진 자동화 시스템</h2>
             <p className="text-[11px] text-[var(--toss-blue)] font-bold mt-1 uppercase tracking-widest">Annual Leave Promotion Engine</p>
           </div>
           <div className="px-4 py-2 bg-blue-50 rounded-[16px]">

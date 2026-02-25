@@ -105,7 +105,7 @@ export default function ShiftCalendar({ staffs, selectedCo }: any) {
         <div className="h-full flex flex-col premium-card p-6 md:p-8 animate-soft-fade">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-8 shrink-0 border-b border-slate-100 pb-6">
                 <div>
-                    <h2 className="text-2xl font-black text-slate-800 tracking-tighter">교대근무 및 스케줄링 간트 차트 🏥</h2>
+                    <h2 className="text-2xl font-black text-slate-800 tracking-tight">교대근무 및 스케줄링 간트 차트 🏥</h2>
                     <p className="text-[12px] font-bold text-slate-400 mt-2 leading-relaxed">
                         클릭하여 데이/이브닝/나이트/휴무를 전환하세요.
                         <br className="md:hidden" />
@@ -134,7 +134,7 @@ export default function ShiftCalendar({ staffs, selectedCo }: any) {
             <div className="flex gap-4 mb-6 shrink-0">
                 {SHIFT_TYPES.map(shift => (
                     <div key={shift.id} className="flex items-center gap-2">
-                        <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black tracking-tighter border ${shift.color}`}>{shift.id}</span>
+                        <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black tracking-tight border ${shift.color}`}>{shift.id}</span>
                         <span className="text-[11px] font-bold text-slate-500">{shift.name} ({shift.hours}h)</span>
                     </div>
                 ))}

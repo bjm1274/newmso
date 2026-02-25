@@ -151,7 +151,7 @@ export default function ShiftManagement({ selectedCo }: any) {
     <div className="p-8 space-y-8 animate-in fade-in duration-500">
       <header className="flex justify-between items-center">
         <div>
-          <h2 className="text-lg font-bold text-[var(--foreground)] tracking-tighter italic">근무 형태 관리 <span className="text-sm text-[var(--toss-blue)]">[{selectedCo}]</span></h2>
+          <h2 className="text-lg font-bold text-[var(--foreground)] tracking-tight">근무 형태 관리 <span className="text-sm text-[var(--toss-blue)]">[{selectedCo}]</span></h2>
           <p className="text-[11px] text-[var(--toss-gray-3)] font-bold uppercase mt-1">3교대, 전담직 등 병원 특화 근무 스케줄 설정</p>
         </div>
         <button

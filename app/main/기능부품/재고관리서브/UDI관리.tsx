@@ -66,7 +66,7 @@ export default function UDIManagement({ user, inventory, fetchInventory }: any) 
       <div className="bg-white p-6 md:p-10 border border-[var(--toss-border)] shadow-xl rounded-[2.5rem]">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
-            <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tighter italic">의료기기 공급내역 보고 (UDI)</h2>
+            <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tight">의료기기 공급내역 보고 (UDI)</h2>
             <p className="text-[11px] text-purple-600 font-bold mt-1 uppercase tracking-widest">Medical Device Supply Reporting</p>
           </div>
           <button

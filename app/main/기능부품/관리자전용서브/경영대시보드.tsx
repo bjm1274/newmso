@@ -51,7 +51,7 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: any) 
     <div className="space-y-8 animate-in fade-in duration-700">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-slate-200/60 pb-6">
         <div>
-          <h2 className="text-2xl font-black text-slate-800 tracking-tighter">HR 데이터 시각화 & 경영 분석 보드 📊</h2>
+          <h2 className="text-2xl font-black text-slate-800 tracking-tight">HR 데이터 시각화 & 경영 분석 보드 📊</h2>
           <p className="text-[11px] font-bold text-slate-400 mt-2 uppercase tracking-widest">Advanced HR Analytics & Predictive Insights</p>
         </div>
         <div className="flex gap-2">

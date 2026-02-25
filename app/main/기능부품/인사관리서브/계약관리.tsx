@@ -109,7 +109,7 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: any) {
     <div className="flex flex-col h-full animate-in fade-in duration-500 bg-[var(--tab-bg)]/20">
       <header className="p-8 border-b border-[var(--toss-border)] bg-[var(--toss-card)] flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
         <div>
-          <h2 className="text-lg font-bold text-[var(--foreground)] tracking-tighter italic">전자 계약 및 법적 비과세 관리 <span className="text-sm text-[var(--toss-blue)] ml-2">[{selectedCo}]</span></h2>
+          <h2 className="text-lg font-bold text-[var(--foreground)] tracking-tight">전자 계약 및 법적 비과세 관리 <span className="text-sm text-[var(--toss-blue)] ml-2">[{selectedCo}]</span></h2>
           <div className="flex gap-0.5 p-1 app-tab-bar w-fit mt-2">
             {['계약현황', '신규/변경계약서', '연봉계약갱신'].map(tab => (
               <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 text-xs font-medium rounded-md transition-all whitespace-nowrap ${activeTab === tab ? 'bg-[var(--toss-card)] text-[var(--toss-blue)] shadow-sm' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-card)]/60'}`}>{tab}</button>
