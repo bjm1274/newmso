@@ -15,6 +15,11 @@ import ShiftCalendar from './인사관리서브/시프트캘린더';
 import DocumentScanner from './인사관리서브/스마트서류제출';
 import OffboardingView from './인사관리서브/오프보딩';
 import TaxFileGenerator from './인사관리서브/원천징수파일생성';
+import InsuranceManagement from './인사관리서브/4대보험관리';
+import HealthCheckupManagement from './인사관리서브/건강검진관리';
+import CongratulationsCondolences from './인사관리서브/경조사관리';
+import PersonnelAppointment from './인사관리서브/인사발령관리';
+import RewardDisciplineManagement from './인사관리서브/포상징계관리';
 
 // 기본 함수 이름을 영문 대문자로 시작하도록 변경해
 // React ESLint 규칙을 만족시킵니다. default export 이므로
@@ -23,7 +28,7 @@ const HR_TAB_KEY = 'erp_hr_tab';
 const HR_COMPANY_KEY = 'erp_hr_company';
 const HR_STATUS_KEY = 'erp_hr_status';
 
-const HR_MENU_IDS = ['구성원', '계약', '문서보관함', '교육', '근태', '교대근무', '급여', '연차/휴가', '캘린더', '비품대여', '증명서', '서류제출', '오프보딩', '원천징수파일'];
+const HR_MENU_IDS = ['구성원', '계약', '문서보관함', '교육', '근태', '교대근무', '급여', '연차/휴가', '캘린더', '비품대여', '증명서', '서류제출', '오프보딩', '원천징수파일', '4대보험', '건강검진', '경조사', '인사발령', '포상/징계'];
 
 export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu }: any) {
   const [현재메뉴, 메뉴설정] = useState(initialMenu && HR_MENU_IDS.includes(initialMenu) ? initialMenu : '구성원');
@@ -37,23 +42,34 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
   const hasAccess = p.mso === true || user?.company === 'SY INC.' || p.hr === true || p.menu_인사관리 === true;
 
   const HR_TABS = [
-    { id: '구성원', perm: 'hr_구성원' },
-    { id: '계약', perm: 'hr_계약' },
-    { id: '문서보관함', perm: 'hr_문서보관함' },
-    { id: '교육', perm: 'hr_교육' },
-    { id: '근태', perm: 'hr_근태' },
-    { id: '교대근무', perm: 'hr_교대근무' },
-    { id: '급여', perm: 'hr_급여' },
-    { id: '연차/휴가', perm: 'hr_연차휴가' },
-    { id: '캘린더', perm: 'hr_캘린더' },
-    { id: '비품대여', perm: 'hr_비품대여' },
-    { id: '증명서', perm: 'hr_증명서' },
-    { id: '원천징수파일', perm: 'hr_급여' }
+    { id: '구성원', perm: 'hr_구성원', icon: '👥', group: '인력관리' },
+    { id: '인사발령', perm: 'hr_구성원', icon: '📋', group: '인력관리' },
+    { id: '포상/징계', perm: 'hr_구성원', icon: '🏅', group: '인력관리' },
+    { id: '교육', perm: 'hr_교육', icon: '📚', group: '인력관리' },
+    { id: '오프보딩', perm: 'hr_구성원', icon: '🚪', group: '인력관리' },
+    { id: '근태', perm: 'hr_근태', icon: '⏰', group: '근태/급여' },
+    { id: '교대근무', perm: 'hr_교대근무', icon: '🔄', group: '근태/급여' },
+    { id: '연차/휴가', perm: 'hr_연차휴가', icon: '🌴', group: '근태/급여' },
+    { id: '급여', perm: 'hr_급여', icon: '💰', group: '근태/급여' },
+    { id: '원천징수파일', perm: 'hr_급여', icon: '📊', group: '근태/급여' },
+    { id: '4대보험', perm: 'hr_구성원', icon: '🏛️', group: '복무/복지' },
+    { id: '건강검진', perm: 'hr_구성원', icon: '🩺', group: '복무/복지' },
+    { id: '경조사', perm: 'hr_구성원', icon: '🎊', group: '복무/복지' },
+    { id: '비품대여', perm: 'hr_비품대여', icon: '📦', group: '복무/복지' },
+    { id: '계약', perm: 'hr_계약', icon: '📝', group: '문서/기타' },
+    { id: '문서보관함', perm: 'hr_문서보관함', icon: '📁', group: '문서/기타' },
+    { id: '증명서', perm: 'hr_증명서', icon: '📄', group: '문서/기타' },
+    { id: '서류제출', perm: 'hr_구성원', icon: '📤', group: '문서/기타' },
+    { id: '캘린더', perm: 'hr_캘린더', icon: '📅', group: '문서/기타' },
   ];
   const visibleHrTabs = HR_TABS.filter(t => p[t.perm] !== false);
   const activeMenu = visibleHrTabs.some(t => t.id === 현재메뉴) ? 현재메뉴 : (visibleHrTabs[0]?.id || '구성원');
 
-  // initialMenu가 바뀌면 현재 메뉴 동기화 (사이드바 플라이아웃에서 선택한 하위 메뉴 반영)
+  // 그룹 순서 및 라벨
+  const GROUP_ORDER = ['인력관리', '근태/급여', '복무/복지', '문서/기타'];
+  const GROUP_LABELS: Record<string, string> = { '인력관리': '👥 인력관리', '근태/급여': '💰 근태 · 급여', '복무/복지': '🏥 복무 · 복지', '문서/기타': '📂 문서 · 기타' };
+
+  // 현재메뉴가 URL이나 외부에서 들어온 경우에 대비
   useEffect(() => {
     if (initialMenu && HR_MENU_IDS.includes(initialMenu)) {
       메뉴설정(initialMenu);
@@ -109,40 +125,56 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
     );
   }
 
-  if (!hasAccess) {
-    return (
-      <div className="flex w-full h-full items-center justify-center bg-[var(--background)]">
-        <div className="text-center">
-          <span className="text-4xl mb-4 block">🔒</span>
-          <h2 className="text-lg font-bold text-[var(--foreground)] mb-2">접근 권한이 없습니다</h2>
-          <p className="text-sm text-[var(--toss-gray-4)]">인사관리 기능에 접근하려면 담당자 권한이 필요합니다.</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-row h-full min-h-0 app-page overflow-hidden">
-      {/* 상단/좌측: 인사관리 메뉴 + 하단 사업자/직원상태 필터 (모바일: 상단 가로 스크롤, PC: 좌측 사이드바) */}
-      <aside className="flex flex-col md:flex-col h-auto md:h-full p-2 md:p-4 bg-[var(--toss-card)] border-b md:border-b-0 md:border-r border-[var(--toss-border)] shrink-0 w-full md:w-44 overflow-hidden">
-        {/* 메뉴 영역: 모바일 가로 스크롤, PC 세로 리스트 */}
-        <div className="flex flex-row md:flex-col gap-1.5 overflow-x-auto md:overflow-y-auto no-scrollbar min-h-0 pb-2 md:pb-0">
-          {visibleHrTabs.map(({ id }) => (
-            <button
-              key={id}
-              onClick={() => 메뉴설정(id)}
-              className={`flex-none md:w-full px-4 md:px-3 py-2 md:py-2.5 text-[11px] font-bold rounded-[12px] transition-all text-center md:text-left whitespace-nowrap ${activeMenu === id
-                ? 'bg-[var(--toss-blue)] text-white shadow-md'
-                : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
-                }`}
-            >
-              {id}
-            </button>
-          ))}
+      {/* 좌측 사이드바 - 그룹별 메뉴 */}
+      <aside className="flex flex-col md:flex-col h-auto md:h-full bg-[var(--toss-card)] border-b md:border-b-0 md:border-r border-[var(--toss-border)] shrink-0 w-full md:w-48 overflow-hidden">
+        {/* 모바일: 가로 스크롤, PC: 그룹별 세로 리스트 */}
+        <div className="flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-y-auto no-scrollbar min-h-0 p-2 md:p-3 md:flex-1">
+          {/* 모바일: 단순 가로 목록 */}
+          <div className="flex md:hidden gap-1">
+            {visibleHrTabs.map(({ id, icon }) => (
+              <button
+                key={id}
+                onClick={() => 메뉴설정(id)}
+                className={`flex-none px-3 py-2 text-[11px] font-bold rounded-[10px] transition-all whitespace-nowrap ${activeMenu === id
+                  ? 'bg-[var(--toss-blue)] text-white shadow-md'
+                  : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
+                  }`}
+              >
+                {icon} {id}
+              </button>
+            ))}
+          </div>
+          {/* PC: 그룹별 세로 목록 */}
+          <div className="hidden md:flex md:flex-col gap-0.5">
+            {GROUP_ORDER.map((group, gi) => {
+              const groupTabs = visibleHrTabs.filter(t => t.group === group);
+              if (groupTabs.length === 0) return null;
+              return (
+                <div key={group} className={gi > 0 ? 'mt-2 pt-2 border-t border-[var(--toss-border)]' : ''}>
+                  <p className="text-[9px] font-bold text-[var(--toss-gray-3)] px-2.5 py-1.5 uppercase tracking-wider">{GROUP_LABELS[group]}</p>
+                  {groupTabs.map(({ id, icon }) => (
+                    <button
+                      key={id}
+                      onClick={() => 메뉴설정(id)}
+                      className={`w-full px-2.5 py-2 text-[11px] font-bold rounded-[10px] transition-all text-left flex items-center gap-2 ${activeMenu === id
+                        ? 'bg-[var(--toss-blue)] text-white shadow-md'
+                        : 'text-[var(--toss-gray-4)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
+                        }`}
+                    >
+                      <span className="text-[13px] shrink-0">{icon}</span>
+                      <span className="truncate">{id}</span>
+                    </button>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
         </div>
 
-        {/* 필터 영역: 모바일 2열, PC 세로 적층 */}
-        <div className="grid grid-cols-2 md:grid-cols-1 gap-2 md:gap-3 mt-2 md:mt-auto pt-2 md:pt-4 shrink-0 border-t border-[var(--toss-border)]">
+        {/* 하단 필터 */}
+        <div className="grid grid-cols-2 md:grid-cols-1 gap-2 md:gap-3 p-2 md:p-3 shrink-0 border-t border-[var(--toss-border)]">
           <div className="flex flex-col gap-1">
             <label className="text-[10px] md:text-[11px] font-bold text-[var(--toss-gray-4)]">사업자</label>
             <select
@@ -245,6 +277,11 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
               <TaxFileGenerator staffs={staffs} selectedCo={선택사업체} />
             </div>
           )}
+          {activeMenu === '4대보험' && <InsuranceManagement staffs={staffs} selectedCo={선택사업체} />}
+          {activeMenu === '건강검진' && <HealthCheckupManagement staffs={staffs} selectedCo={선택사업체} />}
+          {activeMenu === '경조사' && <CongratulationsCondolences staffs={staffs} selectedCo={선택사업체} />}
+          {activeMenu === '인사발령' && <PersonnelAppointment staffs={staffs} selectedCo={선택사업체} user={user} />}
+          {activeMenu === '포상/징계' && <RewardDisciplineManagement staffs={staffs} selectedCo={선택사업체} user={user} />}
         </section>
       </main>
     </div>

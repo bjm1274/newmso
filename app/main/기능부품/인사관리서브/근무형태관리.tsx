@@ -76,74 +76,98 @@ export default function ShiftManagement({ selectedCo }: any) {
     fetchShifts();
   }, [selectedCo]);
 
+  // 커스텀 근무 패턴 목록
+  const [customPatterns, setCustomPatterns] = useState<string[]>([]);
+  const [showPatternInput, setShowPatternInput] = useState(false);
+  const [newPatternName, setNewPatternName] = useState('');
+  const DEFAULT_PATTERNS = ['상근', '2교대', '3교대', '1일근무1일휴무', '야간전담'];
+  const allPatterns = [...DEFAULT_PATTERNS, ...customPatterns].sort((a, b) => a.localeCompare(b, 'ko'));
+
+  const addCustomPattern = () => {
+    const name = newPatternName.trim();
+    if (!name) return;
+    if (allPatterns.includes(name)) return alert('이미 존재하는 패턴입니다.');
+    setCustomPatterns([...customPatterns, name]);
+    setNewShift({ ...newShift, shift_type: name });
+    setNewPatternName('');
+    setShowPatternInput(false);
+  };
+
   const handleSaveShift = async () => {
     if (!newShift.name) return alert('근무 형태 명칭을 입력하세요.');
-    try {
+
+    // 전체 필드
+    const fullPayload: any = {
+      name: newShift.name,
+      start_time: newShift.start_time,
+      end_time: newShift.end_time,
+      description: newShift.description || null,
+      company_name: newShift.company_name,
+      break_start_time: newShift.break_start_time || null,
+      break_end_time: newShift.break_end_time || null,
+      shift_type: newShift.shift_type || null,
+      weekly_work_days: newShift.weekly_work_days ?? null,
+      is_weekend_work: newShift.is_weekend_work ?? null,
+      is_shift: newShift.is_shift ?? false,
+    };
+
+    // 최소 필드 (DB에 확실히 존재하는 컬럼만)
+    const minPayload: any = {
+      name: newShift.name,
+      start_time: newShift.start_time,
+      end_time: newShift.end_time,
+      description: newShift.description || null,
+      company_name: newShift.company_name,
+    };
+
+    const tryUpsert = async (payload: any, label: string) => {
       if (editingShiftId) {
-        const { error } = await supabase
-          .from('work_shifts')
-          .update({
-            name: newShift.name,
-            start_time: newShift.start_time,
-            end_time: newShift.end_time,
-            description: newShift.description || null,
-            company_name: newShift.company_name,
-            break_start_time: newShift.break_start_time || null,
-            break_end_time: newShift.break_end_time || null,
-            shift_type: newShift.shift_type || null,
-            weekly_work_days: newShift.weekly_work_days ?? null,
-            is_weekend_work: newShift.is_weekend_work ?? null,
-            is_shift: newShift.is_shift ?? false,
-          })
-          .eq('id', editingShiftId);
-        if (error) throw error;
-        alert('근무 형태가 수정되었습니다.');
+        const { error } = await supabase.from('work_shifts').update(payload).eq('id', editingShiftId);
+        return { error, label };
       } else {
-        const { error } = await supabase.from('work_shifts').insert([{
-          name: newShift.name,
-          start_time: newShift.start_time,
-          end_time: newShift.end_time,
-          description: newShift.description || null,
-          company_name: newShift.company_name,
-          break_start_time: newShift.break_start_time || null,
-          break_end_time: newShift.break_end_time || null,
-          shift_type: newShift.shift_type || null,
-          weekly_work_days: newShift.weekly_work_days ?? null,
-          is_weekend_work: newShift.is_weekend_work ?? null,
-          is_shift: newShift.is_shift ?? false,
-        }]);
-        if (error) throw error;
-        alert('근무 형태가 등록되었습니다.');
+        const { error } = await supabase.from('work_shifts').insert([payload]);
+        return { error, label };
       }
+    };
+
+    try {
+      // 1차: 전체 필드
+      let result = await tryUpsert(fullPayload, '전체');
+      if (result.error) {
+        console.warn(`[${result.label}] 실패:`, result.error.message, '→ 최소 필드로 재시도');
+        // 2차: 최소 필드만
+        result = await tryUpsert(minPayload, '최소');
+        if (result.error) throw result.error;
+      }
+
+      alert(editingShiftId ? '근무 형태가 수정되었습니다.' : '근무 형태가 등록되었습니다.');
       setShowAddModal(false);
       setEditingShiftId(null);
       setNewShift({
-        name: '',
-        start_time: '09:00',
-        end_time: '18:00',
-        description: '',
-        company_name: '박철홍정형외과',
-        break_start_time: '',
-        break_end_time: '',
-        shift_type: '',
-        weekly_work_days: 5,
-        is_weekend_work: false,
-        is_shift: false,
+        name: '', start_time: '09:00', end_time: '18:00', description: '',
+        company_name: '박철홍정형외과', break_start_time: '', break_end_time: '',
+        shift_type: '', weekly_work_days: 5, is_weekend_work: false, is_shift: false,
       });
       fetchShifts();
-    } catch (err) {
-      alert('저장에 실패했습니다.');
+    } catch (err: any) {
+      console.error('근무형태 저장 최종 실패:', err);
+      alert('저장에 실패했습니다.\n원인: ' + (err?.message || '알 수 없는 오류'));
     }
   };
 
   const handleDeleteShift = async (id: string) => {
     if (!confirm('이 근무 형태를 삭제하시겠습니까?')) return;
     try {
-      const { error } = await supabase.from('work_shifts').update({ is_active: false }).eq('id', id);
-      if (error) throw error;
+      // is_active 컬럼이 없을 수도 있으므로 fallback
+      let { error } = await supabase.from('work_shifts').update({ is_active: false }).eq('id', id);
+      if (error) {
+        // is_active 컬럼 없으면 실제 삭제
+        const retry = await supabase.from('work_shifts').delete().eq('id', id);
+        if (retry.error) throw retry.error;
+      }
       fetchShifts();
-    } catch (err) {
-      alert('삭제에 실패했습니다.');
+    } catch (err: any) {
+      alert('삭제에 실패했습니다.\n원인: ' + (err?.message || ''));
     }
   };
 
@@ -322,12 +346,19 @@ export default function ShiftManagement({ selectedCo }: any) {
                     className="w-full p-3 bg-[var(--input-bg)] border border-[var(--toss-border)] font-semibold text-xs radius-toss"
                   >
                     <option value="">선택</option>
-                    <option value="상근">상근 (주간)</option>
-                    <option value="2교대">2교대</option>
-                    <option value="3교대">3교대</option>
-                    <option value="1일근무1일휴무">1일 근무 · 1일 휴무</option>
-                    <option value="야간전담">야간 전담</option>
+                    {allPatterns.map(p => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
                   </select>
+                  {!showPatternInput ? (
+                    <button type="button" onClick={() => setShowPatternInput(true)} className="mt-1.5 text-[10px] font-bold text-[var(--toss-blue)] hover:underline">+ 패턴 직접 추가</button>
+                  ) : (
+                    <div className="flex items-center gap-1 mt-1.5">
+                      <input type="text" value={newPatternName} onChange={e => setNewPatternName(e.target.value)} onKeyDown={e => e.key === 'Enter' && addCustomPattern()} placeholder="새 패턴명" className="flex-1 px-2 py-1.5 text-[10px] font-bold border border-[var(--toss-border)] rounded-lg bg-[var(--input-bg)] text-[var(--foreground)] outline-none" autoFocus />
+                      <button type="button" onClick={addCustomPattern} className="px-2 py-1.5 bg-[var(--toss-blue)] text-white text-[10px] font-bold rounded-lg">추가</button>
+                      <button type="button" onClick={() => { setShowPatternInput(false); setNewPatternName(''); }} className="px-2 py-1.5 text-[10px] font-bold text-[var(--toss-gray-3)]">취소</button>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="caption uppercase block mb-1">주 근무일수 / 주말</label>
