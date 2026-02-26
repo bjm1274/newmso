@@ -6,12 +6,13 @@ import { NextResponse } from 'next/server';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
-// Gemini 3.0 이상 모델만 사용 (최신 순서)
+// Gemini 3.0 이상 모델 (실제 API 모델명)
 const MODELS = [
-    'gemini-3.1-pro',
-    'gemini-3-pro',
-    'gemini-3-flash',
+    'gemini-3.1-pro-preview',
+    'gemini-3-pro-preview',
+    'gemini-3-flash-preview',
     'gemini-2.5-pro',
+    'gemini-2.5-flash',
 ];
 
 async function callGemini(prompt: string): Promise<string> {
@@ -50,11 +51,15 @@ async function callGemini(prompt: string): Promise<string> {
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        const { patientName, department, admissionDate, dischargeDate, diagnosis, checkedItems, allItems, chartData, templateData } = body;
+        const { patientName, birthDate, gender, department, admissionDate, dischargeDate, diagnosis,
+            insuranceType, surgeryName, surgeryDate, roomGrade, doctorName, comorbidities,
+            admissionRoute, dischargeType, drgCode, diseaseCodes,
+            checkedItems, allItems, chartData, templateData } = body;
 
         const admDate = new Date(admissionDate);
         const disDate = new Date(dischargeDate);
         const stayDays = Math.ceil((disDate.getTime() - admDate.getTime()) / (1000 * 60 * 60 * 24));
+        const age = birthDate ? Math.floor((Date.now() - new Date(birthDate).getTime()) / 31557600000) : null;
 
         const checkedLabels = (checkedItems || []).map((i: any) => `✅ ${i.code ? `[${i.code}] ` : ''}${i.label}`).join('\n');
         const uncheckedLabels = (allItems || [])
@@ -66,11 +71,24 @@ export async function POST(req: Request) {
 
 ## 환자 정보
 - 환자명: ${patientName}
+- 생년월일: ${birthDate || '미입력'}${age !== null ? ` (만 ${age}세)` : ''}
+- 성별: ${gender || '미입력'}
 - 진료과: ${department}
 - 입원일: ${admissionDate}
 - 퇴원 예정일: ${dischargeDate}
 - 입원 기간: ${stayDays}일
 - 진단명: ${diagnosis || '미입력'}
+- 보험 구분: ${insuranceType || '미입력'}
+- 주치의: ${doctorName || '미입력'}
+- 병실 등급: ${roomGrade || '미입력'}
+- 수술명: ${surgeryName || '없음'}${surgeryDate ? ` (수술일: ${surgeryDate})` : ''}
+- 동반 질환: ${comorbidities || '없음'}
+- 입원 경로: ${admissionRoute || '미입력'}
+- 퇴원 유형: ${dischargeType || '미입력'}
+- DRG 코드: ${drgCode || '미입력'}
+${diseaseCodes ? `
+## 상병명 (의사 입력 진단코드)
+${diseaseCodes}` : ''}
 
 ## 확인 완료 항목
 ${checkedLabels || '(없음)'}
@@ -100,12 +118,20 @@ ${templateData}
         prompt += `
 
 ## 분석 요청
-1. **누락 항목 점검**: 미확인 항목 중 반드시 확인해야 할 항목을 알려주세요.
-${templateData ? '2. **템플릿 비교**: 기본 항목 템플릿과 비교하여 환자 차트에 빠진 항목이 있는지 확인하세요.\n' : ''}3. **입원 기간 점검**: ${stayDays}일 입원에 맞는 처방/청구가 적절한지 점검하세요.
-4. **과잉/누락 청구**: 중복 청구, 불필요한 항목, 빠진 청구 항목을 찾아주세요.
-5. **진료과별 확인**: ${department} 특성상 추가로 확인해야 할 사항이 있다면 알려주세요.
+아래 항목을 점검하고, **간결한 단답형**으로 핵심만 전달하세요. 불필요한 설명 없이 짧게 작성하세요.
 
-항목별로 정리하고, 위험 수준(🔴 긴급, 🟡 주의, 🟢 참고)을 표시해주세요. 한국어로 답변하세요.`;
+**출력 형식 (반드시 이 형식을 따르세요):**
+🔴 [항목] — 점검 필요 (이유 한 줄)
+🟡 [항목] — 확인 필요 (이유 한 줄)
+🟢 [항목] — 적절함
+
+**점검 항목:**
+- 누락 항목 (미확인 항목 중 필수 확인 필요한 것)
+${templateData ? '- 템플릿 대비 누락/추가 항목\n' : ''}- ${insuranceType || '건강보험'} 기준 급여/비급여 적절성
+- ${stayDays}일 입원 기간 대비 처방 적절성
+- 중복/과잉/누락 청구
+${diseaseCodes ? '- 상병명-처방 연관성 (상병에 맞지 않는 처방 여부)\n' : ''}${age !== null && age >= 65 ? '- 만 ' + age + '세 노인 가산 항목\n' : ''}${surgeryName ? '- ' + surgeryName + ' 수술 후 표준 처방 누락 여부\n' : ''}${comorbidities ? '- ' + comorbidities + ' 관련 추가 처방\n' : ''}${roomGrade ? '- ' + roomGrade + ' 병실료 적절성\n' : ''}
+**총평** 한 줄로 마무리. 한국어로 답변.`;
 
         const analysis = await callGemini(prompt);
         return NextResponse.json({ analysis });

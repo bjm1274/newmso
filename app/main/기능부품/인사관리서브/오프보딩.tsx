@@ -2,7 +2,7 @@
 import { useState, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 
-export default function OffboardingView({ staffs, onRefresh }: any) {
+export default function OffboardingView({ staffs, selectedCo = '전체', onRefresh }: any) {
     const [activeTab, setActiveTab] = useState<'진행중' | '과거이력'>('진행중');
     const [selectedStaff, setSelectedStaff] = useState<string>('');
     const [exitDate, setExitDate] = useState<string>('');
@@ -11,7 +11,11 @@ export default function OffboardingView({ staffs, onRefresh }: any) {
     const [loading, setLoading] = useState(false);
 
     // Filter active staffs who are NOT currently offboarding
-    const eligibleStaffs = staffs.filter((s: any) => s.status === '재직' || s.status === '계약');
+    // Filter active staffs who are NOT currently offboarding, respect company filter
+    const eligibleStaffs = staffs.filter((s: any) =>
+        (s.status === '재직' || s.status === '계약') &&
+        (selectedCo === '전체' || s.company === selectedCo)
+    );
 
     const handleStartOffboarding = async () => {
         if (!selectedStaff || !exitDate) return alert('대상자와 퇴사 예정일을 선택해주세요.');
@@ -39,8 +43,14 @@ export default function OffboardingView({ staffs, onRefresh }: any) {
         }
     };
 
-    const pendingList = staffs.filter((s: any) => s.status === '퇴사예정' || (s.status === '퇴사' && s.resigned_at > new Date().toISOString().slice(0, 10)));
-    const pastList = staffs.filter((s: any) => s.status === '퇴사');
+    const pendingList = staffs.filter((s: any) =>
+        (s.status === '퇴사예정' || (s.status === '퇴사' && s.resigned_at > new Date().toISOString().slice(0, 10))) &&
+        (selectedCo === '전체' || s.company === selectedCo)
+    );
+    const pastList = staffs.filter((s: any) =>
+        s.status === '퇴사' &&
+        (selectedCo === '전체' || s.company === selectedCo)
+    );
 
     const concludeOffboarding = async (id: string, name: string) => {
         if (!confirm(`${name} 님의 모든 체크리스트가 완료되었습니다.\n최종 퇴사 처리하시겠습니까?`)) return;

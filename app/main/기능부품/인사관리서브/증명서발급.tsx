@@ -5,10 +5,15 @@ import { CERTIFICATE_TYPES } from '@/lib/certificate-types';
 
 function formatDate(d: string | null) {
   if (!d) return '현재';
-  return new Date(d).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\. /g, '.').replace('.', '');
+  const date = new Date(d);
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${y}.${m}.${day}`;
 }
 
-export default function CertificateGenerator({ staffs = [] }: any) {
+export default function CertificateGenerator({ staffs = [], selectedCo = '전체' }: any) {
+  const filteredStaffs = staffs.filter((s: any) => selectedCo === '전체' || s.company === selectedCo);
   const [selectedStaff, setSelectedStaff] = useState<any>(null);
   const [certType, setCertType] = useState('재직증명서');
   const [purpose, setPurpose] = useState('금융기관 제출용');
@@ -30,7 +35,7 @@ export default function CertificateGenerator({ staffs = [] }: any) {
 
   const joined = selectedStaff?.joined_at || selectedStaff?.join_date;
   const resigned = selectedStaff?.resigned_at;
-  const workPeriod = joined ? `${formatDate(joined)} ~ ${resigned ? formatDate(resigned) : '현재'}` : '-';
+  const workPeriod = joined ? `${formatDate(joined)} ~ ${resigned ? formatDate(resigned) : formatDate(new Date().toISOString())}` : '-';
   const baseSalary = selectedStaff?.base_salary ?? selectedStaff?.base ?? 0;
   const totalPay = baseSalary + (selectedStaff?.meal_allowance ?? selectedStaff?.meal ?? 0);
 
@@ -39,9 +44,13 @@ export default function CertificateGenerator({ staffs = [] }: any) {
     경력증명서: '위와 같이 경력을 증명함.',
     퇴직증명서: '위와 같이 퇴직하였음을 증명함.',
     급여인증서: '위와 같이 급여를 지급한 사실을 증명함.',
+    보수지급명세서: '위와 같이 보수를 지급한 사실을 증명함.',
+    연봉금액확인서: '위와 같이 연봉 계약 금액을 확인하며 이를 증명함.',
     근무확인서: '위와 같이 근무하였음을 확인함.',
-    원천징수영수증: '위와 같이 원천징수한 사실을 증명함.',
-    소득금액증명원: '위와 같이 소득금액을 증명함.',
+    '직무교육 이수확인서': '위와 같은 사내 직무 교육 과정을 충실히 이수하였음을 증명함.',
+    원천징수영수증: '본 문서는 내부 확인용이며, 위와 같이 원천징수 되었음을 증명함.',
+    소득금액증명원: '본 문서는 내부 확인용이며, 위와 같이 소득금액을 증명함.',
+    근로소득원천징수필증: '위와 같이 근로소득을 원천징수 하였음을 증명함.',
   };
 
   const handleIssue = async () => {
@@ -64,26 +73,40 @@ export default function CertificateGenerator({ staffs = [] }: any) {
       const w = window.open('', '_blank');
       if (!w) return;
       const printStyles = `
-        * { box-sizing: border-box; }
-        body { font-family: 'Noto Serif KR', Georgia, serif; padding: 40px; max-width: 620px; margin: 0 auto; background: #f5f5f5; color: #191F28; }
-        #cert-print-root { max-width: 600px; margin: 0 auto; padding: 3rem 5rem; background: #fff; border: 1px solid #E5E8EB; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15); position: relative; text-align: center; }
-        #cert-print-root .cert-watermark { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0.03; pointer-events: none; font-size: 7rem; font-weight: 600; transform: rotate(-45deg); }
-        #cert-print-root .cert-header { margin-bottom: 0.5rem; }
-        #cert-print-root .cert-header .cert-no { font-size: 10px; font-weight: 600; color: #6b7280; letter-spacing: 0.5em; }
-        #cert-print-root .cert-header .cert-title { font-size: 1.75rem; letter-spacing: 0.3em; border-bottom: 4px solid #191F28; padding-bottom: 1rem; display: inline-block; margin-top: 0.5rem; font-weight: 600; }
-        #cert-print-root .cert-body { text-align: left; padding-top: 2.5rem; }
-        #cert-print-root .cert-body .cert-row { display: flex; border-bottom: 1px solid #E5E8EB; padding-bottom: 0.5rem; margin-bottom: 1rem; }
-        #cert-print-root .cert-body .cert-row .cert-label { width: 6rem; font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; flex-shrink: 0; }
-        #cert-print-root .cert-body .cert-row .cert-value { font-size: 14px; font-weight: 600; color: #191F28; }
-        #cert-print-root .cert-footer { padding-top: 3rem; text-align: center; }
-        #cert-print-root .cert-footer .cert-closing { font-size: 14px; font-weight: 600; letter-spacing: 0.1em; margin-bottom: 1rem; }
-        #cert-print-root .cert-footer .cert-date { font-size: 12px; font-weight: 700; color: #6b7280; margin-bottom: 1.5rem; }
-        #cert-print-root .cert-footer .cert-sign { font-size: 1.25rem; font-weight: 600; font-style: italic; margin-top: 2rem; position: relative; display: inline-block; }
-        #cert-print-root .cert-seal { position: absolute; right: -3rem; top: -0.5rem; width: 5rem; height: 5rem; border: 4px solid rgba(220,38,38,0.8); border-radius: 50%; display: flex; align-items: center; justify-content: center; transform: rotate(12deg); opacity: 0.9; font-size: 10px; font-weight: 600; color: rgba(220,38,38,0.9); text-align: center; line-height: 1.2; }
-        #cert-print-root img.cert-seal-img { position: absolute; right: -4rem; top: -0.5rem; width: 6rem; height: 6rem; object-fit: contain; mix-blend-mode: multiply; }
-        @media print { body { background: #fff !important; padding: 0; } #cert-print-root { box-shadow: none; border: 1px solid #ccc; } #cert-print-root img.cert-seal-img { mix-blend-mode: multiply; } }
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700&display=swap');
+        * { box-sizing: border-box; -webkit-print-color-adjust: exact; }
+        body { font-family: 'Noto Serif KR', serif; padding: 0; margin: 0; background: #fff; color: #111; }
+        #cert-print-root { width: 210mm; min-height: 297mm; padding: 30mm 25mm; margin: 0 auto; background: #fff; position: relative; display: flex; flex-direction: column; }
+        .cert-watermark { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0.02; pointer-events: none; font-size: 120px; font-weight: 700; transform: rotate(-45deg); white-space: nowrap; }
+        .cert-header { text-align: center; margin-bottom: 40px; }
+        .cert-no { font-size: 13px; font-weight: 400; color: #666; text-align: left; margin-bottom: 15px; }
+        .cert-title { font-size: 48px; font-weight: 700; letter-spacing: 15px; border-bottom: 3px double #000; padding-bottom: 10px; display: inline-block; margin-top: 10px; }
+        .cert-body { flex: 1; padding-top: 40px; }
+        .cert-table { width: 100%; border-collapse: collapse; margin-bottom: 40px; }
+        .cert-row { display: flex; border-bottom: 1px solid #ddd; padding: 12px 0; align-items: center; }
+        .cert-label { width: 120px; font-size: 15px; font-weight: 700; color: #444; }
+        .cert-value { font-size: 17px; font-weight: 400; color: #000; flex: 1; }
+        .cert-footer { margin-top: auto; padding-top: 60px; text-align: center; }
+        .cert-closing { font-size: 18px; font-weight: 700; letter-spacing: 2px; margin-bottom: 40px; }
+        .cert-date { font-size: 16px; font-weight: 400; margin-bottom: 60px; }
+        .cert-sign-area { position: relative; display: inline-block; margin-top: 80px; padding-right: 20px; line-height: 1; }
+        .cert-sign-text { font-size: 32px; font-weight: 700; position: relative; z-index: 2; letter-spacing: 2px; }
+        .cert-seal-img { position: absolute; right: -35px; top: -15px; width: 85px; height: 85px; object-fit: contain; mix-blend-mode: multiply; z-index: 1; opacity: 0.95; }
+        @media print { body { padding: 0; } #cert-print-root { border: none; width: 100%; height: 100%; } }
       `;
-      w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${certType}</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600;700&display=swap" rel="stylesheet"><style>${printStyles}</style></head><body><div id="cert-print-root">${html}</div></body></html>`);
+      w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${certType}</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600;700&display=swap" rel="stylesheet"><style>${printStyles}</style></head><body><div id="cert-print-root">
+        <div class="cert-no">제 ${sn} 호</div>
+        <div class="cert-header"><h1 class="cert-title">${certType}</h1></div>
+        <div class="cert-body">${html.split('<div class="cert-body')[1].split('</div>\n                </div>')[0]}</div>
+        <div class="cert-footer">
+          <p class="cert-closing">${certClosingText[certType] || '위와 같이 증명함.'}</p>
+          <p class="cert-date">${formatDate(new Date().toISOString())}</p>
+          <div class="cert-sign-area">
+            <span class="cert-sign-text">${selectedStaff.company || 'SY INC.'}</span>
+            ${seals[selectedStaff.company || '전체'] ? `<img src="${seals[selectedStaff.company || '전체']}" class="cert-seal-img" />` : ''}
+          </div>
+        </div>
+      </div></body></html>`);
       w.document.close();
       w.print();
       w.close();
@@ -93,7 +116,11 @@ export default function CertificateGenerator({ staffs = [] }: any) {
   useEffect(() => {
     if (!showHistory) return;
     (async () => {
-      const { data } = await supabase.from('certificate_issuances').select('*, staff_members(name, company)').order('issued_at', { ascending: false }).limit(30);
+      let query = supabase.from('certificate_issuances').select('*, staff_members(name, company)');
+      if (selectedCo !== '전체') {
+        query = query.filter('staff_members.company', 'eq', selectedCo);
+      }
+      const { data } = await query.order('issued_at', { ascending: false }).limit(30);
       setHistoryList(data || []);
     })();
   }, [showHistory]);
@@ -122,7 +149,7 @@ export default function CertificateGenerator({ staffs = [] }: any) {
                 className="w-full p-5 bg-[var(--input-bg)] rounded-[12px] text-sm font-semibold border-none outline-none focus:ring-2 focus:ring-[var(--toss-blue)] transition-all"
               >
                 <option value="">직원 선택...</option>
-                {staffs.map((s: any) => <option key={s.id} value={s.id}>{s.name} ({s.department} / {s.position})</option>)}
+                {filteredStaffs.map((s: any) => <option key={s.id} value={s.id}>{s.name} ({s.department} / {s.position})</option>)}
               </select>
             </div>
 
@@ -154,10 +181,14 @@ export default function CertificateGenerator({ staffs = [] }: any) {
             </button>
           </div>
 
-          <div className="bg-orange-50 p-6 rounded-[16px] border border-orange-100">
-            <p className="text-[11px] font-semibold text-orange-800 uppercase mb-2">💡 발급 안내</p>
-            <p className="text-[11px] text-orange-700 font-bold leading-relaxed">
-              발급된 증명서는 고유 번호가 부여되며, 위변조 방지를 위한 디지털 직인이 자동으로 포함됩니다.
+          <div className={`p-6 rounded-[20px] transition-all duration-300 border ${certType === '원천징수영수증' || certType === '소득금액증명원' ? 'bg-amber-50 border-amber-100 shadow-sm' : 'bg-blue-50 border-blue-100 shadow-sm'}`}>
+            <p className={`text-[11px] font-black uppercase mb-2 ${certType === '원천징수영수증' || certType === '소득금액증명원' ? 'text-amber-800' : 'text-blue-800'}`}>
+              {certType === '원천징수영수증' || certType === '소득금액증명원' ? '⚠️ 공식 서류 안내' : '💡 발급 안내'}
+            </p>
+            <p className={`text-[11px] font-bold leading-relaxed ${certType === '원천징수영수증' || certType === '소득금액증명원' ? 'text-amber-700' : 'text-blue-700'}`}>
+              {certType === '원천징수영수증' || certType === '소득금액증명원'
+                ? '본 증명서는 내부 확인용 약식 문서입니다. 금융기관/관공서 제출을 위한 공식 문서는 홈택스(Hometax)를 통해 발급받으시기 바랍니다.'
+                : '발급된 증명서는 고유 번호가 부여되며, 위변조 방지를 위한 디지털 직인이 자동으로 포함됩니다.'}
             </p>
           </div>
         </div>
@@ -209,17 +240,21 @@ export default function CertificateGenerator({ staffs = [] }: any) {
                 </div>
 
                 <div className="cert-footer pt-24 text-center space-y-10">
-                  <p className="cert-closing text-sm font-semibold text-[var(--foreground)] tracking-widest">{certClosingText[certType] || '위와 같이 증명함.'}</p>
-                  <p className="cert-date text-xs font-bold text-[var(--toss-gray-3)]">{new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                  <p className="cert-closing text-[15px] font-black text-[var(--foreground)] tracking-[0.05em]">{certClosingText[certType] || '위와 같이 증명함.'}</p>
+                  <p className="cert-date text-[13px] font-black text-[var(--toss-gray-3)]">{formatDate(new Date().toISOString())}</p>
 
-                  <div className="cert-sign-wrap relative inline-block pt-10">
-                    <p className="cert-sign text-2xl font-semibold tracking-tight text-[var(--foreground)] italic">{selectedStaff.company || 'SY INC.'} 대표이사/원장</p>
+                  <div className="cert-sign-wrap relative inline-block pt-24 text-right pr-6">
+                    <p className="cert-sign text-3xl font-black tracking-widest text-[var(--foreground)] relative z-10">{selectedStaff.company || 'SY INC.'}</p>
                     {seals[selectedStaff.company || '전체'] ? (
-                      <img src={seals[selectedStaff.company || '전체']} alt="seal" className="cert-seal-img" />
+                      <img
+                        src={seals[selectedStaff.company || '전체']}
+                        alt="seal"
+                        className="absolute -right-6 top-8 w-28 h-28 object-contain mix-blend-multiply opacity-95 z-0"
+                      />
                     ) : (
-                      <div className="cert-seal absolute -right-12 -top-2 w-20 h-20 border-4 border-red-600/80 rounded-full flex items-center justify-center rotate-12 opacity-80">
-                        <div className="text-[11px] font-semibold text-red-600/80 text-center leading-tight">
-                          {selectedStaff.company || 'SY INC.'}<br />대표이사<br />박철홍
+                      <div className="absolute -right-8 top-10 w-28 h-28 border-4 border-red-600/60 rounded-full flex items-center justify-center rotate-12 opacity-60 z-0">
+                        <div className="text-[14px] font-bold text-red-600/60 text-center leading-tight">
+                          {selectedStaff.company || 'SY'}<br />대표인
                         </div>
                       </div>
                     )}

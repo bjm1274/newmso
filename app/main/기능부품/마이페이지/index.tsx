@@ -8,6 +8,7 @@ import SalarySlipContainer from './급여명세서';
 import MyTodoList from './나의할일';
 import CommuteRecord from './출퇴근기록';
 import MyCertificates from './증명서관리';
+import MyDocuments from './서류제출';
 import NotificationInbox from '../알림인박스';
 import ContractSignatureModal from '../인사관리서브/계약문서/전자서명모달';
 import { supabase } from '@/lib/supabase';
@@ -23,6 +24,7 @@ type FavoriteId =
   | 'mypage_todo'
   | 'mypage_certificates'
   | 'mypage_salary'
+  | 'mypage_documents'
   | 'hr_payroll'
   | 'inv_purchase'
   | 'menu_home'
@@ -41,6 +43,7 @@ const FAVORITE_OPTIONS: { id: FavoriteId; label: string; icon: string }[] = [
   { id: 'mypage_todo', label: '할일', icon: '✅' },
   { id: 'mypage_certificates', label: '증명서', icon: '📄' },
   { id: 'mypage_salary', label: '급여명세서', icon: '💰' },
+  { id: 'mypage_documents', label: '서류제출', icon: '📤' },
   { id: 'hr_payroll', label: '인사관리 · 급여', icon: '👥' },
   { id: 'inv_purchase', label: '재고관리 · 발주', icon: '📦' },
   // 전체 메뉴 바로가기
@@ -56,7 +59,7 @@ const FAVORITE_OPTIONS: { id: FavoriteId; label: string; icon: string }[] = [
 ];
 
 export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInitialTab, onOpenApproval, setMainMenu }: any) {
-  const [activeTab, setActiveTab] = useState<'profile' | 'salary' | 'todo' | 'commute' | 'certificates' | 'notifications'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'salary' | 'todo' | 'commute' | 'certificates' | 'documents' | 'notifications'>('profile');
   const [favorites, setFavorites] = useState<FavoriteId[]>([]);
   const [showFavPicker, setShowFavPicker] = useState(false);
   const [pendingFav, setPendingFav] = useState<FavoriteId | ''>('');
@@ -85,7 +88,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
     checkPendingContracts();
   }, [user?.id]);
 
-  const handleSignComplete = async (signatureDataUrl: string) => {
+  const handleSignComplete = async (signatureDataUrl: string, contractText: string) => {
     if (!pendingContract) return;
     try {
       await supabase
@@ -97,7 +100,17 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
         })
         .eq('id', pendingContract.id);
 
-      // HR에게 알림 전송 (system_admin로 임시 지정)
+      // 문서 보관함으로 자동 저장 (PDF는 보관함에서 열 때 생성됨)
+      await supabase.from('document_repository').insert({
+        title: `${user.name} 근로계약서 (${new Date().toLocaleDateString()})`,
+        category: '계약서',
+        content: contractText,
+        company_name: user.company || '전체',
+        created_by: user.id,
+        version: 1
+      });
+
+      // HR에게 알림 전송
       await supabase.from('notifications').insert({
         user_id: 'system_admin',
         title: '계약서 서명 완료',
@@ -106,7 +119,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
         is_read: false
       });
 
-      alert('근로계약서 서명이 성공적으로 완료되었습니다.');
+      alert('근로계약서 서명이 성공적으로 완료되었습니다. 마이페이지 > 급여 또는 문서보관함에서 확인하실 수 있습니다.');
       setPendingContract(null);
       setShowSignaturePad(false);
     } catch (e) {
@@ -124,7 +137,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
     if (typeof window === 'undefined') return;
     try {
       const saved = window.localStorage.getItem(MYPAGE_TAB_KEY) as any;
-      const allowed = ['profile', 'salary', 'todo', 'commute', 'certificates', 'notifications'];
+      const allowed = ['profile', 'salary', 'todo', 'commute', 'certificates', 'documents', 'notifications'];
       if (saved && allowed.includes(saved)) {
         setActiveTab(saved);
       }
@@ -175,6 +188,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
     else if (fav === 'mypage_todo') setActiveTab('todo');
     else if (fav === 'mypage_certificates') setActiveTab('certificates');
     else if (fav === 'mypage_salary') setActiveTab('salary');
+    else if (fav === 'mypage_documents') setActiveTab('documents');
     else if (fav === 'hr_payroll') {
       if (typeof window !== 'undefined') {
         window.localStorage.setItem(HR_TAB_KEY, '급여');
@@ -263,7 +277,8 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
                   (id === 'mypage_commute' && activeTab === 'commute') ||
                   (id === 'mypage_todo' && activeTab === 'todo') ||
                   (id === 'mypage_certificates' && activeTab === 'certificates') ||
-                  (id === 'mypage_salary' && activeTab === 'salary');
+                  (id === 'mypage_salary' && activeTab === 'salary') ||
+                  (id === 'mypage_documents' && activeTab === 'documents');
                 return (
                   <QuickFavoriteButton
                     key={id}
@@ -330,6 +345,11 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
             label="급여" icon="💰"
           />
           <TabButton
+            isActive={activeTab === 'documents'}
+            onClick={() => setActiveTab('documents')}
+            label="서류제출" icon="📤"
+          />
+          <TabButton
             isActive={activeTab === 'notifications'}
             onClick={() => setActiveTab('notifications')}
             label="알림" icon="🔔"
@@ -356,6 +376,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
           {activeTab === 'todo' && <MyTodoList user={user} />}
           {activeTab === 'salary' && <SalarySlipContainer user={user} />}
           {activeTab === 'certificates' && <MyCertificates user={user} />}
+          {activeTab === 'documents' && <MyDocuments user={user} />}
           {activeTab === 'notifications' && <NotificationInbox user={user} onRefresh={() => { }} />}
         </div>
       </div>

@@ -2,137 +2,63 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
-const COMPANIES = ['전체', '박철홍정형외과', '수연의원', 'SY INC.'];
+// COMPANIES 상수는 이제 DB에서 동적으로 관리됩니다.
 
-const DEFAULT_CONTRACT_TEMPLATE = `근 로 계 약 서 ( 월 급 제 )
+const DEFAULT_CONTRACT_TEMPLATE = `제1조 [계약의 목적]
+본 계약은 사용자와 근로자 간의 근로조건을 명확히 함으로써 상호 신뢰와 협력을 바탕으로 업무를 수행함을 목적으로 한다.
 
-[사용자 기본정보]
-회사명 : {{company_name}}
-대표자 : {{company_ceo}}           전화번호 : {{company_phone}}
-주소   : {{company_address}}
-사업자등록번호 : {{business_no}}
+제2조 [담당업무 및 근무장소]
+① (근무장소) 근로자의 근무장소는 {{company_name}} 내 지정된 장소로 한다. 단, 사용자는 업무상 필요 시 근로자와 협의하여 근무장소를 변경할 수 있다.
+② (담당업무) 근로자의 주된 업무는 사용자가 지정한 직무로 하며, 경영상 필요에 따라 부수적인 업무를 수행하거나 직무를 변경할 수 있다.
 
-[근로자 기본정보]
-성명   : {{employee_name}} (사번 {{employee_no}})   생년월일 : {{birth_date}}
-주소   : {{address}}
-입사일 : {{join_date}}      연락처 : {{phone}}
+제3조 [근로계약기간 및 수습]
+① (근계기간) {{join_date}}부터 기간의 정함이 없는 근로계약을 체결한 것으로 한다. (또는 별도로 정한 종료일까지로 한다.)
+② (수습기간) 신규 입사 시 입사일로부터 3개월간을 수습기간으로 둘 수 있으며, 수습기간 중 업무 적격성이 현저히 낮다고 판단될 경우 본 채용을 거부할 수 있다.
 
-────────────────────────────────────────────────────
-제1조 [담당업무 및 근무장소]
-① 근무장소: 사업장 및 사용자가 지정한 장소
-② 종사업무: 사용자가 지정한 업무
-③ 사용자는 업무상 필요에 따라 근로자의 근무장소·부서 또는 종사업무를 변경할 수 있다.
-
-────────────────────────────────────────────────────
-제2조 [근로계약기간]
-① 근로계약기간: 입사일로부터 정년 도달 시 또는 별도로 정한 기간의 만료일까지로 한다.
-② 근로조건 적용기간: 본 계약서에 명시된 근로조건 변경 시까지로 한다.
-③ 근로계약기간 만료 시 근로관계는 종료되며, 사용자가 필요한 경우 재계약할 수 있다.
-④ 정년은 관련 법령 및 회사 규정에서 정하는 바에 따른다.
-⑤ 계약기간 중 근로자가 계약을 해지하고자 할 때에는 원칙적으로 1개월 이전에 사직서를 제출하여
-   업무 인수인계가 원활히 이루어지도록 한다.
-
-────────────────────────────────────────────────────
-제3조 [수습기간]
-① 신규채용된 근로자에 대하여는 입사일로부터 일정 기간 수습기간을 둘 수 있다.
-② 사용자는 수습기간 중 근무태도·업무능력·건강상태 등을 고려하여 본 채용을 거부할 수 있다.
-
-────────────────────────────────────────────────────
 제4조 [근로시간 및 휴게]
-① 근로시간 및 휴게시간은 아래 표와 같다.
+① (근로시간) 근로자의 소정근로시간은 주 40시간을 원칙으로 하며, 상세 시간은 다음과 같다.
+   - 시업시각: {{shift_start}} / 종업시각: {{shift_end}}
+② (휴게시간) 휴게시간은 중식 또는 휴식을 위해 {{break_start}} ~ {{break_end}}까지 제공하며, 근로자는 이 시간을 자유로이 이용할 수 있다.
+③ (연장근로) 사용자와 근로자는 필요한 경우 관련 법령이 정하는 범위 내에서 연장·야간·휴일근로를 실시하는 것에 합의한다.
 
-┌────────┬────────┬────────┬──────────────┬────────┐
-│   구 분   │  시   업  │  종   업  │   휴 게 시 간   │  비 고  │
-├────────┼────────┼────────┼──────────────┼────────┤
-│ 월 ~ 금  │  {{shift_start}}  │  {{shift_end}}  │  {{break_start}} ~ {{break_end}}  │          │
-└────────┴────────┴────────┴──────────────┴────────┘
-
-② 상기 휴게시간은 원칙적으로 그 시간을 사용하되, 업무량이 많은 경우 업무량이 적은 시간대로
-   이동하여 사용할 수 있다.
-③ 사용자는 경영상 필요와 계절의 변화 등에 따라 근로시간·휴게시간을 변경할 수 있으며,
-   근로자는 이에 따라 자연발생되는 연장·야간·휴일근로를 하는 것에 동의할 수 있다.
-
-────────────────────────────────────────────────────
 제5조 [임금 및 구성항목]
-① 월급여, 통상시급 및 각종 수당의 구성·금액은 별도의 급여 산정표 및 회사의 급여 규정에 따른다.
-② 임금산정기간: 매월 1일부터 말일까지, 임금지급일: 익월 ○일(휴일인 경우 다음 영업일)로 한다.
-③ 임금은 근로소득세, 4대보험료 등 제세공과금을 공제한 후 근로자가 지정한 계좌로 지급한다.
-④ 중도 입·퇴사 및 휴직 시 월급여는 해당 월의 일수를 기준으로 일할계산하여 지급한다.
-⑤ 약정시간을 초과하거나 미달한 근로에 대한 정산은 근로기준법 및 회사 규정에 따른다.
-⑥ 수습기간 중 임금은 관련 법령이 정하는 범위에서 산정한다.
+① (월급여) 근로자의 임금은 월급제로 하며 구성 항목은 다음과 같다.
+   - 기본급: 금 {{base_salary}}원
+   - 식대: 금 {{meal_allowance}}원
+   - 직책수당: 금 {{position_allowance}}원
+   - 기타수당(비과세 등): 금 {{other_taxfree}}원
+② (지급일) 임금은 매월 1일부터 말일까지 산정하여 익월 지정일에 근로자의 명의로 된 계좌로 지급한다. (지급일이 휴일인 경우 전일 또는 익영업일)
+③ (일할계산) 중도 입·퇴사 시 해당 월의 근무일수에 따라 일할 계산하여 지급한다.
 
-[임금 구성항목 예시]
-구 성 항 목        금 액(원)        산 정 근 거
-────────────────────────────────
-기본급             {{base_salary}}      __________________
-식대               {{meal_allowance}}      __________________
-직책수당           {{position_allowance}}      __________________
-기타수당           {{other_taxfree}}      __________________
-
-────────────────────────────────────────────────────
 제6조 [휴일 및 휴가]
-① 주휴일(주 1회), 근로자의 날, 기타 취업규칙에서 정한 날을 유급휴일로 한다.
-② 법정공휴일 및 연차유급휴가는 근로기준법과 취업규칙에서 정한 바에 따른다.
-③ 사용자는 근로자대표와의 합의에 따라 법정공휴일 또는 연차유급휴가일을 특정 근로일로
-   대체하거나 갈음하여 휴무시킬 수 있다.
+① (유급휴일) 주 1회 유급 주휴일, 근로자의 날, 기타 관련 법령에서 정한 공휴일을 유급휴일로 한다.
+② (연차유급휴가) 근로기준법에서 정하는 바에 따라 연차유급휴가를 부여하며, 근로자는 이를 자유롭게 사용한다.
 
-────────────────────────────────────────────────────
-제7조 [퇴직금]
-퇴직금은 「근로자퇴직급여 보장법」 및 회사의 퇴직급여 규정에 따른다.
+제7조 [사직 및 해고]
+① (사직) 근로자가 사직하고자 할 때에는 업무의 연속성을 위해 최소 30일 전까지 사용자에게 서면으로 사표를 제출하여야 한다.
+② (해고) 사용자는 근로자가 제 규정을 위반하거나 사회통념상 근로관계를 지속할 수 없는 중대한 사유가 발생한 경우 관련 절차에 따라 계약을 해지할 수 있다.
 
-────────────────────────────────────────────────────
-제8조 [근로계약 해지 사유]
-① 근로자가 1개월 전 사직서를 제출하고 후임자에게 인수인계를 완료한 경우
-② 채용 관련 서류의 위조·변조 또는 허위사실이 확인된 경우
-③ 업무수행능력이 현저히 부족하거나 근무태도가 불량한 경우
-④ 무단결근·지각·조퇴 등이 빈번하여 회사 질서를 문란하게 한 경우
-⑤ 기타 취업규칙에서 정한 해고사유 또는 사회통념상 근로관계를 계속할 수 없는 중대한 사유가
-   발생한 경우
+제8조 [비밀유지 및 손해배상]
+① (비밀유지) 근로자는 재직 중은 물론 퇴직 후에도 업무상 알게 된 회사의 경영·기술·고객 정보 등 비밀을 제3자에게 누설하거나 부당하게 이용하지 않는다.
+② (손해배상) 근로자의 고의 또는 중대한 과실로 인하여 사용자에게 재산상 손해를 입힌 경우, 근로자는 이를 배상할 책임이 있다.
 
-────────────────────────────────────────────────────
-제9조 [손해배상]
-다음 각 호에 해당하는 경우에는 근로자는 사용자에게 손해를 배상하여야 한다.
-① 근로자가 고의 또는 과실로 사용자에게 손해를 끼친 경우
-② 근로자가 재직 중 또는 퇴직 후라도 회사 및 업무상 관련자의 기밀·정보를 누설한 경우
-③ 근로자가 회사 재산을 무단 사용·반출하거나 회사의 정당한 지시를 위반하여 손해를 끼친 경우
-
-────────────────────────────────────────────────────
-제10조 [개인정보의 수집·이용에 대한 동의]
-① 정보의 수집·이용 목적: 인사·노무관리, 노동법률 자문, 세무·4대보험 업무, 정부지원금 신청 등
-② 수집되는 개인정보의 항목, 보유·이용기간 및 열람·정정·동의철회 등에 관한 사항은 별도의
-   개인정보 처리방침에 따른다.
-③ 근로자는 개인정보 수집·이용에 대한 동의를 거부할 수 있으나, 이 경우 법령 및 회사 규정에
-   따른 일부 서비스 제공에 제한이 있을 수 있다.
-
-────────────────────────────────────────────────────
-제11조 [기타 근로조건]
-① 계약기간 중 승진·보직변경 등 신분 변동이나 기타 사유로 근로조건이 변경되는 경우에는 별도의
-   계약 또는 부속 합의를 통해 변경된 조건을 명시한다.
-② 근로자는 회사가 업무상 제공한 물품·장비 등을 퇴사 시 반환하여야 하며, 반환하지 않을 경우
-   관련 규정에 따라 실비를 변상하여야 한다.
-
-────────────────────────────────────────────────────
-제12조 [준용 및 해석]
-① 본 계약서에 명시되지 않은 사항은 취업규칙 및 근로기준법 등 관계 법령을 따른다.
-② 본 계약서의 해석에 관하여 이견이 있는 경우 사용자와 근로자는 상호 협의하며, 협의가
-   원만하지 않을 때에는 관계 법령과 회사 규정을 기준으로 한다.
-
-────────────────────────────────────────────────────
-제13조 [교부 및 보관]
-① 본 계약서는 2부 작성하여 사용자와 근로자가 각 1부씩 보관하며, 전자문서로 교부된 경우에도
-   동일한 효력을 가진다.
-② 근로자는 본 계약서를 교부받았음을 확인하며, 계약 내용에 대하여 충분히 설명을 듣고
-   이해하였음을 확인한다.
-
-[상기 내용을 충분히 이해하고 이에 동의하여 근로계약을 체결한다.]`;
+제9조 [기타 및 준용]
+본 계약서에 명시되지 않은 사항은 취업규칙 및 근로기준법 등 관련 법령과 일반적인 상관례에 따르기로 한다.`;
 
 export default function ContractManager() {
   const [selectedCo, setSelectedCo] = useState('박철홍정형외과');
+  const [companies, setCompanies] = useState<any[]>([]);
   const [template, setTemplate] = useState('');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sealUrl, setSealUrl] = useState<string | null>(null);
   const [uploadingSeal, setUploadingSeal] = useState(false);
+
+  useEffect(() => {
+    supabase.from('companies').select('*').order('name').then(({ data }) => {
+      if (data) setCompanies(data);
+    });
+  }, []);
 
   useEffect(() => {
     const fetchTemplate = async () => {
@@ -176,204 +102,218 @@ export default function ContractManager() {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in">
-      {/* 회사 선택 탭 */}
-      <div className="flex gap-1 border-b border-[var(--toss-border)] pb-4">
-        {COMPANIES.filter(c => c !== '전체').map(co => (
-          <button key={co} onClick={() => setSelectedCo(co)} 
-            className={`px-6 py-2 text-[11px] font-semibold border ${selectedCo === co ? 'bg-[var(--toss-blue)] border-[var(--toss-blue)] text-white shadow-lg' : 'bg-[var(--toss-card)] text-[var(--toss-gray-3)] border-[var(--toss-border)]'}`}>
-            {co}
+    <div className="flex flex-col h-[calc(100vh-180px)] overflow-hidden animate-in fade-in duration-500">
+      {/* 상단 액션바: 회사 선택 및 저장 */}
+      <div className="flex items-center justify-between mb-6 shrink-0">
+        <div className="flex bg-[var(--toss-gray-1)] p-1 rounded-2xl border border-[var(--toss-border)] overflow-x-auto no-scrollbar max-w-[70%]">
+          {companies.map(co => (
+            <button
+              key={co.id}
+              onClick={() => setSelectedCo(co.name)}
+              className={`px-5 py-2 text-[12px] font-bold rounded-xl transition-all whitespace-nowrap ${selectedCo === co.name
+                ? 'bg-white text-[var(--toss-blue)] shadow-sm'
+                : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'
+                }`}
+            >
+              {co.name}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              if (window.confirm('현재 본문 내용을 지우고 표준 근로계약서 양식으로 초기화할까요?')) {
+                setTemplate(DEFAULT_CONTRACT_TEMPLATE);
+              }
+            }}
+            className="px-4 py-2 rounded-xl bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] text-[11px] font-bold hover:bg-red-50 hover:text-red-500 transition-colors border border-[var(--toss-border)]"
+          >
+            기본 양식 로드
           </button>
-        ))}
+          <button
+            onClick={handleSave}
+            disabled={saving || loading}
+            className="px-6 py-2 bg-[var(--toss-blue)] text-white rounded-xl text-[12px] font-bold shadow-lg hover:opacity-90 transition-all disabled:opacity-50 flex items-center gap-2"
+          >
+            {saving ? '저장 중...' : '설정 저장하기'}
+          </button>
+        </div>
       </div>
 
-      {/* 9:3 비율로 계약서 편집 / 직인 관리 배치 */}
-      <div className="grid grid-cols-12 gap-6 items-start">
-        {/* 왼쪽: 계약서 표준 틀 편집기 */}
-        <div className="col-span-9 space-y-4">
-          <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-[12px] text-white p-4 flex items-center justify-between shadow-md">
-            <div>
-              <p className="text-[11px] font-semibold tracking-[0.18em] uppercase opacity-70">Contract Template</p>
-              <p className="mt-1 text-sm md:text-base font-semibold">
-                {selectedCo} 표준 근로계약서 틀
-              </p>
+      {/* 메인 Split View */}
+      <div className="flex-1 flex gap-8 overflow-hidden">
+        {/* Left: Editor Pane (45%) */}
+        <div className="w-[45%] flex flex-col gap-6 overflow-y-auto pr-2 custom-scrollbar">
+          {/* 본문 에디터 카드 */}
+          <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[24px] p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
+                <span className="w-1 h-4 bg-[var(--toss-blue)] rounded-full"></span>
+                계약 조항 편집
+              </h3>
+              <p className="text-[10px] text-[var(--toss-gray-3)] font-semibold">자동 연동 정보는 미리보기에서 확인</p>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                if (window.confirm('현재 내용을 지우고 기본 표준 근로계약서 틀로 다시 불러올까요?')) {
-                  setTemplate(DEFAULT_CONTRACT_TEMPLATE);
-                }
-              }}
-              className="px-3 py-1.5 rounded-full bg-white/10 border border-white/30 text-[11px] font-bold hover:bg-white/20 transition-all"
-            >
-              표준 틀로 되돌리기
-            </button>
+
+            <textarea
+              className="w-full h-[400px] p-5 bg-[var(--input-bg)] border border-[var(--toss-border)] rounded-2xl text-[13px] leading-relaxed outline-none focus:border-[var(--toss-blue)]/50 focus:ring-4 focus:ring-[var(--toss-blue)]/5 transition-all custom-scrollbar font-mono"
+              value={template}
+              onChange={e => setTemplate(e.target.value)}
+              placeholder="제1조 [담당업무]부터 내용을 입력하세요."
+            />
+
+            <div className="mt-4">
+              <p className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider mb-2">활성 데이터 토큰 (클릭하여 복사)</p>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  '{{employee_name}}', '{{employee_no}}', '{{join_date}}',
+                  '{{shift_start}}', '{{shift_end}}', '{{base_salary}}',
+                  '{{meal_allowance}}', '{{position_allowance}}'
+                ].map(tkn => (
+                  <button
+                    key={tkn}
+                    onClick={() => {
+                      navigator.clipboard.writeText(tkn);
+                      alert(`${tkn} 토큰이 복사되었습니다.`);
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-[var(--toss-gray-1)] border border-[var(--toss-border)] font-mono text-[10px] text-[var(--toss-gray-4)] hover:border-[var(--toss-blue)]/30 hover:bg-white transition-all"
+                  >
+                    {tkn}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
-          {loading ? (
-            <div className="w-full h-[520px] flex items-center justify-center bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)]">
-              로딩 중...
-            </div>
-          ) : (
-            <>
-              {/* 편집기 + 토큰 안내 */}
-              <div className="grid grid-cols-12 gap-4">
-                <div className="col-span-8">
-                  <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] mb-1.5 block">
-                    계약서 본문
-                    <span className="ml-2 text-[11px] text-[var(--toss-gray-3)]">
-                      {'{{...}} 형태의 토큰은 직원/급여/근무형태 데이터로 자동 채워집니다.'}
-                    </span>
-                  </label>
-                  <textarea
-                    className="w-full h-[320px] p-5 bg-[var(--input-bg)] border border-[var(--toss-border)] rounded-[12px] text-[13px] leading-relaxed outline-none focus:border-[var(--toss-blue)] focus:ring-2 focus:ring-[var(--toss-blue)] shadow-inner custom-scrollbar font-mono"
-                    value={template}
-                    onChange={e => setTemplate(e.target.value)}
-                    placeholder="계약서 본문을 입력하세요. 인사관리 → 계약에서 직원에게 발송 시 이 양식이 사용됩니다."
-                  />
-                </div>
-                <div className="col-span-4">
-                  <div className="h-full rounded-[12px] border border-dashed border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-4 py-3 text-[11px] text-[var(--toss-gray-4)] flex flex-col gap-2">
-                    <p className="font-bold text-[var(--foreground)] text-xs mb-1">사용 가능한 자동입력 토큰</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {[
-                        '{{company_name}}',
-                        '{{employee_name}}',
-                        '{{employee_no}}',
-                        '{{address}}',
-                        '{{join_date}}',
-                        '{{shift_start}}',
-                        '{{shift_end}}',
-                        '{{break_start}}',
-                        '{{break_end}}',
-                        '{{base_salary}}',
-                        '{{meal_allowance}}',
-                        '{{position_allowance}}',
-                        '{{other_taxfree}}',
-                      ].map((tkn) => (
-                        <span
-                          key={tkn}
-                          className="px-2 py-0.5 rounded-full bg-[var(--toss-card)] border border-[var(--toss-border)] font-mono text-[11px] text-[var(--foreground)]"
-                        >
-                          {tkn}
-                        </span>
-                      ))}
-                    </div>
-                    <p className="mt-auto text-[11px] text-[var(--toss-gray-3)]">
-                      위 토큰들은 조직도·급여·근무형태에 등록된 데이터를 기준으로 전자서명 화면에서 자동 채워집니다.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* 미리보기: 실제 근로자 서명 화면과 동일한 레이아웃 */}
-              <div className="mt-5">
-                <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-[0.18em] mb-2 flex items-center gap-2">
-                  <span className="w-1 h-3 bg-[var(--toss-gray-3)]" />
-                  실시간 미리보기 (근로자 서명 화면)
-                </p>
-                <div className="w-full bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] py-6 px-3">
-                  <div className="max-w-[760px] mx-auto bg-[var(--toss-card)] rounded-[12px] shadow-lg border border-[var(--toss-border)] overflow-hidden">
-                    <div className="px-6 md:px-8 pt-6 pb-4 border-b border-[var(--toss-border)] flex items-center justify-between">
-                      <div>
-                        <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">전자 근로계약서</p>
-                        <h3 className="mt-1 text-base md:text-lg font-bold text-[var(--foreground)]">
-                          표준 근로계약서
-                        </h3>
-                      </div>
-                      {sealUrl && (
-                        <div className="flex flex-col items-center text-[11px] text-[var(--toss-gray-3)]">
-                          <span className="mb-1">사업자 직인</span>
-                          <img
-                            src={sealUrl}
-                            alt="사업자 직인"
-                            className="h-14 w-14 object-contain opacity-90 drop-shadow-sm"
-                          />
-                        </div>
-                      )}
-                    </div>
-                    <div className="px-6 md:px-8 py-5 max-h-[260px] overflow-y-auto custom-scrollbar text-[12px] leading-relaxed text-[var(--foreground)]">
-                    <div className="whitespace-pre-wrap font-mono text-[12px]">
-                        {template || '여기에 입력한 계약서 본문이 근로자 서명 화면에 그대로 표시됩니다.'}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* 오른쪽: 소형 직인 관리 카드 */}
-        <div className="col-span-3 space-y-6">
-          <div className="space-y-3">
-            <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">사업자 공식 직인</p>
-            <label className="aspect-square w-full border-2 border-dashed border-[var(--toss-border)] flex flex-col items-center justify-center bg-[var(--toss-gray-1)] group hover:border-red-100 transition-all cursor-pointer relative overflow-hidden">
-              {sealUrl ? (
-                <>
-                  <img src={sealUrl} alt="사업자 직인" className="w-full h-full object-contain" />
-                  <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 flex items-center justify-center text-[11px] font-semibold text-white">
-                    변경하려면 클릭
-                  </div>
-                </>
-              ) : (
-                <>
-                  <span className="text-4xl opacity-10 font-serif text-red-600 mb-2">印</span>
-                  <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">파일 선택</span>
-                </>
-              )}
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                className="hidden"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  setUploadingSeal(true);
-                  try {
-                    const ext = file.name.split('.').pop() || 'png';
-                    // Supabase Storage object key는 ASCII만 허용하므로 회사명은 안전한 슬러그로 변환
-                    const safeFolder =
-                      selectedCo === '박철홍정형외과'
-                        ? 'pch_ortho'
-                        : selectedCo === '수연의원'
-                        ? 'suyeon_clinic'
-                        : selectedCo === 'SY INC.'
-                        ? 'sy_inc'
-                        : selectedCo.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || 'company';
-                    const fileName = `${safeFolder}/seal_${Date.now()}.${ext}`;
-                    const { error: upErr } = await supabase.storage.from('company-seals').upload(fileName, file, { upsert: true });
-                    if (upErr) {
-                      console.error('seal upload error', upErr);
-                      alert(`직인 파일 업로드에 실패했습니다.\n(${upErr.message || 'Supabase Storage 설정을 확인해주세요.'})`);
-                    } else {
+          {/* 직인 관리 카드 */}
+          <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[24px] p-6 shadow-sm mb-4">
+            <h3 className="text-sm font-bold text-[var(--foreground)] mb-4 flex items-center gap-2">
+              <span className="w-1 h-4 bg-red-400 rounded-full"></span>
+              사업자 직인 관리
+            </h3>
+            <div className="flex items-center gap-6">
+              <label className="w-24 h-24 border-2 border-dashed border-[var(--toss-border)] flex flex-col items-center justify-center bg-[var(--toss-gray-1)] rounded-2xl group hover:border-[var(--toss-blue)]/30 transition-all cursor-pointer relative overflow-hidden shrink-0">
+                {sealUrl ? (
+                  <img src={sealUrl} alt="직인" className="w-full h-full object-contain p-2" />
+                ) : (
+                  <span className="text-2xl opacity-20">印</span>
+                )}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setUploadingSeal(true);
+                    try {
+                      const ext = file.name.split('.').pop() || 'png';
+                      const safeFolder = selectedCo.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || 'company';
+                      const fileName = `seals/${safeFolder}_${Date.now()}.${ext}`;
+                      const { error: upErr } = await supabase.storage.from('company-seals').upload(fileName, file);
+                      if (upErr) throw upErr;
                       const { data: urlData } = supabase.storage.from('company-seals').getPublicUrl(fileName);
                       setSealUrl(urlData.publicUrl);
-                      alert('사업자 직인이 등록되었습니다. 저장 버튼을 눌러 계약서에 적용하세요.');
+                    } catch (err) {
+                      alert('직인 업로드에 실패했습니다. (Storage 설정을 확인하세요)');
+                    } finally {
+                      setUploadingSeal(false);
+                      e.target.value = '';
                     }
-                  } catch (err) {
-                    alert('직인 업로드 중 오류가 발생했습니다.');
-                  } finally {
-                    setUploadingSeal(false);
-                    e.target.value = '';
-                  }
-                }}
-              />
-            </label>
-            <p className="text-[11px] text-[var(--toss-gray-3)] font-bold leading-tight bg-[var(--toss-gray-1)] p-3 border border-[var(--toss-border)]">
-                * PNG(투명배경) 권장<br/>
-                * Supabase Storage의 <code>company-seals</code> 버킷에 저장됩니다.<br/>
-                * 저장 시 모든 사원 계약서에 적용
-            </p>
-            {uploadingSeal && (
-              <p className="text-[11px] text-[var(--toss-blue)] font-bold">직인 업로드 중...</p>
-            )}
+                  }}
+                />
+              </label>
+              <div className="flex-1 space-y-1">
+                <p className="text-[11px] font-bold text-[var(--foreground)]">공식 직인 이미지 (PNG 권장)</p>
+                <p className="text-[10px] text-[var(--toss-gray-3)] font-semibold leading-relaxed">
+                  배경이 투명한 정방형 이미지를 권장합니다.<br />
+                  업로드 시 즉시 우측 미리보기에 반영됩니다.
+                </p>
+                {uploadingSeal && <p className="text-[10px] text-[var(--toss-blue)] font-bold animate-pulse">업로드 중...</p>}
+              </div>
+            </div>
           </div>
-          
-          <button onClick={handleSave} disabled={saving || loading} className="w-full py-5 bg-[var(--toss-blue)] text-white text-xs font-semibold shadow-xl hover:bg-[var(--toss-blue)] transition-all disabled:opacity-50">
-            {saving ? '저장 중...' : `${selectedCo} 양식 저장`}
-          </button>
+        </div>
+
+        {/* Right: Live Preview Pane (55%) */}
+        <div className="flex-1 flex flex-col bg-[var(--toss-gray-1)] rounded-[32px] border border-[var(--toss-border)] overflow-hidden">
+          <div className="px-6 py-4 border-b border-[var(--toss-border)] flex items-center justify-between bg-white/50 backdrop-blur-md">
+            <span className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+              Live Preview
+            </span>
+            <span className="text-[10px] font-semibold text-[var(--toss-gray-3)]">A4 규격 실시간 랜더링</span>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-12 flex justify-center custom-scrollbar">
+            {/* 고해상도 미리보기 페이퍼 */}
+            <div className="w-full max-w-[640px] bg-white shadow-2xl rounded-sm border border-gray-200 min-h-[900px] flex flex-col p-[50px] font-serif transition-transform duration-500 scale-[0.98] hover:scale-100 origin-top">
+              {/* 미리보기 헤더: 자동 연동 정보 모사 */}
+              <div className="relative border-b-2 border-slate-800 pb-10 mb-10">
+                <h1 className="text-3xl font-black text-center mb-12 tracking-[0.2em] underline underline-offset-8 decoration-1">근 로 계 약 서</h1>
+
+                <div className="grid grid-cols-2 gap-8">
+                  {/* 왼쪽: 회사 정보 */}
+                  <div className="space-y-3">
+                    <p className="text-[11px] font-bold text-slate-800 border-b-2 border-slate-900 pb-1 flex items-center gap-1">
+                      [사용자]
+                    </p>
+                    <div className="grid grid-cols-12 border-t border-l border-gray-300 text-[10px]">
+                      <div className="col-span-4 bg-gray-50 border-r border-b border-gray-300 p-2 font-bold text-center">회사명</div>
+                      <div className="col-span-8 border-r border-b border-gray-300 p-2 font-bold">{selectedCo}</div>
+
+                      <div className="col-span-4 bg-gray-50 border-r border-b border-gray-300 p-2 font-bold text-center">사업자번호</div>
+                      <div className="col-span-8 border-r border-b border-gray-300 p-2 text-gray-400 italic">자동 연동</div>
+
+                      <div className="col-span-4 bg-gray-50 border-r border-b border-gray-300 p-2 font-bold text-center">주소</div>
+                      <div className="col-span-8 border-r border-b border-gray-300 p-2 text-gray-400 italic">자동 연동</div>
+
+                      <div className="col-span-4 bg-gray-50 border-r border-b border-gray-300 p-2 font-bold text-center">연락처</div>
+                      <div className="col-span-8 border-r border-b border-gray-300 p-2 text-gray-400 italic">자동 연동</div>
+                    </div>
+                  </div>
+
+                  {/* 오른쪽: 근로자 정보 */}
+                  <div className="space-y-3">
+                    <p className="text-[11px] font-bold text-slate-800 border-b-2 border-slate-900 pb-1 flex items-center gap-1">
+                      [근로자]
+                    </p>
+                    <div className="grid grid-cols-12 border-t border-l border-gray-300 text-[10px]">
+                      <div className="col-span-4 bg-gray-50 border-r border-b border-gray-300 p-2 font-bold text-center">성명</div>
+                      <div className="col-span-8 border-r border-b border-gray-300 p-2 text-gray-400 italic">근로자 성명</div>
+
+                      <div className="col-span-4 bg-gray-50 border-r border-b border-gray-300 p-2 font-bold text-center">생년월일</div>
+                      <div className="col-span-8 border-r border-b border-gray-300 p-2 text-gray-400 italic">0000.00.00</div>
+
+                      <div className="col-span-4 bg-gray-50 border-r border-b border-gray-300 p-2 font-bold text-center">주소</div>
+                      <div className="col-span-8 border-r border-b border-gray-300 p-2 text-gray-400 italic">자동 연동</div>
+
+                      <div className="col-span-4 bg-gray-50 border-r border-b border-gray-300 p-2 font-bold text-center">연락처</div>
+                      <div className="col-span-8 border-r border-b border-gray-300 p-2 text-gray-400 italic">자동 연동</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 미리보기 본문: 에디터 내용 반영 */}
+              <div className="flex-1 text-[13px] leading-[1.8] text-slate-800 whitespace-pre-wrap font-serif">
+                {template || (
+                  <div className="h-full flex flex-col items-center justify-center opacity-20 py-20">
+                    <span className="text-4xl mb-4">⌨️</span>
+                    <p className="font-sans font-bold">에디터에 내용을 입력하세요</p>
+                  </div>
+                )}
+              </div>
+
+              {/* 미리보기 하단: 서명란 */}
+              <div className="mt-16 pt-8 border-t border-dotted border-gray-400 flex justify-between items-end shrink-0">
+                <p className="text-[11px] text-gray-400">전자 서명 시 상기 내용은 법적 효력을 가집니다.</p>
+                <div className="text-right">
+                  <p className="text-[12px] font-bold mb-4">{new Date().getFullYear()}년 {new Date().getMonth() + 1}월 {new Date().getDate()}일</p>
+                  <p className="text-[13px] font-bold">{selectedCo} 대표이사 (인)</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
