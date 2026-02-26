@@ -90,7 +90,8 @@ export default function PayrollSlipPDF({ staff, record, yearMonth }: any) {
     w.document.write(`
       <!DOCTYPE html><html><head><meta charset="utf-8"><title>${titleText}</title>
       <style>
-        body{font-family:sans-serif;padding:40px;max-width:600px;margin:0 auto}
+        @page { size: landscape; margin: 10mm; }
+        body{font-family:sans-serif;padding:40px;max-width:800px;margin:0 auto}
         table{width:100%;border-collapse:collapse} td,th{padding:8px;border:1px solid #ddd}
         .title{font-size:18px;font-weight:bold;margin-bottom:20px;color:${primaryColor}}
         .total{font-size:16px;font-weight:bold;color:${primaryColor}}

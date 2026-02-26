@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import SmartDatePicker from '../공통/SmartDatePicker';
 
 type FieldType = 'text' | 'textarea' | 'date' | 'number' | 'checkbox' | 'radio';
 
@@ -168,7 +169,7 @@ export default function FormBuilder({ user }: any) {
                                         <div className="pl-9 pointer-events-none opacity-50">
                                             {field.type === 'text' && <input type="text" disabled placeholder="단답형 텍스트 입력창" className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs" />}
                                             {field.type === 'textarea' && <textarea disabled placeholder="장문형 텍스트 입력창" className="w-full h-20 px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs" />}
-                                            {field.type === 'date' && <input type="date" disabled className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs" />}
+                                            {field.type === 'date' && <SmartDatePicker value="" onChange={() => { }} disabled className="w-full h-10 px-4 bg-slate-50 border border-slate-200 rounded-lg text-xs" />}
                                             {field.type === 'number' && <input type="number" disabled placeholder="0" className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs" />}
                                             {field.type === 'checkbox' && (
                                                 <div className="flex items-center gap-2">

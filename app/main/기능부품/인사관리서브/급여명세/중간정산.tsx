@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { calculateSeverancePay, formatWorkPeriod } from '@/lib/severance-pay';
 import { logAudit } from '@/lib/audit';
+import SmartDatePicker from '../../공통/SmartDatePicker';
 
 export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }: any) {
   const [selectedStaff, setSelectedStaff] = useState<any>(null);
@@ -155,7 +156,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="text-xs font-medium text-[var(--toss-gray-4)]">정산 기준일</label>
-              <input type="date" value={settlementDate} onChange={(e) => setSettlementDate(e.target.value)} className="w-full h-10 px-3 bg-[var(--input-bg)] border border-[var(--toss-border)] rounded-md text-sm font-medium focus:ring-2 focus:ring-[var(--toss-blue)]/30" />
+              <SmartDatePicker value={settlementDate} onChange={val => setSettlementDate(val)} className="w-full h-10 px-3 bg-[var(--input-bg)] border border-[var(--toss-border)] rounded-md text-sm font-medium" />
             </div>
             <div className="space-y-1">
               <label className="text-xs font-medium text-[var(--toss-gray-4)]">정산 사유</label>

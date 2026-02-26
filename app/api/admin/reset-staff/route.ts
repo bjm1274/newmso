@@ -47,7 +47,55 @@ export async function POST(req: Request) {
     }
 
     const ids = toDelete.map((r) => r.id);
+
+    // 종속 테이블 데이터 먼저 삭제 (외래키 제약조건 해소)
+    const dependentTables = [
+      // 전자결재
+      { table: 'approvals', column: 'sender_id' },
+      // 근로계약
+      { table: 'employment_contracts', column: 'staff_id' },
+      // 근태/출퇴근
+      { table: 'attendance', column: 'staff_id' },
+      { table: 'shift_assignments', column: 'staff_id' },
+      // 휴가
+      { table: 'leave_requests', column: 'staff_id' },
+      // 자격면허
+      { table: 'staff_certifications', column: 'staff_id' },
+      // 할일
+      { table: 'todos', column: 'user_id' },
+      // 알림
+      { table: 'notifications', column: 'user_id' },
+      // 인수인계
+      { table: 'handover_notes', column: 'author_id' },
+      // 채팅
+      { table: 'pinned_messages', column: 'pinned_by' },
+      { table: 'message_reactions', column: 'user_id' },
+      { table: 'message_reads', column: 'user_id' },
+      { table: 'messages', column: 'sender_id' },
+      { table: 'room_notification_settings', column: 'user_id' },
+      { table: 'polls', column: 'creator_id' },
+      { table: 'poll_votes', column: 'user_id' },
+      { table: 'chat_rooms', column: 'created_by' },
+      // 게시판
+      { table: 'board_post_likes', column: 'user_id' },
+      { table: 'board_post_comments', column: 'author_id' },
+      { table: 'board_posts', column: 'author_id' },
+      { table: 'posts', column: 'author_id' },
+      // 문서/감사
+      { table: 'document_repository', column: 'created_by' },
+      { table: 'audit_logs', column: 'user_id' },
+      { table: 'audit_logs', column: 'target_id' },
+    ];
+
     const BATCH = 100;
+    for (const dep of dependentTables) {
+      for (let i = 0; i < ids.length; i += BATCH) {
+        const chunk = ids.slice(i, i + BATCH);
+        await supabase.from(dep.table).delete().in(dep.column, chunk);
+      }
+    }
+
+    // 직원 데이터 삭제
     for (let i = 0; i < ids.length; i += BATCH) {
       const chunk = ids.slice(i, i + BATCH);
       const { error } = await supabase.from('staff_members').delete().in('id', chunk);

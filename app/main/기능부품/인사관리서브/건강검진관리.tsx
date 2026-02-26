@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
+import SmartDatePicker from '../공통/SmartDatePicker';
 
 const CHECKUP_TYPES = ['일반검진', '특수검진', '채용검진', '배치전검진'] as const;
 
@@ -68,7 +69,7 @@ export default function HealthCheckupManagement({ staffs = [], selectedCo }: any
                             <select value={form.checkup_type} onChange={e => setForm({ ...form, checkup_type: e.target.value })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none">
                                 {CHECKUP_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                             </select>
-                            <input type="date" value={form.scheduled_date} onChange={e => setForm({ ...form, scheduled_date: e.target.value })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" required />
+                            <SmartDatePicker value={form.scheduled_date} onChange={val => setForm({ ...form, scheduled_date: val })} inputClassName="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" />
                             <input type="text" value={form.hospital} onChange={e => setForm({ ...form, hospital: e.target.value })} placeholder="검진 병원명" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)]" />
                             <input type="text" value={form.memo} onChange={e => setForm({ ...form, memo: e.target.value })} placeholder="비고" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)] md:col-span-2" />
                         </div>

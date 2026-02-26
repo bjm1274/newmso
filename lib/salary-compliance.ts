@@ -3,10 +3,10 @@
  * company-collab-system의 salary-compliance-service를 Supabase용으로 변환
  */
 
-import { MINIMUM_WAGE_2024 as MW24, MINIMUM_WAGE_2025 as MW25, MONTHLY_STANDARD_HOURS } from './tax-free-limits';
+import { MINIMUM_WAGE_2025 as MW25, MINIMUM_WAGE_2026 as MW26, MONTHLY_STANDARD_HOURS } from './tax-free-limits';
 
-const MINIMUM_WAGE_2024 = MW24;
 const MINIMUM_WAGE_2025 = MW25;
+const MINIMUM_WAGE_2026 = MW26;
 const MONTHLY_HOURS = MONTHLY_STANDARD_HOURS; // 월 소정근로시간(미입력 시 209h 기본값)
 
 export interface StaffForCompliance {
@@ -25,7 +25,8 @@ export function validateMinimumWageCompliance(
   _month?: number
 ) {
   const y = year ?? new Date().getFullYear();
-  const minWage = y >= 2025 ? MINIMUM_WAGE_2025 : MINIMUM_WAGE_2024;
+  // 2026년 이후면 2026년 기준, 그 외(2025년 포함)는 2025년 기준 적용 (2024 삭제됨)
+  const minWage = y >= 2026 ? MINIMUM_WAGE_2026 : MINIMUM_WAGE_2025;
   const baseSalary = staff.base_salary ?? 0;
   const positionAllowance = staff.position ?? 0;
   const monthlySalary = baseSalary + positionAllowance;

@@ -2,16 +2,16 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
-const PRESET_HOSPITAL = { 
-  reg_num: '000-00-00000', 
-  sangho: '박철홍정형외과', 
-  ceo: '박철홍', 
-  addr: '전라남도 목포시', 
-  phone: '061-000-0000', 
+const PRESET_HOSPITAL = {
+  reg_num: '000-00-00000',
+  sangho: '박철홍정형외과',
+  ceo: '박철홍',
+  addr: '전라남도 목포시',
+  phone: '061-000-0000',
   contact: '',
   email: '',
-  status: '보건업', 
-  type: '정형외과' 
+  status: '보건업',
+  type: '정형외과'
 };
 
 export default function InvoiceManagement({ user, inventory, suppliers, fetchSuppliers }: any) {
@@ -20,8 +20,8 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
   const [loading, setLoading] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
   const [customPresets, setCustomPresets] = useState<any[]>([]);
-  
-  const [supplierForm, setSupplierForm] = useState({ 
+
+  const [supplierForm, setSupplierForm] = useState({
     name: '',
     contact: '',
     address: '',
@@ -145,10 +145,10 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
 
   const selectItem = (index: number, item: any) => {
     const newItems = [...invoiceData.items];
-    newItems[index] = { 
-      ...newItems[index], 
-      name: item.item_name, 
-      spec: item.category || '', 
+    newItems[index] = {
+      ...newItems[index],
+      name: item.item_name,
+      spec: item.category || '',
       price: item.unit_price || 0,
       qty: newItems[index].qty || 1
     };
@@ -171,7 +171,7 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="bg-white p-6 md:p-10 border border-[var(--toss-border)] shadow-xl rounded-[2.5rem]">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tight">거래처 및 명세서 관리</h2>
             <p className="text-[11px] text-green-600 font-bold mt-1 uppercase tracking-widest">Supplier & Invoice Control</p>
@@ -369,7 +369,7 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
             </div>
             <button onClick={() => setShowInvoiceForm(false)} className="text-[var(--toss-gray-3)] hover:text-red-500 text-2xl">✕</button>
           </div>
-          
+
           <div className="space-y-8">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div className="text-[11px] text-[var(--toss-gray-3)] font-bold">
@@ -377,7 +377,8 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
                 <span className="text-[var(--toss-gray-3)]">(세금계산서/명세서 기준일)</span>
               </div>
               <input
-                type="date"
+                type="text"
+                placeholder="0000-00-00"
                 value={invoiceData.date}
                 onChange={(e) =>
                   setInvoiceData((prev: any) => ({
@@ -476,75 +477,75 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
               </div>
             </div>
 
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">품목 리스트</p>
-                  <button onClick={addRow} className="text-[11px] font-semibold text-[var(--toss-blue)] hover:underline">
-                    + 품목 추가
-                  </button>
-                </div>
-                <div className="overflow-x-auto no-scrollbar">
-                  <table className="w-full text-left border-collapse min-w-[600px]">
-                    <thead>
-                      <tr className="bg-[var(--toss-gray-1)]/50 border-b border-[var(--toss-border)]">
-                        <th className="px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">품목명</th>
-                        <th className="px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase text-center">수량</th>
-                        <th className="px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase text-right">단가</th>
-                        <th className="px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase text-right">공급가액</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                      {invoiceData.items.map((item, idx) => (
-                        <tr key={idx} className="hover:bg-[var(--toss-gray-1)]/70 transition-colors">
-                          <td className="px-4 py-3 relative">
-                            <input
-                              value={item.name}
-                              onChange={(e) => updateItem(idx, 'name', e.target.value)}
-                              onFocus={() => setFocusedRow(idx)}
-                              placeholder="품목 선택/입력"
-                              className="w-full px-3 py-2 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] outline-none text-xs font-semibold text-[var(--foreground)] focus:bg-white focus:ring-2 focus:ring-[var(--toss-blue)]/30"
-                            />
-                            {focusedRow === idx && (
-                              <div className="absolute left-0 top-full w-full bg-white border border-[var(--toss-border)] shadow-2xl z-50 rounded-[16px] max-h-40 overflow-y-auto">
-                                {inventory
-                                  .filter((i: any) => i.item_name.includes(item.name))
-                                  .map((i: any) => (
-                                    <button
-                                      key={i.id}
-                                      onClick={() => selectItem(idx, i)}
-                                      className="w-full text-left p-3 text-[11px] font-bold hover:bg-blue-50 border-b border-gray-50"
-                                    >
-                                      {i.item_name}
-                                    </button>
-                                  ))}
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <input
-                              type="number"
-                              value={item.qty}
-                              onChange={(e) => updateItem(idx, 'qty', e.target.value)}
-                              className="w-20 px-2 py-2 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] outline-none text-xs font-semibold text-center text-[var(--foreground)] focus:bg-white focus:ring-2 focus:ring-[var(--toss-blue)]/30"
-                            />
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <input
-                              type="number"
-                              value={item.price}
-                              onChange={(e) => updateItem(idx, 'price', e.target.value)}
-                              className="w-24 px-2 py-2 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] outline-none text-xs font-semibold text-right text-[var(--foreground)] focus:bg-white focus:ring-2 focus:ring-[var(--toss-blue)]/30"
-                            />
-                          </td>
-                          <td className="px-4 py-3 text-right text-xs font-semibold text-[var(--foreground)]">
-                            {(item.supply_price || 0).toLocaleString()}원
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">품목 리스트</p>
+                <button onClick={addRow} className="text-[11px] font-semibold text-[var(--toss-blue)] hover:underline">
+                  + 품목 추가
+                </button>
               </div>
+              <div className="overflow-x-auto no-scrollbar">
+                <table className="w-full text-left border-collapse min-w-[600px]">
+                  <thead>
+                    <tr className="bg-[var(--toss-gray-1)]/50 border-b border-[var(--toss-border)]">
+                      <th className="px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">품목명</th>
+                      <th className="px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase text-center">수량</th>
+                      <th className="px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase text-right">단가</th>
+                      <th className="px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase text-right">공급가액</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {invoiceData.items.map((item, idx) => (
+                      <tr key={idx} className="hover:bg-[var(--toss-gray-1)]/70 transition-colors">
+                        <td className="px-4 py-3 relative">
+                          <input
+                            value={item.name}
+                            onChange={(e) => updateItem(idx, 'name', e.target.value)}
+                            onFocus={() => setFocusedRow(idx)}
+                            placeholder="품목 선택/입력"
+                            className="w-full px-3 py-2 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] outline-none text-xs font-semibold text-[var(--foreground)] focus:bg-white focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+                          />
+                          {focusedRow === idx && (
+                            <div className="absolute left-0 top-full w-full bg-white border border-[var(--toss-border)] shadow-2xl z-50 rounded-[16px] max-h-40 overflow-y-auto">
+                              {inventory
+                                .filter((i: any) => i.item_name.includes(item.name))
+                                .map((i: any) => (
+                                  <button
+                                    key={i.id}
+                                    onClick={() => selectItem(idx, i)}
+                                    className="w-full text-left p-3 text-[11px] font-bold hover:bg-blue-50 border-b border-gray-50"
+                                  >
+                                    {i.item_name}
+                                  </button>
+                                ))}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <input
+                            type="number"
+                            value={item.qty}
+                            onChange={(e) => updateItem(idx, 'qty', e.target.value)}
+                            className="w-20 px-2 py-2 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] outline-none text-xs font-semibold text-center text-[var(--foreground)] focus:bg-white focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <input
+                            type="number"
+                            value={item.price}
+                            onChange={(e) => updateItem(idx, 'price', e.target.value)}
+                            className="w-24 px-2 py-2 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] outline-none text-xs font-semibold text-right text-[var(--foreground)] focus:bg-white focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-right text-xs font-semibold text-[var(--foreground)]">
+                          {(item.supply_price || 0).toLocaleString()}원
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
 
             <div className="flex justify-end pt-6 border-t border-gray-50">
               <div className="text-right">

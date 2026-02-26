@@ -1,9 +1,9 @@
 /** 퇴직금 계산 (근로기준법) */
 export function calculateSeverancePay(avgWage: number, workDays: number): number {
-  // 퇴직금 = (1일 평균임금 × 30일) × (재직일수 / 365) × (1/2)
+  // 퇴직금 = (1일 평균임금 × 30일) × (재직일수 / 365)
   const dailyAvg = avgWage / 30;
   const years = workDays / 365;
-  return Math.floor(dailyAvg * 30 * years * 0.5);
+  return Math.floor(dailyAvg * 30 * years);
 }
 
 export function formatWorkPeriod(workDays: number): string {

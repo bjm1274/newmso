@@ -90,11 +90,11 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
           childcare_allowance: s.childcare_allowance || 0,
           research_allowance: s.research_allowance || 0,
           other_taxfree: s.other_taxfree || 0,
-          extra_allowance: 0,
+          extra_allowance: Number(s.overtime_allowance || 0) + Number(s.night_work_allowance || 0) + Number(s.holiday_work_allowance || 0) + Number(s.annual_leave_pay || 0),
           overtime_pay: 0,
           bonus: 0,
-          apply_tax: true,
-          apply_insurance: true,
+          apply_tax: s.permissions?.insurance?.income_tax !== false,
+          apply_insurance: s.permissions?.insurance?.national !== false,
           attendance_deduction: total,
           attendance_deduction_detail: { ...detail, original_deduction: total },
           custom_deduction: 0,
@@ -145,13 +145,34 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
 
     const total_payment = total_taxable + total_taxfree;
 
+    // 직원별 보험/복지 설정 가져오기 (Duru-nuri, Medical Benefit 등)
+    const staff = staffs.find((s: any) => String(s.id) === String(id));
+    const insSettings = staff?.permissions?.insurance || {};
+    const isMedicalBenefit = staff?.permissions?.is_medical_benefit || false;
+
+    // 두루누리 적용 여부 판단 (기간 체크)
+    let isDuruNuriActive = insSettings.duru_nuri || false;
+    if (isDuruNuriActive && insSettings.duru_nuri_start && insSettings.duru_nuri_end) {
+      const current = yearMonth; // "YYYY-MM"
+      isDuruNuriActive = (current >= insSettings.duru_nuri_start && current <= insSettings.duru_nuri_end);
+    }
+
     // 공제 상세: 4대보험·소득세는 과세표준(급여−비과세) 기준, 항목별 계산 (학습 문서 §8·§14.3)
     let national_pension = 0, health_insurance = 0, long_term_care = 0, employment_insurance = 0, income_tax = 0, local_tax = 0;
     if (data.apply_insurance) {
-      national_pension = Math.floor(total_taxable * 0.045);   // 국민연금 근로자 4.5%
-      health_insurance = Math.floor(total_taxable * 0.03545);  // 건강보험 근로자 3.545%
-      long_term_care = Math.floor(health_insurance * 0.1295); // 장기요양 12.95%
-      employment_insurance = Math.floor(total_taxable * 0.009); // 고용보험 근로자 0.9%
+      // 1. 국민연금 (4.5%) - 두루누리 80% 지원 적용 시 20%만 부과
+      const full_national = Math.floor(total_taxable * 0.045);
+      national_pension = isDuruNuriActive ? Math.floor(full_national * 0.2) : full_national;
+
+      // 2. 건강보험 (3.545%) - 의료급여 수급자는 제외(0원)
+      if (!isMedicalBenefit) {
+        health_insurance = Math.floor(total_taxable * 0.03545);
+        long_term_care = Math.floor(health_insurance * 0.1295); // 장기요양 12.95%
+      }
+
+      // 3. 고용보험 (0.9%) - 두루누리 80% 지원 적용 시 20%만 부과
+      const full_employment = Math.floor(total_taxable * 0.009);
+      employment_insurance = isDuruNuriActive ? Math.floor(full_employment * 0.2) : full_employment;
     }
     if (data.apply_tax) {
       income_tax = Math.floor(total_taxable * 0.03);  // 소득세 간이세액표 근사
@@ -166,7 +187,9 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
       employment_insurance,
       income_tax,
       local_tax,
-      custom_deduction
+      custom_deduction,
+      is_duru_nuri: isDuruNuriActive,
+      is_medical_benefit: isMedicalBenefit
     };
 
     return {
@@ -290,100 +313,58 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
                 const isAdvanceOnly = advancePay > 0;
                 const res = isAdvanceOnly ? { net: advancePay, taxable: 0, taxfree: 0 } : calculateSalary(s.id);
                 return (
-                  <div key={s.id} className="p-5 bg-[var(--page-bg)] border border-[var(--toss-border)] rounded-[12px] space-y-5">
-                    <div className="flex justify-between items-center flex-wrap gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="px-2 py-0.5 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] text-xs font-medium rounded">{s.company}</span>
-                        <span className="text-base font-semibold text-[var(--foreground)]">{s.name}</span>
-                        {isAdvanceOnly && <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-xs font-medium rounded">선지급</span>}
+                  <div key={s.id} className="p-4 bg-white border border-[var(--toss-border)] rounded-[16px] shadow-sm space-y-4 hover:border-[var(--toss-blue)] transition-all">
+                    <div className="flex justify-between items-center border-b border-[var(--toss-gray-1)] pb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-[var(--toss-blue-light)] flex items-center justify-center text-xs font-bold text-[var(--toss-blue)]">{s.name[0]}</div>
+                        <div>
+                          <p className="text-sm font-bold text-[var(--foreground)] leading-none">{s.name}</p>
+                          <p className="text-[10px] text-[var(--toss-gray-3)] mt-1">{s.company} · {s.department}</p>
+                        </div>
+                        {isAdvanceOnly && <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-bold rounded">선지급</span>}
                       </div>
                       <div className="text-right">
-                        <p className="text-xs text-[var(--toss-gray-3)]">차인지급액</p>
-                        <p className="text-lg font-semibold text-[var(--toss-blue)]">₩ {res.net.toLocaleString()}</p>
+                        <p className="text-[10px] text-[var(--toss-gray-3)] font-bold">합계 예상 실지급액</p>
+                        <p className="text-lg font-black text-[var(--toss-blue)]">₩ {res.net.toLocaleString()}</p>
                       </div>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4">
                       <div className="space-y-1">
-                        <label className="text-xs font-medium text-[var(--toss-gray-4)]">과세 · 기본급</label>
-                        <input type="number" value={data.base_salary} readOnly className="w-full h-9 px-3 bg-[var(--toss-gray-1)] border border-[var(--toss-border)] rounded-md text-sm text-[var(--toss-gray-4)]" />
+                        <label className="text-[10px] font-bold text-[var(--toss-gray-4)] ml-1">과세·기본급</label>
+                        <input type="text" value={Number(data.base_salary).toLocaleString()} readOnly className="w-full h-8 px-3 bg-[var(--toss-gray-1)] border-none rounded-lg text-xs font-bold text-[var(--toss-gray-4)]" />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-xs font-medium text-[var(--toss-gray-4)]">기타 수당</label>
-                        <input type="number" value={data.extra_allowance} onChange={(e) => updateData(s.id, 'extra_allowance', e.target.value)} className="w-full h-9 px-3 border border-[var(--toss-border)] rounded-md text-sm focus:ring-2 focus:ring-[var(--toss-blue)] focus:border-[var(--toss-blue)]" placeholder="0" />
+                        <label className="text-[10px] font-bold text-[var(--toss-blue)] ml-1">수당 합계(고정포함)</label>
+                        <input type="text" value={Number(data.extra_allowance).toLocaleString()} onChange={(e) => updateData(s.id, 'extra_allowance', parseInt(e.target.value.replace(/,/g, '')) || 0)} className="w-full h-8 px-3 border border-[var(--toss-border)] rounded-lg text-xs font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20 outline-none" />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-xs font-medium text-[var(--toss-gray-4)]">비과세 · 당직수당(야간)</label>
-                        <input type="number" value={Number(data.night_duty_allowance) || 0} onChange={(e) => updateData(s.id, 'night_duty_allowance', e.target.value)} className="w-full h-9 px-3 border border-[var(--toss-border)] rounded-md text-sm focus:ring-2 focus:ring-[var(--toss-blue)]" placeholder="0" />
+                        <label className="text-[10px] font-bold text-[var(--toss-gray-4)] ml-1">야간/당직 (비과세)</label>
+                        <input type="text" value={Number(data.night_duty_allowance).toLocaleString()} onChange={(e) => updateData(s.id, 'night_duty_allowance', parseInt(e.target.value.replace(/,/g, '')) || 0)} className="w-full h-8 px-3 border border-[var(--toss-border)] rounded-lg text-xs font-bold outline-none" />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-xs font-medium text-[var(--toss-gray-4)]">연장/상여</label>
-                        <input type="number" value={Number(data.overtime_pay) + Number(data.bonus)} onChange={(e) => updateData(s.id, 'overtime_pay', e.target.value)} className="w-full h-9 px-3 border border-[var(--toss-border)] rounded-md text-sm" />
+                        <label className="text-[10px] font-bold text-[var(--toss-gray-4)] ml-1">연장/상여</label>
+                        <input type="text" value={(Number(data.overtime_pay) + Number(data.bonus)).toLocaleString()} onChange={(e) => updateData(s.id, 'overtime_pay', parseInt(e.target.value.replace(/,/g, '')) || 0)} className="w-full h-8 px-3 border border-[var(--toss-border)] rounded-lg text-xs font-bold outline-none" />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-xs font-medium text-[var(--toss-gray-4)]">비과세 합계</label>
-                        <div className="h-9 px-3 flex items-center bg-[var(--toss-gray-1)] border border-[var(--toss-border)] rounded-md text-sm font-medium text-[var(--foreground)]">₩ {(isAdvanceOnly ? 0 : res.taxfree).toLocaleString()}</div>
+                        <label className="text-[10px] font-bold text-orange-600 ml-1">근태/기타차감</label>
+                        <input type="text" value={(Number(data.attendance_deduction) + Number(data.custom_deduction)).toLocaleString()} onChange={(e) => updateData(s.id, 'custom_deduction', parseInt(e.target.value.replace(/,/g, '')) || 0)} className="w-full h-8 px-3 border border-orange-200 bg-orange-50/30 rounded-lg text-xs font-bold text-orange-700 outline-none" />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-xs font-medium text-amber-700">기타 공제 (원)</label>
-                        <input type="number" min={0} value={Number(data.custom_deduction) || 0} onChange={(e) => updateData(s.id, 'custom_deduction', Number(e.target.value) || 0)} className="w-full h-9 px-3 border border-amber-200 rounded-md text-sm focus:ring-2 focus:ring-amber-400" placeholder="0" />
+                        <label className="text-[10px] font-bold text-amber-600 ml-1">선지급(차감)</label>
+                        <input type="text" value={Number(data.advance_pay).toLocaleString()} onChange={(e) => updateData(s.id, 'advance_pay', parseInt(e.target.value.replace(/,/g, '')) || 0)} className="w-full h-8 px-3 border border-amber-200 bg-amber-50/30 rounded-lg text-xs font-bold text-amber-700 outline-none" />
                       </div>
-                      <div className="space-y-1">
-                        <label className="text-xs font-medium text-amber-700">선지급 (원)</label>
-                        <input type="number" min={0} value={advancePay} onChange={(e) => updateData(s.id, 'advance_pay', Number(e.target.value) || 0)} className="w-full h-9 px-3 border border-amber-200 rounded-md text-sm focus:ring-2 focus:ring-amber-400" placeholder="0" />
-                        <p className="text-[11px] text-[var(--toss-gray-3)]">0 초과 시 해당 월 선지급만 적용</p>
-                      </div>
-                      {(data.attendance_deduction !== undefined && (data.attendance_deduction > 0 || data.attendance_deduction_detail?.original_deduction > 0)) && (
-                        <div className="sm:col-span-2 lg:col-span-3 space-y-1">
-                          <div className="flex justify-between items-center">
-                            <label className="text-xs font-bold text-orange-700">근태 차감 (지각/조퇴/결근)</label>
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => {
-                                  if (confirm('이 직원의 근태 차감을 전액 면제(0원)하시겠습니까?\n사유: 관리자 재량 예외처리 / 보상휴가 전환 등')) {
-                                    updateData(s.id, 'attendance_deduction', 0);
-                                  }
-                                }}
-                                className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-1 rounded-[6px] hover:bg-emerald-200 transition-colors"
-                              >
-                                ✨ 전액 면제
-                              </button>
-                              <button
-                                onClick={() => {
-                                  const ans = prompt('수동으로 차감할 금액을 입력하세요 (원 단위):', data.attendance_deduction);
-                                  if (ans !== null && !isNaN(Number(ans))) {
-                                    updateData(s.id, 'attendance_deduction', Number(ans));
-                                  }
-                                }}
-                                className="text-[10px] font-bold bg-orange-100 text-orange-700 px-2 py-1 rounded-[6px] hover:bg-orange-200 transition-colors shadow-sm"
-                              >
-                                📝 금액 직접수정
-                              </button>
-                            </div>
-                          </div>
-                          <div className="px-3 py-2.5 bg-orange-50/80 border border-orange-200 rounded-lg text-sm font-extrabold text-orange-800 flex justify-between items-center shadow-inner">
-                            <span>-₩ {(data.attendance_deduction || 0).toLocaleString()}</span>
-                            {data.attendance_deduction_detail?.original_deduction !== undefined && data.attendance_deduction_detail.original_deduction !== data.attendance_deduction && (
-                              <span className="text-[10px] font-semibold text-orange-400/80 line-through">원래 산출액: -₩{data.attendance_deduction_detail.original_deduction.toLocaleString()}</span>
-                            )}
-                          </div>
-                          {data.attendance_deduction === 0 && data.attendance_deduction_detail?.original_deduction > 0 && (
-                            <p className="text-[10px] text-emerald-600 font-bold mt-1 text-right">※ 관리자 권한으로 차감이 면제되었습니다.</p>
+                      <div className="col-span-2 flex items-center justify-between bg-[var(--toss-gray-1)] px-4 py-2 rounded-xl mt-1">
+                        <div className="flex gap-4">
+                          <span className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase">과세: ₩{res.taxable.toLocaleString()}</span>
+                          <span className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase">비과세: ₩{res.taxfree.toLocaleString()}</span>
+                        </div>
+                        <div className="flex gap-2">
+                          {data.attendance_deduction > 0 && (
+                            <button onClick={() => updateData(s.id, 'attendance_deduction', 0)} className="text-[9px] font-bold text-emerald-600 bg-white px-2 py-0.5 rounded shadow-sm border border-emerald-100">근태차감 면제</button>
                           )}
                         </div>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-[var(--toss-border)]">
-                      <div className="flex gap-4">
-                        <label className="flex items-center gap-2 cursor-pointer text-sm text-[var(--toss-gray-4)]">
-                          <input type="checkbox" checked={data.apply_insurance} onChange={(e) => updateData(s.id, 'apply_insurance', e.target.checked)} className="w-4 h-4 rounded border-[var(--toss-border)] text-[var(--toss-blue)]" />
-                          4대보험
-                        </label>
-                        <label className="flex items-center gap-2 cursor-pointer text-sm text-[var(--toss-gray-4)]">
-                          <input type="checkbox" checked={data.apply_tax} onChange={(e) => updateData(s.id, 'apply_tax', e.target.checked)} className="w-4 h-4 rounded border-[var(--toss-border)] text-[var(--toss-blue)]" />
-                          소득세
-                        </label>
                       </div>
-                      <p className="text-xs text-[var(--toss-gray-3)]">과세 ₩{(isAdvanceOnly ? 0 : res.taxable).toLocaleString()} / 비과세 ₩{(isAdvanceOnly ? 0 : res.taxfree).toLocaleString()}</p>
                     </div>
                   </div>
                 );

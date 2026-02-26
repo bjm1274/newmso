@@ -1,8 +1,9 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import SmartDatePicker from '../공통/SmartDatePicker';
 
-const ORDER_TYPES = ['승진', '전보(부서이동)', '직무변경', '직급변경', '파견', '복직', '휴직', '기타'] as const;
+const ORDER_TYPES = ['승진', '전보(부서이동)', '퇴직/면직'] as const;
 
 export default function PersonnelAppointment({ staffs = [], selectedCo, user }: any) {
     const [records, setRecords] = useState<any[]>([]);
@@ -95,7 +96,7 @@ export default function PersonnelAppointment({ staffs = [], selectedCo, user }: 
                             <select value={form.order_type} onChange={e => setForm({ ...form, order_type: e.target.value })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none">
                                 {ORDER_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                             </select>
-                            <input type="date" max="2999-12-31" value={form.effective_date} onChange={e => setForm({ ...form, effective_date: e.target.value })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" required />
+                            <SmartDatePicker value={form.effective_date} onChange={val => setForm({ ...form, effective_date: val })} inputClassName="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" />
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200">
                             <div><label className="text-[9px] font-bold text-[var(--toss-gray-4)] block mb-1">현재 부서</label><input value={form.before_dept} readOnly className="w-full px-2 py-2 text-[11px] font-bold rounded-lg bg-gray-100 text-[var(--toss-gray-4)] border-none" /></div>

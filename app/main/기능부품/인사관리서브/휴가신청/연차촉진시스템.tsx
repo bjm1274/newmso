@@ -26,10 +26,24 @@ type PromotionTarget = StaffLite & {
 export default function AnnualLeavePromotion({ staffs, selectedCo }: { staffs: StaffLite[]; selectedCo: string }) {
   const [promotionTargets, setPromotionTargets] = useState<PromotionTarget[]>([]);
   const [loading, setLoading] = useState(false);
+  const [submittedPlans, setSubmittedPlans] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchSubmittedPlans();
+  }, []);
 
   useEffect(() => {
     calculatePromotionTargets();
-  }, [staffs, selectedCo]);
+  }, [staffs, selectedCo, submittedPlans]);
+
+  const fetchSubmittedPlans = async () => {
+    const { data } = await supabase
+      .from('approvals')
+      .select('sender_id, status, type')
+      .eq('type', '연차계획서')
+      .neq('status', '반려');
+    if (data) setSubmittedPlans(data);
+  };
 
   const getEmploymentMonths = (joinDate: string | null | undefined) => {
     if (!joinDate) return 0;
@@ -43,7 +57,7 @@ export default function AnnualLeavePromotion({ staffs, selectedCo }: { staffs: S
       .filter((s) => selectedCo === '전체' || s.company === selectedCo)
       .map((s) => {
         const totalLeave = s.annual_leave_total ?? 15;
-        const usedLeave = s.annual_leave_used ?? Math.floor(Math.random() * 10);
+        const usedLeave = s.annual_leave_used ?? 0;
         const remainingLeave = Math.max(0, totalLeave - usedLeave);
         const employmentMonths = getEmploymentMonths(s.join_date);
         const { pushDays } = calculateAnnualLeavePush(String(s.id), employmentMonths);
@@ -53,8 +67,13 @@ export default function AnnualLeavePromotion({ staffs, selectedCo }: { staffs: S
         let status = '정상';
         let actionRequired = false;
 
+        const hasPlan = submittedPlans.some(p => String(p.sender_id) === String(s.id));
+
         if (remainingLeave > 0) {
-          if (month >= 7 && month <= 9) {
+          if (hasPlan) {
+            status = '계획 제출 완료';
+            actionRequired = false;
+          } else if (month >= 7 && month <= 9) {
             status = '1차 촉진 대상';
             actionRequired = true;
           } else if (month >= 10) {
@@ -84,27 +103,22 @@ export default function AnnualLeavePromotion({ staffs, selectedCo }: { staffs: S
   };
 
   const handleSendPromotion = async (staff: PromotionTarget) => {
-    if (!confirm(`${staff.name}님께 연차사용촉진 통보를 발송하시겠습니까?`)) return;
+    if (!confirm(`${staff.name}님께 연차사용촉진 통보를 발송하시겠습니까?\n발송 시 알림과 함께 전자결재 작성이 요청됩니다.`)) return;
     setLoading(true);
     try {
       await supabase.from('notifications').insert([{
         user_id: staff.id,
         type: '인사',
-        title: '연차사용촉진 통보',
-        body: `${staff.name}님, 미사용 연차 ${staff.remainingLeave}일에 대한 사용 계획을 제출해 주세요.`,
-        metadata: { type: 'annual_leave_promotion', remaining: staff.remainingLeave },
+        title: '📅 연차사용촉진 및 계획 제출 요청',
+        body: `${staff.name}님, 미사용 연차 ${staff.remainingLeave}일에 대해 근로기준법에 따라 촉진하오니 [전자결재 > 작성하기 > 연차계획서]를 통해 계획을 제출해 주세요.`,
+        metadata: {
+          type: 'annual_leave_promotion',
+          remaining: staff.remainingLeave,
+          link: '/main/전자결재?view=작성하기&type=연차계획서'
+        },
       }]);
-      await supabase.from('approvals').insert([{
-        sender_id: staff.id,
-        sender_name: 'SY INC. 시스템 (연차촉진)',
-        sender_company: staff.company ?? 'SY INC.',
-        type: '연차촉진',
-        title: `[통보] 연차사용촉진 및 사용계획 제출 요청 (${staff.name})`,
-        content: `귀하의 미사용 연차 ${staff.remainingLeave}일에 대하여 근로기준법 제61조에 의거하여 사용을 촉진합니다.`,
-        status: '대기',
-        meta_data: { type: 'annual_leave_promotion', remaining: staff.remainingLeave },
-      }]);
-      alert('연차사용촉진 통보 및 서류 생성이 완료되었습니다.');
+      alert('연차사용촉진 통보가 발송되었습니다.');
+      fetchSubmittedPlans();
     } catch {
       alert('발송 실패');
     } finally {
@@ -126,10 +140,10 @@ export default function AnnualLeavePromotion({ staffs, selectedCo }: { staffs: S
         </div>
 
         <div className="grid grid-cols-1 gap-4">
-          {promotionTargets.filter(t => t.actionRequired).map((staff: any) => (
-            <div key={staff.id} className="p-6 bg-[var(--toss-gray-1)] border border-[var(--toss-border)] rounded-[16px] flex flex-col md:flex-row justify-between items-center gap-4">
+          {promotionTargets.filter(t => t.actionRequired || t.status === '계획 제출 완료').map((staff: any) => (
+            <div key={staff.id} className={`p-6 border rounded-[16px] flex flex-col md:flex-row justify-between items-center gap-4 transition-all ${staff.status === '계획 제출 완료' ? 'bg-indigo-50/30 border-indigo-100 opacity-80' : 'bg-[var(--toss-gray-1)] border-[var(--toss-border)]'}`}>
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center font-semibold text-[var(--toss-blue)] shadow-sm border border-[var(--toss-border)]">
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center font-semibold shadow-sm border ${staff.status === '계획 제출 완료' ? 'bg-white text-indigo-500 border-indigo-100' : 'bg-white text-[var(--toss-blue)] border-[var(--toss-border)]'}`}>
                   {staff.name[0]}
                 </div>
                 <div>
@@ -137,27 +151,33 @@ export default function AnnualLeavePromotion({ staffs, selectedCo }: { staffs: S
                   <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">{staff.company} / {staff.department}</p>
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-8">
                 <div className="text-center">
                   <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">잔여 연차</p>
-                  <p className="text-lg font-semibold text-red-600">{staff.remainingLeave}일</p>
+                  <p className={`text-lg font-semibold ${staff.status === '계획 제출 완료' ? 'text-indigo-600' : 'text-red-600'}`}>{staff.remainingLeave}일</p>
                 </div>
                 <div className="text-center">
                   <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">상태</p>
-                  <span className="px-3 py-1 bg-orange-100 text-orange-600 rounded-full text-[11px] font-semibold">{staff.status}</span>
+                  <span className={`px-3 py-1 rounded-full text-[11px] font-semibold ${staff.status === '계획 제출 완료' ? 'bg-indigo-100 text-indigo-600' : 'bg-orange-100 text-orange-600'}`}>{staff.status}</span>
                 </div>
-                <button 
-                  onClick={() => handleSendPromotion(staff)}
-                  disabled={loading}
-                  className="px-6 py-3 bg-[var(--toss-blue)] text-white rounded-[16px] text-[11px] font-semibold shadow-lg hover:scale-[0.98] transition-all disabled:opacity-50"
-                >
-                  ⚡ 촉진 통보 발송
-                </button>
+                {staff.actionRequired ? (
+                  <button
+                    onClick={() => handleSendPromotion(staff)}
+                    disabled={loading}
+                    className="px-6 py-3 bg-[var(--toss-blue)] text-white rounded-[16px] text-[11px] font-semibold shadow-lg hover:scale-[0.98] transition-all disabled:opacity-50"
+                  >
+                    ⚡ 촉진 통보 발송
+                  </button>
+                ) : (
+                  <div className="px-6 py-3 bg-white border border-indigo-100 text-indigo-400 rounded-[16px] text-[11px] font-semibold flex items-center gap-2">
+                    <span>✅ 제출 완료</span>
+                  </div>
+                )}
               </div>
             </div>
           ))}
-          {promotionTargets.filter(t => t.actionRequired).length === 0 && (
+          {promotionTargets.filter(t => t.actionRequired).length === 0 && promotionTargets.filter(t => t.status === '계획 제출 완료').length === 0 && (
             <div className="text-center py-20 bg-green-50 rounded-[16px] border border-dashed border-green-200">
               <p className="text-sm font-semibold text-green-600">✅ 현재 연차사용촉진 대상자가 없습니다.</p>
             </div>

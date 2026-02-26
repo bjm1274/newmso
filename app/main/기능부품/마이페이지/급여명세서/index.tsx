@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import SalarySlipUI from './명세서디자인';
+import SalaryDetail from '../../인사관리서브/급여명세/급여상세';
 
 export default function SalarySlipContainer({ user }: any) {
   const [unlocked, setUnlocked] = useState(false);
@@ -52,27 +52,27 @@ export default function SalarySlipContainer({ user }: any) {
   };
 
   useEffect(() => {
-    if (!user) return;
-    // 기본급여가 설정되지 않은 경우 명세서 생성 자체를 막는다.
-    if (!user.base_salary || user.base_salary <= 0) {
-      setSalaryData(null);
-      return;
-    }
-    const base = user.base_salary;
-    const month = currentDate.getMonth() + 1;
-    const overtimePay = Math.floor((month % 2 === 0 ? 12.5 : 5.0) * 22000);
-    const bonus = month === 12 ? 1500000 : 0;
-    const totalPay = base + overtimePay + 100000 + bonus;
+    if (!user?.id) return;
 
-    setSalaryData({
-      base_salary: base,
-      overtime_pay: overtimePay,
-      bonus: bonus,
-      national_pension: Math.floor(totalPay * 0.045),
-      health_insurance: Math.floor(totalPay * 0.03545),
-      income_tax: Math.floor(totalPay * 0.03),
-    });
-  }, [currentDate, user]);
+    const fetchSalaryRecord = async () => {
+      const yearMonth = currentDate.toISOString().slice(0, 7);
+      const { data, error } = await supabase
+        .from('payroll_records')
+        .select('*')
+        .eq('staff_id', user.id)
+        .eq('year_month', yearMonth)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error fetching salary record:', error);
+        setSalaryData(null);
+      } else {
+        setSalaryData(data);
+      }
+    };
+
+    fetchSalaryRecord();
+  }, [currentDate, user?.id]);
 
   const handlePrint = () => { window.print(); };
 
@@ -105,20 +105,19 @@ export default function SalarySlipContainer({ user }: any) {
     );
   }
 
-  if (!user?.base_salary || user.base_salary <= 0) {
+  if (!salaryData) {
     return (
-      <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] p-8 sm:p-10 text-sm font-semibold text-[var(--toss-gray-4)] leading-relaxed">
-        아직 <span className="text-[var(--toss-blue)]">기본급여</span>가 등록되지 않아 급여명세서를 생성할 수 없습니다.
-        <br className="my-2" />
-        인사 담당자에게 직원 기본급을 먼저 등록해 달라고 요청해 주세요.
+      <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] p-8 sm:p-10 flex flex-col items-center justify-center min-h-[300px] text-center">
+        <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-2xl mb-4">📅</div>
+        <h3 className="text-lg font-bold text-[var(--foreground)] mb-2">급여 내역이 없습니다</h3>
+        <p className="text-sm text-[var(--toss-gray-3)] leading-relaxed">
+          {currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월의 급여 정산이 아직 완료되지 않았습니다.<br />
+          정산이 완료되면 이곳에서 명세서를 확인하실 수 있습니다.
+        </p>
       </div>
     );
   }
 
-  if (!salaryData) return <div className="p-8 text-[var(--toss-gray-3)] font-semibold">데이터 로딩 중...</div>;
-
-  const totalPayment = salaryData.base_salary + salaryData.overtime_pay + 100000 + salaryData.bonus;
-  const totalDeduction = salaryData.national_pension + salaryData.health_insurance + Math.floor(salaryData.health_insurance * 0.1281) + Math.floor(totalPayment * 0.009) + salaryData.income_tax + Math.floor(salaryData.income_tax * 0.1);
 
   return (
     <>
@@ -130,8 +129,8 @@ export default function SalarySlipContainer({ user }: any) {
           
           /* 2. 인쇄 페이지 여백 설정 (프린터 물리 여백 확보) */
           @page {
-            size: A4;
-            margin: 5mm; /* 최소한의 안전 여백 5mm 확보 */
+            size: A4 landscape;
+            margin: 5mm;
           }
           
           /* 3. 인쇄 대상 컨테이너 설정 */
@@ -178,13 +177,10 @@ export default function SalarySlipContainer({ user }: any) {
         </div>
 
         <div className="flex-1 overflow-auto bg-[var(--toss-gray-1)] p-6 sm:p-8 lg:p-10 flex justify-center custom-scrollbar">
-          <div id="print-section" className="bg-[var(--toss-card)] shadow-2xl print:shadow-none print:w-full">
-            <SalarySlipUI 
-              user={user} 
-              currentDate={currentDate} 
-              salaryData={salaryData}
-              totalPayment={totalPayment}
-              totalDeduction={totalDeduction}
+          <div id="print-section" className="w-full max-w-4xl mx-auto shadow-2xl print:shadow-none bg-white rounded-3xl overflow-hidden">
+            <SalaryDetail
+              staff={user}
+              record={salaryData}
             />
           </div>
         </div>

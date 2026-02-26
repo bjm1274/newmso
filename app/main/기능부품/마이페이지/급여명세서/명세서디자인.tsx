@@ -17,7 +17,11 @@ export default function SalarySlipUI({ user, currentDate, salaryData, totalPayme
   return (
     // [핵심] 고정폭(210mm) 제거 -> w-full로 변경하여 프린터 여백에 유동적 대응
     <div className="w-full max-w-[210mm] mx-auto bg-white text-black p-12 print:p-8 box-border flex flex-col h-full min-h-[280mm]">
-
+      <style>{`
+        @media print {
+          @page { size: landscape; margin: 10mm; }
+        }
+      `}</style>
       {/* 1. 헤더 */}
       <div className="text-center border-b-4 border-double border-[var(--foreground)] pb-5 mb-8">
         <h1 className="text-4xl font-semibold tracking-[0.5em] text-[var(--foreground)] mb-2">급 여 명 세 서</h1>

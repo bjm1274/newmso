@@ -2,23 +2,27 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 
-type DeptStat = { dept: string; total: number; used: number; remain: number; expiring: number };
+type DeptStat = { dept: string; company?: string; total: number; used: number; remain: number; expiring: number };
 
 export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }: any) {
   const [byDept, setByDept] = useState<DeptStat[]>([]);
 
   useEffect(() => {
     const filtered = selectedCo === '전체' ? staffs : staffs.filter((s: any) => s.company === selectedCo);
-    const map: Record<string, { total: number; used: number }> = {};
+    const map: Record<string, { total: number; used: number; company?: string }> = {};
     filtered.forEach((s: any) => {
       const dept = s.department || '미지정';
-      if (!map[dept]) map[dept] = { total: 0, used: 0 };
-      map[dept].total += s.annual_leave_total ?? 0;
-      map[dept].used += s.annual_leave_used ?? 0;
+      const company = s.company || '미지정';
+      const key = selectedCo === '전체' ? `${company} - ${dept}` : dept;
+
+      if (!map[key]) map[key] = { total: 0, used: 0, company };
+      map[key].total += s.annual_leave_total ?? 0;
+      map[key].used += s.annual_leave_used ?? 0;
     });
     setByDept(
-      Object.entries(map).map(([dept, v]) => ({
-        dept,
+      Object.entries(map).map(([key, v]) => ({
+        dept: key,
+        company: v.company,
         total: v.total,
         used: v.used,
         remain: Math.max(0, v.total - v.used),
@@ -77,13 +81,16 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
 
   return (
     <div className="border border-[var(--toss-border)] p-4 bg-[var(--toss-card)] rounded-[12px] shadow-sm">
-      <div className="flex items-center justify-between mb-3 pb-2 border-b border-[var(--toss-border)]">
-        <h3 className="text-sm font-semibold text-[var(--foreground)]">연차 종합 대시보드</h3>
+      <div className="flex items-center justify-between mb-4 pb-3 border-b border-[var(--toss-border)]">
+        <h3 className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-2">
+          연차 종합 대시보드
+          {selectedCo !== '전체' && <span className="px-2 py-0.5 bg-blue-50 text-[var(--toss-blue)] text-[10px] rounded-full">{selectedCo}</span>}
+        </h3>
         <div className="flex gap-0.5 bg-[var(--tab-bg)] rounded-[12px] p-0.5">
           <button
             type="button"
             onClick={() => setViewMode('dept')}
-            className={`px-2.5 py-1 rounded-md text-xs font-medium ${viewMode === 'dept' ? 'bg-teal-600 text-white' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'
+            className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${viewMode === 'dept' ? 'bg-[var(--foreground)] text-white' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'
               }`}
           >
             팀별
@@ -91,12 +98,27 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
           <button
             type="button"
             onClick={() => setViewMode('personal')}
-            className={`px-2.5 py-1 rounded-md text-xs font-medium ${viewMode === 'personal' ? 'bg-teal-600 text-white' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'
+            className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${viewMode === 'personal' ? 'bg-[var(--foreground)] text-white' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'
               }`}
           >
             개인별
           </button>
         </div>
+      </div>
+
+      {/* 요약 카드 */}
+      <div className="grid grid-cols-4 gap-2 mb-4">
+        {[
+          { label: '인원', val: filteredStaffs.length, unit: '명', color: 'text-[var(--foreground)]' },
+          { label: '총 연차', val: filteredStaffs.reduce((acc: number, s: any) => acc + (s.annual_leave_total ?? 0), 0), unit: '일', color: 'text-[var(--toss-blue)]' },
+          { label: '사용', val: filteredStaffs.reduce((acc: number, s: any) => acc + (s.annual_leave_used ?? 0), 0), unit: '일', color: 'text-amber-600' },
+          { label: '잔여', val: filteredStaffs.reduce((acc: number, s: any) => acc + Math.max(0, (s.annual_leave_total ?? 0) - (s.annual_leave_used ?? 0)), 0), unit: '일', color: 'text-emerald-600' },
+        ].map((stat, i) => (
+          <div key={i} className="bg-[var(--toss-gray-1)]/50 p-2.5 rounded-[12px] border border-[var(--toss-border)] text-center">
+            <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mb-0.5">{stat.label}</p>
+            <p className={`text-sm font-bold ${stat.color}`}>{stat.val}{stat.unit}</p>
+          </div>
+        ))}
       </div>
 
       {viewMode === 'dept' ? (
@@ -140,11 +162,16 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
               >
                 <div className="flex items-center justify-between text-xs">
                   <div>
-                    <p className="font-semibold text-[var(--foreground)]">
+                    <p className="font-semibold text-[var(--foreground)] flex items-center gap-1.5">
                       {s.name}{' '}
                       <span className="text-[11px] text-[var(--toss-gray-3)] font-normal">
                         ({s.department || '미지정'})
                       </span>
+                      {selectedCo === '전체' && (
+                        <span className="px-1.5 py-0.5 bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] text-[9px] rounded-md font-bold">
+                          {s.company}
+                        </span>
+                      )}
                     </p>
                     <p className="text-[11px] text-[var(--toss-gray-3)] mt-0.5">
                       총 {total}일 · 사용 {used}일 · <span className="text-[var(--foreground)]">잔여 <span className="font-semibold text-emerald-600">{remain}일</span></span>

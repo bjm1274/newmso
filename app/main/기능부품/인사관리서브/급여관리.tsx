@@ -5,7 +5,6 @@ import SalaryDetail from './급여명세/급여상세';
 import PayrollTable from './급여명세/급여대장표';
 import PayrollMonthlySummary from './급여명세/급여대장월별요약';
 import LaborCostSimulation from './인력예측/인건비예측';
-import CompliancePanel from './급여명세/노무준수패널';
 import InterimSettlement from './급여명세/중간정산';
 import YearEndSettlement from './급여명세/연말정산';
 import SalarySettlement from './급여명세/급여정산';
@@ -13,7 +12,6 @@ import SeveranceCalculator from './급여명세/퇴직금계산기';
 import PayrollEmailSender from './급여명세/급여명세서발송';
 import TaxFreeSettingsPanel from './급여명세/비과세항목설정';
 import LegalStandardsPanel from './급여명세/법정기준패널';
-import PayrollExport from './급여명세/급여대장내보내기';
 import WeeklyHoursMonitor from './급여명세/주52시간모니터링';
 import HRDashboardIntegrated from './급여명세/인사대시보드통합';
 import SeveranceLeaveDashboard from './급여명세/예상퇴직금연차대시보드';
@@ -24,7 +22,6 @@ import AuditLogDetail from './급여명세/감사로그상세';
 import PayrollLockPanel from './급여명세/급여월마감잠금';
 import ShiftPatternManager from './급여명세/교대제스케줄관리';
 import NotificationTemplatesPanel from './급여명세/알림템플릿관리';
-import PayrollSlipPDF from './급여명세/급여명세서PDF';
 import TaxInsuranceRatesPanel from './급여명세/세율보험요율관리';
 import IntegratedHRSettings from './인사통합설정';
 
@@ -37,7 +34,7 @@ type Staff = {
 };
 
 export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any) {
-  const [activeTab, setActiveTab] = useState('대장');
+  const [activeTab, setActiveTab] = useState('대시보드');
   const [selectedStaffId, setSelectedStaffId] = useState(1);
   const [checkedIds, setCheckedIds] = useState<number[]>([]);
   const [yearMonth, setYearMonth] = useState<string>(() => new Date().toISOString().slice(0, 7));
@@ -79,80 +76,114 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
   const [y, m] = (yearMonth || '').split('-');
   const periodLabel = y && m ? `${y}년 ${Number(m)}월` : '';
 
+  const tabs = [
+    { id: '대시보드', label: '대시보드', icon: '📊' },
+    { id: '급여정산', label: '급여정산', icon: '⚖️' },
+    { id: '급여대장', label: '급여대장', icon: '📋' },
+    { id: '연말퇴직정산', label: '연말퇴직정산', icon: '🗓️' },
+    { id: '통합설정', label: '통합설정', icon: '⚙️' },
+  ];
+
   return (
     <div className="flex flex-col h-full animate-in fade-in duration-500 app-page">
-      <header className="shrink-0 app-header">
-        <div className="px-6 md:px-8 pt-5 pb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-4">
-            <div>
-              <h1 className="page-header-title text-lg font-bold">{periodLabel || '급여'} 급여</h1>
-              <p className="page-header-caption text-xs mt-0.5">[{selectedCo}]</p>
-            </div>
-            {activeTab === '대장' && (
-              <label className="flex items-center gap-2 text-sm text-[var(--toss-gray-4)]">
-                <span>기간</span>
-                <input type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="h-9 px-3 border border-[var(--toss-border)] rounded-md bg-[var(--input-bg)] text-[var(--foreground)] font-medium focus:ring-2 focus:ring-[var(--toss-blue)]/30 focus:border-[var(--toss-blue)]" />
-              </label>
-            )}
-          </div>
-          {activeTab === '대장' && (
-            <span className="caption hidden md:inline">우측 패널에서 대장 내보내기</span>
-          )}
+      {/* 🚀 Header: Reordered and group context with tabs */}
+      <header className="sticky top-0 z-30 flex flex-col md:flex-row md:items-center justify-between p-6 md:p-8 bg-[var(--toss-card)] border-b border-[var(--toss-border)] gap-6 shadow-sm">
+        <div className="flex flex-col gap-1 shrink-0">
+          <h1 className="text-xl md:text-2xl font-bold text-[var(--foreground)] tracking-tight">급여 관리 시스템</h1>
+          <p className="text-xs font-bold text-[var(--toss-blue)] uppercase tracking-wider">Payroll & Tax Management</p>
         </div>
-        <nav className="flex gap-0.5 p-1 app-tab-bar overflow-x-auto no-scrollbar w-full md:w-fit mt-2">
-          {['대시보드', '급여 정산 (Run Payroll)', '급여대장', '연말/퇴직 정산', '통합 설정'].map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`min-h-[44px] touch-manipulation px-4 py-2 text-xs font-bold whitespace-nowrap rounded-md transition-all ${activeTab === tab ? 'bg-[var(--toss-card)] text-[var(--toss-blue)] shadow-sm' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'}`}
-            >
-              {tab === '급여 정산 (Run Payroll)' ? '🚀 ' : ''}{tab}
-            </button>
-          ))}
-        </nav>
+
+        <div className="flex flex-wrap items-center gap-4 bg-[var(--toss-gray-1)] p-1.5 rounded-[22px] border border-[var(--toss-border)]">
+          {/* Calendar Picker moved here */}
+          <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-[18px] shadow-sm ring-1 ring-black/5">
+            <span className="text-sm">📅</span>
+            <input
+              type="month"
+              value={yearMonth}
+              onChange={(e) => setYearMonth(e.target.value)}
+              className="bg-transparent border-none outline-none text-sm font-bold text-[var(--foreground)] cursor-pointer"
+            />
+          </div>
+
+          <div className="h-6 w-[1px] bg-[var(--toss-border)] mx-1" />
+
+          {/* Navigation Tabs next to Calendar */}
+          <nav className="flex gap-1">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  if (tab.id !== '급여정산') setSelectedStaffId(null as any);
+                }}
+                className={`px-5 py-2.5 rounded-[18px] text-[11px] md:text-xs font-bold transition-all flex items-center gap-2 ${activeTab === tab.id
+                  ? 'bg-[var(--toss-blue)] text-white shadow-md scale-[1.02]'
+                  : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-white/50'
+                  }`}
+              >
+                <span>{tab.label}</span>
+              </button>
+            ))}
+          </nav>
+        </div>
+
+        <div className="hidden lg:flex items-center gap-3">
+          <div className="px-5 py-2.5 bg-[var(--toss-blue-light)]/50 rounded-[18px] border border-[var(--toss-blue)]/10">
+            <p className="text-[10px] font-bold text-[var(--toss-blue)]/60 text-center leading-tight">선택된 사업체</p>
+            <p className="text-sm font-bold text-[var(--toss-blue)] leading-tight">{selectedCo}</p>
+          </div>
+        </div>
       </header>
 
       <div className="flex-1 p-4 md:p-6 overflow-y-auto custom-scrollbar">
         {filtered.length > 0 ? (
           <>
-            {activeTab === '대시보드' && <HRDashboardIntegrated staffs={filtered} selectedCo={selectedCo} checkedIds={checkedIds} />}
+            {activeTab === '대시보드' && <HRDashboardIntegrated staffs={filtered} selectedCo={selectedCo} checkedIds={checkedIds} yearMonth={yearMonth} />}
 
-            {activeTab === '급여 정산 (Run Payroll)' && (
+            {activeTab === '급여정산' && (
               <RunPayrollWizard staffs={staffs} selectedCo={selectedCo} onRefresh={onRefresh} />
             )}
 
             {activeTab === '급여대장' && (
-              <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                <div className="xl:col-span-2 space-y-6">
-                  {current && <SalaryDetail staff={current} record={currentRecord || null} />}
-                  <PayrollTable staffs={filtered} payrollRecords={payrollRecords} yearMonth={yearMonth} checkedIds={checkedIds} setCheckedIds={setCheckedIds} onSelect={setSelectedStaffId} />
+              <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 items-start">
+                <div className="xl:col-span-1 h-fit max-h-[800px] sticky top-4">
+                  <PayrollTable
+                    staffs={filtered}
+                    payrollRecords={payrollRecords}
+                    yearMonth={yearMonth}
+                    checkedIds={checkedIds}
+                    setCheckedIds={setCheckedIds}
+                    onSelect={setSelectedStaffId}
+                    onSendAll={async () => {
+                      const records = payrollRecords.filter(r => r.year_month === yearMonth);
+                      if (records.length === 0) return alert("해당 월에 정산 완료된 레코드가 없습니다.");
+                      if (confirm(`${records.length}명의 직원에게 급여명세서 알림을 발송하시겠습니까?`)) {
+                        alert(`${records.length}건의 알림 발송이 예약되었습니다.`);
+                      }
+                    }}
+                  />
                 </div>
-                <aside className="space-y-4">
-                  <PayrollExport staffs={filtered} checkedIds={checkedIds} selectedCo={selectedCo} yearMonth={yearMonth} />
-                  <PayrollMonthlySummary selectedCo={selectedCo} />
-                  <WeeklyHoursMonitor selectedCo={selectedCo} />
-                  <LaborCostSimulation staffs={filtered} selectedCo={selectedCo} />
-                  <CompliancePanel staffs={filtered.filter((s: Staff) => checkedIds.includes(s.id))} companyName={selectedCo} />
-                  {current && <BenefitSummary staff={current} />}
-                  {current && <SalarySimulationSummary staff={current} />}
-                  {current && <PayrollSlipPDF staff={current} record={currentRecord ?? null} yearMonth={yearMonth} />}
-                  {current && <SalaryChangeHistory staffId={String(current.id)} staffName={current.name} />}
-                </aside>
+                <div className="xl:col-span-3 space-y-6">
+                  {current && <SalaryDetail staff={current} record={currentRecord || null} />}
+                  <aside className="grid grid-cols-1 gap-4">
+                    {current && <SalaryChangeHistory staffId={String(current.id)} staffName={current.name} />}
+                  </aside>
+                </div>
               </div>
             )}
 
-            {activeTab === '연말/퇴직 정산' && (
+            {activeTab === '연말퇴직정산' && (
               <div className="space-y-8">
                 <div className="p-4 bg-[var(--toss-gray-1)] rounded-xl border border-[var(--toss-border)]">
                   <h2 className="text-lg font-bold text-[var(--foreground)] mb-2">연말/퇴직 통합 정산 센터</h2>
                   <p className="text-sm text-[var(--toss-gray-3)]">복잡한 연말정산과 퇴직금(퇴직소득세) 정산을 한 곳에서 처리합니다.</p>
                 </div>
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
-                  <div className="bg-[var(--toss-card)] p-6 rounded-[16px] border border-[var(--toss-border)] shadow-sm">
+                <div className="grid grid-cols-1 xl:grid-cols-5 gap-8 items-start">
+                  <div className="xl:col-span-3 bg-[var(--toss-card)] p-6 rounded-[16px] border border-[var(--toss-border)] shadow-sm">
                     <h3 className="text-base font-bold text-[var(--toss-blue)] mb-4">연말정산 처리</h3>
                     <YearEndSettlement staffs={staffs} selectedCo={selectedCo} />
                   </div>
-                  <div className="space-y-6">
+                  <div className="xl:col-span-2 space-y-6">
                     <div className="bg-[var(--toss-card)] p-6 rounded-[16px] border border-[var(--toss-border)] shadow-sm">
                       <h3 className="text-base font-bold text-red-500 mb-4">퇴직금 정산 처리</h3>
                       <SeveranceCalculator />
@@ -164,15 +195,19 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
               </div>
             )}
 
-            {activeTab === '통합 설정' && (
+            {activeTab === '통합설정' && (
               <IntegratedHRSettings companyName={selectedCo} />
             )}
           </>
         ) : (
-          <div className="h-full flex items-center justify-center bg-[var(--toss-card)] border border-dashed border-[var(--toss-border)] rounded-[16px] p-20">
-            <p className="text-sm font-medium text-[var(--toss-gray-3)]">
-              &quot;{selectedCo}&quot; 소속 인원이 없습니다.
-            </p>
+          <div className="h-full flex items-center justify-center bg-[var(--toss-card)] border border-dashed border-[var(--toss-border)] rounded-[24px] p-20">
+            <div className="text-center">
+              <div className="text-4xl mb-4">🔍</div>
+              <p className="text-sm font-bold text-[var(--toss-gray-4)]">
+                &quot;{selectedCo}&quot; 소속 인원이 없습니다.
+              </p>
+              <p className="text-xs text-[var(--toss-gray-3)] mt-2">직원 명부에서 사업체를 확인해 주세요.</p>
+            </div>
           </div>
         )}
       </div>

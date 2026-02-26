@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
+import SmartDatePicker from './공통/SmartDatePicker';
 
 interface ChartLine {
     code: string;
@@ -451,8 +452,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">생년월일</label>
-                                    <input type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} min="1900-01-01" max="2099-12-31"
-                                        className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30" />
+                                    <SmartDatePicker value={birthDate} onChange={val => setBirthDate(val)} className="w-full h-[46px] px-4 bg-gray-50 border-none rounded-xl text-sm font-medium" />
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">성별</label>
@@ -473,13 +473,11 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">입원일 *</label>
-                                    <input type="date" value={admissionDate} onChange={e => setAdmissionDate(e.target.value)} min="1900-01-01" max="2099-12-31"
-                                        className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30" />
+                                    <SmartDatePicker value={admissionDate} onChange={val => setAdmissionDate(val)} className="w-full h-[46px] px-4 bg-gray-50 border-none rounded-xl text-sm font-medium" />
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">퇴원 예정일</label>
-                                    <input type="date" value={dischargeDate} onChange={e => setDischargeDate(e.target.value)} min="1900-01-01" max="2099-12-31"
-                                        className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30" />
+                                    <SmartDatePicker value={dischargeDate} onChange={val => setDischargeDate(val)} className="w-full h-[46px] px-4 bg-gray-50 border-none rounded-xl text-sm font-medium" />
                                 </div>
                             </div>
 
@@ -531,8 +529,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">수술일</label>
-                                    <input type="date" value={surgeryDate} onChange={e => setSurgeryDate(e.target.value)} min="1900-01-01" max="2099-12-31"
-                                        className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30" />
+                                    <SmartDatePicker value={surgeryDate} onChange={val => setSurgeryDate(val)} className="w-full h-[46px] px-4 bg-gray-50 border-none rounded-xl text-sm font-medium" />
                                 </div>
                             </div>
 

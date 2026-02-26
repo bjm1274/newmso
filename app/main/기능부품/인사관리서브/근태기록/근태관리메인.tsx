@@ -1,6 +1,8 @@
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
+import SmartDatePicker from '../../공통/SmartDatePicker';
+import SmartMonthPicker from '../../공통/SmartMonthPicker';
 
 export default function AttendanceMain({ staffs, selectedCo }: any) {
   const [viewMode, setViewMode] = useState<'daily' | 'monthly' | 'calendar' | 'dashboard' | 'schedule'>('monthly');
@@ -179,20 +181,18 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
               {viewMode === 'daily' ? (
                 <>
                   <div className="px-3 bg-zinc-50 dark:bg-zinc-900/50 rounded-lg py-1.5 border border-zinc-100 dark:border-zinc-800 text-[10px] font-bold text-zinc-400">DATE</div>
-                  <input
-                    type="date"
+                  <SmartDatePicker
                     value={selectedDate}
-                    onChange={(e) => setSelectedDate(e.target.value)}
+                    onChange={(val) => setSelectedDate(val)}
                     className="bg-transparent px-3 py-1.5 text-xs font-bold text-foreground outline-none w-32 cursor-pointer"
                   />
                 </>
               ) : (
                 <>
                   <div className="px-3 bg-zinc-50 dark:bg-zinc-900/50 rounded-lg py-1.5 border border-zinc-100 dark:border-zinc-800 text-[10px] font-bold text-zinc-400">MONTH</div>
-                  <input
-                    type="month"
+                  <SmartMonthPicker
                     value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(e.target.value)}
+                    onChange={(val) => setSelectedMonth(val)}
                     className="bg-transparent px-3 py-1.5 text-xs font-bold text-foreground outline-none w-32 cursor-pointer"
                   />
                 </>
@@ -667,29 +667,26 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                 <div className="flex gap-3">
                   <div className="flex-1">
                     <p className="text-[11px] font-bold text-zinc-500 uppercase mb-1.5 ml-1">시작일</p>
-                    <input
-                      type="date"
+                    <SmartDatePicker
                       value={bulkStartDate}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setBulkStartDate(v);
+                      onChange={(val) => {
+                        setBulkStartDate(val);
                         if (bulkRangeType === 'week') {
-                          const d = new Date(v);
+                          const d = new Date(val);
                           d.setDate(d.getDate() + 6);
                           setBulkEndDate(d.toISOString().slice(0, 10));
                         }
                       }}
-                      className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 px-4 py-3 rounded-xl text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+                      className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 px-4 py-3 rounded-xl text-sm font-bold text-foreground outline-none transition-shadow"
                     />
                   </div>
                   {(bulkRangeType === 'custom' || bulkRangeType === 'week') && (
                     <div className="flex-1">
                       <p className="text-[11px] font-bold text-zinc-500 uppercase mb-1.5 ml-1">종료일</p>
-                      <input
-                        type="date"
+                      <SmartDatePicker
                         value={bulkEndDate}
-                        onChange={(e) => setBulkEndDate(e.target.value)}
-                        className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 px-4 py-3 rounded-xl text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+                        onChange={(val) => setBulkEndDate(val)}
+                        className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 px-4 py-3 rounded-xl text-sm font-bold text-foreground outline-none transition-shadow"
                       />
                     </div>
                   )}

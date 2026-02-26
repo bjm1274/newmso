@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import SmartDatePicker from './공통/SmartDatePicker';
 const CHAT_ROOM_KEY = 'erp_chat_last_room';
 const CHAT_FOCUS_KEY = 'erp_chat_focus_keyword';
 
@@ -784,23 +785,11 @@ export default function BoardView({ user, subView, setSubView, initialBoard, ini
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">날짜 (YYYY-MM-DD)</label>
-                        <input
-                          type="text"
+                        <SmartDatePicker
                           value={scheduleDate}
-                          onChange={e => {
-                            // 숫자만 추출 후 YYYY-MM-DD 형태로 자동 포맷팅
-                            const digits = e.target.value.replace(/[^0-9]/g, '').slice(0, 8);
-                            let formatted = '';
-                            if (digits.length <= 4) {
-                              formatted = digits;
-                            } else if (digits.length <= 6) {
-                              formatted = `${digits.slice(0, 4)}-${digits.slice(4, 6)}`;
-                            } else {
-                              formatted = `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`;
-                            }
-                            setScheduleDate(formatted);
-                          }}
-                          className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[12px] border border-[var(--toss-border)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20"
+                          onChange={setScheduleDate}
+                          placeholder="0000-00-00"
+                          inputClassName="w-full p-4 bg-[var(--toss-gray-1)] rounded-[12px] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20"
                         />
                       </div>
                       <div>

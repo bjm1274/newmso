@@ -194,9 +194,9 @@ export default function ShiftManagement({ selectedCo }: any) {
             });
             setShowAddModal(true);
           }}
-          className="px-6 py-3 btn-toss-primary text-xs"
+          className="px-8 py-4 bg-[var(--toss-blue)] text-white text-sm font-bold rounded-[14px] shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all flex items-center gap-2"
         >
-          신규 근무 형태 생성
+          <span className="text-lg">＋</span> 신규 근무 형태 생성
         </button>
       </header>
 
@@ -245,7 +245,7 @@ export default function ShiftManagement({ selectedCo }: any) {
               </div>
               {shift.break_start_time && shift.break_end_time && (
                 <div className="ml-auto text-right">
-                  <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">휴게/점심</p>
+                  <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">휴게시간</p>
                   <p className="text-sm font-semibold text-[var(--foreground)]">
                     {shift.break_start_time} ~ {shift.break_end_time}
                   </p>
@@ -316,7 +316,7 @@ export default function ShiftManagement({ selectedCo }: any) {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="caption uppercase block mb-1">휴게/점심 시작</label>
+                  <label className="caption uppercase block mb-1">휴게시간 시작</label>
                   <input
                     type="time"
                     value={newShift.break_start_time}
@@ -325,7 +325,7 @@ export default function ShiftManagement({ selectedCo }: any) {
                   />
                 </div>
                 <div>
-                  <label className="caption uppercase block mb-1">휴게/점심 종료</label>
+                  <label className="caption uppercase block mb-1">휴게시간 종료</label>
                   <input
                     type="time"
                     value={newShift.break_end_time}

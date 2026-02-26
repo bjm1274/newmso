@@ -1,9 +1,6 @@
-/**
- * 비과세 항목 설정 조회/적용
- */
 import { supabase } from '@/lib/supabase';
 import {
-  TAX_FREE_LEGAL_LIMITS_2024,
+  TAX_FREE_LEGAL_LIMITS,
   type TaxFreeItemKey,
   getTaxFreeLimit
 } from './tax-free-limits';
@@ -20,13 +17,13 @@ export interface TaxFreeSettings {
 }
 
 const DEFAULT_SETTINGS: TaxFreeSettings = {
-  meal_limit: TAX_FREE_LEGAL_LIMITS_2024.meal.limit,
-  vehicle_limit: TAX_FREE_LEGAL_LIMITS_2024.vehicle.limit,
-  childcare_limit: TAX_FREE_LEGAL_LIMITS_2024.childcare.limit,
-  research_limit: TAX_FREE_LEGAL_LIMITS_2024.research.limit,
-  uniform_limit: TAX_FREE_LEGAL_LIMITS_2024.uniform.limit,
-  congratulations_limit: TAX_FREE_LEGAL_LIMITS_2024.congratulations.limit,
-  housing_limit: TAX_FREE_LEGAL_LIMITS_2024.housing.limit,
+  meal_limit: TAX_FREE_LEGAL_LIMITS.meal.limit,
+  vehicle_limit: TAX_FREE_LEGAL_LIMITS.vehicle.limit,
+  childcare_limit: TAX_FREE_LEGAL_LIMITS.childcare.limit,
+  research_limit: TAX_FREE_LEGAL_LIMITS.research.limit,
+  uniform_limit: TAX_FREE_LEGAL_LIMITS.uniform.limit,
+  congratulations_limit: TAX_FREE_LEGAL_LIMITS.congratulations.limit,
+  housing_limit: TAX_FREE_LEGAL_LIMITS.housing.limit,
   other_taxfree_limit: 0,
 };
 
@@ -75,4 +72,4 @@ export function getLimitByKey(
   return settings[key] ?? DEFAULT_SETTINGS[key];
 }
 
-export { DEFAULT_SETTINGS, TAX_FREE_LEGAL_LIMITS_2024, type TaxFreeItemKey };
+export { DEFAULT_SETTINGS, TAX_FREE_LEGAL_LIMITS, type TaxFreeItemKey };

@@ -7,6 +7,7 @@ import AdminForms from './전자결재서브/관리행정양식';
 import FormRequest from './전자결재서브/양식신청';
 import AttendanceCorrectionForm from './전자결재서브/출결정정양식';
 import RepairRequestForm from './전자결재서브/수리요청서양식';
+import AnnualLeavePlanForm from './전자결재서브/연차사용계획서양식';
 
 const APPROVAL_VIEW_KEY = 'erp_approval_view';
 
@@ -28,7 +29,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const [savedApproverLine, setSavedApproverLine] = useState<any[]>([]);
   const isMso = user?.company === 'SY INC.' || user?.permissions?.mso === true;
 
-  const BUILTIN_FORM_TYPES = ['인사명령', '연차/휴가', '연장근무', '물품신청', '수리요청서', '업무기안', '업무협조', '양식신청', '출결정정'];
+  const BUILTIN_FORM_TYPES = ['인사명령', '연차/휴가', '연차계획서', '연장근무', '물품신청', '수리요청서', '업무기안', '업무협조', '양식신청', '출결정정'];
 
   // 결재자 후보: 부서장 이상(팀장·부장·병원장 등)을 목록 상단에, 그 다음 나머지 직원 (staffs는 이미 메인에서 회사별로 불러옴)
   const APPROVER_POSITIONS = ['팀장', '간호과장', '실장', '부장', '이사', '병원장'];
@@ -415,6 +416,8 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                   <FormRequest user={user} staffs={staffs} />
                 ) : formType === '출결정정' ? (
                   <AttendanceCorrectionForm user={user} staffs={staffs} />
+                ) : formType === '연차계획서' ? (
+                  <AnnualLeavePlanForm user={user} staffs={staffs} setExtraData={setExtraData} setFormTitle={setFormTitle} />
                 ) : (
                   <AdminForms staffs={staffs} formType={formType} setExtraData={setExtraData} />
                 )}

@@ -41,6 +41,7 @@ const PERM_GROUPS = [
       { key: 'hr_급여', label: '급여' },
       { key: 'hr_연차휴가', label: '연차/휴가' },
       { key: 'hr_캘린더', label: '캘린더' },
+      { key: 'hr_교대근무', label: '교대근무·스케줄 편성' },
       { key: 'hr_비품대여', label: '비품대여' },
       { key: 'hr_증명서', label: '증명서' }
     ]

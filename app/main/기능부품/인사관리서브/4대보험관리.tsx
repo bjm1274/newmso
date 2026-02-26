@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import SmartDatePicker from '../공통/SmartDatePicker';
 
 type InsuranceRecord = {
     id: string;
@@ -184,7 +185,7 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: any) {
                             </div>
                             <div className="flex flex-col gap-1.5">
                                 <label className="text-[10px] font-bold text-[var(--toss-gray-4)]">적용일</label>
-                                <input type="date" value={form.effective_date} onChange={e => setForm({ ...form, effective_date: e.target.value })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30" />
+                                <SmartDatePicker value={form.effective_date} onChange={val => setForm({ ...form, effective_date: val })} inputClassName="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" />
                             </div>
                             <div className="flex flex-col gap-1.5">
                                 <label className="text-[10px] font-bold text-[var(--toss-gray-4)]">사유</label>

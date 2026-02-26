@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import SmartDatePicker from '../공통/SmartDatePicker';
 
 const EVENT_TYPES = ['생일', '결혼', '출산', '사망(본인가족)', '회갑/칠순', '입학/졸업', '기타'] as const;
 const AMOUNT_GUIDE: Record<string, string> = { '생일': '30,000~50,000', '결혼': '50,000~100,000', '출산': '50,000', '사망(본인가족)': '100,000~200,000', '회갑/칠순': '50,000', '입학/졸업': '30,000', '기타': '별도 결정' };
@@ -84,7 +85,7 @@ export default function CongratulationsCondolences({ staffs = [], selectedCo }: 
                             <select value={form.event_type} onChange={e => setForm({ ...form, event_type: e.target.value })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none">
                                 {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                             </select>
-                            <input type="date" value={form.event_date} onChange={e => setForm({ ...form, event_date: e.target.value })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" required />
+                            <SmartDatePicker value={form.event_date} onChange={val => setForm({ ...form, event_date: val })} inputClassName="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" />
                             <div className="flex flex-col gap-1">
                                 <input type="number" value={form.amount || ''} onChange={e => setForm({ ...form, amount: Number(e.target.value) })} placeholder="경조금 (원)" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)]" />
                                 <p className="text-[9px] text-[var(--toss-gray-3)] font-bold ml-1">가이드: {AMOUNT_GUIDE[form.event_type] || '-'}원</p>

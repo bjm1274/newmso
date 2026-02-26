@@ -1,10 +1,13 @@
 'use client';
+import { useState } from 'react';
+import SmartDatePicker from '../공통/SmartDatePicker';
 
 /**
  * 수리요청서 전자결재 양식
  * 장비/시설 수리 요청 시 사용 (제목은 사용자가 직접 입력)
  */
 export default function RepairRequestForm({ setExtraData }: any) {
+  const [localDesiredDate, setLocalDesiredDate] = useState('');
   return (
     <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-3xl overflow-hidden shadow-sm animate-in fade-in duration-300">
       <div className="p-4 md:p-6 bg-amber-50/50 border-b border-amber-100">
@@ -36,10 +39,10 @@ export default function RepairRequestForm({ setExtraData }: any) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
             <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] ml-1 uppercase">희망 수리일</label>
-            <input
-              type="date"
-              className="w-full p-4 rounded-[12px] border bg-[var(--toss-card)] font-bold text-xs shadow-sm outline-none focus:ring-2 focus:ring-amber-200 border-none"
-              onChange={e => setExtraData((p: any) => ({ ...p, desiredDate: e.target.value }))}
+            <SmartDatePicker
+              value={localDesiredDate}
+              onChange={val => { setLocalDesiredDate(val); setExtraData((p: any) => ({ ...p, desiredDate: val })); }}
+              inputClassName="w-full h-[46px] px-4 rounded-[12px] bg-[var(--toss-card)] font-bold text-xs"
             />
           </div>
           <div className="space-y-2">

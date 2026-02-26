@@ -1,6 +1,7 @@
-﻿'use client';
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import SmartMonthPicker from './공통/SmartMonthPicker';
+import SmartDatePicker from './공통/SmartDatePicker';
 
 export default function SharedCalendar({ user }: any) {
   const [yearMonth, setYearMonth] = useState(new Date().toISOString().slice(0, 7));
@@ -38,10 +39,10 @@ export default function SharedCalendar({ user }: any) {
     <div className="bg-white p-6 border border-[var(--toss-border)] rounded-[12px] shadow-xl">
       <div className="flex justify-between items-center mb-6">
         <h3 className="text-xl font-semibold text-[var(--foreground)]">공유 캘린더</h3>
-        <input type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="p-2 rounded-[16px] border font-bold" />
+        <SmartMonthPicker value={yearMonth} onChange={setYearMonth} />
       </div>
       <div className="grid grid-cols-7 gap-1 text-center">
-        {['일','월','화','수','목','금','토'].map(d => <div key={d} className="text-[11px] font-semibold text-[var(--toss-gray-3)] py-2">{d}</div>)}
+        {['일', '월', '화', '수', '목', '금', '토'].map(d => <div key={d} className="text-[11px] font-semibold text-[var(--toss-gray-3)] py-2">{d}</div>)}
         {days.map((d, i) => {
           if (d === null) return <div key={i} />;
           const dateStr = `${yearMonth}-${String(d).padStart(2, '0')}`;
