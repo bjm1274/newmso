@@ -121,44 +121,42 @@ export default function SalarySlipContainer({ user }: any) {
 
   return (
     <>
-      <style jsx global>{`
+      <style>{`
         @media print {
-          /* 1. 기본 설정 초기화 */
-          body * { visibility: hidden; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          html, body { margin: 0 !important; padding: 0 !important; height: 100%; overflow: hidden; }
-          
-          /* 2. 인쇄 페이지 여백 설정 (프린터 물리 여백 확보) */
           @page {
             size: A4 landscape;
-            margin: 5mm;
+            margin: 0;
           }
-          
-          /* 3. 인쇄 대상 컨테이너 설정 */
+          body * { 
+            visibility: hidden; 
+            print-color-adjust: exact !important;
+            -webkit-print-color-adjust: exact !important;
+          }
           #print-section {
             visibility: visible !important;
-            position: fixed;
+            position: absolute;
             left: 0;
             top: 0;
-            width: 100% !important; /* 여백을 제외한 나머지 영역을 꽉 채움 */
-            height: 100% !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            
-            /* [핵심] 내용이 넘치지 않도록 자동 맞춤 */
+            width: 297mm;
+            height: 209mm;
+            overflow: hidden;
             display: flex;
-            align-items: flex-start; /* 상단부터 채움 */
-            justify-content: center; /* 좌우 중앙 정렬 */
+            justify-content: center;
+            align-items: flex-start;
+            padding-top: 5mm; /* 상단 여백 */
           }
-          
-          /* 4. 내부 콘텐츠 스케일링 (안전장치) */
+          #print-section * { 
+            visibility: visible !important; 
+          }
+          /* 원본 데스크탑 넓이(1200px) 고정 후 화면 캡처하듯 정확히 88% 축소 */
           #print-section > div {
-            width: 100% !important;
-            max-width: 210mm !important; /* 최대폭 제한 */
-            transform: scale(0.98); /* 98%로 미세 축소하여 잘림 방지 */
-            transform-origin: top center;
+            width: 1200px !important;
+            min-width: 1200px !important;
+            max-width: none !important;
+            margin: 0 !important;
+            transform: scale(0.88) !important;
+            transform-origin: top center !important;
           }
-
-          #print-section * { visibility: visible !important; }
         }
       `}</style>
 
@@ -177,7 +175,7 @@ export default function SalarySlipContainer({ user }: any) {
         </div>
 
         <div className="flex-1 overflow-auto bg-[var(--toss-gray-1)] p-6 sm:p-8 lg:p-10 flex justify-center custom-scrollbar">
-          <div id="print-section" className="w-full max-w-4xl mx-auto shadow-2xl print:shadow-none bg-white rounded-3xl overflow-hidden">
+          <div id="print-section" className="w-full max-w-7xl print:max-w-none print:w-full mx-auto shadow-2xl print:shadow-none bg-white print:bg-transparent overflow-visible">
             <SalaryDetail
               staff={user}
               record={salaryData}
