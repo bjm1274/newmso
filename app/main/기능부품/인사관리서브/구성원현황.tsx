@@ -15,7 +15,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   const [팀목록캐시, 팀목록캐시설정] = useState<Record<string, string[]>>({});
   const [신규직원, 신규직원설정] = useState({
     성명: '', 전화번호: '', 내선번호: '', 사업체: '박철홍정형외과', 팀: '원무팀', 직함: '', 입사일: '', 퇴사일: '',
-    주민번호: '', 이메일: '', 주소: '', 면허사항: '', 계좌정보: '', 임금정보: '', 상태: '재직',
+    주민번호: '', 이메일: '', 주소: '', 면허사항: '', 면허번호: '', 취득일자: '', 계좌정보: '', 임금정보: '', 상태: '재직',
     연차총개수: 0, 연차사용개수: 0, 근무형태ID: '',
     base_salary: 0,
     meal_allowance: 0, night_duty_allowance: 0, vehicle_allowance: 0, childcare_allowance: 0, research_allowance: 0, other_taxfree: 0, position_allowance: 0
@@ -113,7 +113,9 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         status: 신규직원.상태,
         permissions: {
           ...(편집모드 && 선택된직원ID ? 직원목록.find((s: any) => s.id === 선택된직원ID)?.permissions : {}),
-          extension: 신규직원.내선번호 || null
+          extension: 신규직원.내선번호 || null,
+          license_no: 신규직원.면허번호 || null,
+          license_date: 신규직원.취득일자 || null
         },
         annual_leave_total: 0,
         annual_leave_used: 0,
@@ -163,7 +165,10 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       성명: 직원.name || '', 전화번호: 직원.phone || '', 내선번호: extensionValue, 사업체: 직원.company || '박철홍정형외과',
       팀: 직원.department ?? '', 직함: 직원.position || '', 입사일: 직원.joined_at || '',
       퇴사일: 직원.resigned_at || '', 주민번호: 직원.resident_no || '', 이메일: 직원.email || '',
-      주소: 직원.address || '', 면허사항: 직원.license || '', 계좌정보: 직원.bank_account || '',
+      주소: 직원.address || '', 면허사항: 직원.license || '',
+      면허번호: 직원.permissions?.license_no || '',
+      취득일자: 직원.permissions?.license_date || '',
+      계좌정보: 직원.bank_account || '',
       임금정보: 직원.salary_info || '', 상태: 직원.status || '재직',
       연차총개수: typeof 직원.annual_leave_total === 'number' ? 직원.annual_leave_total : 0,
       연차사용개수: 직원.annual_leave_used || 0, 근무형태ID: 직원.shift_id || '',
@@ -179,7 +184,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     편집모드설정(false); 선택된직원ID설정(null);
     신규직원설정({
       성명: '', 전화번호: '', 내선번호: '', 사업체: '박철홍정형외과', 팀: '원무팀', 직함: '', 입사일: '', 퇴사일: '',
-      주민번호: '', 이메일: '', 주소: '', 면허사항: '', 계좌정보: '', 임금정보: '', 상태: '재직',
+      주민번호: '', 이메일: '', 주소: '', 면허사항: '', 면허번호: '', 취득일자: '', 계좌정보: '', 임금정보: '', 상태: '재직',
       연차총개수: 0, 연차사용개수: 0, 근무형태ID: '',
       base_salary: 0,
       meal_allowance: 0, night_duty_allowance: 0, vehicle_allowance: 0, childcare_allowance: 0, research_allowance: 0, other_taxfree: 0, position_allowance: 0
@@ -449,6 +454,25 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                 <div className="space-y-1">
                   <label className="text-[11px] font-semibold text-[var(--toss-gray-3)]">주소</label>
                   <input type="text" value={신규직원.주소} onChange={e => 신규직원설정({ ...신규직원, 주소: e.target.value })} className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[12px] border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-[var(--toss-blue)]/30" />
+                </div>
+                <div className="pt-4 border-t border-slate-100 space-y-3">
+                  <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">면허/자격 사항</h5>
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500">면허/자격 명칭</label>
+                        <input type="text" placeholder="예: 간호사, 물리치료사" value={신규직원.면허사항} onChange={e => 신규직원설정({ ...신규직원, 면허사항: e.target.value })} className="w-full p-2.5 bg-white rounded-lg border border-slate-200 outline-none text-[11px] font-semibold focus:border-[var(--toss-blue)]" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500">면허 번호</label>
+                        <input type="text" placeholder="번호 입력" value={신규직원.면허번호} onChange={e => 신규직원설정({ ...신규직원, 면허번호: e.target.value })} className="w-full p-2.5 bg-white rounded-lg border border-slate-200 outline-none text-[11px] font-semibold focus:border-[var(--toss-blue)]" />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500">취득 일자</label>
+                      <input type="date" value={신규직원.취득일자} onChange={e => 신규직원설정({ ...신규직원, 취득일자: e.target.value })} className="w-full p-2.5 bg-white rounded-lg border border-slate-200 outline-none text-[11px] font-semibold focus:border-[var(--toss-blue)]" />
+                    </div>
+                  </div>
                 </div>
               </div>
 

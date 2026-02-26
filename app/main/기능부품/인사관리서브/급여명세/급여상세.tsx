@@ -1,8 +1,10 @@
-'use client';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis } from 'recharts';
+import ContractPreview from '../계약문서/계약서미리보기';
+import { supabase } from '@/lib/supabase';
 
 export default function SalaryDetail({ record, staff }: any) {
+  const [showContract, setShowContract] = useState(false);
   // record가 없을 경우 staff 정보를 기반으로 가상 계산 (미리보기용)
   const data = record || {
     base_salary: staff?.base_salary || 0,
@@ -65,12 +67,23 @@ export default function SalaryDetail({ record, staff }: any) {
   return (
     <div className="bg-[var(--toss-card)] rounded-[12px] border border-[var(--toss-border)] shadow-sm overflow-hidden animate-in fade-in duration-300">
       {/* 명세서 헤더 – 메디플로우 스타일: 연한 띠 + 제목 */}
-      <div className="px-6 py-5 bg-[var(--tab-bg)] border-b border-[var(--toss-border)]">
-        <p className="text-xs font-medium text-[var(--toss-gray-3)] mb-1">{companyName}</p>
-        <h2 className="text-lg font-bold text-[var(--foreground)]">
-          {monthLabel} 급여명세서 {isAdvancePay && <span className="text-amber-700">(선지급)</span>}
-        </h2>
+      <div className="px-6 py-5 bg-[var(--tab-bg)] border-b border-[var(--toss-border)] flex justify-between items-center">
+        <div>
+          <p className="text-xs font-medium text-[var(--toss-gray-3)] mb-1">{companyName}</p>
+          <h2 className="text-lg font-bold text-[var(--foreground)]">
+            {monthLabel} 급여명세서 {isAdvancePay && <span className="text-amber-700">(선지급)</span>}
+          </h2>
+        </div>
+        <button
+          onClick={() => setShowContract(true)}
+          className="px-3 py-1.5 rounded-full text-[10px] font-black bg-[var(--toss-blue)] text-white shadow-sm hover:scale-[0.98] transition-all"
+        >
+          📄 근로계약서 보기
+        </button>
       </div>
+
+      {/* 근로계약서 보기 모달 */}
+      <ContractModal isOpen={showContract} onClose={() => setShowContract(false)} staff={staff} />
 
       <div className="p-6 space-y-6">
         {/* 인적 사항 */}
@@ -254,6 +267,50 @@ function SalaryRow({ label, value, isDeduction, isTaxFree }: any) {
       <span className={`text-sm font-medium ${isDeduction ? 'text-red-600' : 'text-[var(--foreground)]'}`}>
         {isDeduction ? '-' : ''} ₩{(Number(value) || 0).toLocaleString()}
       </span>
+    </div>
+  );
+}
+
+function ContractModal({ isOpen, onClose, staff }: any) {
+  const [contract, setContract] = useState<any>(null);
+
+  useEffect(() => {
+    if (!isOpen || !staff?.id) return;
+    const fetchContract = async () => {
+      const { data } = await supabase
+        .from('employment_contracts')
+        .select('*')
+        .eq('staff_id', staff.id)
+        .eq('status', '서명완료')
+        .maybeSingle();
+      setContract(data);
+    };
+    fetchContract();
+  }, [isOpen, staff?.id]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-10 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+      <div className="bg-white w-full max-w-4xl h-full max-h-[90vh] rounded-[24px] shadow-2xl flex flex-col overflow-hidden border-2 border-[var(--toss-border)]">
+        <div className="p-4 border-b border-[var(--toss-border)] flex justify-between items-center bg-slate-50">
+          <h3 className="text-sm font-bold text-[var(--foreground)]">내 근로계약서 확인</h3>
+          <button onClick={onClose} className="p-2 text-gray-400 hover:text-red-500 transition-colors">✕</button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 md:p-10 scroll-smooth custom-scrollbar bg-[var(--page-bg)]">
+          <div className="max-w-[800px] mx-auto">
+            {contract ? (
+              <ContractPreview staff={staff} contract={contract} />
+            ) : (
+              <div className="h-64 flex flex-col items-center justify-center text-slate-400 gap-4">
+                <span className="text-4xl text-slate-200">📋</span>
+                <p className="text-sm font-bold">서명 완료된 계약서가 없습니다.</p>
+                <button onClick={onClose} className="text-xs font-bold text-[var(--toss-blue)] underline">닫기</button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

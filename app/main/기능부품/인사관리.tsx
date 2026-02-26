@@ -259,17 +259,17 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
           )}
           {activeMenu === '증명서' && (
             <div className="p-4 md:p-10">
-              <CertificateGenerator staffs={staffs} />
+              <CertificateGenerator staffs={staffs} selectedCo={선택사업체} />
             </div>
           )}
           {activeMenu === '서류제출' && (
             <div className="p-4 md:p-10">
-              <DocumentScanner user={user} staffs={staffs} />
+              <DocumentScanner user={user} staffs={staffs} selectedCo={선택사업체} />
             </div>
           )}
           {activeMenu === '오프보딩' && (
             <div className="p-4 md:p-10">
-              <OffboardingView staffs={staffs} onRefresh={onRefresh} />
+              <OffboardingView staffs={staffs} selectedCo={선택사업체} onRefresh={onRefresh} />
             </div>
           )}
           {activeMenu === '원천징수파일' && (

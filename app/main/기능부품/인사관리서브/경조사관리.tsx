@@ -2,8 +2,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
-const EVENT_TYPES = ['결혼', '출산', '사망(본인가족)', '회갑/칠순', '입학/졸업', '기타'] as const;
-const AMOUNT_GUIDE: Record<string, string> = { '결혼': '50,000~100,000', '출산': '50,000', '사망(본인가족)': '100,000~200,000', '회갑/칠순': '50,000', '입학/졸업': '30,000', '기타': '별도 결정' };
+const EVENT_TYPES = ['생일', '결혼', '출산', '사망(본인가족)', '회갑/칠순', '입학/졸업', '기타'] as const;
+const AMOUNT_GUIDE: Record<string, string> = { '생일': '30,000~50,000', '결혼': '50,000~100,000', '출산': '50,000', '사망(본인가족)': '100,000~200,000', '회갑/칠순': '50,000', '입학/졸업': '30,000', '기타': '별도 결정' };
 
 export default function CongratulationsCondolences({ staffs = [], selectedCo }: any) {
     const [records, setRecords] = useState<any[]>([]);
@@ -122,7 +122,7 @@ export default function CongratulationsCondolences({ staffs = [], selectedCo }: 
                             {filteredRecords.length === 0 ? <tr><td colSpan={6} className="px-4 py-16 text-center text-[var(--toss-gray-3)] font-bold">경조사 이력이 없습니다</td></tr> : filteredRecords.map((r: any) => (
                                 <tr key={r.id} className="border-b border-[var(--toss-border)] hover:bg-[var(--toss-gray-1)]/50">
                                     <td className="px-4 py-3 font-bold text-[var(--foreground)]">{r.staff_name}<br /><span className="text-[9px] text-[var(--toss-gray-3)]">{r.department}</span></td>
-                                    <td className="px-4 py-3"><span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${r.event_type?.includes('사망') ? 'bg-gray-800 text-white' : 'bg-pink-100 text-pink-700'}`}>{r.event_type}</span></td>
+                                    <td className="px-4 py-3"><span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${r.event_type?.includes('사망') ? 'bg-gray-800 text-white' : r.event_type === '생일' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}`}>{r.event_type}</span></td>
                                     <td className="px-4 py-3 text-[var(--toss-gray-4)]">{r.event_date}</td>
                                     <td className="px-4 py-3 text-[var(--toss-gray-4)]">{r.relation} {r.recipient ? `(${r.recipient})` : ''}</td>
                                     <td className="px-4 py-3 text-right font-bold text-[var(--foreground)]">{(r.amount || 0).toLocaleString()}원</td>

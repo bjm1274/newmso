@@ -2,7 +2,12 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
-const CATEGORIES = [{ id: '규정', label: '규정' }, { id: '양식', label: '양식' }, { id: '계약서', label: '계약서' }, { id: '기타', label: '기타' }];
+const CATEGORIES = [
+  { id: '규정', label: '규정' },
+  { id: '양식', label: '양식' },
+  { id: '근로계약서', label: '근로계약서' },
+  { id: '기타', label: '기타' }
+];
 
 // ESLint 규칙에 맞게 컴포넌트 이름을 영문 대문자로 시작하게 변경합니다.
 // default export 이므로 외부에서의 import 이름(문서보관함)은 그대로 유지됩니다.
@@ -100,6 +105,9 @@ export default function DocumentRepository({
       };
 
       const pdfUrl = await generatePdf();
+
+      const isContract = selected?.category === '근로계약서';
+      if (isContract) return alert('근로계약서 카테고리의 문서는 법적 효력 유지를 위해 수정이 불가능합니다.');
 
       if (selected) {
         const newVersion = (selected.version || 1) + 1;
@@ -277,7 +285,9 @@ export default function DocumentRepository({
                 return (
                   <div key={cat.id} className="border-b border-[var(--toss-gray-1)]">
                     <div className="px-4 py-2.5 bg-[var(--page-bg)] font-bold text-[var(--toss-gray-4)] text-xs flex items-center gap-2">
-                      <span className="text-base">{cat.id === '규정' ? '📁' : cat.id === '양식' ? '📄' : cat.id === '계약서' ? '📋' : '📂'}</span>
+                      <span className="text-base">
+                        {cat.id === '규정' ? '📁' : cat.id === '양식' ? '📄' : cat.id === '근로계약서' ? '📋' : '📂'}
+                      </span>
                       {cat.label} ({folderDocs.length})
                     </div>
                     {folderDocs.length === 0 ? (
@@ -286,9 +296,8 @@ export default function DocumentRepository({
                       folderDocs.map((d) => (
                         <div
                           key={d.id}
-                          className={`flex items-center border-b border-[var(--toss-gray-1)] hover:bg-[var(--toss-gray-1)] ${
-                            selected?.id === d.id ? 'bg-[var(--toss-blue-light)]' : ''
-                          }`}
+                          className={`flex items-center border-b border-[var(--toss-gray-1)] hover:bg-[var(--toss-gray-1)] ${selected?.id === d.id ? 'bg-[var(--toss-blue-light)]' : ''
+                            }`}
                         >
                           <button
                             onClick={() => handleEdit(d)}
@@ -322,7 +331,7 @@ export default function DocumentRepository({
         <div className="lg:col-span-2 bg-[var(--toss-card)] rounded-[16px] border border-[var(--toss-border)] p-6">
           <div className="flex items-center justify-between mb-4 gap-2">
             <h3 className="text-lg font-bold text-[var(--foreground)]">
-              {selected ? '문서 수정 (버전 관리)' : '새 문서 등록'}
+              {selected ? (selected.category === '근로계약서' ? '문서 열람 (수정 불가)' : '문서 수정 (버전 관리)') : '새 문서 등록'}
             </h3>
             {selected && (
               <div className="flex items-center gap-2">
@@ -343,26 +352,83 @@ export default function DocumentRepository({
               </div>
             )}
           </div>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-semibold text-[var(--toss-gray-4)] mb-2">제목</label>
-              <input type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full px-4 py-2 rounded-[12px] border border-[var(--toss-border)] text-[var(--foreground)]" placeholder="문서 제목" />
+          {selected?.category === '근로계약서' ? (
+            /* 계약서 전용 뷰어 (A4 스타일) */
+            <div className="bg-gray-100 p-4 md:p-8 rounded-[12px] min-h-[600px] flex justify-center overflow-y-auto max-h-[700px] custom-scrollbar">
+              <div className="w-full max-w-[650px] bg-white shadow-lg p-10 md:p-14 font-serif text-[12px] leading-relaxed relative border border-gray-200">
+                {/* Watermark */}
+                <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none select-none">
+                  <span className="text-[80px] font-black rotate-[-45deg]">ORIGINAL</span>
+                </div>
+
+                <div className="relative z-10">
+                  <h1 className="text-xl font-black text-center mb-10 tracking-widest underline underline-offset-8">근 로 계 약 서</h1>
+
+                  <div className="whitespace-pre-wrap text-slate-900 leading-[1.8]">
+                    {(() => {
+                      let text = form.content;
+                      // ASCII 표 제거
+                      text = text.replace(/┌[─┬┐\s\S]*?┘/g, '');
+                      return text;
+                    })()}
+                  </div>
+
+                  <div className="mt-14 pt-8 border-t border-dotted border-gray-300 text-center">
+                    <p className="font-bold text-[14px]">{new Date(selected.updated_at).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+
+                    <div className="mt-10 flex justify-between items-start text-left">
+                      <div className="w-1/2 space-y-2">
+                        <p className="text-[10px] font-bold text-gray-400">[사용자]</p>
+                        <p className="font-bold">{selected.company_name || selectedCo}</p>
+                        <div className="relative inline-block">
+                          <p className="font-bold">대표이사 (인)</p>
+                          <div className="absolute -top-3 -right-6 w-10 h-10 border-2 border-red-500/30 rounded-full flex items-center justify-center rotate-12">
+                            <span className="text-[10px] text-red-500/40 font-bold">인</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="w-1/2 text-right space-y-2">
+                        <p className="text-[10px] font-bold text-gray-400">[근로자]</p>
+                        <p className="font-bold">{selected.title.split(' ')[0]}</p>
+                        <p className="font-bold">(서명)</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-semibold text-[var(--toss-gray-4)] mb-2">분류</label>
-              <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full px-4 py-2 rounded-[12px] border border-[var(--toss-border)] text-[var(--foreground)]">
-                {CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-              </select>
+          ) : (
+            /* 일반 문서 편집 폼 */
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-[var(--toss-gray-4)] mb-2">제목</label>
+                <input type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full px-4 py-2 rounded-[12px] border border-[var(--toss-border)] text-[var(--foreground)]" placeholder="문서 제목" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-[var(--toss-gray-4)] mb-2">분류</label>
+                <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full px-4 py-2 rounded-[12px] border border-[var(--toss-border)] text-[var(--foreground)]">
+                  {CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-[var(--toss-gray-4)] mb-2">내용</label>
+                <textarea value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} rows={12} className="w-full px-4 py-2 rounded-[12px] border border-[var(--toss-border)] text-[var(--foreground)] font-mono text-sm" placeholder="규정, 양식, 계약서 본문 등을 입력하세요." />
+              </div>
+              {selected && selected.category !== '근로계약서' && <p className="text-xs text-[var(--toss-gray-3)]">* 수정 시 이전 버전이 자동으로 버전 이력에 저장됩니다.</p>}
             </div>
-            <div>
-              <label className="block text-sm font-semibold text-[var(--toss-gray-4)] mb-2">내용</label>
-              <textarea value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} rows={12} className="w-full px-4 py-2 rounded-[12px] border border-[var(--toss-border)] text-[var(--foreground)] font-mono text-sm" placeholder="규정, 양식, 계약서 본문 등을 입력하세요." />
+          )}
+
+          {selected?.category === '근로계약서' && (
+            <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-start gap-3">
+              <span className="text-lg">🔒</span>
+              <p className="text-[11px] font-bold text-amber-800 leading-relaxed pt-0.5">이 문서는 체결된 근로계약서 원본으로 법적 효력 유지를 위해 수정을 방지하고 있습니다. 내용 변경이 필요한 경우 신규 계약을 진행해 주시기 바랍니다.</p>
             </div>
-            {selected && <p className="text-xs text-[var(--toss-gray-3)]">* 수정 시 이전 버전이 자동으로 버전 이력에 저장됩니다.</p>}
-            <div className="flex gap-2">
+          )}
+          <div className="flex gap-2">
+            {selected?.category !== '근로계약서' && (
               <button onClick={handleSave} disabled={saving} className="px-6 py-2 bg-[var(--toss-blue)] text-white font-semibold rounded-[12px] hover:bg-[var(--toss-blue)] disabled:opacity-50">저장</button>
-              {selected && <button onClick={() => { setSelected(null); setForm({ title: '', category: '규정', content: '' }); }} className="px-6 py-2 bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] font-semibold rounded-[12px]">취소</button>}
-            </div>
+            )}
+            {selected && <button onClick={() => { setSelected(null); setForm({ title: '', category: '규정', content: '' }); }} className="px-6 py-2 bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] font-semibold rounded-[12px]">취소</button>}
           </div>
         </div>
       </div>

@@ -6,9 +6,13 @@ export const CERTIFICATE_TYPES = [
   { id: '경력증명서', label: '경력증명서', desc: '근무 경력 및 직책 증명' },
   { id: '퇴직증명서', label: '퇴직증명서', desc: '퇴직 사실 증명' },
   { id: '급여인증서', label: '급여인증서', desc: '급여 지급 증명' },
+  { id: '보수지급명세서', label: '보수지급명세서', desc: '상세 급여/보수 내역 증명' },
+  { id: '연봉금액확인서', label: '연봉금액확인서', desc: '연봉 계약 금액 확인' },
   { id: '근무확인서', label: '근무확인서', desc: '근무 기간 및 부서 확인' },
-  { id: '원천징수영수증', label: '원천징수영수증', desc: '근로소득 원천징수 증명' },
-  { id: '소득금액증명원', label: '소득금액증명원', desc: '소득금액 증명 (대출 등)' },
+  { id: '직무교육 이수확인서', label: '직무교육 이수확인서', desc: '사내 직무 교육 이수 증명' },
+  { id: '원천징수영수증', label: '원천징수영수증(ERP)', desc: '근로소득 원천징수 내부 확인용' },
+  { id: '소득금액증명원', label: '소득금액증명원(ERP)', desc: '소득금액 증명 내부 확인용' },
+  { id: '근로소득원천징수필증', label: '근로소득원천징수필증', desc: '병원 자체 발행 원천징수 확인' },
 ] as const;
 
 export type CertTypeId = typeof CERTIFICATE_TYPES[number]['id'];
