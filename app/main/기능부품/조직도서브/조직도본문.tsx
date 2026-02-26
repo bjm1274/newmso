@@ -95,7 +95,7 @@ export default function MainContent({
       {mainMenu === '인사관리' && <div className="flex-1 overflow-hidden"><HRView user={user} staffs={data.staffs} depts={data.depts} selectedCo={selectedCo} onRefresh={onRefresh} initialMenu={subView} /></div>}
       {mainMenu === '재고관리' && <div className="flex-1 overflow-hidden"><InventoryView user={user} depts={data.depts} onRefresh={onRefresh} selectedCo={selectedCo} initialView={subView} /></div>}
       {mainMenu === '추가기능' && (
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden flex flex-col">
           <추가기능
             user={user}
             staffs={data.staffs}
