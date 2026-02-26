@@ -93,9 +93,7 @@ export default function ExtraFeatures({
             >
               ← 목록으로
             </button>
-            <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] p-6 shadow-sm">
-              <인계노트 user={user || {}} />
-            </div>
+            <인계노트 user={user || {}} />
           </div>
         )}
 

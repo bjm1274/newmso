@@ -154,7 +154,7 @@ export default function HandoverNotes({ user }: { user: any }) {
     };
 
     return (
-        <div className="flex flex-col h-full bg-[var(--page-bg)] animate-in fade-in duration-300">
+        <div className="bg-[var(--page-bg)] animate-in fade-in duration-300">
             {/* Header & Search */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-6 bg-white border-b border-[var(--toss-border)] shrink-0 gap-4">
                 <div>
@@ -183,71 +183,69 @@ export default function HandoverNotes({ user }: { user: any }) {
                 </div>
             </div>
 
-            <div className="flex flex-col flex-1 overflow-auto">
+            <div>
                 {/* 1. Calendar View */}
                 {!isSearching && (
-                    <div className="w-full border-b border-[var(--toss-border)] bg-gray-50/50 flex flex-col shrink-0">
-                        <div className="p-4 md:p-4 flex-1 flex flex-col min-h-min">
-                            <div className="flex justify-between items-center mb-6">
-                                <button onClick={handlePrevMonth} className="px-3 py-1 bg-white border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 font-bold transition-colors">⟵</button>
-                                <h3 className="text-base font-bold text-gray-800 tracking-tight">{currentYear}년 {currentMonth + 1}월</h3>
-                                <button onClick={handleNextMonth} className="px-3 py-1 bg-white border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 font-bold transition-colors">⟶</button>
-                            </div>
+                    <div className="p-1 md:p-2 bg-gray-50/50">
+                        <div className="flex justify-between items-center mb-1">
+                            <button onClick={handlePrevMonth} className="px-3 py-1 bg-white border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 font-bold transition-colors">⟵</button>
+                            <h3 className="text-base font-bold text-gray-800 tracking-tight">{currentYear}년 {currentMonth + 1}월</h3>
+                            <button onClick={handleNextMonth} className="px-3 py-1 bg-white border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 font-bold transition-colors">⟶</button>
+                        </div>
 
-                            <div className="grid grid-cols-7 gap-1 flex-1">
-                                {['일', '월', '화', '수', '목', '금', '토'].map(day => (
-                                    <div key={day} className="text-center text-[10px] font-bold text-gray-400 py-2 uppercase tracking-widest">{day}</div>
-                                ))}
+                        <div className="grid grid-cols-7 gap-1 flex-1">
+                            {['일', '월', '화', '수', '목', '금', '토'].map(day => (
+                                <div key={day} className="text-center text-[10px] font-bold text-gray-400 py-2 uppercase tracking-widest">{day}</div>
+                            ))}
 
-                                {blanks.map(b => <div key={`blank-${b}`} className="min-h-[60px] md:min-h-0 bg-transparent rounded-xl border border-transparent"></div>)}
+                            {blanks.map(b => <div key={`blank-${b}`} className="min-h-[20px] md:min-h-0 bg-transparent rounded-xl border border-transparent"></div>)}
 
-                                {days.map(day => {
-                                    const dateObj = new Date(currentYear, currentMonth, day);
-                                    const isSelected = selectedDate.getDate() === day && selectedDate.getMonth() === currentMonth && selectedDate.getFullYear() === currentYear;
-                                    const today = new Date();
-                                    const isToday = today.getDate() === day && today.getMonth() === currentMonth && today.getFullYear() === currentYear;
+                            {days.map(day => {
+                                const dateObj = new Date(currentYear, currentMonth, day);
+                                const isSelected = selectedDate.getDate() === day && selectedDate.getMonth() === currentMonth && selectedDate.getFullYear() === currentYear;
+                                const today = new Date();
+                                const isToday = today.getDate() === day && today.getMonth() === currentMonth && today.getFullYear() === currentYear;
 
-                                    const dayNotes = checkNotesForDay(day);
-                                    const uncompletedHtml = dayNotes.filter(n => !n.is_completed).length;
-                                    const hasHighPriority = dayNotes.some(n => n.priority === 'High' && !n.is_completed);
+                                const dayNotes = checkNotesForDay(day);
+                                const uncompletedHtml = dayNotes.filter(n => !n.is_completed).length;
+                                const hasHighPriority = dayNotes.some(n => n.priority === 'High' && !n.is_completed);
 
-                                    return (
-                                        <button
-                                            key={day}
-                                            onClick={() => {
-                                                setSelectedDate(dateObj);
-                                            }}
-                                            className={`
-                                                relative p-1 md:p-2 flex flex-col items-center md:items-start min-h-[48px] overflow-hidden rounded-2xl border transition-all
+                                return (
+                                    <button
+                                        key={day}
+                                        onClick={() => {
+                                            setSelectedDate(dateObj);
+                                        }}
+                                        className={`
+                                                relative p-0.5 md:p-1 flex flex-col items-center md:items-start min-h-[24px] md:min-h-[28px] overflow-hidden rounded-lg border transition-all
                                                 ${isSelected ? 'bg-blue-50/80 border-[var(--toss-blue)]/50 ring-1 ring-[var(--toss-blue)]/20 shadow-sm z-10' : 'bg-white border-transparent hover:border-gray-200 hover:bg-gray-50/80 hover:shadow-sm'}
                                                 ${isToday && !isSelected ? 'border-blue-100 bg-blue-50/20' : ''}
                                             `}
-                                        >
-                                            <span className={`text-[12px] font-bold w-6 h-6 flex items-center justify-center rounded-full mb-1 ${isToday ? 'bg-[var(--toss-blue)] text-white shadow-sm' : isSelected ? 'text-[var(--toss-blue)]' : 'text-gray-700'}`}>
-                                                {day}
-                                            </span>
+                                    >
+                                        <span className={`text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full mb-0 ${isToday ? 'bg-[var(--toss-blue)] text-white shadow-sm' : isSelected ? 'text-[var(--toss-blue)]' : 'text-gray-700'}`}>
+                                            {day}
+                                        </span>
 
-                                            <div className="flex gap-1 flex-wrap mt-auto w-full justify-center md:justify-start px-0.5">
-                                                {hasHighPriority && <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 shadow-sm shadow-red-500/30"></span>}
-                                                {uncompletedHtml > 0 && <span className="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0 shadow-sm shadow-orange-400/30"></span>}
-                                                {dayNotes.length > 0 && uncompletedHtml === 0 && <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0 shadow-sm shadow-green-400/30"></span>}
-                                            </div>
+                                        <div className="flex gap-1 flex-wrap mt-auto w-full justify-center md:justify-start px-0.5">
+                                            {hasHighPriority && <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 shadow-sm shadow-red-500/30"></span>}
+                                            {uncompletedHtml > 0 && <span className="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0 shadow-sm shadow-orange-400/30"></span>}
+                                            {dayNotes.length > 0 && uncompletedHtml === 0 && <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0 shadow-sm shadow-green-400/30"></span>}
+                                        </div>
 
-                                            {/* PC 뷰 전용 텍스트 지시자 */}
-                                            <div className="hidden md:block w-full text-[9px] font-bold text-gray-400 mt-1 truncate px-1">
-                                                {uncompletedHtml > 0 ? `${uncompletedHtml}개 미완료` : dayNotes.length > 0 ? '모두 완료' : ''}
-                                            </div>
-                                        </button>
-                                    );
-                                })}
-                            </div>
+                                        {/* PC 뷰 전용 텍스트 지시자 (공간 확보를 위해 아주 작게 하거나 생략) */}
+                                        <div className="hidden md:block w-full text-[7px] font-bold text-gray-400 mt-0 truncate px-0.5">
+                                            {uncompletedHtml > 0 ? `${uncompletedHtml}개` : dayNotes.length > 0 ? '완료' : ''}
+                                        </div>
+                                    </button>
+                                );
+                            })}
                         </div>
                     </div>
                 )}
 
                 {/* 2. Detail & Search Results View */}
-                <div className="flex-1 flex flex-col bg-white overflow-hidden relative">
-                    <div className="p-4 md:p-6 pb-2 shrink-0 border-b border-[var(--toss-border)] bg-white sticky top-0 z-20 flex justify-between items-end">
+                <div className="bg-white relative">
+                    <div className="p-4 md:p-4 pb-2 shrink-0 border-b border-[var(--toss-border)] bg-white sticky top-0 z-20 flex justify-between items-end">
                         <div className="space-y-1">
                             {isSearching ? (
                                 <>
@@ -275,7 +273,7 @@ export default function HandoverNotes({ user }: { user: any }) {
                         )}
                     </div>
 
-                    <div className="flex-1 overflow-y-auto bg-gray-50/30 p-4 md:p-6 custom-scrollbar relative z-10 inner-shadow-sm">
+                    <div className="bg-gray-50/30 p-4 md:p-6 relative z-10 inner-shadow-sm">
                         {isComposing && !isSearching && (
                             <form onSubmit={handleCreateNote} className="bg-white p-5 rounded-3xl border border-gray-200/60 shadow-lg shadow-gray-200/50 space-y-4 mb-6 animate-in slide-in-from-top-4">
                                 <div className="flex gap-2">

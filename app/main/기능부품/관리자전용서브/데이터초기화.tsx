@@ -22,18 +22,27 @@ export default function DataReseter({ onRefresh }: { onRefresh: () => void }) {
 
     try {
       if (type === 'chat') {
-        // [기존] 사내 채팅 내역 삭제
+        // 사내 채팅 내역 및 채팅방 전체 삭제
+        await supabase.from('chat_messages').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        await supabase.from('chat_room_members').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        await supabase.from('chat_rooms').delete().neq('id', '00000000-0000-0000-0000-000000000000');
         await supabase.from('messages').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      } 
+      }
       else if (type === 'inventory') {
-        // [기존] 재고 및 로그 삭제
+        // 재고 및 로그 삭제
         await supabase.from('inventory_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
         await supabase.from('inventory').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      } 
+      }
       else if (type === 'board') {
-        // [기존] 게시판 게시물 삭제
+        // 게시판(공지사항, 경조사 등) 게시물 및 댓글 삭제 (수술일정/MRI 제외)
         await supabase.from('posts').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      } 
+        await supabase.from('board_post_comments').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        await supabase.from('board_posts').delete().neq('board_type', '수술일정').neq('board_type', 'MRI일정표').neq('board_type', 'mri');
+      }
+      else if (type === 'schedule') {
+        // 수술일정 및 MRI일정표 게시물 삭제
+        await supabase.from('board_posts').delete().in('board_type', ['수술일정', 'MRI일정표', 'mri']);
+      }
       else if (type === 'staff') {
         // 서버 API에서 Service Role로 삭제 (관리자 제외)
         const res = await fetch('/api/admin/reset-staff', {
@@ -60,7 +69,7 @@ export default function DataReseter({ onRefresh }: { onRefresh: () => void }) {
         // [추천] 비활성화된 팝업 미디어 정리
         await supabase.from('popups').delete().eq('is_active', false);
       }
-      
+
       alert("선택하신 데이터 초기화 작업이 성공적으로 완료되었습니다.");
       onRefresh();
     } catch (e: unknown) {
@@ -75,12 +84,12 @@ export default function DataReseter({ onRefresh }: { onRefresh: () => void }) {
         <div className="bg-white p-12 border border-red-100 shadow-2xl text-center space-y-6 max-w-sm w-full">
           <h3 className="font-semibold text-xl text-red-600 tracking-tight uppercase">시스템 보안 인증</h3>
           <p className="text-[11px] text-[var(--toss-gray-3)] font-bold tracking-widest uppercase">보안 구역 접근을 위해 암호를 입력하세요</p>
-          <input 
-            type="password" 
-            value={password} 
+          <input
+            type="password"
+            value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full p-4 bg-[var(--toss-gray-1)] border border-[var(--toss-border)] text-center font-semibold text-2xl outline-none focus:border-red-600" 
-            placeholder="••••••" 
+            className="w-full p-4 bg-[var(--toss-gray-1)] border border-[var(--toss-border)] text-center font-semibold text-2xl outline-none focus:border-red-600"
+            placeholder="••••••"
           />
           <button onClick={handleUnlock} className="w-full py-4 bg-red-600 text-white text-xs font-semibold shadow-lg">보안 잠금 해제</button>
         </div>
@@ -93,26 +102,27 @@ export default function DataReseter({ onRefresh }: { onRefresh: () => void }) {
 
           <div className="grid grid-cols-1 gap-3">
             {/* 기본 항목 */}
-            <ResetButton onClick={() => runReset('chat')} label="💬 사내 채팅 내역 및 메시지 전체 삭제" />
+            <ResetButton onClick={() => runReset('chat')} label="💬 사내 채팅 내역 및 채팅방 전체 삭제" />
             <ResetButton onClick={() => runReset('inventory')} label="📦 재고 현황 및 입출고 로그 전체 삭제" />
-            <ResetButton onClick={() => runReset('board')} label="📋 게시판 게시물 및 공지사항 전체 삭제" />
-            
+            <ResetButton onClick={() => runReset('board')} label="📋 게시판 게시물(공지/경조사 등) 전체 삭제" />
+            <ResetButton onClick={() => runReset('schedule')} label="🏥 수술일정 및 MRI일정표 전체 삭제" />
+
             {/* 추천 항목 */}
             <ResetButton onClick={() => runReset('system_logs')} label="🕒 시스템 활동 및 접속 로그 초기화 (용량 확보)" />
             <ResetButton onClick={() => runReset('expired_contracts')} label="📄 30일 경과 미체결 계약서 초안 일괄 삭제" />
             <ResetButton onClick={() => runReset('expired_popups')} label="🖼️ 비활성화된 홈페이지 팝업 데이터 정리" />
 
             {/* 직원 삭제: 관리자는 항상 제외 */}
-            <button 
-              onClick={() => runReset('staff')} 
+            <button
+              onClick={() => runReset('staff')}
               className="p-6 bg-white border-2 border-red-50 hover:border-red-600 hover:bg-red-50 text-left font-semibold text-xs text-red-600 flex justify-between items-center transition-all group"
             >
               <span>👤 관리자 제외 전 직원 계정 및 데이터 삭제</span>
               <span className="text-[11px] font-bold px-2 py-1 bg-red-600 text-white uppercase">관리자 유지</span>
             </button>
           </div>
-          
-          <button 
+
+          <button
             onClick={() => setIsUnlocked(false)}
             className="w-full py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest hover:text-[var(--toss-gray-4)] transition-colors"
           >
