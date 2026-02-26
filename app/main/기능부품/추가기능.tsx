@@ -146,7 +146,7 @@ export default function ExtraFeatures({
               <span className="text-[var(--toss-gray-3)] group-hover:text-[var(--toss-blue)]">→</span>
             </button>
 
-            {(user?.department === '병동팀' || user?.team === '병동팀') && (
+            {(user?.department === '병동팀' || user?.team === '병동팀' || user?.role === 'admin' || user?.permissions?.mso || user?.permissions?.handover_read) && (
               <button
                 type="button"
                 onClick={() => setSubView('인계노트')}
@@ -156,7 +156,7 @@ export default function ExtraFeatures({
                   📝
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-[var(--foreground)] text-sm">인계노트 (병동팀 전용)</h3>
+                  <h3 className="font-semibold text-[var(--foreground)] text-sm">인계노트</h3>
                   <p className="text-[11px] text-[var(--toss-gray-3)] mt-0.5">3교대 근무자 필수 공유사항</p>
                 </div>
                 <span className="text-[var(--toss-gray-3)] group-hover:text-[var(--toss-blue)]">→</span>

@@ -96,15 +96,12 @@ export default function ShiftManagement({ selectedCo }: any) {
   const handleSaveShift = async () => {
     if (!newShift.name) return alert('근무 형태 명칭을 입력하세요.');
 
-    // 전체 필드
     const fullPayload: any = {
       name: newShift.name,
       start_time: newShift.start_time,
       end_time: newShift.end_time,
       description: newShift.description || null,
       company_name: newShift.company_name,
-      break_start_time: newShift.break_start_time || null,
-      break_end_time: newShift.break_end_time || null,
       shift_type: newShift.shift_type || null,
       weekly_work_days: newShift.weekly_work_days ?? null,
       is_weekend_work: newShift.is_weekend_work ?? null,

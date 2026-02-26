@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 export default function ProductRegistration({ user, suppliers, fetchInventory, fetchSuppliers }: any) {
   const [loading, setLoading] = useState(false);
   const [departments, setDepartments] = useState<string[]>([]);
+  const [companies, setCompanies] = useState<string[]>(['박철홍정형외과', '수연의원', 'SY INC.']);
   const [productForm, setProductForm] = useState({
     item_name: '',
     category: '',
@@ -23,23 +24,30 @@ export default function ProductRegistration({ user, suppliers, fetchInventory, f
 
   // 수연의원 / SY INC. / 병원 전체의 부서명을 staff_members에서 동적으로 수집
   useEffect(() => {
-    const loadDepts = async () => {
+    const loadDeptsAndComps = async () => {
       try {
-        const { data, error } = await supabase
+        const { data: deptData, error: deptError } = await supabase
           .from('staff_members')
           .select('department, company');
-        if (error) return;
-        const list =
-          data
-            ?.map((s: any) => (s.department || '').trim())
-            .filter(Boolean) || [];
-        const unique = Array.from(new Set(list)).sort();
-        setDepartments(unique);
+        if (!deptError && deptData) {
+          const list = deptData.map((s: any) => (s.department || '').trim()).filter(Boolean);
+          const unique = Array.from(new Set(list)).sort();
+          setDepartments(unique);
+        }
+
+        const { data: compData, error: compError } = await supabase
+          .from('companies')
+          .select('name')
+          .eq('is_active', true);
+        if (!compError && compData) {
+          setCompanies(compData.map((c: any) => c.name));
+        }
+
       } catch (_) {
         // 실패해도 치명적이지 않으므로 무시
       }
     };
-    loadDepts();
+    loadDeptsAndComps();
   }, []);
 
   const handleRegisterProduct = async () => {
@@ -102,11 +110,11 @@ export default function ProductRegistration({ user, suppliers, fetchInventory, f
           {/* 기본 정보 */}
           <div className="space-y-2">
             <label className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">제품명 *</label>
-            <input value={productForm.item_name} onChange={e => setProductForm({...productForm, item_name: e.target.value})} className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/20" placeholder="제품명을 입력하세요" />
+            <input value={productForm.item_name} onChange={e => setProductForm({ ...productForm, item_name: e.target.value })} className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/20" placeholder="제품명을 입력하세요" />
           </div>
           <div className="space-y-2">
             <label className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">분류 *</label>
-            <select value={productForm.category} onChange={e => setProductForm({...productForm, category: e.target.value})} className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/20">
+            <select value={productForm.category} onChange={e => setProductForm({ ...productForm, category: e.target.value })} className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/20">
               <option value="">분류 선택</option>
               <option value="의료기기">의료기기</option>
               <option value="소모품">소모품</option>
@@ -118,31 +126,31 @@ export default function ProductRegistration({ user, suppliers, fetchInventory, f
           {/* 수량 및 단가 */}
           <div className="space-y-2">
             <label className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">현재 수량</label>
-            <input type="number" value={productForm.quantity} onChange={e => setProductForm({...productForm, quantity: parseInt(e.target.value) || 0})} className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/20" />
+            <input type="number" value={productForm.quantity} onChange={e => setProductForm({ ...productForm, quantity: parseInt(e.target.value) || 0 })} className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/20" />
           </div>
           <div className="space-y-2">
             <label className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">단가 (원)</label>
-            <input type="number" value={productForm.unit_price} onChange={e => setProductForm({...productForm, unit_price: parseInt(e.target.value) || 0})} className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/20" placeholder="0" />
+            <input type="number" value={productForm.unit_price} onChange={e => setProductForm({ ...productForm, unit_price: parseInt(e.target.value) || 0 })} className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/20" placeholder="0" />
           </div>
 
           {/* 유효기간 및 LOT */}
           <div className="space-y-2">
             <label className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">유효기간 (선택)</label>
-            <input type="date" value={productForm.expiry_date} onChange={e => setProductForm({...productForm, expiry_date: e.target.value})} className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/20" />
+            <input type="date" value={productForm.expiry_date} onChange={e => setProductForm({ ...productForm, expiry_date: e.target.value })} className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/20" />
           </div>
           <div className="space-y-2">
             <label className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">LOT 번호 (선택)</label>
-            <input value={productForm.lot_number} onChange={e => setProductForm({...productForm, lot_number: e.target.value})} className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/20" placeholder="LOT-0000-00" />
+            <input value={productForm.lot_number} onChange={e => setProductForm({ ...productForm, lot_number: e.target.value })} className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/20" placeholder="LOT-0000-00" />
           </div>
 
           {/* 기타 설정 */}
           <div className="space-y-2">
             <label className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">안전 재고</label>
-            <input type="number" value={productForm.min_quantity} onChange={e => setProductForm({...productForm, min_quantity: parseInt(e.target.value) || 0})} className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/20" />
+            <input type="number" value={productForm.min_quantity} onChange={e => setProductForm({ ...productForm, min_quantity: parseInt(e.target.value) || 0 })} className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/20" />
           </div>
           <div className="space-y-2">
             <label className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">공급 업체</label>
-            <select value={productForm.supplier_name} onChange={e => setProductForm({...productForm, supplier_name: e.target.value})} className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/20">
+            <select value={productForm.supplier_name} onChange={e => setProductForm({ ...productForm, supplier_name: e.target.value })} className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/20">
               <option value="">업체 선택</option>
               {suppliers.map((s: any) => <option key={s.id} value={s.name}>{s.name}</option>)}
             </select>
@@ -167,12 +175,24 @@ export default function ProductRegistration({ user, suppliers, fetchInventory, f
               placeholder="예: 1/0(고), 30매/BOX"
             />
           </div>
+          <div className="space-y-2">
+            <label className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">귀속 회사 *</label>
+            <select
+              value={productForm.company}
+              onChange={e => setProductForm({ ...productForm, company: e.target.value })}
+              className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/20"
+            >
+              {companies.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
 
           <div className="space-y-2">
             <label className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">배정 부서 (부서별 현황에 표시)</label>
             <select
               value={productForm.department}
-              onChange={e => setProductForm({...productForm, department: e.target.value})}
+              onChange={e => setProductForm({ ...productForm, department: e.target.value })}
               className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/20"
             >
               <option value="">미지정</option>
@@ -182,11 +202,14 @@ export default function ProductRegistration({ user, suppliers, fetchInventory, f
             </select>
           </div>
 
-          <div className="flex items-center pt-6">
-            <label className="flex items-center gap-3 cursor-pointer group">
-              <input type="checkbox" checked={productForm.is_udi} onChange={e => setProductForm({...productForm, is_udi: e.target.checked})} className="w-6 h-6 accent-blue-600 rounded-[12px]" />
-              <span className="text-xs font-bold text-[var(--toss-gray-4)] group-hover:text-[var(--toss-blue)] transition-colors">UDI 공급내역 보고 대상</span>
-            </label>
+          <div className="space-y-2">
+            <label className="text-[11px] font-bold tracking-widest invisible">UDI 대상 여부</label>
+            <div className="flex items-center h-[52px]">
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <input type="checkbox" checked={productForm.is_udi} onChange={e => setProductForm({ ...productForm, is_udi: e.target.checked })} className="w-6 h-6 accent-blue-600 rounded-[12px]" />
+                <span className="text-xs font-bold text-[var(--toss-gray-4)] group-hover:text-[var(--toss-blue)] transition-colors">UDI 공급내역 보고 대상</span>
+              </label>
+            </div>
           </div>
         </div>
 
