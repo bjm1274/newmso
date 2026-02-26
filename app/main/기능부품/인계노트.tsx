@@ -30,6 +30,12 @@ export default function HandoverNotes({ user }: { user: any }) {
     const [newShift, setNewShift] = useState('Day');
     const [newPriority, setNewPriority] = useState('Normal');
 
+    // Edit State
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [editContent, setEditContent] = useState('');
+    const [editShift, setEditShift] = useState('Day');
+    const [editPriority, setEditPriority] = useState('Normal');
+
     useEffect(() => {
         fetchNotes();
     }, []);
@@ -104,6 +110,47 @@ export default function HandoverNotes({ user }: { user: any }) {
                 .eq('id', id);
         } catch (err) {
             console.error(err);
+        }
+    };
+
+    // 수정 시작
+    const startEditing = (note: HandoverNote) => {
+        setEditingId(note.id);
+        setEditContent(note.content);
+        setEditShift(note.shift);
+        setEditPriority(note.priority);
+    };
+
+    // 수정 저장
+    const handleUpdateNote = async (id: string) => {
+        if (!editContent.trim()) return;
+        setNotes(notes.map(n => n.id === id ? { ...n, content: editContent, shift: editShift, priority: editPriority } : n));
+        setEditingId(null);
+        try {
+            await supabase
+                .from('handover_notes')
+                .update({ content: editContent, shift: editShift, priority: editPriority })
+                .eq('id', id);
+        } catch (err) {
+            console.error(err);
+            alert('수정에 실패했습니다.');
+            fetchNotes();
+        }
+    };
+
+    // 삭제
+    const handleDeleteNote = async (id: string) => {
+        if (!confirm('이 인계사항을 삭제하시겠습니까?')) return;
+        setNotes(notes.filter(n => n.id !== id));
+        try {
+            await supabase
+                .from('handover_notes')
+                .delete()
+                .eq('id', id);
+        } catch (err) {
+            console.error(err);
+            alert('삭제에 실패했습니다.');
+            fetchNotes();
         }
     };
 
@@ -377,9 +424,60 @@ export default function HandoverNotes({ user }: { user: any }) {
                                                 ✓
                                             </button>
                                         </div>
-                                        <p className={`text-sm leading-relaxed whitespace-pre-wrap ml-2 ${note.is_completed ? 'line-through text-gray-400 decoration-gray-300' : 'text-gray-700 font-medium'}`}>
-                                            {note.content}
-                                        </p>
+                                        {editingId === note.id ? (
+                                            /* 수정 모드 */
+                                            <div className="ml-2 space-y-3 mt-2">
+                                                <div className="flex gap-2">
+                                                    <select value={editShift} onChange={e => setEditShift(e.target.value)} className="py-1.5 px-3 bg-gray-50 border-none font-bold rounded-lg text-xs outline-none">
+                                                        <option value="Day">☀️ Day</option>
+                                                        <option value="Evening">🌆 Evening</option>
+                                                        <option value="Night">🌙 Night</option>
+                                                    </select>
+                                                    <select value={editPriority} onChange={e => setEditPriority(e.target.value)} className={`py-1.5 px-3 border-none font-bold rounded-lg text-xs outline-none ${editPriority === 'High' ? 'bg-red-50 text-red-700' : 'bg-gray-50 text-gray-700'}`}>
+                                                        <option value="Normal">🟢 일반</option>
+                                                        <option value="High">🔥 중요</option>
+                                                    </select>
+                                                </div>
+                                                <textarea
+                                                    value={editContent}
+                                                    onChange={e => setEditContent(e.target.value)}
+                                                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20 resize-none h-24"
+                                                    autoFocus
+                                                />
+                                                <div className="flex gap-2 justify-end">
+                                                    <button onClick={() => setEditingId(null)} className="px-4 py-2 text-xs font-bold text-gray-500 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+                                                        취소
+                                                    </button>
+                                                    <button onClick={() => handleUpdateNote(note.id)} className="px-4 py-2 text-xs font-bold text-white bg-[var(--toss-blue)] rounded-lg hover:opacity-90 transition-all">
+                                                        저장
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            /* 일반 보기 모드 */
+                                            <>
+                                                <p className={`text-sm leading-relaxed whitespace-pre-wrap ml-2 ${note.is_completed ? 'line-through text-gray-400 decoration-gray-300' : 'text-gray-700 font-medium'}`}>
+                                                    {note.content}
+                                                </p>
+                                                {/* 수정/삭제 버튼 - 본인 작성 노트만 */}
+                                                {(note.author_id === user?.id || user?.role === 'admin') && (
+                                                    <div className="flex gap-2 ml-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button
+                                                            onClick={() => startEditing(note)}
+                                                            className="px-3 py-1.5 text-[11px] font-bold text-[var(--toss-blue)] bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                                                        >
+                                                            ✏️ 수정
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteNote(note.id)}
+                                                            className="px-3 py-1.5 text-[11px] font-bold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+                                                        >
+                                                            🗑️ 삭제
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
                                     </div>
                                 ))}
                             </div>

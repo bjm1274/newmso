@@ -6,6 +6,7 @@ import GlobalSearch from '@/app/components/GlobalSearch';
 import 부서별물품장비현황 from './재고관리서브/부서별물품장비현황';
 import 근무현황 from './근무현황';
 import 인계노트 from './인계노트';
+import 퇴원심사 from './퇴원심사';
 
 const EXTERNAL_LINKS = [
   { id: 'km-park', label: 'KM Park', url: 'http://kmp0001103.iptime.org/login?redirectTo=undefined', icon: '🏥' },
@@ -97,6 +98,19 @@ export default function ExtraFeatures({
           </div>
         )}
 
+        {subView === '퇴원심사' && (
+          <div className="space-y-4">
+            <button
+              type="button"
+              onClick={() => setSubView(null)}
+              className="text-[11px] font-bold text-[var(--toss-blue)] hover:underline"
+            >
+              ← 목록으로
+            </button>
+            <퇴원심사 user={user || {}} />
+          </div>
+        )}
+
         {!subView && (
           <div className="grid gap-3 md:grid-cols-2">
             {onOpenOrgChart && (
@@ -160,6 +174,21 @@ export default function ExtraFeatures({
                 <span className="text-[var(--toss-gray-3)] group-hover:text-[var(--toss-blue)]">→</span>
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={() => setSubView('퇴원심사')}
+              className="flex items-center gap-3 p-4 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] shadow-sm hover:bg-[var(--toss-blue-light)]/50 hover:border-[var(--toss-blue)]/30 transition-all group text-left w-full"
+            >
+              <div className="w-12 h-12 bg-purple-50 text-purple-500 group-hover:bg-purple-100 rounded-[12px] flex items-center justify-center text-xl transition-colors">
+                🏥
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-[var(--foreground)] text-sm">퇴원심사</h3>
+                <p className="text-[11px] text-[var(--toss-gray-3)] mt-0.5">퇴원 체크리스트 점검 및 AI 분석</p>
+              </div>
+              <span className="text-[var(--toss-gray-3)] group-hover:text-[var(--toss-blue)]">→</span>
+            </button>
 
             {EXTERNAL_LINKS.map((item) => (
               <a
