@@ -1,10 +1,9 @@
-'use client';
 import { useState, useEffect } from 'react';
 import {
   fetchTaxFreeSettings,
   saveTaxFreeSettings,
   DEFAULT_SETTINGS,
-  TAX_FREE_LEGAL_LIMITS_2024,
+  TAX_FREE_LEGAL_LIMITS,
   type TaxFreeSettings,
 } from '@/lib/use-tax-free-settings';
 
@@ -44,13 +43,13 @@ export default function TaxFreeSettingsPanel({ companyName, onSaved }: { company
 
   const resetToLegal = () => {
     setSettings({
-      meal_limit: TAX_FREE_LEGAL_LIMITS_2024.meal.limit,
-      vehicle_limit: TAX_FREE_LEGAL_LIMITS_2024.vehicle.limit,
-      childcare_limit: TAX_FREE_LEGAL_LIMITS_2024.childcare.limit,
-      research_limit: TAX_FREE_LEGAL_LIMITS_2024.research.limit,
-      uniform_limit: TAX_FREE_LEGAL_LIMITS_2024.uniform.limit,
-      congratulations_limit: TAX_FREE_LEGAL_LIMITS_2024.congratulations.limit,
-      housing_limit: TAX_FREE_LEGAL_LIMITS_2024.housing.limit,
+      meal_limit: TAX_FREE_LEGAL_LIMITS.meal.limit,
+      vehicle_limit: TAX_FREE_LEGAL_LIMITS.vehicle.limit,
+      childcare_limit: TAX_FREE_LEGAL_LIMITS.childcare.limit,
+      research_limit: TAX_FREE_LEGAL_LIMITS.research.limit,
+      uniform_limit: TAX_FREE_LEGAL_LIMITS.uniform.limit,
+      congratulations_limit: TAX_FREE_LEGAL_LIMITS.congratulations.limit,
+      housing_limit: TAX_FREE_LEGAL_LIMITS.housing.limit,
       other_taxfree_limit: 0,
     });
   };
@@ -85,7 +84,7 @@ export default function TaxFreeSettingsPanel({ companyName, onSaved }: { company
       <div className="flex gap-2 mb-4">
         <select value={year} onChange={(e) => setYear(parseInt(e.target.value))} className="h-9 px-3 border border-[var(--toss-border)] rounded-md text-sm font-medium"
         >
-          {[2024, 2025, 2026].map((y) => (
+          {[2025, 2026].map((y) => (
             <option key={y} value={y}>{y}년</option>
           ))}
         </select>

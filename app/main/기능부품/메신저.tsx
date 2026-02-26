@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import SmartDatePicker from './공통/SmartDatePicker';
 
 const NOTICE_ROOM_ID = '00000000-0000-0000-0000-000000000000';
 const NOTICE_ROOM_NAME = '공지메시지';

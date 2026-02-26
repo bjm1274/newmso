@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import SmartDatePicker from './공통/SmartDatePicker';
 
 // 수술·MRI 일정에서 자주 쓰는 문구(수술명/검사명) 프리셋
 const COMMON_SURGERY_NAMES = [
@@ -114,11 +115,10 @@ export default function BoardAdvanced() {
           <button
             key={board.id}
             onClick={() => setActiveBoard(board.id)}
-            className={`px-6 py-3 font-semibold text-sm transition-all rounded-[12px] ${
-              activeBoard === board.id
-                ? 'bg-[var(--toss-blue)] text-white'
-                : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-gray-2)]'
-            }`}
+            className={`px-6 py-3 font-semibold text-sm transition-all rounded-[12px] ${activeBoard === board.id
+              ? 'bg-[var(--toss-blue)] text-white'
+              : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-gray-2)]'
+              }`}
           >
             {board.label}
           </button>
@@ -328,9 +328,9 @@ export default function BoardAdvanced() {
                           type="text"
                           value={
                             formData[
-                              activeBoard === '수술'
-                                ? 'surgery_name'
-                                : 'exam_name'
+                            activeBoard === '수술'
+                              ? 'surgery_name'
+                              : 'exam_name'
                             ] || ''
                           }
                           onChange={(e) =>
@@ -371,23 +371,14 @@ export default function BoardAdvanced() {
                         예정 일시 *
                       </label>
                       <div className="grid grid-cols-2 gap-2">
-                        <input
-                          type="date"
+                        <SmartDatePicker
                           value={getDatePart(formData.scheduled_time || '')}
-                          onChange={(e) => {
-                            const newDate = e.target.value;
-                            const timePart =
-                              getTimePart(formData.scheduled_time || '') ||
-                              '09:00';
-                            setFormData({
-                              ...formData,
-                              scheduled_time: combineDateTime(
-                                newDate,
-                                timePart,
-                              ),
-                            });
+                          onChange={val => {
+                            const timePart = getTimePart(formData.scheduled_time || '') || '09:00';
+                            setFormData({ ...formData, scheduled_time: combineDateTime(val, timePart) });
                           }}
-                          className="w-full px-4 py-3 border border-[var(--toss-border)] rounded-[12px] focus:outline-none focus:border-[var(--toss-blue)]"
+                          placeholder="0000-00-00"
+                          inputClassName="px-4 py-3 border border-[var(--toss-border)] rounded-[12px]"
                         />
                         <select
                           value={getTimePart(formData.scheduled_time || '')}

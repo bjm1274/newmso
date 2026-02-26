@@ -1,11 +1,14 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import SmartDatePicker from '../공통/SmartDatePicker';
 
 export default function AttendanceForms({ user, staffs, formType, setExtraData, setFormTitle }: any) {
   const [attData, setAttData] = useState<any[]>([]);
   const [schedules, setSchedules] = useState<any[]>([]);
   const [selectedDate, setSelectedDate] = useState('');
+  const [localStartDate, setLocalStartDate] = useState('');
+  const [localEndDate, setLocalEndDate] = useState('');
 
   useEffect(() => {
     const load = async () => {
@@ -46,13 +49,11 @@ export default function AttendanceForms({ user, staffs, formType, setExtraData, 
             </div>
             <div className="space-y-2">
               <label className="text-[11px] font-bold text-[var(--toss-blue)] ml-1 uppercase">시작 일자</label>
-              <input type="date" className="w-full p-4 rounded-[12px] bg-[var(--toss-card)] font-bold text-xs shadow-sm border-none focus:ring-2 focus:ring-[var(--toss-blue)]/30"
-                onChange={e => setExtraData((prev: any) => ({ ...prev, startDate: e.target.value }))} />
+              <SmartDatePicker value={localStartDate} onChange={val => { setLocalStartDate(val); setExtraData((prev: any) => ({ ...prev, startDate: val })); }} inputClassName="w-full h-[46px] px-4 rounded-[12px] bg-[var(--toss-card)] font-bold text-xs" />
             </div>
             <div className="space-y-2">
               <label className="text-[11px] font-bold text-[var(--toss-blue)] ml-1 uppercase">종료 일자</label>
-              <input type="date" className="w-full p-4 rounded-[12px] bg-[var(--toss-card)] font-bold text-xs shadow-sm border-none focus:ring-2 focus:ring-[var(--toss-blue)]/30"
-                onChange={e => setExtraData((prev: any) => ({ ...prev, endDate: e.target.value }))} />
+              <SmartDatePicker value={localEndDate} onChange={val => { setLocalEndDate(val); setExtraData((prev: any) => ({ ...prev, endDate: val })); }} inputClassName="w-full h-[46px] px-4 rounded-[12px] bg-[var(--toss-card)] font-bold text-xs" />
             </div>
           </div>
         </>

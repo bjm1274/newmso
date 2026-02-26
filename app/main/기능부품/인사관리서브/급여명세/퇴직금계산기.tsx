@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { calculateSeverancePay, formatWorkPeriod } from '@/lib/severance-pay';
+import SmartDatePicker from '../../공통/SmartDatePicker';
 
 export default function SeveranceCalculator() {
   const [avgWage, setAvgWage] = useState(3000000);
@@ -16,7 +17,7 @@ export default function SeveranceCalculator() {
     <div className="bg-[var(--toss-card)] p-5 border border-[var(--toss-border)] rounded-[12px] shadow-sm max-w-md">
       <div className="pb-3 border-b border-[var(--toss-border)] mb-4">
         <h3 className="text-lg font-bold text-[var(--foreground)]">퇴직금 계산기</h3>
-        <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">근로기준법 · 1일평균임금 × 30 × (재직일/365) × 1/2</p>
+        <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">근로기준법 · 1일평균임금 × 30 × (재직일/365)</p>
       </div>
       <div className="space-y-4">
         <div className="space-y-1">
@@ -24,12 +25,10 @@ export default function SeveranceCalculator() {
           <input type="number" value={avgWage} onChange={e => setAvgWage(parseInt(e.target.value, 10) || 0)} className="w-full h-10 px-3 rounded-md border border-[var(--toss-border)] text-sm font-medium" />
         </div>
         <div className="space-y-1">
-          <label className="text-xs font-medium text-[var(--toss-gray-4)]">입사일</label>
-          <input type="date" value={joinDate} onChange={e => setJoinDate(e.target.value)} className="w-full h-10 px-3 rounded-md border border-[var(--toss-border)] text-sm font-medium" />
+          <SmartDatePicker value={joinDate} onChange={val => setJoinDate(val)} className="w-full h-10 px-3 rounded-md border border-[var(--toss-border)] text-sm font-medium bg-white" />
         </div>
         <div className="space-y-1">
-          <label className="text-xs font-medium text-[var(--toss-gray-4)]">퇴직예정일</label>
-          <input type="date" value={retireDate} onChange={e => setRetireDate(e.target.value)} className="w-full h-10 px-3 rounded-md border border-[var(--toss-border)] text-sm font-medium" />
+          <SmartDatePicker value={retireDate} onChange={val => setRetireDate(val)} className="w-full h-10 px-3 rounded-md border border-[var(--toss-border)] text-sm font-medium bg-white" />
         </div>
       </div>
       <div className="mt-5 p-4 bg-[var(--tab-bg)] rounded-[12px] border border-[var(--toss-border)]">

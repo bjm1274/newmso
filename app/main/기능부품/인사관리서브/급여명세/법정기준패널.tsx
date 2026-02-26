@@ -1,8 +1,8 @@
 'use client';
 import {
-  TAX_FREE_LEGAL_LIMITS_2024,
-  MINIMUM_WAGE_2024,
+  TAX_FREE_LEGAL_LIMITS,
   MINIMUM_WAGE_2025,
+  MINIMUM_WAGE_2026,
   MONTHLY_STANDARD_HOURS,
   WEEKLY_MAX_HOURS,
   ANNUAL_LEAVE_FIRST_YEAR,
@@ -11,11 +11,11 @@ import {
 
 export default function LegalStandardsPanel() {
   const items = [
-    { title: '최저임금', rows: [{ label: '2024년 시급', value: `${MINIMUM_WAGE_2024.toLocaleString()}원` }, { label: '2025년 시급', value: `${MINIMUM_WAGE_2025.toLocaleString()}원` }, { label: '월 소정근로시간', value: `${MONTHLY_STANDARD_HOURS}시간` }] },
+    { title: '최저임금', rows: [{ label: '2025년 시급', value: `${MINIMUM_WAGE_2025.toLocaleString()}원` }, { label: '2026년 시급', value: `${MINIMUM_WAGE_2026.toLocaleString()}원` }, { label: '월 소정근로시간', value: `${MONTHLY_STANDARD_HOURS}시간` }] },
     { title: '주/연차', rows: [{ label: '주 52시간', value: '근로기준법' }, { label: '1년 미만 연차', value: `${ANNUAL_LEAVE_FIRST_YEAR}일` }, { label: '1년 이상 연차', value: `${ANNUAL_LEAVE_AFTER_ONE}일` }] },
     {
-      title: '비과세 한도 (2024-2025 기준)',
-      rows: Object.entries(TAX_FREE_LEGAL_LIMITS_2024).map(([k, v]) => ({
+      title: '비과세 한도 (2025-2026 기준)',
+      rows: Object.entries(TAX_FREE_LEGAL_LIMITS).map(([k, v]) => ({
         label: v.name,
         value: `${(v as any).limit.toLocaleString()}원`,
         sub: v.basis,
@@ -47,7 +47,7 @@ export default function LegalStandardsPanel() {
           </div>
         ))}
       </div>
-      <p className="mt-4 text-[11px] text-[var(--toss-gray-3)]">* 2024-2025년 기준. 법령 개정 시 갱신 필요.</p>
+      <p className="mt-4 text-[11px] text-[var(--toss-gray-3)]">* 2025-2026년 기준. 법령 개정 시 갱신 필요.</p>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import SmartDatePicker from '../공통/SmartDatePicker';
 
 const ASSET_TYPES = ['노트북', 'PC', '모니터', '키보드', '마우스', '회의실키', '기타'];
 
@@ -94,7 +95,7 @@ export default function AssetLoanManager({ staffs = [], selectedCo }: any) {
               ))}
             </select>
             <input type="text" value={form.assetName} onChange={(e) => setForm({ ...form, assetName: e.target.value })} placeholder="장비명 (선택)" className="w-full p-3 border rounded-[16px]" />
-            <input type="date" value={form.loanedAt} onChange={(e) => setForm({ ...form, loanedAt: e.target.value })} className="w-full p-3 border rounded-[16px]" />
+            <SmartDatePicker value={form.loanedAt} onChange={val => setForm({ ...form, loanedAt: val })} inputClassName="w-full p-3 border rounded-[16px]" />
             <div className="flex gap-2">
               <button onClick={handleAdd} className="flex-1 py-3 bg-[var(--toss-blue)] text-white font-semibold rounded-[16px]">등록</button>
               <button onClick={() => setAdding(false)} className="flex-1 py-3 bg-[var(--toss-gray-2)] font-semibold rounded-[16px]">취소</button>

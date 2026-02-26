@@ -1,6 +1,6 @@
-'use client';
 import { useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import SmartDatePicker from '../공통/SmartDatePicker';
 
 export default function InvoiceAutoExtraction({ onRefresh, user }: any) {
     const [file, setFile] = useState<File | null>(null);
@@ -226,7 +226,7 @@ export default function InvoiceAutoExtraction({ onRefresh, user }: any) {
                                             </div>
                                             <div className="col-span-1">
                                                 <label className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase">유효/만료일</label>
-                                                <input type="date" value={item.expiry_date || ''} onChange={(e) => handleItemChange(idx, 'expiry_date', e.target.value)} className="w-full mt-1 p-2 bg-[var(--input-bg)] rounded-[8px] text-[11px] font-bold outline-none border border-transparent focus:border-[var(--toss-blue)]/50" />
+                                                <SmartDatePicker value={item.expiry_date || ''} onChange={val => handleItemChange(idx, 'expiry_date', val)} placeholder="0000-00-00" />
                                             </div>
                                             <div className="col-span-1">
                                                 <label className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase">LOT 번호</label>

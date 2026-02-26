@@ -122,7 +122,7 @@ export default function EducationMain({ staffs, selectedCo }: any) {
       <div className="flex-1 p-8 overflow-y-auto space-y-8 custom-scrollbar">
         {activeTab === '의무교육' ? (
           <>
-            <EducationStatus selectedCo={selectedCo} urgentCount={notifications.length} />
+            <EducationStatus selectedCo={selectedCo} urgentCount={notifications.length} staffs={staffs} />
             <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] p-8 shadow-sm rounded-2xl">
               <EducationList selectedCo={selectedCo} staffs={staffs} notifications={notifications} />
             </div>

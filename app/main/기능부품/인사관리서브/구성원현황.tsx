@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import StaffHistoryTimeline from './인사이력타임라인';
 import OnboardingChecklist from './급여명세/입퇴사온보딩';
 import CertTransferPanel from './교육자격인사이동패널';
+import SmartDatePicker from '../공통/SmartDatePicker';
 
 // ESLint가 React 컴포넌트로 인식하도록 함수 이름을
 // 영문 대문자로 시작하는 형태로 지정합니다.
@@ -13,13 +14,17 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   const [선택된직원ID, 선택된직원ID설정] = useState<string | number | null>(null);
   const [근무형태목록, 근무형태목록설정] = useState<any[]>([]);
   const [팀목록캐시, 팀목록캐시설정] = useState<Record<string, string[]>>({});
+  const [activeTab, setActiveTab] = useState('기본'); // '기본', '소속', '급여'
   const [신규직원, 신규직원설정] = useState({
-    성명: '', 전화번호: '', 내선번호: '', 사업체: '박철홍정형외과', 팀: '원무팀', 직함: '', 입사일: '', 퇴사일: '',
-    주민번호: '', 이메일: '', 주소: '', 면허사항: '', 면허번호: '', 취득일자: '', 계좌정보: '', 임금정보: '', 상태: '재직',
+    성명: '', 전화번호: '', 내선번호: '', 사업체: '박철홍정형외과', 팀: '원무팀', 직함: '', 입사일: '0000-00-00', 퇴사일: '0000-00-00',
+    주민번호: '', 이메일: '', 주소: '', 면허사항: '', 면허번호: '', 취득일자: '0000-00-00', 계좌정보: '', 임금정보: '', 상태: '재직',
     연차총개수: 0, 연차사용개수: 0, 근무형태ID: '',
-    고용형태: '정규직' as string, 계약종료일: '' as string,
+    고용형태: '정규직' as string, 계약종료일: '0000-00-00' as string,
     base_salary: 0,
-    meal_allowance: 0, night_duty_allowance: 0, vehicle_allowance: 0, childcare_allowance: 0, research_allowance: 0, other_taxfree: 0, position_allowance: 0
+    meal_allowance: 0, night_duty_allowance: 0, vehicle_allowance: 0, childcare_allowance: 0, research_allowance: 0, other_taxfree: 0, position_allowance: 0,
+    overtime_allowance: 0, night_work_allowance: 0, holiday_work_allowance: 0, annual_leave_pay: 0,
+    ins_national: true, ins_health: true, ins_employment: true, ins_injury: true, is_basic_living: false, other_welfare: '',
+    ins_duru_nuri: false, duru_nuri_start: '0000-00', duru_nuri_end: '0000-00', is_medical_benefit: false
   });
 
   // ESS (직원 셀프 서비스) 승인 대기함 관련
@@ -95,8 +100,9 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   };
 
   const 정보저장 = async () => {
-    if (!신규직원.성명 || !신규직원.입사일) return alert('성함과 입사일은 필수 입력 사항입니다.');
+    if (!신규직원.성명 || !신규직원.입사일 || 신규직원.입사일 === '0000-00-00') return alert('성함과 실제 입사일은 필수 입력 사항입니다.');
     try {
+      const dateOrNull = (val: string) => (val === '0000-00-00' || val === '0000-00' || !val) ? null : val;
       const commonData = {
         name: 신규직원.성명,
         phone: 신규직원.전화번호,
@@ -109,24 +115,36 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         license: 신규직원.면허사항,
         bank_account: 신규직원.계좌정보,
         salary_info: 신규직원.임금정보,
-        joined_at: 신규직원.입사일,
-        resigned_at: 신규직원.퇴사일 || null,
+        joined_at: dateOrNull(신규직원.입사일),
+        resigned_at: dateOrNull(신규직원.퇴사일),
         status: 신규직원.상태,
         permissions: {
           ...(편집모드 && 선택된직원ID ? 직원목록.find((s: any) => s.id === 선택된직원ID)?.permissions : {}),
           extension: 신규직원.내선번호 || null,
           license_no: 신규직원.면허번호 || null,
-          license_date: 신규직원.취득일자 || null,
+          license_date: dateOrNull(신규직원.취득일자),
           employment_type: 신규직원.고용형태 || '정규직',
-          contract_end_date: 신규직원.고용형태 === '계약직' ? (신규직원.계약종료일 || null) : null
+          contract_end_date: 신규직원.고용형태 === '계약직' ? dateOrNull(신규직원.계약종료일) : null,
+          insurance: {
+            national: 신규직원.ins_national,
+            health: 신규직원.ins_health,
+            employment: 신규직원.ins_employment,
+            injury: 신규직원.ins_injury,
+            duru_nuri: 신규직원.ins_duru_nuri,
+            duru_nuri_start: dateOrNull(신규직원.duru_nuri_start),
+            duru_nuri_end: dateOrNull(신규직원.duru_nuri_end)
+          },
+          is_basic_living: 신규직원.is_basic_living,
+          is_medical_benefit: 신규직원.is_medical_benefit,
+          other_welfare: 신규직원.other_welfare
         },
         annual_leave_total: 0,
         annual_leave_used: 0,
         shift_id: 신규직원.근무형태ID || null,
         base_salary: 신규직원.base_salary,
-        meal_allowance: 신규직원.meal_allowance ?? 0, night_duty_allowance: 신규직원.night_duty_allowance ?? 0,
-        vehicle_allowance: 신규직원.vehicle_allowance ?? 0, childcare_allowance: 신규직원.childcare_allowance ?? 0, research_allowance: 신규직원.research_allowance ?? 0,
-        other_taxfree: 신규직원.other_taxfree ?? 0, position_allowance: 신규직원.position_allowance ?? 0
+        other_taxfree: 신규직원.other_taxfree ?? 0, position_allowance: 신규직원.position_allowance ?? 0,
+        overtime_allowance: 신규직원.overtime_allowance ?? 0, night_work_allowance: 신규직원.night_work_allowance ?? 0,
+        holiday_work_allowance: 신규직원.holiday_work_allowance ?? 0, annual_leave_pay: 신규직원.annual_leave_pay ?? 0
       };
 
       if (편집모드 && 선택된직원ID) {
@@ -144,10 +162,27 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         console.log('수정 성공 데이터:', updatedData);
         alert('직원 정보가 수정되었습니다.');
       } else {
-        const { data: maxNo } = await supabase.from('staff_members').select('employee_no').order('employee_no', { ascending: false }).limit(1).single();
-        const lastNo = typeof maxNo?.employee_no === 'number' ? maxNo.employee_no : parseInt(String(maxNo?.employee_no || '0'), 10) || 0;
-        const newEmployeeNo = String(Math.max(21, lastNo + 1));
-        const { error: insertErr } = await supabase.from('staff_members').insert([{ ...commonData, employee_no: newEmployeeNo, role: 'staff', password: '', join_date: 신규직원.입사일 || null }]);
+        // 사번 부여 로직: 박철홍이면 1, 아니면 2~9999 순차
+        let newEmployeeNo = '';
+        if (신규직원.성명 === '박철홍') {
+          newEmployeeNo = '1';
+        } else {
+          // 1번을 제외한 가장 큰 사번 찾기
+          const { data: maxNoData } = await supabase
+            .from('staff_members')
+            .select('employee_no')
+            .neq('employee_no', '1')
+            .order('employee_no', { ascending: false })
+            .limit(1);
+
+          let lastNo = 1;
+          if (maxNoData && maxNoData.length > 0) {
+            lastNo = parseInt(String(maxNoData[0].employee_no), 10) || 1;
+          }
+          newEmployeeNo = String(Math.max(2, lastNo + 1));
+        }
+
+        const { error: insertErr } = await supabase.from('staff_members').insert([{ ...commonData, employee_no: newEmployeeNo, role: 'staff', password: '', join_date: dateOrNull(신규직원.입사일) }]);
         if (insertErr) {
           console.error(insertErr);
           return alert('직원 등록 실패: ' + (insertErr.message || 'DB 오류'));
@@ -164,13 +199,14 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   const 수정시작 = (직원: any) => {
     선택된직원ID설정(직원.id);
     const extensionValue = 직원.extension || 직원.permissions?.extension || '';
+    const ins = 직원.permissions?.insurance || { national: true, health: true, employment: true, injury: true };
     신규직원설정({
       성명: 직원.name || '', 전화번호: 직원.phone || '', 내선번호: extensionValue, 사업체: 직원.company || '박철홍정형외과',
-      팀: 직원.department ?? '', 직함: 직원.position || '', 입사일: 직원.joined_at || '',
-      퇴사일: 직원.resigned_at || '', 주민번호: 직원.resident_no || '', 이메일: 직원.email || '',
+      팀: 직원.department ?? '', 직함: 직원.position || '', 입사일: 직원.joined_at || 직원.join_date || '0000-00-00',
+      퇴사일: 직원.resigned_at || '0000-00-00', 주민번호: 직원.resident_no || '', 이메일: 직원.email || '',
       주소: 직원.address || '', 면허사항: 직원.license || '',
       면허번호: 직원.permissions?.license_no || '',
-      취득일자: 직원.permissions?.license_date || '',
+      취득일자: 직원.permissions?.license_date || '0000-00-00',
       계좌정보: 직원.bank_account || '',
       임금정보: 직원.salary_info || '', 상태: 직원.status || '재직',
       연차총개수: typeof 직원.annual_leave_total === 'number' ? 직원.annual_leave_total : 0,
@@ -179,8 +215,20 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       meal_allowance: 직원.meal_allowance ?? 0, night_duty_allowance: 직원.night_duty_allowance ?? 0,
       vehicle_allowance: 직원.vehicle_allowance ?? 0, childcare_allowance: 직원.childcare_allowance ?? 0, research_allowance: 직원.research_allowance ?? 0,
       other_taxfree: 직원.other_taxfree ?? 0, position_allowance: 직원.position_allowance ?? 0,
+      overtime_allowance: 직원.overtime_allowance ?? 0, night_work_allowance: 직원.night_work_allowance ?? 0,
+      holiday_work_allowance: 직원.holiday_work_allowance ?? 0, annual_leave_pay: 직원.annual_leave_pay ?? 0,
       고용형태: 직원.permissions?.employment_type || '정규직',
-      계약종료일: 직원.permissions?.contract_end_date || ''
+      계약종료일: 직원.permissions?.contract_end_date || '0000-00-00',
+      ins_national: ins.national !== false,
+      ins_health: ins.health !== false,
+      ins_employment: ins.employment !== false,
+      ins_injury: ins.injury !== false,
+      is_basic_living: 직원.permissions?.is_basic_living || false,
+      is_medical_benefit: 직원.permissions?.is_medical_benefit || false,
+      ins_duru_nuri: ins.duru_nuri || false,
+      duru_nuri_start: ins.duru_nuri_start || '0000-00',
+      duru_nuri_end: ins.duru_nuri_end || '0000-00',
+      other_welfare: 직원.permissions?.other_welfare || ''
     });
     편집모드설정(true);
   };
@@ -188,14 +236,16 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   const 닫기함수 = () => {
     편집모드설정(false); 선택된직원ID설정(null);
     신규직원설정({
-      성명: '', 전화번호: '', 내선번호: '', 사업체: '박철홍정형외과', 팀: '원무팀', 직함: '', 입사일: '', 퇴사일: '',
-      주민번호: '', 이메일: '', 주소: '', 면허사항: '', 면허번호: '', 취득일자: '', 계좌정보: '', 임금정보: '', 상태: '재직',
+      성명: '', 전화번호: '', 내선번호: '', 사업체: '박철홍정형외과', 팀: '원무팀', 직함: '', 입사일: '0000-00-00', 퇴사일: '0000-00-00',
+      주민번호: '', 이메일: '', 주소: '', 면허사항: '', 면허번호: '', 취득일자: '0000-00-00', 계좌정보: '', 임금정보: '', 상태: '재직',
       연차총개수: 0, 연차사용개수: 0, 근무형태ID: '',
-      고용형태: '정규직', 계약종료일: '',
-      base_salary: 0,
-      meal_allowance: 0, night_duty_allowance: 0, vehicle_allowance: 0, childcare_allowance: 0, research_allowance: 0, other_taxfree: 0, position_allowance: 0
+      고용형태: '정규직', 계약종료일: '0000-00-00',
+      base_salary: 0, meal_allowance: 0, night_duty_allowance: 0, vehicle_allowance: 0, childcare_allowance: 0, research_allowance: 0, other_taxfree: 0, position_allowance: 0,
+      overtime_allowance: 0, night_work_allowance: 0, holiday_work_allowance: 0, annual_leave_pay: 0,
+      ins_national: true, ins_health: true, ins_employment: true, ins_injury: true, is_basic_living: false, other_welfare: '',
+      ins_duru_nuri: false, duru_nuri_start: '0000-00', duru_nuri_end: '0000-00', is_medical_benefit: false
     });
-    창닫기();
+    창닫기?.();
   };
 
   const 직원삭제 = async (직원: any) => {
@@ -282,7 +332,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         <div className="hidden md:block bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] overflow-hidden shadow-xl">
           <table className="w-full text-left border-collapse">
             <thead className="bg-[var(--toss-gray-1)] text-[11px] font-semibold text-[var(--toss-gray-3)] border-b border-[var(--toss-border)] uppercase tracking-widest">
-              <tr><th className="p-6">사번</th><th className="p-6">성명/직함</th><th className="p-6">소속</th><th className="p-6">부서/팀</th><th className="p-6">근무형태</th><th className="p-6">상태</th><th className="p-6 text-right">관리</th></tr>
+              <tr><th className="p-6">사번</th><th className="p-6">성명/직함</th><th className="p-6">소속</th><th className="p-6">부서/팀</th><th className="p-6">입사일</th><th className="p-6">근무형태</th><th className="p-6">상태</th><th className="p-6 text-right">관리</th></tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {필터목록.map((직원: any) => (
@@ -294,6 +344,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                   </td>
                   <td className="p-6 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">{직원.company}</td>
                   <td className="p-6 text-xs font-bold text-[var(--toss-gray-4)]">{직원.department}</td>
+                  <td className="p-6 text-xs font-bold text-[var(--toss-gray-4)]">{직원.joined_at || 직원.join_date || '-'}</td>
                   <td className="p-6">
                     <span className="px-3 py-1 bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] text-[11px] font-semibold rounded-full">
                       {근무형태목록.find(s => s.id === 직원.shift_id)?.name || '기본(09-18)'}
@@ -341,7 +392,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                   <div className="w-12 h-12 bg-[var(--toss-blue-light)] rounded-[12px] flex items-center justify-center text-[var(--toss-blue)] font-semibold text-xs">#{직원.employee_no}</div>
                   <div>
                     <h4 className="text-base font-semibold text-[var(--foreground)]">{직원.name}</h4>
-                    <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">{직원.company} · {직원.position}</p>
+                    <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">{직원.company} · {직원.position} · {직원.joined_at || 직원.join_date}</p>
                   </div>
                 </div>
                 <span className={`px-3 py-1 text-[11px] font-semibold rounded-full ${직원.status === '퇴사' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>{직원.status || '재직중'}</span>
@@ -385,252 +436,400 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
       {/* 등록/수정 모달 - 모바일 최적화 */}
       {(창상태 || 편집모드) && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[110] flex items-end md:items-center justify-center p-0 md:p-4" onClick={닫기함수}>
-          <div className="bg-[var(--toss-card)] w-full max-w-5xl rounded-t-[2.5rem] md:rounded-[3rem] p-6 md:p-10 shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-8 border-b-4 border-[var(--foreground)] pb-4">
-              <h3 className="text-xl md:text-2xl font-semibold text-[var(--foreground)] tracking-tight">{편집모드 ? '구성원 정보 수정' : '신규 직원 등록'}</h3>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[110] flex items-center justify-center p-4 min-h-screen" onClick={닫기함수}>
+          <div className="bg-[var(--toss-card)] w-full max-w-5xl rounded-[3rem] overflow-hidden shadow-2xl flex flex-col max-h-[95vh] animate-in slide-in-from-bottom duration-300" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="p-8 border-b border-[var(--toss-border)] flex justify-between items-center bg-[var(--toss-card)] shrink-0">
+              <h3 className="text-2xl font-semibold text-[var(--foreground)] tracking-tight">{편집모드 ? '구성원 정보 수정' : '신규 직원 등록'}</h3>
               <button onClick={닫기함수} className="text-[var(--toss-gray-3)] hover:text-red-500 text-2xl">✕</button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <div className="space-y-4">
-                <h4 className="text-[11px] font-semibold text-[var(--toss-blue)] uppercase tracking-widest">기본 인적 사항</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-[var(--toss-gray-3)]">성명 *</label>
-                    <input type="text" value={신규직원.성명} onChange={e => 신규직원설정({ ...신규직원, 성명: e.target.value })} className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[12px] border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-[var(--toss-blue)]/30" />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-[var(--toss-gray-3)]">주민번호</label>
-                    <input
-                      type="text"
-                      value={신규직원.주민번호}
-                      maxLength={14}
-                      onChange={e => {
-                        const raw = e.target.value.replace(/[^0-9]/g, '').slice(0, 13);
-                        const formatted = raw.length > 6 ? `${raw.slice(0, 6)}-${raw.slice(6)}` : raw;
-                        신규직원설정({ ...신규직원, 주민번호: formatted });
-                      }}
-                      className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[12px] border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-[var(--toss-blue)]/30"
-                      placeholder="000000-0000000"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[11px] font-semibold text-[var(--toss-gray-3)]">연락처 (개인)</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={신규직원.전화번호}
-                    onChange={e => {
-                      let raw = e.target.value.replace(/[^0-9]/g, '');
-                      let formatted = '';
-                      if (raw.startsWith('010')) {
-                        raw = raw.slice(0, 11);
-                        if (raw.length <= 3) formatted = raw;
-                        else if (raw.length <= 7) formatted = raw.slice(0, 3) + '-' + raw.slice(3);
-                        else formatted = raw.slice(0, 3) + '-' + raw.slice(3, 7) + '-' + raw.slice(7);
-                      } else if (raw.startsWith('02')) {
-                        raw = raw.slice(0, 9);
-                        if (raw.length <= 2) formatted = raw;
-                        else if (raw.length <= 5) formatted = raw.slice(0, 2) + '-' + raw.slice(2);
-                        else formatted = raw.slice(0, 2) + '-' + raw.slice(2, 5) + '-' + raw.slice(5);
-                      } else {
-                        raw = raw.slice(0, 10);
-                        if (raw.length <= 3) formatted = raw;
-                        else if (raw.length <= 6) formatted = raw.slice(0, 3) + '-' + raw.slice(3);
-                        else formatted = raw.slice(0, 3) + '-' + raw.slice(3, 6) + '-' + raw.slice(6);
-                      }
-                      신규직원설정({ ...신규직원, 전화번호: formatted });
-                    }}
-                    placeholder="010-1234-5678"
-                    className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[12px] border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-[var(--toss-blue)]/30"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[11px] font-semibold text-[var(--toss-gray-3)]">내선번호</label>
-                  <input
-                    type="text"
-                    value={신규직원.내선번호}
-                    onChange={e => 신규직원설정({ ...신규직원, 내선번호: e.target.value })}
-                    placeholder="예: 1234"
-                    className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[12px] border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-[var(--toss-blue)]/30"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[11px] font-semibold text-[var(--toss-gray-3)]">주소</label>
-                  <input type="text" value={신규직원.주소} onChange={e => 신규직원설정({ ...신규직원, 주소: e.target.value })} className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[12px] border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-[var(--toss-blue)]/30" />
-                </div>
-                <div className="pt-4 border-t border-slate-100 space-y-3">
-                  <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">면허/자격 사항</h5>
-                  <div className="space-y-2">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-500">면허/자격 명칭</label>
-                        <input type="text" placeholder="예: 간호사, 물리치료사" value={신규직원.면허사항} onChange={e => 신규직원설정({ ...신규직원, 면허사항: e.target.value })} className="w-full p-2.5 bg-white rounded-lg border border-slate-200 outline-none text-[11px] font-semibold focus:border-[var(--toss-blue)]" />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-500">면허 번호</label>
-                        <input type="text" placeholder="번호 입력" value={신규직원.면허번호} onChange={e => 신규직원설정({ ...신규직원, 면허번호: e.target.value })} className="w-full p-2.5 bg-white rounded-lg border border-slate-200 outline-none text-[11px] font-semibold focus:border-[var(--toss-blue)]" />
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500">취득 일자</label>
-                      <input type="date" value={신규직원.취득일자} onChange={e => 신규직원설정({ ...신규직원, 취득일자: e.target.value })} className="w-full p-2.5 bg-white rounded-lg border border-slate-200 outline-none text-[11px] font-semibold focus:border-[var(--toss-blue)]" />
-                    </div>
-                  </div>
-                </div>
+            {/* Content Body */}
+            <div className="p-8 overflow-y-auto flex-1 bg-white relative">
+              {/* 탭 메뉴 */}
+              <div className="flex gap-1 p-1 bg-[var(--toss-gray-1)] rounded-[16px] mb-8 w-fit">
+                {[
+                  { id: '기본', label: '인적사항', icon: '👤' },
+                  { id: '소속', label: '소속/근무', icon: '🏢' },
+                  { id: '급여', label: '급여/보험', icon: '💰' },
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`px-6 py-2.5 rounded-[12px] text-sm font-bold transition-all flex items-center gap-2 ${activeTab === tab.id
+                      ? 'bg-white text-[var(--toss-blue)] shadow-sm'
+                      : 'text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)]'
+                      }`}
+                  >
+                    <span className="text-base">{tab.icon}</span>
+                    {tab.label}
+                  </button>
+                ))}
               </div>
 
-              <div className="space-y-4">
-                <h4 className="text-[11px] font-semibold text-[var(--toss-blue)] uppercase tracking-widest">소속 및 인사 정보</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-[var(--toss-gray-3)]">사업체</label>
-                    <select value={신규직원.사업체} onChange={e => 신규직원설정({ ...신규직원, 사업체: e.target.value, 팀: 팀목록가져오기(e.target.value)[0] ?? '' })} className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[12px] border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-[var(--toss-blue)]/30">
-                      <option value="박철홍정형외과">박철홍정형외과</option>
-                      <option value="수연의원">수연의원</option>
-                      <option value="SY INC.">SY INC.</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-[var(--toss-gray-3)]">부서/팀</label>
-                    <select value={신규직원.팀} onChange={e => 신규직원설정({ ...신규직원, 팀: e.target.value })} className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[12px] border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-[var(--toss-blue)]/30">
-                      <option value="">팀 선택 안함</option>
-                      {팀목록가져오기(신규직원.사업체).map(팀 => <option key={팀} value={팀}>{팀}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-[var(--toss-gray-3)]">직함</label>
-                    <select value={신규직원.직함} onChange={e => 신규직원설정({ ...신규직원, 직함: e.target.value })} className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[12px] border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-[var(--toss-blue)]/30">
-                      <option value="">선택</option>
-                      <option value="사원">사원</option>
-                      <option value="주임">주임</option>
-                      <option value="대리">대리</option>
-                      <option value="팀장">팀장</option>
-                      <option value="간호과장">간호과장</option>
-                      <option value="간호부장">간호부장</option>
-                      <option value="실장">실장</option>
-                      <option value="부장">부장</option>
-                      <option value="진료부장">진료부장</option>
-                      <option value="총무부장">총무부장</option>
-                      <option value="이사">이사</option>
-                      <option value="원장">원장</option>
-                      <option value="병원장">병원장</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-[var(--toss-gray-3)]">입사일 *</label>
-                    <input
-                      type="date"
-                      value={신규직원.입사일}
-                      onChange={e => {
-                        let v = e.target.value || '';
-                        if (v.length > 10 && v.match(/^\d{5,}/)) {
-                          v = v.replace(/^(\d{4})\d+(-\d{2}-\d{2})?/, (_m: string, y: string, rest: string) => rest ? y + rest : y);
-                        }
-                        신규직원설정({ ...신규직원, 입사일: v });
-                      }}
-                      className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[12px] border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-[var(--toss-blue)]/30"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-[var(--toss-gray-3)]">고용형태 *</label>
-                    <div className="flex gap-2">
-                      {['정규직', '계약직'].map(type => (
-                        <button
-                          key={type}
-                          type="button"
-                          onClick={() => 신규직원설정({ ...신규직원, 고용형태: type, ...(type === '정규직' ? { 계약종료일: '' } : {}) })}
-                          className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all border-2 ${신규직원.고용형태 === type
-                            ? type === '정규직' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-orange-50 border-orange-500 text-orange-700'
-                            : 'bg-[var(--toss-gray-1)] border-transparent text-[var(--toss-gray-3)] hover:border-slate-200'
-                            }`}
-                        >
-                          {type}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  {신규직원.고용형태 === '계약직' && (
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-semibold text-orange-600">계약 종료일</label>
-                      <input
-                        type="date"
-                        value={신규직원.계약종료일}
-                        onChange={e => 신규직원설정({ ...신규직원, 계약종료일: e.target.value })}
-                        className="w-full p-3 bg-orange-50 rounded-[12px] border border-orange-200 outline-none font-semibold text-xs focus:ring-2 focus:ring-orange-400/30"
-                      />
-                      <p className="text-[9px] text-orange-500 font-semibold">미입력 시 별도 정한 기간의 만료일까지로 처리됩니다.</p>
-                    </div>
-                  )}
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[11px] font-semibold text-[var(--toss-gray-3)]">근무 형태 (근무·휴게시간)</label>
-                  <select value={신규직원.근무형태ID} onChange={e => 신규직원설정({ ...신규직원, 근무형태ID: e.target.value })} className="w-full p-3 bg-[var(--toss-blue-light)] rounded-[12px] border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-[var(--toss-blue)]/30">
-                    <option value="">기본 근무 (09:00–18:00, 휴게 60분)</option>
-                    {근무형태목록.filter((s: any) => s.company_name === 신규직원.사업체 || s.company === 신규직원.사업체).map((s: any) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} · {s.start_time}~{s.end_time}{s.break_minutes != null ? `, 휴게 ${s.break_minutes}분` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="space-y-4 bg-[var(--toss-gray-1)] p-6 rounded-[16px]">
-                <h4 className="text-[11px] font-semibold text-[var(--toss-blue)] uppercase tracking-widest">급여·비과세 (근로계약서/통상임금 연동)</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  {[
-                    { key: 'base_salary', label: '기본급 (월)', placeholder: '0' },
-                    { key: 'position_allowance', label: '직책수당 (월)', placeholder: '0' },
-                    { key: 'meal_allowance', label: '식대 (비과세 한도 20만)', placeholder: '0' },
-                    { key: 'vehicle_allowance', label: '자가운전 (비과세 한도 20만)', placeholder: '0' },
-                    { key: 'childcare_allowance', label: '보육수당 (비과세)', placeholder: '0' },
-                    { key: 'research_allowance', label: '연구활동비 (비과세 한도 20만)', placeholder: '0' },
-                  ].map(({ key, label, placeholder }) => {
-                    const val = Number(신규직원[key as keyof typeof 신규직원] ?? 0);
-                    return (
-                      <div key={key} className="space-y-1">
-                        <label className="text-[11px] font-semibold text-[var(--toss-gray-3)]">{label}</label>
+              <div className="min-h-[450px]">
+                {activeTab === '기본' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <div className="space-y-6">
+                      <h4 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
+                        <span className="w-1.5 h-4 bg-[var(--toss-blue)] rounded-full" />
+                        필수 입력
+                      </h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">성명 *</label>
+                          <input type="text" value={신규직원.성명} onChange={e => 신규직원설정({ ...신규직원, 성명: e.target.value })} className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/30" placeholder="홍길동" />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">주민번호</label>
+                          <input
+                            type="text"
+                            value={신규직원.주민번호}
+                            maxLength={14}
+                            onChange={e => {
+                              const raw = e.target.value.replace(/[^0-9]/g, '').slice(0, 13);
+                              const formatted = raw.length > 6 ? `${raw.slice(0, 6)}-${raw.slice(6)}` : raw;
+                              if (raw.length >= 7 && 신규직원.주민번호.replace(/[^0-9]/g, '').length < 7) {
+                                const yearPrefix = parseInt(raw.slice(0, 2), 10);
+                                const genderDigit = parseInt(raw.slice(6, 7), 10);
+                                const birthYear = (genderDigit === 1 || genderDigit === 2) ? 1900 + yearPrefix : 2000 + yearPrefix;
+                                const age = new Date().getFullYear() - birthYear;
+                                if (age >= 60 && 신규직원.ins_national) alert(`만 ${age}세는 국민연금 의무 가입 대상이 아닙니다.\n국민연금 체크를 해제해 주세요.`);
+                              }
+                              신규직원설정({ ...신규직원, 주민번호: formatted });
+                            }}
+                            className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+                            placeholder="000000-0000000"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">연락처 (개인)</label>
                         <input
                           type="text"
                           inputMode="numeric"
-                          value={val ? val.toLocaleString() : ''}
+                          value={신규직원.전화번호}
                           onChange={e => {
-                            const n = parseInt(e.target.value.replace(/,/g, ''), 10) || 0;
-                            신규직원설정({ ...신규직원, [key]: n });
+                            let raw = e.target.value.replace(/[^0-9]/g, '');
+                            let formatted = '';
+                            if (raw.startsWith('010')) {
+                              raw = raw.slice(0, 11);
+                              if (raw.length <= 3) formatted = raw;
+                              else if (raw.length <= 7) formatted = raw.slice(0, 3) + '-' + raw.slice(3);
+                              else formatted = raw.slice(0, 3) + '-' + raw.slice(3, 7) + '-' + raw.slice(7);
+                            } else if (raw.startsWith('02')) {
+                              raw = raw.slice(0, 9);
+                              if (raw.length <= 2) formatted = raw;
+                              else if (raw.length <= 5) formatted = raw.slice(0, 2) + '-' + raw.slice(2);
+                              else formatted = raw.slice(0, 2) + '-' + raw.slice(2, 5) + '-' + raw.slice(5);
+                            } else {
+                              raw = raw.slice(0, 10);
+                              if (raw.length <= 3) formatted = raw;
+                              else if (raw.length <= 6) formatted = raw.slice(0, 3) + '-' + raw.slice(3);
+                              else formatted = raw.slice(0, 3) + '-' + raw.slice(3, 6) + '-' + raw.slice(6);
+                            }
+                            신규직원설정({ ...신규직원, 전화번호: formatted });
                           }}
-                          placeholder={placeholder}
-                          className="w-full p-3 bg-[var(--toss-card)] rounded-[12px] border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+                          placeholder="010-1234-5678"
+                          className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/30"
                         />
                       </div>
-                    );
-                  })}
-                  <div className="space-y-1 col-span-2">
-                    <label className="text-[11px] font-semibold text-[var(--toss-gray-3)]">기타 비과세</label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={(신규직원.other_taxfree ?? 0) ? Number(신규직원.other_taxfree).toLocaleString() : ''}
-                      onChange={e => {
-                        const n = parseInt(e.target.value.replace(/,/g, ''), 10) || 0;
-                        신규직원설정({ ...신규직원, other_taxfree: n });
-                      }}
-                      placeholder="0"
-                      className="w-full p-3 bg-[var(--toss-card)] rounded-[12px] border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-[var(--toss-blue)]/30"
-                    />
-                  </div>
-                </div>
-                <p className="text-[8px] font-bold text-[var(--toss-gray-3)] leading-tight">* 등록 후 인사관리 → 계약관리에서 근로계약서 발송 시 통상임금 표가 자동으로 포함됩니다.</p>
-              </div>
-            </div>
+                      <div className="space-y-2">
+                        <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">주소</label>
+                        <input type="text" value={신규직원.주소} onChange={e => 신규직원설정({ ...신규직원, 주소: e.target.value })} className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/30" placeholder="상세 주소 입력" />
+                      </div>
+                    </div>
 
-            <div className="mt-10 flex gap-3">
-              <button onClick={닫기함수} className="flex-1 py-4 bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] rounded-[12px] font-semibold text-sm hover:opacity-90 transition-all">취소</button>
-              <button onClick={정보저장} className="flex-[2] py-4 bg-[var(--toss-blue)] text-white rounded-[12px] font-semibold text-sm shadow-xl hover:scale-[0.99] active:scale-95 transition-all">정보 저장하기</button>
+                    <div className="space-y-6">
+                      <h4 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
+                        <span className="w-1.5 h-4 bg-amber-400 rounded-full" />
+                        부가 정보
+                      </h4>
+                      <div className="space-y-2">
+                        <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">내선번호</label>
+                        <input type="text" value={신규직원.내선번호} onChange={e => 신규직원설정({ ...신규직원, 내선번호: e.target.value })} placeholder="1234" className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/30" />
+                      </div>
+                      <div className="p-5 bg-amber-50 rounded-[24px] border border-amber-100 space-y-4">
+                        <h5 className="text-[11px] font-extrabold text-amber-800 flex items-center gap-1.5">📜 면허/자격 사항</h5>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-amber-700 ml-1">자격 명칭</label>
+                            <input type="text" placeholder="간호사 등" value={신규직원.면허사항} onChange={e => 신규직원설정({ ...신규직원, 면허사항: e.target.value })} className="w-full p-3 bg-white rounded-[12px] border-none outline-none text-xs font-bold text-amber-900 focus:ring-2 focus:ring-amber-300" />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-amber-700 ml-1">면허 번호</label>
+                            <input type="text" placeholder="번호 입력" value={신규직원.면허번호} onChange={e => 신규직원설정({ ...신규직원, 면허번호: e.target.value })} className="w-full p-3 bg-white rounded-[12px] border-none outline-none text-xs font-bold text-amber-900 focus:ring-2 focus:ring-amber-300" />
+                          </div>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-amber-700 ml-1">취득 일자</label>
+                          <SmartDatePicker
+                            value={신규직원.취득일자}
+                            onChange={val => 신규직원설정({ ...신규직원, 취득일자: val })}
+                            inputClassName="w-full p-3 bg-white rounded-[12px] border-none outline-none text-xs font-bold text-amber-900 focus:ring-2 focus:ring-amber-300"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === '소속' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <div className="space-y-6">
+                      <h4 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
+                        <span className="w-1.5 h-4 bg-emerald-500 rounded-full" />
+                        소속 및 직책
+                      </h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">사업체</label>
+                          <select value={신규직원.사업체} onChange={e => 신규직원설정({ ...신규직원, 사업체: e.target.value, 팀: 팀목록가져오기(e.target.value)[0] ?? '' })} className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/30 appearance-none">
+                            <option value="박철홍정형외과">박철홍정형외과</option>
+                            <option value="수연의원">수연의원</option>
+                            <option value="SY INC.">SY INC.</option>
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">부서/팀</label>
+                          <select value={신규직원.팀} onChange={e => 신규직원설정({ ...신규직원, 팀: e.target.value })} className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/30 appearance-none">
+                            <option value="">팀 선택 안함</option>
+                            {팀목록가져오기(신규직원.사업체).map(팀 => <option key={팀} value={팀}>{팀}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">직함</label>
+                        <select value={신규직원.직함} onChange={e => 신규직원설정({ ...신규직원, 직함: e.target.value })} className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/30 appearance-none">
+                          <option value="">직함 선택</option>
+                          {['사원', '주임', '대리', '팀장', '간호과장', '간호부장', '실장', '부장', '진료부장', '총무부장', '이사', '원장', '병원장'].map(pos => (
+                            <option key={pos} value={pos}>{pos}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-6">
+                      <h4 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
+                        <span className="w-1.5 h-4 bg-purple-500 rounded-full" />
+                        근무 조건
+                      </h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">입사일 *</label>
+                          <SmartDatePicker
+                            value={신규직원.입사일}
+                            onChange={val => 신규직원설정({ ...신규직원, 입사일: val || '0000-00-00' })}
+                            className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">고용형태</label>
+                          <div className="flex gap-1 p-1 bg-[var(--toss-gray-1)] rounded-[12px]">
+                            {['정규직', '계약직'].map(type => (
+                              <button
+                                key={type}
+                                type="button"
+                                onClick={() => 신규직원설정({ ...신규직원, 고용형태: type, ...(type === '정규직' ? { 계약종료일: '' } : {}) })}
+                                className={`flex-1 py-2 rounded-[10px] text-xs font-bold transition-all ${신규직원.고용형태 === type
+                                  ? 'bg-white text-[var(--foreground)] shadow-sm'
+                                  : 'text-[var(--toss-gray-3)]'
+                                  }`}
+                              >
+                                {type}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      {신규직원.고용형태 === '계약직' && (
+                        <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
+                          <label className="text-[11px] font-bold text-orange-600 ml-1">계약 종료일</label>
+                          <SmartDatePicker
+                            value={신규직원.계약종료일}
+                            onChange={val => 신규직원설정({ ...신규직원, 계약종료일: val || '0000-00-00' })}
+                            className="w-full p-4 bg-orange-50 rounded-[16px] border border-orange-100 outline-none font-bold text-sm focus:ring-2 focus:ring-orange-300"
+                          />
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">지정 스케줄 (근무형태)</label>
+                        <select value={신규직원.근무형태ID} onChange={e => 신규직원설정({ ...신규직원, 근무형태ID: e.target.value })} className="w-full p-4 bg-[var(--toss-blue-light)] rounded-[16px] border-none outline-none font-bold text-sm text-[var(--toss-blue)] focus:ring-2 focus:ring-[var(--toss-blue)]/30 appearance-none">
+                          <option value="">기본 근무 (09:00–18:00)</option>
+                          {근무형태목록.filter((s: any) => s.company_name === 신규직원.사업체 || s.company === 신규직원.사업체).map((s: any) => (
+                            <option key={s.id} value={s.id}>
+                              {s.name} ({s.start_time}~{s.end_time})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === '급여' && (
+                  <div className="flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    {/* (과세) 월 급여 및 고정 수당 */}
+                    <div className="space-y-4">
+                      <h4 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
+                        <span className="w-1.5 h-4 bg-[var(--toss-blue)] rounded-full" />
+                        월 급여 및 고정 수당 (과세)
+                      </h4>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 bg-[var(--toss-gray-1)] p-6 rounded-[24px]">
+                        {[
+                          { key: 'base_salary', label: '기본급 (월)' },
+                          { key: 'position_allowance', label: '직책수당' },
+                          { key: 'overtime_allowance', label: '연장근로수당' },
+                          { key: 'night_work_allowance', label: '야간근로수당' },
+                          { key: 'holiday_work_allowance', label: '휴일근로수당' },
+                          { key: 'annual_leave_pay', label: '연차휴가수당' },
+                        ].map(({ key, label }) => {
+                          const val = Number(신규직원[key as keyof typeof 신규직원] ?? 0);
+                          return (
+                            <div key={key} className="space-y-1.5">
+                              <label className="text-[10px] font-bold text-[var(--toss-gray-4)] ml-1">{label}</label>
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                value={val ? val.toLocaleString() : ''}
+                                onChange={e => {
+                                  const n = parseInt(e.target.value.replace(/,/g, ''), 10) || 0;
+                                  신규직원설정({ ...신규직원, [key]: n });
+                                }}
+                                placeholder="0"
+                                className="w-full p-3 bg-white rounded-[12px] border-none outline-none font-bold text-xs focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* (비과세) 항목 */}
+                    <div className="space-y-4">
+                      <h4 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
+                        <span className="w-1.5 h-4 bg-emerald-500 rounded-full" />
+                        비과세 수당 항목
+                      </h4>
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 bg-[var(--toss-gray-1)] p-6 rounded-[24px]">
+                        {[
+                          { key: 'meal_allowance', label: '식대' },
+                          { key: 'vehicle_allowance', label: '자가운전' },
+                          { key: 'childcare_allowance', label: '보육수당' },
+                          { key: 'research_allowance', label: '연구비' },
+                          { key: 'other_taxfree', label: '기타 비과세' },
+                        ].map(({ key, label }) => {
+                          const val = Number(신규직원[key as keyof typeof 신규직원] ?? 0);
+                          return (
+                            <div key={key} className="space-y-1">
+                              <label className="text-[10px] font-bold text-[var(--toss-gray-4)] ml-1">{label}</label>
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                value={val ? val.toLocaleString() : ''}
+                                onChange={e => {
+                                  const n = parseInt(e.target.value.replace(/,/g, ''), 10) || 0;
+                                  신규직원설정({ ...신규직원, [key]: n });
+                                }}
+                                placeholder="0"
+                                className="w-full p-2.5 bg-white rounded-[10px] border-none outline-none font-bold text-[11px] focus:ring-2 focus:ring-emerald-500/30"
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* 사회보험 및 복지 (하단) */}
+                    <div className="space-y-4 pt-4 border-t border-[var(--toss-border)]">
+                      <h4 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
+                        <span className="w-1.5 h-4 bg-red-400 rounded-full" />
+                        사회보험 및 복지 설정
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-2 gap-2 bg-[var(--toss-gray-1)] p-4 rounded-[20px]">
+                          {[
+                            { key: 'ins_national', label: '국민연금' },
+                            { key: 'ins_health', label: '건강보험' },
+                            { key: 'ins_employment', label: '고용보험' },
+                            { key: 'ins_injury', label: '산재보험' },
+                          ].map((item) => (
+                            <label key={item.key} className="flex items-center gap-3 p-3 bg-white rounded-[12px] shadow-sm cursor-pointer border-2 border-transparent hover:border-[var(--toss-blue-light)] transition-all">
+                              <input
+                                type="checkbox"
+                                checked={신규직원[item.key as keyof typeof 신규직원] as boolean}
+                                onChange={e => {
+                                  if (item.key === 'ins_national' && e.target.checked && 신규직원.주민번호.length >= 7) {
+                                    const raw = 신규직원.주민번호.replace('-', '');
+                                    const yearPrefix = parseInt(raw.slice(0, 2), 10);
+                                    const genderDigit = parseInt(raw.slice(6, 7), 10);
+                                    const birthYear = (genderDigit === 1 || genderDigit === 2) ? 1900 + yearPrefix : 2000 + yearPrefix;
+                                    const age = new Date().getFullYear() - birthYear;
+                                    if (age >= 60) return alert('만 60세 이상은 국민연금 가입 대상이 아닙니다.');
+                                  }
+                                  신규직원설정({ ...신규직원, [item.key]: e.target.checked });
+                                }}
+                                className="w-4 h-4 rounded text-[var(--toss-blue)]"
+                              />
+                              <span className="text-xs font-bold text-[var(--foreground)]">{item.label}</span>
+                            </label>
+                          ))}
+                        </div>
+
+                        <div className="p-4 bg-blue-50 border border-blue-100 rounded-[20px] space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-base">💎</span>
+                              <h4 className="text-xs font-bold text-blue-900">두루누리 지원 (80%)</h4>
+                            </div>
+                            <input type="checkbox" checked={신규직원.ins_duru_nuri} onChange={e => 신규직원설정({ ...신규직원, ins_duru_nuri: e.target.checked })} className="w-4 h-4 rounded" />
+                          </div>
+                          {신규직원.ins_duru_nuri && (
+                            <div className="grid grid-cols-2 gap-2 animate-in fade-in">
+                              <SmartDatePicker
+                                placeholder="0000-00"
+                                value={신규직원.duru_nuri_start}
+                                onChange={val => 신규직원설정({ ...신규직원, duru_nuri_start: val || '0000-00' })}
+                                inputClassName="p-2.5 bg-white border border-blue-200 rounded-lg text-[10px] font-bold"
+                              />
+                              <SmartDatePicker
+                                placeholder="0000-00"
+                                value={신규직원.duru_nuri_end}
+                                onChange={val => 신규직원설정({ ...신규직원, duru_nuri_end: val || '0000-00' })}
+                                inputClassName="p-2.5 bg-white border border-blue-200 rounded-lg text-[10px] font-bold"
+                              />
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="p-4 bg-emerald-50 rounded-[20px] border border-emerald-100 space-y-3">
+                          <label className="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" checked={신규직원.is_basic_living} onChange={e => {
+                              if (e.target.checked && 신규직원.ins_health) {
+                                alert('기초생활수급 및 의료급여 수급자는 건강보험 가입 제외 대상일 수 있습니다.\n건강보험 체크 상태를 확인 및 해제해 주세요.');
+                              }
+                              신규직원설정({ ...신규직원, is_basic_living: e.target.checked });
+                            }} className="w-4 h-4 rounded text-emerald-600" />
+                            <span className="text-xs font-bold text-emerald-800">기초생활수급/차상위</span>
+                          </label>
+                          {신규직원.is_basic_living && (
+                            <label className="ml-7 flex items-center gap-2 animate-in slide-in-from-left-2">
+                              <input type="checkbox" checked={신규직원.is_medical_benefit} onChange={e => 신규직원설정({ ...신규직원, is_medical_benefit: e.target.checked })} className="w-3.5 h-3.5 rounded text-emerald-600" />
+                              <span className="text-[10px] font-bold text-emerald-700">의료급여 (건보 제외)</span>
+                            </label>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 하단 버튼 영역 (Footer) - 스크롤 영역 외부에 고정 */}
+              <div className="px-8 py-6 bg-[var(--page-bg)] border-t border-[var(--toss-border)] flex gap-3 shrink-0">
+                <button onClick={닫기함수} className="flex-1 py-4 bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] rounded-[12px] font-semibold text-sm hover:opacity-90 transition-all">취소</button>
+                <button onClick={정보저장} className="flex-[2] py-4 bg-[var(--toss-blue)] text-white rounded-[12px] font-semibold text-sm shadow-xl hover:scale-[0.99] active:scale-95 transition-all">정보 저장하기</button>
+              </div>
             </div>
           </div>
         </div>

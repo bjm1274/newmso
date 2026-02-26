@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import SmartDatePicker from '../공통/SmartDatePicker';
 
 export default function ProductRegistration({ user, suppliers, fetchInventory, fetchSuppliers }: any) {
   const [loading, setLoading] = useState(false);
@@ -136,7 +137,7 @@ export default function ProductRegistration({ user, suppliers, fetchInventory, f
           {/* 유효기간 및 LOT */}
           <div className="space-y-2">
             <label className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">유효기간 (선택)</label>
-            <input type="date" value={productForm.expiry_date} onChange={e => setProductForm({ ...productForm, expiry_date: e.target.value })} className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/20" />
+            <SmartDatePicker value={productForm.expiry_date} onChange={val => setProductForm({ ...productForm, expiry_date: val })} className="w-full h-12 px-4 bg-[var(--input-bg)] rounded-[12px] font-bold text-sm" />
           </div>
           <div className="space-y-2">
             <label className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">LOT 번호 (선택)</label>

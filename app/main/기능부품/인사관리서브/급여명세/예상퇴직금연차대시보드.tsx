@@ -15,7 +15,15 @@ export default function SeveranceLeaveDashboard({ staffs = [] }: any) {
     const avgWage = (s.base_salary || s.base || 0) + (s.meal_allowance || s.meal || 0);
     const severance = calculateSeverancePay(avgWage, workDays);
     const years = workDays / 365;
-    const leaveTotal = years >= 1 ? 15 + Math.floor((years - 1) / 1) : 11;
+    let leaveTotal = 0;
+    if (years >= 1) {
+      leaveTotal = 15;
+      if (years >= 3) {
+        leaveTotal = Math.min(25, 15 + Math.floor((years - 1) / 2));
+      }
+    } else {
+      leaveTotal = Math.min(11, Math.floor(workDays / 30));
+    }
     const leaveUsed = s.annual_leave_used || 0;
     const leaveRemain = Math.max(0, (s.annual_leave_total ?? leaveTotal) - leaveUsed);
     return {

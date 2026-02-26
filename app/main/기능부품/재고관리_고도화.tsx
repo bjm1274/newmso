@@ -18,7 +18,7 @@ export default function AdvancedInventoryManagement({ user }: any) {
   // 폼 상태
   const [supplierForm, setSupplierForm] = useState({ name: '', contact: '', address: '', phone: '' });
   const [productForm, setProductForm] = useState({
-    name: '', qty: 0, unit_price: 0, supplier_id: '', 
+    name: '', qty: 0, unit_price: 0, supplier_id: '',
     expiry_date: '', lot_number: '', is_udi_reportable: false, category: ''
   });
   const [invoiceForm, setInvoiceForm] = useState({ supplier_id: '', invoice_date: '', items: [] });
@@ -58,7 +58,7 @@ export default function AdvancedInventoryManagement({ user }: any) {
   // 거래처 추가
   const handleAddSupplier = async () => {
     if (!supplierForm.name) return alert('거래처명을 입력해주세요.');
-    
+
     setLoading(true);
     try {
       const { error } = await supabase.from('suppliers').insert([supplierForm]);
@@ -110,7 +110,7 @@ export default function AdvancedInventoryManagement({ user }: any) {
   // 안전재고 미달 자동 발주
   const handleAutoGeneratePurchaseOrder = async () => {
     const itemsToOrder = inventory.filter(item => item.stock <= item.min_stock);
-    
+
     if (itemsToOrder.length === 0) return alert('발주 대상 품목이 없습니다.');
 
     setLoading(true);
@@ -125,7 +125,7 @@ export default function AdvancedInventoryManagement({ user }: any) {
 
       if (!error) {
         alert('발주서가 생성되었습니다. 행정팀에 알림이 전송됩니다.');
-        
+
         // 행정팀에 알림 전송
         await supabase.from('notifications').insert([{
           user_id: user.id,
@@ -202,11 +202,10 @@ export default function AdvancedInventoryManagement({ user }: any) {
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-6 py-3 rounded-[16px] text-xs font-semibold whitespace-nowrap transition-all ${
-              activeTab === tab
+            className={`px-6 py-3 rounded-[16px] text-xs font-semibold whitespace-nowrap transition-all ${activeTab === tab
                 ? 'bg-[var(--toss-blue)] text-white shadow-lg'
                 : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]'
-            }`}
+              }`}
           >
             {tab}
           </button>
@@ -318,25 +317,25 @@ export default function AdvancedInventoryManagement({ user }: any) {
             <div className="bg-white p-8 border border-[var(--toss-border)] shadow-sm rounded-[12px] space-y-4">
               <input
                 value={supplierForm.name}
-                onChange={e => setSupplierForm({...supplierForm, name: e.target.value})}
+                onChange={e => setSupplierForm({ ...supplierForm, name: e.target.value })}
                 placeholder="거래처명"
                 className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/30"
               />
               <input
                 value={supplierForm.contact}
-                onChange={e => setSupplierForm({...supplierForm, contact: e.target.value})}
+                onChange={e => setSupplierForm({ ...supplierForm, contact: e.target.value })}
                 placeholder="담당자"
                 className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/30"
               />
               <input
                 value={supplierForm.phone}
-                onChange={e => setSupplierForm({...supplierForm, phone: e.target.value})}
+                onChange={e => setSupplierForm({ ...supplierForm, phone: e.target.value })}
                 placeholder="전화번호"
                 className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/30"
               />
               <input
                 value={supplierForm.address}
-                onChange={e => setSupplierForm({...supplierForm, address: e.target.value})}
+                onChange={e => setSupplierForm({ ...supplierForm, address: e.target.value })}
                 placeholder="주소"
                 className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/30"
               />
@@ -377,9 +376,8 @@ export default function AdvancedInventoryManagement({ user }: any) {
             <div key={order.id || idx} className="bg-white p-6 border border-[var(--toss-border)] shadow-sm rounded-[12px]">
               <div className="flex justify-between items-center mb-4">
                 <p className="font-semibold text-[var(--foreground)]">발주 #{order.id?.slice(0, 8)}</p>
-                <span className={`px-3 py-1 rounded-[12px] text-xs font-semibold ${
-                  order.status === '승인' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-500'
-                }`}>
+                <span className={`px-3 py-1 rounded-[12px] text-xs font-semibold ${order.status === '승인' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-500'
+                  }`}>
                   {order.status}
                 </span>
               </div>
@@ -403,7 +401,7 @@ export default function AdvancedInventoryManagement({ user }: any) {
             <div className="bg-white p-8 border border-[var(--toss-border)] shadow-sm rounded-[12px] space-y-4">
               <input
                 value={productForm.name}
-                onChange={e => setProductForm({...productForm, name: e.target.value})}
+                onChange={e => setProductForm({ ...productForm, name: e.target.value })}
                 placeholder="제품명"
                 className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/30"
               />
@@ -411,36 +409,36 @@ export default function AdvancedInventoryManagement({ user }: any) {
                 <input
                   type="number"
                   value={productForm.qty}
-                  onChange={e => setProductForm({...productForm, qty: parseInt(e.target.value) || 0})}
+                  onChange={e => setProductForm({ ...productForm, qty: parseInt(e.target.value) || 0 })}
                   placeholder="수량"
                   className="p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/30"
                 />
                 <input
                   type="number"
                   value={productForm.unit_price}
-                  onChange={e => setProductForm({...productForm, unit_price: parseInt(e.target.value) || 0})}
+                  onChange={e => setProductForm({ ...productForm, unit_price: parseInt(e.target.value) || 0 })}
                   placeholder="단가"
                   className="p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/30"
                 />
               </div>
               <select
                 value={productForm.supplier_id}
-                onChange={e => setProductForm({...productForm, supplier_id: e.target.value})}
+                onChange={e => setProductForm({ ...productForm, supplier_id: e.target.value })}
                 className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/30"
               >
                 <option value="">거래처 선택</option>
                 {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
               <input
-                type="date"
+                type="text"
+                placeholder="0000-00-00"
                 value={productForm.expiry_date}
-                onChange={e => setProductForm({...productForm, expiry_date: e.target.value})}
-                placeholder="유효기간"
+                onChange={e => setProductForm({ ...productForm, expiry_date: e.target.value })}
                 className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/30"
               />
               <input
                 value={productForm.lot_number}
-                onChange={e => setProductForm({...productForm, lot_number: e.target.value})}
+                onChange={e => setProductForm({ ...productForm, lot_number: e.target.value })}
                 placeholder="LOT번호"
                 className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/30"
               />
@@ -448,7 +446,7 @@ export default function AdvancedInventoryManagement({ user }: any) {
                 <input
                   type="checkbox"
                   checked={productForm.is_udi_reportable}
-                  onChange={e => setProductForm({...productForm, is_udi_reportable: e.target.checked})}
+                  onChange={e => setProductForm({ ...productForm, is_udi_reportable: e.target.checked })}
                   className="w-4 h-4"
                 />
                 <label className="text-sm font-semibold text-[var(--foreground)]">공급내역 보고 대상</label>
@@ -480,7 +478,7 @@ export default function AdvancedInventoryManagement({ user }: any) {
               <p className="text-sm font-bold text-[var(--toss-gray-4)]">명세서 스캔 또는 바코드 촬영 후 정보를 확인하세요.</p>
               <input
                 value={scanData.product_name}
-                onChange={e => setScanData({...scanData, product_name: e.target.value})}
+                onChange={e => setScanData({ ...scanData, product_name: e.target.value })}
                 placeholder="제품명 (OCR 인식 또는 수동 입력)"
                 className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/30"
               />
@@ -488,28 +486,28 @@ export default function AdvancedInventoryManagement({ user }: any) {
                 <input
                   type="number"
                   value={scanData.qty}
-                  onChange={e => setScanData({...scanData, qty: parseInt(e.target.value) || 0})}
+                  onChange={e => setScanData({ ...scanData, qty: parseInt(e.target.value) || 0 })}
                   placeholder="수량"
                   className="p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/30"
                 />
                 <input
                   type="number"
                   value={scanData.unit_price}
-                  onChange={e => setScanData({...scanData, unit_price: parseInt(e.target.value) || 0})}
+                  onChange={e => setScanData({ ...scanData, unit_price: parseInt(e.target.value) || 0 })}
                   placeholder="단가"
                   className="p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/30"
                 />
               </div>
               <input
-                type="date"
+                type="text"
+                placeholder="0000-00-00"
                 value={scanData.expiry_date}
-                onChange={e => setScanData({...scanData, expiry_date: e.target.value})}
-                placeholder="유효기간 (추가 입력)"
+                onChange={e => setScanData({ ...scanData, expiry_date: e.target.value })}
                 className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/30"
               />
               <input
                 value={scanData.lot_number}
-                onChange={e => setScanData({...scanData, lot_number: e.target.value})}
+                onChange={e => setScanData({ ...scanData, lot_number: e.target.value })}
                 placeholder="LOT번호 (추가 입력)"
                 className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/30"
               />

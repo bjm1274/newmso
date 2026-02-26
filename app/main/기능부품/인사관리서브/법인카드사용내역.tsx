@@ -1,6 +1,8 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import SmartDatePicker from '../공통/SmartDatePicker';
+import SmartMonthPicker from '../공통/SmartMonthPicker';
 
 const COMPANIES = ['전체', '박철홍정형외과', '수연의원', 'SY INC.'];
 const CATEGORIES = ['식비', '교통', '경비', '복리후생', '의료', '기타'];
@@ -127,7 +129,7 @@ export default function CorporateCardTransactions({ staffs = [] }: any) {
       const parts = line.split(/[\t,]/).map((p: string) => p.trim());
       if (parts.length < 3) continue;
       const dateMatch = parts[0].match(/(\d{4})-(\d{2})-(\d{2})/) || parts[0].match(/(\d{4})\/(\d{1,2})\/(\d{1,2})/);
-      const date = dateMatch ? `${dateMatch[1]}-${dateMatch[2].padStart(2,'0')}-${dateMatch[3].padStart(2,'0')}` : '';
+      const date = dateMatch ? `${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}` : '';
       const merchant = parts[1] || '';
       const amount = parseInt(String(parts[2]).replace(/[^0-9]/g, '')) || 0;
       if (!date || amount <= 0) continue;
@@ -202,7 +204,7 @@ export default function CorporateCardTransactions({ staffs = [] }: any) {
       {activeTab === 'transactions' && (
         <>
           <div className="flex flex-wrap gap-2 items-center mb-6">
-            <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="p-2 border rounded-[16px] text-sm font-bold" />
+            <SmartMonthPicker value={month} onChange={val => setMonth(val)} inputClassName="p-2 border rounded-[16px] text-sm font-bold bg-white" />
             <select value={filterCat} onChange={(e) => setFilterCat(e.target.value)} className="p-2 border rounded-[16px] text-sm font-bold">
               <option value="">전체 항목</option>
               {CATEGORIES.map((c) => (
@@ -277,7 +279,7 @@ export default function CorporateCardTransactions({ staffs = [] }: any) {
                 <option key={c.id} value={c.id}>{c.card_nickname || `****${c.last_four}`} - {c.company_name}</option>
               ))}
             </select>
-            <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className="w-full p-3 border rounded-[16px]" />
+            <SmartDatePicker value={form.date} onChange={val => setForm({ ...form, date: val })} inputClassName="w-full p-3 border rounded-[16px] font-bold" />
             <input type="text" value={form.merchant} onChange={(e) => setForm({ ...form, merchant: e.target.value })} placeholder="가맹점" className="w-full p-3 border rounded-[16px]" />
             <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full p-3 border rounded-[16px]">
               {CATEGORIES.map((c) => (

@@ -11,9 +11,27 @@ export default function WeeklyHoursMonitor({ selectedCo, yearMonth: initialYm }:
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const [y, m] = yearMonth.split('-').map(Number);
+      const parts = (yearMonth || '').split('-');
+      if (parts.length < 2) {
+        setLoading(false);
+        return;
+      }
+      const y = Number(parts[0]);
+      const m = Number(parts[1]);
+
+      if (isNaN(y) || isNaN(m)) {
+        setLoading(false);
+        return;
+      }
+
       const start = new Date(y, m - 1, 1);
       const end = new Date(y, m, 0);
+
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        setLoading(false);
+        return;
+      }
+
       const { data: att } = await supabase
         .from('attendances')
         .select('*, staff_members(name, company)')
@@ -23,8 +41,11 @@ export default function WeeklyHoursMonitor({ selectedCo, yearMonth: initialYm }:
       const byStaffWeek: Record<string, { name: string; company?: string; hours: number }> = {};
       (att || []).forEach((a: any) => {
         const d = new Date(a.work_date);
+        if (isNaN(d.getTime())) return;
         const weekNum = Math.floor((d.getDate() - 1) / 7);
-        const weekStart = new Date(y, m - 1, weekNum * 7 + 1).toISOString().slice(0, 10);
+        const wsDate = new Date(y, m - 1, weekNum * 7 + 1);
+        if (isNaN(wsDate.getTime())) return;
+        const weekStart = wsDate.toISOString().slice(0, 10);
         const key = `${a.staff_id}_${weekStart}`;
         const hrs = (a.work_hours_minutes || 0) / 60;
         if (!byStaffWeek[key]) {

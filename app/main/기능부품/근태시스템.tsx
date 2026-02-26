@@ -1,10 +1,12 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import SmartDatePicker from './공통/SmartDatePicker';
+import SmartMonthPicker from './공통/SmartMonthPicker';
 import { WORKPLACE_LOCATION, ALLOWED_DISTANCE_M } from '@/lib/location';
 
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
-  const R = 6371000; 
+  const R = 6371000;
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
   const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
@@ -54,7 +56,7 @@ export default function AttendanceSystem({ user, staffs, selectedCo, isAdminView
         status,
         work_hours_minutes: mins
       }, { onConflict: 'staff_id,work_date' });
-    } catch (_) {}
+    } catch (_) { }
   };
 
   const getLocation = () => {
@@ -82,7 +84,7 @@ export default function AttendanceSystem({ user, staffs, selectedCo, isAdminView
     try {
       const today = new Date().toISOString().split('T')[0];
       const checkInTime = new Date().toISOString();
-      
+
       // 지각 판단 로직 (부여된 근무 형태 기준)
       let status = '정상';
       if (userShift) {
@@ -155,7 +157,7 @@ export default function AttendanceSystem({ user, staffs, selectedCo, isAdminView
     } else {
       query = query.eq('staff_id', user.id).gte('date', `${viewMonth}-01`).lte('date', `${viewMonth}-31`);
     }
-    
+
     const { data } = await query;
     if (data) {
       let filtered = data;
@@ -192,7 +194,7 @@ export default function AttendanceSystem({ user, staffs, selectedCo, isAdminView
         </div>
         {isAdminView && (
           <div className="flex gap-2">
-            <input type="date" value={viewDate} onChange={e => setViewDate(e.target.value)} className="p-2 border border-[var(--toss-border)] text-xs font-bold outline-none" />
+            <SmartDatePicker value={viewDate} onChange={setViewDate} placeholder="0000-00-00" inputClassName="p-2 border border-[var(--toss-border)] text-xs font-bold outline-none" />
           </div>
         )}
       </header>
@@ -228,7 +230,16 @@ export default function AttendanceSystem({ user, staffs, selectedCo, isAdminView
           <h3 className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">
             {isAdminView ? `${viewDate} 출결 현황` : `${viewMonth} 나의 근태 기록`}
           </h3>
-          {!isAdminView && <input type="month" value={viewMonth} onChange={e => setViewMonth(e.target.value)} className="p-1 border border-[var(--toss-border)] text-[11px] font-bold" />}
+          {!isAdminView && (
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-[var(--toss-gray-3)]">월 선택</span>
+              <SmartMonthPicker
+                value={viewMonth}
+                onChange={setViewMonth}
+                inputClassName="p-2 bg-white border border-[var(--toss-border)] rounded-[8px] text-[11px] font-bold outline-none w-[100px]"
+              />
+            </div>
+          )}
         </div>
         <table className="w-full text-left border-collapse">
           <thead className="bg-[var(--toss-card)] text-[11px] font-bold text-[var(--toss-gray-3)] border-b border-[var(--toss-border)] uppercase">

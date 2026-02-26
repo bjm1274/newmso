@@ -1,6 +1,7 @@
 'use client';
 import { useState, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
+import SmartDatePicker from '../공통/SmartDatePicker';
 
 export default function OffboardingView({ staffs, selectedCo = '전체', onRefresh }: any) {
     const [activeTab, setActiveTab] = useState<'진행중' | '과거이력'>('진행중');
@@ -96,11 +97,10 @@ export default function OffboardingView({ staffs, selectedCo = '전체', onRefre
                                         <option key={s.id} value={s.id}>{s.name} ({s.department} / {s.company})</option>
                                     ))}
                                 </select>
-                                <input
-                                    type="date"
-                                    className="px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white font-bold text-sm shrink-0"
+                                <SmartDatePicker
+                                    inputClassName="px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white font-bold text-sm shrink-0"
                                     value={exitDate}
-                                    onChange={e => setExitDate(e.target.value)}
+                                    onChange={val => setExitDate(val)}
                                 />
                                 <select className="px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white font-bold text-sm">
                                     <option value="개인 사유">개인 사유 (자발적)</option>

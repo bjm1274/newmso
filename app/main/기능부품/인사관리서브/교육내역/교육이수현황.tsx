@@ -3,13 +3,16 @@
 interface EducationStatusProps {
   selectedCo: string;
   urgentCount?: number;
+  staffs?: any[];
 }
 
-export default function EducationStatus({ selectedCo, urgentCount = 0 }: EducationStatusProps) {
-  // 사업자별 가상 데이터 (실제 운영 시 DB 연동)
+export default function EducationStatus({ selectedCo, urgentCount = 0, staffs = [] }: EducationStatusProps) {
+  // 실제 직원 데이터 기반 통계
+  const filtered = selectedCo === '전체' ? staffs : staffs.filter((s: any) => s.company === selectedCo);
+  const totalCount = filtered.length;
   const stats = {
-    totalRate: selectedCo === 'SY(법인)' ? 85 : 72,
-    pendingCount: selectedCo === '수연의원' ? 5 : 12,
+    totalRate: totalCount > 0 ? Math.round(((totalCount - urgentCount) / totalCount) * 100) : 0,
+    pendingCount: urgentCount,
     urgentItems: ["아동학대신고", "노인학대신고"]
   };
 
@@ -24,8 +27,8 @@ export default function EducationStatus({ selectedCo, urgentCount = 0 }: Educati
         <div className="mt-4 flex items-end gap-2">
           <span className="text-4xl font-semibold text-[var(--toss-blue)]">{stats.totalRate}%</span>
           <div className="flex-1 h-2 bg-[var(--toss-gray-1)] mb-2">
-            <div 
-              className="h-full bg-[var(--toss-blue)] transition-all duration-1000" 
+            <div
+              className="h-full bg-[var(--toss-blue)] transition-all duration-1000"
               style={{ width: `${stats.totalRate}%` }}
             ></div>
           </div>

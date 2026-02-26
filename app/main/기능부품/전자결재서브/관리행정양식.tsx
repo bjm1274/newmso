@@ -1,4 +1,6 @@
 'use client';
+import { useState } from 'react';
+import SmartDatePicker from '../공통/SmartDatePicker';
 
 /**
  * AdminForms 컴포넌트
@@ -7,6 +9,7 @@
  * @param setExtraData - 상위 Approval 컴포넌트로 데이터를 전달하는 함수
  */
 export default function AdminForms({ staffs, formType, setExtraData }: any) {
+  const [localExecutionDate, setLocalExecutionDate] = useState('');
 
   // 병원 실무에서 주로 사용하는 본문 가이드라인 정의
   const hospitalGuides: any = {
@@ -46,10 +49,10 @@ export default function AdminForms({ staffs, formType, setExtraData }: any) {
               </div>
               <div className="space-y-2">
                 <label className="text-[11px] font-semibold text-purple-600 ml-1 uppercase">시행 일자</label>
-                <input
-                  type="date"
-                  className="w-full p-4 rounded-[12px] border font-semibold text-xs bg-white shadow-sm outline-none focus:ring-2 focus:ring-purple-200 border-none"
-                  onChange={e => setExtraData((p: any) => ({ ...p, executionDate: e.target.value }))}
+                <SmartDatePicker
+                  value={localExecutionDate}
+                  onChange={val => { setLocalExecutionDate(val); setExtraData((p: any) => ({ ...p, executionDate: val })); }}
+                  inputClassName="w-full h-[46px] px-4 rounded-[12px] bg-white font-semibold text-xs"
                 />
               </div>
             </div>
@@ -110,10 +113,10 @@ export default function AdminForms({ staffs, formType, setExtraData }: any) {
             </div>
             <div className="space-y-2">
               <label className="text-[11px] font-semibold text-blue-500 ml-1">협조 희망일</label>
-              <input
-                type="date"
-                className="w-full p-4 rounded-[12px] border bg-white font-bold text-xs shadow-sm outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 border-none"
-                onChange={e => setExtraData((p: any) => ({ ...p, deadlineDate: e.target.value }))}
+              <SmartDatePicker
+                value=""
+                onChange={val => setExtraData((p: any) => ({ ...p, deadlineDate: val }))}
+                className="w-full h-[46px] px-4 rounded-[12px] bg-white font-bold text-xs"
               />
             </div>
           </div>

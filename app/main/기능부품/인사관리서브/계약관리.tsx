@@ -146,7 +146,7 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: any) {
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold opacity-80">적용일자</label>
-                      <input type="date" value={salaryInfo.effective_date} onChange={(e) => setSalaryInfo({ ...salaryInfo, effective_date: e.target.value })} className="w-full p-2.5 bg-white/10 border border-white/20 rounded-[8px] font-bold text-xs outline-none focus:bg-white/20 text-white selection:bg-white/30" />
+                      <input type="text" value={salaryInfo.effective_date} onChange={(e) => setSalaryInfo({ ...salaryInfo, effective_date: e.target.value })} className="w-full p-2.5 bg-white/10 border border-white/20 rounded-[8px] font-bold text-xs outline-none focus:bg-white/20 text-white selection:bg-white/30" placeholder="0000-00-00" />
                     </div>
                   </div>
                 </div>
@@ -161,7 +161,7 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: any) {
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold opacity-70">적용 시작일</label>
-                      <input type="date" value={salaryInfo.effective_date} onChange={(e) => setSalaryInfo({ ...salaryInfo, effective_date: e.target.value })} className="w-full p-2.5 bg-white/5 border border-white/10 rounded-[8px] font-bold text-xs outline-none focus:bg-white/10 text-white selection:bg-white/20" />
+                      <input type="text" value={salaryInfo.effective_date} onChange={(e) => setSalaryInfo({ ...salaryInfo, effective_date: e.target.value })} className="w-full p-2.5 bg-white/5 border border-white/10 rounded-[8px] font-bold text-xs outline-none focus:bg-white/10 text-white selection:bg-white/20" placeholder="0000-00-00" />
                     </div>
                   </div>
                 </div>

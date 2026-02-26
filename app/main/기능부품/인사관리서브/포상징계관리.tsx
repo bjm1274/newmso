@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import SmartDatePicker from '../공통/SmartDatePicker';
 
 const REWARD_TYPES = ['우수사원', '근속상', '모범직원', '특별공로', '사내공모 수상', '기타포상'] as const;
 const DISCIPLINE_TYPES = ['구두경고', '서면경고', '감봉', '정직', '해임', '기타'] as const;
@@ -88,7 +89,7 @@ export default function RewardDisciplineManagement({ staffs = [], selectedCo, us
                                 <option value="">유형 선택</option>
                                 {(activeTab === '포상' ? REWARD_TYPES : DISCIPLINE_TYPES).map(t => <option key={t} value={t}>{t}</option>)}
                             </select>
-                            <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" required />
+                            <SmartDatePicker value={form.date} onChange={val => setForm({ ...form, date: val })} inputClassName="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" />
                             <input type="text" value={form.reason} onChange={e => setForm({ ...form, reason: e.target.value })} placeholder="사유" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)]" required />
                             <textarea value={form.detail} onChange={e => setForm({ ...form, detail: e.target.value })} placeholder="상세 내용" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)] resize-none h-20" />
                             {activeTab === '포상' && <input type="number" value={form.amount || ''} onChange={e => setForm({ ...form, amount: Number(e.target.value) })} placeholder="포상금(원)" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)]" />}
@@ -97,7 +98,7 @@ export default function RewardDisciplineManagement({ staffs = [], selectedCo, us
                             <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-3">
                                 <p className="text-[10px] font-bold text-[var(--toss-gray-4)]">징계위원회 정보 (해당 시)</p>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                    <input type="date" value={form.committee_date} onChange={e => setForm({ ...form, committee_date: e.target.value })} placeholder="심의일" className="px-3 py-2 text-[11px] font-bold rounded-lg border border-gray-200 bg-white outline-none" />
+                                    <SmartDatePicker value={form.committee_date} onChange={val => setForm({ ...form, committee_date: val })} inputClassName="px-3 py-2 text-[11px] font-bold rounded-lg border border-gray-200 bg-white outline-none" />
                                     <input type="text" value={form.committee_members} onChange={e => setForm({ ...form, committee_members: e.target.value })} placeholder="위원 (쉼표 구분)" className="px-3 py-2 text-[11px] font-bold rounded-lg border border-gray-200 bg-white outline-none placeholder:text-[var(--toss-gray-3)]" />
                                     <input type="text" value={form.committee_result} onChange={e => setForm({ ...form, committee_result: e.target.value })} placeholder="심의 결과" className="px-3 py-2 text-[11px] font-bold rounded-lg border border-gray-200 bg-white outline-none placeholder:text-[var(--toss-gray-3)]" />
                                 </div>
