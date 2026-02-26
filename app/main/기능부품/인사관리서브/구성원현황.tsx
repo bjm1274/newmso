@@ -437,7 +437,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       {/* 등록/수정 모달 - 모바일 최적화 */}
       {(창상태 || 편집모드) && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[110] flex items-center justify-center p-4 min-h-screen" onClick={닫기함수}>
-          <div className="bg-[var(--toss-card)] w-full max-w-5xl rounded-[3rem] overflow-hidden shadow-2xl flex flex-col max-h-[95vh] animate-in slide-in-from-bottom duration-300" onClick={e => e.stopPropagation()}>
+          <div className="bg-[var(--toss-card)] w-full max-w-5xl rounded-[2rem] md:rounded-[3rem] overflow-hidden shadow-2xl flex flex-col h-[90vh] md:h-[85vh] animate-in slide-in-from-bottom duration-300" onClick={e => e.stopPropagation()}>
             {/* Header */}
             <div className="p-8 border-b border-[var(--toss-border)] flex justify-between items-center bg-[var(--toss-card)] shrink-0">
               <h3 className="text-2xl font-semibold text-[var(--foreground)] tracking-tight">{편집모드 ? '구성원 정보 수정' : '신규 직원 등록'}</h3>
@@ -445,7 +445,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
             </div>
 
             {/* Content Body */}
-            <div className="p-8 overflow-y-auto flex-1 bg-white relative">
+            <div className="p-6 md:p-8 overflow-y-auto overflow-x-hidden flex-1 bg-white relative">
               {/* 탭 메뉴 */}
               <div className="flex gap-1 p-1 bg-[var(--toss-gray-1)] rounded-[16px] mb-8 w-fit">
                 {[
@@ -826,9 +826,9 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
               </div>
 
               {/* 하단 버튼 영역 (Footer) - 스크롤 영역 외부에 고정 */}
-              <div className="px-8 py-6 bg-[var(--page-bg)] border-t border-[var(--toss-border)] flex gap-3 shrink-0">
-                <button onClick={닫기함수} className="flex-1 py-4 bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] rounded-[12px] font-semibold text-sm hover:opacity-90 transition-all">취소</button>
-                <button onClick={정보저장} className="flex-[2] py-4 bg-[var(--toss-blue)] text-white rounded-[12px] font-semibold text-sm shadow-xl hover:scale-[0.99] active:scale-95 transition-all">정보 저장하기</button>
+              <div className="px-6 py-5 md:px-8 md:py-6 bg-[var(--page-bg)] border-t border-[var(--toss-border)] flex gap-3 shrink-0">
+                <button onClick={닫기함수} className="flex-1 py-3.5 md:py-4 bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] rounded-[12px] font-semibold text-sm hover:opacity-90 transition-all">취소</button>
+                <button onClick={정보저장} className="flex-[2] py-3.5 md:py-4 bg-[var(--toss-blue)] text-white rounded-[12px] font-semibold text-sm shadow-xl hover:scale-[0.99] active:scale-95 transition-all">정보 저장하기</button>
               </div>
             </div>
           </div>

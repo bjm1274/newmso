@@ -14,7 +14,7 @@ function InfoItem({ label, value, highlight }: any) {
 
 function SalaryRow({ label, value, isDeduction, isTaxFree, note }: any) {
   return (
-    <div className="py-2 border-b border-gray-50 last:border-0">
+    <div className="py-2 print:py-1 border-b border-gray-50 last:border-0">
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-2">
           <span className="text-[13px] font-bold text-[var(--toss-gray-4)]">{label}</span>
@@ -138,15 +138,14 @@ export default function SalaryDetail({ record, staff }: any) {
   const hourlyRate = Math.floor((Number(data.base_salary) || 0) / 209);
 
   return (
-    <div className="bg-white rounded-[24px] border border-[var(--toss-border)] shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-500 max-w-[1000px] mx-auto mb-10">
+    <div className="bg-white rounded-[24px] border border-[var(--toss-border)] shadow-xl print:shadow-md overflow-hidden animate-in fade-in zoom-in-95 duration-500 w-full max-w-7xl print:max-w-none print:w-full mx-auto mb-10 print:mb-0">
       <style>{`
         @media print {
-          @page { size: landscape; margin: 10mm; }
           .print\\:hidden { display: none !important; }
         }
       `}</style>
       {/* 프리미엄 헤더 */}
-      <div className="px-8 py-10 bg-gradient-to-br from-[var(--toss-blue)] to-indigo-700 text-white relative overflow-hidden">
+      <div className="px-8 py-10 print:py-6 bg-gradient-to-br from-[var(--toss-blue)] to-indigo-700 text-white relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-20 -mt-20 blur-3xl" />
         <div className="relative z-10 flex justify-between items-end">
           <div>
@@ -162,9 +161,9 @@ export default function SalaryDetail({ record, staff }: any) {
         </div>
       </div>
 
-      <div className="p-8 space-y-10">
+      <div className="p-8 print:py-4 print:px-8 space-y-10 print:space-y-4">
         {/* 인적 사항 & 시급 정보 */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 p-6 bg-[var(--toss-gray-1)] rounded-[20px] border border-[var(--toss-border)]">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 print:grid-cols-6 gap-6 p-6 print:py-4 print:px-6 bg-[var(--toss-gray-1)] rounded-[20px] border border-[var(--toss-border)]">
           <InfoItem label="성명" value={staff?.name} />
           <InfoItem label="사번" value={staff?.employee_no || staff?.id} />
           <InfoItem label="입사일" value={staff?.join_date} />
@@ -191,7 +190,7 @@ export default function SalaryDetail({ record, staff }: any) {
         ) : (
           <>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 print:grid-cols-2 gap-8 print:gap-x-8 print:gap-y-4 flex-1">
               {/* 지급 내역 */}
               <div className="space-y-4">
                 <div className="flex justify-between items-end px-1">
@@ -199,7 +198,7 @@ export default function SalaryDetail({ record, staff }: any) {
                   <span className="text-xs font-bold text-[var(--toss-blue)]">지급합계 ₩{calc.totalPayment.toLocaleString()}</span>
                 </div>
                 <div className="bg-white border-2 border-[var(--toss-blue)] rounded-[16px] overflow-hidden">
-                  <div className="p-5 space-y-3">
+                  <div className="p-5 print:py-3 print:px-5 space-y-3 print:space-y-1.5">
                     <SalaryRow label="기본급" value={data.base_salary} note="계약된 월 고정 급여" />
                     {data.overtime_pay > 0 && (
                       <SalaryRow
@@ -230,7 +229,7 @@ export default function SalaryDetail({ record, staff }: any) {
                   <span className="text-xs font-bold text-red-600">공제합계 ₩{calc.totalDeduction.toLocaleString()}</span>
                 </div>
                 <div className="bg-white border-2 border-red-900 rounded-[16px] overflow-hidden">
-                  <div className="p-5 space-y-3">
+                  <div className="p-5 print:py-3 print:px-5 space-y-3 print:space-y-1.5">
                     <SalaryRow label="국민연금" value={calc.pension} isDeduction />
                     <SalaryRow label="건강보험" value={calc.health} isDeduction />
                     <SalaryRow label="장기요양보험" value={calc.longTerm} isDeduction />
@@ -247,8 +246,8 @@ export default function SalaryDetail({ record, staff }: any) {
         )}
 
         {/* 하단 안내 및 직인 */}
-        <div className="pt-10 border-t border-[var(--toss-border)] flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="space-y-1 text-center md:text-left">
+        <div className="pt-10 print:pt-4 border-t border-[var(--toss-border)] flex flex-col md:flex-row print:flex-row justify-between items-center print:items-end gap-6 print:gap-2">
+          <div className="space-y-1 text-center md:text-left print:text-left">
             <p className="text-[11px] font-bold text-[var(--toss-gray-3)] leading-relaxed">
               * 본 명세서는 근로기준법 제48조 제2항에 의거하여 지급되는 정식 급여명세서입니다.
             </p>
@@ -273,18 +272,6 @@ export default function SalaryDetail({ record, staff }: any) {
         </div>
       </div>
 
-      {/* 액션 플로팅 버튼 (모바일/웹 공통) */}
-      <div className="bg-[var(--toss-gray-1)] p-4 border-t border-[var(--toss-border)] flex justify-end gap-3">
-        <button
-          onClick={() => setShowContract(true)}
-          className="px-5 py-2.5 rounded-xl text-xs font-bold bg-white border border-[var(--toss-border)] text-[var(--toss-gray-4)] shadow-sm hover:bg-[var(--toss-gray-2)] transition-all"
-        >
-          📄 근로계약서 확인
-        </button>
-      </div>
-
-      {/* 근로계약서 보기 모달 */}
-      <ContractModal isOpen={showContract} onClose={() => setShowContract(false)} staff={staff} />
     </div>
   );
 }
