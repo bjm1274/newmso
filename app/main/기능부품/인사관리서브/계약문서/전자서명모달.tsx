@@ -39,19 +39,17 @@ export default function ContractSignatureModal({ contract, user, templateText, o
             if (!contract) return;
             try {
                 const targetCompany = contract?.company_name || user?.company;
-                const targetType = contract?.contract_type || '표준근로계약서';
 
                 const [tplRes, compRes] = await Promise.all([
-                    supabase.from('document_templates')
-                        .select('content')
+                    supabase.from('contract_templates')
+                        .select('template_content')
                         .eq('company_name', targetCompany)
-                        .eq('title', targetType)
                         .maybeSingle(),
                     supabase.from('companies').select('*').eq('name', targetCompany).maybeSingle()
                 ]);
 
-                if (tplRes.data?.content) {
-                    const template = tplRes.data.content;
+                if (tplRes.data?.template_content) {
+                    const template = tplRes.data.template_content;
                     const company = compRes.data;
 
                     const formatDate = (ds: any) => (!ds ? '' : ds.split('T')[0]);

@@ -5,7 +5,6 @@ import type { Company, CompanyType } from '@/lib/company';
 import TeamManager from './팀관리';
 import ContractManager from './계약관리도구';
 import CorporateCardTransactions from '../인사관리서브/법인카드사용내역';
-import ApprovalFormTypesManager from './전자결재양식관리';
 import ShiftManagement from '../인사관리서브/근무형태관리';
 import AttendanceDeductionRules from './근태차감규칙설정';
 
@@ -28,7 +27,7 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
     memo: '',
   });
   const [msoId, setMsoId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'company' | 'team' | 'shift' | 'attendanceRules' | 'card' | 'contract' | 'forms'>('company');
+  const [activeTab, setActiveTab] = useState<'company' | 'team' | 'shift' | 'attendanceRules' | 'card' | 'contract'>('company');
 
   const fetchCompanies = async () => {
     const { data, error } = await supabase
@@ -188,12 +187,6 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
           >
             계약 설정
           </button>
-          <button
-            className={`px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'forms' ? 'bg-[var(--toss-card)] text-[var(--toss-blue)] shadow-sm' : 'text-[var(--toss-gray-3)] hover:bg-[var(--toss-card)]/60'}`}
-            onClick={() => setActiveTab('forms')}
-          >
-            전자결재 서식
-          </button>
         </div>
       </div>
 
@@ -222,9 +215,8 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
                       <td className="px-6 py-4 font-bold text-[var(--foreground)]">{c.name}</td>
                       <td className="px-6 py-4">
                         <span
-                          className={`px-2 py-1 rounded-[12px] text-xs font-bold ${
-                            c.type === 'MSO' ? 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)]' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'
-                          }`}
+                          className={`px-2 py-1 rounded-[12px] text-xs font-bold ${c.type === 'MSO' ? 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)]' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'
+                            }`}
                         >
                           {c.type === 'MSO' ? '경영지원(MSO)' : c.type === 'HOSPITAL' ? '병원' : '클리닉'}
                         </span>
@@ -355,12 +347,6 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
       {activeTab === 'card' && <CorporateCardTransactions staffs={staffs} />}
 
       {activeTab === 'contract' && <ContractManager />}
-
-      {activeTab === 'forms' && (
-        <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[12px] shadow-sm p-6">
-          <ApprovalFormTypesManager />
-        </div>
-      )}
     </div>
   );
 }

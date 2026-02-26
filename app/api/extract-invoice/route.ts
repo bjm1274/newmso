@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Initialize the Google Generative AI with your API key
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-
 export async function POST(req: NextRequest) {
     try {
-        if (!process.env.GEMINI_API_KEY) {
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) {
             return NextResponse.json(
-                { error: 'GEMINI_API_KEY가 서버에 설정되어 있지 않습니다.' },
+                { error: 'GEMINI_API_KEY 환경 변수가 서버에 설정되어 있지 않습니다. 서버 설정을 확인해 주세요.' },
                 { status: 500 }
             );
         }
+
+        // Initialize the Google Generative AI within the request to ensure process.env is ready
+        const genAI = new GoogleGenerativeAI(apiKey);
 
         const formData = await req.formData();
         const file = formData.get('file') as File;

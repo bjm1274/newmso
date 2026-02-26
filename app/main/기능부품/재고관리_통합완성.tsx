@@ -23,7 +23,7 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchKeyword, setSearchKeyword] = useState('');
-  const [stockModal, setStockModal] = useState<{ item: any; type: 'in' | 'out' } | null>(null);
+  const [stockModal, setStockModal] = useState<{ item: any; type: 'in' | 'out'; targetCompany: string; targetDept: string } | null>(null);
   const [stockAmount, setStockAmount] = useState(1);
   const [showLogs, setShowLogs] = useState(false);
   const [logs, setLogs] = useState<any[]>([]);
@@ -138,12 +138,13 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
     setSelectedDept('전체');
   }, [viewCompany]);
 
-  const handleStockUpdate = async (item: any, type: 'in' | 'out', amount: number) => {
+  const handleStockUpdate = async (item: any, type: 'in' | 'out', amount: number, targetCompany: string, targetDept: string) => {
     if (amount <= 0) return alert("수량은 0보다 커야 합니다.");
     const currentQty = item.quantity ?? item.stock ?? 0;
     const newStock = type === 'in' ? currentQty + amount : currentQty - amount;
     if (type === 'out' && newStock < 0) return alert("재고가 부족하여 출고할 수 없습니다.");
     try {
+      // 해당 물품의 귀속 회사/부서를 완전히 변경하는 것이 아니라면 inventory 테이블의 소속 구조는 유지하고 로그에만 사유를 기록
       const { error } = await supabase.from('inventory').update({ quantity: newStock, stock: newStock }).eq('id', item.id);
       if (!error) {
         await supabase.from('inventory_logs').insert([{
@@ -154,8 +155,8 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
           quantity: amount,
           prev_quantity: currentQty,
           next_quantity: newStock,
-          actor_name: user?.name,
-          company: item.company
+          actor_name: targetDept && targetDept !== '전체' ? `${user?.name} (${targetDept})` : user?.name,
+          company: targetCompany || item.company
         }]);
         alert(`${type === 'in' ? '입고' : '출고'} 처리가 완료되었습니다.`);
         fetchInventory();
@@ -187,7 +188,7 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
 
   const executeStockUpdate = () => {
     if (!stockModal) return;
-    handleStockUpdate(stockModal.item, stockModal.type, stockAmount);
+    handleStockUpdate(stockModal.item, stockModal.type, stockAmount, stockModal.targetCompany, stockModal.targetDept);
     setStockModal(null);
     setStockAmount(1);
   };
@@ -308,8 +309,8 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
                                 </span>
                               </td>
                               <td className="px-6 py-4 text-right space-x-1">
-                                <button onClick={() => { setStockModal({ item, type: 'in' }); setStockAmount(1); }} className="px-2 py-1 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] text-[11px] font-semibold rounded-md hover:bg-[var(--toss-blue-light)]">입고</button>
-                                <button onClick={() => { setStockModal({ item, type: 'out' }); setStockAmount(1); }} className="px-2 py-1 bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] text-[11px] font-semibold rounded-md hover:bg-[var(--toss-gray-1)]/80">출고</button>
+                                <button onClick={() => { setStockModal({ item, type: 'in', targetCompany: item.company || '전체', targetDept: item.department || '전체' }); setStockAmount(1); }} className="px-2 py-1 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] text-[11px] font-semibold rounded-md hover:bg-[var(--toss-blue-light)]">입고</button>
+                                <button onClick={() => { setStockModal({ item, type: 'out', targetCompany: item.company || '전체', targetDept: item.department || '전체' }); setStockAmount(1); }} className="px-2 py-1 bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] text-[11px] font-semibold rounded-md hover:bg-[var(--toss-gray-1)]/80">출고</button>
                                 {item.quantity <= item.min_quantity && (
                                   <button onClick={() => handleAutoApprovalRequest(item)} className="px-2 py-1 bg-orange-600 text-white text-[11px] font-semibold rounded-md shadow-sm">발주</button>
                                 )}
@@ -390,10 +391,34 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
       {stockModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[110] flex items-center justify-center p-4" onClick={() => setStockModal(null)}>
           <div className="bg-[var(--toss-card)] rounded-[16px] shadow-2xl p-8 max-w-sm w-full" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-[var(--foreground)] mb-4">{stockModal.type === 'in' ? '입고' : '출고'} 수량 입력</h3>
+            <h3 className="text-lg font-semibold text-[var(--foreground)] mb-4">{stockModal.type === 'in' ? '입고' : '출고'} 상세 입력</h3>
             <p className="text-xs font-bold text-[var(--toss-gray-3)] mb-2">{stockModal.item.item_name || stockModal.item.name}</p>
             <p className="text-[11px] text-[var(--toss-gray-3)] mb-4">현재고: {stockModal.item.quantity ?? stockModal.item.stock ?? 0}</p>
-            <input type="number" min={1} max={stockModal.type === 'out' ? (stockModal.item.quantity ?? stockModal.item.stock ?? 0) : 99999} value={stockAmount} onChange={e => setStockAmount(Math.max(1, parseInt(e.target.value) || 1))} className="w-full px-4 py-3 rounded-[12px] border border-[var(--toss-border)] text-lg font-semibold mb-6" />
+
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="text-[11px] font-bold text-[var(--toss-gray-3)] mb-1 block">수량 (개/단위)</label>
+                <input type="number" min={1} max={stockModal.type === 'out' ? (stockModal.item.quantity ?? stockModal.item.stock ?? 0) : 99999} value={stockAmount} onChange={e => setStockAmount(Math.max(1, parseInt(e.target.value) || 1))} className="w-full px-4 py-3 rounded-[12px] border border-[var(--toss-border)] text-sm font-semibold" />
+              </div>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="text-[11px] font-bold text-[var(--toss-gray-3)] mb-1 block">대상 회사</label>
+                  <select value={stockModal.targetCompany} onChange={e => setStockModal({ ...stockModal, targetCompany: e.target.value })} className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[12px] text-xs font-bold">
+                    <option value="전체">미지정</option>
+                    {companiesInInventory.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div className="flex-1">
+                  <label className="text-[11px] font-bold text-[var(--toss-gray-3)] mb-1 block">대상 부서</label>
+                  <select value={stockModal.targetDept} onChange={e => setStockModal({ ...stockModal, targetDept: e.target.value })} className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[12px] text-xs font-bold">
+                    <option value="전체">미지정</option>
+                    {departmentsByViewCompany.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+              </div>
+              <p className="text-[9px] text-[var(--toss-gray-3)] leading-relaxed">* 대상 회사/부서를 지정하면 입출고 이력(처리자 목록)에 귀속 대상이 함께 기록됩니다.</p>
+            </div>
+
             <div className="flex gap-2">
               <button onClick={() => setStockModal(null)} className="flex-1 py-3 rounded-[12px] bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] font-semibold text-sm">취소</button>
               <button onClick={executeStockUpdate} className="flex-1 py-3 rounded-[12px] bg-[var(--toss-blue)] text-white font-semibold text-sm">확인</button>

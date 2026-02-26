@@ -95,13 +95,42 @@ export default function PersonnelAppointment({ staffs = [], selectedCo, user }: 
                             <select value={form.order_type} onChange={e => setForm({ ...form, order_type: e.target.value })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none">
                                 {ORDER_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                             </select>
-                            <input type="date" value={form.effective_date} onChange={e => setForm({ ...form, effective_date: e.target.value })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" required />
+                            <input type="date" max="2999-12-31" value={form.effective_date} onChange={e => setForm({ ...form, effective_date: e.target.value })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" required />
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200">
                             <div><label className="text-[9px] font-bold text-[var(--toss-gray-4)] block mb-1">현재 부서</label><input value={form.before_dept} readOnly className="w-full px-2 py-2 text-[11px] font-bold rounded-lg bg-gray-100 text-[var(--toss-gray-4)] border-none" /></div>
-                            <div><label className="text-[9px] font-bold text-[var(--toss-blue)] block mb-1">변경 부서 →</label><input value={form.after_dept} onChange={e => setForm({ ...form, after_dept: e.target.value })} placeholder="변경될 부서" className="w-full px-2 py-2 text-[11px] font-bold rounded-lg border border-[var(--toss-blue)]/30 bg-blue-50/30 text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)]" /></div>
+                            <div>
+                                <label className="text-[9px] font-bold text-[var(--toss-blue)] block mb-1">변경 부서 →</label>
+                                <input list="dept-list" value={form.after_dept} onChange={e => setForm({ ...form, after_dept: e.target.value })} placeholder="변경될 부서 선택/입력" className="w-full px-2 py-2 text-[11px] font-bold rounded-lg border border-[var(--toss-blue)]/30 bg-blue-50/30 text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)]" />
+                                <datalist id="dept-list">
+                                    <option value="의료진" />
+                                    <option value="병동팀" />
+                                    <option value="외래팀" />
+                                    <option value="수술실" />
+                                    <option value="물리치료실" />
+                                    <option value="영상의학실" />
+                                    <option value="행정부" />
+                                    <option value="원무재무팀" />
+                                    <option value="심사청구팀" />
+                                    <option value="경영기획팀" />
+                                </datalist>
+                            </div>
                             <div><label className="text-[9px] font-bold text-[var(--toss-gray-4)] block mb-1">현재 직급</label><input value={form.before_position} readOnly className="w-full px-2 py-2 text-[11px] font-bold rounded-lg bg-gray-100 text-[var(--toss-gray-4)] border-none" /></div>
-                            <div><label className="text-[9px] font-bold text-[var(--toss-blue)] block mb-1">변경 직급 →</label><input value={form.after_position} onChange={e => setForm({ ...form, after_position: e.target.value })} placeholder="변경될 직급" className="w-full px-2 py-2 text-[11px] font-bold rounded-lg border border-[var(--toss-blue)]/30 bg-blue-50/30 text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)]" /></div>
+                            <div>
+                                <label className="text-[9px] font-bold text-[var(--toss-blue)] block mb-1">변경 직급 →</label>
+                                <input list="position-list" value={form.after_position} onChange={e => setForm({ ...form, after_position: e.target.value })} placeholder="변경될 직급 선택/입력" className="w-full px-2 py-2 text-[11px] font-bold rounded-lg border border-[var(--toss-blue)]/30 bg-blue-50/30 text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)]" />
+                                <datalist id="position-list">
+                                    <option value="병원장" />
+                                    <option value="원장" />
+                                    <option value="간호과장" />
+                                    <option value="팀장" />
+                                    <option value="수간호사" />
+                                    <option value="책임간호사" />
+                                    <option value="주임" />
+                                    <option value="사원" />
+                                    <option value="인턴" />
+                                </datalist>
+                            </div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <input type="text" value={form.reason} onChange={e => setForm({ ...form, reason: e.target.value })} placeholder="발령 사유" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)]" />

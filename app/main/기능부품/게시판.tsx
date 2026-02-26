@@ -390,8 +390,33 @@ export default function BoardView({ user, subView, setSubView, initialBoard, ini
 
   const canEditPost = (post: any) => {
     if (!user) return false;
-    if (activeBoard === '수술일정' || activeBoard === 'MRI일정') return isDepartmentHead;
+    // 일반 직원도 자신이 올린 수술/MRI일정에 대해 '요청'을 할 수 있도록 조건 완화 (작성자 본인 포함)
     return (post.author_id && String(post.author_id) === String(user.id)) || isDepartmentHead;
+  };
+
+  const sendScheduleApprovalRequest = async (post: any, actionType: '삭제' | '수정', updatedData?: any) => {
+    try {
+      const { error } = await supabase.from('approvals').insert([{
+        sender_id: user.id,
+        sender_name: user.name,
+        sender_company: user.company,
+        type: '기타',
+        title: `[일정 ${actionType} 요청] ${post.board_type} - ${post.title}`,
+        content: `요청자: ${user.name}\n요청 대상: ${post.title}\n작업 분류: ${actionType}\n\n* 이 결재 문서는 일반 직원이 임의로 일정을 ${actionType}하고자 시스템을 통해 보낸 자동 승인 요청입니다. 관리자께서는 확인 후 처리해 주시기 바랍니다.`,
+        status: '대기',
+        meta_data: {
+          board_post_id: post.id,
+          action_type: actionType,
+          updated_data: updatedData || null,
+          is_schedule_approval: true
+        }
+      }]);
+      if (error) throw error;
+      alert(`해당 일정의 ${actionType} 처리를 위해 부서장/관리자에게 승인 요청 문서가 상신되었습니다.`);
+    } catch (err) {
+      console.error(err);
+      alert('승인 요청 중 오류가 발생했습니다.');
+    }
   };
 
   const handleDeletePost = async (post: any) => {
@@ -399,6 +424,13 @@ export default function BoardView({ user, subView, setSubView, initialBoard, ini
       alert('이 게시물을 삭제할 권한이 없습니다.');
       return;
     }
+
+    if ((activeBoard === '수술일정' || activeBoard === 'MRI일정') && !isDepartmentHead) {
+      if (!confirm('부서장 이상 권한이 필요합니다. 관리자(간호과장 등)에게 삭제 승인 결재를 상신하시겠습니까?')) return;
+      await sendScheduleApprovalRequest(post, '삭제');
+      return;
+    }
+
     if (!confirm('이 게시물을 정말 삭제하시겠습니까?')) return;
     const { error } = await supabase.from('board_posts').delete().eq('id', post.id);
     if (error) {
@@ -566,6 +598,18 @@ export default function BoardView({ user, subView, setSubView, initialBoard, ini
 
       // 수정 모드인 경우 업데이트
       if (editingPostId) {
+        if ((activeBoard === '수술일정' || activeBoard === 'MRI일정') && !isDepartmentHead) {
+          if (!confirm('부서장 이상 권한이 필요합니다. 관리자(간호과장 등)에게 일정 수정 승인 결재를 상신하시겠습니까?')) {
+            setLoading(false);
+            return;
+          }
+          await sendScheduleApprovalRequest({ id: editingPostId, title: postData.title, board_type: activeBoard }, '수정', postData);
+          resetForm();
+          setShowNewPost(false);
+          setLoading(false);
+          return;
+        }
+
         const { error: updateError } = await supabase.from('board_posts').update(postData).eq('id', editingPostId);
         if (!updateError) {
           alert('게시물이 수정되었습니다.');

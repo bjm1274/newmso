@@ -15,13 +15,19 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   const fileInputRef = useRef<HTMLInputElement>(null);
   const msgRefs = useRef<any>({});
 
-  // 추가된 상태
+  // 추가된 UI 상태
+  const [activeTab, setActiveTab] = useState<'friends' | 'chat' | 'more'>('chat');
   const [viewMode, setViewMode] = useState<'chat' | 'org'>('chat');
   const [chatRooms, setChatRooms] = useState<any[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState(NOTICE_ROOM_ID);
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [groupName, setGroupName] = useState('');
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+
+  // 메시지 검색 상태
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [msgSearchTerm, setMsgSearchTerm] = useState('');
+  const [searchIndex, setSearchIndex] = useState(0);
 
   const fetchData = async () => {
     // 메시지 로드
@@ -49,9 +55,6 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       .order('created_at', { ascending: false });
     setChatRooms(rooms || []);
   };
-
-  // 추가된 UI 상태
-  const [activeTab, setActiveTab] = useState<'friends' | 'chat' | 'more'>('chat');
 
   useEffect(() => {
     fetchData();
@@ -81,16 +84,32 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
 
   useEffect(() => {
     if (initialOpenMessageId && messages.length > 0) {
-      setTimeout(() => {
-        const el = document.getElementById(`msg-${initialOpenMessageId}`);
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          el.classList.add('bg-yellow-50', 'transition-colors', 'duration-1000');
-          setTimeout(() => el.classList.remove('bg-yellow-50'), 2000);
-        }
-      }, 100);
+      scrollToMsg(initialOpenMessageId);
     }
   }, [initialOpenMessageId, messages]);
+
+  const scrollToMsg = (msgId: string) => {
+    setTimeout(() => {
+      const el = document.getElementById(`msg-${msgId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('bg-yellow-100', 'transition-colors', 'duration-1000');
+        setTimeout(() => el.classList.remove('bg-yellow-100'), 2000);
+      }
+    }, 100);
+  };
+
+  const handleMsgSearchScroll = (dir: 'prev' | 'next') => {
+    const results = messages.filter(m => m.content?.includes(msgSearchTerm));
+    if (results.length === 0) return;
+
+    let newIdx = searchIndex;
+    if (dir === 'next') newIdx = searchIndex + 1 >= results.length ? 0 : searchIndex + 1;
+    else newIdx = searchIndex - 1 < 0 ? results.length - 1 : searchIndex - 1;
+
+    setSearchIndex(newIdx);
+    scrollToMsg(results[newIdx].id);
+  };
 
   const handleSendMessage = async (fileUrl?: string) => {
     if (!inputMsg.trim() && !fileUrl) return;
@@ -304,10 +323,40 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
             <span className="text-[10px] font-bold text-gray-500 opacity-60">👥 그룹</span>
           </div>
           <div className="flex gap-5 text-gray-600">
-            <button className="hover:text-gray-900">🔍</button>
+            <button onClick={() => { setIsSearchOpen(!isSearchOpen); setMsgSearchTerm(''); setSearchIndex(0); }} className="hover:text-gray-900">🔍</button>
             <button className="hover:text-gray-900 text-xl">≡</button>
           </div>
         </header>
+
+        {isSearchOpen && (
+          <div className="bg-white px-4 py-2 border-b border-gray-200 flex items-center gap-3 animate-in fade-in shrink-0 z-10 shadow-sm relative">
+            <span className="text-gray-400 text-sm">🔍</span>
+            <input
+              type="text"
+              value={msgSearchTerm}
+              onChange={(e) => {
+                setMsgSearchTerm(e.target.value);
+                setSearchIndex(0);
+                // 첫번째 결과로 스크롤
+                const res = messages.filter(m => m.content?.includes(e.target.value));
+                if (res.length > 0) scrollToMsg(res[0].id);
+              }}
+              placeholder="대화 내용 검색"
+              className="flex-1 bg-transparent border-none outline-none text-xs font-bold text-gray-800"
+              autoFocus
+            />
+            {msgSearchTerm && (
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-gray-400 mr-2">
+                  {messages.filter(m => m.content?.includes(msgSearchTerm)).length > 0 ? searchIndex + 1 : 0} / {messages.filter(m => m.content?.includes(msgSearchTerm)).length}
+                </span>
+                <button onClick={() => handleMsgSearchScroll('prev')} className="p-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-600">∧</button>
+                <button onClick={() => handleMsgSearchScroll('next')} className="p-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-600">∨</button>
+              </div>
+            )}
+            <button onClick={() => setIsSearchOpen(false)} className="text-gray-400 hover:text-red-500 font-bold ml-2">✕</button>
+          </div>
+        )}
 
         <div
           className="flex-1 overflow-y-auto px-4 py-6 space-y-6 custom-scrollbar scroll-smooth"

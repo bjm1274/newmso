@@ -183,11 +183,11 @@ export default function HandoverNotes({ user }: { user: any }) {
                 </div>
             </div>
 
-            <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
-                {/* 1. Calendar View (Hidden during search or when a specific date is selected and expanded) */}
-                {!isSearching && isCalendarVisible && (
-                    <div className="w-full md:w-1/2 lg:w-2/5 md:border-r border-[var(--toss-border)] bg-gray-50/50 flex flex-col shrink-0 overflow-y-auto custom-scrollbar">
-                        <div className="p-4 md:p-6 flex-1 flex flex-col min-h-min">
+            <div className="flex flex-col flex-1 overflow-auto">
+                {/* 1. Calendar View */}
+                {!isSearching && (
+                    <div className="w-full border-b border-[var(--toss-border)] bg-gray-50/50 flex flex-col shrink-0">
+                        <div className="p-4 md:p-4 flex-1 flex flex-col min-h-min">
                             <div className="flex justify-between items-center mb-6">
                                 <button onClick={handlePrevMonth} className="px-3 py-1 bg-white border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 font-bold transition-colors">⟵</button>
                                 <h3 className="text-base font-bold text-gray-800 tracking-tight">{currentYear}년 {currentMonth + 1}월</h3>
@@ -216,10 +216,9 @@ export default function HandoverNotes({ user }: { user: any }) {
                                             key={day}
                                             onClick={() => {
                                                 setSelectedDate(dateObj);
-                                                setIsCalendarVisible(false);
                                             }}
                                             className={`
-                                                relative p-1 md:p-2 flex flex-col items-center md:items-start min-h-[60px] overflow-hidden rounded-2xl border transition-all
+                                                relative p-1 md:p-2 flex flex-col items-center md:items-start min-h-[48px] overflow-hidden rounded-2xl border transition-all
                                                 ${isSelected ? 'bg-blue-50/80 border-[var(--toss-blue)]/50 ring-1 ring-[var(--toss-blue)]/20 shadow-sm z-10' : 'bg-white border-transparent hover:border-gray-200 hover:bg-gray-50/80 hover:shadow-sm'}
                                                 ${isToday && !isSelected ? 'border-blue-100 bg-blue-50/20' : ''}
                                             `}
@@ -257,14 +256,6 @@ export default function HandoverNotes({ user }: { user: any }) {
                                 </>
                             ) : (
                                 <div className="flex items-center gap-3">
-                                    {!isCalendarVisible && !isSearching && (
-                                        <button
-                                            onClick={() => setIsCalendarVisible(true)}
-                                            className="text-gray-400 hover:text-gray-700 bg-gray-100 w-8 h-8 rounded-full flex items-center justify-center transition-all hover:bg-gray-200 shrink-0 shadow-sm"
-                                        >
-                                            ⟵
-                                        </button>
-                                    )}
                                     <div className="flex flex-col space-y-1">
                                         <h3 className="text-2xl font-black text-gray-900 tracking-tight">
                                             {selectedDate.getDate()}일 <span className="text-lg text-gray-400 font-bold ml-1">{['일', '월', '화', '수', '목', '금', '토'][selectedDate.getDay()]}요일</span>
