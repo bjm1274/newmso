@@ -102,6 +102,10 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                     };
 
                     let result = template;
+
+                    // [수습 기간] 태그 제거 (본문에서 자체 처리)
+                    result = result.replace(/\[\s*수습\s*기간\s*\]/g, '');
+
                     Object.entries(vars).forEach(([key, value]) => {
                         const token = `{{${key}}}`;
                         if (result.includes(token)) {
@@ -112,11 +116,9 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                     const companyLineValues: Record<string, string | undefined> = {
                         회사명: vars.company_name,
                         대표자: vars.company_ceo,
-                        대표자명: vars.company_ceo,
                         사업자등록번호: vars.company_business_no,
                         주소: vars.company_address,
                         전화번호: vars.company_phone,
-                        '대표 전화번호': vars.company_phone,
                     };
                     Object.entries(companyLineValues).forEach(([label, value]) => {
                         if (!value) return;
@@ -279,22 +281,77 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                                 <p className="text-xs text-[var(--toss-gray-4)] font-bold mt-1">하단으로 끝까지 스크롤하여 모든 내용을 확인해야 합니다.</p>
                             </div>
 
-                            <div className="bg-white p-6 border border-slate-200 text-xs leading-[1.8] text-slate-800 font-serif max-h-[50vh] overflow-y-auto custom-scrollbar shadow-sm rounded-xl">
-                                <div dangerouslySetInnerHTML={{ __html: localTemplateText }} />
+                            <div className="bg-white p-5 border border-slate-200 max-h-[50vh] overflow-y-auto custom-scrollbar shadow-sm rounded-xl">
+                                {(() => {
+                                    let raw = localTemplateText;
+                                    // ASCII 표 장식 제거
+                                    raw = raw.replace(/[┌┬┐├┼┤└┴┘─│]+/g, '');
+                                    // 제목 줄 제거
+                                    raw = raw.replace(/근\s*로\s*계\s*약\s*서\s*\(\s*월\s*급\s*제\s*\)/, '');
+                                    // 기본정보 블록 제거
+                                    raw = raw.replace(/\[사용자 기본정보\][\s\S]*?(?=제\d+조|────|$)/m, '');
+                                    raw = raw.replace(/\[근로자 기본정보\][\s\S]*?(?=제\d+조|────|$)/m, '');
+                                    raw = raw.replace(/\[상기[\s\S]*?체결한다\.\]/, '');
 
-                                <div className="mt-10 pt-6 border-t border-dotted border-gray-300">
-                                    <div className="flex justify-between items-start">
-                                        <div className="w-1/2 space-y-2">
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase">[회사]</p>
-                                            <p className="font-bold text-[13px]">{company?.name}</p>
-                                            <p className="font-bold text-[13px]">대표 {company?.ceo_name}</p>
-                                        </div>
-                                        <div className="w-1/2 text-right space-y-2">
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase">[근로자]</p>
-                                            <p className="font-bold text-[14px] text-blue-600">{user?.name} (서명예정)</p>
-                                        </div>
-                                    </div>
-                                </div>
+                                    // 조 단위 파싱
+                                    const sectionRe = /제(\d+)조\s*\[([^\]]+)\]/g;
+                                    const matches: { index: number; full: string; num: string; title: string }[] = [];
+                                    let mm;
+                                    while ((mm = sectionRe.exec(raw)) !== null) {
+                                        matches.push({ index: mm.index, full: mm[0], num: mm[1], title: mm[2] });
+                                    }
+                                    if (matches.length === 0) return <p className="text-xs text-slate-500 whitespace-pre-wrap">{raw}</p>;
+
+                                    return matches.map((sec, si) => {
+                                        const start = sec.index + sec.full.length;
+                                        const end = si + 1 < matches.length ? matches[si + 1].index : raw.length;
+                                        const body = raw.slice(start, end).replace(/─+/g, '').trim();
+                                        const lines = body.split('\n').filter(l => l.trim());
+
+                                        return (
+                                            <div key={si} className="mb-5">
+                                                <h4 className="text-[12px] font-black text-slate-800 mb-1.5 flex items-center gap-1.5">
+                                                    <span className="w-1 h-1 bg-blue-600 rounded-full shrink-0" />
+                                                    제{sec.num}조 [{sec.title}]
+                                                </h4>
+                                                <div className="pl-3 border-l-2 border-slate-100 space-y-0.5">
+                                                    {lines.map((line, li) => {
+                                                        const t = line.trim();
+                                                        if (t.startsWith('[') && t.endsWith(']')) {
+                                                            return <span key={li} className="inline-block text-[10px] font-black text-blue-700 bg-blue-50 px-2 py-0.5 rounded mt-2 mb-1">{t.replace(/[\[\]]/g, '')}</span>;
+                                                        }
+                                                        if (/^[①②③④⑤⑥⑦⑧⑨⑩]/.test(t)) {
+                                                            return (
+                                                                <div key={li} className="flex gap-1.5 mt-1">
+                                                                    <span className="text-blue-600 font-black text-[11px] shrink-0">{t[0]}</span>
+                                                                    <span className="text-[11px] text-slate-700 leading-[1.75]">{t.slice(1).trim()}</span>
+                                                                </div>
+                                                            );
+                                                        }
+                                                        if (t.startsWith('-') || t.startsWith('·')) {
+                                                            return (
+                                                                <div key={li} className="flex gap-1.5 pl-4 mt-0.5">
+                                                                    <span className="text-slate-400 shrink-0">•</span>
+                                                                    <span className="text-[10.5px] text-slate-600 leading-[1.75]">{t.replace(/^[-·]\s*/, '')}</span>
+                                                                </div>
+                                                            );
+                                                        }
+                                                        if (/^(기본급|식대|직책수당|기타수당)\s+/.test(t)) {
+                                                            const parts = t.split(/\s{2,}/);
+                                                            return (
+                                                                <div key={li} className="flex justify-between py-0.5 border-b border-slate-50">
+                                                                    <span className="text-[10.5px] font-semibold text-slate-600">{parts[0]}</span>
+                                                                    <span className="text-[10.5px] font-black text-slate-800">{parts[1] || ''}</span>
+                                                                </div>
+                                                            );
+                                                        }
+                                                        return <p key={li} className="text-[11px] text-slate-700 leading-[1.75]">{t}</p>;
+                                                    })}
+                                                </div>
+                                            </div>
+                                        );
+                                    });
+                                })()}
                             </div>
                         </div>
                     )}
@@ -413,7 +470,6 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                     )}
                 </div>
             </div>
-        </div>
+        </div >
     );
 }
-

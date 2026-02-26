@@ -22,11 +22,11 @@ export default function DataReseter({ onRefresh }: { onRefresh: () => void }) {
 
     try {
       if (type === 'chat') {
-        // 사내 채팅 내역 및 채팅방 전체 삭제
-        await supabase.from('chat_messages').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-        await supabase.from('chat_room_members').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-        await supabase.from('chat_rooms').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        // 채팅 메시지, 읽음 확인, 알림 설정, 채팅방 전체 삭제
         await supabase.from('messages').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        await supabase.from('message_reads').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        await supabase.from('room_notification_settings').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        await supabase.from('chat_rooms').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       }
       else if (type === 'inventory') {
         // 재고 및 로그 삭제
@@ -57,16 +57,16 @@ export default function DataReseter({ onRefresh }: { onRefresh: () => void }) {
         return;
       }
       else if (type === 'system_logs') {
-        // [추천] 시스템 활동 로그 삭제 (접속 기록 등)
-        await supabase.from('activity_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        // 시스템 감사 로그 삭제
+        await supabase.from('audit_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       }
       else if (type === 'expired_contracts') {
-        // [추천] 미체결 계약서 초안 삭제 (30일 경과)
+        // 미체결 계약서 초안 삭제 (30일 경과)
         const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-        await supabase.from('contracts').delete().eq('status', 'pending').lt('created_at', thirtyDaysAgo);
+        await supabase.from('employment_contracts').delete().eq('status', 'pending').lt('created_at', thirtyDaysAgo);
       }
       else if (type === 'expired_popups') {
-        // [추천] 비활성화된 팝업 미디어 정리
+        // 비활성화된 팝업 미디어 정리
         await supabase.from('popups').delete().eq('is_active', false);
       }
 

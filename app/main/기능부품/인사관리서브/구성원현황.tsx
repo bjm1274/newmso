@@ -17,6 +17,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     성명: '', 전화번호: '', 내선번호: '', 사업체: '박철홍정형외과', 팀: '원무팀', 직함: '', 입사일: '', 퇴사일: '',
     주민번호: '', 이메일: '', 주소: '', 면허사항: '', 면허번호: '', 취득일자: '', 계좌정보: '', 임금정보: '', 상태: '재직',
     연차총개수: 0, 연차사용개수: 0, 근무형태ID: '',
+    고용형태: '정규직' as string, 계약종료일: '' as string,
     base_salary: 0,
     meal_allowance: 0, night_duty_allowance: 0, vehicle_allowance: 0, childcare_allowance: 0, research_allowance: 0, other_taxfree: 0, position_allowance: 0
   });
@@ -115,7 +116,9 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           ...(편집모드 && 선택된직원ID ? 직원목록.find((s: any) => s.id === 선택된직원ID)?.permissions : {}),
           extension: 신규직원.내선번호 || null,
           license_no: 신규직원.면허번호 || null,
-          license_date: 신규직원.취득일자 || null
+          license_date: 신규직원.취득일자 || null,
+          employment_type: 신규직원.고용형태 || '정규직',
+          contract_end_date: 신규직원.고용형태 === '계약직' ? (신규직원.계약종료일 || null) : null
         },
         annual_leave_total: 0,
         annual_leave_used: 0,
@@ -175,7 +178,9 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       base_salary: 직원.base_salary || 0,
       meal_allowance: 직원.meal_allowance ?? 0, night_duty_allowance: 직원.night_duty_allowance ?? 0,
       vehicle_allowance: 직원.vehicle_allowance ?? 0, childcare_allowance: 직원.childcare_allowance ?? 0, research_allowance: 직원.research_allowance ?? 0,
-      other_taxfree: 직원.other_taxfree ?? 0, position_allowance: 직원.position_allowance ?? 0
+      other_taxfree: 직원.other_taxfree ?? 0, position_allowance: 직원.position_allowance ?? 0,
+      고용형태: 직원.permissions?.employment_type || '정규직',
+      계약종료일: 직원.permissions?.contract_end_date || ''
     });
     편집모드설정(true);
   };
@@ -186,6 +191,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       성명: '', 전화번호: '', 내선번호: '', 사업체: '박철홍정형외과', 팀: '원무팀', 직함: '', 입사일: '', 퇴사일: '',
       주민번호: '', 이메일: '', 주소: '', 면허사항: '', 면허번호: '', 취득일자: '', 계좌정보: '', 임금정보: '', 상태: '재직',
       연차총개수: 0, 연차사용개수: 0, 근무형태ID: '',
+      고용형태: '정규직', 계약종료일: '',
       base_salary: 0,
       meal_allowance: 0, night_duty_allowance: 0, vehicle_allowance: 0, childcare_allowance: 0, research_allowance: 0, other_taxfree: 0, position_allowance: 0
     });
@@ -530,6 +536,36 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                       className="w-full p-3 bg-[var(--toss-gray-1)] rounded-[12px] border-none outline-none font-semibold text-xs focus:ring-2 focus:ring-[var(--toss-blue)]/30"
                     />
                   </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-[var(--toss-gray-3)]">고용형태 *</label>
+                    <div className="flex gap-2">
+                      {['정규직', '계약직'].map(type => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => 신규직원설정({ ...신규직원, 고용형태: type, ...(type === '정규직' ? { 계약종료일: '' } : {}) })}
+                          className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all border-2 ${신규직원.고용형태 === type
+                            ? type === '정규직' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-orange-50 border-orange-500 text-orange-700'
+                            : 'bg-[var(--toss-gray-1)] border-transparent text-[var(--toss-gray-3)] hover:border-slate-200'
+                            }`}
+                        >
+                          {type}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {신규직원.고용형태 === '계약직' && (
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-orange-600">계약 종료일</label>
+                      <input
+                        type="date"
+                        value={신규직원.계약종료일}
+                        onChange={e => 신규직원설정({ ...신규직원, 계약종료일: e.target.value })}
+                        className="w-full p-3 bg-orange-50 rounded-[12px] border border-orange-200 outline-none font-semibold text-xs focus:ring-2 focus:ring-orange-400/30"
+                      />
+                      <p className="text-[9px] text-orange-500 font-semibold">미입력 시 별도 정한 기간의 만료일까지로 처리됩니다.</p>
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <label className="text-[11px] font-semibold text-[var(--toss-gray-3)]">근무 형태 (근무·휴게시간)</label>
