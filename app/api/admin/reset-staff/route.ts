@@ -4,14 +4,14 @@
  */
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-
-const RESET_PASSWORD = process.env.RESET_SECRET || 'qkrcjfghd!!';
+import bcrypt from 'bcryptjs';
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { password } = body || {};
-    if (password !== RESET_PASSWORD) {
+    const resetHash = process.env.RESET_SECRET_HASH;
+    if (!resetHash || !(await bcrypt.compare(password, resetHash))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

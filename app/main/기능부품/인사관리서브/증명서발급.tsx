@@ -57,7 +57,7 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
     if (!selectedStaff) return alert("발급 대상을 선택해주세요.");
     const sn = `CERT-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(Date.now()).slice(-6)}`;
     setSerialNo(sn);
-    const u = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('erp_user') || '{}') : {};
+    const u = typeof window !== 'undefined' ? (() => { try { return JSON.parse(localStorage.getItem('erp_user') || '{}'); } catch { return {}; } })() : {};
     try {
       await supabase.from('certificate_issuances').insert({
         staff_id: selectedStaff.id,

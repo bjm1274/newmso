@@ -100,14 +100,14 @@ export default function HandoverNotes({ user }: { user: any }) {
     };
 
     const toggleComplete = async (id: string, currentStatus: boolean) => {
-        setNotes(notes.map(n => n.id === id ? { ...n, is_completed: !currentStatus } : n));
-        try {
-            await supabase
-                .from('handover_notes')
-                .update({ is_completed: !currentStatus })
-                .eq('id', id);
-        } catch (err) {
-            console.error(err);
+        setNotes(prev => prev.map(n => n.id === id ? { ...n, is_completed: !currentStatus } : n));
+        const { error } = await supabase
+            .from('handover_notes')
+            .update({ is_completed: !currentStatus })
+            .eq('id', id);
+        if (error) {
+            console.error('인계 완료 상태 변경 실패:', error);
+            setNotes(prev => prev.map(n => n.id === id ? { ...n, is_completed: currentStatus } : n));
         }
     };
 

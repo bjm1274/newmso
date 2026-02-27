@@ -24,7 +24,11 @@ export async function POST(req: NextRequest) {
         const arrayBuffer = await file.arrayBuffer();
         const base64Data = Buffer.from(arrayBuffer).toString('base64');
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        // 현재 가용한 최상위 고정밀 모델 적용 (기존 flash 모델에서 Pro로 업그레이드)
+        const model = genAI.getGenerativeModel({
+            model: 'gemini-1.5-pro',
+            generationConfig: { temperature: 0.1 }
+        });
 
         const prompt = `
 당신은 의료기기 및 소모품 명세서(영수증/인보이스) 데이터 추출 전문가입니다. 

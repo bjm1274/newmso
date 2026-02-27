@@ -240,7 +240,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
       });
 
       await supabase.from('payroll_records').upsert(records, { onConflict: 'staff_id,year_month' });
-      const u = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('erp_user') || '{}') : {};
+      const u = typeof window !== 'undefined' ? (() => { try { return JSON.parse(localStorage.getItem('erp_user') || '{}'); } catch { return {}; } })() : {};
       await logAudit('급여수정', 'payroll', yearMonth, { count: records.length, total: records.reduce((s: number, r: any) => s + (Number(r.net_pay) || 0), 0) }, u.id, u.name);
 
       alert("급여 정산 및 명세서 생성이 완료되었습니다. 법적 비과세 한도가 자동 적용되었습니다.");
