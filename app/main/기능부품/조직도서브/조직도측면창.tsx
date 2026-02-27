@@ -14,6 +14,7 @@ export const SUB_MENUS: Record<string, { id: string; label: string; group?: stri
     { id: '등록', label: '+ 등록' },
     { id: '현황', label: '📊 현황' },
     { id: '이력', label: '📋 이력' },
+    { id: 'AS반품', label: '🔧 AS·반품' },
   ],
   게시판: [
     { id: '공지사항', label: '📢 공지사항' },
@@ -51,6 +52,8 @@ export const SUB_MENUS: Record<string, { id: string; label: string; group?: stri
   관리자: [
     { id: '경영대시보드', label: '분석 요약', group: '📊 대시보드' },
     { id: '재무대시보드', label: 'C레벨 재무', group: '📊 대시보드' },
+    { id: '예산관리', label: '예산 관리', group: '📊 대시보드' },
+    { id: '통합보고서', label: '통합 보고서', group: '📊 대시보드' },
     { id: '회사관리', label: '회사/조직', group: '👥 인사·권한' },
     { id: '직원권한', label: '직원·권한', group: '👥 인사·권한' },
     { id: '연차부여', label: '연차 부여', group: '👥 인사·권한' },

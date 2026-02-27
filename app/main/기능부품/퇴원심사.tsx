@@ -112,7 +112,6 @@ export default function DischargeReviewPage({ user }: { user: any }) {
 
     const [aiLoading, setAiLoading] = useState(false);
     const [aiResult, setAiResult] = useState('');
-    const [aiRecommendations, setAiRecommendations] = useState('');
     const [compareResult, setCompareResult] = useState<{ matched: string[]; missing: string[]; extra: string[] } | null>(null);
 
     // 수정 모드
@@ -399,7 +398,6 @@ export default function DischargeReviewPage({ user }: { user: any }) {
             const data = await res.json();
             if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
             setAiResult(data.analysis);
-            setAiRecommendations(data.recommendations || '');
             setSelectedReview({ ...selectedReview, ai_analysis: data.analysis });
             setReviews(reviews.map(r => r.id === selectedReview.id ? { ...r, ai_analysis: data.analysis } : r));
             await supabase.from('discharge_reviews').update({ ai_analysis: data.analysis }).eq('id', selectedReview.id);
@@ -1042,57 +1040,6 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                             )}
                             {!aiResult && !aiLoading && <p className="text-xs text-gray-400 font-medium text-center py-4">AI 분석으로 누락/과잉 청구를 확인하세요.</p>}
                         </div>
-
-                        {/* 처방 가능 품목 추천 */}
-                        {(aiRecommendations || aiLoading) && (
-                            <div className="bg-white rounded-2xl border border-[var(--toss-border)] p-6 shadow-sm space-y-4">
-                                <div className="flex items-center gap-2">
-                                    <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
-                                        <span className="text-lg">💡</span> 처방 가능 품목 추천
-                                    </h3>
-                                    <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-lg">
-                                        {selectedReview.surgery_name || selectedReview.diagnosis || '해당 수술/진단'}
-                                    </span>
-                                </div>
-                                {aiLoading ? (
-                                    <div className="flex items-center gap-3 p-4 bg-blue-50/50 rounded-xl border border-blue-100">
-                                        <div className="w-5 h-5 border-2 border-blue-200 border-t-blue-500 rounded-full animate-spin" />
-                                        <p className="text-sm text-blue-600 font-medium">처방 추천 목록 생성 중...</p>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-2">
-                                        {aiRecommendations.split('\n').filter(line => line.trim()).map((line, idx) => {
-                                            const isDrug = line.startsWith('💊');
-                                            const isMaterial = line.startsWith('🩹');
-                                            const isTest = line.startsWith('🔬');
-                                            const isTreatment = line.startsWith('🩻');
-                                            const parts = line.split('|').map(p => p.trim());
-                                            const hasInsurance = parts[2];
-                                            const isCovered = hasInsurance && parts[2].includes('급여') && !parts[2].includes('비급여');
-                                            const bgColor = isDrug ? 'bg-purple-50 border-purple-100' : isMaterial ? 'bg-green-50 border-green-100' : isTest ? 'bg-blue-50 border-blue-100' : isTreatment ? 'bg-orange-50 border-orange-100' : 'bg-gray-50 border-gray-200';
-                                            const insuranceBadge = hasInsurance
-                                                ? <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isCovered ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>{parts[2]}</span>
-                                                : null;
-                                            if (parts.length >= 3) {
-                                                return (
-                                                    <div key={idx} className={`flex items-start gap-2 p-3 rounded-xl border ${bgColor}`}>
-                                                        <span className="text-base shrink-0">{parts[0].split(' ')[0]}</span>
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex items-center gap-1.5 flex-wrap">
-                                                                <span className="text-xs font-bold text-gray-800">{parts[1]}</span>
-                                                                {insuranceBadge}
-                                                            </div>
-                                                            {parts[3] && <p className="text-[11px] text-gray-500 mt-0.5">{parts[3]}</p>}
-                                                        </div>
-                                                    </div>
-                                                );
-                                            }
-                                            return <p key={idx} className="text-xs text-gray-600 font-medium px-1">{line}</p>;
-                                        })}
-                                    </div>
-                                )}
-                            </div>
-                        )}
 
                         {selectedReview.status !== 'approved' && (
                             <button onClick={() => approveReview(selectedReview.id)}
