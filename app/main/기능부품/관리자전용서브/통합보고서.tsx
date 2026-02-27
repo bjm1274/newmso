@@ -158,11 +158,10 @@ export default function 통합보고서({ staffs = [] }: { staffs: any[] }) {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2 rounded-[10px] text-sm font-bold transition-all ${
-              activeTab === tab.id
+            className={`px-4 py-2 rounded-[10px] text-sm font-bold transition-all ${activeTab === tab.id
                 ? 'bg-white text-[var(--toss-blue)] shadow-sm'
                 : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'
-            }`}
+              }`}
           >
             {tab.label}
           </button>
@@ -201,7 +200,7 @@ export default function 통합보고서({ staffs = [] }: { staffs: any[] }) {
                     <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--toss-gray-3)' }} />
                     <YAxis tick={{ fontSize: 11, fill: 'var(--toss-gray-3)' }} />
                     <Tooltip
-                      formatter={(value: number) => [`${value}명`]}
+                      formatter={(value: any) => [`${value || 0}명`]}
                       contentStyle={{ borderRadius: '10px', border: '1px solid var(--toss-border)', background: 'var(--toss-card)' }}
                     />
                     <Bar dataKey="regular" name="정규직" stackId="a" fill="#4F8EF7" radius={[0, 0, 0, 0]} />
@@ -235,7 +234,7 @@ export default function 통합보고서({ staffs = [] }: { staffs: any[] }) {
                       ))}
                     </Pie>
                     <Tooltip
-                      formatter={(value: number) => [`${value}명`]}
+                      formatter={(value: any) => [`${value || 0}명`]}
                       contentStyle={{ borderRadius: '10px', border: '1px solid var(--toss-border)', background: 'var(--toss-card)' }}
                     />
                     <Legend />
@@ -309,7 +308,7 @@ export default function 통합보고서({ staffs = [] }: { staffs: any[] }) {
                   <XAxis dataKey="dept" tick={{ fontSize: 12, fill: 'var(--toss-gray-3)' }} />
                   <YAxis tickFormatter={(v: number) => `${(v / 10000).toFixed(0)}만`} tick={{ fontSize: 11, fill: 'var(--toss-gray-3)' }} />
                   <Tooltip
-                    formatter={(value: number) => [`${value.toLocaleString()}원`, '인건비']}
+                    formatter={(value: any) => [`${(value || 0).toLocaleString()}원`, '인건비']}
                     contentStyle={{ borderRadius: '10px', border: '1px solid var(--toss-border)', background: 'var(--toss-card)' }}
                   />
                   <Bar dataKey="total" name="인건비" fill="#4F8EF7" radius={[6, 6, 0, 0]} />
@@ -399,7 +398,7 @@ export default function 통합보고서({ staffs = [] }: { staffs: any[] }) {
                           ))}
                         </Pie>
                         <Tooltip
-                          formatter={(value: number) => [`${value}개`]}
+                          formatter={(value: any) => [`${value || 0}개`]}
                           contentStyle={{ borderRadius: '10px', border: '1px solid var(--toss-border)', background: 'var(--toss-card)' }}
                         />
                         <Legend />
@@ -420,7 +419,7 @@ export default function 통합보고서({ staffs = [] }: { staffs: any[] }) {
                         <XAxis dataKey="category" tick={{ fontSize: 11, fill: 'var(--toss-gray-3)' }} />
                         <YAxis tickFormatter={(v: number) => `${(v / 10000).toFixed(0)}만`} tick={{ fontSize: 11, fill: 'var(--toss-gray-3)' }} />
                         <Tooltip
-                          formatter={(value: number) => [`${value.toLocaleString()}원`, '재고 금액']}
+                          formatter={(value: any) => [`${(value || 0).toLocaleString()}원`, '재고 금액']}
                           contentStyle={{ borderRadius: '10px', border: '1px solid var(--toss-border)', background: 'var(--toss-card)' }}
                         />
                         <Bar dataKey="totalAmount" name="재고 금액" fill="#34C759" radius={[6, 6, 0, 0]} />
