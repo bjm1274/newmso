@@ -1,13 +1,14 @@
 /**
- * 퇴원심사 AI 분석 API (Gemini 3.0+)
+ * 퇴원심사 AI 분석 API
  * 차트 데이터와 기본 템플릿을 비교 분석합니다.
  */
 import { NextResponse } from 'next/server';
 
 const MODELS = [
-    'gemini-1.5-pro',
-    'gemini-1.5-flash',
-    'gemini-pro',
+    'gemini-2.5-flash',
+    'gemini-2.5-pro',
+    'gemini-2.0-flash',
+    'gemini-2.0-flash-lite',
 ];
 
 async function callGemini(prompt: string): Promise<string> {
@@ -17,6 +18,7 @@ async function callGemini(prompt: string): Promise<string> {
         throw new Error('Gemini API 키가 설정되지 않았습니다. .env.local 파일에 GEMINI_API_KEY가 있는지 확인해주세요.');
     }
 
+    let lastError = '';
     for (const model of MODELS) {
         try {
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
@@ -28,23 +30,32 @@ async function callGemini(prompt: string): Promise<string> {
                     generationConfig: { temperature: 0.3, maxOutputTokens: 3000 },
                 }),
             });
+            const data = await res.json();
+
             if (res.ok) {
-                const data = await res.json();
                 const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
                 if (text) return text;
-            }
-            if (res.status === 404) continue;
-            const errText = await res.text();
-            console.error(`Gemini [${model}] error (${res.status}):`, errText);
-            if (res.status === 400 || res.status === 403) {
-                throw new Error(`API 오류 (${res.status}): ${errText.substring(0, 200)}`);
+                lastError = `[${model}] 응답 텍스트 없음: ${JSON.stringify(data).substring(0, 100)}`;
+            } else {
+                lastError = `[${model}] API 오류 (${res.status}): ${data?.error?.message || JSON.stringify(data).substring(0, 100)}`;
+                console.error(`Gemini [${model}] error:`, data);
+                if (res.status === 400 || res.status === 403) {
+                    // API 키 오류 등 치명적 오류는 즉시 중단
+                    throw new Error(lastError);
+                }
+                // 429(쿼터 초과), 404(모델 미지원)는 다음 모델로 시도
             }
         } catch (err) {
-            if (err instanceof Error && err.message.startsWith('API 오류')) throw err;
+            if (err instanceof Error && (err.message.includes('API 오류') || err.message.includes('상태'))) throw err;
             console.error(`Model ${model} failed:`, err);
+            lastError = String(err);
         }
     }
-    throw new Error('Gemini 분석에 실패했습니다. (모델 연결 불가 혹은 API 키 오류)');
+    const isQuotaError = lastError.includes('429') || lastError.includes('RESOURCE_EXHAUSTED') || lastError.includes('quota');
+    if (isQuotaError) {
+        throw new Error('Gemini API 무료 쿼터가 소진되었습니다. Google AI Studio에서 API 키를 재발급하거나 결제를 활성화해주세요.');
+    }
+    throw new Error(`Gemini 분석 실패. 마지막 오류: ${lastError}`);
 }
 
 export async function POST(req: Request) {
