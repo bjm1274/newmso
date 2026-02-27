@@ -1,6 +1,6 @@
 /**
- * 6시간마다 데이터 백업 Cron
- * 직원, 급여, 휴가, 근태, 결재, 감사로그 → Supabase Storage 'mso-backups' 버킷
+ * 하루 1회 전체 백업 Cron (한국시간 자정 = UTC 15:00)
+ * Supabase Storage 'mso-backups' 버킷에 JSON 저장
  */
 import { NextResponse } from 'next/server';
 import { runBackup } from '@/lib/backup-cron';
@@ -13,8 +13,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const type = new URL(req.url).searchParams.get('type') || '6h';
-  const result = await runBackup(type === '24h' ? '24h' : '6h');
+  const result = await runBackup('24h');
   if (!result.ok) {
     return NextResponse.json(
       { error: result.error, hint: result.hint, ok: false },

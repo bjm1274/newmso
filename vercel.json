@@ -1,7 +1,6 @@
 {
   "crons": [
-    { "path": "/api/cron/chat-retention", "schedule": "0 17 * * *" },
-    { "path": "/api/cron/backup", "schedule": "0 12 * * *" },
-    { "path": "/api/cron/backup-full", "schedule": "0 15 * * *" }
+    { "path": "/api/cron/backup", "schedule": "0 15 * * *" },
+    { "path": "/api/cron/chat-retention", "schedule": "0 17 * * *" }
   ]
 }
