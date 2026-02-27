@@ -99,7 +99,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
 
       await supabase.from('payroll_records').upsert(record, { onConflict: 'staff_id,year_month' });
 
-      const u = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('erp_user') || '{}') : {};
+      const u = typeof window !== 'undefined' ? (() => { try { return JSON.parse(localStorage.getItem('erp_user') || '{}'); } catch { return {}; } })() : {};
       await logAudit('중간정산확정', 'payroll', yearMonth, { staff: selectedStaff.name, total: calc.total, severance: calc.severance }, u.id, u.name);
 
       alert('중간정산이 저장되었습니다.');

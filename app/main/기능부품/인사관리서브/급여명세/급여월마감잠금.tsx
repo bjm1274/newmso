@@ -19,7 +19,7 @@ export default function PayrollLockPanel({ yearMonth, companyName, onLockChange 
       await supabase.from('payroll_locks').delete().eq('year_month', yearMonth).eq('company_name', companyName || '전체');
       setLocked(false);
     } else {
-      const u = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('erp_user') || '{}') : {};
+      const u = typeof window !== 'undefined' ? (() => { try { return JSON.parse(localStorage.getItem('erp_user') || '{}'); } catch { return {}; } })() : {};
       await supabase.from('payroll_locks').insert({ year_month: yearMonth, company_name: companyName || '전체', locked_by: u.id });
       setLocked(true);
     }

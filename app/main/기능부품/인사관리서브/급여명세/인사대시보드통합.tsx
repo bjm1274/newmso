@@ -23,7 +23,7 @@ export default function HRDashboardIntegrated({ staffs = [], selectedCo, checked
         <WeeklyHoursMonitor selectedCo={selectedCo} yearMonth={ym} />
         <TurnoverDashboard staffs={staffs} />
         <SeveranceLeaveDashboard staffs={staffs} />
-        <LeaveDashboard staffs={staffs} selectedCo={selectedCo} currentUser={typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('erp_user') || '{}') : null} />
+        <LeaveDashboard staffs={staffs} selectedCo={selectedCo} currentUser={typeof window !== 'undefined' ? (() => { try { return JSON.parse(localStorage.getItem('erp_user') || '{}'); } catch { return null; } })() : null} />
         <DeptSalaryDistribution staffs={staffs} selectedCo={selectedCo} />
       </div>
 

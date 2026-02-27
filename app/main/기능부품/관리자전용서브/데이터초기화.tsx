@@ -6,9 +6,15 @@ export default function DataReseter({ onRefresh }: { onRefresh: () => void }) {
   const [password, setPassword] = useState('');
   const [isUnlocked, setIsUnlocked] = useState(false);
 
-  // 1. 보안 잠금 해제 로직 (기존 암호 유지)
-  const handleUnlock = () => {
-    if (password === 'qkrcjfghd!!') {
+  // 1. 보안 잠금 해제 로직 (서버에서 bcrypt 검증)
+  const handleUnlock = async () => {
+    const res = await fetch('/api/admin/verify-unlock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password }),
+    });
+    const data = await res.json().catch(() => ({ ok: false }));
+    if (data.ok) {
       setIsUnlocked(true);
       alert("보안 잠금이 해제되었습니다. 모든 초기화 기능이 활성화됩니다.");
     } else {

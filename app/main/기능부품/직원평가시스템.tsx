@@ -19,6 +19,7 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
     const [selectedStaff, setSelectedStaff] = useState<any>(null);
     const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
     const [loading, setLoading] = useState(false);
+    const [fetchError, setFetchError] = useState<string | null>(null);
 
     // 입력 폼 상태
     const [category, setCategory] = useState('성과');
@@ -28,6 +29,7 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
 
     const fetchEvaluations = useCallback(async (staffId: string) => {
         setLoading(true);
+        setFetchError(null);
         try {
             const { data, error } = await supabase
                 .from('staff_evaluations')
@@ -49,6 +51,7 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
             setEvaluations(formatted);
         } catch (err) {
             console.error('평가 데이터 로드 실패:', err);
+            setFetchError('평가 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
         } finally {
             setLoading(false);
         }
@@ -242,7 +245,11 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
                                 {loading && <span className="text-[10px] text-[var(--toss-blue)] animate-pulse font-bold uppercase">새로고침 중...</span>}
                             </div>
                             <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
-                                {evaluations.length === 0 ? (
+                                {fetchError ? (
+                                    <div className="h-full flex flex-col items-center justify-center text-red-400">
+                                        <p className="text-xs font-bold">{fetchError}</p>
+                                    </div>
+                                ) : evaluations.length === 0 ? (
                                     <div className="h-full flex flex-col items-center justify-center opacity-30">
                                         <p className="text-xs font-bold">기록된 이력이 없습니다.</p>
                                     </div>

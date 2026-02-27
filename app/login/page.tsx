@@ -35,42 +35,15 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
 
-    if (loginId.trim() === '박철홍' && password === 'tndus5125!!') {
-      const { data: msoRow } = await supabase.from('staff_members').select('*').eq('name', '박철홍').maybeSingle();
-      const msoUser = msoRow ? {
-        ...msoRow,
-        role: 'admin',
-        permissions: { inventory: true, hr: true, approval: true, admin: true, mso: true, hr_교대근무: true }
-      } : {
-        id: null,
-        employee_no: '1',
-        name: '박철홍',
-        role: 'admin',
-        department: '경영지원팀',
-        company: 'SY INC.',
-        company_id: null,
-        permissions: { inventory: true, hr: true, approval: true, admin: true, mso: true, hr_교대근무: true }
-      };
-      localStorage.setItem('erp_user', JSON.stringify(msoUser));
-      localStorage.setItem('erp_login_at', new Date().toISOString());
-      setLoading(false);
-      router.push('/main');
-      return;
-    }
-
-    // 절대 관리자 (숨김 계정)
-    if (loginId.trim() === 'bjm127' && password === 'pch5125!!') {
-      const superAdmin = {
-        id: null,
-        employee_no: '0',
-        name: '시스템관리자',
-        role: 'admin',
-        department: '경영지원팀',
-        company: 'SY INC.',
-        company_id: null,
-        permissions: { inventory: true, hr: true, approval: true, admin: true, mso: true, hr_교대근무: true }
-      };
-      localStorage.setItem('erp_user', JSON.stringify(superAdmin));
+    // 마스터 계정 체크 (서버에서 환경변수로 검증)
+    const masterRes = await fetch('/api/auth/master-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ loginId, password }),
+    });
+    const masterData = await masterRes.json();
+    if (masterData.success) {
+      localStorage.setItem('erp_user', JSON.stringify(masterData.user));
       localStorage.setItem('erp_login_at', new Date().toISOString());
       setLoading(false);
       router.push('/main');

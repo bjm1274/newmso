@@ -3,53 +3,39 @@
  * 차트 프로그램 스크린샷에서 데이터를 텍스트로 추출합니다.
  */
 import { NextResponse } from 'next/server';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const MODELS = [
-    'gemini-1.5-pro',
-    'gemini-1.5-flash',
-    'gemini-pro',
+    'gemini-2.5-pro',
+    'gemini-2.5-flash',
 ];
 
 async function callGeminiVision(prompt: string, imageBase64: string, mimeType: string): Promise<string> {
-    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
     if (!apiKey) {
-        console.error('Environment keys available:', Object.keys(process.env).filter(k => k.includes('KEY') || k.includes('API')));
-        throw new Error('Gemini API 키가 설정되지 않았습니다. .env.local 파일에 GEMINI_API_KEY가 있는지 확인해주세요.');
+        throw new Error('Gemini API 키가 설정되지 않았습니다.');
     }
 
-    for (const model of MODELS) {
+    // SDK 방식으로 전환하여 안정성 확보
+    const genAI = new GoogleGenerativeAI(apiKey);
+
+    for (const modelName of MODELS) {
         try {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-            const res = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{
-                        parts: [
-                            { text: prompt },
-                            { inlineData: { mimeType, data: imageBase64 } },
-                        ],
-                    }],
-                    generationConfig: { temperature: 0.1, maxOutputTokens: 8000 },
-                }),
-            });
-            if (res.ok) {
-                const data = await res.json();
-                const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-                if (text) return text;
-            }
-            if (res.status === 404) continue;
-            const errText = await res.text();
-            console.error(`Gemini Vision [${model}] error (${res.status}):`, errText);
-            if (res.status === 400 || res.status === 403) {
-                throw new Error(`API 오류 (${res.status}): ${errText.substring(0, 200)}`);
-            }
-        } catch (err) {
-            if (err instanceof Error && err.message.startsWith('API 오류')) throw err;
-            console.error(`Vision model ${model} failed:`, err);
+            const model = genAI.getGenerativeModel({ model: modelName });
+            const result = await model.generateContent([
+                prompt,
+                { inlineData: { data: imageBase64, mimeType } }
+            ]);
+            const response = await result.response;
+            const text = response.text();
+            if (text) return text;
+        } catch (err: any) {
+            console.error(`Vision model ${modelName} failed:`, err.message);
+            if (err.message?.includes('404')) continue;
+            throw err;
         }
     }
-    throw new Error('Gemini Vision 모델을 찾을 수 없습니다.');
+    throw new Error('모든 모델 호출에 실패했습니다.');
 }
 
 export async function POST(req: Request) {

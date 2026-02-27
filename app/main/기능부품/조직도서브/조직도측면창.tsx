@@ -1,6 +1,5 @@
-'use client';
 import { useState, useRef, useEffect } from 'react';
-import GlobalNotificationBell from '@/app/components/GlobalNotificationBell';
+import NotificationCenter from '../NotificationCenter';
 
 const MYPAGE_TAB_KEY = 'erp_mypage_tab';
 
@@ -120,11 +119,7 @@ export default function Sidebar({ user, mainMenu, subView, onMenuChange, onOpenN
       {/* PC 사이드바 — 알림 상단, 메뉴 아래. 클릭 시 해당 메뉴로 이동 (서브메뉴는 본문 영역에서 별도 표시) */}
       <aside className="hidden md:flex w-[72px] bg-[var(--toss-card)] border-r border-[var(--toss-border)] flex-col items-center py-4 space-y-1 shrink-0 z-50 h-screen shadow-sm relative">
         <div className="flex flex-col items-center shrink-0 w-full px-2 mb-3">
-          {onOpenNotifications && (
-            <div className="w-full flex justify-center">
-              <GlobalNotificationBell user={user} onOpenFull={onOpenNotifications} />
-            </div>
-          )}
+          {user && <NotificationCenter user={user} />}
         </div>
         <div className="flex-1 flex flex-col space-y-1 overflow-y-auto no-scrollbar w-full px-2">
           {visibleMenus.map(m => (
@@ -156,9 +151,9 @@ export default function Sidebar({ user, mainMenu, subView, onMenuChange, onOpenN
             <span className="text-[10px] font-bold mt-1 truncate w-full text-center">{m.label}</span>
           </button>
         ))}
-        {onOpenNotifications && (
+        {user && (
           <div className="flex flex-col items-center justify-center min-h-[50px] py-1.5 px-2 flex-none translate-y-[-2px]">
-            <GlobalNotificationBell user={user} onOpenFull={onOpenNotifications} />
+            <NotificationCenter user={user} />
           </div>
         )}
       </nav>

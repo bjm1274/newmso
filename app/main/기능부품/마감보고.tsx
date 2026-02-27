@@ -57,7 +57,8 @@ export default function DailyClosurePage({ user }: { user: any }) {
             .from('daily_closures')
             .select('*')
             .order('date', { ascending: false });
-        if (data) setClosures(data);
+        if (error) { console.error('마감보고 목록 조회 오류:', error); }
+        else if (data) setClosures(data);
         setLoading(false);
     };
 
@@ -111,20 +112,24 @@ export default function DailyClosurePage({ user }: { user: any }) {
             if (cError) throw cError;
 
             // Delete existing items if any (for update)
-            await supabase.from('daily_closure_items').delete().eq('closure_id', closure.id);
-            await supabase.from('daily_checks').delete().eq('closure_id', closure.id);
+            const { error: delErr1 } = await supabase.from('daily_closure_items').delete().eq('closure_id', closure.id);
+            if (delErr1) throw delErr1;
+            const { error: delErr2 } = await supabase.from('daily_checks').delete().eq('closure_id', closure.id);
+            if (delErr2) throw delErr2;
 
             // Insert new items
             if (items.length > 0) {
-                await supabase.from('daily_closure_items').insert(
+                const { error: insErr1 } = await supabase.from('daily_closure_items').insert(
                     items.map(item => ({ ...item, closure_id: closure.id }))
                 );
+                if (insErr1) throw insErr1;
             }
 
             if (checks.length > 0) {
-                await supabase.from('daily_checks').insert(
+                const { error: insErr2 } = await supabase.from('daily_checks').insert(
                     checks.map(check => ({ ...check, closure_id: closure.id }))
                 );
+                if (insErr2) throw insErr2;
             }
 
             alert('마감 보고가 저장되었습니다.');

@@ -64,14 +64,11 @@ export default function TaskView({ user, tasks, subView, setSubView, onRefresh }
 
   const toggleStatus = async (task: any) => {
     const newStatus = task.status === 'pending' ? 'completed' : 'pending';
-    try {
-      setTaskList(prev =>
-        prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t)
-      );
-      await supabase.from('tasks').update({ status: newStatus }).eq('id', task.id);
-    } catch (e) {
-      console.error('업무 상태 변경 실패:', e);
-      fetchMyTasks();
+    setTaskList(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t));
+    const { error } = await supabase.from('tasks').update({ status: newStatus }).eq('id', task.id);
+    if (error) {
+      console.error('업무 상태 변경 실패:', error);
+      fetchMyTasks(); // DB에서 다시 불러와 UI 복구
     }
   };
 

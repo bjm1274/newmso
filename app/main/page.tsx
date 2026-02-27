@@ -66,7 +66,14 @@ function MainPageContent() {
       router.replace('/');
       return;
     }
-    const parsedUser = JSON.parse(storedUser);
+    let parsedUser;
+    try {
+      parsedUser = JSON.parse(storedUser);
+    } catch {
+      localStorage.removeItem('erp_user');
+      router.replace('/');
+      return;
+    }
     setUser(parsedUser);
 
     // 이전 메뉴 상태 복구
@@ -84,7 +91,8 @@ function MainPageContent() {
     }
 
     if (parsedUser?.company === 'SY INC.' || parsedUser?.permissions?.mso) {
-      supabase.from('companies').select('id, name, type').eq('is_active', true).then(({ data: list }) => {
+      supabase.from('companies').select('id, name, type').eq('is_active', true).then(({ data: list, error }) => {
+        if (error) { console.error('companies 조회 오류:', error); return; }
         const sorted = (list || []).sort((a: any, b: any) => {
           const order = ['박철홍정형외과', '수연의원', 'SY INC.'];
           const ia = order.indexOf(a.name);
@@ -100,7 +108,7 @@ function MainPageContent() {
       if (savedId) setSelectedCompanyIdState(savedId);
     }
     setSelectedCompanyIdState(getSelectedCompanyId());
-  }, [user?.company, user?.permissions?.mso]);
+  }, []); // 마운트 시 1회만 실행
 
   // 1-1. 강제 로그아웃 실시간 감지 (Session Security)
   useEffect(() => {

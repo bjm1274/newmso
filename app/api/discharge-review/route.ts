@@ -4,16 +4,13 @@
  */
 import { NextResponse } from 'next/server';
 
-// Gemini 3.x 무료 티어 모델 (우선순위 순)
-// gemini-3-flash-preview: 무료, 빠른 응답
-// gemini-3.1-pro-preview: 최신, 고성능
 const MODELS = [
-    'gemini-3-flash-preview',
-    'gemini-3.1-pro-preview',
+    'gemini-2.5-pro',
+    'gemini-2.5-flash',
 ];
 
 async function callGemini(prompt: string): Promise<string> {
-    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
     if (!apiKey) {
         console.error('Environment keys available:', Object.keys(process.env).filter(k => k.includes('KEY') || k.includes('API')));
         throw new Error('Gemini API 키가 설정되지 않았습니다. .env.local 파일에 GEMINI_API_KEY가 있는지 확인해주세요.');
