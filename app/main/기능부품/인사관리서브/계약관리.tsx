@@ -72,7 +72,8 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: any) {
         };
       });
 
-      await supabase.from('employment_contracts').upsert(requests, { onConflict: 'staff_id' });
+      await supabase.from('employment_contracts').upsert(requests, { onConflict: 'staff_id,contract_type,status' });
+
 
       if (includeTaxFree) {
         await Promise.all(checkedIds.map((id: number) => {

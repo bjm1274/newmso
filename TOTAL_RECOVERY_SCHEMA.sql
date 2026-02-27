@@ -1,8 +1,8 @@
 -- ============================================================
--- SY INC. MSO 통합 관리 시스템 - 마스터 통합 스키마 (최종 복구용)
+-- SY INC. MSO 통합 관리 시스템 - 마스터 통합 스키마 (최종 복구용 v2)
 -- 작성일: 2026-02-27
 -- 목적: 유실된 모든 테이블과 제약 조건을 초기화하고 수납/인사/재고/채팅 기능을 복구합니다.
--- 주의: 이 스크립트는 기존 테이블을 삭제하고 다시 생성하므로 데이터가 초기화될 수 있습니다.
+-- v2 수정사항: staff_members 테이블에 shift_id, resident_no 등 필수 컬럼 추가
 -- ============================================================
 
 -- 0. 확장 기능 활성화
@@ -24,6 +24,7 @@ DROP TABLE IF EXISTS inventory_receipts CASCADE;
 DROP TABLE IF EXISTS inventory CASCADE;
 DROP TABLE IF EXISTS suppliers CASCADE;
 DROP TABLE IF EXISTS system_configs CASCADE;
+DROP TABLE IF EXISTS work_shifts CASCADE;
 DROP TABLE IF EXISTS staff_members CASCADE;
 DROP TABLE IF EXISTS companies CASCADE;
 
@@ -37,7 +38,25 @@ CREATE TABLE companies (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 2. 직원 정보 테이블 (staff_members)
+-- 2. 근무 형태 (work_shifts)
+CREATE TABLE work_shifts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(100) NOT NULL,
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    break_start_time TIME,
+    break_end_time TIME,
+    description TEXT,
+    company_name VARCHAR(100),
+    shift_type VARCHAR(50),
+    weekly_work_days INT DEFAULT 5,
+    is_weekend_work BOOLEAN DEFAULT false,
+    is_shift BOOLEAN DEFAULT false,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 3. 직원 정보 테이블 (staff_members)
 CREATE TABLE staff_members (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     employee_no VARCHAR(20) UNIQUE NOT NULL,
@@ -49,20 +68,34 @@ CREATE TABLE staff_members (
     team VARCHAR(50),
     email VARCHAR(100),
     phone VARCHAR(20),
-    join_date DATE,
+    resident_no VARCHAR(20), -- 주민번호
+    address TEXT, -- 주소
+    license TEXT, -- 면허사항
+    bank_account TEXT, -- 계좌정보
+    salary_info TEXT, -- 임금(합의)정보
+    join_date DATE, -- 입사일
+    joined_at DATE, -- 입사일(alias)
+    resigned_at DATE, -- 퇴사일
     status VARCHAR(20) DEFAULT '재직',
     role VARCHAR(20) DEFAULT 'user',
     permissions JSONB DEFAULT '{}',
     password TEXT,
     annual_leave_total DECIMAL(4,1) DEFAULT 15.0,
     annual_leave_used DECIMAL(4,1) DEFAULT 0.0,
+    shift_id UUID REFERENCES work_shifts(id), -- 근무형태ID
     base_salary BIGINT DEFAULT 0,
+    other_taxfree BIGINT DEFAULT 0,
+    position_allowance BIGINT DEFAULT 0,
+    overtime_allowance BIGINT DEFAULT 0,
+    night_work_allowance BIGINT DEFAULT 0,
+    holiday_work_allowance BIGINT DEFAULT 0,
+    annual_leave_pay BIGINT DEFAULT 0,
     last_seen_at TIMESTAMPTZ,
     presence_status VARCHAR(20) DEFAULT 'away',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 3. 시스템 설정 (system_configs)
+-- 4. 시스템 설정 (system_configs)
 CREATE TABLE system_configs (
     "key" VARCHAR(50) PRIMARY KEY,
     value TEXT,
@@ -70,7 +103,7 @@ CREATE TABLE system_configs (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 4. 재고/물품 관리 관련
+-- 5. 재고/물품 관리 관련
 CREATE TABLE suppliers (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name TEXT NOT NULL UNIQUE,
@@ -131,7 +164,7 @@ CREATE TABLE purchase_orders (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 5. 전자결재 (approvals)
+-- 6. 전자결재 (approvals)
 CREATE TABLE approvals (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     company_id UUID REFERENCES companies(id),
@@ -147,7 +180,7 @@ CREATE TABLE approvals (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 6. 채팅/메신저 관련
+-- 7. 채팅/메신저 관련
 CREATE TABLE chat_rooms (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(100),
@@ -175,7 +208,7 @@ CREATE TABLE message_reads (
     UNIQUE(message_id, reader_id)
 );
 
--- 7. 게시판 관련
+-- 8. 게시판 관련
 CREATE TABLE board_posts (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     company_id UUID REFERENCES companies(id),
@@ -198,7 +231,7 @@ CREATE TABLE board_post_comments (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 8. 인사/급여 관련
+-- 9. 인사/급여 관련
 CREATE TABLE payroll (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
@@ -211,7 +244,7 @@ CREATE TABLE payroll (
     UNIQUE (company_id, staff_id, month)
 );
 
--- 9. 원무과 마감 관련
+-- 10. 원무과 마감 관련
 CREATE TABLE daily_closures (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     company_id UUID REFERENCES companies(id),
@@ -247,7 +280,41 @@ CREATE TABLE daily_checks (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 10. 초기 데이터 설정
+-- 11. 전자 근로계약 및 템플릿
+CREATE TABLE contract_templates (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_name VARCHAR(100) NOT NULL UNIQUE,
+    template_content TEXT,
+    seal_url TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE employment_contracts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    staff_id UUID REFERENCES staff_members(id) ON DELETE CASCADE,
+    contract_type VARCHAR(50),
+    status VARCHAR(20) DEFAULT '서명대기', -- 서명대기, 서명완료
+    base_salary BIGINT DEFAULT 0,
+    meal_allowance BIGINT DEFAULT 0,
+    vehicle_allowance BIGINT DEFAULT 0,
+    childcare_allowance BIGINT DEFAULT 0,
+    position_allowance BIGINT DEFAULT 0,
+    research_allowance BIGINT DEFAULT 0,
+    other_taxfree BIGINT DEFAULT 0,
+    effective_date DATE,
+    probation_months INT DEFAULT 3,
+    probation_percent INT DEFAULT 90,
+    payment_day INT DEFAULT 7,
+    content TEXT, -- 최종 생성된 HTML/텍스트
+    signature_data TEXT, -- 서명 이미지 DataURL
+    requested_at TIMESTAMPTZ DEFAULT NOW(),
+    signed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(staff_id, contract_type, status)
+);
+
+-- 12. 초기 데이터 설정
 INSERT INTO companies (name, type, is_active)
 VALUES 
 ('SY INC.', 'MSO', true),
@@ -259,10 +326,44 @@ INSERT INTO system_configs ("key", value, description)
 VALUES ('min_auth_time', '2026-01-01T00:00:00Z', '로그인 세션 최소 유효 시간')
 ON CONFLICT ("key") DO NOTHING;
 
--- 11. 인덱스 및 RLS
+-- 근로계약서 기본 템플릿
+INSERT INTO contract_templates (company_name, template_content)
+VALUES ('전체', '근 로 계 약 서 (월급제)
+
+[사용자 기본정보]
+회사명: {{company_name}}
+대표자: {{company_ceo}}
+주  소: {{company_address}}
+
+[근로자 기본정보]
+성  명: {{employee_name}}
+생년월일: {{birth_date}}
+주  소: {{address}}
+
+제1조 [계약기간]
+본 계약은 {{join_date}}부터 효력을 발생한다.
+
+제2조 [근무장소 및 업무]
+1. 근무장소: {{company_name}} 내 지정 장소
+2. 업무내용: {{department}} / {{position}}
+
+제3조 [임금]
+1. 임금 구성항목
+[임금 구성항목 예시]
+- 기본급: {{base_salary}}
+- 식대: {{meal_allowance}}
+
+제4조 [서명]
+본 계약을 체결함.
+{{today}}
+') ON CONFLICT DO NOTHING;
+
+-- 13. 인덱스 및 RLS
 CREATE INDEX idx_staff_members_company_id ON staff_members(company_id);
+CREATE INDEX idx_staff_members_shift_id ON staff_members(shift_id);
 CREATE INDEX idx_board_posts_company_id ON board_posts(company_id);
 CREATE INDEX idx_inventory_company_id ON inventory(company_id);
+CREATE INDEX idx_contracts_staff_id ON employment_contracts(staff_id);
 
 ALTER TABLE staff_members ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public Access SM" ON staff_members FOR ALL USING (true);
@@ -276,3 +377,10 @@ ALTER TABLE daily_closures ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public Access DC" ON daily_closures FOR ALL USING (true);
 ALTER TABLE system_configs ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public Access SC" ON system_configs FOR ALL USING (true);
+ALTER TABLE work_shifts ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public Access WS" ON work_shifts FOR ALL USING (true);
+ALTER TABLE contract_templates ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public Access CT" ON contract_templates FOR ALL USING (true);
+ALTER TABLE employment_contracts ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public Access EC" ON employment_contracts FOR ALL USING (true);
+
