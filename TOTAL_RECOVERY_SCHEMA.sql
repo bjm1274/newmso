@@ -488,3 +488,17 @@ CREATE POLICY "Public Access LR" ON leave_requests FOR ALL USING (true);
 ALTER TABLE attendance ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public Access AT" ON attendance FOR ALL USING (true);
 
+-- 14. 직원 평가 및 문제사항 기록
+CREATE TABLE IF NOT EXISTS staff_evaluations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    staff_id UUID REFERENCES staff_members(id) ON DELETE CASCADE,
+    evaluator_id UUID REFERENCES staff_members(id) ON DELETE SET NULL,
+    category VARCHAR(50) NOT NULL, -- '성과', '문제사항', '칭찬', '주의', '기타'
+    content TEXT NOT NULL,
+    score INTEGER CHECK (score >= 1 AND score <= 5),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_staff_evaluations_staff_id ON staff_evaluations(staff_id);
+ALTER TABLE staff_evaluations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public Access SE" ON staff_evaluations FOR ALL USING (true);

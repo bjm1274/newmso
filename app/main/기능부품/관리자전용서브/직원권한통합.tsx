@@ -261,6 +261,24 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
               </div>
             </div>
 
+            <div className="bg-red-50 p-6 rounded-[12px] shadow-sm border border-red-200">
+              <p className="text-sm font-semibold text-red-600 mb-2">🚨 보안 및 세션 관리</p>
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={async () => {
+                    if (!confirm(`[${selectedStaff.name}] 직원을 즉시 강제 로그아웃 시키겠습니까?\n현재 활성화된 모든 기기의 세션이 즉시 종료됩니다.`)) return;
+                    const { error } = await supabase.from('staff_members').update({ force_logout_at: new Date().toISOString() }).eq('id', selectedStaff.id);
+                    if (!error) alert('강제 로그아웃 명령이 전송되었습니다.');
+                    else alert('처리 중 오류 발생');
+                  }}
+                  className="w-full py-3 bg-red-600 text-white rounded-[16px] text-xs font-bold hover:bg-red-700 transition-colors shadow-sm"
+                >
+                  기기 전체 강제 로그아웃 (Session Kill)
+                </button>
+                <p className="text-[10px] text-red-400 font-bold">* 이 기능은 직원의 실시간 연결을 즉시 끊어야 하는 응급 보안 상황에 사용합니다.</p>
+              </div>
+            </div>
+
             <div className="space-y-6">
               <p className="text-sm font-semibold text-[var(--foreground)]">🔐 세부 권한 (메뉴별 설정)</p>
               {PERM_GROUPS.map((group, gi) => (

@@ -34,11 +34,12 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: any) 
     const burnoutCandidates = staffs.filter((s: any) => (s.annual_leave_used || 0) < 3).length;
 
     setMetrics({
+      totalLaborCost: laborCost,
       attendanceRate,
       leaveUsageRate: leaveRate,
       burnoutCandidates,
-      turnoverPrediction: 0, // Mock removed. Initializing with 0.
-      efficiencyScore: 0     // Mock removed. Initializing with 0.
+      turnoverPrediction: 0,
+      efficiencyScore: 0
     });
   }, [staffs, inventory, approvals, leaves]);
 

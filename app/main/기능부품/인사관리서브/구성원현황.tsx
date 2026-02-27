@@ -380,7 +380,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                   <td className="p-6 text-xs font-bold text-[var(--toss-gray-4)]">{직원.joined_at || 직원.join_date || '-'}</td>
                   <td className="p-6">
                     <span className="px-3 py-1 bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] text-[11px] font-semibold rounded-full">
-                      {근무형태목록.find(s => s.id === 직원.shift_id)?.name || '기본(09-18)'}
+                      {근무형태목록.find(s => s.id === 직원.shift_id)?.name || '-'}
                     </span>
                   </td>
                   <td className="p-6">
@@ -437,7 +437,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                 </div>
                 <div className="text-right">
                   <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">근무형태</p>
-                  <p className="text-xs font-bold text-[var(--foreground)]">{근무형태목록.find(s => s.id === 직원.shift_id)?.name || '기본'}</p>
+                  <p className="text-xs font-bold text-[var(--foreground)]">{근무형태목록.find(s => s.id === 직원.shift_id)?.name || '-'}</p>
                 </div>
               </div>
               <div className="flex gap-2">
@@ -718,7 +718,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                       <div className="space-y-2">
                         <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">지정 스케줄 (근무형태)</label>
                         <select value={신규직원.근무형태ID} onChange={e => 신규직원설정({ ...신규직원, 근무형태ID: e.target.value })} className="w-full p-4 bg-[var(--toss-blue-light)] rounded-[16px] border-none outline-none font-bold text-sm text-[var(--toss-blue)] focus:ring-2 focus:ring-[var(--toss-blue)]/30 appearance-none">
-                          <option value="">기본 근무 (09:00–18:00)</option>
+                          <option value="">근무형태 선택</option>
                           {근무형태목록.filter((s: any) => s.company_name === 신규직원.사업체 || s.company === 신규직원.사업체).map((s: any) => (
                             <option key={s.id} value={s.id}>
                               {s.name} ({s.start_time}~{s.end_time})

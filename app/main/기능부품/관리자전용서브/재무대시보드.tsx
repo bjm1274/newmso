@@ -1,10 +1,10 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 
 export default function FinancialDashboard() {
     const [period, setPeriod] = useState<'Q1' | 'Q2' | 'Q3' | 'Q4' | '초기화'>('Q1');
 
-    // Hardcoded mockup data removed. Now initializing with zero.
     const [cashFlow, setCashFlow] = useState({
         in: 0,
         out: 0,
@@ -13,8 +13,25 @@ export default function FinancialDashboard() {
 
     const [budgets, setBudgets] = useState<any[]>([]);
 
-    // TODO: useEffect에서 실제 supabase fetch (daily_closures 등) 로직 구현 가능
+    useEffect(() => {
+        const fetchFinancials = async () => {
+            const today = new Date().toISOString().slice(0, 10);
+            const { data } = await supabase
+                .from('daily_closures')
+                .select('*')
+                .eq('date', today)
+                .maybeSingle();
 
+            if (data) {
+                setCashFlow({
+                    in: Number(data.total_amount) || 0,
+                    out: 0,
+                    balance: Number(data.total_amount) || 0
+                });
+            }
+        };
+        fetchFinancials();
+    }, [period]);
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500 max-w-7xl mx-auto pb-20">
@@ -85,7 +102,6 @@ export default function FinancialDashboard() {
                                 </div>
                             );
                         })}
-
                     </div>
                 </div>
 
