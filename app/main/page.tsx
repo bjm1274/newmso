@@ -324,6 +324,7 @@ function MainPageContent() {
           onOpenChat={(roomId) => { setMainMenu('채팅'); setInitialOpenChatRoomId(roomId); }}
           onOpenApproval={() => setMainMenu('전자결재')}
           onOpenNotifications={() => { setMainMenu('내정보'); setInitialMyPageTab('notifications'); }}
+          onOpenInventory={() => setMainMenu('재고관리')}
         />
         {/* 전역 알림 및 푸시 처리 (채팅 탭을 열지 않아도 작동) */}
         <NotificationSystem

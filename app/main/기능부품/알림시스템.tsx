@@ -70,25 +70,50 @@ export async function initNotificationService(staffId?: string) {
   }
 }
 
-// 짧은 알림음 (Web Audio API, PC·모바일 웹 공통, 카카오톡처럼 실시간 반응)
-function playNotificationSound() {
+// 카카오톡 스타일 더블 비프 알림음 (Web Audio API)
+function playNotificationSound(type: 'message' | 'alert' = 'message') {
   try {
     if (typeof window === 'undefined' || (!window.AudioContext && !(window as any).webkitAudioContext)) return;
     const Ctx = window.AudioContext || (window as any).webkitAudioContext;
     const ctx = new Ctx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.frequency.value = 800;
-    osc.type = 'sine';
-    gain.gain.setValueAtTime(0.15, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.15);
+
+    const playBeep = (freq: number, startTime: number, duration: number, volume = 0.18) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = freq;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(volume, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+      osc.start(startTime);
+      osc.stop(startTime + duration);
+    };
+
+    if (type === 'message') {
+      // 카카오톡처럼 두 음 연속 (높은음 → 낮은음)
+      playBeep(880, ctx.currentTime, 0.12);
+      playBeep(660, ctx.currentTime + 0.14, 0.10);
+    } else {
+      // 결재/시스템 알림: 단음 + 짧은 울림
+      playBeep(700, ctx.currentTime, 0.18, 0.15);
+      playBeep(700, ctx.currentTime + 0.22, 0.10, 0.08);
+    }
   } catch {
     // ignore
   }
+}
+
+// 앱 아이콘 배지 업데이트 (PWA/홈 추가 시 아이콘에 숫자 표시)
+function setAppBadge(count: number) {
+  try {
+    if (typeof navigator === 'undefined') return;
+    if (count > 0 && 'setAppBadge' in navigator) {
+      (navigator as any).setAppBadge(count).catch(() => {});
+    } else if (count === 0 && 'clearAppBadge' in navigator) {
+      (navigator as any).clearAppBadge().catch(() => {});
+    }
+  } catch { /* ignore */ }
 }
 
 // 모바일 웹: 짧은 진동 (지원 시에만, PC는 no-op)
@@ -337,14 +362,22 @@ export default function NotificationSystem({
       )
       .subscribe();
 
+    // 채널 상태 헬스체크 — 연결 끊기면 자동 재구독 (카카오톡처럼 항상 연결 유지)
+    const channels = [approvalsChannel, inventoryChannel, payrollChannel, educationChannel, messagesChannel, notificationsTableChannel, attendanceChannel];
+    const healthCheckInterval = setInterval(() => {
+      channels.forEach(ch => {
+        try {
+          const state = (ch as any).state;
+          if (state === 'closed' || state === 'errored') {
+            ch.subscribe();
+          }
+        } catch { /* ignore */ }
+      });
+    }, 30_000); // 30초마다 체크
+
     return () => {
-      supabase.removeChannel(approvalsChannel);
-      supabase.removeChannel(inventoryChannel);
-      supabase.removeChannel(payrollChannel);
-      supabase.removeChannel(educationChannel);
-      supabase.removeChannel(messagesChannel);
-      supabase.removeChannel(notificationsTableChannel);
-      supabase.removeChannel(attendanceChannel);
+      clearInterval(healthCheckInterval);
+      channels.forEach(ch => supabase.removeChannel(ch));
     };
   }, [user]);
 
@@ -411,42 +444,56 @@ export default function NotificationSystem({
   handleNotificationFromServerRef.current = handleNotificationFromServer;
 
   const handleNotification = (notif: any) => {
-    // 1. 브라우저 푸시 알림 (권한 허용 시)
+    // 1. 인앱 브라우저 알림 (포그라운드, 권한 허용 시)
     sendNotification(notif.title, {
       body: notif.body,
       tag: notif.type,
-      data: { ...(notif.data || {}), room_id: notif.data?.room_id },
+      data: { ...(notif.data || {}), type: notif.type },
     });
 
-    // 2. 채팅/멘션 시 인앱 이벤트 발송 (PC·모바일 웹 공통)
+    // 2. 인앱 이벤트 (채팅알림배너 트리거)
     if (notif.type === 'message' || notif.type === 'mention') {
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('erp-chat-notification', {
           detail: { title: notif.title, body: notif.body, room_id: notif.data?.room_id },
         }));
       }
-      playNotificationSound();
+      playNotificationSound('message');
       vibrateIfSupported();
-    } else if (notif.type === 'approval' || notif.type === 'attendance') {
-      // 전자결재·출퇴근도 인앱 배너로 즉시 표시
+    } else {
+      // 결재·출퇴근·재고·급여·교육 모두 배너로 표시
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('erp-alert', {
           detail: { title: notif.title, body: notif.body, type: notif.type, data: notif.data },
         }));
       }
-      playNotificationSound();
-      vibrateIfSupported();
-    } else {
-      // 재고·급여·교육 등
-      playNotificationSound();
+      playNotificationSound('alert');
       vibrateIfSupported();
     }
 
-    // 3. 시스템 내 알림 리스트에 추가
-    setNotifications(prev => [notif, ...prev].slice(0, 50));
-    setUnreadCount(prev => prev + 1);
+    // 3. 앱 배지 업데이트
+    setNotifications(prev => {
+      const next = [notif, ...prev].slice(0, 50);
+      setUnreadCount(next.length);
+      setAppBadge(next.length);
+      return next;
+    });
 
-    // 4. Supabase에 알림 기록 저장 (채팅 알림은 metadata.room_id로 클릭 시 해당 채팅방 이동)
+    // 4. 중요 알림(결재·재고)은 Web Push로도 발송 (앱이 닫혀있을 때 대비)
+    const shouldWebPush = notif.type === 'approval' || notif.type === 'inventory' || notif.type === 'payroll';
+    if (shouldWebPush && user?.id) {
+      supabase.functions.invoke('send-web-push', {
+        body: {
+          notification_type: notif.type,
+          title: notif.title,
+          body: notif.body,
+          data: notif.data || {},
+          target_user_ids: [user.id],
+        },
+      }).catch(() => { /* VAPID 미설정 시 무시 */ });
+    }
+
+    // 5. Supabase에 알림 기록 저장
     (async () => {
       try {
         const row: Record<string, unknown> = {
@@ -459,19 +506,23 @@ export default function NotificationSystem({
         };
         if ((notif.type === 'message' || notif.type === 'mention') && notif.data?.room_id) {
           row.metadata = { room_id: notif.data.room_id };
+        } else if (notif.data?.id) {
+          row.metadata = { id: notif.data.id, type: notif.type };
         }
-        const { error } = await supabase.from('notifications').insert([row]);
-        if (error) console.error('알림 저장 실패:', error);
-      } catch (err) {
-        console.error('알림 저장 실패:', err);
-      }
+        await supabase.from('notifications').insert([row]);
+      } catch { /* ignore */ }
     })();
   };
   handleNotificationRef.current = handleNotification;
 
   const markAsRead = (id: string) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n).filter(n => n.id !== id));
-    setUnreadCount(prev => Math.max(0, prev - 1));
+    setNotifications(prev => {
+      const next = prev.filter(n => n.id !== id);
+      const newCount = Math.max(0, next.length);
+      setUnreadCount(newCount);
+      setAppBadge(newCount);
+      return next;
+    });
   };
 
   // 알림 5초 후 자동 삭제 로직
