@@ -57,6 +57,7 @@ function MainPageContent() {
     surgeries: [],
     mris: []
   });
+  const [loginAt] = useState<string>(new Date().toISOString());
 
   // 1. 초기 로드 시 사용자 정보 및 이전 상태 복구
   useEffect(() => {
@@ -99,34 +100,50 @@ function MainPageContent() {
       if (savedId) setSelectedCompanyIdState(savedId);
     }
     setSelectedCompanyIdState(getSelectedCompanyId());
+  }, [user?.company, user?.permissions?.mso]);
 
-    // 1-1. 강제 로그아웃(세션 만료) 체크
-    const checkForcedLogout = async () => {
-      try {
-        const { data: config } = await supabase
-          .from('system_configs')
-          .select('value')
-          .eq('key', 'min_auth_time')
-          .single();
-
-        if (config?.value) {
-          const minAuthTime = new Date(config.value).getTime();
-          const loginAtStr = localStorage.getItem('erp_login_at');
-          const loginAt = loginAtStr ? new Date(loginAtStr).getTime() : 0;
-
-          if (loginAt < minAuthTime) {
-            alert("보안 정책 또는 시스템 업데이트로 인해 모든 세션이 만료되었습니다. 다시 로그인해 주세요.");
-            localStorage.removeItem('erp_user');
-            localStorage.removeItem('erp_login_at');
-            router.replace('/');
-          }
+  // 1-1. 강제 로그아웃 실시간 감지 (Session Security)
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase.channel(`force-logout-${user.id}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'staff_members', filter: `id=eq.${user.id}` }, (payload) => {
+        const forceLogoutAt = payload.new.force_logout_at;
+        if (forceLogoutAt && new Date(forceLogoutAt).getTime() > new Date(loginAt).getTime()) {
+          alert('관리자에 의해 강제 로그아웃 되었습니다. 다시 로그인해 주세요.');
+          localStorage.clear();
+          window.location.href = '/';
         }
-      } catch (e) {
-        // 테이블이 없거나 설정이 없으면 무시
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.id, loginAt]);
+
+  // 1-1. 강제 로그아웃(세션 만료) 체크
+  const checkForcedLogout = async () => {
+    try {
+      const { data: config } = await supabase
+        .from('system_configs')
+        .select('value')
+        .eq('key', 'min_auth_time')
+        .single();
+
+      if (config?.value) {
+        const minAuthTime = new Date(config.value).getTime();
+        const loginAtStr = localStorage.getItem('erp_login_at');
+        const loginAt = loginAtStr ? new Date(loginAtStr).getTime() : 0;
+
+        if (loginAt < minAuthTime) {
+          alert("보안 정책 또는 시스템 업데이트로 인해 모든 세션이 만료되었습니다. 다시 로그인해 주세요.");
+          localStorage.removeItem('erp_user');
+          localStorage.removeItem('erp_login_at');
+          router.replace('/');
+        }
       }
-    };
-    checkForcedLogout();
-  }, []);
+    } catch (e) {
+      // 테이블이 없거나 설정이 없으면 무시
+    }
+  };
+  checkForcedLogout();
 
   // 알림 클릭 시 open_chat_room 쿼리 처리 → 채팅 메뉴 + 해당 채팅방 연동 (웹/모바일 동일)
   useEffect(() => {

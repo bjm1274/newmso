@@ -8,6 +8,7 @@ import 근무현황 from './근무현황';
 import 인계노트 from './인계노트';
 import 퇴원심사 from './퇴원심사';
 import 마감보고 from './마감보고';
+import 직원평가시스템 from './직원평가시스템';
 
 const EXTERNAL_LINKS = [
   { id: 'km-park', label: 'KM Park', url: 'http://kmp0001103.iptime.org/login?redirectTo=undefined', icon: '🏥' },
@@ -21,6 +22,7 @@ const FEATURE_CARDS = [
   { id: '인계노트', label: '인계노트', icon: '📝', desc: '3교대 근무자 필수 공유사항', subView: '인계노트', restricted: true },
   { id: '퇴원심사', label: '퇴원심사', icon: '🏥', desc: '퇴원 체크리스트 점검 및 AI 분석', subView: '퇴원심사' },
   { id: '마감보고', label: '마감보고', icon: '💰', desc: '원무과 일일 정산 및 시재 관리', subView: '마감보고', restricted: true },
+  { id: '직원평가', label: '직원평가', icon: '✍️', desc: '부서장 전용 성과 및 문제사항 기록', subView: '직원평가', restricted: true },
 ];
 
 const MAX_RECENT = 5;
@@ -90,7 +92,9 @@ export default function ExtraFeatures({
       user?.team?.includes('원무') ||
       user?.role === 'admin' ||
       user?.permissions?.mso ||
-      user?.permissions?.handover_read
+      user?.permissions?.handover_read ||
+      // 부서장 이상 권한 체크 (직원평가용)
+      ['팀장', '수간호사', '부장', '이사', '병원장', '원장'].includes(user?.position)
     );
   };
 
@@ -229,6 +233,21 @@ export default function ExtraFeatures({
               ← 목록으로
             </button>
             <마감보고 user={user || {}} />
+          </div>
+        )}
+
+        {subView === '직원평가' && (
+          <div className="space-y-4">
+            <button
+              type="button"
+              onClick={() => setSubView(null)}
+              className="text-[11px] font-bold text-[var(--toss-blue)] hover:underline"
+            >
+              ← 목록으로
+            </button>
+            <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] p-6 shadow-sm">
+              <직원평가시스템 user={user || {}} staffs={staffs} />
+            </div>
           </div>
         )}
 
