@@ -4,23 +4,19 @@
  */
 import { NextResponse } from 'next/server';
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-
-// Gemini 3.0 이상 모델 (실제 API 모델명)
 const MODELS = [
-    'gemini-3.1-pro-preview',
-    'gemini-3-pro-preview',
-    'gemini-3-flash-preview',
-    'gemini-2.5-pro',
-    'gemini-2.5-flash',
+    'gemini-1.5-pro',
+    'gemini-1.5-flash',
+    'gemini-pro',
 ];
 
 async function callGemini(prompt: string): Promise<string> {
-    if (!GEMINI_API_KEY) throw new Error('Gemini API 키가 설정되지 않았습니다.');
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) throw new Error('Gemini API 키가 설정되지 않았습니다.');
 
     for (const model of MODELS) {
         try {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
             const res = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
