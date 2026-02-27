@@ -1,9 +1,12 @@
 'use client';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { sound } from '@/lib/sounds';
 
-// [실시간 알림 엔진] 
+/**
+ * [실시간 알림 엔진]
+ * - 역할: 데이터베이스 리얼타임 감지, 알림 생성 및 저장, 사운드 발송, 브라우저 배지 관리
+ */
 
 export async function initNotificationService(staffId?: string) {
   if (typeof window === 'undefined') return;
@@ -89,7 +92,21 @@ export function sendNotification(title: string, options?: NotificationOptions) {
   }
 }
 
-export default function NotificationSystem({ user }: { user: any }) {
+export default function NotificationSystem({
+  user,
+  onOpenChatRoom,
+  onOpenMessage,
+  onOpenApproval,
+  onOpenBoard,
+  onOpenPost,
+}: {
+  user: any;
+  onOpenChatRoom?: (roomId: string) => void;
+  onOpenMessage?: (roomId: string, messageId: string) => void;
+  onOpenApproval?: () => void;
+  onOpenBoard?: (boardId?: string) => void;
+  onOpenPost?: (boardId: string, postId: string) => void;
+}) {
   const shownNotifIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
