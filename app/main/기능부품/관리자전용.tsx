@@ -35,6 +35,10 @@ export default function AdminView({ user, staffs = [], depts = [], onRefresh, in
     }
   }, [isMso]);
 
+  useEffect(() => {
+    if (initialTab && ADMIN_TAB_IDS.includes(initialTab)) setActiveTab(initialTab);
+  }, [initialTab]);
+
   const adminTabs = [
     { id: '경영대시보드', label: '📊 일반 대시보드' },
     { id: '재무대시보드', label: '📉 재무 대시보드' },
@@ -60,10 +64,6 @@ export default function AdminView({ user, staffs = [], depts = [], onRefresh, in
       </div>
     );
   }
-
-  useEffect(() => {
-    if (initialTab && ADMIN_TAB_IDS.includes(initialTab)) setActiveTab(initialTab);
-  }, [initialTab]);
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-[var(--page-bg)] h-full relative animate-in fade-in duration-500">
