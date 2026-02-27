@@ -58,18 +58,24 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                     setCompany({ ...companyData, seal_url: tplRes.data?.seal_url });
 
                     const formatDate = (ds: any) => (!ds ? '' : ds.split('T')[0]);
-                    const formatWon = (val: any) => (!val ? '0' : Number(val).toLocaleString());
+                    const formatWon = (val: any) => {
+                        const num = Number(val);
+                        return isNaN(num) || num === 0 ? '' : num.toLocaleString();
+                    };
                     const parseBirthFromResident = (rn: string) => {
                         if (!rn || rn.length < 6) return '';
-                        const yearPrefix = ['1', '2', '5', '6'].includes(rn.charAt(6)) ? '19' : '20';
+                        const genderCode = rn.length >= 7 ? rn.charAt(6) : '1';
+                        const yearPrefix = ['1', '2', '5', '6'].includes(genderCode) ? '19' : '20';
                         const yy = rn.substring(0, 2);
                         const mm = rn.substring(2, 4);
                         const dd = rn.substring(4, 6);
-                        return `${yearPrefix}${yy}-${mm}-${dd}`;
+                        return `${yearPrefix}${yy}년 ${mm}월 ${dd}일`;
                     };
 
+                    // 계약서(contract)에 데이터가 없으면 직원(user) 등록 시 입력한 상세 값을 사용
                     const vars: Record<string, any> = {
                         staff_name: user?.name || '',
+                        employee_name: user?.name || '',
                         company_name: targetCompany || '',
                         company_ceo: companyData?.ceo_name || '',
                         company_business_no: companyData?.business_no || '',
@@ -80,24 +86,27 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                         phone_company: companyData?.phone || '',
                         department: user?.department || '',
                         position: user?.position || '',
-                        join_date: formatDate(user?.joined_at || contract?.effective_date),
+                        join_date: formatDate(contract?.join_date || user?.joined_at || user?.join_date),
                         phone: user?.phone || '',
                         address: user?.address || '',
                         birth_date: parseBirthFromResident(user?.resident_no),
                         license_name: user?.license || '',
                         license_no: user?.permissions?.license_no || '',
                         license_date: formatDate(user?.permissions?.license_date || ''),
-                        base_salary: formatWon(contract?.base_salary),
-                        position_allowance: formatWon(contract?.position_allowance),
-                        meal_allowance: formatWon(contract?.meal_allowance),
-                        vehicle_allowance: formatWon(contract?.vehicle_allowance),
-                        childcare_allowance: formatWon(contract?.childcare_allowance),
-                        research_allowance: formatWon(contract?.research_allowance),
-                        other_taxfree: formatWon(contract?.other_taxfree),
-                        shift_start: contract?.shift_start_time ? String(contract.shift_start_time).slice(0, 5) : '',
-                        shift_end: contract?.shift_end_time ? String(contract.shift_end_time).slice(0, 5) : '',
-                        break_start: contract?.break_start_time ? String(contract.break_start_time).slice(0, 5) : '',
-                        break_end: contract?.break_end_time ? String(contract.break_end_time).slice(0, 5) : '',
+                        base_salary: formatWon(contract?.base_salary || user?.base_salary),
+                        position_allowance: formatWon(contract?.position_allowance || user?.position_allowance),
+                        meal_allowance: formatWon(contract?.meal_allowance || user?.meal_allowance),
+                        vehicle_allowance: formatWon(contract?.vehicle_allowance || user?.vehicle_allowance),
+                        childcare_allowance: formatWon(contract?.childcare_allowance || user?.childcare_allowance),
+                        research_allowance: formatWon(contract?.research_allowance || user?.research_allowance),
+                        other_taxfree: formatWon(contract?.other_taxfree || user?.other_taxfree),
+                        shift_start: (contract?.shift_start_time || user?.shift_start_time) ? String(contract?.shift_start_time || user?.shift_start_time).slice(0, 5) : '',
+                        shift_end: (contract?.shift_end_time || user?.shift_end_time) ? String(contract?.shift_end_time || user?.shift_end_time).slice(0, 5) : '',
+                        break_start: (contract?.break_start_time || user?.break_start_time) ? String(contract?.break_start_time || user?.break_start_time).slice(0, 5) : '',
+                        break_end: (contract?.break_end_time || user?.break_end_time) ? String(contract?.break_end_time || user?.break_end_time).slice(0, 5) : '',
+                        probation_months: String(contract?.probation_months || '3'),
+                        probation_percent: String(contract?.probation_percent || '90'),
+                        payment_day: String(contract?.payment_day || '7'),
                         today: formatDate(new Date().toISOString()),
                     };
 
@@ -128,6 +137,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
 
                     setLocalTemplateText(result);
                 }
+
             } catch (err) {
                 console.warn('Error applying template for modal:', err);
             }
@@ -281,18 +291,13 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                                 <p className="text-xs text-[var(--toss-gray-4)] font-bold mt-1">하단으로 끝까지 스크롤하여 모든 내용을 확인해야 합니다.</p>
                             </div>
 
-                            <div className="bg-white p-5 border border-slate-200 max-h-[50vh] overflow-y-auto custom-scrollbar shadow-sm rounded-xl">
+                            <div className="bg-white p-6 md:p-10 border border-slate-200 max-h-[55vh] overflow-y-auto custom-scrollbar shadow-inner rounded-2xl" style={{ fontFamily: 'Noto Sans KR, sans-serif' }}>
                                 {(() => {
                                     let raw = localTemplateText;
-                                    // ASCII 표 장식 제거
+                                    // ASCII 표 장식 제거 (단, 임금 구성항목 등 주요 라벨은 보존)
                                     raw = raw.replace(/[┌┬┐├┼┤└┴┘─│]+/g, '');
-                                    // 제목 줄 제거
-                                    raw = raw.replace(/근\s*로\s*계\s*약\s*서\s*\(\s*월\s*급\s*제\s*\)/, '');
-                                    // 기본정보 블록 제거
-                                    raw = raw.replace(/\[사용자 기본정보\][\s\S]*?(?=제\d+조|────|$)/m, '');
-                                    raw = raw.replace(/\[근로자 기본정보\][\s\S]*?(?=제\d+조|────|$)/m, '');
-                                    raw = raw.replace(/\[상기[\s\S]*?체결한다\.\]/, '');
 
+                                    // 제목 줄 및 기본정보 블록은 이미 상단에 표시되거나 본문에 포함됨
                                     // 조 단위 파싱
                                     const sectionRe = /제(\d+)조\s*\[([^\]]+)\]/g;
                                     const matches: { index: number; full: string; num: string; title: string }[] = [];
@@ -300,7 +305,8 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                                     while ((mm = sectionRe.exec(raw)) !== null) {
                                         matches.push({ index: mm.index, full: mm[0], num: mm[1], title: mm[2] });
                                     }
-                                    if (matches.length === 0) return <p className="text-xs text-slate-500 whitespace-pre-wrap">{raw}</p>;
+
+                                    if (matches.length === 0) return <p className="text-[14px] text-slate-800 whitespace-pre-wrap leading-relaxed">{raw}</p>;
 
                                     return matches.map((sec, si) => {
                                         const start = sec.index + sec.full.length;
@@ -309,43 +315,44 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                                         const lines = body.split('\n').filter(l => l.trim());
 
                                         return (
-                                            <div key={si} className="mb-5">
-                                                <h4 className="text-[12px] font-black text-slate-800 mb-1.5 flex items-center gap-1.5">
-                                                    <span className="w-1 h-1 bg-blue-600 rounded-full shrink-0" />
+                                            <div key={si} className="mb-8 last:mb-0">
+                                                <h4 className="text-[15px] font-black text-slate-900 mb-3 flex items-center gap-2.5">
+                                                    <span className="w-2 h-2 bg-blue-600 rounded-full shrink-0" />
                                                     제{sec.num}조 [{sec.title}]
                                                 </h4>
-                                                <div className="pl-3 border-l-2 border-slate-100 space-y-0.5">
+                                                <div className="pl-4 border-l-2 border-slate-100 space-y-2">
                                                     {lines.map((line, li) => {
                                                         const t = line.trim();
                                                         if (t.startsWith('[') && t.endsWith(']')) {
-                                                            return <span key={li} className="inline-block text-[10px] font-black text-blue-700 bg-blue-50 px-2 py-0.5 rounded mt-2 mb-1">{t.replace(/[\[\]]/g, '')}</span>;
+                                                            return <div key={li} className="mt-4 mb-2"><span className="inline-block text-[12px] font-black text-blue-700 bg-blue-50 px-2.5 py-1 rounded-md">{t.replace(/[\[\]]/g, '')}</span></div>;
                                                         }
                                                         if (/^[①②③④⑤⑥⑦⑧⑨⑩]/.test(t)) {
                                                             return (
-                                                                <div key={li} className="flex gap-1.5 mt-1">
-                                                                    <span className="text-blue-600 font-black text-[11px] shrink-0">{t[0]}</span>
-                                                                    <span className="text-[11px] text-slate-700 leading-[1.75]">{t.slice(1).trim()}</span>
+                                                                <div key={li} className="flex gap-2 mt-1">
+                                                                    <span className="text-blue-600 font-black text-[13px] shrink-0">{t[0]}</span>
+                                                                    <span className="text-[13.5px] text-slate-700 leading-[1.8]">{t.slice(1).trim()}</span>
                                                                 </div>
                                                             );
                                                         }
-                                                        if (t.startsWith('-') || t.startsWith('·')) {
+                                                        if (t.startsWith('-') || t.startsWith('·') || t.startsWith('•')) {
                                                             return (
-                                                                <div key={li} className="flex gap-1.5 pl-4 mt-0.5">
+                                                                <div key={li} className="flex gap-2 pl-5 mt-0.5">
                                                                     <span className="text-slate-400 shrink-0">•</span>
-                                                                    <span className="text-[10.5px] text-slate-600 leading-[1.75]">{t.replace(/^[-·]\s*/, '')}</span>
+                                                                    <span className="text-[13px] text-slate-600 leading-[1.8]">{t.replace(/^[-·•]\s*/, '')}</span>
                                                                 </div>
                                                             );
                                                         }
-                                                        if (/^(기본급|식대|직책수당|기타수당)\s+/.test(t)) {
+                                                        // 급여 항목 테이블 스타일 대안 (그리드 레이아웃)
+                                                        if (/^(기본급|식대|직책수당|기타수당|비과세)\s+/.test(t)) {
                                                             const parts = t.split(/\s{2,}/);
                                                             return (
-                                                                <div key={li} className="flex justify-between py-0.5 border-b border-slate-50">
-                                                                    <span className="text-[10.5px] font-semibold text-slate-600">{parts[0]}</span>
-                                                                    <span className="text-[10.5px] font-black text-slate-800">{parts[1] || ''}</span>
+                                                                <div key={li} className="flex justify-between py-1.5 border-b border-slate-50 px-1 hover:bg-slate-50 transition-colors">
+                                                                    <span className="text-[13px] font-semibold text-slate-600">{parts[0]}</span>
+                                                                    <span className="text-[13px] font-black text-slate-900">{parts[1] || ''}</span>
                                                                 </div>
                                                             );
                                                         }
-                                                        return <p key={li} className="text-[11px] text-slate-700 leading-[1.75]">{t}</p>;
+                                                        return <p key={li} className="text-[13.5px] text-slate-700 leading-[1.8]">{t}</p>;
                                                     })}
                                                 </div>
                                             </div>
@@ -353,6 +360,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                                     });
                                 })()}
                             </div>
+
                         </div>
                     )}
 
