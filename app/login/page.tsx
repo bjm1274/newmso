@@ -52,6 +52,7 @@ export default function LoginPage() {
         permissions: { inventory: true, hr: true, approval: true, admin: true, mso: true, hr_교대근무: true }
       };
       localStorage.setItem('erp_user', JSON.stringify(msoUser));
+      localStorage.setItem('erp_login_at', new Date().toISOString());
       setLoading(false);
       router.push('/main');
       return;
@@ -70,6 +71,7 @@ export default function LoginPage() {
         permissions: { inventory: true, hr: true, approval: true, admin: true, mso: true, hr_교대근무: true }
       };
       localStorage.setItem('erp_user', JSON.stringify(superAdmin));
+      localStorage.setItem('erp_login_at', new Date().toISOString());
       setLoading(false);
       router.push('/main');
       return;
@@ -101,6 +103,7 @@ export default function LoginPage() {
         }
         const toStore = { ...user, password: isFirstLogin ? password : user.password, company_id: user.company_id ?? null };
         localStorage.setItem('erp_user', JSON.stringify(toStore));
+        localStorage.setItem('erp_login_at', new Date().toISOString());
         setLoading(false);
         if (isFirstLogin) alert("비밀번호가 설정되었습니다. 다음 로그인부터 이 비밀번호를 사용해 주세요.");
         router.push('/main');
@@ -153,6 +156,7 @@ export default function LoginPage() {
 
       const toStore = { ...user, company_id: user.company_id ?? null };
       localStorage.setItem('erp_user', JSON.stringify(toStore));
+      localStorage.setItem('erp_login_at', new Date().toISOString());
       setLoading(false);
       if (isFirstLogin) {
         alert("비밀번호가 설정되었습니다. 다음 로그인부터 이 비밀번호를 사용해 주세요.");
