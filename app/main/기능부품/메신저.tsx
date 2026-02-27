@@ -624,7 +624,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   };
 
 
-  const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024; // 100MB
+  const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20MB (동영상 업로드 비허용)
   const handleSendMessage = async (
     fileUrl?: string,
     fileSizeBytes?: number,
@@ -714,8 +714,12 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   const [isDragging, setIsDragging] = useState(false);
 
   const processFileUpload = async (file: File) => {
+    if (file.type.startsWith('video/')) {
+      alert('동영상 파일은 업로드할 수 없습니다.\n(사진, 문서, 일반 파일만 가능합니다.)');
+      return;
+    }
     if (file.size > MAX_FILE_SIZE_BYTES) {
-      alert('파일 크기는 100MB 이하여야 합니다.');
+      alert('파일 크기는 20MB 이하여야 합니다.');
       return;
     }
     setFileUploading(true);
@@ -1464,7 +1468,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
             ? 'bg-[var(--toss-gray-1)] border-[var(--toss-border)] opacity-80 pointer-events-none'
             : 'bg-[var(--toss-gray-1)] border-[var(--toss-border)] focus-within:bg-[var(--toss-card)] focus-within:ring-4 focus-within:ring-[var(--toss-blue)]'
             }`}>
-            <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
+            <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.hwp" />
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={fileUploading}
