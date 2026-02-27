@@ -38,7 +38,12 @@ export default function DataBackup() {
   const exportData = async () => {
     setLoading(true);
     try {
-      const tables = ['staff_members', 'payroll_records', 'leave_requests', 'attendances', 'approvals', 'audit_logs'];
+      const tables = [
+        'staff_members', 'payroll_records', 'leave_requests', 'attendances',
+        'approvals', 'audit_logs', 'inventory', 'inventory_logs',
+        'board_posts', 'posts', 'employment_contracts', 'work_shifts',
+        'shift_assignments', 'annual_leave_promotions'
+      ];
       const data: Record<string, any[]> = {};
       for (const t of tables) {
         const { data: rows } = await supabase.from(t).select('*');

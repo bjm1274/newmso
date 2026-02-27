@@ -155,74 +155,89 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const handleApproveAction = async (item: any) => {
     if (!confirm("승인하시겠습니까? 관련 데이터가 즉시 업데이트됩니다.")) return;
 
-    const { error: appError } = await supabase.from('approvals').update({ status: '승인' }).eq('id', item.id);
+    const lineIds = Array.isArray(item.approver_line) ? item.approver_line : [];
+    const currentIndex = lineIds.findIndex((id: string) => String(id) === String(item.current_approver_id));
+    const isFinalApproval = currentIndex === lineIds.length - 1 || currentIndex === -1;
+
+    let updateData: any = {};
+    if (isFinalApproval) {
+      updateData.status = '승인';
+    } else {
+      updateData.current_approver_id = lineIds[currentIndex + 1];
+    }
+
+    const { error: appError } = await supabase.from('approvals').update(updateData).eq('id', item.id);
 
     if (!appError) {
-      if (item.type === '물품신청' && item.meta_data.items) {
-        await supabase.from('notifications').insert([{
-          user_id: '00000000-0000-4000-a000-000000000001',
-          type: '물품이동요청',
-          title: '📦 물품 부서이동 승인 알림',
-          body: `[${item.title}] 결재가 최종 승인되었습니다. 물품 이동을 완료해주세요.`,
-          metadata: { approval_id: item.id, items: item.meta_data.items }
-        }]);
-        alert("물품 신청이 승인되었습니다. 행정팀에서 물품 이동을 완료하면 재고가 반영됩니다.");
-      }
-
-      if (item.type === '인사명령' && item.meta_data.orderTargetId) {
-        const { orderTargetId, newPosition, orderCategory } = item.meta_data;
-        const updateData: any = {};
-        if (newPosition) updateData.position = newPosition;
-        if (orderCategory === '부서 이동(전보)' && item.meta_data.targetDept) {
-          updateData.department = item.meta_data.targetDept;
+      if (isFinalApproval) {
+        if (item.type === '물품신청' && item.meta_data.items) {
+          await supabase.from('notifications').insert([{
+            user_id: '00000000-0000-4000-a000-000000000001',
+            type: '물품이동요청',
+            title: '📦 물품 부서이동 승인 알림',
+            body: `[${item.title}] 결재가 최종 승인되었습니다. 물품 이동을 완료해주세요.`,
+            metadata: { approval_id: item.id, items: item.meta_data.items }
+          }]);
+          alert("최종 승인되었습니다. 행정팀에서 물품 이동을 완료하면 재고가 반영됩니다.");
         }
-        if (Object.keys(updateData).length > 0) {
-          await supabase.from('staff_members').update(updateData).eq('id', orderTargetId);
-        }
-      }
 
-      if (item.type === '연차/휴가') {
-        const startStr = item.meta_data?.startDate || item.meta_data?.start;
-        const endStr = item.meta_data?.endDate || item.meta_data?.end || startStr;
-        const start = new Date(startStr);
-        const end = new Date(endStr);
-        const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
-        for (let d = 0; d < days; d++) {
-          const dte = new Date(start);
-          dte.setDate(dte.getDate() + d);
-          const dateStr = dte.toISOString().split('T')[0];
-          await supabase.from('attendance').upsert({
-            staff_id: item.sender_id,
-            date: dateStr,
-            status: '휴가',
-          }, { onConflict: 'staff_id,date' });
-          try {
-            await supabase.from('attendances').upsert({
+        if (item.type === '인사명령' && item.meta_data.orderTargetId) {
+          const { orderTargetId, newPosition, orderCategory } = item.meta_data;
+          const staffUpdate: any = {};
+          if (newPosition) staffUpdate.position = newPosition;
+          if (orderCategory === '부서 이동(전보)' && item.meta_data.targetDept) {
+            staffUpdate.department = item.meta_data.targetDept;
+          }
+          if (Object.keys(staffUpdate).length > 0) {
+            await supabase.from('staff_members').update(staffUpdate).eq('id', orderTargetId);
+          }
+        }
+
+        if (item.type === '연차/휴가') {
+          const startStr = item.meta_data?.startDate || item.meta_data?.start;
+          const endStr = item.meta_data?.endDate || item.meta_data?.end || startStr;
+          const start = new Date(startStr);
+          const end = new Date(endStr);
+          const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+          for (let d = 0; d < days; d++) {
+            const dte = new Date(start);
+            dte.setDate(dte.getDate() + d);
+            const dateStr = dte.toISOString().split('T')[0];
+            await supabase.from('attendance').upsert({
               staff_id: item.sender_id,
-              work_date: dateStr,
-              status: 'annual_leave',
-            }, { onConflict: 'staff_id,work_date' });
+              date: dateStr,
+              status: '휴가',
+            }, { onConflict: 'staff_id,date' });
+            try {
+              await supabase.from('attendances').upsert({
+                staff_id: item.sender_id,
+                work_date: dateStr,
+                status: 'annual_leave',
+              }, { onConflict: 'staff_id,work_date' });
+            } catch (_) { }
+          }
+          const { data: staff } = await supabase.from('staff_members').select('annual_leave_used').eq('id', item.sender_id).single();
+          const used = (Number(staff?.annual_leave_used) || 0) + days;
+          await supabase.from('staff_members').update({ annual_leave_used: used }).eq('id', item.sender_id);
+        }
+
+        if (item.type === '양식신청' && item.meta_data?.form_type && item.meta_data?.target_staff && item.meta_data?.auto_issue) {
+          try {
+            const sn = `CERT-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(Date.now()).slice(-6)}`;
+            await supabase.from('certificate_issuances').insert({
+              staff_id: item.meta_data.target_staff,
+              cert_type: item.meta_data.form_type,
+              serial_no: sn,
+              purpose: item.meta_data.purpose || '제출용',
+              issued_by: user?.id,
+            });
           } catch (_) { }
         }
-        const { data: staff } = await supabase.from('staff_members').select('annual_leave_used').eq('id', item.sender_id).single();
-        const used = (Number(staff?.annual_leave_used) || 0) + days;
-        await supabase.from('staff_members').update({ annual_leave_used: used }).eq('id', item.sender_id);
-      }
 
-      if (item.type === '양식신청' && item.meta_data?.form_type && item.meta_data?.target_staff && item.meta_data?.auto_issue) {
-        try {
-          const sn = `CERT-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(Date.now()).slice(-6)}`;
-          await supabase.from('certificate_issuances').insert({
-            staff_id: item.meta_data.target_staff,
-            cert_type: item.meta_data.form_type,
-            serial_no: sn,
-            purpose: item.meta_data.purpose || '제출용',
-            issued_by: user?.id,
-          });
-        } catch (_) { }
+        alert("최종 승인 처리가 완료되었습니다.");
+      } else {
+        alert("승인되어 다음 결재자에게 진행되었습니다.");
       }
-
-      alert("승인 처리가 완료되었습니다.");
       fetchApprovals();
     } else {
       alert("승인 처리에 실패했습니다. " + (appError?.message || ""));
