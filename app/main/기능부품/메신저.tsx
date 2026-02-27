@@ -725,8 +725,8 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     setFileUploading(true);
     try {
       const ext = file.name.split('.').pop() || 'bin';
-      const randomStr = Math.random().toString(36).substring(2, 10);
-      const path = `chat/${Date.now()}_${randomStr}.${ext}`;
+      const uuid = crypto.randomUUID();
+      const path = `chat/${Date.now()}_${uuid}.${ext}`;
       const { error } = await supabase.storage.from(CHAT_BUCKET).upload(path, file, { upsert: false });
       if (error) throw error;
       const publicUrl = supabase.storage.from(CHAT_BUCKET).getPublicUrl(path).data.publicUrl;
@@ -1480,7 +1480,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
             <div className="relative flex-1">
               <input
                 className="w-full bg-transparent p-1 px-2 outline-none text-[15px] md:text-sm font-bold min-w-0"
-                placeholder={selectedRoomId === NOTICE_ROOM_ID && user?.position && !CAN_WRITE_NOTICE_POSITIONS.includes(user.position) ? "부서장 이상만 작성 가능" : "메시지를 입력하세요... (예: @홍길동 메모) "}
+                placeholder={selectedRoomId === NOTICE_ROOM_ID && user?.position && !CAN_WRITE_NOTICE_POSITIONS.includes(user.position) ? "부서장 이상만 작성 가능" : "메시지를 입력하세요... (예: @이름 메모) "}
                 value={inputMsg}
                 onChange={e => {
                   const value = e.target.value;

@@ -21,7 +21,13 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: any) {
     position_allowance: 0,   // 직책수당
     research_allowance: 0,   // 연구활동비 (한도 20만)
     other_taxfree: 0,        // 기타 비과세
-    effective_date: new Date().toISOString().split('T')[0]
+    effective_date: new Date().toISOString().split('T')[0],
+    working_hours_per_week: 40,
+    working_days_per_week: 5,
+    shift_start_time: '09:00',
+    shift_end_time: '18:00',
+    break_start_time: '12:00',
+    break_end_time: '13:00'
   });
 
   const fetchContracts = async () => {
@@ -68,6 +74,12 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: any) {
           status: '서명대기',
           requested_at: new Date().toISOString(),
           contract_type: contractType,
+          working_hours_per_week: salaryInfo.working_hours_per_week ?? s?.working_hours_per_week ?? 40,
+          working_days_per_week: salaryInfo.working_days_per_week ?? s?.working_days_per_week ?? 5,
+          shift_start_time: salaryInfo.shift_start_time ?? '09:00',
+          shift_end_time: salaryInfo.shift_end_time ?? '18:00',
+          break_start_time: salaryInfo.break_start_time ?? '12:00',
+          break_end_time: salaryInfo.break_end_time ?? '13:00',
           ...pay
         };
       });
@@ -148,6 +160,26 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: any) {
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold opacity-80">적용일자</label>
                       <input type="text" value={salaryInfo.effective_date} onChange={(e) => setSalaryInfo({ ...salaryInfo, effective_date: e.target.value })} className="w-full p-2.5 bg-white/10 border border-white/20 rounded-[8px] font-bold text-xs outline-none focus:bg-white/20 text-white selection:bg-white/30" placeholder="0000-00-00" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 pt-2 border-t border-white/10 mt-2">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold opacity-80">주당 시간</label>
+                        <input type="number" value={salaryInfo.working_hours_per_week} onChange={(e) => setSalaryInfo({ ...salaryInfo, working_hours_per_week: Number(e.target.value) })} className="w-full p-2.5 bg-white/10 border border-white/20 rounded-[8px] font-bold text-xs outline-none focus:bg-white/20 text-white" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold opacity-80">주당 일수</label>
+                        <input type="number" value={salaryInfo.working_days_per_week} onChange={(e) => setSalaryInfo({ ...salaryInfo, working_days_per_week: Number(e.target.value) })} className="w-full p-2.5 bg-white/10 border border-white/20 rounded-[8px] font-bold text-xs outline-none focus:bg-white/20 text-white" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold opacity-80">출근시간</label>
+                        <input type="text" value={salaryInfo.shift_start_time} onChange={(e) => setSalaryInfo({ ...salaryInfo, shift_start_time: e.target.value })} className="w-full p-2.5 bg-white/10 border border-white/20 rounded-[8px] font-bold text-xs outline-none focus:bg-white/20 text-white" placeholder="09:00" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold opacity-80">퇴근시간</label>
+                        <input type="text" value={salaryInfo.shift_end_time} onChange={(e) => setSalaryInfo({ ...salaryInfo, shift_end_time: e.target.value })} className="w-full p-2.5 bg-white/10 border border-white/20 rounded-[8px] font-bold text-xs outline-none focus:bg-white/20 text-white" placeholder="18:00" />
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -18,8 +18,7 @@ export async function initNotificationService(staffId?: string) {
 
     // 2. 사용자 알림 권한 요청
     if (Notification.permission === 'default') {
-      const permission = await Notification.requestPermission();
-      console.log('알림 권한:', permission);
+      await Notification.requestPermission();
     }
 
     // 3. 푸시 구독: VAPID가 있을 때만 구독 (없으면 스킵해 등록 실패 방지, Android/iOS 호환)
@@ -56,14 +55,11 @@ export async function initNotificationService(staffId?: string) {
                 },
                 { onConflict: 'staff_id,endpoint' }
               );
-            console.log('✅ 푸시 구독 정보 저장 완료');
           }
         } catch (e) {
           console.error('푸시 구독 정보 저장 실패:', e);
         }
       }
-    } else if (!vapidPublicKey) {
-      console.log('ℹ️ VAPID 키 미설정 — 인앱·실시간 알림만 사용 (푸시는 환경변수 설정 시 활성화)');
     }
   } catch (error) {
     console.error('Service Worker 등록 실패:', error);
@@ -109,9 +105,9 @@ function setAppBadge(count: number) {
   try {
     if (typeof navigator === 'undefined') return;
     if (count > 0 && 'setAppBadge' in navigator) {
-      (navigator as any).setAppBadge(count).catch(() => {});
+      (navigator as any).setAppBadge(count).catch(() => { });
     } else if (count === 0 && 'clearAppBadge' in navigator) {
-      (navigator as any).clearAppBadge().catch(() => {});
+      (navigator as any).clearAppBadge().catch(() => { });
     }
   } catch { /* ignore */ }
 }

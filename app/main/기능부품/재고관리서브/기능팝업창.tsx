@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 
 const PRESET_A = { reg_num: '000-00-00000', sangho: '박철홍정형외과', ceo: '박철홍', addr: '전라남도 목포시', phone: '061-000-0000', status: '보건업', type: '정형외과' };
-const PRESET_B = { reg_num: '111-11-11111', sangho: '수연메디칼', ceo: '홍길동', addr: '서울시 강남구', phone: '02-000-0000', status: '도소매', type: '의료기기' };
+const PRESET_B = { reg_num: '', sangho: '', ceo: '', addr: '', phone: '', status: '', type: '' };
 
 // [모달 3] 발주서 (기존 유지)
 export function POModal({ isOpen, onClose, inventory }: any) {
@@ -185,7 +185,13 @@ export function ScanModals({ isOpen, onClose, onComplete, mode, inventory }: any
   const [isScanning, setIsScanning] = useState(false);
   const [scannedItems, setScannedItems] = useState<any[]>([]);
   useEffect(() => { if (isOpen && mode === 'camera') { const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); if (!isMobile) { alert("📷 카메라는 모바일 기기(핸드폰)에서만 사용 가능합니다."); onClose(); } } }, [isOpen, mode, onClose]);
-  const handleCapture = () => { setIsScanning(true); setTimeout(() => { setIsScanning(false); const mockResult = inventory.slice(0, mode === 'camera' ? 2 : 3).map((item: any) => ({ ...item, scan_qty: 10, detected_lot: `LOT-${Math.floor(Math.random() * 9000) + 1000}`, detected_exp: '2026-12-31', detected_barcode: item.barcode || '880123456789' })); setScannedItems(mockResult); }, 1500); };
+  const handleCapture = () => {
+    setIsScanning(true);
+    setTimeout(() => {
+      setIsScanning(false);
+      alert('AI 분석(OCR) 서비스 준비 중입니다. 현재는 수동 입력 기능을 이용해 주세요.');
+    }, 1500);
+  };
   const confirm = async () => { onComplete(scannedItems); setScannedItems([]); };
   const updateItem = (idx: number, field: string, val: any) => { const n = [...scannedItems]; n[idx] = { ...n[idx], [field]: val }; setScannedItems(n); };
   if (!isOpen) return null;
@@ -215,7 +221,7 @@ export function UDIModal({ isOpen, onClose, inventory, user, onRefresh }: any) {
   const [udiItems, setUdiItems] = useState<any[]>([]);
   const [barcodeInput, setBarcodeInput] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
-  const handleScan = (e: any) => { if (e.key === 'Enter') { const f = inventory.find((i: any) => i.barcode === barcodeInput) || inventory[0]; if (f) setUdiItems(p => [{ ...f, report_qty: 1, lot_number: 'LOT-TEST', expiration_date: '2027-12-31' }, ...p]); setBarcodeInput(''); } };
+  const handleScan = (e: any) => { if (e.key === 'Enter') { const f = inventory.find((i: any) => i.barcode === barcodeInput); if (f) setUdiItems(p => [{ ...f, report_qty: 1, lot_number: '', expiration_date: '' }, ...p]); setBarcodeInput(''); } };
   const submit = async () => { if (!confirm("전송하시겠습니까?")) return; await supabase.from('inventory_logs').insert(udiItems.map(i => ({ item_id: i.id, type: '출고', amount: i.report_qty, worker_id: user.id, lot_number: i.lot_number, expiration_date: i.expiration_date }))); alert("완료"); setUdiItems([]); onRefresh(); onClose(); };
   if (!isOpen) return null;
   return (

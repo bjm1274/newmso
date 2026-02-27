@@ -33,7 +33,7 @@ export default function FormBuilder({ user }: any) {
 
     const addField = (type: FieldType) => {
         setFields([...fields, {
-            id: Math.random().toString(36).substring(7),
+            id: crypto.randomUUID(),
             type,
             label: `새 ${type} 필드`,
             required: false,

@@ -509,7 +509,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div className="space-y-1.5">
                                     <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">환자명 *</label>
-                                    <input value={patientName} onChange={e => setPatientName(e.target.value)} placeholder="홍길동"
+                                    <input value={patientName} onChange={e => setPatientName(e.target.value)} placeholder="검색 또는 입력"
                                         className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30" />
                                 </div>
                                 <div className="space-y-1.5">

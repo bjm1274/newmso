@@ -17,12 +17,7 @@ export default function QRAssetManager({ user, inventory, fetchInventory }: any)
         item.item_name.includes('모니터')
     );
 
-    const mockScan = () => {
-        if (assets.length === 0) return alert('등록된 자산(전자기기 등)이 없습니다.');
-        const randomAsset = assets[Math.floor(Math.random() * assets.length)];
-        setScanResult(randomAsset);
-        setScannerActive(false);
-    };
+
 
     const handleBorrow = async () => {
         if (!scanResult) return;
@@ -96,7 +91,6 @@ export default function QRAssetManager({ user, inventory, fetchInventory }: any)
                                         <div className="absolute top-0 w-full h-1 bg-[var(--toss-blue)] shadow-[0_0_10px_#3182f6] animate-[scan_2s_ease-in-out_infinite]"></div>
                                     </div>
                                     <p className="text-white text-[10px] mt-4 font-bold animate-pulse">카메라 로딩 중...</p>
-                                    <button onClick={mockScan} className="mt-4 px-3 py-1 bg-slate-800 text-white text-[10px] rounded hover:bg-slate-700">모의 스캔(Mock)</button>
                                 </div>
                             ) : (
                                 <div className="text-6xl opacity-20">📱</div>

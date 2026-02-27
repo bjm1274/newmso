@@ -1,25 +1,7 @@
 'use client';
 import { useState } from 'react';
 
-const mockWikiData = [
-    {
-        id: 'hr', name: '인사/총무 가이드', isFolder: true, isOpen: true, children: [
-            { id: 'hr-1', name: '휴가 및 연차 규정', content: '# 연차 사용 가이드\n잔여 연차는 [마이페이지]에서 확인 가능하며, 반차/반반차 사용이 가능합니다.\n\n### 지각 및 결근 시\n- 지각 3회 누적 시 연차 1일 차감\n- 무단 결근 시 해당 일 급여 전액 차감 및 인사 위원회 회부' },
-            { id: 'hr-2', name: '경조사 지원 기준', content: '# 경조사 지원\n결혼, 출산, 조의 등 경조사 발생 시 인사팀에 청첩장/부고장 사본을 제출해주세요.\n- 본인 결혼: 화환 및 축하금 100만원, 유급휴가 5일\n- 직계 가족 조의: 조화 및 조의금 50만원, 유급휴가 3일' }
-        ]
-    },
-    {
-        id: 'it', name: 'IT 인프라 / 헬프데스크', isFolder: true, isOpen: false, children: [
-            { id: 'it-1', name: '와이파이 및 사내망 접속', content: '# Wi-Fi 접속 안내\n업무용 네트워크 대역은 사내 보안 규정에 따라 암호화됩니다.\n\n`SSID: SY_Office_5G`\n`Password: sy123456!@#`' },
-            { id: 'it-2', name: '보안 프로그램 설치 가이드', content: '# 보안 프로그램 안내\n사무실 외부에서 ERP/EMR 접속 시 VPN을 반드시 켜야 합니다.' }
-        ]
-    },
-    {
-        id: 'onboard', name: '신규 입사자 온보딩', isFolder: true, isOpen: false, children: [
-            { id: 'ob-1', name: 'Day 1 가이드', content: '# 환영합니다!\n첫 출근 시 부서장과 티타임을 가지고 웰컴 키트를 수령하세요.' }
-        ]
-    }
-];
+const mockWikiData: any[] = [];
 
 export default function WikiDashboard() {
     const [nodes, setNodes] = useState(mockWikiData);
@@ -57,7 +39,7 @@ export default function WikiDashboard() {
                             </button>
                             {folder.isOpen && (
                                 <div className="ml-4 mt-1 pl-2 border-l border-slate-200 space-y-1">
-                                    {folder.children.map(doc => (
+                                    {folder.children.map((doc: any) => (
                                         <button
                                             key={doc.id}
                                             onClick={() => setSelectedDoc(doc)}

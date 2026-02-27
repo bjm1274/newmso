@@ -34,18 +34,16 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: any) 
     const burnoutCandidates = staffs.filter((s: any) => (s.annual_leave_used || 0) < 3).length;
 
     setMetrics({
-      totalLaborCost: laborCost,
-      pendingApprovals: approvals.length,
       attendanceRate,
       leaveUsageRate: leaveRate,
       burnoutCandidates,
-      turnoverPrediction: (Math.random() * 5 + 2).toFixed(1), // 2~7%
-      efficiencyScore: (85 + Math.random() * 10).toFixed(1)
+      turnoverPrediction: 0, // Mock removed. Initializing with 0.
+      efficiencyScore: 0     // Mock removed. Initializing with 0.
     });
   }, [staffs, inventory, approvals, leaves]);
 
-  const monthlyTurnover = [2.1, 1.8, 3.2, 4.5, 2.8, 3.1, 2.0, 1.5, 2.2, 3.8, 4.1, 2.5]; // 가상 이직률 추이
-  const leaveUsageTrend = [12, 15, 25, 40, 55, 60, 85, 90, 75, 50, 45, 80]; // 가상 연차 사용률 추이
+  const monthlyTurnover: number[] = []; // Virtual data removed
+  const leaveUsageTrend: number[] = []; // Virtual data removed
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
@@ -100,21 +98,29 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: any) 
           </div>
 
           <div className="h-56 flex items-end justify-between gap-1 md:gap-2 relative">
-            <div className="absolute top-1/4 w-full border-t border-dashed border-danger/30 z-0"></div>
-            <div className="absolute top-1/2 w-full border-t border-dashed border-slate-200 z-0"></div>
-            {monthlyTurnover.map((val, i) => (
-              <div key={i} className="flex-1 flex flex-col items-center gap-3 h-full z-10 group relative">
-                {/* Tooltip */}
-                <div className="absolute -top-8 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                  {val}%
-                </div>
-                <div className="w-full flex-1 flex flex-col justify-end min-h-[50px]">
-                  <div className={`w-full rounded-t-md transition-all duration-500 hover:opacity-80 ${val >= 4.0 ? 'bg-danger' : val >= 3.0 ? 'bg-orange-400' : 'bg-slate-300'}`} style={{ height: `${(val / 5) * 100}%` }}></div>
-                </div>
-                <span className="text-[10px] font-bold text-slate-400">{i + 1}월</span>
+            {monthlyTurnover.length === 0 ? (
+              <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-300 uppercase tracking-widest">
+                분석할 데이터가 부족합니다
               </div>
-            ))}
+            ) : (
+              <>
+                <div className="absolute top-1/4 w-full border-t border-dashed border-danger/30 z-0"></div>
+                <div className="absolute top-1/2 w-full border-t border-dashed border-slate-200 z-0"></div>
+                {monthlyTurnover.map((val, i) => (
+                  <div key={i} className="flex-1 flex flex-col items-center gap-3 h-full z-10 group relative">
+                    <div className="absolute -top-8 bg-slate-800 text-white text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                      {val}%
+                    </div>
+                    <div className="w-full flex-1 flex flex-col justify-end min-h-[50px]">
+                      <div className={`w-full rounded-t-md transition-all duration-500 hover:opacity-80 ${val >= 4.0 ? 'bg-danger' : val >= 3.0 ? 'bg-orange-400' : 'bg-slate-300'}`} style={{ height: `${(val / 5) * 100}%` }}></div>
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-400">{i + 1}월</span>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
+
         </div>
 
         <div className="bg-white border border-slate-200/60 p-6 md:p-8 rounded-3xl shadow-sm">
@@ -127,21 +133,30 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: any) 
           </div>
 
           <div className="h-56 flex items-end justify-between gap-1 md:gap-2 relative">
-            <div className="absolute bottom-[50%] w-full border-t border-dashed border-slate-200 z-0"></div>
-            {leaveUsageTrend.map((val, i) => (
-              <div key={i} className="flex-1 flex flex-col items-center gap-3 h-full z-10 group relative">
-                <div className="absolute -top-8 bg-primary text-white text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                  {val}%
-                </div>
-                <div className="w-full flex-1 flex flex-col justify-end min-h-[50px]">
-                  <div className="w-full bg-primary/20 rounded-t-md relative transition-all duration-500 hover:bg-primary/40" style={{ height: `${val}%` }}>
-                    <div className="absolute bottom-0 w-full bg-primary rounded-t-sm" style={{ height: '4px' }}></div>
-                  </div>
-                </div>
-                <span className="text-[10px] font-bold text-slate-400">{i + 1}월</span>
+            {leaveUsageTrend.length === 0 ? (
+              <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-300 uppercase tracking-widest">
+                데이터가 집계 전입니다
               </div>
-            ))}
+            ) : (
+              <>
+                <div className="absolute bottom-[50%] w-full border-t border-dashed border-slate-200 z-0"></div>
+                {leaveUsageTrend.map((val, i) => (
+                  <div key={i} className="flex-1 flex flex-col items-center gap-3 h-full z-10 group relative">
+                    <div className="absolute -top-8 bg-primary text-white text-[10px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                      {val}%
+                    </div>
+                    <div className="w-full flex-1 flex flex-col justify-end min-h-[50px]">
+                      <div className="w-full bg-primary/20 rounded-t-md relative transition-all duration-500 hover:bg-primary/40" style={{ height: `${val}%` }}>
+                        <div className="absolute bottom-0 w-full bg-primary rounded-t-sm" style={{ height: '4px' }}></div>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-400">{i + 1}월</span>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
+
         </div>
       </div>
 
@@ -151,10 +166,8 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: any) 
         </div>
         <div className="z-10 xl:w-2/3">
           <h3 className="text-xl font-black text-white mb-2">지표 분석 리포트 요약</h3>
-          <p className="text-[12px] font-medium text-slate-300 leading-relaxed">
-            현재 조직의 평균 퇴사율은 동종 업계 대비 양호한 수준이나, 특정 부서(마케팅/영업)의 연차 미사용자가 다수 발견되어 번아웃 경고 수치가 상승했습니다.
-            <br />
-            인사팀 차원에서의 직접적인 면담 또는 휴가 사용 촉진 메일 발송을 권장합니다.
+          <p className="text-[12px] font-medium text-slate-300 leading-relaxed italic">
+            실제 인사 및 근태 데이터를 기반으로 분석 중입니다. 데이터가 쌓이면 부서별 번아웃 위험도 및 채용 전략 제안이 이곳에 표시됩니다.
           </p>
         </div>
         <button className="z-10 px-8 py-4 bg-white text-slate-900 text-[12px] font-black rounded-2xl shadow-lg hover:scale-105 active:scale-95 transition-all w-full md:w-auto shrink-0 flex items-center justify-center gap-2">

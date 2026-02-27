@@ -87,9 +87,7 @@ export default function HandoverNotes({ user }: { user: any }) {
                 .select();
 
             if (error) {
-                alert('저장에 실패했습니다.');
-                const mockNote = { ...newNote, id: crypto.randomUUID() };
-                setNotes([mockNote as HandoverNote, ...notes]);
+                alert('인계사항 저장에 실패했습니다. (DB 연결 확인 필요)');
             } else if (data) {
                 setNotes([data[0] as HandoverNote, ...notes]);
             }

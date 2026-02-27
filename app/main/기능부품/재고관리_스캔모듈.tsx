@@ -64,31 +64,9 @@ export default function InventoryScanModule({ onScanComplete }: any) {
   // OCR 처리 (시뮬레이션)
   const processImageWithOCR = async (imageData: string) => {
     // 실제 구현: Tesseract.js 또는 Google Vision API 호출
-    // 여기서는 시뮬레이션
-    
-    const mockData = {
-      바코드: {
-        product_name: '인슐린 주사기',
-        barcode: '8801234567890',
-        qty: 10,
-        unit_price: 5000,
-        expiry_date: '2026-12-31',
-        lot_number: 'LOT-2025-001'
-      },
-      명세서: {
-        items: [
-          { product_name: '수술용 장갑', qty: 100, unit_price: 2000 },
-          { product_name: '소독용 알콜', qty: 50, unit_price: 15000 },
-          { product_name: '멸균 거즈', qty: 200, unit_price: 1000 }
-        ],
-        supplier_name: '의료용품 A사',
-        invoice_date: new Date().toISOString().split('T')[0]
-      }
-    };
-
-    const result = mockData[scanMode as keyof typeof mockData];
-    setScannedData(result);
-    setRecognizedText(JSON.stringify(result, null, 2));
+    // 현재는 시뮬레이션 데이터를 제거하고 서비스 준비 중임을 알립니다.
+    alert('스마트 스캔(OCR) 서비스 준비 중입니다. 현재는 수동 입고 기능을 이용해 주세요.');
+    setLoading(false);
   };
 
   // 파일 업로드로 스캔 (모바일 미지원 환경용)
@@ -199,21 +177,19 @@ export default function InventoryScanModule({ onScanComplete }: any) {
       <div className="flex gap-2 bg-white p-4 rounded-[12px] border border-[var(--toss-border)] shadow-sm">
         <button
           onClick={() => setScanMode('바코드')}
-          className={`flex-1 px-6 py-3 rounded-[16px] text-xs font-semibold transition-all ${
-            scanMode === '바코드'
+          className={`flex-1 px-6 py-3 rounded-[16px] text-xs font-semibold transition-all ${scanMode === '바코드'
               ? 'bg-[var(--toss-blue)] text-white shadow-lg'
               : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]'
-          }`}
+            }`}
         >
           📱 바코드 스캔
         </button>
         <button
           onClick={() => setScanMode('명세서')}
-          className={`flex-1 px-6 py-3 rounded-[16px] text-xs font-semibold transition-all ${
-            scanMode === '명세서'
+          className={`flex-1 px-6 py-3 rounded-[16px] text-xs font-semibold transition-all ${scanMode === '명세서'
               ? 'bg-[var(--toss-blue)] text-white shadow-lg'
               : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]'
-          }`}
+            }`}
         >
           📄 명세서 스캔
         </button>

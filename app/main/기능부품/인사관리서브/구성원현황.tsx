@@ -24,7 +24,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     meal_allowance: 0, night_duty_allowance: 0, vehicle_allowance: 0, childcare_allowance: 0, research_allowance: 0, other_taxfree: 0, position_allowance: 0,
     overtime_allowance: 0, night_work_allowance: 0, holiday_work_allowance: 0, annual_leave_pay: 0,
     ins_national: true, ins_health: true, ins_employment: true, ins_injury: true, is_basic_living: false, other_welfare: '',
-    ins_duru_nuri: false, duru_nuri_start: '0000-00', duru_nuri_end: '0000-00', is_medical_benefit: false
+    ins_duru_nuri: false, duru_nuri_start: '0000-00', duru_nuri_end: '0000-00', is_medical_benefit: false,
+    working_hours_per_week: 40, working_days_per_week: 5
   });
 
   // ESS (직원 셀프 서비스) 승인 대기함 관련
@@ -33,15 +34,29 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
   useEffect(() => {
     const fetchEssRequests = async () => {
-      const { data } = await supabase
+      // 1. 먼저 보류 중인 모든 요청을 가져옴
+      const { data: logs } = await supabase
         .from('audit_logs')
         .select('*')
         .eq('target_type', 'ESS_PROFILE_UPDATE_PENDING')
         .order('created_at', { ascending: false });
-      if (data) setEssRequests(data);
+
+      if (!logs) {
+        setEssRequests([]);
+        return;
+      }
+
+      // 2. 현재 선택된 사업체에 속한 직원의 요청만 필터링
+      // (성능 최적화를 위해 클라이언트 사이드 필터링 수행, 대규모 시 테이블 조인 고려)
+      const filtered = logs.filter((log: any) => {
+        const staff = 직원목록.find((s: any) => s.id === log.target_id);
+        return staff && staff.company === 선택사업체;
+      });
+
+      setEssRequests(filtered);
     };
     fetchEssRequests();
-  }, [새로고침]);
+  }, [새로고침, 선택사업체, 직원목록]);
 
   const handleApproveEss = async (request: any) => {
     if (!confirm(`${request.user_name}님의 정보 변경 요청을 승인하시겠습니까?`)) return;
@@ -93,6 +108,24 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     fetchTeams();
   }, [새로고침]);
 
+  // 주당 근로시간 변경 시 연차 자동 계산 (비례 산정)
+  useEffect(() => {
+    const hours = 신규직원.working_hours_per_week || 0;
+    if (hours > 0) {
+      // (주당 근로시간 / 40) * 8시간 / 8시간(1일 기준) = 연차 일수
+      // 1개월 개근 시 발생하는 연차를 기준으로 계산 (단위: 일)
+      const calculatedLeave = (hours / 40); // 1일 기준 8시간이므로 단순히 시간 비중만 계산하면 일수가 됨
+      // 소수점 첫째 자리까지 반올림 (예: 주 24시간 -> 0.6일)
+      const roundedLeave = Math.round(calculatedLeave * 10) / 10;
+
+      // 1년 미만 근로자의 매월 발생하는 연차를 annual_leave_total에 기본값으로 세팅 (사용자가 원하면 수정 가능)
+      // 단, 기존 값이 0이거나 편집모드가 아닐 때만 자동 세팅하여 사용자 입력을 방해하지 않음
+      if (!편집모드 && 신규직원.연차총개수 === 0) {
+        신규직원설정(prev => ({ ...prev, 연차총개수: roundedLeave }));
+      }
+    }
+  }, [신규직원.working_hours_per_week]);
+
   const 팀목록가져오기 = (회사: string) => {
     if (팀목록캐시[회사]?.length) return 팀목록캐시[회사];
     if (회사 === 'SY INC.') return ['경영지원팀', '진료지원팀', '관리팀', '재무팀', '인사팀', '전략기획팀', '마케팅팀'];
@@ -141,6 +174,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         annual_leave_total: 0,
         annual_leave_used: 0,
         shift_id: 신규직원.근무형태ID || null,
+        working_hours_per_week: 신규직원.working_hours_per_week || 40,
+        working_days_per_week: 신규직원.working_days_per_week || 5,
         base_salary: 신규직원.base_salary,
         other_taxfree: 신규직원.other_taxfree ?? 0, position_allowance: 신규직원.position_allowance ?? 0,
         overtime_allowance: 신규직원.overtime_allowance ?? 0, night_work_allowance: 신규직원.night_work_allowance ?? 0,
@@ -148,7 +183,6 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       };
 
       if (편집모드 && 선택된직원ID) {
-        console.log('직원 정보 수정 시도:', { id: 선택된직원ID, department: 신규직원.팀 });
         const { error: updateErr, data: updatedData } = await supabase.from('staff_members').update({
           ...commonData,
           annual_leave_total: 신규직원.연차총개수,
@@ -156,10 +190,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         }).eq('id', 선택된직원ID).select();
 
         if (updateErr) {
-          console.error('수정 실패 에러:', updateErr);
           throw updateErr;
         }
-        console.log('수정 성공 데이터:', updatedData);
         alert('직원 정보가 수정되었습니다.');
       } else {
         // 사번 부여 로직: 박철홍이면 1, 아니면 2~9999 순차
@@ -184,14 +216,12 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
         const { error: insertErr } = await supabase.from('staff_members').insert([{ ...commonData, employee_no: newEmployeeNo, role: 'staff', password: '', join_date: dateOrNull(신규직원.입사일) }]);
         if (insertErr) {
-          console.error(insertErr);
           return alert('직원 등록 실패: ' + (insertErr.message || 'DB 오류'));
         }
         alert(`직원 등록 완료!\n로그인 아이디: 사번 ${newEmployeeNo} 또는 이름 ${신규직원.성명}\n(동명이인이 있으면 사번으로 로그인하세요)`);
       }
       닫기함수(); 새로고침();
     } catch (error: any) {
-      console.error('정보저장 오류:', error);
       alert('처리 중 오류가 발생했습니다: ' + (error.message || 'Unknown error'));
     }
   };
@@ -228,7 +258,9 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       ins_duru_nuri: ins.duru_nuri || false,
       duru_nuri_start: ins.duru_nuri_start || '0000-00',
       duru_nuri_end: ins.duru_nuri_end || '0000-00',
-      other_welfare: 직원.permissions?.other_welfare || ''
+      other_welfare: 직원.permissions?.other_welfare || '',
+      working_hours_per_week: 직원.working_hours_per_week || 40,
+      working_days_per_week: 직원.working_days_per_week || 5
     });
     편집모드설정(true);
   };
@@ -243,7 +275,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       base_salary: 0, meal_allowance: 0, night_duty_allowance: 0, vehicle_allowance: 0, childcare_allowance: 0, research_allowance: 0, other_taxfree: 0, position_allowance: 0,
       overtime_allowance: 0, night_work_allowance: 0, holiday_work_allowance: 0, annual_leave_pay: 0,
       ins_national: true, ins_health: true, ins_employment: true, ins_injury: true, is_basic_living: false, other_welfare: '',
-      ins_duru_nuri: false, duru_nuri_start: '0000-00', duru_nuri_end: '0000-00', is_medical_benefit: false
+      ins_duru_nuri: false, duru_nuri_start: '0000-00', duru_nuri_end: '0000-00', is_medical_benefit: false,
+      working_hours_per_week: 40, working_days_per_week: 5
     });
     창닫기?.();
   };
@@ -478,7 +511,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">성명 *</label>
-                          <input type="text" value={신규직원.성명} onChange={e => 신규직원설정({ ...신규직원, 성명: e.target.value })} className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/30" placeholder="홍길동" />
+                          <input type="text" value={신규직원.성명} onChange={e => 신규직원설정({ ...신규직원, 성명: e.target.value })} className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/30" placeholder="성명을 입력하세요" />
                         </div>
                         <div className="space-y-2">
                           <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">주민번호</label>
@@ -639,6 +672,36 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                                 {type}
                               </button>
                             ))}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="p-5 bg-purple-50 rounded-[24px] border border-purple-100 space-y-4">
+                        <h5 className="text-[11px] font-extrabold text-purple-800 flex items-center gap-1.5">⏱️ 상세 근로 시간 설정</h5>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-purple-700 ml-1">주당 근로시간 (시간)</label>
+                            <input
+                              type="number"
+                              value={신규직원.working_hours_per_week}
+                              onChange={e => 신규직원설정({ ...신규직원, working_hours_per_week: parseInt(e.target.value, 10) || 0 })}
+                              className="w-full p-3 bg-white rounded-[12px] border-none outline-none text-xs font-bold text-purple-900 focus:ring-2 focus:ring-purple-300"
+                              placeholder="40"
+                            />
+                            {신규직원.working_hours_per_week < 40 && 신규직원.working_hours_per_week > 0 && (
+                              <p className="text-[9px] font-bold text-purple-600 mt-1 ml-1">
+                                ✨ 단시간 근로자 비례 연차: 월 {Math.round((신규직원.working_hours_per_week / 40) * 10) / 10}일 발생
+                              </p>
+                            )}
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-purple-700 ml-1">주당 근무일수 (일)</label>
+                            <input
+                              type="number"
+                              value={신규직원.working_days_per_week}
+                              onChange={e => 신규직원설정({ ...신규직원, working_days_per_week: parseInt(e.target.value, 10) || 0 })}
+                              className="w-full p-3 bg-white rounded-[12px] border-none outline-none text-xs font-bold text-purple-900 focus:ring-2 focus:ring-purple-300"
+                              placeholder="5"
+                            />
                           </div>
                         </div>
                       </div>

@@ -282,14 +282,29 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
         }
 
         if (item.type === '인사명령' && item.meta_data.orderTargetId) {
-          const { orderTargetId, newPosition, orderCategory } = item.meta_data;
+          const { orderTargetId, newPosition, orderCategory, targetDept } = item.meta_data;
+          const { data: currentStaff } = await supabase.from('staff_members').select('department, position').eq('id', orderTargetId).single();
+
           const staffUpdate: any = {};
           if (newPosition) staffUpdate.position = newPosition;
-          if (orderCategory === '부서 이동(전보)' && item.meta_data.targetDept) {
-            staffUpdate.department = item.meta_data.targetDept;
+          if (orderCategory === '부서 이동(전보)' && targetDept) {
+            staffUpdate.department = targetDept;
           }
+
           if (Object.keys(staffUpdate).length > 0) {
             await supabase.from('staff_members').update(staffUpdate).eq('id', orderTargetId);
+
+            // 인사이동 이력 기록 (staff_transfer_history 테이블이 있다고 가정하고 insert 시도)
+            try {
+              await supabase.from('staff_transfer_history').insert({
+                staff_id: orderTargetId,
+                transfer_type: orderCategory,
+                before_value: orderCategory === '부서 이동(전보)' ? currentStaff?.department : currentStaff?.position,
+                after_value: orderCategory === '부서 이동(전보)' ? targetDept : newPosition,
+                effective_date: new Date().toISOString().split('T')[0],
+                approval_id: item.id
+              });
+            } catch (e) { /* 테이블 부재 시 무시 */ }
           }
         }
 
@@ -299,6 +314,21 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
           const start = new Date(startStr);
           const end = new Date(endStr);
           const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+
+          // 1. 인사관리 휴가신청 테이블(leave_requests) 동기화
+          try {
+            await supabase.from('leave_requests').insert({
+              staff_id: item.sender_id,
+              leave_type: item.meta_data?.leaveType || '연차',
+              start_date: startStr,
+              end_date: endStr,
+              reason: item.title,
+              status: '승인',
+              approved_at: new Date().toISOString()
+            });
+          } catch (e) { /* 테이블 부재 시 무시 */ }
+
+          // 2. 근태/연차 차감 로직 (기존 유지)
           for (let d = 0; d < days; d++) {
             const dte = new Date(start);
             dte.setDate(dte.getDate() + d);
@@ -308,13 +338,6 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
               date: dateStr,
               status: '휴가',
             }, { onConflict: 'staff_id,date' });
-            try {
-              await supabase.from('attendances').upsert({
-                staff_id: item.sender_id,
-                work_date: dateStr,
-                status: 'annual_leave',
-              }, { onConflict: 'staff_id,work_date' });
-            } catch (_) { }
           }
           const { data: staff } = await supabase.from('staff_members').select('annual_leave_used').eq('id', item.sender_id).single();
           const used = (Number(staff?.annual_leave_used) || 0) + days;

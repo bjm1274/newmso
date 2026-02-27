@@ -2,13 +2,16 @@
 -- SY INC. MSO 통합 관리 시스템 - 마스터 통합 스키마 (최종 복구용 v2)
 -- 작성일: 2026-02-27
 -- 목적: 유실된 모든 테이블과 제약 조건을 초기화하고 수납/인사/재고/채팅 기능을 복구합니다.
--- v2 수정사항: staff_members 테이블에 shift_id, resident_no 등 필수 컬럼 추가
+-- v3 수정사항: leave_requests, attendance, staff_transfer_history 등 누락된 인사/근태 테이블 추가 및 전체 테이블 DROP 구문 보완(멱등성 보장)
 -- ============================================================
 
 -- 0. 확장 기능 활성화
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- 기존 테이블 삭제 (의존성 순서 고려)
+DROP TABLE IF EXISTS notifications CASCADE;
+DROP TABLE IF EXISTS employment_contracts CASCADE;
+DROP TABLE IF EXISTS contract_templates CASCADE;
 DROP TABLE IF EXISTS daily_checks CASCADE;
 DROP TABLE IF EXISTS daily_closure_items CASCADE;
 DROP TABLE IF EXISTS daily_closures CASCADE;
@@ -24,6 +27,12 @@ DROP TABLE IF EXISTS inventory_receipts CASCADE;
 DROP TABLE IF EXISTS inventory CASCADE;
 DROP TABLE IF EXISTS suppliers CASCADE;
 DROP TABLE IF EXISTS system_configs CASCADE;
+DROP TABLE IF EXISTS education_records CASCADE;
+DROP TABLE IF EXISTS certificate_issuances CASCADE;
+DROP TABLE IF EXISTS staff_transfer_history CASCADE;
+DROP TABLE IF EXISTS staff_certifications CASCADE;
+DROP TABLE IF EXISTS leave_requests CASCADE;
+DROP TABLE IF EXISTS attendance CASCADE;
 DROP TABLE IF EXISTS work_shifts CASCADE;
 DROP TABLE IF EXISTS staff_members CASCADE;
 DROP TABLE IF EXISTS companies CASCADE;
@@ -90,6 +99,8 @@ CREATE TABLE staff_members (
     night_work_allowance BIGINT DEFAULT 0,
     holiday_work_allowance BIGINT DEFAULT 0,
     annual_leave_pay BIGINT DEFAULT 0,
+    working_hours_per_week INT DEFAULT 40,
+    working_days_per_week INT DEFAULT 5,
     last_seen_at TIMESTAMPTZ,
     presence_status VARCHAR(20) DEFAULT 'away',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -244,7 +255,73 @@ CREATE TABLE payroll (
     UNIQUE (company_id, staff_id, month)
 );
 
--- 10. 원무과 마감 관련
+-- 10. 인사/근태 상세 (attendance, leave_requests)
+CREATE TABLE attendance (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    staff_id UUID REFERENCES staff_members(id) ON DELETE CASCADE,
+    date DATE NOT NULL,
+    check_in TIMESTAMPTZ,
+    check_out TIMESTAMPTZ,
+    status VARCHAR(20) DEFAULT '정상',
+    notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(staff_id, date)
+);
+
+CREATE TABLE leave_requests (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    staff_id UUID REFERENCES staff_members(id) ON DELETE CASCADE,
+    leave_type VARCHAR(50) NOT NULL, -- 연차, 반차, 병가, 경조 등
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    reason TEXT,
+    status VARCHAR(20) DEFAULT '대기',
+    approved_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE staff_certifications (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    staff_id UUID REFERENCES staff_members(id) ON DELETE CASCADE,
+    name VARCHAR(200) NOT NULL,
+    issuer VARCHAR(100),
+    issue_date DATE,
+    expiry_date DATE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE staff_transfer_history (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    staff_id UUID REFERENCES staff_members(id) ON DELETE CASCADE,
+    transfer_type VARCHAR(50), -- 부서이동, 승진 등
+    before_value VARCHAR(100),
+    after_value VARCHAR(100),
+    effective_date DATE,
+    approval_id UUID REFERENCES approvals(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE education_records (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    staff_id UUID REFERENCES staff_members(id) ON DELETE CASCADE,
+    education_name VARCHAR(200) NOT NULL,
+    deadline DATE,
+    completed_at DATE,
+    status VARCHAR(20) DEFAULT '대기',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE certificate_issuances (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    staff_id UUID REFERENCES staff_members(id) ON DELETE CASCADE,
+    cert_type VARCHAR(50) NOT NULL,
+    serial_no VARCHAR(50) UNIQUE,
+    purpose TEXT,
+    issued_by UUID REFERENCES staff_members(id) ON DELETE SET NULL,
+    issued_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 11. 원무과 마감 관련
 CREATE TABLE daily_closures (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     company_id UUID REFERENCES companies(id),
@@ -307,6 +384,12 @@ CREATE TABLE employment_contracts (
     probation_percent INT DEFAULT 90,
     payment_day INT DEFAULT 7,
     content TEXT, -- 최종 생성된 HTML/텍스트
+    working_hours_per_week INT DEFAULT 40,
+    working_days_per_week INT DEFAULT 5,
+    shift_start_time TIME DEFAULT '09:00',
+    shift_end_time TIME DEFAULT '18:00',
+    break_start_time TIME DEFAULT '12:00',
+    break_end_time TIME DEFAULT '13:00',
     signature_data TEXT, -- 서명 이미지 DataURL
     requested_at TIMESTAMPTZ DEFAULT NOW(),
     signed_at TIMESTAMPTZ,
@@ -314,7 +397,19 @@ CREATE TABLE employment_contracts (
     UNIQUE(staff_id, contract_type, status)
 );
 
--- 12. 초기 데이터 설정
+-- 13. 알림 (notifications)
+CREATE TABLE notifications (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES staff_members(id) ON DELETE CASCADE,
+    type VARCHAR(50),
+    title TEXT,
+    body TEXT,
+    metadata JSONB,
+    read_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 14. 초기 데이터 설정
 INSERT INTO companies (name, type, is_active)
 VALUES 
 ('SY INC.', 'MSO', true),
@@ -364,6 +459,9 @@ CREATE INDEX idx_staff_members_shift_id ON staff_members(shift_id);
 CREATE INDEX idx_board_posts_company_id ON board_posts(company_id);
 CREATE INDEX idx_inventory_company_id ON inventory(company_id);
 CREATE INDEX idx_contracts_staff_id ON employment_contracts(staff_id);
+CREATE INDEX idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX idx_attendance_staff_date ON attendance(staff_id, date);
+CREATE INDEX idx_leave_requests_staff_id ON leave_requests(staff_id);
 
 ALTER TABLE staff_members ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public Access SM" ON staff_members FOR ALL USING (true);
@@ -383,4 +481,10 @@ ALTER TABLE contract_templates ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public Access CT" ON contract_templates FOR ALL USING (true);
 ALTER TABLE employment_contracts ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public Access EC" ON employment_contracts FOR ALL USING (true);
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public Access NT" ON notifications FOR ALL USING (true);
+ALTER TABLE leave_requests ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public Access LR" ON leave_requests FOR ALL USING (true);
+ALTER TABLE attendance ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public Access AT" ON attendance FOR ALL USING (true);
 

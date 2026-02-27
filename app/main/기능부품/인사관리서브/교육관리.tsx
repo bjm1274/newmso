@@ -16,20 +16,8 @@ export default function EducationMain({ staffs, selectedCo }: any) {
     const urgentNotis: any[] = [];
 
     filtered.forEach((staff: any) => {
-      const mockExpiry = new Date();
-      mockExpiry.setDate(today.getDate() + 7);
-
-      const diffDays = Math.ceil((mockExpiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-
-      if (diffDays <= 30) {
-        urgentNotis.push({
-          id: staff.id,
-          name: staff.name,
-          education: "개인정보보호",
-          daysLeft: diffDays,
-          type: diffDays <= 7 ? 'URGENT' : 'WARNING'
-        });
-      }
+      // TODO: 실제 교육 이수 데이터(education_records) 테이블과 연동하여 기한 계산 필요
+      // 현재는 가상 알림(mockExpiry) 로직을 제거했습니다.
     });
 
     setNotifications(urgentNotis);
