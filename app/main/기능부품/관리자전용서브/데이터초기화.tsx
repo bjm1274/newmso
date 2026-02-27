@@ -69,6 +69,13 @@ export default function DataReseter({ onRefresh }: { onRefresh: () => void }) {
         // 비활성화된 팝업 미디어 정리
         await supabase.from('popups').delete().eq('is_active', false);
       }
+      else if (type === 'force_logout') {
+        // 전역 세션 만료 시간 업데이트
+        const now = new Date().toISOString();
+        await supabase
+          .from('system_configs')
+          .upsert({ key: 'min_auth_time', value: now, description: '전체 로그아웃 시점' }, { onConflict: 'key' });
+      }
 
       alert("선택하신 데이터 초기화 작업이 성공적으로 완료되었습니다.");
       onRefresh();
@@ -111,6 +118,7 @@ export default function DataReseter({ onRefresh }: { onRefresh: () => void }) {
             <ResetButton onClick={() => runReset('system_logs')} label="🕒 시스템 활동 및 접속 로그 초기화 (용량 확보)" />
             <ResetButton onClick={() => runReset('expired_contracts')} label="📄 30일 경과 미체결 계약서 초안 일괄 삭제" />
             <ResetButton onClick={() => runReset('expired_popups')} label="🖼️ 비활성화된 홈페이지 팝업 데이터 정리" />
+            <ResetButton onClick={() => runReset('force_logout')} label="🚫 모든 시스템 접속자 강제 로그아웃" />
 
             {/* 직원 삭제: 관리자는 항상 제외 */}
             <button
