@@ -11,8 +11,11 @@ const MODELS = [
 ];
 
 async function callGemini(prompt: string): Promise<string> {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error('Gemini API 키가 설정되지 않았습니다.');
+    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+    if (!apiKey) {
+        console.error('Environment keys available:', Object.keys(process.env).filter(k => k.includes('KEY') || k.includes('API')));
+        throw new Error('Gemini API 키가 설정되지 않았습니다. .env.local 파일에 GEMINI_API_KEY가 있는지 확인해주세요.');
+    }
 
     for (const model of MODELS) {
         try {
@@ -41,7 +44,7 @@ async function callGemini(prompt: string): Promise<string> {
             console.error(`Model ${model} failed:`, err);
         }
     }
-    throw new Error('사용 가능한 Gemini 모델을 찾을 수 없습니다. API 키를 확인해주세요.');
+    throw new Error('Gemini 분석에 실패했습니다. (모델 연결 불가 혹은 API 키 오류)');
 }
 
 export async function POST(req: Request) {

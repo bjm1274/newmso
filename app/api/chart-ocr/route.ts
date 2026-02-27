@@ -11,8 +11,11 @@ const MODELS = [
 ];
 
 async function callGeminiVision(prompt: string, imageBase64: string, mimeType: string): Promise<string> {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error('Gemini API 키가 설정되지 않았습니다.');
+    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+    if (!apiKey) {
+        console.error('Environment keys available:', Object.keys(process.env).filter(k => k.includes('KEY') || k.includes('API')));
+        throw new Error('Gemini API 키가 설정되지 않았습니다. .env.local 파일에 GEMINI_API_KEY가 있는지 확인해주세요.');
+    }
 
     for (const model of MODELS) {
         try {
