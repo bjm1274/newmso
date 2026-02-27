@@ -55,3 +55,34 @@ BEGIN
         END IF;
     END IF;
 END $$;
+
+-- 4. 채팅방 기술 정보 (last_message_at, last_message 등)
+DO $$ 
+BEGIN
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'chat_rooms') THEN
+        ALTER TABLE chat_rooms ADD COLUMN IF NOT EXISTS last_message_at TIMESTAMPTZ;
+        ALTER TABLE chat_rooms ADD COLUMN IF NOT EXISTS last_message TEXT;
+        ALTER TABLE chat_rooms ADD COLUMN IF NOT EXISTS last_message_preview TEXT; -- 호환성용
+    END IF;
+END $$;
+
+-- 5. 채팅방 정보 자동 갱신 트리거 보정
+CREATE OR REPLACE FUNCTION update_chat_room_last_message_v2()
+RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE chat_rooms
+  SET
+    last_message_at = NEW.created_at,
+    last_message = LEFT(COALESCE(NEW.content, '(파일)'), 100),
+    last_message_preview = LEFT(COALESCE(NEW.content, '(파일)'), 80)
+  WHERE id = NEW.room_id;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 트리거 재연결 (messages 테이블 대상)
+DROP TRIGGER IF EXISTS trigger_messages_update_room_last ON messages;
+CREATE TRIGGER trigger_messages_update_room_last
+  AFTER INSERT ON messages
+  FOR EACH ROW
+  EXECUTE PROCEDURE update_chat_room_last_message_v2();
