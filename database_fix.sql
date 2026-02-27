@@ -86,3 +86,45 @@ CREATE TRIGGER trigger_messages_update_room_last
   AFTER INSERT ON messages
   FOR EACH ROW
   EXECUTE PROCEDURE update_chat_room_last_message_v2();
+
+-- 6. 메시지 생성 시 알림(notifications) 테이블 자동 삽입 트리거
+CREATE OR REPLACE FUNCTION create_message_notification()
+RETURNS TRIGGER AS $$
+DECLARE
+    target_members UUID[];
+    m_id UUID;
+    sender_name TEXT;
+BEGIN
+    -- 1. 채팅방 정보 및 멤버 가져오기
+    SELECT members INTO target_members FROM chat_rooms WHERE id = NEW.room_id;
+    
+    -- 2. 발신자 이름 가져오기
+    SELECT name INTO sender_name FROM staff_members WHERE id = NEW.sender_id;
+    
+    -- 3. 각 멤버에게 알림 삽입 (발신자 제외)
+    IF target_members IS NOT NULL THEN
+        FOREACH m_id IN ARRAY target_members
+        LOOP
+            IF m_id != NEW.sender_id THEN
+                INSERT INTO notifications (user_id, type, title, body, metadata, created_at)
+                VALUES (
+                    m_id,
+                    'message',
+                    '💬 ' || COALESCE(sender_name, '새로운 메시지'),
+                    LEFT(COALESCE(NEW.content, '(파일)'), 100),
+                    jsonb_build_object('room_id', NEW.room_id, 'message_id', NEW.id, 'type', 'message'),
+                    NEW.created_at
+                );
+            END IF;
+        END LOOP;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS tr_messages_to_notifications ON messages;
+CREATE TRIGGER tr_messages_to_notifications
+    AFTER INSERT ON messages
+    FOR EACH ROW
+    EXECUTE FUNCTION create_message_notification();
