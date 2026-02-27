@@ -314,6 +314,22 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
                                 {item.quantity <= item.min_quantity && (
                                   <button onClick={() => handleAutoApprovalRequest(item)} className="px-2 py-1 bg-orange-600 text-white text-[11px] font-semibold rounded-md shadow-sm">발주</button>
                                 )}
+                                <button
+                                  onClick={async () => {
+                                    if (confirm(`[${item.item_name}] 품목을 정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
+                                      try {
+                                        await supabase.from('inventory').delete().eq('id', item.id);
+                                        alert('삭제되었습니다.');
+                                        fetchInventory();
+                                      } catch (err) {
+                                        alert('삭제 오류가 발생했습니다.');
+                                      }
+                                    }
+                                  }}
+                                  className="px-2 py-1 bg-red-50 text-red-600 text-[11px] font-semibold rounded-md hover:bg-red-100"
+                                >
+                                  삭제
+                                </button>
                               </td>
                             </tr>
                           );

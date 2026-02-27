@@ -123,10 +123,7 @@ export default function SalarySlipContainer({ user }: any) {
     <>
       <style>{`
         @media print {
-          @page {
-            size: A4 landscape;
-            margin: 0;
-          }
+          @page { size: landscape; margin: 5mm; }
           body * { 
             visibility: hidden; 
             print-color-adjust: exact !important;
@@ -137,25 +134,12 @@ export default function SalarySlipContainer({ user }: any) {
             position: absolute;
             left: 0;
             top: 0;
-            width: 297mm;
-            height: 209mm;
-            overflow: hidden;
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            padding-top: 5mm; /* 상단 여백 */
+            width: 100%;
           }
-          #print-section * { 
-            visibility: visible !important; 
-          }
-          /* 원본 데스크탑 넓이(1200px) 고정 후 화면 캡처하듯 정확히 88% 축소 */
+          #print-section * { visibility: visible !important; }
           #print-section > div {
-            width: 1200px !important;
-            min-width: 1200px !important;
+            width: 100% !important;
             max-width: none !important;
-            margin: 0 !important;
-            transform: scale(0.88) !important;
-            transform-origin: top center !important;
           }
         }
       `}</style>

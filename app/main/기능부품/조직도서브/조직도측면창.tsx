@@ -153,6 +153,11 @@ export default function Sidebar({ user, mainMenu, subView, onMenuChange, onOpenN
             <span className="text-[10px] font-bold mt-1 truncate w-full text-center">{m.label}</span>
           </button>
         ))}
+        {onOpenNotifications && (
+          <div className="flex flex-col items-center justify-center min-h-[50px] py-1.5 px-2 flex-none translate-y-[-2px]">
+            <GlobalNotificationBell user={user} onOpenFull={onOpenNotifications} />
+          </div>
+        )}
       </nav>
 
     </>
