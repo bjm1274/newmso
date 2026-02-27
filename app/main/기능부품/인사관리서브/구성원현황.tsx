@@ -16,15 +16,16 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   const [팀목록캐시, 팀목록캐시설정] = useState<Record<string, string[]>>({});
   const [activeTab, setActiveTab] = useState('기본'); // '기본', '소속', '급여'
   const [신규직원, 신규직원설정] = useState({
-    성명: '', 전화번호: '', 내선번호: '', 사업체: '박철홍정형외과', 팀: '원무팀', 직함: '', 입사일: '0000-00-00', 퇴사일: '0000-00-00',
-    주민번호: '', 이메일: '', 주소: '', 면허사항: '', 면허번호: '', 취득일자: '0000-00-00', 계좌정보: '', 임금정보: '', 상태: '재직',
+    성명: '', 전화번호: '', 내선번호: '', 사업체: '박철홍정형외과', 팀: '원무팀', 직함: '', 입사일: '', 퇴사일: '',
+    주민번호: '', 이메일: '', 주소: '', 면허사항: '', 면허번호: '', 취득일자: '', 계좌정보: '', 임금정보: '', 상태: '재직',
     연차총개수: 0, 연차사용개수: 0, 근무형태ID: '',
-    고용형태: '정규직' as string, 계약종료일: '0000-00-00' as string,
+    고용형태: '정규직' as string, 계약종료일: '' as string,
+    probation_months: 0,
     base_salary: 0,
     meal_allowance: 0, night_duty_allowance: 0, vehicle_allowance: 0, childcare_allowance: 0, research_allowance: 0, other_taxfree: 0, position_allowance: 0,
     overtime_allowance: 0, night_work_allowance: 0, holiday_work_allowance: 0, annual_leave_pay: 0,
     ins_national: true, ins_health: true, ins_employment: true, ins_injury: true, is_basic_living: false, other_welfare: '',
-    ins_duru_nuri: false, duru_nuri_start: '0000-00', duru_nuri_end: '0000-00', is_medical_benefit: false,
+    ins_duru_nuri: false, duru_nuri_start: '', duru_nuri_end: '', is_medical_benefit: false,
     working_hours_per_week: 40, working_days_per_week: 5
   });
 
@@ -133,9 +134,9 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   };
 
   const 정보저장 = async () => {
-    if (!신규직원.성명 || !신규직원.입사일 || 신규직원.입사일 === '0000-00-00') return alert('성함과 실제 입사일은 필수 입력 사항입니다.');
+    if (!신규직원.성명 || !신규직원.입사일 || 신규직원.입사일 === '0000-00-00' || 신규직원.입사일 === '') return alert('성함과 실제 입사일은 필수 입력 사항입니다.');
     try {
-      const dateOrNull = (val: string) => (val === '0000-00-00' || val === '0000-00' || !val) ? null : val;
+      const dateOrNull = (val: string) => (val === '0000-00-00' || val === '0000-00' || !val || val === '') ? null : val;
       const commonData = {
         name: 신규직원.성명,
         phone: 신규직원.전화번호,
@@ -167,6 +168,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
             duru_nuri_start: dateOrNull(신규직원.duru_nuri_start),
             duru_nuri_end: dateOrNull(신규직원.duru_nuri_end)
           },
+          probation_months: 신규직원.probation_months || 0,
           is_basic_living: 신규직원.is_basic_living,
           is_medical_benefit: 신규직원.is_medical_benefit,
           other_welfare: 신규직원.other_welfare
@@ -232,11 +234,11 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     const ins = 직원.permissions?.insurance || { national: true, health: true, employment: true, injury: true };
     신규직원설정({
       성명: 직원.name || '', 전화번호: 직원.phone || '', 내선번호: extensionValue, 사업체: 직원.company || '박철홍정형외과',
-      팀: 직원.department ?? '', 직함: 직원.position || '', 입사일: 직원.joined_at || 직원.join_date || '0000-00-00',
-      퇴사일: 직원.resigned_at || '0000-00-00', 주민번호: 직원.resident_no || '', 이메일: 직원.email || '',
+      팀: 직원.department ?? '', 직함: 직원.position || '', 입사일: 직원.joined_at || 직원.join_date || '',
+      퇴사일: 직원.resigned_at || '', 주민번호: 직원.resident_no || '', 이메일: 직원.email || '',
       주소: 직원.address || '', 면허사항: 직원.license || '',
       면허번호: 직원.permissions?.license_no || '',
-      취득일자: 직원.permissions?.license_date || '0000-00-00',
+      취득일자: 직원.permissions?.license_date || '',
       계좌정보: 직원.bank_account || '',
       임금정보: 직원.salary_info || '', 상태: 직원.status || '재직',
       연차총개수: typeof 직원.annual_leave_total === 'number' ? 직원.annual_leave_total : 0,
@@ -248,7 +250,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       overtime_allowance: 직원.overtime_allowance ?? 0, night_work_allowance: 직원.night_work_allowance ?? 0,
       holiday_work_allowance: 직원.holiday_work_allowance ?? 0, annual_leave_pay: 직원.annual_leave_pay ?? 0,
       고용형태: 직원.permissions?.employment_type || '정규직',
-      계약종료일: 직원.permissions?.contract_end_date || '0000-00-00',
+      계약종료일: 직원.permissions?.contract_end_date || '',
+      probation_months: 직원.permissions?.probation_months || 0,
       ins_national: ins.national !== false,
       ins_health: ins.health !== false,
       ins_employment: ins.employment !== false,
@@ -256,8 +259,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       is_basic_living: 직원.permissions?.is_basic_living || false,
       is_medical_benefit: 직원.permissions?.is_medical_benefit || false,
       ins_duru_nuri: ins.duru_nuri || false,
-      duru_nuri_start: ins.duru_nuri_start || '0000-00',
-      duru_nuri_end: ins.duru_nuri_end || '0000-00',
+      duru_nuri_start: ins.duru_nuri_start || '',
+      duru_nuri_end: ins.duru_nuri_end || '',
       other_welfare: 직원.permissions?.other_welfare || '',
       working_hours_per_week: 직원.working_hours_per_week || 40,
       working_days_per_week: 직원.working_days_per_week || 5
@@ -268,14 +271,15 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   const 닫기함수 = () => {
     편집모드설정(false); 선택된직원ID설정(null);
     신규직원설정({
-      성명: '', 전화번호: '', 내선번호: '', 사업체: '박철홍정형외과', 팀: '원무팀', 직함: '', 입사일: '0000-00-00', 퇴사일: '0000-00-00',
-      주민번호: '', 이메일: '', 주소: '', 면허사항: '', 면허번호: '', 취득일자: '0000-00-00', 계좌정보: '', 임금정보: '', 상태: '재직',
+      성명: '', 전화번호: '', 내선번호: '', 사업체: '박철홍정형외과', 팀: '원무팀', 직함: '', 입사일: '', 퇴사일: '',
+      주민번호: '', 이메일: '', 주소: '', 면허사항: '', 면허번호: '', 취득일자: '', 계좌정보: '', 임금정보: '', 상태: '재직',
       연차총개수: 0, 연차사용개수: 0, 근무형태ID: '',
-      고용형태: '정규직', 계약종료일: '0000-00-00',
+      고용형태: '정규직', 계약종료일: '',
+      probation_months: 0,
       base_salary: 0, meal_allowance: 0, night_duty_allowance: 0, vehicle_allowance: 0, childcare_allowance: 0, research_allowance: 0, other_taxfree: 0, position_allowance: 0,
       overtime_allowance: 0, night_work_allowance: 0, holiday_work_allowance: 0, annual_leave_pay: 0,
       ins_national: true, ins_health: true, ins_employment: true, ins_injury: true, is_basic_living: false, other_welfare: '',
-      ins_duru_nuri: false, duru_nuri_start: '0000-00', duru_nuri_end: '0000-00', is_medical_benefit: false,
+      ins_duru_nuri: false, duru_nuri_start: '', duru_nuri_end: '', is_medical_benefit: false,
       working_hours_per_week: 40, working_days_per_week: 5
     });
     창닫기?.();
@@ -652,7 +656,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                           <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">입사일 *</label>
                           <SmartDatePicker
                             value={신규직원.입사일}
-                            onChange={val => 신규직원설정({ ...신규직원, 입사일: val || '0000-00-00' })}
+                            onChange={val => 신규직원설정({ ...신규직원, 입사일: val || '' })}
                             className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/30"
                           />
                         </div>
@@ -673,6 +677,21 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                               </button>
                             ))}
                           </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-[11px] font-bold text-blue-600 ml-1">수습 기간 설정</label>
+                          <select
+                            value={신규직원.probation_months}
+                            onChange={e => 신규직원설정({ ...신규직원, probation_months: Number(e.target.value) })}
+                            className="w-full p-4 bg-blue-50 rounded-[16px] border border-blue-100 outline-none font-bold text-sm focus:ring-2 focus:ring-blue-300 appearance-none"
+                          >
+                            <option value={0}>수습 없음</option>
+                            <option value={1}>1개월</option>
+                            <option value={2}>2개월</option>
+                            <option value={3}>3개월</option>
+                            <option value={6}>6개월</option>
+                          </select>
                         </div>
                       </div>
                       <div className="p-5 bg-purple-50 rounded-[24px] border border-purple-100 space-y-4">
@@ -710,7 +729,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                           <label className="text-[11px] font-bold text-orange-600 ml-1">계약 종료일</label>
                           <SmartDatePicker
                             value={신규직원.계약종료일}
-                            onChange={val => 신규직원설정({ ...신규직원, 계약종료일: val || '0000-00-00' })}
+                            onChange={val => 신규직원설정({ ...신규직원, 계약종료일: val || '' })}
                             className="w-full p-4 bg-orange-50 rounded-[16px] border border-orange-100 outline-none font-bold text-sm focus:ring-2 focus:ring-orange-300"
                           />
                         </div>
@@ -852,13 +871,13 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                               <SmartDatePicker
                                 placeholder="0000-00"
                                 value={신규직원.duru_nuri_start}
-                                onChange={val => 신규직원설정({ ...신규직원, duru_nuri_start: val || '0000-00' })}
+                                onChange={val => 신규직원설정({ ...신규직원, duru_nuri_start: val || '' })}
                                 inputClassName="p-2.5 bg-white border border-blue-200 rounded-lg text-[10px] font-bold"
                               />
                               <SmartDatePicker
                                 placeholder="0000-00"
                                 value={신규직원.duru_nuri_end}
-                                onChange={val => 신규직원설정({ ...신규직원, duru_nuri_end: val || '0000-00' })}
+                                onChange={val => 신규직원설정({ ...신규직원, duru_nuri_end: val || '' })}
                                 inputClassName="p-2.5 bg-white border border-blue-200 rounded-lg text-[10px] font-bold"
                               />
                             </div>

@@ -161,6 +161,9 @@ export default function ContractPreview({ staff, contract }: Props) {
       probation_months: String(contract?.probation_months || '3'),
       probation_percent: String(contract?.probation_percent || '90'),
       payment_day: String(contract?.payment_day || '7'),
+      contract_start: formatDate(contract?.contract_start_date || user?.joined_at || salarySource?.join_date),
+      contract_end: contract?.contract_end_date ? formatDate(contract.contract_end_date) : '정년도달시',
+      conditions_applied_at: formatDate(contract?.conditions_applied_at || salarySource?.effective_date),
       today: formatDate(new Date().toISOString()),
     };
 

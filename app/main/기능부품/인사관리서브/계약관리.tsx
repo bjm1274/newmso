@@ -48,6 +48,17 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: any) {
 
       const requests = checkedIds.map((staffId: number) => {
         const s = staffs?.find((x: any) => x.id === staffId);
+        const probationMonths = s?.permissions?.probation_months || 0;
+        const joinDate = s?.joined_at || s?.join_date;
+
+        // 근로조건 적용일 계산 (수습 종료 익일)
+        let conditionsAppDate = salaryInfo.effective_date;
+        if (joinDate && probationMonths > 0) {
+          const d = new Date(joinDate);
+          d.setMonth(d.getMonth() + probationMonths);
+          conditionsAppDate = d.toISOString().split('T')[0];
+        }
+
         const pay = includeTaxFree
           ? {
             base_salary: salaryInfo.base_salary ?? s?.base_salary ?? 0,
@@ -57,7 +68,7 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: any) {
             position_allowance: salaryInfo.position_allowance ?? s?.position_allowance ?? 0,
             research_allowance: salaryInfo.research_allowance ?? s?.research_allowance ?? 0,
             other_taxfree: salaryInfo.other_taxfree ?? s?.other_taxfree ?? 0,
-            effective_date: salaryInfo.effective_date
+            effective_date: conditionsAppDate
           }
           : {
             base_salary: s?.base_salary ?? 0,
@@ -67,7 +78,7 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: any) {
             position_allowance: s?.position_allowance ?? 0,
             research_allowance: s?.research_allowance ?? 0,
             other_taxfree: s?.other_taxfree ?? 0,
-            effective_date: salaryInfo.effective_date
+            effective_date: conditionsAppDate
           };
         return {
           staff_id: staffId,
@@ -80,6 +91,9 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: any) {
           shift_end_time: salaryInfo.shift_end_time ?? '18:00',
           break_start_time: salaryInfo.break_start_time ?? '12:00',
           break_end_time: salaryInfo.break_end_time ?? '13:00',
+          probation_months: probationMonths,
+          contract_start_date: joinDate,
+          conditions_applied_at: conditionsAppDate,
           ...pay
         };
       });
