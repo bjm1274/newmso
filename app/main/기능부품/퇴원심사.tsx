@@ -366,7 +366,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
 
     const requestAiAnalysis = async () => {
         if (!selectedReview) return;
-        setAiLoading(true); setAiResult(''); setAiRecommendations('');
+        setAiLoading(true); setAiResult('');
         const tmpl = templates.find(t => t.id === selectedReview.template_id);
         try {
             const res = await fetch('/api/discharge-review', {
@@ -709,7 +709,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                 <button onClick={() => setTab('new')} className="px-6 py-3 bg-gray-900 text-white text-xs font-bold rounded-xl">➕ 새 심사 등록</button>
                             </div>
                         ) : reviews.map(r => (
-                            <button key={r.id} onClick={() => { setSelectedReview(r); setAiResult(r.ai_analysis || ''); setAiRecommendations(''); setCompareResult(null); }}
+                            <button key={r.id} onClick={() => { setSelectedReview(r); setAiResult(r.ai_analysis || ''); setCompareResult(null); }}
                                 className="w-full p-5 bg-white rounded-2xl border border-[var(--toss-border)] shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all text-left">
                                 <div className="flex justify-between items-start">
                                     <div className="space-y-1">

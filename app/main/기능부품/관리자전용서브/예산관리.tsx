@@ -188,11 +188,10 @@ export default function 예산관리({ staffs = [] }: { staffs: any[] }) {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2 rounded-[10px] text-sm font-bold transition-all ${
-              activeTab === tab.id
-                ? 'bg-white text-[var(--toss-blue)] shadow-sm'
-                : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'
-            }`}
+            className={`px-4 py-2 rounded-[10px] text-sm font-bold transition-all ${activeTab === tab.id
+              ? 'bg-white text-[var(--toss-blue)] shadow-sm'
+              : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'
+              }`}
           >
             {tab.label}
           </button>
@@ -398,8 +397,8 @@ export default function 예산관리({ staffs = [] }: { staffs: any[] }) {
                   <XAxis dataKey="dept" tick={{ fontSize: 12, fill: 'var(--toss-gray-3)' }} />
                   <YAxis tickFormatter={(v: number) => `${(v / 10000).toFixed(0)}만`} tick={{ fontSize: 11, fill: 'var(--toss-gray-3)' }} />
                   <Tooltip
-                    formatter={(value: number, name: string) => [
-                      `${value.toLocaleString()}원`,
+                    formatter={(value: any, name: any) => [
+                      `${(value || 0).toLocaleString()}원`,
                       name === 'budget' ? '예산' : name === 'executed' ? '집행' : '잔액'
                     ]}
                     contentStyle={{ borderRadius: '10px', border: '1px solid var(--toss-border)', background: 'var(--toss-card)' }}
