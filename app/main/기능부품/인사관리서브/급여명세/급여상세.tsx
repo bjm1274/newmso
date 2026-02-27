@@ -252,7 +252,7 @@ export default function SalaryDetail({ record, staff }: any) {
               * 본 명세서는 근로기준법 제48조 제2항에 의거하여 지급되는 정식 급여명세서입니다.
             </p>
             <p className="text-[10px] text-[var(--toss-gray-3)] opacity-60">
-              Generated: {new Date().toLocaleString()} · 전자문서 확인번호: PAY-{Math.random().toString(36).substr(2, 9).toUpperCase()}
+              Generated: {new Date().toLocaleString()} · 전자문서 확인번호: PAY-{crypto.randomUUID().split('-')[0].toUpperCase()}
             </p>
           </div>
           <div className="flex items-center gap-6">

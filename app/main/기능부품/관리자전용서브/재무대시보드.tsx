@@ -4,19 +4,17 @@ import { useState } from 'react';
 export default function FinancialDashboard() {
     const [period, setPeriod] = useState<'Q1' | 'Q2' | 'Q3' | 'Q4' | '초기화'>('Q1');
 
-    // Hardcoded mockup data for presentation
-    const cashFlow = {
-        in: 1250000000,
-        out: 840000000,
-        balance: 410000000
-    };
+    // Hardcoded mockup data removed. Now initializing with zero.
+    const [cashFlow, setCashFlow] = useState({
+        in: 0,
+        out: 0,
+        balance: 0
+    });
 
-    const budgets = [
-        { name: '마케팅본부', total: 500000000, used: 210000000 },
-        { name: '개발본부', total: 800000000, used: 650000000 },
-        { name: '운영본부', total: 300000000, used: 120000000 },
-        { name: '디자인팀', total: 150000000, used: 140000000 },
-    ];
+    const [budgets, setBudgets] = useState<any[]>([]);
+
+    // TODO: useEffect에서 실제 supabase fetch (daily_closures 등) 로직 구현 가능
+
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500 max-w-7xl mx-auto pb-20">
@@ -64,7 +62,11 @@ export default function FinancialDashboard() {
                         <span>🔥</span> 부서별 예산 통제 현황 (Budget Burn Rate)
                     </h3>
                     <div className="space-y-6">
-                        {budgets.map((b, i) => {
+                        {budgets.length === 0 ? (
+                            <div className="py-10 text-center text-xs text-slate-400 font-bold uppercase tracking-widest">
+                                예산 데이터가 없습니다
+                            </div>
+                        ) : budgets.map((b, i) => {
                             const percent = (b.used / b.total) * 100;
                             const isWarning = percent > 85;
                             return (
@@ -83,23 +85,24 @@ export default function FinancialDashboard() {
                                 </div>
                             );
                         })}
+
                     </div>
                 </div>
 
                 <div className="bg-slate-900 rounded-3xl p-6 md:p-8 shadow-xl text-white relative overflow-hidden flex flex-col justify-center border border-slate-700">
                     <div className="absolute top-0 right-0 p-8 text-8xl opacity-10">📉</div>
                     <h3 className="text-sm font-black text-white mb-2 relative z-10">AI 재무 건전성 분석</h3>
-                    <p className="text-[11px] font-medium text-slate-400 leading-relaxed relative z-10">
-                        현재 현금흐름(Runway)은 안정적이며, 이전 분기 대비 영업 이익률이 <b>14.2%</b> 상승했습니다. 다만 <b>디자인팀</b>과 <b>개발본부</b>의 인건비 및 SW 라이선스 예산 소진 속도가 계획 대비 빠릅니다.
+                    <p className="text-[11px] font-medium text-slate-400 leading-relaxed relative z-10 italic">
+                        실제 데이터를 분석 중입니다. 데이터가 충분히 쌓이면 경영진을 위한 인사이트가 자동으로 생성됩니다.
                     </p>
                     <div className="mt-8 grid grid-cols-2 gap-4 relative z-10">
                         <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">런웨이 (Runway)</p>
-                            <p className="text-xl font-black mt-1">18.5개월</p>
+                            <p className="text-xl font-black mt-1">데이터 부족</p>
                         </div>
                         <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">OpEx 런레이트</p>
-                            <p className="text-xl font-black mt-1 text-red-400">+4.2% ↑</p>
+                            <p className="text-xl font-black mt-1 text-slate-500">-</p>
                         </div>
                     </div>
                 </div>

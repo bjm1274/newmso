@@ -30,24 +30,10 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: any) {
 
   const handleOCRScan = async (file: File) => {
     setUploadLoading(true);
-    // Simulate OCR delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    // Simulated result from a typical National Tax Service (Hometax) PDF
-    const mockResult = {
-      total_salary: 48000000,
-      tax_paid: 2400000,
-      insurance: 3800000,
-      deductions: {
-        credit_card: 1200000,
-        medical: 500000,
-        education: 0,
-      }
-    };
-
-    setScanResult(mockResult);
+    // 실제 OCR API 연동 전까지 시뮬레이션 데이터를 제거합니다.
+    await new Promise(resolve => setTimeout(resolve, 1500));
     setUploadLoading(false);
-    alert("원천징수 영수증 분석이 완료되었습니다. 항목을 확인해 주세요.");
+    alert("스마트 OCR 분석 서비스 준비 중입니다. 현재는 수기 입력 기능을 이용해 주세요.");
   };
 
   const fetchSettlementData = async () => {

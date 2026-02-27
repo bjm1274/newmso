@@ -5,58 +5,47 @@ import { supabase } from '@/lib/supabase';
 export default function LicenseTracking({ staffs, selectedCo }: any) {
     const [searchTerm, setSearchTerm] = useState('');
 
-    // 가상의 자격증 데이터 (실제로는 staff_members의 면허/자격 필드나 별도 테이블 연동)
-    const mockLicenses = useMemo(() => {
+    // 실제 데이터베이스의 직원 정보를 기반으로 자격증 목록 생성
+    const realLicenses = useMemo(() => {
         const list: any[] = [];
         const filtered = selectedCo === '전체' ? staffs : staffs?.filter((s: any) => s.company === selectedCo);
 
         filtered?.forEach((staff: any) => {
-            // 병원/의원 직원일 때 면허증 추가
-            if (staff.company?.includes('의원') || staff.company?.includes('외과')) {
-                let type = '보건의료인 자격증';
-                if (staff.position === '원장' || staff.position === '병원장') type = '의사면허';
-                if (staff.position?.includes('간호') || staff.department?.includes('간호')) type = '간호사면허';
-                if (staff.position?.includes('물리치료')) type = '물리치료사면허';
-                if (staff.position?.includes('방사선')) type = '방사선사면허';
+            const p = staff.permissions || {};
+            // 직원 정보에 면허/자격 사항이 등록되어 있는 경우에만 표시
+            if (staff.license || p.license_no) {
+                const expDateStr = p.license_date || '0000-00-00';
+                let status = '정상';
 
-                const isExpired = Math.random() > 0.8; // 20% 확률로 만료 위험
-                const expDate = new Date();
-                expDate.setDate(expDate.getDate() + (isExpired ? Math.floor(Math.random() * 30) : 100 + Math.floor(Math.random() * 300)));
+                // 만료일이 현재 날짜 기준 30일 이내인지 체크 (데이터가 유효할 때만)
+                if (expDateStr !== '0000-00-00') {
+                    const expDate = new Date(expDateStr);
+                    const today = new Date();
+                    const diffDays = Math.ceil((expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                    if (diffDays <= 0) status = '만료됨';
+                    else if (diffDays <= 30) status = '갱신요망(30일내)';
+                }
 
                 list.push({
                     id: staff.id,
                     name: staff.name,
                     department: staff.department,
                     company: staff.company,
-                    licenseName: type,
-                    licenseNumber: `LC-${Math.floor(Math.random() * -10000000).toString().substring(1)}`,
-                    expirationDate: expDate.toISOString().split('T')[0],
-                    status: isExpired ? '갱신요망(30일내)' : '정상'
+                    licenseName: staff.license || '미지정 자격',
+                    licenseNumber: p.license_no || '-',
+                    expirationDate: expDateStr,
+                    status: status
                 });
-            } else {
-                // 일반 기업 직원일 때
-                if (Math.random() > 0.5) {
-                    const expDate = new Date();
-                    expDate.setDate(expDate.getDate() + 200);
-                    list.push({
-                        id: staff.id,
-                        name: staff.name,
-                        department: staff.department,
-                        company: staff.company,
-                        licenseName: '정보처리기사',
-                        licenseNumber: `IT-${Math.floor(Math.random() * 100000)}`,
-                        expirationDate: expDate.toISOString().split('T')[0],
-                        status: '정상'
-                    });
-                }
             }
         });
         return list;
     }, [staffs, selectedCo]);
 
-    const filtered = mockLicenses.filter(l =>
+    const filtered = realLicenses.filter((l: any) =>
         l.name.includes(searchTerm) || l.licenseName.includes(searchTerm)
     );
+
+
 
     return (
         <div className="space-y-6 animate-in slide-in-from-bottom-5">
@@ -84,21 +73,21 @@ export default function LicenseTracking({ staffs, selectedCo }: any) {
                 <div className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm flex items-center justify-between">
                     <div>
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">총 등록 자격증</p>
-                        <p className="text-2xl font-black text-slate-800">{mockLicenses.length}건</p>
+                        <p className="text-2xl font-black text-slate-800">{realLicenses.length}건</p>
                     </div>
                     <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-xl">📜</div>
                 </div>
                 <div className="bg-danger/5 p-6 rounded-2xl border border-danger/10 shadow-sm flex items-center justify-between">
                     <div>
                         <p className="text-[10px] font-black text-danger/60 uppercase tracking-widest mb-1">갱신 임박 (30일 이내)</p>
-                        <p className="text-2xl font-black text-danger">{mockLicenses.filter(l => l.status.includes('갱신요망')).length}명</p>
+                        <p className="text-2xl font-black text-danger">{realLicenses.filter((l: any) => l.status.includes('갱신요망')).length}명</p>
                     </div>
                     <div className="w-12 h-12 rounded-full bg-danger/10 flex items-center justify-center text-xl">⚠️</div>
                 </div>
                 <div className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm flex items-center justify-between">
                     <div>
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">정상 유지중</p>
-                        <p className="text-2xl font-black text-slate-800">{mockLicenses.filter(l => l.status === '정상').length}건</p>
+                        <p className="text-2xl font-black text-slate-800">{realLicenses.filter((l: any) => l.status === '정상').length}건</p>
                     </div>
                     <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-xl">✅</div>
                 </div>

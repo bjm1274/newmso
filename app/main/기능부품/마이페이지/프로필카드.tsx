@@ -54,19 +54,18 @@ export default function MyProfileCard({ user: initialUser, onOpenApproval }: any
         .single();
 
       if (error || !data) {
-        setDebugMsg(`ID 복구 실패: ${name}을 찾을 수 없음.`);
+        // setDebugMsg(`ID 복구 실패: ${name}을 찾을 수 없음.`);
         return;
       }
 
       // 2. 찾아낸 진짜 정보로 상태 업데이트
-      console.log("ID 복구 성공:", data.id);
       setUser(data);
       setAvatarUrl(data.avatar_url);
 
       // 3. 브라우저 저장소 동기화 (다른 탭·할일 등에서 동일 사용자 인식)
       localStorage.setItem('user_session', JSON.stringify(data));
       localStorage.setItem('erp_user', JSON.stringify(data));
-      setDebugMsg(`ID 복구 완료: ${data.id}`);
+      // setDebugMsg(`ID 복구 완료: ${data.id}`);
 
     } catch (err) {
       console.error(err);

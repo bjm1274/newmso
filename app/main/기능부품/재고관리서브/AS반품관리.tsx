@@ -46,7 +46,7 @@ const RETURN_STATUS_COLORS: Record<ReturnStatus, string> = {
   완료: 'bg-green-50 text-green-600',
 };
 
-const generateId = () => `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+const generateId = () => crypto.randomUUID();
 
 const loadFromStorage = <T,>(key: string): T[] => {
   if (typeof window === 'undefined') return [];
@@ -382,11 +382,10 @@ export default function ASReturnManagement({ user }: { user: any }) {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2.5 rounded-[12px] text-[11px] font-semibold transition-all ${
-                activeTab === tab.id
+              className={`px-4 py-2.5 rounded-[12px] text-[11px] font-semibold transition-all ${activeTab === tab.id
                   ? 'bg-[var(--toss-blue)] text-white shadow-sm'
                   : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-border)]'
-              }`}
+                }`}
             >
               {tab.label}
             </button>

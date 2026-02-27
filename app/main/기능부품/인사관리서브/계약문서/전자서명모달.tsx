@@ -104,10 +104,13 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                         shift_end: (contract?.shift_end_time || user?.shift_end_time) ? String(contract?.shift_end_time || user?.shift_end_time).slice(0, 5) : '',
                         break_start: (contract?.break_start_time || user?.break_start_time) ? String(contract?.break_start_time || user?.break_start_time).slice(0, 5) : '',
                         break_end: (contract?.break_end_time || user?.break_end_time) ? String(contract?.break_end_time || user?.break_end_time).slice(0, 5) : '',
-                        probation_months: String(contract?.probation_months || '3'),
-                        probation_percent: String(contract?.probation_percent || '90'),
                         payment_day: String(contract?.payment_day || '7'),
                         today: formatDate(new Date().toISOString()),
+                        weekly_work_hours: String(contract?.working_hours_per_week || user?.working_hours_per_week || 40),
+                        work_days_per_week: String(contract?.working_days_per_week || user?.working_days_per_week || 5),
+                        shift_time_range: `${String(contract?.shift_start_time || user?.shift_start_time || '09:00').slice(0, 5)} ~ ${String(contract?.shift_end_time || user?.shift_end_time || '18:00').slice(0, 5)}`,
+                        break_time_range: `${String(contract?.break_start_time || user?.break_start_time || '12:00').slice(0, 5)} ~ ${String(contract?.break_end_time || user?.break_end_time || '13:00').slice(0, 5)}`,
+                        shift_time: (contract?.shift_start_time || user?.shift_start_time) ? `${String(contract?.shift_start_time || user?.shift_start_time).slice(0, 5)} ~ ${String(contract?.shift_end_time || user?.shift_end_time).slice(0, 5)}` : '',
                     };
 
                     let result = template;

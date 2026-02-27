@@ -77,8 +77,7 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: any) {
 
         const { data, error } = await supabase.from('insurance_records').insert([newRecord]).select();
         if (error) {
-            const mock = { ...newRecord, id: crypto.randomUUID(), created_at: new Date().toISOString() } as InsuranceRecord;
-            setRecords([mock, ...records]);
+            alert('보험 신고 기록 저장에 실패했습니다. (DB 연결 확인 필요)');
         } else if (data) {
             setRecords([data[0], ...records]);
         }

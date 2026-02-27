@@ -7,25 +7,13 @@ export default function WorkforcePrediction({ staffs }: any) {
 
   useEffect(() => {
     // [AI 시뮬레이션] 과거 환자 유입량 및 수술 일정을 기반으로 한 미래 인력 수요 예측 로직
+    // AI Simulation removed for production use.
+    // Future implementation will use actual patient flow and surgery schedule data.
     const generatePrediction = () => {
-      const days = ['월', '화', '수', '목', '금', '토'];
-      const mockData = days.map(day => {
-        const baseDemand = Math.floor(Math.random() * 5) + 10; // 기본 필요 인원
-        const surgeryLoad = day === '화' || day === '목' ? 8 : 3; // 화, 목 수술 집중
-        const predictedDemand = baseDemand + surgeryLoad;
-        const currentStaff = staffs.length;
-        
-        return {
-          day,
-          predictedDemand,
-          currentStaff,
-          status: predictedDemand > currentStaff ? 'SHORTAGE' : 'OPTIMAL',
-          gap: predictedDemand - currentStaff
-        };
-      });
-      setPredictionData(mockData);
+      setPredictionData([]);
       setLoading(false);
     };
+
 
     const timer = setTimeout(generatePrediction, 1500);
     return () => clearTimeout(timer);
@@ -45,6 +33,12 @@ export default function WorkforcePrediction({ staffs }: any) {
 
       {loading ? (
         <div className="h-40 flex items-center justify-center animate-pulse text-[var(--toss-gray-3)] font-semibold">AI 분석 엔진 가동 중...</div>
+      ) : predictionData.length === 0 ? (
+        <div className="h-40 flex flex-col items-center justify-center border-2 border-dashed border-slate-100 rounded-3xl text-[var(--toss-gray-3)] gap-2">
+          <span className="text-2xl">📉</span>
+          <p className="text-xs font-bold">인력 수요 분석을 위한 충분한 데이터가 확보되지 않았습니다.</p>
+          <p className="text-[10px] text-slate-400">외래 예약 및 수술 일정이 누적되면 자동으로 다음 주 수요가 예측됩니다.</p>
+        </div>
       ) : (
         <div className="grid grid-cols-6 gap-4">
           {predictionData.map((data, i) => (
@@ -55,7 +49,7 @@ export default function WorkforcePrediction({ staffs }: any) {
                 <span className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">Need</span>
               </div>
               <div className="w-full h-1.5 bg-[var(--toss-gray-1)] rounded-full mt-2 overflow-hidden">
-                <div 
+                <div
                   className={`h-full transition-all duration-1000 ${data.status === 'SHORTAGE' ? 'bg-red-500' : 'bg-green-500'}`}
                   style={{ width: `${(data.currentStaff / data.predictedDemand) * 100}%` }}
                 />
@@ -68,12 +62,13 @@ export default function WorkforcePrediction({ staffs }: any) {
         </div>
       )}
 
+
       <div className="bg-[#232933] p-6 rounded-[16px] flex justify-between items-center shadow-xl">
         <div className="flex gap-4 items-center">
           <div className="w-12 h-12 bg-white/10 rounded-[12px] flex items-center justify-center text-2xl">💡</div>
           <div>
-            <p className="text-white text-xs font-semibold">AI 추천 근무 편성</p>
-            <p className="text-[var(--toss-gray-3)] text-[11px] font-bold">화요일 수술팀 인력을 2명 보강하고, 금요일 연차 신청을 제한할 것을 권장합니다.</p>
+            <p className="text-white text-xs font-semibold">AI 인력 분석 리포트</p>
+            <p className="text-[var(--toss-gray-3)] text-[11px] font-bold italic">현재 데이터를 수집하고 있습니다. 통계적 유의미함이 확보되면 이곳에 분석 결과가 표시됩니다.</p>
           </div>
         </div>
         <button className="px-6 py-3 bg-[var(--toss-blue)] text-white text-[11px] font-semibold rounded-[12px] shadow-lg hover:scale-105 transition-all">
