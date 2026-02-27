@@ -28,6 +28,7 @@ export default function ShiftManagement({ selectedCo }: any) {
     end_time: '18:00',
     description: '',
     company_name: '박철홍정형외과',
+    selectedCompanies: [] as string[],
     break_start_time: '',
     break_end_time: '',
     shift_type: '',
@@ -128,13 +129,31 @@ export default function ShiftManagement({ selectedCo }: any) {
     };
 
     try {
-      // 1차: 전체 필드
-      let result = await tryUpsert(fullPayload, '전체');
-      if (result.error) {
-        console.warn(`[${result.label}] 실패:`, result.error.message, '→ 최소 필드로 재시도');
-        // 2차: 최소 필드만
-        result = await tryUpsert(minPayload, '최소');
-        if (result.error) throw result.error;
+      if (editingShiftId) {
+        // 1차: 전체 필드
+        let result = await tryUpsert(fullPayload, '전체');
+        if (result.error) {
+          console.warn(`[${result.label}] 실패:`, result.error.message, '→ 최소 필드로 재시도');
+          // 2차: 최소 필드만
+          result = await tryUpsert(minPayload, '최소');
+          if (result.error) throw result.error;
+        }
+      } else {
+        // 복수 사업장 등록
+        const companiesToInsert = newShift.selectedCompanies.length > 0
+          ? newShift.selectedCompanies
+          : [newShift.company_name];
+
+        for (const co of companiesToInsert) {
+          const currentFullPayload = { ...fullPayload, company_name: co };
+          const currentMinPayload = { ...minPayload, company_name: co };
+
+          let result = await tryUpsert(currentFullPayload, '전체');
+          if (result.error) {
+            result = await tryUpsert(currentMinPayload, '최소');
+            if (result.error) throw result.error;
+          }
+        }
       }
 
       alert(editingShiftId ? '근무 형태가 수정되었습니다.' : '근무 형태가 등록되었습니다.');
@@ -142,7 +161,7 @@ export default function ShiftManagement({ selectedCo }: any) {
       setEditingShiftId(null);
       setNewShift({
         name: '', start_time: '09:00', end_time: '18:00', description: '',
-        company_name: '박철홍정형외과', break_start_time: '', break_end_time: '',
+        company_name: '박철홍정형외과', selectedCompanies: [], break_start_time: '', break_end_time: '',
         shift_type: '', weekly_work_days: 5, is_weekend_work: false, is_shift: false,
       });
       fetchShifts();
@@ -185,6 +204,7 @@ export default function ShiftManagement({ selectedCo }: any) {
               end_time: '18:00',
               description: '',
               company_name: selectedCo && selectedCo !== '전체' ? selectedCo : '박철홍정형외과',
+              selectedCompanies: selectedCo && selectedCo !== '전체' ? [selectedCo] : ['박철홍정형외과'],
               break_start_time: '',
               break_end_time: '',
               shift_type: '',
@@ -200,11 +220,11 @@ export default function ShiftManagement({ selectedCo }: any) {
         </button>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-3">
         {shifts.map((shift) => (
-          <div key={shift.id} className="bg-[var(--toss-card)] border-2 border-[var(--toss-border)] p-6 hover:border-[var(--toss-blue)] transition-all group relative">
-            <div className="flex justify-between items-start mb-4">
-              <span className="px-2 py-1 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] text-[11px] font-semibold uppercase">{shift.company_name || '-'}</span>
+          <div key={shift.id} className="bg-[var(--toss-card)] border-2 border-[var(--toss-border)] p-3 hover:border-[var(--toss-blue)] transition-all group relative rounded-2xl">
+            <div className="flex justify-between items-start mb-2">
+              <span className="px-1.5 py-0.5 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] text-[9px] font-semibold uppercase rounded-md">{shift.company_name || '-'}</span>
               <div className="flex items-center gap-2 text-xs font-bold">
                 <button
                   onClick={() => {
@@ -215,6 +235,7 @@ export default function ShiftManagement({ selectedCo }: any) {
                       end_time: shift.end_time,
                       description: shift.description || '',
                       company_name: shift.company_name || selectedCo || '박철홍정형외과',
+                      selectedCompanies: [shift.company_name || selectedCo || '박철홍정형외과'],
                       break_start_time: shift.break_start_time || '',
                       break_end_time: shift.break_end_time || '',
                       shift_type: shift.shift_type || '',
@@ -231,39 +252,39 @@ export default function ShiftManagement({ selectedCo }: any) {
                 <button onClick={() => handleDeleteShift(shift.id)} className="text-[var(--toss-gray-3)] hover:text-red-500 transition-colors">✕</button>
               </div>
             </div>
-            <h3 className="text-lg font-semibold text-[var(--foreground)] mb-1">{shift.name}</h3>
-            <p className="text-xs text-[var(--toss-gray-3)] font-bold mb-4">{shift.description || '설명 없음'}</p>
-            <div className="flex items-center gap-4 pt-4 border-t border-[var(--toss-border)]">
+            <h3 className="text-sm font-bold text-[var(--foreground)] mb-0.5 truncate" title={shift.name}>{shift.name}</h3>
+            <p className="text-[10px] text-[var(--toss-gray-3)] font-bold mb-3 truncate" title={shift.description || '설명 없음'}>{shift.description || '설명 없음'}</p>
+            <div className="flex items-center gap-2 pt-2 border-t border-[var(--toss-border)]">
               <div>
-                <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">출근</p>
-                <p className="text-sm font-semibold text-[var(--foreground)]">{shift.start_time}</p>
+                <p className="text-[9px] font-semibold text-[var(--toss-gray-3)] uppercase">출근</p>
+                <p className="text-xs font-bold text-[var(--foreground)]">{shift.start_time}</p>
               </div>
-              <div className="text-[var(--toss-gray-3)]">→</div>
+              <div className="text-[var(--toss-gray-3)] text-[10px]">→</div>
               <div>
-                <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">퇴근</p>
-                <p className="text-sm font-semibold text-[var(--foreground)]">{shift.end_time}</p>
+                <p className="text-[9px] font-semibold text-[var(--toss-gray-3)] uppercase">퇴근</p>
+                <p className="text-xs font-bold text-[var(--foreground)]">{shift.end_time}</p>
               </div>
               {shift.break_start_time && shift.break_end_time && (
                 <div className="ml-auto text-right">
-                  <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">휴게시간</p>
-                  <p className="text-sm font-semibold text-[var(--foreground)]">
-                    {shift.break_start_time} ~ {shift.break_end_time}
+                  <p className="text-[9px] font-semibold text-[var(--toss-gray-3)] uppercase">휴게</p>
+                  <p className="text-xs font-bold text-[var(--foreground)]">
+                    {shift.break_start_time}
                   </p>
                 </div>
               )}
             </div>
             {(shift.shift_type || shift.weekly_work_days || shift.is_weekend_work || shift.is_shift) && (
-              <div className="mt-2 text-[11px] font-bold text-white flex flex-wrap gap-2">
-                {shift.is_shift && <span className="px-2 py-0.5 rounded-full bg-indigo-600 border border-indigo-700 shadow-sm">교대근무 전용</span>}
-                {shift.shift_type && <span className="px-2 py-0.5 rounded-full bg-slate-700 border border-slate-800 shadow-sm">{shift.shift_type}</span>}
+              <div className="mt-2 text-[9px] font-bold text-white flex flex-wrap gap-1">
+                {shift.is_shift && <span className="px-1.5 py-0.5 rounded-full bg-indigo-600 border border-indigo-700 shadow-sm">교대</span>}
+                {shift.shift_type && <span className="px-1.5 py-0.5 rounded-full bg-slate-700 border border-slate-800 shadow-sm">{shift.shift_type}</span>}
                 {shift.weekly_work_days && (
-                  <span className="px-2 py-0.5 rounded-full bg-slate-700 border border-slate-800 shadow-sm">
-                    주 {shift.weekly_work_days}일 근무
+                  <span className="px-1.5 py-0.5 rounded-full bg-slate-700 border border-slate-800 shadow-sm">
+                    {shift.weekly_work_days}일
                   </span>
                 )}
                 {shift.is_weekend_work && (
-                  <span className="px-2 py-0.5 rounded-full bg-slate-700 border border-slate-800 shadow-sm">
-                    주말 포함
+                  <span className="px-1.5 py-0.5 rounded-full bg-slate-700 border border-slate-800 shadow-sm">
+                    주말
                   </span>
                 )}
               </div>
@@ -299,16 +320,51 @@ export default function ShiftManagement({ selectedCo }: any) {
                 </div>
               </div>
               <div>
-                <label className="caption uppercase block mb-1">적용 사업체</label>
-                <select
-                  value={newShift.company_name}
-                  onChange={e => setNewShift({ ...newShift, company_name: e.target.value })}
-                  className="w-full p-3 bg-[var(--input-bg)] border border-[var(--toss-border)] font-semibold text-xs radius-toss"
-                >
-                  <option value="박철홍정형외과">박철홍정형외과</option>
-                  <option value="수연의원">수연의원</option>
-                  <option value="SY INC.">SY INC.</option>
-                </select>
+                <label className="caption uppercase block mb-1">적용 사업체 {editingShiftId ? '' : '(복수 선택 가능)'}</label>
+                {editingShiftId ? (
+                  <select
+                    value={newShift.company_name}
+                    onChange={e => setNewShift({ ...newShift, company_name: e.target.value })}
+                    className="w-full p-3 bg-[var(--input-bg)] border border-[var(--toss-border)] font-semibold text-xs radius-toss"
+                  >
+                    <option value="박철홍정형외과">박철홍정형외과</option>
+                    <option value="수연의원">수연의원</option>
+                    <option value="SY INC.">SY INC.</option>
+                  </select>
+                ) : (
+                  <div className="p-3 bg-[var(--toss-gray-1)] rounded-xl border border-[var(--toss-border)] space-y-2">
+                    <label className="flex items-center gap-2 pb-2 border-b border-[var(--toss-border)] mb-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={newShift.selectedCompanies.length === 3}
+                        onChange={e => {
+                          if (e.target.checked) setNewShift({ ...newShift, selectedCompanies: ['박철홍정형외과', '수연의원', 'SY INC.'] });
+                          else setNewShift({ ...newShift, selectedCompanies: [] });
+                        }}
+                        className="w-4 h-4 text-[var(--toss-blue)]"
+                      />
+                      <span className="text-[11px] font-bold text-[var(--toss-blue)]">전체 선택</span>
+                    </label>
+                    <div className="grid grid-cols-1 gap-2">
+                      {['박철홍정형외과', '수연의원', 'SY INC.'].map(co => (
+                        <label key={co} className="flex items-center gap-2 cursor-pointer hover:bg-white p-1 rounded-md transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={newShift.selectedCompanies.includes(co)}
+                            onChange={e => {
+                              const next = e.target.checked
+                                ? [...newShift.selectedCompanies, co]
+                                : newShift.selectedCompanies.filter(c => c !== co);
+                              setNewShift({ ...newShift, selectedCompanies: next });
+                            }}
+                            className="w-4 h-4 text-[var(--toss-blue)]"
+                          />
+                          <span className="text-xs font-semibold text-[var(--foreground)]">{co}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="caption uppercase block mb-1">설명</label>
