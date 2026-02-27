@@ -699,8 +699,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
         console.error('send-web-push 호출 실패:', e);
       }
     } else {
-      console.error('메시지 전송 실패:', error);
-      alert(`메시지 전송에 실패했습니다: ${error?.message || '알 수 없는 오류'}`);
+      alert('메시지 전송에 실패했습니다.');
     }
   };
 
