@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import AttendanceForms from './전자결재서브/근태신청양식';
 import SuppliesForm from './전자결재서브/비품구매양식';
@@ -10,6 +10,7 @@ import RepairRequestForm from './전자결재서브/수리요청서양식';
 import AnnualLeavePlanForm from './전자결재서브/연차사용계획서양식';
 
 const APPROVAL_VIEW_KEY = 'erp_approval_view';
+const DRAFT_STORAGE_KEY = 'erp_draft_approval';
 
 const APPROVAL_VIEWS = ['기안함', '결재함', '작성하기'];
 
@@ -27,6 +28,13 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const [selectedApprovalId, setSelectedApprovalId] = useState<string | null>(null);
   const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대기' | '승인' | '반려'>('전체');
   const [savedApproverLine, setSavedApproverLine] = useState<any[]>([]);
+  // 결재함 일괄 처리용
+  const [selectedApprovalIds, setSelectedApprovalIds] = useState<string[]>([]);
+  // 작성하기 자동 저장용
+  const [autoSaveMsg, setAutoSaveMsg] = useState<string | null>(null);
+  const [draftBanner, setDraftBanner] = useState<boolean>(false);
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoSaveMsgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMso = user?.company === 'SY INC.' || user?.permissions?.mso === true;
 
   const BUILTIN_FORM_TYPES = ['인사명령', '연차/휴가', '연차계획서', '연장근무', '물품신청', '수리요청서', '업무기안', '업무협조', '양식신청', '출결정정'];
@@ -141,6 +149,98 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     if (suppliesLoadKey > 0) return;
     loadLastDraft();
   }, [viewMode, formType, lastDraftByType, formTitle, formContent, suppliesLoadKey]);
+
+  // 작성하기 마운트 시 임시저장 여부 확인
+  useEffect(() => {
+    if (viewMode !== '작성하기') return;
+    if (typeof window === 'undefined') return;
+    try {
+      const saved = window.localStorage.getItem(DRAFT_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.formTitle || parsed?.formContent) {
+          setDraftBanner(true);
+        }
+      }
+    } catch { /* ignore */ }
+  }, [viewMode]);
+
+  // 작성하기 자동 저장: 3초 디바운스
+  useEffect(() => {
+    if (viewMode !== '작성하기') return;
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(() => {
+      if (!formTitle && !formContent && Object.keys(extraData).length === 0) return;
+      try {
+        const now = new Date();
+        const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+        window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify({ formTitle, formContent, extraData, formType, savedAt: hhmm }));
+        setAutoSaveMsg(`임시저장됨 ${hhmm}`);
+        if (autoSaveMsgTimer.current) clearTimeout(autoSaveMsgTimer.current);
+        autoSaveMsgTimer.current = setTimeout(() => setAutoSaveMsg(null), 3000);
+      } catch { /* ignore */ }
+    }, 3000);
+    return () => {
+      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    };
+  }, [formTitle, formContent, extraData, viewMode]);
+
+  // 임시저장 불러오기
+  const loadDraftFromStorage = useCallback(() => {
+    try {
+      const saved = window.localStorage.getItem(DRAFT_STORAGE_KEY);
+      if (!saved) return;
+      const parsed = JSON.parse(saved);
+      if (parsed?.formTitle) setFormTitle(parsed.formTitle);
+      if (parsed?.formContent) setFormContent(parsed.formContent);
+      if (parsed?.extraData) setExtraData(parsed.extraData);
+      if (parsed?.formType) setFormType(parsed.formType);
+    } catch { /* ignore */ }
+    setDraftBanner(false);
+  }, []);
+
+  // 임시저장 삭제
+  const clearDraftFromStorage = useCallback(() => {
+    try { window.localStorage.removeItem(DRAFT_STORAGE_KEY); } catch { /* ignore */ }
+  }, []);
+
+  // 결재함 일괄 승인 처리
+  const handleBulkApprove = async () => {
+    const count = selectedApprovalIds.length;
+    if (count === 0) return;
+    if (!confirm(`선택된 ${count}건을 일괄 승인하시겠습니까?`)) return;
+    for (const id of selectedApprovalIds) {
+      const item = approvals.find((a: any) => a.id === id);
+      if (!item) continue;
+      const lineIds = Array.isArray(item.approver_line) ? item.approver_line : [];
+      const currentIndex = lineIds.findIndex((lid: string) => String(lid) === String(item.current_approver_id));
+      const isFinal = currentIndex === lineIds.length - 1 || currentIndex === -1;
+      const updateData: any = isFinal ? { status: '승인' } : { current_approver_id: lineIds[currentIndex + 1] };
+      await supabase.from('approvals').update(updateData).eq('id', id);
+    }
+    setSelectedApprovalIds([]);
+    alert(`${count}건이 일괄 승인 처리되었습니다.`);
+    fetchApprovals();
+  };
+
+  // 결재함 일괄 반려 처리
+  const handleBulkReject = async () => {
+    const count = selectedApprovalIds.length;
+    if (count === 0) return;
+    const reason = window.prompt(`선택된 ${count}건을 일괄 반려합니다.\n반려 사유를 입력해 주세요. (선택)`);
+    if (reason === null) return;
+    for (const id of selectedApprovalIds) {
+      const item = approvals.find((a: any) => a.id === id);
+      if (!item) continue;
+      await supabase.from('approvals').update({
+        status: '반려',
+        meta_data: { ...(item.meta_data || {}), reject_reason: reason },
+      }).eq('id', id);
+    }
+    setSelectedApprovalIds([]);
+    alert(`${count}건이 일괄 반려 처리되었습니다.`);
+    fetchApprovals();
+  };
 
   useEffect(() => {
     const channel = supabase
@@ -295,6 +395,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       alert("기안이 올라가지 않았습니다.\n\n" + (error.message || ""));
       return;
     }
+    clearDraftFromStorage();
     alert("상신 완료!");
     setViewMode('기안함');
     fetchApprovals();
@@ -322,6 +423,30 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
 
   const listForView = viewMode === '기안함' ? draftBoxList : approvalBoxList;
 
+  // 결재함에서 일괄 처리 대상: status가 '대기'이며 내가 current_approver인 항목
+  const bulkTargetList = useMemo(() => {
+    if (viewMode !== '결재함') return [];
+    return approvalBoxList.filter(
+      (a: any) => a.status === '대기' && String(a.current_approver_id) === String(user?.id)
+    );
+  }, [approvalBoxList, viewMode, user?.id]);
+
+  const allBulkSelected = bulkTargetList.length > 0 && bulkTargetList.every((a: any) => selectedApprovalIds.includes(a.id));
+
+  const toggleSelectAll = () => {
+    if (allBulkSelected) {
+      setSelectedApprovalIds([]);
+    } else {
+      setSelectedApprovalIds(bulkTargetList.map((a: any) => a.id));
+    }
+  };
+
+  const toggleSelectOne = (id: string) => {
+    setSelectedApprovalIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
   return (
     <div className="flex flex-col h-full min-h-0 app-page overflow-hidden">
       {/* 상세 메뉴(기안함·결재함·작성하기)는 메인 좌측 사이드바에서 전자결재 호버/클릭 시 플라이아웃으로 선택 */}
@@ -329,6 +454,26 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       <main className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden p-4 md:p-10 bg-[var(--page-bg)] custom-scrollbar">
         {viewMode === '작성하기' ? (
           <div className="max-w-4xl mx-auto space-y-6 md:space-y-8">
+            {/* 임시저장 복구 배너 */}
+            {draftBanner && (
+              <div className="flex items-center gap-3 p-4 bg-[var(--toss-card)] border border-[var(--toss-blue)]/30 rounded-[12px] shadow-sm animate-in fade-in duration-300">
+                <span className="text-[13px] font-bold text-[var(--foreground)] flex-1">저장된 임시저장이 있습니다.</span>
+                <button
+                  type="button"
+                  onClick={loadDraftFromStorage}
+                  className="px-4 py-2 bg-[var(--toss-blue)] text-white rounded-[10px] text-[11px] font-bold hover:opacity-90 transition-all shrink-0"
+                >
+                  불러오기
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { clearDraftFromStorage(); setDraftBanner(false); }}
+                  className="px-4 py-2 bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] border border-[var(--toss-border)] rounded-[10px] text-[11px] font-bold hover:bg-[var(--toss-gray-2)] transition-all shrink-0"
+                >
+                  무시
+                </button>
+              </div>
+            )}
             <div className="bg-[var(--toss-card)] p-6 md:p-10 rounded-[16px] md:rounded-[20px] border border-[var(--toss-border)] shadow-sm space-y-8 md:space-y-10">
               <div className="bg-[var(--toss-blue-light)] p-6 md:p-8 rounded-[16px] border border-[var(--toss-blue-light)] space-y-6">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-2">
@@ -489,6 +634,45 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                 ))}
               </div>
             </div>
+
+            {/* 결재함 일괄 처리 바 */}
+            {viewMode === '결재함' && bulkTargetList.length > 0 && (
+              <div className="flex flex-wrap items-center gap-3 p-4 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[12px] shadow-sm animate-in fade-in duration-200">
+                <label className="flex items-center gap-2 cursor-pointer select-none shrink-0" onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    checked={allBulkSelected}
+                    onChange={toggleSelectAll}
+                    className="w-4 h-4 accent-[var(--toss-blue)] rounded cursor-pointer"
+                  />
+                  <span className="text-[12px] font-bold text-[var(--foreground)]">전체 선택</span>
+                </label>
+                {selectedApprovalIds.length > 0 && (
+                  <span className="text-[11px] font-bold text-[var(--toss-blue)] bg-[var(--toss-blue-light)] px-3 py-1 rounded-full">
+                    {selectedApprovalIds.length}건 선택됨
+                  </span>
+                )}
+                <div className="flex gap-2 ml-auto shrink-0">
+                  <button
+                    type="button"
+                    disabled={selectedApprovalIds.length === 0}
+                    onClick={handleBulkApprove}
+                    className="px-5 py-2.5 bg-[var(--toss-blue)] text-white rounded-[10px] text-[11px] font-bold shadow-sm hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    일괄 승인
+                  </button>
+                  <button
+                    type="button"
+                    disabled={selectedApprovalIds.length === 0}
+                    onClick={handleBulkReject}
+                    className="px-5 py-2.5 bg-red-50 text-red-600 border border-red-200 rounded-[10px] text-[11px] font-bold shadow-sm hover:bg-red-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    일괄 반려
+                  </button>
+                </div>
+              </div>
+            )}
+
             {listForView.length === 0 ? (
               <div className="h-96 flex flex-col items-center justify-center opacity-20">
                 <span className="text-6xl mb-4">📄</span>
@@ -506,6 +690,8 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                     const isCurrent = id === item.current_approver_id;
                     return { step: i + 1, name, isCurrent };
                   });
+                  const isBulkTarget = viewMode === '결재함' && item.status === '대기' && String(item.current_approver_id) === String(user?.id);
+                  const isChecked = selectedApprovalIds.includes(item.id);
                   return (
                     <div
                       key={item.id}
@@ -513,9 +699,21 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                       tabIndex={0}
                       onClick={() => setSelectedApprovalId(item.id)}
                       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedApprovalId(item.id); } }}
-                      className="bg-[var(--toss-card)] p-6 md:p-8 border border-[var(--toss-border)] rounded-[16px] shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6 group hover:border-[var(--toss-blue)]/30 hover:shadow-md transition-all animate-in fade-in-up cursor-pointer"
+                      className={`bg-[var(--toss-card)] p-6 md:p-8 border rounded-[16px] shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6 group hover:border-[var(--toss-blue)]/30 hover:shadow-md transition-all animate-in fade-in-up cursor-pointer ${isChecked ? 'border-[var(--toss-blue)]/50 bg-[var(--toss-blue-light)]' : 'border-[var(--toss-border)]'}`}
                     >
                       <div className="flex gap-4 md:gap-6 items-center flex-1 min-w-0">
+                        {/* 일괄 처리 체크박스 (결재함 대기 항목에만 표시) */}
+                        {isBulkTarget && (
+                          <div onClick={(e) => { e.stopPropagation(); toggleSelectOne(item.id); }} className="shrink-0 cursor-pointer p-1">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => toggleSelectOne(item.id)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-4 h-4 accent-[var(--toss-blue)] rounded cursor-pointer"
+                            />
+                          </div>
+                        )}
                         <div className="w-14 h-14 md:w-16 md:h-16 bg-[var(--toss-gray-1)] shrink-0 rounded-[12px] flex items-center justify-center text-xl md:text-2xl shadow-inner group-hover:bg-[var(--toss-blue-light)] transition-colors">
                           {item.type === '물품신청' ? '📦' : item.type === '양식신청' ? '📄' : item.type === '인사명령' ? '🎖️' : item.type === '수리요청서' ? '🔧' : '📋'}
                         </div>
@@ -554,6 +752,15 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
           </div>
         )}
       </main>
+
+      {/* 자동 저장 메시지 (우하단 고정, 작성하기 뷰에서만) */}
+      {viewMode === '작성하기' && autoSaveMsg && (
+        <div className="fixed bottom-8 right-6 z-[90] pointer-events-none animate-in fade-in duration-300">
+          <span className="text-[11px] font-bold text-[var(--toss-gray-3)] bg-[var(--toss-card)] border border-[var(--toss-border)] px-3 py-2 rounded-[10px] shadow-sm">
+            {autoSaveMsg}
+          </span>
+        </div>
+      )}
 
       {/* 모바일 전용 기안 작성 FAB (작성하기 아닐 때만 노출) */}
       {viewMode !== '작성하기' && (

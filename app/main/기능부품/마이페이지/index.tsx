@@ -11,6 +11,7 @@ import MyCertificates from './증명서관리';
 import MyDocuments from './서류제출';
 import NotificationInbox from '../알림인박스';
 import ContractSignatureModal from '../인사관리서브/계약문서/전자서명모달';
+import RoleDashboard from './역할별대시보드';
 import { supabase } from '@/lib/supabase';
 
 const MYPAGE_TAB_KEY = 'erp_mypage_tab';
@@ -360,7 +361,14 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
       {/* 메인 콘텐츠 영역 */}
       <div className="flex-1 min-h-0 overflow-hidden relative">
         <div className="absolute inset-0 overflow-y-auto overflow-x-hidden transition-all duration-300">
-          {activeTab === 'profile' && <MyProfileCard user={user} onOpenApproval={onOpenApproval} />}
+          {activeTab === 'profile' && (
+            <div>
+              <div className="p-4 md:p-6">
+                <RoleDashboard user={user} setMainMenu={setMainMenu} />
+              </div>
+              <MyProfileCard user={user} onOpenApproval={onOpenApproval} />
+            </div>
+          )}
           {activeTab === 'commute' && (
             <CommuteRecord
               user={user}

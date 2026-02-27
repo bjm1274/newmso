@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx vercel:*)",
+      "Bash(npx eslint:*)",
+      "Bash(git:*)",
+      "Bash(curl:*)",
+      "Bash(__NEW_LINE_9f091355f332a733__ curl:*)",
+      "Bash(__NEW_LINE_cd2fed6a2c0a244b__ curl:*)",
+      "Bash(__NEW_LINE_0acfddeb810af3dc__ curl:*)",
+      "Bash(__NEW_LINE_e31c0f040ee2488c__ curl:*)",
+      "WebSearch",
+      "WebFetch(domain:ai.google.dev)",
+      "Bash(__NEW_LINE_2fe8fbdb1230d24e__ curl:*)",
+      "Bash(grep:*)",
+      "Bash(rm:*)"
+    ]
+  }
+}

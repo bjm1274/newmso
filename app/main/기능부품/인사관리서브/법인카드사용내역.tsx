@@ -7,6 +7,17 @@ import SmartMonthPicker from '../공통/SmartMonthPicker';
 const COMPANIES = ['전체', '박철홍정형외과', '수연의원', 'SY INC.'];
 const CATEGORIES = ['식비', '교통', '경비', '복리후생', '의료', '기타'];
 
+// 가맹점명 키워드 기반 자동 분류
+function autoClassify(merchant: string): string {
+  const m = merchant.toLowerCase();
+  if (/식당|카페|커피|음식|빵|편의점|마트|치킨|피자|김밥|분식|레스토랑|순두부|냉면|설렁탕|삼겹살|갈비|스타벅스|투썸|이디야|맥도날드|버거킹|kfc|롯데리아|배달|요기요|배민/.test(m)) return '식비';
+  if (/주유|택시|카카오t|버스|지하철|고속도로|통행료|ktx|기차|항공|렌터카|카렌탈|하이패스|주차|톨게이트/.test(m)) return '교통';
+  if (/병원|약국|의원|클리닉|한의원|치과|안과|정형외과|내과|외과|피부과|이비인후과|의료|메디/.test(m)) return '의료';
+  if (/헬스|스포츠|당구|볼링|영화|공연|워크숍|노래방|피씨방|마사지|사우나/.test(m)) return '복리후생';
+  if (/문구|사무용품|소모품|화방|소프트웨어|클라우드|구독|aws|azure|구글|네이버|microsoft/.test(m)) return '경비';
+  return '기타';
+}
+
 export default function CorporateCardTransactions({ staffs = [] }: any) {
   const [activeTab, setActiveTab] = useState<'cards' | 'transactions'>('transactions');
   const [selectedCo, setSelectedCo] = useState('전체');
@@ -133,11 +144,13 @@ export default function CorporateCardTransactions({ staffs = [] }: any) {
       const merchant = parts[1] || '';
       const amount = parseInt(String(parts[2]).replace(/[^0-9]/g, '')) || 0;
       if (!date || amount <= 0) continue;
+      // 카테고리가 명시되지 않은 경우 자동 분류
+      const category = CATEGORIES.includes(parts[3]) ? parts[3] : autoClassify(merchant);
       await supabase.from('corporate_card_transactions').insert({
         transaction_date: date,
         merchant,
         amount,
-        category: CATEGORIES.includes(parts[3]) ? parts[3] : '기타',
+        category,
         description: parts[4] || '',
         company_name: co,
       });
@@ -145,7 +158,24 @@ export default function CorporateCardTransactions({ staffs = [] }: any) {
     }
     setImporting(false);
     (e.target as HTMLInputElement).value = '';
-    alert(`${imported}건 가져왔습니다.`);
+    alert(`${imported}건 가져왔습니다. (카테고리 자동 분류 적용)`);
+    fetchTransactions();
+  };
+
+  // '기타'로 분류된 항목을 일괄 자동 분류
+  const handleBulkAutoClassify = async () => {
+    const unclassified = list.filter((r: any) => r.category === '기타' && r.merchant);
+    if (unclassified.length === 0) return alert('자동 분류할 항목이 없습니다. (이미 분류됨)');
+    if (!confirm(`${unclassified.length}건을 자동 분류하시겠습니까?`)) return;
+    let updated = 0;
+    for (const r of unclassified) {
+      const cat = autoClassify(r.merchant);
+      if (cat !== '기타') {
+        await supabase.from('corporate_card_transactions').update({ category: cat }).eq('id', r.id);
+        updated++;
+      }
+    }
+    alert(`${updated}건 자동 분류 완료.`);
     fetchTransactions();
   };
 
@@ -218,6 +248,7 @@ export default function CorporateCardTransactions({ staffs = [] }: any) {
               ))}
             </select>
             <button onClick={() => setAdding(true)} className="px-4 py-2 bg-[var(--toss-blue)] text-white text-xs font-semibold rounded-[16px]">+ 수동 등록</button>
+            <button onClick={handleBulkAutoClassify} className="px-4 py-2 bg-amber-50 text-amber-700 border border-amber-200 text-xs font-semibold rounded-[16px] hover:bg-amber-100 transition-all">🤖 일괄 자동 분류</button>
             <label className="px-4 py-2 bg-[var(--toss-gray-1)] text-[var(--foreground)] text-xs font-semibold rounded-[16px] cursor-pointer hover:opacity-90">
               CSV 가져오기
               <input type="file" accept=".csv,.txt" className="hidden" onChange={handleCsvImport} disabled={importing} />
@@ -280,7 +311,14 @@ export default function CorporateCardTransactions({ staffs = [] }: any) {
               ))}
             </select>
             <SmartDatePicker value={form.date} onChange={val => setForm({ ...form, date: val })} inputClassName="w-full p-3 border rounded-[16px] font-bold" />
-            <input type="text" value={form.merchant} onChange={(e) => setForm({ ...form, merchant: e.target.value })} placeholder="가맹점" className="w-full p-3 border rounded-[16px]" />
+            <div className="relative">
+              <input type="text" value={form.merchant} onChange={(e) => {
+                const m = e.target.value;
+                const suggested = autoClassify(m);
+                setForm({ ...form, merchant: m, category: suggested });
+              }} placeholder="가맹점 (입력 시 카테고리 자동 제안)" className="w-full p-3 border rounded-[16px]" />
+              {form.merchant && <span className="absolute right-3 top-3 text-[10px] text-[var(--toss-blue)] font-bold bg-blue-50 px-2 py-0.5 rounded-lg">자동: {autoClassify(form.merchant)}</span>}
+            </div>
             <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full p-3 border rounded-[16px]">
               {CATEGORIES.map((c) => (
                 <option key={c} value={c}>{c}</option>

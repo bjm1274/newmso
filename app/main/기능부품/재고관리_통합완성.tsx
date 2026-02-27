@@ -10,10 +10,11 @@ import ExcelBulkUpload from './관리자전용서브/엑셀일괄등록';
 import InvoiceAutoExtraction from './관리자전용서브/명세서자동추출';
 import { useInventoryAlertSystem, InventoryAlertBadge } from './재고관리서브/재고알림시스템';
 import QRAssetManager from './재고관리서브/자산QR관리';
+import ASReturnManagement from './재고관리서브/AS반품관리';
 
 const INV_VIEW_KEY = 'erp_inventory_view';
 
-const VALID_VIEWS = ['UDI', '명세서', '발주', '스캔', '등록', '현황', '이력', '자산'];
+const VALID_VIEWS = ['UDI', '명세서', '발주', '스캔', '등록', '현황', '이력', '자산', 'AS반품'];
 
 export default function IntegratedInventoryManagement({ user, selectedCo, onRefresh, initialView }: any) {
   const [activeView, setActiveView] = useState(initialView && VALID_VIEWS.includes(initialView) ? initialView : '현황');
@@ -400,6 +401,7 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
             </div>
           )}
           {activeView === '자산' && <QRAssetManager user={user} inventory={inventory} fetchInventory={() => fetchInventory(selectedCo)} />}
+          {activeView === 'AS반품' && <ASReturnManagement user={user} />}
         </main>
       </div>
 
