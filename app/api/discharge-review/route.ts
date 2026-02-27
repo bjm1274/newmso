@@ -144,10 +144,29 @@ ${templateData ? '- 템플릿 대비 누락/추가 항목\n' : ''}- ${insuranceT
 - ${stayDays}일 입원 기간 대비 처방 적절성
 - 중복/과잉/누락 청구
 ${diseaseCodes ? '- 상병명-처방 연관성 (상병에 맞지 않는 처방 여부)\n' : ''}${age !== null && age >= 65 ? '- 만 ' + age + '세 노인 가산 항목\n' : ''}${surgeryName ? '- ' + surgeryName + ' 수술 후 표준 처방 누락 여부\n' : ''}${comorbidities ? '- ' + comorbidities + ' 관련 추가 처방\n' : ''}${roomGrade ? '- ' + roomGrade + ' 병실료 적절성\n' : ''}
-**총평** 한 줄로 마무리. 한국어로 답변.`;
+**총평** 한 줄로 마무리. 한국어로 답변.
 
-        const analysis = await callGemini(prompt);
-        return NextResponse.json({ analysis });
+[RECOMMENDATIONS]
+
+## 처방 가능 품목 추천
+${surgeryName ? `'${surgeryName}' 수술` : `'${diagnosis || '해당 진단'}' 진단`} 환자에게 처방 가능한 품목을 아래 형식으로 추천하세요.
+보험 구분(${insuranceType || '건강보험'}) 기준으로 급여/비급여를 구분해주세요.
+${comorbidities ? `동반 질환(${comorbidities}) 관련 추가 처방도 포함하세요.` : ''}
+
+**출력 형식 (반드시 이 형식을 따르세요):**
+💊 약품 | [품목명] | [급여/비급여] | [효능·용도 한 줄]
+🩹 재료 | [품목명] | [급여/비급여] | [사용 목적 한 줄]
+🔬 검사 | [품목명] | [급여/비급여] | [시행 이유 한 줄]
+🩻 처치 | [품목명] | [급여/비급여] | [시행 목적 한 줄]
+
+중요도 순으로 나열하고, 각 카테고리별 3~5개씩 추천하세요. 한국어로 답변.`;
+
+        const raw = await callGemini(prompt);
+        const separator = '[RECOMMENDATIONS]';
+        const sepIdx = raw.indexOf(separator);
+        const analysis = sepIdx !== -1 ? raw.slice(0, sepIdx).trim() : raw.trim();
+        const recommendations = sepIdx !== -1 ? raw.slice(sepIdx + separator.length).trim() : '';
+        return NextResponse.json({ analysis, recommendations });
     } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         console.error('Discharge review API error:', msg);
