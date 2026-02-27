@@ -110,10 +110,13 @@ export default function DischargeReviewPage({ user }: { user: any }) {
     // 관리자 수술목록
     const [surgeryOptions, setSurgeryOptions] = useState<{ id: string; name: string }[]>([]);
 
-    // AI
     const [aiLoading, setAiLoading] = useState(false);
     const [aiResult, setAiResult] = useState('');
     const [compareResult, setCompareResult] = useState<{ matched: string[]; missing: string[]; extra: string[] } | null>(null);
+
+    // 수정 모드
+    const [isEditing, setIsEditing] = useState(false);
+    const [editForm, setEditForm] = useState<Partial<DischargeReview>>({});
 
     const parsedNewChart = useMemo(() => parseChartData(newChartData), [newChartData]);
     const selectedTemplate = useMemo(() => templates.find(t => t.id === selectedTemplateId), [templates, selectedTemplateId]);
@@ -300,6 +303,65 @@ export default function DischargeReviewPage({ user }: { user: any }) {
         setReviews(reviews.filter(r => r.id !== id));
         if (selectedReview?.id === id) setSelectedReview(null);
         try { await supabase.from('discharge_reviews').delete().eq('id', id); } catch { }
+    };
+
+    const handleStartEdit = () => {
+        if (!selectedReview) return;
+        setEditForm({ ...selectedReview });
+        setIsEditing(true);
+    };
+
+    const handleCancelEdit = () => {
+        setIsEditing(false);
+        setEditForm({});
+    };
+
+    const handleUpdateReview = async () => {
+        if (!selectedReview || !editForm) return;
+
+        let updatedItems = editForm.items || [];
+        if (editForm.chart_data !== selectedReview.chart_data) {
+            if (confirm('차트 데이터가 변경되었습니다. 체크리스트 항목을 다시 생성하시겠습니까? (기본 체크 해제됨)')) {
+                const newLines = parseChartData(editForm.chart_data || '');
+                updatedItems = chartLinesToCheckItems(newLines);
+            }
+        }
+
+        const updatedReview = { ...selectedReview, ...editForm, items: updatedItems } as DischargeReview;
+
+        try {
+            const { error } = await supabase.from('discharge_reviews').update({
+                patient_name: updatedReview.patient_name,
+                birth_date: updatedReview.birth_date,
+                gender: updatedReview.gender,
+                department: updatedReview.department,
+                admission_date: updatedReview.admission_date,
+                discharge_date: updatedReview.discharge_date,
+                diagnosis: updatedReview.diagnosis,
+                template_id: updatedReview.template_id,
+                insurance_type: updatedReview.insurance_type,
+                surgery_name: updatedReview.surgery_name,
+                surgery_date: updatedReview.surgery_date,
+                room_grade: updatedReview.room_grade,
+                doctor_name: updatedReview.doctor_name,
+                comorbidities: updatedReview.comorbidities,
+                disease_codes: updatedReview.disease_codes,
+                admission_route: updatedReview.admission_route,
+                discharge_type: updatedReview.discharge_type,
+                drg_code: updatedReview.drg_code,
+                chart_data: updatedReview.chart_data,
+                items: updatedReview.items,
+            }).eq('id', selectedReview.id);
+
+            if (error) throw error;
+
+            setSelectedReview(updatedReview);
+            setReviews(reviews.map(r => r.id === selectedReview.id ? updatedReview : r));
+            setIsEditing(false);
+        } catch (err) {
+            console.error(err);
+            alert('수정 중 오류가 발생했습니다.');
+        }
     };
 
     const requestAiAnalysis = async () => {
@@ -677,7 +739,12 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                 {/* ===== 심사 상세 ===== */}
                 {tab === 'reviews' && selectedReview && (
                     <div className="max-w-4xl mx-auto space-y-4">
-                        <button onClick={() => { setSelectedReview(null); setCompareResult(null); }} className="text-[11px] font-bold text-[var(--toss-blue)] hover:underline">← 목록으로</button>
+                        <div className="flex justify-between items-center">
+                            <button onClick={() => { setSelectedReview(null); setCompareResult(null); setIsEditing(false); }} className="text-[11px] font-bold text-[var(--toss-blue)] hover:underline">← 목록으로</button>
+                            {!isEditing && selectedReview.status !== 'approved' && (
+                                <button onClick={handleStartEdit} className="px-3 py-1.5 text-[11px] font-bold text-[var(--toss-blue)] bg-blue-50 rounded-lg hover:bg-blue-100">✏️ 정보 수정</button>
+                            )}
+                        </div>
 
                         {/* 환자 정보 */}
                         <div className="bg-white rounded-2xl border border-[var(--toss-border)] p-6 shadow-sm">
@@ -687,38 +754,193 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                         <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${selectedReview.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
                                             {selectedReview.status === 'approved' ? '✅ 승인' : '⏳ 심사 중'}
                                         </span>
-                                        {selectedReview.diagnosis && <span className="text-[10px] font-bold text-purple-500 bg-purple-50 px-2 py-0.5 rounded-lg">{selectedReview.diagnosis}</span>}
-                                        {selectedReview.insurance_type && <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-lg">{selectedReview.insurance_type}</span>}
+                                        {isEditing ? (
+                                            <select value={editForm.template_id} onChange={e => {
+                                                const tmpl = templates.find(t => t.id === e.target.value);
+                                                setEditForm({ ...editForm, template_id: e.target.value, diagnosis: tmpl?.title || '' });
+                                            }} className="text-[10px] font-bold text-purple-500 bg-purple-50 px-2 py-1 rounded-lg border-none outline-none">
+                                                <option value="">템플릿 선택</option>
+                                                {templates.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
+                                            </select>
+                                        ) : (
+                                            selectedReview.diagnosis && <span className="text-[10px] font-bold text-purple-500 bg-purple-50 px-2 py-0.5 rounded-lg">{selectedReview.diagnosis}</span>
+                                        )}
+                                        {isEditing ? (
+                                            <select value={editForm.insurance_type} onChange={e => setEditForm({ ...editForm, insurance_type: e.target.value })}
+                                                className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-1 rounded-lg border-none outline-none">
+                                                <option value="건강보험">건강보험</option>
+                                                <option value="의료급여 1종">의료급여 1종</option>
+                                                <option value="의료급여 2종">의료급여 2종</option>
+                                                <option value="산재보험">산재보험</option>
+                                                <option value="자동차보험">자동차보험</option>
+                                                <option value="비급여">비급여</option>
+                                            </select>
+                                        ) : (
+                                            selectedReview.insurance_type && <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-lg">{selectedReview.insurance_type}</span>
+                                        )}
                                     </div>
-                                    <h3 className="text-xl font-bold text-gray-800">{selectedReview.patient_name}
-                                        {selectedReview.gender && <span className="text-sm font-medium text-gray-400 ml-2">({selectedReview.gender})</span>}
-                                        {selectedReview.birth_date && <span className="text-sm font-medium text-gray-400 ml-1">만 {Math.floor((Date.now() - new Date(selectedReview.birth_date).getTime()) / 31557600000)}세</span>}
-                                    </h3>
-                                    <p className="text-sm text-gray-400 font-medium mt-1">{selectedReview.department} · {stayDays(selectedReview.admission_date, selectedReview.discharge_date)}일 입원{selectedReview.doctor_name ? ` · 주치의: ${selectedReview.doctor_name}` : ''}</p>
+                                    <div className="flex items-center gap-2">
+                                        {isEditing ? (
+                                            <input value={editForm.patient_name} onChange={e => setEditForm({ ...editForm, patient_name: e.target.value })}
+                                                className="text-xl font-bold text-gray-800 bg-gray-50 px-2 py-1 rounded-lg w-32 border-none outline-none" />
+                                        ) : (
+                                            <h3 className="text-xl font-bold text-gray-800">{selectedReview.patient_name}</h3>
+                                        )}
+                                        {isEditing ? (
+                                            <div className="flex gap-1 items-center">
+                                                <select value={editForm.gender} onChange={e => setEditForm({ ...editForm, gender: e.target.value })} className="text-sm bg-gray-50 px-1 py-1 rounded-lg border-none outline-none">
+                                                    <option value="남">남</option>
+                                                    <option value="여">여</option>
+                                                </select>
+                                                <SmartDatePicker value={editForm.birth_date || ''} onChange={val => setEditForm({ ...editForm, birth_date: val })} className="text-sm bg-gray-50 h-8 px-2 rounded-lg border-none outline-none w-32" />
+                                            </div>
+                                        ) : (
+                                            <>
+                                                {selectedReview.gender && <span className="text-sm font-medium text-gray-400 ml-1">({selectedReview.gender})</span>}
+                                                {selectedReview.birth_date && <span className="text-sm font-medium text-gray-400 ml-1">만 {Math.floor((Date.now() - new Date(selectedReview.birth_date).getTime()) / 31557600000)}세</span>}
+                                            </>
+                                        )}
+                                    </div>
+                                    <div className="mt-1 flex items-center gap-2">
+                                        {isEditing ? (
+                                            <div className="flex gap-2 items-center">
+                                                <input value={editForm.department} onChange={e => setEditForm({ ...editForm, department: e.target.value })} className="text-sm bg-gray-50 px-2 py-1 rounded-lg border-none outline-none w-24" />
+                                                <span className="text-gray-300">|</span>
+                                                <input value={editForm.doctor_name} onChange={e => setEditForm({ ...editForm, doctor_name: e.target.value })} placeholder="주치의" className="text-sm bg-gray-50 px-2 py-1 rounded-lg border-none outline-none w-24" />
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm text-gray-400 font-medium">{selectedReview.department} · {stayDays(selectedReview.admission_date, selectedReview.discharge_date)}일 입원{selectedReview.doctor_name ? ` · 주치의: ${selectedReview.doctor_name}` : ''}</p>
+                                        )}
+                                    </div>
                                 </div>
-                                <button onClick={() => deleteReview(selectedReview.id)} className="px-3 py-2 text-[11px] font-bold text-red-500 bg-red-50 rounded-lg hover:bg-red-100">🗑️</button>
+                                {!isEditing && <button onClick={() => deleteReview(selectedReview.id)} className="px-3 py-2 text-[11px] font-bold text-red-500 bg-red-50 rounded-lg hover:bg-red-100">🗑️</button>}
                             </div>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
-                                <div className="bg-gray-50 rounded-xl p-3"><p className="text-[10px] font-bold text-gray-400 mb-1">입원일</p><p className="text-sm font-bold text-gray-700">{selectedReview.admission_date}</p></div>
-                                <div className="bg-gray-50 rounded-xl p-3"><p className="text-[10px] font-bold text-gray-400 mb-1">퇴원일</p><p className="text-sm font-bold text-gray-700">{selectedReview.discharge_date}</p></div>
-                                <div className="bg-gray-50 rounded-xl p-3"><p className="text-[10px] font-bold text-gray-400 mb-1">입원 기간</p><p className="text-sm font-bold text-[var(--toss-blue)]">{stayDays(selectedReview.admission_date, selectedReview.discharge_date)}일</p></div>
-                                <div className="bg-gray-50 rounded-xl p-3"><p className="text-[10px] font-bold text-gray-400 mb-1">병실</p><p className="text-sm font-bold text-gray-700">{selectedReview.room_grade || '-'}</p></div>
-                            </div>
-                            {(selectedReview.surgery_name || selectedReview.comorbidities || selectedReview.admission_route || selectedReview.drg_code) && (
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center mt-3">
-                                    {selectedReview.surgery_name && <div className="bg-gray-50 rounded-xl p-3"><p className="text-[10px] font-bold text-gray-400 mb-1">수술</p><p className="text-xs font-bold text-gray-700">{selectedReview.surgery_name}{selectedReview.surgery_date ? ` (${selectedReview.surgery_date})` : ''}</p></div>}
-                                    {selectedReview.comorbidities && <div className="bg-gray-50 rounded-xl p-3"><p className="text-[10px] font-bold text-gray-400 mb-1">동반질환</p><p className="text-xs font-bold text-gray-700">{selectedReview.comorbidities}</p></div>}
-                                    {selectedReview.admission_route && <div className="bg-gray-50 rounded-xl p-3"><p className="text-[10px] font-bold text-gray-400 mb-1">입원경로</p><p className="text-sm font-bold text-gray-700">{selectedReview.admission_route}</p></div>}
-                                    {selectedReview.drg_code && <div className="bg-gray-50 rounded-xl p-3"><p className="text-[10px] font-bold text-gray-400 mb-1">DRG</p><p className="text-sm font-bold text-gray-700">{selectedReview.drg_code}</p></div>}
+                                <div className="bg-gray-50 rounded-xl p-3">
+                                    <p className="text-[10px] font-bold text-gray-400 mb-1">입원일</p>
+                                    {isEditing ? (
+                                        <SmartDatePicker value={editForm.admission_date || ''} onChange={val => setEditForm({ ...editForm, admission_date: val })} className="w-full text-xs font-bold bg-transparent border-none outline-none text-center" />
+                                    ) : (
+                                        <p className="text-sm font-bold text-gray-700">{selectedReview.admission_date}</p>
+                                    )}
                                 </div>
+                                <div className="bg-gray-50 rounded-xl p-3">
+                                    <p className="text-[10px] font-bold text-gray-400 mb-1">퇴원일</p>
+                                    {isEditing ? (
+                                        <SmartDatePicker value={editForm.discharge_date || ''} onChange={val => setEditForm({ ...editForm, discharge_date: val })} className="w-full text-xs font-bold bg-transparent border-none outline-none text-center" />
+                                    ) : (
+                                        <p className="text-sm font-bold text-gray-700">{selectedReview.discharge_date}</p>
+                                    )}
+                                </div>
+                                <div className="bg-gray-50 rounded-xl p-3">
+                                    <p className="text-[10px] font-bold text-gray-400 mb-1">입원 기간</p>
+                                    <p className="text-sm font-bold text-[var(--toss-blue)]">{stayDays(isEditing ? (editForm.admission_date || '') : selectedReview.admission_date, isEditing ? (editForm.discharge_date || '') : selectedReview.discharge_date)}일</p>
+                                </div>
+                                <div className="bg-gray-50 rounded-xl p-3">
+                                    <p className="text-[10px] font-bold text-gray-400 mb-1">병실</p>
+                                    {isEditing ? (
+                                        <select value={editForm.room_grade} onChange={e => setEditForm({ ...editForm, room_grade: e.target.value })} className="w-full text-xs font-bold bg-transparent border-none outline-none text-center">
+                                            <option value="">선택</option>
+                                            <option value="1인실">1인실</option>
+                                            <option value="2인실">2인실</option>
+                                            <option value="4인실">4인실</option>
+                                        </select>
+                                    ) : (
+                                        <p className="text-sm font-bold text-gray-700">{selectedReview.room_grade || '-'}</p>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                                <div className="bg-gray-50 rounded-xl p-3 flex flex-col items-center">
+                                    <p className="text-[10px] font-bold text-gray-400 mb-1">수술/시술</p>
+                                    {isEditing ? (
+                                        <div className="flex gap-2 w-full">
+                                            <select value={editForm.surgery_name} onChange={e => setEditForm({ ...editForm, surgery_name: e.target.value })} className="flex-1 text-xs font-bold bg-white px-2 py-1 rounded border border-gray-100">
+                                                <option value="">수술 없음</option>
+                                                {surgeryOptions.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                                            </select>
+                                            <SmartDatePicker value={editForm.surgery_date || ''} onChange={val => setEditForm({ ...editForm, surgery_date: val })} className="w-28 text-xs font-bold bg-white px-2 py-1 rounded border border-gray-100" />
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs font-bold text-gray-700">{selectedReview.surgery_name || '-'}{selectedReview.surgery_date ? ` (${selectedReview.surgery_date})` : ''}</p>
+                                    )}
+                                </div>
+                                <div className="bg-gray-50 rounded-xl p-3 flex flex-col items-center">
+                                    <p className="text-[10px] font-bold text-gray-400 mb-1">동반질환/참고사항</p>
+                                    {isEditing ? (
+                                        <input value={editForm.comorbidities} onChange={e => setEditForm({ ...editForm, comorbidities: e.target.value })} className="w-full text-xs font-bold bg-white px-2 py-1 rounded border border-gray-100 text-center" />
+                                    ) : (
+                                        <p className="text-xs font-bold text-gray-700">{selectedReview.comorbidities || '-'}</p>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-center mt-3">
+                                <div className="bg-gray-50 rounded-xl p-3">
+                                    <p className="text-[10px] font-bold text-gray-400 mb-1">입원경로</p>
+                                    {isEditing ? (
+                                        <select value={editForm.admission_route} onChange={e => setEditForm({ ...editForm, admission_route: e.target.value })} className="w-full text-xs font-bold bg-transparent border-none outline-none text-center">
+                                            <option value="">선택</option>
+                                            <option value="외래">외래</option>
+                                            <option value="응급">응급</option>
+                                            <option value="전원">전원</option>
+                                        </select>
+                                    ) : (
+                                        <p className="text-sm font-bold text-gray-700">{selectedReview.admission_route || '-'}</p>
+                                    )}
+                                </div>
+                                <div className="bg-gray-50 rounded-xl p-3">
+                                    <p className="text-[10px] font-bold text-gray-400 mb-1">퇴원유형</p>
+                                    {isEditing ? (
+                                        <select value={editForm.discharge_type} onChange={e => setEditForm({ ...editForm, discharge_type: e.target.value })} className="w-full text-xs font-bold bg-transparent border-none outline-none text-center">
+                                            <option value="">선택</option>
+                                            <option value="정상퇴원">정상퇴원</option>
+                                            <option value="전원">전원</option>
+                                            <option value="자의퇴원">자의퇴원</option>
+                                        </select>
+                                    ) : (
+                                        <p className="text-sm font-bold text-gray-700">{selectedReview.discharge_type || '-'}</p>
+                                    )}
+                                </div>
+                                <div className="bg-gray-50 rounded-xl p-3">
+                                    <p className="text-[10px] font-bold text-gray-400 mb-1">DRG</p>
+                                    {isEditing ? (
+                                        <input value={editForm.drg_code} onChange={e => setEditForm({ ...editForm, drg_code: e.target.value })} className="w-full text-xs font-bold bg-transparent border-none outline-none text-center" />
+                                    ) : (
+                                        <p className="text-sm font-bold text-gray-700">{selectedReview.drg_code || '-'}</p>
+                                    )}
+                                </div>
+                            </div>
+
+                            {isEditing ? (
+                                <div className="space-y-1.5 mt-3">
+                                    <label className="text-[10px] font-bold text-purple-500 uppercase tracking-wider">상병명 (진단코드)</label>
+                                    <textarea value={editForm.disease_codes} onChange={e => setEditForm({ ...editForm, disease_codes: e.target.value })}
+                                        className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-[11px] font-mono outline-none focus:ring-2 focus:ring-purple-200 resize-none h-24 custom-scrollbar" />
+                                </div>
+                            ) : (
+                                selectedReview.disease_codes && (
+                                    <div className="bg-purple-50 p-3 rounded-xl mt-3">
+                                        <p className="text-[10px] font-bold text-purple-500 mb-1">🏥 상병명</p>
+                                        <p className="text-xs font-mono text-gray-700 whitespace-pre-line">{selectedReview.disease_codes}</p>
+                                    </div>
+                                )
                             )}
-                            {selectedReview.disease_codes && (
-                                <div className="bg-purple-50 p-3 rounded-xl mt-3">
-                                    <p className="text-[10px] font-bold text-purple-500 mb-1">🏥 상병명</p>
-                                    <p className="text-xs font-mono text-gray-700 whitespace-pre-line">{selectedReview.disease_codes}</p>
+
+                            {isEditing && (
+                                <div className="space-y-1.5 mt-3">
+                                    <label className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">차트 데이터 (수정 시 체크리스트 재구성 가능)</label>
+                                    <textarea value={editForm.chart_data} onChange={e => setEditForm({ ...editForm, chart_data: e.target.value })}
+                                        className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-[10px] font-mono outline-none focus:ring-2 focus:ring-blue-200 resize-none h-32 custom-scrollbar" />
                                 </div>
                             )}
                         </div>
+
+                        {isEditing && (
+                            <div className="flex gap-2">
+                                <button onClick={handleCancelEdit} className="flex-1 py-3 bg-gray-100 text-gray-600 text-sm font-bold rounded-xl hover:bg-gray-200 transition-all">취소</button>
+                                <button onClick={handleUpdateReview} className="flex-[2] py-3 bg-[var(--toss-blue)] text-white text-sm font-bold rounded-xl hover:opacity-90 transition-all shadow-lg shadow-blue-600/20">변경 내용 저장</button>
+                            </div>
+                        )}
 
                         {/* 체크리스트 */}
                         <div className="bg-white rounded-2xl border border-[var(--toss-border)] p-6 shadow-sm space-y-3">
