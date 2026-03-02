@@ -104,31 +104,28 @@ export default function StatusPanel({ user, tasks, surgeries, mris, attStatus, o
       <div className="flex gap-0.5 mb-6 p-1 app-tab-bar">
         <button
           onClick={() => setActiveTab('알림')}
-          className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-all ${
-            activeTab === '알림'
+          className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-all ${activeTab === '알림'
               ? 'bg-[var(--toss-card)] shadow-sm text-[var(--toss-blue)]'
               : 'text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]'
-          }`}
+            }`}
         >
           🔔 {unreadCount > 0 && <span className="text-red-400">{unreadCount}</span>}
         </button>
         <button
           onClick={() => setActiveTab('일정')}
-          className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-all ${
-            activeTab === '일정'
+          className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-all ${activeTab === '일정'
               ? 'bg-[var(--toss-card)] shadow-sm text-[var(--toss-blue)]'
               : 'text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]'
-          }`}
+            }`}
         >
           📅
         </button>
         <button
           onClick={() => setActiveTab('근태')}
-          className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-all ${
-            activeTab === '근태'
+          className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-all ${activeTab === '근태'
               ? 'bg-[var(--toss-card)] shadow-sm text-[var(--toss-blue)]'
               : 'text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]'
-          }`}
+            }`}
         >
           ⏰
         </button>
@@ -155,8 +152,8 @@ export default function StatusPanel({ user, tasks, surgeries, mris, attStatus, o
                       {new Date(notif.created_at).toLocaleTimeString()}
                     </p>
                   </div>
-                  {!notif.is_read && (
-                    <div className="w-2 h-2 bg-[var(--toss-blue)] rounded-full shrink-0 mt-1" />
+                  {!notif.read_at && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--toss-blue)] shrink-0 mt-2" />
                   )}
                 </div>
               </div>
@@ -195,9 +192,8 @@ export default function StatusPanel({ user, tasks, surgeries, mris, attStatus, o
                 mris.map((m: any, i: number) => (
                   <div
                     key={i}
-                    className={`p-3 rounded-[12px] border ${
-                      m.is_fasting ? 'border-[var(--toss-blue)]/30 bg-[var(--toss-blue-light)]/50' : 'bg-[var(--toss-card)] border-[var(--toss-border)]'
-                    }`}
+                    className={`p-3 rounded-[12px] border ${m.is_fasting ? 'border-[var(--toss-blue)]/30 bg-[var(--toss-blue-light)]/50' : 'bg-[var(--toss-card)] border-[var(--toss-border)]'
+                      }`}
                   >
                     <span className="text-[11px] font-semibold text-[var(--toss-blue)]">{m.mri_time?.slice(0, 5)}</span>
                     <p className="text-[11px] font-semibold text-[var(--foreground)]">
@@ -221,22 +217,20 @@ export default function StatusPanel({ user, tasks, surgeries, mris, attStatus, o
             <button
               disabled={attStatus !== 'none' || loading}
               onClick={() => handleAttendance('in')}
-              className={`py-5 rounded-3xl font-semibold text-xs transition-all ${
-                attStatus === 'none'
+              className={`py-5 rounded-3xl font-semibold text-xs transition-all ${attStatus === 'none'
                   ? 'bg-green-600 text-white shadow-lg'
                   : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]'
-              }`}
+                }`}
             >
               {attStatus === 'none' ? '출근하기' : '출근완료'}
             </button>
             <button
               disabled={attStatus !== 'checked_in' || loading}
               onClick={() => handleAttendance('out')}
-              className={`py-5 rounded-3xl font-semibold text-xs transition-all ${
-                attStatus === 'checked_in'
+              className={`py-5 rounded-3xl font-semibold text-xs transition-all ${attStatus === 'checked_in'
                   ? 'bg-orange-500 text-white shadow-lg'
                   : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]'
-              }`}
+                }`}
             >
               {attStatus === 'checked_out' ? '퇴근완료' : '퇴근하기'}
             </button>

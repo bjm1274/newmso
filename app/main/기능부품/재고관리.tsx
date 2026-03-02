@@ -60,8 +60,8 @@ export default function IntegratedInventoryManagement({ user }: any) {
       const { data } = await supabase
         .from('notifications')
         .select('*')
-        .eq('type', '물품이동요청')
-        .eq('is_read', false);
+        .eq('user_id', user.id)
+        .is('read_at', null);
       if (data) setNotifications(data);
     } catch (err) {
       console.error('알림 조회 실패:', err);
@@ -71,7 +71,7 @@ export default function IntegratedInventoryManagement({ user }: any) {
   // 물품 부서이동 완료 처리
   const handleMoveComplete = async (notif: any) => {
     if (!confirm("물품 부서 이동을 완료 처리하시겠습니까? 해당 수량만큼 재고가 차감됩니다.")) return;
-    
+
     const { items } = notif.metadata;
     let successCount = 0;
 
@@ -94,7 +94,7 @@ export default function IntegratedInventoryManagement({ user }: any) {
     }
 
     if (successCount > 0) {
-      await supabase.from('notifications').update({ is_read: true }).eq('id', notif.id);
+      await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('id', notif.id);
       alert(`${successCount}건의 물품 이동 처리가 완료되었습니다.`);
       fetchNotifications();
       fetchInventory();
@@ -131,11 +131,10 @@ export default function IntegratedInventoryManagement({ user }: any) {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-5 py-3 rounded-[16px] text-sm font-semibold transition-all whitespace-nowrap ${
-              activeTab === tab.id
+            className={`flex items-center gap-2 px-5 py-3 rounded-[16px] text-sm font-semibold transition-all whitespace-nowrap ${activeTab === tab.id
                 ? 'bg-[var(--toss-blue)] text-white shadow-lg'
                 : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]/80'
-            }`}
+              }`}
           >
             <span className="text-lg">{tab.icon}</span>
             {tab.label}
@@ -161,10 +160,10 @@ export default function IntegratedInventoryManagement({ user }: any) {
                       <div>
                         <p className="text-xs font-semibold text-[var(--foreground)]">{n.body}</p>
                         <p className="text-[11px] text-[var(--toss-gray-3)] font-bold mt-1">
-                          {n.metadata.items.map((i:any) => `${i.name}(${i.qty}개/수령:${i.dept})`).join(', ')}
+                          {n.metadata.items.map((i: any) => `${i.name}(${i.qty}개/수령:${i.dept})`).join(', ')}
                         </p>
                       </div>
-                      <button 
+                      <button
                         onClick={() => handleMoveComplete(n)}
                         className="px-4 py-2 bg-orange-600 text-white text-[11px] font-semibold rounded-[12px] shadow-md hover:bg-orange-700 transition-all"
                       >

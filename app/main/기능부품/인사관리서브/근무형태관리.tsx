@@ -175,7 +175,7 @@ export default function ShiftManagement({ selectedCo }: any) {
     if (!confirm('이 근무 형태를 삭제하시겠습니까?')) return;
     try {
       // is_active 컬럼이 없을 수도 있으므로 fallback
-      let { error } = await supabase.from('work_shifts').update({ is_active: false }).eq('id', id);
+      const { error } = await supabase.from('work_shifts').update({ is_active: false }).eq('id', id);
       if (error) {
         // is_active 컬럼 없으면 실제 삭제
         const retry = await supabase.from('work_shifts').delete().eq('id', id);
@@ -447,7 +447,7 @@ export default function ShiftManagement({ selectedCo }: any) {
                   />
                   <div>
                     <span className="text-xs font-bold text-indigo-900 dark:text-indigo-400 block mb-0.5">교대 근무 전용 스케줄 여부</span>
-                    <span className="text-[10px] text-indigo-700 dark:text-indigo-500 font-medium">체크 시, 교대제 캘린더 화면에서 '교대근무자'를 대상으로만 이 근무 형태가 노출됩니다.</span>
+                    <span className="text-[10px] text-indigo-700 dark:text-indigo-500 font-medium">체크 시, 교대제 캘린더 화면에서 &apos;교대근무자&apos;를 대상으로만 이 근무 형태가 노출됩니다.</span>
                   </div>
                 </label>
               </div>

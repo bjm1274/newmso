@@ -30,7 +30,7 @@ export default function NotificationAutomation({ user }: any) {
             type: '급여일알림',
             title: '급여 정산일',
             body: '오늘은 급여 정산일입니다. 정산 및 전송을 확인해주세요.',
-            is_read: false,
+            read_at: null,
           });
         }
       }
@@ -48,8 +48,8 @@ export default function NotificationAutomation({ user }: any) {
 
       const stepToday =
         isSameDate(step1Date) ? 1 :
-        isSameDate(step2Date) ? 2 :
-        0;
+          isSameDate(step2Date) ? 2 :
+            0;
 
       if (stepToday === 0) return;
 
@@ -83,7 +83,7 @@ export default function NotificationAutomation({ user }: any) {
           type: '연차촉진',
           title,
           body,
-          is_read: false,
+          read_at: null,
         });
 
         await supabase.from('annual_leave_promotion_logs').insert({

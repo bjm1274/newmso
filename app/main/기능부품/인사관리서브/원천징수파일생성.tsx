@@ -67,7 +67,7 @@ export default function TaxFileGenerator({ staffs, selectedCo }: { staffs: any[]
                 <p className="text-[11px] font-bold text-amber-800 dark:text-amber-500 leading-relaxed flex gap-2">
                     <span className="shrink-0">⚠️</span>
                     <span>
-                        해당 월에 "급여 확정" 처리가 완료된 임직원 데이터만 변환됩니다. <br />
+                        해당 월에 &quot;급여 확정&quot; 처리가 완료된 임직원 데이터만 변환됩니다. <br />
                         홈택스나 EDI 시스템에 업로드 전, 반드시 테스트 업로드 기능을 이용하여 오류 여부를 검증하세요.
                     </span>
                 </p>

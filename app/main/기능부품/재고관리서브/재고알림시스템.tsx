@@ -41,7 +41,7 @@ export function useInventoryAlertSystem(inventory: any[], user: any) {
 
     if (newAlertItems.length > 0) {
       await sendInventoryAlerts(lowStock, expiryImminent);
-      
+
       // 알림 보낸 품목 기록
       const newAlertsSent = new Set(alertsSent);
       lowStock.forEach((item: any) => newAlertsSent.add(item.id + '_stock'));
@@ -71,7 +71,7 @@ export function useInventoryAlertSystem(inventory: any[], user: any) {
             title: '⚠️ 안전재고 미달 알림',
             body: `${lowStock.length}개 품목의 재고가 부족합니다. 발주 검토가 필요합니다.`,
             metadata: { items: lowStock.map(i => i.item_name) },
-            is_read: false,
+            read_at: null,
             created_at: new Date().toISOString()
           });
         });
@@ -86,7 +86,7 @@ export function useInventoryAlertSystem(inventory: any[], user: any) {
             title: '⏰ 유효기간 임박 알림',
             body: `${expiryImminent.length}개 품목의 유효기간이 30일 이내로 남았습니다.`,
             metadata: { items: expiryImminent.map(i => i.item_name) },
-            is_read: false,
+            read_at: null,
             created_at: new Date().toISOString()
           });
         });

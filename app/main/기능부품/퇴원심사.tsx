@@ -655,7 +655,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                 </select>
                                 {selectedTemplate && (
                                     <div className="bg-blue-50 p-3 rounded-xl mt-2">
-                                        <p className="text-xs font-bold text-[var(--toss-blue)]">📋 "{selectedTemplate.title}" 템플릿 선택됨 — 심사 생성 시 자동 비교</p>
+                                        <p className="text-xs font-bold text-[var(--toss-blue)]">📋 &quot;{selectedTemplate.title}&quot; 템플릿 선택됨 &mdash; 심사 생성 시 자동 비교</p>
                                     </div>
                                 )}
                             </div>

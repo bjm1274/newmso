@@ -87,7 +87,7 @@ export default function EducationMain({ staffs, selectedCo }: any) {
                       type: 'education',
                       title: '🚨 법정의무교육 이수 독촉',
                       body: `${n.education} 의무교육 이수 기한이 ${n.daysLeft}일 남았습니다. 신속히 교육을 수료하시고 이수증을 등록해 주세요.`,
-                      is_read: false
+                      read_at: null
                     });
                     if (!error) {
                       alert(`${n.name}님에게 독촉 알림이 성공적으로 전송되었습니다.`);

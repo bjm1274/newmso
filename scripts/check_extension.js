@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
+const fs = require('fs');
 const { createClient } = require('@supabase/supabase-js');
 
 const supabaseUrl = 'https://rtleqrtcqucntnygzudv.supabase.co';

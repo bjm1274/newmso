@@ -146,7 +146,7 @@ function HRPolicies({ companyName }: { companyName: string }) {
                         <div className="p-6 flex items-center justify-between hover:bg-[var(--toss-gray-1)]/50 transition-colors">
                             <div>
                                 <h4 className="font-bold text-[var(--foreground)] text-[15px] mb-1">연장근로 무조건 보상휴가(대휴) 전환</h4>
-                                <p className="text-[12px] text-[var(--toss-gray-4)]">추가 수당(돈)을 지급하는 대신, 1.5배 가산된 시간만큼 직원의 '보상 연차' 개수에 자동으로 더해줍니다.</p>
+                                <p className="text-[12px] text-[var(--toss-gray-4)]">추가 수당(돈)을 지급하는 대신, 1.5배 가산된 시간만큼 직원의 &apos;보상 연차&apos; 개수에 자동으로 더해줍니다.</p>
                             </div>
                             <ToggleSwitch checked={policies.autoConvertOvertimeToLeave} onChange={(v) => setPolicies({ ...policies, autoConvertOvertimeToLeave: v })} />
                         </div>

@@ -54,7 +54,7 @@ export default function ExpirationAlert() {
         type: 'expiration_alert',
         title: `⚠️ 유효기간 임박 제품 ${expiring.length}개, 만료 제품 ${expired.length}개`,
         body: `유효기간 6개월 미만: ${expiring.length}개 | 만료됨: ${expired.length}개`,
-        is_read: false,
+        read_at: null,
         created_at: new Date().toISOString(),
       }));
 

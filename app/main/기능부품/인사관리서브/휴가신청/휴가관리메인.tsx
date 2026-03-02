@@ -361,7 +361,7 @@ export default function LeaveManagement({ staffs = [], selectedCo, onRefresh }: 
                         <p className="text-[11px] text-[var(--toss-gray-3)] font-semibold mb-2">{staff?.company} | {staff?.department}</p>
                         <div className="flex flex-col gap-1">
                           <p className="text-[12px] font-bold text-[var(--toss-gray-4)]">📅 {l.start_date} ~ {l.end_date}</p>
-                          <p className="text-[12px] text-[var(--toss-gray-3)] italic">" {l.reason} "</p>
+                          <p className="text-[12px] text-[var(--toss-gray-3)] italic">&quot; {l.reason} &quot;</p>
                         </div>
                       </div>
                       <div className="flex gap-2 w-full md:w-auto shrink-0">

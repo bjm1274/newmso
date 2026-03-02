@@ -51,8 +51,19 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   }, [staffs]);
 
   useEffect(() => {
-    supabase.from('approval_form_types').select('name, slug').eq('is_active', true).order('sort_order').then(({ data }) => {
-      setCustomFormTypes((data || []).map((r: any) => ({ name: r.name, slug: r.slug })));
+    supabase.from('approval_form_types').select('name, slug').eq('is_active', true).order('sort_order').then(({ data, error }) => {
+      if (!error && data?.length) {
+        setCustomFormTypes(data.map((r: any) => ({ name: r.name, slug: r.slug })));
+      } else {
+        // Fallback hardcoded types if table is missing or empty
+        setCustomFormTypes([
+          { name: '휴가신청', slug: 'leave' },
+          { name: '연장근무', slug: 'overtime' },
+          { name: '비품구매', slug: 'purchase' },
+          { name: '출결정정', slug: 'attendance_fix' },
+          { name: '양식신청', slug: 'generic' }
+        ]);
+      }
     });
   }, []);
 
@@ -259,7 +270,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     const currentIndex = lineIds.findIndex((id: string) => String(id) === String(item.current_approver_id));
     const isFinalApproval = currentIndex === lineIds.length - 1 || currentIndex === -1;
 
-    let updateData: any = {};
+    const updateData: any = {};
     if (isFinalApproval) {
       updateData.status = '승인';
     } else {
