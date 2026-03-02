@@ -1,4 +1,6 @@
+/* eslint-disable */
 const fs = require('fs');
+const { createClient } = require('@supabase/supabase-js');
 const https = require('https');
 
 const env = fs.readFileSync('.env.local', 'utf-8');

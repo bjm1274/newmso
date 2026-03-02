@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 const fs = require('fs');
 const path = require('path');
 
@@ -26,7 +27,7 @@ function walk(dir) {
         fs.writeFileSync(full, content, 'utf8');
       }
     }
-  } catch (e) {}
+  } catch (e) { }
 }
 
 walk(appDir);

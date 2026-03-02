@@ -43,7 +43,7 @@ function saveToStorage(key: string, value: any) {
   } catch { /* ignore */ }
 }
 
-export default function 예산관리({ staffs = [] }: { staffs: any[] }) {
+export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
   const [activeTab, setActiveTab] = useState<'설정' | '집행현황'>('설정');
 
   // 예산 설정 상태

@@ -16,7 +16,7 @@ export default function PayrollEmailSender({ staffs, yearMonth }: any) {
           type: '급여명세',
           title: `[${yearMonth}] 급여명세서`,
           body: `급여명세서가 발송되었습니다. 마이페이지에서 확인하세요.`,
-          is_read: false
+          read_at: null
         });
       }
       setSent(staffs.length);

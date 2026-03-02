@@ -295,7 +295,7 @@ export default function HandoverNotes({ user }: { user: any }) {
                             {isSearching ? (
                                 <>
                                     <h3 className="text-xl font-bold text-gray-900 tracking-tight">검색 결과</h3>
-                                    <p className="text-sm font-semibold text-[var(--toss-blue)]">"{searchQuery}"에 대한 인계사항</p>
+                                    <p className="text-sm font-semibold text-[var(--toss-blue)]">&quot;{searchQuery}&quot;에 대한 인계사항</p>
                                 </>
                             ) : (
                                 <div className="flex items-center gap-3">

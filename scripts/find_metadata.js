@@ -1,7 +1,8 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 const { createClient } = require('@supabase/supabase-js');
 
 const supabaseUrl = 'https://rtleqrtcqucntnygzudv.supabase.co';
-const supabaseKey = 'sb_publishable_EoUqPt5EyaldLFGhMWrQ-A_qCz-fNHx';
+const supabaseKey = 'sb_publishable_EoUqPt5EyaldLFGhMWrQ-A_qCz-fNHr';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function findMetadataTable() {

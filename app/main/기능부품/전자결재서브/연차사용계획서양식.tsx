@@ -43,7 +43,7 @@ export default function AnnualLeavePlanForm({ user, staffs, setExtraData, setFor
         <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-3xl overflow-hidden shadow-sm animate-in fade-in duration-500">
             <div className="p-6 bg-indigo-50 border-b border-indigo-100 flex justify-between items-center">
                 <div>
-                    <h4 className="text-sm font-bold text-indigo-700">📅 연차계획서 작성</h4>
+                    <p className="text-xs text-blue-500 bg-blue-50 px-2 py-0.5 rounded-lg font-bold">&apos;{user.name}&apos;님의 연차사용계획서</p>
                     <p className="text-[11px] font-semibold text-indigo-500/70 mt-1">미사용 연차에 대한 사용 시기를 지정하여 제출해 주세요.</p>
                 </div>
                 <div className="text-right">
@@ -94,7 +94,7 @@ export default function AnnualLeavePlanForm({ user, staffs, setExtraData, setFor
 
                 <div className="p-4 bg-amber-50 rounded-[16px] border border-amber-100 mt-4">
                     <p className="text-[10px] text-amber-700 font-bold leading-relaxed">
-                        💡 안내: 계획서에 기재한 날짜에 실제 휴가를 사용하시려면, 추후 해당 날짜 이전에 별도의 [연차/휴가] 신청서를 상신하여 결재를 득해야 합니다. 본 계획서는 '사용 의사'를 확인하기 위한 서류입니다.
+                        💡 안내: 계획서에 기재한 날짜에 실제 휴가를 사용하시려면, 추후 해당 날짜 이전에 별도의 [연차/휴가] 신청서를 상신하여 결재를 득해야 합니다. 본 계획서는 &apos;사용 의사&apos;를 확인하기 위한 서류입니다.
                     </p>
                 </div>
             </div>

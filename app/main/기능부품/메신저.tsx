@@ -218,7 +218,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     if (typeof window === 'undefined') return;
     try {
       const saved = window.localStorage.getItem(CHAT_ROOM_KEY);
-      if (saved) {
+      if (saved && saved !== 'null' && saved !== 'undefined') {
         setSelectedRoomId(saved);
       } else {
         setSelectedRoomId(NOTICE_ROOM_ID);
@@ -253,6 +253,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   }, [messages]);
 
   const fetchData = useCallback(async () => {
+    if (!selectedRoomId) return;
     const query = supabase
       .from('messages')
       .select('*, staff:staff_members(name, photo_url)')
@@ -324,12 +325,16 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
 
           await supabase.from('message_reads').upsert(readPayloads, { onConflict: 'user_id,message_id' });
 
-          // [추가] 채팅방 전체 안읽음 개수 캐시인 room_read_cursors 업데이트
-          await supabase.from('room_read_cursors').upsert({
-            user_id: user.id,
-            room_id: selectedRoomId,
-            last_read_at: new Date().toISOString()
-          }, { onConflict: 'user_id,room_id' });
+          // table notification_settings might not exist
+          try {
+            await supabase.from('room_read_cursors').upsert({
+              user_id: user.id,
+              room_id: selectedRoomId,
+              last_read_at: new Date().toISOString()
+            }, { onConflict: 'user_id,room_id' });
+          } catch (e) {
+            console.warn('room_read_cursors upsert skip');
+          }
 
           // 읽음 수 로컬 상태 갱신 (즉시 반영 목적)
           setReadCounts(prev => {
@@ -673,9 +678,10 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       sender_id: user.id,
       content,
       file_url: fileUrl || null,
+      file_size_bytes: fileSizeBytes || null,
+      file_kind: fileKind || null,
       reply_to_id: replyTo?.id || null,
     };
-    // file_size_bytes, file_kind 컬럼 미존재로 인한 에러 방지를 위해 Payload에서 제거
     const { data: inserted, error } = await supabase.from('messages').insert([payload]).select().single();
     if (!error && inserted) {
       setInputMsg('');
@@ -1480,7 +1486,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
             <div className="relative flex-1">
               <input
                 className="w-full bg-transparent p-1 px-2 outline-none text-[15px] md:text-sm font-bold min-w-0"
-                placeholder={selectedRoomId === NOTICE_ROOM_ID && user?.position && !CAN_WRITE_NOTICE_POSITIONS.includes(user.position) ? "부서장 이상만 작성 가능" : "메시지를 입력하세요... (예: @이름 메모) "}
+                placeholder={selectedRoomId === NOTICE_ROOM_ID && user?.position && !CAN_WRITE_NOTICE_POSITIONS.includes(user.position) ? "부서장 이상만 작성 가능" : "메시지를 입력하세요&hellip; (예: @이름 메모) "}
                 value={inputMsg}
                 onChange={e => {
                   const value = e.target.value;
@@ -1583,7 +1589,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                     {messages.filter(m => m.file_kind === 'image' || m.file_kind === 'video').slice(-6).map((m, idx) => (
                       <div key={idx} className="aspect-square bg-zinc-100 dark:bg-zinc-800 relative group cursor-pointer">
                         {m.file_kind === 'image' ? (
-                          <img src={m.file_url} className="w-full h-full object-cover" />
+                          <img src={m.file_url} alt="Attached image" className="w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-xl">🎬</div>
                         )}
@@ -1633,7 +1639,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                         <div key={memberId} className="flex items-center justify-between group">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-[10px] font-bold text-emerald-600">
-                              {s?.photo_url ? <img src={s.photo_url} className="w-full h-full rounded-full object-cover" /> : (s?.name?.[0] || '?')}
+                              {s?.photo_url ? <img src={s.photo_url} alt={`${s.name}'s profile`} className="w-full h-full rounded-full object-cover" /> : (s?.name?.[0] || '?')}
                             </div>
                             <div>
                               <p className="text-xs font-bold text-foreground">{s?.name || '알 수 없음'}</p>
@@ -2247,7 +2253,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                         {unreadUsers.map((u: any) => (
                           <div key={u.id} className="flex items-center gap-3 p-2 rounded-xl bg-zinc-50 dark:bg-zinc-800/30">
                             <div className="w-7 h-7 rounded-lg bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-[10px] font-bold text-zinc-400 overflow-hidden">
-                              {u.photo_url ? <img src={u.photo_url} className="w-full h-full object-cover" /> : u.name[0]}
+                              {u.photo_url ? <img src={u.photo_url} alt={`${u.name}'s profile`} className="w-full h-full object-cover" /> : u.name[0]}
                             </div>
                             <div className="min-w-0 flex-1">
                               <p className="text-[11px] font-bold text-foreground truncate">{u.name}</p>
@@ -2271,7 +2277,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                         {readUsers.map((u: any) => (
                           <div key={u.id} className="flex items-center gap-3 p-2 rounded-xl bg-zinc-50 dark:bg-zinc-800/30">
                             <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-[10px] font-bold text-emerald-600 overflow-hidden">
-                              {u.photo_url ? <img src={u.photo_url} className="w-full h-full object-cover" /> : u.name[0]}
+                              {u.photo_url ? <img src={u.photo_url} alt={`${u.name}'s profile`} className="w-full h-full object-cover" /> : u.name[0]}
                             </div>
                             <div className="min-w-0 flex-1">
                               <p className="text-[11px] font-bold text-foreground truncate">{u.name}</p>
@@ -2523,7 +2529,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                 filteredMediaMessages.map((m: any) => (
                   <div key={m.id} className="p-3 bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 rounded-xl hover:border-blue-300 transition-all group">
                     {isImageUrl(m.file_url) ? (
-                      <img src={m.file_url} className="w-full h-24 object-cover rounded-lg mb-2 cursor-pointer" onClick={() => window.open(m.file_url)} />
+                      <img src={m.file_url} alt="Attached media" className="w-full h-24 object-cover rounded-lg mb-2 cursor-pointer" onClick={() => window.open(m.file_url)} />
                     ) : (
                       <div className="w-full h-12 bg-zinc-100 dark:bg-zinc-800 rounded-lg mb-2 flex items-center justify-center text-xl">📄</div>
                     )}

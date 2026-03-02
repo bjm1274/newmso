@@ -178,7 +178,7 @@ export default function MyDocuments({ user }: any) {
                 <h4 className="text-[13px] font-black text-blue-800 mb-2">📢 제출 및 촬영 가이드</h4>
                 <ul className="text-[11px] text-blue-700 space-y-2 font-medium list-disc ml-5">
                     <li><strong className="font-black underline decoration-2">모바일 촬영 시</strong>: 글자가 선명하게 보이도록 밝은 곳에서 촬영해 주세요.</li>
-                    <li><strong className="font-black underline decoration-2">다중 페이지</strong>: 여러 장의 서류는 촬영 후 '다음 페이지 추가'를 통해 하나의 PDF로 제출 가능합니다.</li>
+                    <li><strong className="font-black underline decoration-2">다중 페이지</strong>: 여러 장의 서류는 촬영 후 &apos;다음 페이지 추가&apos;를 통해 하나의 PDF로 제출 가능합니다.</li>
                 </ul>
             </div>
 

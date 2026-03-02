@@ -170,7 +170,7 @@ export default function ShiftCalendar({ staffs, selectedCo }: any) {
                                     <td className="p-4 border-r border-slate-100 sticky left-0 bg-white group-hover:bg-slate-50/50 z-10 transition-colors">
                                         <div className="flex items-center gap-3">
                                             <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center shrink-0">
-                                                {staff.avatar_url ? <img src={staff.avatar_url} className="w-full h-full object-cover" /> : <span className="text-xl">👤</span>}
+                                                {staff.avatar_url ? <img src={staff.avatar_url} alt="" className="w-full h-full object-cover" /> : <span className="text-xl">👤</span>}
                                             </div>
                                             <div>
                                                 <p className="text-[12px] font-black text-slate-800 tracking-tight">{staff.name} <span className="text-[10px] text-slate-400 font-bold ml-1">{staff.position}</span></p>

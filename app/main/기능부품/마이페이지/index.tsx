@@ -117,7 +117,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
         title: '계약서 서명 완료',
         message: `${user.name} 님이 근로계약서에 전자서명을 완료했습니다.`,
         type: 'SUCCESS',
-        is_read: false
+        read_at: null
       });
 
       alert('근로계약서 서명이 성공적으로 완료되었습니다. 마이페이지 > 급여 또는 문서보관함에서 확인하실 수 있습니다.');

@@ -116,3 +116,58 @@ body {
   transform: translateY(-2px);
   box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.08);
 }
+
+/* ─── 알림 시스템 애니메이션 ─── */
+
+/* 벨 아이콘 흔들림 (새 알림 도착 시) */
+@keyframes bellShake {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  15%  { transform: rotate(-18deg) scale(1.15); }
+  30%  { transform: rotate(18deg) scale(1.15); }
+  45%  { transform: rotate(-12deg) scale(1.08); }
+  60%  { transform: rotate(12deg) scale(1.08); }
+  75%  { transform: rotate(-6deg) scale(1.03); }
+  90%  { transform: rotate(6deg) scale(1.03); }
+}
+.animate-bell-shake {
+  animation: bellShake 0.6s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+  transform-origin: top center;
+}
+
+/* 토스트 진행바: 7초 동안 좌→우로 줄어듦 */
+@keyframes progressShrink7 {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
+.animate-progress-7s {
+  animation: progressShrink7 7s linear forwards;
+  transform-origin: left center;
+}
+
+/* 토스트 카드 우측에서 슬라이드 인 */
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(110%) scale(0.96); }
+  to   { opacity: 1; transform: translateX(0) scale(1); }
+}
+.animate-slide-in-right-toast {
+  animation: slideInRight 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* 토스트 카드 우측으로 슬라이드 아웃 */
+@keyframes slideOutRight {
+  from { opacity: 1; transform: translateX(0) scale(1); }
+  to   { opacity: 0; transform: translateX(110%) scale(0.96); }
+}
+.animate-slide-out-right-toast {
+  animation: slideOutRight 0.22s ease-in forwards;
+}
+
+/* 채팅 배너 진행바: 6초 */
+@keyframes progressShrink6 {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
+.animate-progress-6s {
+  animation: progressShrink6 6s linear forwards;
+  transform-origin: left center;
+}

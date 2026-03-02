@@ -123,7 +123,7 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: any) {
           title: '계약서 서명 요청',
           message: `${contractType}발송이 완료되었습니다. 확인 후 서명해 주세요.`,
           type: 'INFO',
-          is_read: false
+          read_at: null
         }))
       );
 

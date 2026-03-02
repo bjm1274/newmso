@@ -11,7 +11,7 @@ type ReportTab = '인사현황' | '급여요약' | '재고현황';
 
 const PIE_COLORS = ['#4F8EF7', '#34C759', '#FF9500', '#FF6B6B', '#AF52DE', '#5AC8FA'];
 
-export default function 통합보고서({ staffs = [] }: { staffs: any[] }) {
+export default function IntegratedReport({ staffs = [] }: { staffs: any[] }) {
   const [activeTab, setActiveTab] = useState<ReportTab>('인사현황');
   const [inventory, setInventory] = useState<any[]>([]);
   const [loadingInventory, setLoadingInventory] = useState(false);
@@ -159,8 +159,8 @@ export default function 통합보고서({ staffs = [] }: { staffs: any[] }) {
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={`px-4 py-2 rounded-[10px] text-sm font-bold transition-all ${activeTab === tab.id
-                ? 'bg-white text-[var(--toss-blue)] shadow-sm'
-                : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'
+              ? 'bg-white text-[var(--toss-blue)] shadow-sm'
+              : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'
               }`}
           >
             {tab.label}
