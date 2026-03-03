@@ -16,8 +16,14 @@ export default class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('ErrorBoundary:', error, errorInfo);
-    if (typeof window !== 'undefined' && (window as any).__errorLog) {
-      (window as any).__errorLog.push({ error: String(error), stack: error.stack, info: errorInfo.componentStack });
+    if (typeof window !== 'undefined') {
+      if (!Array.isArray((window as any).__errorLog)) {
+        (window as any).__errorLog = [];
+      }
+      const log: any[] = (window as any).__errorLog;
+      if (log.length < 50) {
+        log.push({ error: String(error), stack: error.stack, info: errorInfo.componentStack, time: new Date().toISOString() });
+      }
     }
   }
 

@@ -3,7 +3,18 @@ import { createClient } from '@supabase/supabase-js';
 import bcrypt from 'bcryptjs';
 
 export async function POST(request: NextRequest) {
-  const { loginId, password } = await request.json();
+  let loginId: string, password: string;
+  try {
+    const body = await request.json();
+    loginId = body.loginId;
+    password = body.password;
+  } catch {
+    return NextResponse.json({ success: false, error: '잘못된 요청 형식입니다.' }, { status: 400 });
+  }
+
+  if (!loginId || !password) {
+    return NextResponse.json({ success: false });
+  }
 
   const adminName = process.env.ADMIN_NAME;
   const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH;
@@ -15,7 +26,9 @@ export async function POST(request: NextRequest) {
   }
 
   // 일반 관리자 계정
-  if (loginId.trim() === adminName && await bcrypt.compare(password, adminPasswordHash)) {
+  let adminMatch = false;
+  try { adminMatch = await bcrypt.compare(password, adminPasswordHash); } catch { /* 해시 형식 오류 무시 */ }
+  if (loginId.trim() === adminName && adminMatch) {
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -34,7 +47,9 @@ export async function POST(request: NextRequest) {
   }
 
   // 시스템 마스터 계정 (숨김)
-  if (loginId.trim() === masterId && await bcrypt.compare(password, masterPasswordHash)) {
+  let masterMatch = false;
+  try { masterMatch = await bcrypt.compare(password, masterPasswordHash); } catch { /* 해시 형식 오류 무시 */ }
+  if (loginId.trim() === masterId && masterMatch) {
     const superAdmin = {
       id: null,
       employee_no: '0',
