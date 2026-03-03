@@ -61,7 +61,13 @@ function MainPageContent() {
 
   // 1. 초기 로드 시 사용자 정보 및 이전 상태 복구
   useEffect(() => {
-    const storedUser = localStorage.getItem('erp_user');
+    let storedUser: string | null = null;
+    try {
+      storedUser = localStorage.getItem('erp_user');
+    } catch {
+      router.replace('/');
+      return;
+    }
     if (!storedUser) {
       router.replace('/');
       return;
@@ -70,7 +76,7 @@ function MainPageContent() {
     try {
       parsedUser = JSON.parse(storedUser);
     } catch {
-      localStorage.removeItem('erp_user');
+      try { localStorage.removeItem('erp_user'); } catch { /* ignore */ }
       router.replace('/');
       return;
     }
@@ -126,32 +132,34 @@ function MainPageContent() {
     return () => { supabase.removeChannel(channel); };
   }, [user?.id, loginAt]);
 
-  // 1-1. 강제 로그아웃(세션 만료) 체크
-  const checkForcedLogout = async () => {
-    try {
-      const { data: config } = await supabase
-        .from('system_configs')
-        .select('value')
-        .eq('key', 'min_auth_time')
-        .single();
+  // 1-1. 강제 로그아웃(세션 만료) 체크 — 마운트 시 1회만 실행
+  useEffect(() => {
+    const checkForcedLogout = async () => {
+      try {
+        const { data: config } = await supabase
+          .from('system_configs')
+          .select('value')
+          .eq('key', 'min_auth_time')
+          .single();
 
-      if (config?.value) {
-        const minAuthTime = new Date(config.value).getTime();
-        const loginAtStr = localStorage.getItem('erp_login_at');
-        const loginAt = loginAtStr ? new Date(loginAtStr).getTime() : 0;
+        if (config?.value) {
+          const minAuthTime = new Date(config.value).getTime();
+          const loginAtStr = localStorage.getItem('erp_login_at');
+          const loginAtMs = loginAtStr ? new Date(loginAtStr).getTime() : 0;
 
-        if (loginAt < minAuthTime) {
-          alert("보안 정책 또는 시스템 업데이트로 인해 모든 세션이 만료되었습니다. 다시 로그인해 주세요.");
-          localStorage.removeItem('erp_user');
-          localStorage.removeItem('erp_login_at');
-          router.replace('/');
+          if (loginAtMs < minAuthTime) {
+            alert("보안 정책 또는 시스템 업데이트로 인해 모든 세션이 만료되었습니다. 다시 로그인해 주세요.");
+            localStorage.removeItem('erp_user');
+            localStorage.removeItem('erp_login_at');
+            router.replace('/');
+          }
         }
+      } catch {
+        // 테이블이 없거나 설정이 없으면 무시
       }
-    } catch (e) {
-      // 테이블이 없거나 설정이 없으면 무시
-    }
-  };
-  checkForcedLogout();
+    };
+    checkForcedLogout();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 알림 클릭 시 open_chat_room 쿼리 처리 → 채팅 메뉴 + 해당 채팅방 연동 (웹/모바일 동일)
   useEffect(() => {
@@ -251,7 +259,7 @@ function MainPageContent() {
 
       let postQuery = supabase.from('board_posts').select('*').order('created_at', { ascending: false });
       if (filterCompanyId) {
-        try { postQuery = postQuery.eq('company_id', filterCompanyId); } catch (_) { }
+        postQuery = postQuery.eq('company_id', filterCompanyId);
       }
       const { data: postData } = await postQuery;
 
