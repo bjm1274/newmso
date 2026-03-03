@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 
 export default function ChatMessenger({ user, staffs }: any) {
@@ -15,13 +15,29 @@ export default function ChatMessenger({ user, staffs }: any) {
   const [groupName, setGroupName] = useState('');
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  // Race condition 방지: 마지막으로 요청한 roomId를 추적
+  const lastLoadedRoomRef = useRef<string | null>(null);
+
+  const safeStaffs: any[] = Array.isArray(staffs) ? staffs : [];
 
   useEffect(() => {
     loadChatRooms();
     loadAnnouncements();
   }, []);
 
-  // 실시간 메시지 구독
+  // 채팅방 목록 실시간 구독 (새 방 생성 시 자동 갱신)
+  useEffect(() => {
+    const channel = supabase
+      .channel('chat-rooms-list')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_rooms' }, () => {
+        loadChatRooms();
+        loadAnnouncements();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
+  // 선택된 방의 메시지 실시간 구독
   useEffect(() => {
     if (!selectedRoom) return;
 
@@ -36,7 +52,14 @@ export default function ChatMessenger({ user, staffs }: any) {
           filter: `room_id=eq.${selectedRoom.id}`,
         },
         (payload) => {
-          setMessages((prev) => [...prev, payload.new]);
+          // 현재 선택된 방의 메시지만 추가 (race condition 방지)
+          if (lastLoadedRoomRef.current === selectedRoom.id) {
+            setMessages((prev) => {
+              // 이미 존재하는 메시지 중복 방지
+              if (prev.some((m: any) => m.id === payload.new.id)) return prev;
+              return [...prev, payload.new];
+            });
+          }
         }
       )
       .subscribe();
@@ -59,7 +82,7 @@ export default function ChatMessenger({ user, staffs }: any) {
       .from('chat_rooms')
       .select('*')
       .order('created_at', { ascending: false });
-    
+
     const sortedRooms = (data || []).sort((a: any, b: any) => {
       if (a.type === 'group' && b.type !== 'group') return -1;
       if (a.type !== 'group' && b.type === 'group') return 1;
@@ -77,14 +100,19 @@ export default function ChatMessenger({ user, staffs }: any) {
     setAnnouncements(data || []);
   };
 
-  const loadMessages = async (roomId: string) => {
+  // Race condition 방지: roomId 인자를 기준으로 마지막 요청만 반영
+  const loadMessages = useCallback(async (roomId: string) => {
+    lastLoadedRoomRef.current = roomId;
     const { data } = await supabase
       .from('chat_messages')
       .select('*')
       .eq('room_id', roomId)
       .order('created_at', { ascending: true });
-    setMessages(data || []);
-  };
+    // 응답이 돌아왔을 때 여전히 같은 방이 선택된 경우에만 반영
+    if (lastLoadedRoomRef.current === roomId) {
+      setMessages(data || []);
+    }
+  }, []);
 
   const handleSelectRoom = (room: any) => {
     setSelectedRoom(room);
@@ -92,7 +120,7 @@ export default function ChatMessenger({ user, staffs }: any) {
   };
 
   const sendMessage = async () => {
-    if (!newMessage.trim() || !selectedRoom) return;
+    if (!newMessage.trim() || !selectedRoom || !user?.id) return;
 
     const messageContent = newMessage;
     setNewMessage(''); // 즉시 입력창 비우기
@@ -110,24 +138,31 @@ export default function ChatMessenger({ user, staffs }: any) {
       alert('메시지 전송에 실패했습니다.');
       setNewMessage(messageContent); // 실패 시 복구
     } else {
-      // 실시간 구독이 메시지를 추가하겠지만, 즉각적인 피드백을 위해 수동 로드도 병행 가능
-      // loadMessages(selectedRoom.id); 
+      // 사이드바 last_message 업데이트
+      await supabase
+        .from('chat_rooms')
+        .update({ last_message: messageContent })
+        .eq('id', selectedRoom.id);
     }
   };
 
   const deleteAnnouncement = async (announcementId: string) => {
-    await supabase
+    const { error } = await supabase
       .from('chat_rooms')
       .delete()
       .eq('id', announcementId);
-    loadAnnouncements();
-    setSelectedRoom(null);
+    if (!error) {
+      loadAnnouncements();
+      setSelectedRoom(null);
+    } else {
+      alert('공지 삭제에 실패했습니다.');
+    }
   };
 
   const createGroupChat = async () => {
-    if (!groupName.trim() || selectedMembers.length === 0) return;
+    if (!groupName.trim() || selectedMembers.length === 0 || !user?.id) return;
 
-    const { data: newRoom } = await supabase
+    const { data: newRoom, error: roomError } = await supabase
       .from('chat_rooms')
       .insert({
         name: groupName,
@@ -139,26 +174,32 @@ export default function ChatMessenger({ user, staffs }: any) {
       .select()
       .single();
 
-    if (newRoom) {
-      const memberInserts = selectedMembers.map((memberId: string) => ({
-        room_id: newRoom.id,
-        user_id: memberId,
-        joined_at: new Date().toISOString(),
-      }));
-
-      await supabase.from('chat_room_members').insert(memberInserts);
-
-      setGroupName('');
-      setSelectedMembers([]);
-      setShowNewGroupModal(false);
-      loadChatRooms();
+    if (roomError || !newRoom) {
+      alert('채팅방 생성에 실패했습니다.');
+      return;
     }
+
+    const memberInserts = selectedMembers.map((memberId: string) => ({
+      room_id: newRoom.id,
+      user_id: memberId,
+      joined_at: new Date().toISOString(),
+    }));
+
+    const { error: memberError } = await supabase.from('chat_room_members').insert(memberInserts);
+    if (memberError) {
+      console.error('멤버 추가 실패:', memberError);
+    }
+
+    setGroupName('');
+    setSelectedMembers([]);
+    setShowNewGroupModal(false);
+    loadChatRooms();
   };
 
   const handleSearch = (term: string) => {
     setSearchTerm(term);
     if (term.trim()) {
-      const filtered = staffs.filter((staff: any) =>
+      const filtered = safeStaffs.filter((staff: any) =>
         staff.name?.includes(term) || staff.email?.includes(term)
       );
       setFilteredStaffs(filtered);
@@ -168,17 +209,19 @@ export default function ChatMessenger({ user, staffs }: any) {
   };
 
   const startDirectChat = async (targetStaff: any) => {
+    if (!user?.id) return;
+
     const { data: existingRoom } = await supabase
       .from('chat_rooms')
       .select('*')
       .eq('type', 'direct')
       .contains('members', [user.id, targetStaff.id])
-      .single();
+      .maybeSingle();
 
     if (existingRoom) {
       handleSelectRoom(existingRoom);
     } else {
-      const { data: newRoom } = await supabase
+      const { data: newRoom, error } = await supabase
         .from('chat_rooms')
         .insert({
           name: `${user.name} & ${targetStaff.name}`,
@@ -189,10 +232,13 @@ export default function ChatMessenger({ user, staffs }: any) {
         .select()
         .single();
 
-      if (newRoom) {
-        handleSelectRoom(newRoom);
-        loadChatRooms();
+      if (error || !newRoom) {
+        alert('채팅방 생성에 실패했습니다.');
+        return;
       }
+
+      handleSelectRoom(newRoom);
+      loadChatRooms();
     }
 
     setSearchTerm('');
@@ -286,7 +332,7 @@ export default function ChatMessenger({ user, staffs }: any) {
                         {new Date(announce.created_at).toLocaleDateString('ko-KR')}
                       </p>
                     </div>
-                    {user.role === 'admin' && (
+                    {user?.role === 'admin' && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -345,7 +391,7 @@ export default function ChatMessenger({ user, staffs }: any) {
           <>
             <div className="p-4 bg-white border-b border-[var(--toss-border)] flex justify-between items-center shrink-0">
               <h3 className="font-semibold text-lg text-[var(--foreground)]">{selectedRoom.name}</h3>
-              {selectedRoom.is_announcement && user.role === 'admin' && (
+              {selectedRoom.is_announcement && user?.role === 'admin' && (
                 <button
                   onClick={() => deleteAnnouncement(selectedRoom.id)}
                   className="px-3 py-1 bg-red-100 text-red-600 rounded text-sm font-semibold hover:bg-red-200"
@@ -357,8 +403,8 @@ export default function ChatMessenger({ user, staffs }: any) {
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
               {messages.map((msg: any) => {
-                const sender = staffs.find((s: any) => s.id === msg.sender_id);
-                const isOwn = msg.sender_id === user.id;
+                const sender = safeStaffs.find((s: any) => s.id === msg.sender_id);
+                const isOwn = msg.sender_id === user?.id;
 
                 return (
                   <div key={msg.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
@@ -383,7 +429,7 @@ export default function ChatMessenger({ user, staffs }: any) {
                 type="text"
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && sendMessage()}
                 placeholder="메시지를 입력하세요..."
                 className="flex-1 px-4 py-3 bg-[var(--toss-gray-1)] border-none rounded-[16px] focus:ring-2 focus:ring-[var(--toss-blue)]/30 text-sm font-bold"
               />
@@ -423,7 +469,7 @@ export default function ChatMessenger({ user, staffs }: any) {
               <div className="space-y-2">
                 <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">멤버 선택</label>
                 <div className="max-h-48 overflow-y-auto space-y-2 bg-[var(--toss-gray-1)] rounded-[16px] p-4 custom-scrollbar">
-                  {staffs.map((staff: any) => (
+                  {safeStaffs.map((staff: any) => (
                     <label key={staff.id} className="flex items-center gap-3 cursor-pointer group">
                       <input
                         type="checkbox"

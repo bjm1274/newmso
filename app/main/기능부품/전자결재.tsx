@@ -220,17 +220,23 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     const count = selectedApprovalIds.length;
     if (count === 0) return;
     if (!confirm(`선택된 ${count}건을 일괄 승인하시겠습니까?`)) return;
-    for (const id of selectedApprovalIds) {
+    const results = await Promise.all(selectedApprovalIds.map(async (id) => {
       const item = approvals.find((a: any) => a.id === id);
-      if (!item) continue;
+      if (!item) return null;
       const lineIds = Array.isArray(item.approver_line) ? item.approver_line : [];
       const currentIndex = lineIds.findIndex((lid: string) => String(lid) === String(item.current_approver_id));
       const isFinal = currentIndex === lineIds.length - 1 || currentIndex === -1;
       const updateData: any = isFinal ? { status: '승인' } : { current_approver_id: lineIds[currentIndex + 1] };
-      await supabase.from('approvals').update(updateData).eq('id', id);
-    }
+      const { error } = await supabase.from('approvals').update(updateData).eq('id', id);
+      return error ? id : null;
+    }));
+    const failedCount = results.filter(Boolean).length;
     setSelectedApprovalIds([]);
-    alert(`${count}건이 일괄 승인 처리되었습니다.`);
+    if (failedCount > 0) {
+      alert(`${count - failedCount}건 승인 완료, ${failedCount}건 실패했습니다.`);
+    } else {
+      alert(`${count}건이 일괄 승인 처리되었습니다.`);
+    }
     fetchApprovals();
   };
 
@@ -240,16 +246,22 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     if (count === 0) return;
     const reason = window.prompt(`선택된 ${count}건을 일괄 반려합니다.\n반려 사유를 입력해 주세요. (선택)`);
     if (reason === null) return;
-    for (const id of selectedApprovalIds) {
+    const results = await Promise.all(selectedApprovalIds.map(async (id) => {
       const item = approvals.find((a: any) => a.id === id);
-      if (!item) continue;
-      await supabase.from('approvals').update({
+      if (!item) return null;
+      const { error } = await supabase.from('approvals').update({
         status: '반려',
         meta_data: { ...(item.meta_data || {}), reject_reason: reason },
       }).eq('id', id);
-    }
+      return error ? id : null;
+    }));
+    const failedCount = results.filter(Boolean).length;
     setSelectedApprovalIds([]);
-    alert(`${count}건이 일괄 반려 처리되었습니다.`);
+    if (failedCount > 0) {
+      alert(`${count - failedCount}건 반려 완료, ${failedCount}건 실패했습니다.`);
+    } else {
+      alert(`${count}건이 일괄 반려 처리되었습니다.`);
+    }
     fetchApprovals();
   };
 
@@ -322,8 +334,18 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
         if (item.type === '연차/휴가') {
           const startStr = item.meta_data?.startDate || item.meta_data?.start;
           const endStr = item.meta_data?.endDate || item.meta_data?.end || startStr;
+          if (!startStr) {
+            alert("최종 승인 처리가 완료되었습니다.");
+            fetchApprovals();
+            return;
+          }
           const start = new Date(startStr);
-          const end = new Date(endStr);
+          const end = new Date(endStr || startStr);
+          if (isNaN(start.getTime())) {
+            alert("최종 승인 처리가 완료되었습니다.");
+            fetchApprovals();
+            return;
+          }
           const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
 
           // 1. 인사관리 휴가신청 테이블(leave_requests) 동기화

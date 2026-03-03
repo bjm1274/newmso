@@ -36,12 +36,19 @@ export default function LoginPage() {
     setError('');
 
     // 마스터 계정 체크 (서버에서 환경변수로 검증)
-    const masterRes = await fetch('/api/auth/master-login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ loginId, password }),
-    });
-    const masterData = await masterRes.json();
+    let masterData: any = { success: false };
+    try {
+      const masterRes = await fetch('/api/auth/master-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ loginId, password }),
+      });
+      if (masterRes.ok) {
+        masterData = await masterRes.json();
+      }
+    } catch {
+      // 마스터 로그인 API 오류 시 일반 로그인으로 진행
+    }
     if (masterData.success) {
       localStorage.setItem('erp_user', JSON.stringify(masterData.user));
       localStorage.setItem('erp_login_at', new Date().toISOString());
