@@ -298,8 +298,8 @@ export default function NotificationSystem({
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${uid}` }, () => syncBadge())
       .subscribe();
 
-    // B. 결재 트리거
-    const approvalsCh = supabase.channel('approvals-trigger')
+    // B. 결재 트리거 (채널명에 uid 포함 → 크로스유저 알림 누수 방지)
+    const approvalsCh = supabase.channel(`approvals-trigger-${uid}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'approvals' }, (p: any) => {
         if (String(p.new.current_approver_id) === uid && p.new.status === '대기')
           insertNoti({ type: 'approval', title: `📋 새 결재 요청: ${p.new.title}`, body: `${p.new.sender_name || '신청자'}님이 결재를 요청했습니다.`, data: { id: p.new.id, type: 'approval' } });
@@ -311,7 +311,7 @@ export default function NotificationSystem({
       .subscribe();
 
     // C. 재고 부족
-    const inventoryCh = supabase.channel('inventory-trigger')
+    const inventoryCh = supabase.channel(`inventory-trigger-${uid}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'inventory' }, (p: any) => {
         if (p.new.stock <= p.new.min_stock && (user.permissions?.inventory || user.department === '행정팀'))
           insertNoti({ type: 'inventory', title: `⚠️ 재고 부족 경고`, body: `${p.new.item_name || p.new.name}: 현재 ${p.new.stock}개 (최소 ${p.new.min_stock}개)`, data: { id: p.new.id, type: 'inventory' } });
@@ -319,7 +319,7 @@ export default function NotificationSystem({
       .subscribe();
 
     // D. 급여 정산
-    const payrollCh = supabase.channel('payroll-trigger')
+    const payrollCh = supabase.channel(`payroll-trigger-${uid}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'payroll_records' }, (p: any) => {
         if (String(p.new.staff_id) === uid)
           insertNoti({ type: 'payroll', title: `💰 급여 정산 완료`, body: `${new Date().getFullYear()}년 ${new Date().getMonth() + 1}월 급여가 정산되었습니다.`, data: { id: p.new.id, type: 'payroll' } });
@@ -327,7 +327,7 @@ export default function NotificationSystem({
       .subscribe();
 
     // E. 교육 기한 임박
-    const educationCh = supabase.channel('education-trigger')
+    const educationCh = supabase.channel(`education-trigger-${uid}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'education_records' }, (p: any) => {
         const daysLeft = Math.ceil((new Date(p.new.deadline).getTime() - Date.now()) / 86400000);
         if (daysLeft <= 7 && daysLeft > 0 && String(p.new.staff_id) === uid)
@@ -336,15 +336,15 @@ export default function NotificationSystem({
       .subscribe();
 
     // F. 채팅 메시지
-    const messagesCh = supabase.channel('messages-trigger')
+    const messagesCh = supabase.channel(`messages-trigger-${uid}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async (p: any) => {
         const msg = p.new;
         if (String(msg.sender_id) === uid) return;
         const [roomRes, senderRes] = await Promise.all([
-          supabase.from('chat_rooms').select('members').eq('id', msg.room_id).single(),
+          supabase.from('chat_rooms').select('members').eq('id', msg.room_id).maybeSingle(),
           msg.sender_id ? supabase.from('staff_members').select('name').eq('id', msg.sender_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
         ]);
-        if (roomRes.error) return;
+        if (roomRes.error || !roomRes.data) return;
         const members: string[] = Array.isArray(roomRes.data?.members) ? roomRes.data.members.map((id: any) => String(id)) : [];
         if (!members.includes(uid)) return;
         const senderName = (senderRes.data as any)?.name || '알 수 없음';
@@ -361,7 +361,7 @@ export default function NotificationSystem({
       .subscribe();
 
     // G. 출퇴근
-    const attendanceCh = supabase.channel('attendance-trigger')
+    const attendanceCh = supabase.channel(`attendance-trigger-${uid}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, (p: any) => {
         if (String(p.new?.staff_id) !== uid) return;
         const s = p.new.status; const isOut = p.new.check_out != null;

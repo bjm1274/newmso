@@ -208,6 +208,43 @@ export default function ChatMessenger({ user, staffs }: any) {
     }
   };
 
+  const leaveRoom = async () => {
+    if (!selectedRoom || !user?.id) return;
+    if (selectedRoom.is_announcement) return; // 공지방은 나가기 불가
+
+    const roomLabel = selectedRoom.type === 'group' ? '단체채팅방' : '채팅방';
+    if (!confirm(`이 ${roomLabel}에서 나가시겠습니까?`)) return;
+
+    try {
+      if (selectedRoom.type === 'group') {
+        // 그룹 채팅: chat_room_members 테이블에서 삭제
+        const { error } = await supabase
+          .from('chat_room_members')
+          .delete()
+          .eq('room_id', selectedRoom.id)
+          .eq('user_id', user.id);
+        if (error) throw error;
+      } else {
+        // 1:1 채팅: members 배열에서 내 ID 제거
+        const currentMembers: any[] = Array.isArray(selectedRoom.members) ? selectedRoom.members : [];
+        const newMembers = currentMembers.filter((id: any) => String(id) !== String(user.id));
+        const { error } = await supabase
+          .from('chat_rooms')
+          .update({ members: newMembers })
+          .eq('id', selectedRoom.id);
+        if (error) throw error;
+      }
+
+      // UI에서 즉시 제거
+      setChatRooms((prev) => prev.filter((r: any) => r.id !== selectedRoom.id));
+      setSelectedRoom(null);
+      setMessages([]);
+      lastLoadedRoomRef.current = null;
+    } catch {
+      alert('채팅방 나가기 중 오류가 발생했습니다.');
+    }
+  };
+
   const startDirectChat = async (targetStaff: any) => {
     if (!user?.id) return;
 
@@ -391,14 +428,24 @@ export default function ChatMessenger({ user, staffs }: any) {
           <>
             <div className="p-4 bg-white border-b border-[var(--toss-border)] flex justify-between items-center shrink-0">
               <h3 className="font-semibold text-lg text-[var(--foreground)]">{selectedRoom.name}</h3>
-              {selectedRoom.is_announcement && user?.role === 'admin' && (
-                <button
-                  onClick={() => deleteAnnouncement(selectedRoom.id)}
-                  className="px-3 py-1 bg-red-100 text-red-600 rounded text-sm font-semibold hover:bg-red-200"
-                >
-                  공지 내리기
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {selectedRoom.is_announcement && user?.role === 'admin' && (
+                  <button
+                    onClick={() => deleteAnnouncement(selectedRoom.id)}
+                    className="px-3 py-1 bg-red-100 text-red-600 rounded text-sm font-semibold hover:bg-red-200"
+                  >
+                    공지 내리기
+                  </button>
+                )}
+                {!selectedRoom.is_announcement && (
+                  <button
+                    onClick={leaveRoom}
+                    className="px-3 py-1 bg-gray-100 text-gray-500 rounded-[10px] text-sm font-semibold hover:bg-red-50 hover:text-red-500 transition-colors"
+                  >
+                    나가기
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
