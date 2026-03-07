@@ -11,10 +11,13 @@ import InvoiceAutoExtraction from './관리자전용서브/명세서자동추출
 import { useInventoryAlertSystem, InventoryAlertBadge } from './재고관리서브/재고알림시스템';
 import QRAssetManager from './재고관리서브/자산QR관리';
 import ASReturnManagement from './재고관리서브/AS반품관리';
+import SupplierManagement from './재고관리서브/거래처관리';
+import InventoryCount from './재고관리서브/재고실사';
+import ExpirationAlert from './재고관리서브/유효기간알림';
 
 const INV_VIEW_KEY = 'erp_inventory_view';
 
-const VALID_VIEWS = ['UDI', '명세서', '발주', '스캔', '등록', '현황', '이력', '자산', 'AS반품'];
+const VALID_VIEWS = ['UDI', '명세서', '발주', '스캔', '등록', '현황', '이력', '자산', 'AS반품', '거래처', '재고실사', '유통기한'];
 
 export default function IntegratedInventoryManagement({ user, selectedCo, onRefresh, initialView }: any) {
   const [activeView, setActiveView] = useState(initialView && VALID_VIEWS.includes(initialView) ? initialView : '현황');
@@ -402,6 +405,9 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
           )}
           {activeView === '자산' && <QRAssetManager user={user} inventory={inventory} fetchInventory={() => fetchInventory(selectedCo)} />}
           {activeView === 'AS반품' && <ASReturnManagement user={user} />}
+          {activeView === '거래처' && <SupplierManagement user={user} />}
+          {activeView === '재고실사' && <InventoryCount user={user} inventory={inventory} fetchInventory={() => fetchInventory(selectedCo)} />}
+          {activeView === '유통기한' && <ExpirationAlert />}
         </main>
       </div>
 
