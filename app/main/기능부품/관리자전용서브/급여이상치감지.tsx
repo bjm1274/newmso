@@ -30,13 +30,14 @@ export default function SalaryAnomalyDetector({ staffs = [] }: { staffs: any[] }
     try {
       const prev = prevMonth(currentMonth);
 
-      const { data: curr } = await supabase.from('salary_records')
-        .select('staff_id, net_salary, gross_salary, total_deduction')
-        .eq('pay_month', currentMonth);
+      // payroll_records: year_month(YYYY-MM), net_pay, total_deduction
+      const { data: curr } = await supabase.from('payroll_records')
+        .select('staff_id, net_pay, total_deduction, base_salary, bonus, extra_allowance')
+        .eq('year_month', currentMonth);
 
-      const { data: prevData } = await supabase.from('salary_records')
-        .select('staff_id, net_salary, gross_salary, total_deduction')
-        .eq('pay_month', prev);
+      const { data: prevData } = await supabase.from('payroll_records')
+        .select('staff_id, net_pay, total_deduction, base_salary, bonus, extra_allowance')
+        .eq('year_month', prev);
 
       const currMap: Record<string, any> = {};
       (curr || []).forEach((r: any) => { currMap[r.staff_id] = r; });
@@ -53,25 +54,25 @@ export default function SalaryAnomalyDetector({ staffs = [] }: { staffs: any[] }
         const staff = staffs.find((s: any) => String(s.id) === String(staffId));
 
         if (!c && p) {
-          results.push({ staffId, staff, type: '급여누락', current: 0, previous: p.net_salary, diff: -p.net_salary, pct: -100, severity: 'critical' });
+          results.push({ staffId, staff, type: '급여누락', current: 0, previous: p.net_pay, diff: -p.net_pay, pct: -100, severity: 'critical' });
           return;
         }
         if (c && !p) {
-          results.push({ staffId, staff, type: '신규지급', current: c.net_salary, previous: 0, diff: c.net_salary, pct: 100, severity: 'info' });
+          results.push({ staffId, staff, type: '신규지급', current: c.net_pay, previous: 0, diff: c.net_pay, pct: 100, severity: 'info' });
           return;
         }
         if (!c || !p) return;
 
-        const diff = c.net_salary - p.net_salary;
-        const pct = p.net_salary > 0 ? (diff / p.net_salary) * 100 : 0;
+        const diff = c.net_pay - p.net_pay;
+        const pct = p.net_pay > 0 ? (diff / p.net_pay) * 100 : 0;
 
         if (Math.abs(pct) >= threshold) {
           results.push({
             staffId,
             staff,
             type: pct > 0 ? '급여급증' : '급여급감',
-            current: c.net_salary,
-            previous: p.net_salary,
+            current: c.net_pay,
+            previous: p.net_pay,
             diff,
             pct,
             severity: Math.abs(pct) >= 50 ? 'critical' : 'warning',
