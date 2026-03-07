@@ -161,6 +161,11 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   // 스레드 뷰(특정 메시지만 모아보기) 상태
   const [threadRoot, setThreadRoot] = useState<any | null>(null);
 
+  // 메시지 예약 발송 상태
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [scheduledAt, setScheduledAt] = useState('');
+  const [scheduledMessages, setScheduledMessages] = useState<any[]>([]);
+
   // 슬래시 명령(/연차, /발주)용 상태
   const [slashCommand, setSlashCommand] = useState<'annual_leave' | 'purchase' | null>(null);
   const [showSlashModal, setShowSlashModal] = useState(false);
@@ -462,6 +467,72 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     window.addEventListener('blur', onBlur);
     return () => { window.removeEventListener('focus', onFocus); window.removeEventListener('blur', onBlur); };
   }, []);
+
+  // 예약 발송: 1분마다 만료된 예약 메시지 자동 전송
+  useEffect(() => {
+    if (!user?.id) return;
+    const checkAndSendScheduled = async () => {
+      const now = new Date().toISOString();
+      const { data } = await supabase.from('scheduled_messages')
+        .select('*')
+        .eq('sender_id', user.id)
+        .eq('is_sent', false)
+        .lte('scheduled_at', now);
+      if (!data?.length) return;
+      for (const sm of data) {
+        await supabase.from('messages').insert([{
+          room_id: sm.room_id,
+          sender_id: sm.sender_id,
+          content: sm.content,
+          reply_to_id: sm.reply_to_id || null,
+        }]);
+        await supabase.from('scheduled_messages').update({ is_sent: true }).eq('id', sm.id);
+      }
+      if (data.length > 0) {
+        fetchData();
+        loadScheduledMessages();
+      }
+    };
+    checkAndSendScheduled();
+    const interval = setInterval(checkAndSendScheduled, 60000);
+    return () => clearInterval(interval);
+  }, [user?.id, fetchData]);
+
+  const loadScheduledMessages = useCallback(async () => {
+    if (!user?.id || !selectedRoomId) return;
+    const { data } = await supabase.from('scheduled_messages')
+      .select('*')
+      .eq('sender_id', user.id)
+      .eq('room_id', selectedRoomId)
+      .eq('is_sent', false)
+      .order('scheduled_at');
+    setScheduledMessages(data || []);
+  }, [user?.id, selectedRoomId]);
+
+  useEffect(() => { loadScheduledMessages(); }, [loadScheduledMessages]);
+
+  const handleScheduleSend = async () => {
+    const trimmed = inputMsg.trim();
+    if (!trimmed) return alert('메시지를 입력하세요.');
+    if (!scheduledAt) return alert('발송 시간을 선택하세요.');
+    if (new Date(scheduledAt) <= new Date()) return alert('발송 시간은 현재 시간 이후여야 합니다.');
+    try {
+      await supabase.from('scheduled_messages').insert([{
+        room_id: selectedRoomId,
+        sender_id: user.id,
+        content: trimmed,
+        scheduled_at: new Date(scheduledAt).toISOString(),
+        is_sent: false,
+      }]);
+      setInputMsg('');
+      setScheduledAt('');
+      setShowScheduleModal(false);
+      loadScheduledMessages();
+      alert(`${new Date(scheduledAt).toLocaleString('ko-KR')}에 예약 발송되었습니다.`);
+    } catch {
+      alert('예약 발송 등록에 실패했습니다.');
+    }
+  };
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -1532,10 +1603,76 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                 </div>
               )}
             </div>
+            <button
+              onClick={() => setShowScheduleModal(true)}
+              title="예약 발송"
+              className="bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] w-8 h-8 rounded-full hover:bg-[var(--toss-border)] transition-all flex items-center justify-center text-sm relative"
+            >
+              🕐
+              {scheduledMessages.length > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-orange-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center">{scheduledMessages.length}</span>
+              )}
+            </button>
             <button onClick={() => handleSendMessage()} className="bg-[var(--toss-blue)] text-white w-8 h-8 rounded-full shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center justify-center text-sm">↑</button>
           </div>
         </div>
 
+        {/* 예약 발송 모달 */}
+        {showScheduleModal && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-end md:items-center justify-center p-4" onClick={() => setShowScheduleModal(false)}>
+            <div className="bg-[var(--toss-card)] rounded-t-[20px] md:rounded-[20px] shadow-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-bold text-[var(--foreground)]">메시지 예약 발송</h3>
+                <button onClick={() => setShowScheduleModal(false)} className="p-1 hover:bg-[var(--toss-gray-1)] rounded-full text-[var(--toss-gray-3)]">✕</button>
+              </div>
+
+              {/* 예약된 메시지 목록 */}
+              {scheduledMessages.length > 0 && (
+                <div className="mb-4 space-y-2">
+                  <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">대기 중인 예약 메시지</p>
+                  {scheduledMessages.map(sm => (
+                    <div key={sm.id} className="flex items-center justify-between p-3 bg-orange-50 border border-orange-100 rounded-[12px]">
+                      <div>
+                        <p className="text-xs font-semibold text-[var(--foreground)] truncate max-w-[200px]">{sm.content}</p>
+                        <p className="text-[10px] text-orange-500 font-bold mt-0.5">{new Date(sm.scheduled_at).toLocaleString('ko-KR')}</p>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          await supabase.from('scheduled_messages').delete().eq('id', sm.id);
+                          loadScheduledMessages();
+                        }}
+                        className="ml-2 text-xs text-red-400 hover:text-red-600 font-bold"
+                      >취소</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[11px] font-bold text-[var(--toss-gray-3)] block mb-1">메시지 내용</label>
+                  <p className="text-sm font-medium text-[var(--foreground)] p-3 bg-[var(--toss-gray-1)] rounded-[12px] min-h-[48px]">
+                    {inputMsg.trim() || <span className="text-[var(--toss-gray-3)]">입력창에 메시지를 먼저 작성하세요.</span>}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-[var(--toss-gray-3)] block mb-1">발송 시간</label>
+                  <input
+                    type="datetime-local"
+                    value={scheduledAt}
+                    onChange={e => setScheduledAt(e.target.value)}
+                    min={new Date(Date.now() + 60000).toISOString().slice(0, 16)}
+                    className="w-full px-4 py-3 border border-[var(--toss-border)] rounded-[12px] text-sm font-bold bg-[var(--toss-card)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20"
+                  />
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <button onClick={() => setShowScheduleModal(false)} className="flex-1 py-3 rounded-[12px] bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] font-semibold text-sm">닫기</button>
+                  <button onClick={handleScheduleSend} className="flex-1 py-3 rounded-[12px] bg-orange-500 text-white font-semibold text-sm hover:opacity-90">예약 등록</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 채팅방 상세 정보 드로어 (프리미엄 - 이미지 2 스타일) */}
         {showDrawer && (

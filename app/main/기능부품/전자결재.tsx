@@ -28,6 +28,10 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const [selectedApprovalId, setSelectedApprovalId] = useState<string | null>(null);
   const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대기' | '승인' | '반려'>('전체');
   const [savedApproverLine, setSavedApproverLine] = useState<any[]>([]);
+  // 결재선 다중 템플릿 (name + line 배열)
+  const [approverTemplates, setApproverTemplates] = useState<{id: string; name: string; line: any[]}[]>([]);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [templateNameInput, setTemplateNameInput] = useState('');
   // 결재함 일괄 처리용
   const [selectedApprovalIds, setSelectedApprovalIds] = useState<string[]>([]);
   // 작성하기 자동 저장용
@@ -72,6 +76,8 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       try {
         const saved = window.localStorage.getItem(`erp_fav_approveline_${user.id}`);
         if (saved) setSavedApproverLine(JSON.parse(saved));
+        const savedTpls = window.localStorage.getItem(`erp_approveline_templates_${user.id}`);
+        if (savedTpls) setApproverTemplates(JSON.parse(savedTpls));
       } catch { }
     }
   }, [user?.id]);
@@ -562,28 +568,45 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                       <option key={s.id} value={s.id}>{s.name} {s.position || ''} {s.company ? `(${s.company})` : ''}</option>
                     ))}
                   </select>
-                  <div className="flex gap-2 shrink-0">
+                  <div className="flex gap-2 shrink-0 flex-wrap">
                     <button
                       type="button"
-                      onClick={() => {
-                        setSavedApproverLine(approverLine);
-                        if (typeof window !== 'undefined' && user?.id) {
-                          window.localStorage.setItem(`erp_fav_approveline_${user.id}`, JSON.stringify(approverLine));
-                        }
-                        alert('현재 결재선이 즐겨찾기로 저장되었습니다.');
-                      }}
+                      onClick={() => { setTemplateNameInput(''); setShowTemplateModal(true); }}
                       className="px-4 py-3 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[12px] text-[11px] font-bold text-[var(--toss-blue)] hover:bg-[var(--toss-gray-1)]"
                     >
-                      ⭐ 즐겨찾기 저장
+                      💾 템플릿 저장
                     </button>
-                    {savedApproverLine.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setApproverLine(savedApproverLine)}
-                        className="px-4 py-3 bg-[var(--toss-blue)] border border-[var(--toss-blue)] rounded-[12px] text-[11px] font-bold text-white shadow-sm hover:opacity-95"
-                      >
-                        ⭐ 즐겨찾기 불러오기
-                      </button>
+                    {approverTemplates.length > 0 && (
+                      <div className="relative group">
+                        <button type="button" className="px-4 py-3 bg-[var(--toss-blue)] border border-[var(--toss-blue)] rounded-[12px] text-[11px] font-bold text-white shadow-sm hover:opacity-95">
+                          📂 템플릿 불러오기 ({approverTemplates.length})
+                        </button>
+                        <div className="absolute right-0 top-full mt-1 w-56 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[12px] shadow-xl z-50 hidden group-hover:block">
+                          {approverTemplates.map(tpl => (
+                            <div key={tpl.id} className="flex items-center justify-between px-3 py-2 hover:bg-[var(--toss-gray-1)] first:rounded-t-[12px] last:rounded-b-[12px]">
+                              <button
+                                type="button"
+                                onClick={() => setApproverLine(tpl.line)}
+                                className="flex-1 text-left text-xs font-semibold text-[var(--foreground)]"
+                              >
+                                {tpl.name}
+                                <span className="text-[10px] text-[var(--toss-gray-3)] ml-1">({tpl.line.length}명)</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const next = approverTemplates.filter(t => t.id !== tpl.id);
+                                  setApproverTemplates(next);
+                                  if (typeof window !== 'undefined' && user?.id) {
+                                    window.localStorage.setItem(`erp_approveline_templates_${user.id}`, JSON.stringify(next));
+                                  }
+                                }}
+                                className="ml-2 text-[var(--toss-gray-3)] hover:text-red-500 text-xs"
+                              >✕</button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -867,6 +890,57 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
           </div>
         );
       })()}
+
+      {/* 결재선 템플릿 저장 모달 */}
+      {showTemplateModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4" onClick={() => setShowTemplateModal(false)}>
+          <div className="bg-[var(--toss-card)] rounded-[18px] shadow-2xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            <h3 className="text-base font-bold text-[var(--foreground)] mb-1">결재선 템플릿 저장</h3>
+            <p className="text-xs text-[var(--toss-gray-3)] mb-4">
+              현재 결재선 ({approverLine.length}명)을 이름을 붙여 저장합니다.
+            </p>
+            {approverLine.length === 0 ? (
+              <p className="text-xs text-red-500 mb-4">결재선을 먼저 지정해주세요.</p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5 mb-4">
+                {approverLine.map((a, i) => (
+                  <span key={i} className="px-2 py-1 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] rounded-full text-[10px] font-semibold">
+                    {i + 1}. {a.name}
+                  </span>
+                ))}
+              </div>
+            )}
+            <input
+              type="text"
+              value={templateNameInput}
+              onChange={e => setTemplateNameInput(e.target.value)}
+              placeholder="템플릿 이름 (예: 연차 기본, 물품 신청)"
+              className="w-full px-4 py-3 border border-[var(--toss-border)] rounded-[12px] text-sm font-semibold bg-[var(--toss-gray-1)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)] mb-4"
+              onKeyDown={e => { if (e.key === 'Enter' && templateNameInput.trim() && approverLine.length > 0) { const newTpl = { id: Date.now().toString(), name: templateNameInput.trim(), line: approverLine }; const next = [...approverTemplates, newTpl]; setApproverTemplates(next); if (typeof window !== 'undefined' && user?.id) window.localStorage.setItem(`erp_approveline_templates_${user.id}`, JSON.stringify(next)); setShowTemplateModal(false); alert(`"${newTpl.name}" 템플릿이 저장되었습니다.`); } }}
+            />
+            <div className="flex gap-2">
+              <button onClick={() => setShowTemplateModal(false)} className="flex-1 py-3 rounded-[12px] bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] font-semibold text-sm">취소</button>
+              <button
+                onClick={() => {
+                  if (!templateNameInput.trim()) return alert('템플릿 이름을 입력하세요.');
+                  if (approverLine.length === 0) return alert('결재선을 먼저 지정해주세요.');
+                  const newTpl = { id: Date.now().toString(), name: templateNameInput.trim(), line: approverLine };
+                  const next = [...approverTemplates, newTpl];
+                  setApproverTemplates(next);
+                  if (typeof window !== 'undefined' && user?.id) {
+                    window.localStorage.setItem(`erp_approveline_templates_${user.id}`, JSON.stringify(next));
+                  }
+                  setShowTemplateModal(false);
+                  alert(`"${newTpl.name}" 템플릿이 저장되었습니다.`);
+                }}
+                className="flex-1 py-3 rounded-[12px] bg-[var(--toss-blue)] text-white font-semibold text-sm"
+              >
+                저장
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

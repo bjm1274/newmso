@@ -17,8 +17,9 @@ import FormBuilder from './전자결재서브/양식빌더';
 import FinancialDashboard from './관리자전용서브/재무대시보드';
 import 예산관리 from './관리자전용서브/예산관리';
 import 통합보고서 from './관리자전용서브/통합보고서';
+import SalaryAnomalyDetector from './관리자전용서브/급여이상치감지';
 
-const ADMIN_TAB_IDS = ['경영대시보드', '재무대시보드', '예산관리', '통합보고서', '엑셀등록', '알림자동화', '연차부여', '회사관리', '직원권한', '수술검사템플릿', '팝업관리', '감사로그', '데이터백업', '데이터초기화', '양식빌더'];
+const ADMIN_TAB_IDS = ['경영대시보드', '재무대시보드', '예산관리', '통합보고서', '엑셀등록', '알림자동화', '연차부여', '회사관리', '직원권한', '수술검사템플릿', '팝업관리', '감사로그', '데이터백업', '데이터초기화', '양식빌더', '급여이상치'];
 
 export default function AdminView({ user, staffs = [], depts = [], onRefresh, initialTab }: any) {
   const [activeTab, setActiveTab] = useState(initialTab && ADMIN_TAB_IDS.includes(initialTab) ? initialTab : '경영대시보드');
@@ -56,7 +57,8 @@ export default function AdminView({ user, staffs = [], depts = [], onRefresh, in
     { id: '감사로그', label: '감사 로그' },
     { id: '데이터백업', label: '백업/복원' },
     { id: '데이터초기화', label: '초기화' },
-    { id: '양식빌더', label: '📝 양식 빌더' }
+    { id: '양식빌더', label: '📝 양식 빌더' },
+    { id: '급여이상치', label: '🔍 급여 이상치' },
   ];
 
   if (!isMso) {
@@ -94,6 +96,7 @@ export default function AdminView({ user, staffs = [], depts = [], onRefresh, in
           <DataReseter onRefresh={onRefresh} />
         )}
         {activeTab === '양식빌더' && <FormBuilder user={user} />}
+        {activeTab === '급여이상치' && <SalaryAnomalyDetector staffs={staffs} />}
       </main>
     </div>
   );

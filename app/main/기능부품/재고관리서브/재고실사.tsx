@@ -1,0 +1,269 @@
+'use client';
+import { useState, useCallback } from 'react';
+import { supabase } from '@/lib/supabase';
+
+type CountItem = {
+  id: string;
+  item_name: string;
+  category: string;
+  company: string;
+  expected: number;
+  actual: string; // 입력값 (string)
+};
+
+export default function InventoryCount({ user, inventory, fetchInventory }: { user: any; inventory: any[]; fetchInventory: () => void }) {
+  const [sessionStarted, setSessionStarted] = useState(false);
+  const [items, setItems] = useState<CountItem[]>([]);
+  const [search, setSearch] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [report, setReport] = useState<any[] | null>(null);
+
+  const startSession = () => {
+    const list: CountItem[] = inventory.map(item => ({
+      id: item.id,
+      item_name: item.item_name || item.name || '-',
+      category: item.category || '-',
+      company: item.company || '-',
+      expected: item.quantity ?? item.stock ?? 0,
+      actual: '',
+    }));
+    setItems(list);
+    setSessionStarted(true);
+    setReport(null);
+  };
+
+  const setActual = (id: string, val: string) => {
+    setItems(prev => prev.map(it => it.id === id ? { ...it, actual: val } : it));
+  };
+
+  const filtered = items.filter(it =>
+    !search || it.item_name.includes(search) || it.category.includes(search) || it.company.includes(search)
+  );
+
+  const enteredCount = items.filter(it => it.actual !== '').length;
+  const discrepancies = items.filter(it => it.actual !== '' && Number(it.actual) !== it.expected);
+
+  const handleComplete = async () => {
+    const unenteredCount = items.filter(it => it.actual === '').length;
+    if (unenteredCount > 0) {
+      if (!confirm(`아직 ${unenteredCount}개 품목의 실사 수량이 입력되지 않았습니다.\n미입력 품목은 제외하고 완료하시겠습니까?`)) return;
+    }
+    setSaving(true);
+    try {
+      const entered = items.filter(it => it.actual !== '');
+      const discrepancyList = entered.filter(it => Number(it.actual) !== it.expected);
+
+      // 차이 있는 품목만 DB 업데이트
+      for (const it of discrepancyList) {
+        await supabase.from('inventory').update({ quantity: Number(it.actual), stock: Number(it.actual) }).eq('id', it.id);
+        await supabase.from('inventory_logs').insert([{
+          item_id: it.id,
+          inventory_id: it.id,
+          type: '실사조정',
+          change_type: '실사조정',
+          quantity: Math.abs(Number(it.actual) - it.expected),
+          prev_quantity: it.expected,
+          next_quantity: Number(it.actual),
+          actor_name: user?.name,
+          company: it.company,
+        }]);
+      }
+
+      // 실사 기록 저장
+      try {
+        await supabase.from('inventory_count_sessions').insert([{
+          conducted_by: user?.id,
+          conducted_name: user?.name,
+          total_items: entered.length,
+          discrepancy_count: discrepancyList.length,
+          report: entered.map(it => ({
+            id: it.id,
+            item_name: it.item_name,
+            category: it.category,
+            expected: it.expected,
+            actual: Number(it.actual),
+            diff: Number(it.actual) - it.expected,
+          })),
+          created_at: new Date().toISOString(),
+        }]);
+      } catch { /* 테이블 없으면 무시 */ }
+
+      setReport(discrepancyList.map(it => ({
+        item_name: it.item_name,
+        category: it.category,
+        expected: it.expected,
+        actual: Number(it.actual),
+        diff: Number(it.actual) - it.expected,
+      })));
+      fetchInventory();
+      setSessionStarted(false);
+    } catch (err) {
+      alert('실사 저장 중 오류가 발생했습니다.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // 실사 전
+  if (!sessionStarted && !report) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-6">
+        <div className="text-5xl">📦</div>
+        <div className="text-center">
+          <h2 className="text-lg font-bold text-[var(--foreground)] mb-2">재고 실사</h2>
+          <p className="text-sm text-[var(--toss-gray-3)] max-w-sm leading-relaxed">
+            현재 등록된 모든 재고 품목에 대해 실물 수량을 입력하고<br/>
+            장부 수량과의 차이를 자동으로 조정합니다.
+          </p>
+          <p className="text-xs text-[var(--toss-gray-3)] mt-2">대상 품목: {inventory.length}개</p>
+        </div>
+        <button
+          onClick={startSession}
+          className="px-8 py-4 bg-[var(--toss-blue)] text-white rounded-[14px] font-bold text-sm shadow-md hover:opacity-90 transition-all"
+        >
+          실사 시작
+        </button>
+      </div>
+    );
+  }
+
+  // 실사 완료 리포트
+  if (report) {
+    return (
+      <div className="space-y-4">
+        <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] p-6 shadow-sm">
+          <div className="flex items-center gap-3 mb-4">
+            <span className="text-2xl">✅</span>
+            <div>
+              <h3 className="text-base font-bold text-[var(--foreground)]">실사 완료</h3>
+              <p className="text-xs text-[var(--toss-gray-3)]">{new Date().toLocaleString('ko-KR')} · {user?.name}</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <div className="bg-[var(--toss-gray-1)] rounded-[12px] p-3 text-center">
+              <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">실사 품목</p>
+              <p className="text-xl font-bold text-[var(--toss-blue)]">{enteredCount}개</p>
+            </div>
+            <div className="bg-[var(--toss-gray-1)] rounded-[12px] p-3 text-center">
+              <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">수량 차이 조정</p>
+              <p className="text-xl font-bold text-orange-500">{report.length}개</p>
+            </div>
+          </div>
+          {report.length === 0 ? (
+            <p className="text-center text-emerald-600 font-bold text-sm py-4">모든 품목의 실물 수량이 장부와 일치합니다.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs min-w-[400px]">
+                <thead>
+                  <tr className="border-b border-[var(--toss-border)] text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">
+                    <th className="py-2 px-3">품목</th><th className="py-2 px-3 text-center">장부</th><th className="py-2 px-3 text-center">실물</th><th className="py-2 px-3 text-center">차이</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {report.map((r, i) => (
+                    <tr key={i} className="border-b border-[var(--toss-border)]">
+                      <td className="py-2 px-3 font-medium">{r.item_name} <span className="text-[var(--toss-gray-3)]">{r.category}</span></td>
+                      <td className="py-2 px-3 text-center">{r.expected}</td>
+                      <td className="py-2 px-3 text-center font-bold">{r.actual}</td>
+                      <td className={`py-2 px-3 text-center font-bold ${r.diff > 0 ? 'text-emerald-600' : 'text-red-500'}`}>{r.diff > 0 ? '+' : ''}{r.diff}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+        <button onClick={() => setReport(null)} className="w-full py-3 rounded-[12px] bg-[var(--toss-blue)] text-white font-semibold text-sm">새 실사 시작</button>
+      </div>
+    );
+  }
+
+  // 실사 진행 중
+  return (
+    <div className="space-y-4">
+      {/* 진행 상황 */}
+      <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] p-4 shadow-sm">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-sm font-bold text-[var(--foreground)]">실사 진행 중</p>
+          <p className="text-xs text-[var(--toss-blue)] font-bold">{enteredCount} / {items.length} 입력됨</p>
+        </div>
+        <div className="w-full h-2 bg-[var(--toss-gray-1)] rounded-full overflow-hidden">
+          <div
+            className="h-full bg-[var(--toss-blue)] rounded-full transition-all"
+            style={{ width: items.length > 0 ? `${(enteredCount / items.length) * 100}%` : '0%' }}
+          />
+        </div>
+        {discrepancies.length > 0 && (
+          <p className="text-xs text-orange-500 font-bold mt-2">⚠️ 차이 발견: {discrepancies.length}개 품목</p>
+        )}
+      </div>
+
+      <div className="flex gap-3">
+        <input
+          type="text"
+          placeholder="품목명·분류·회사 검색..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="flex-1 px-4 py-3 rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-bold outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20"
+        />
+        <button
+          onClick={handleComplete}
+          disabled={saving}
+          className="px-5 py-3 bg-emerald-600 text-white rounded-[12px] text-sm font-semibold shadow-sm hover:opacity-90 disabled:opacity-50"
+        >
+          {saving ? '저장 중...' : '실사 완료'}
+        </button>
+        <button
+          onClick={() => { if (confirm('실사를 중단하시겠습니까? 입력한 내용이 사라집니다.')) { setSessionStarted(false); setItems([]); } }}
+          className="px-4 py-3 bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] rounded-[12px] text-sm font-semibold"
+        >
+          중단
+        </button>
+      </div>
+
+      <div className="bg-[var(--toss-card)] rounded-[16px] border border-[var(--toss-border)] shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left min-w-[600px]">
+            <thead>
+              <tr className="bg-[var(--toss-gray-1)]/60 border-b border-[var(--toss-border)]">
+                {['회사/분류', '품목명', '장부 수량', '실물 수량 입력', '차이'].map(h => (
+                  <th key={h} className="px-4 py-3 text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--toss-border)]">
+              {filtered.map(it => {
+                const actualNum = it.actual !== '' ? Number(it.actual) : null;
+                const diff = actualNum !== null ? actualNum - it.expected : null;
+                const hasDiff = diff !== null && diff !== 0;
+                return (
+                  <tr key={it.id} className={`transition-colors ${hasDiff ? 'bg-orange-50/50' : ''}`}>
+                    <td className="px-4 py-3">
+                      <p className="text-[10px] font-bold text-[var(--toss-blue)]">{it.company}</p>
+                      <p className="text-[9px] text-[var(--toss-gray-3)]">{it.category}</p>
+                    </td>
+                    <td className="px-4 py-3 text-xs font-semibold text-[var(--foreground)]">{it.item_name}</td>
+                    <td className="px-4 py-3 text-center text-sm font-bold text-[var(--toss-gray-4)]">{it.expected}</td>
+                    <td className="px-4 py-3">
+                      <input
+                        type="number"
+                        min={0}
+                        value={it.actual}
+                        onChange={e => setActual(it.id, e.target.value)}
+                        placeholder="실물 수량"
+                        className={`w-24 px-3 py-1.5 border rounded-[8px] text-sm font-bold text-center outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20 ${hasDiff ? 'border-orange-400 bg-orange-50' : 'border-[var(--toss-border)] bg-[var(--toss-card)]'}`}
+                      />
+                    </td>
+                    <td className={`px-4 py-3 text-center text-sm font-bold ${diff === null ? 'text-[var(--toss-gray-3)]' : diff > 0 ? 'text-emerald-600' : diff < 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+                      {diff === null ? '-' : diff === 0 ? '✓' : `${diff > 0 ? '+' : ''}${diff}`}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}

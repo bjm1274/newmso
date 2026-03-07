@@ -24,6 +24,7 @@ import ShiftPatternManager from './급여명세/교대제스케줄관리';
 import NotificationTemplatesPanel from './급여명세/알림템플릿관리';
 import TaxInsuranceRatesPanel from './급여명세/세율보험요율관리';
 import IntegratedHRSettings from './인사통합설정';
+import SalarySimulator from './급여명세/급여시뮬레이터';
 
 type Staff = {
   id: number;
@@ -82,6 +83,7 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
     { id: '급여대장', label: '급여대장', icon: '📋' },
     { id: '연말퇴직정산', label: '연말퇴직정산', icon: '🗓️' },
     { id: '통합설정', label: '통합설정', icon: '⚙️' },
+    { id: '급여시뮬레이터', label: '급여 시뮬레이터', icon: '🧮' },
   ];
 
   return (
@@ -197,6 +199,15 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
 
             {activeTab === '통합설정' && (
               <IntegratedHRSettings companyName={selectedCo} />
+            )}
+            {activeTab === '급여시뮬레이터' && (
+              <div className="p-4 md:p-6">
+                <div className="mb-5">
+                  <h2 className="text-base font-bold text-[var(--foreground)]">급여 실시간 시뮬레이터</h2>
+                  <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">기본급·수당을 입력하면 공제 항목과 실수령액을 즉시 계산합니다.</p>
+                </div>
+                <SalarySimulator />
+              </div>
             )}
           </>
         ) : (
