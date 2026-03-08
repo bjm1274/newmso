@@ -1,13 +1,14 @@
 'use client';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import { withMissingColumnFallback } from '@/lib/supabase-compat';
 import SmartDatePicker from './공통/SmartDatePicker';
 const CHAT_ROOM_KEY = 'erp_chat_last_room';
 const CHAT_FOCUS_KEY = 'erp_chat_focus_keyword';
 
 const BOARD_IDS = ['공지사항', '자유게시판', '익명소리함', '경조사', '수술일정', 'MRI일정', '직원제안함'];
 
-export default function BoardView({ user, subView, setSubView, initialBoard, initialPostId, onConsumePostId, surgeries, mris, onRefresh, setMainMenu }: any) {
+export default function BoardView({ user, subView, setSubView, selectedCo, selectedCompanyId, initialBoard, initialPostId, onConsumePostId, surgeries, mris, onRefresh, setMainMenu }: any) {
   const [activeBoard, setActiveBoard] = useState(initialBoard && BOARD_IDS.includes(initialBoard) ? initialBoard : (subView && BOARD_IDS.includes(subView) ? subView : '공지사항'));
   const [posts, setPosts] = useState<any[]>([]);
   const [showNewPost, setShowNewPost] = useState(false);
@@ -112,7 +113,33 @@ export default function BoardView({ user, subView, setSubView, initialBoard, ini
   };
 
   const fetchPosts = async () => {
-    const { data } = await supabase.from('board_posts').select('*').eq('board_type', activeBoard).order('created_at', { ascending: false });
+    const isMso = user?.company === 'SY INC.' || user?.permissions?.mso === true;
+    const scopedCompanyId = isMso ? selectedCompanyId : user?.company_id;
+    const scopedCompanyName =
+      isMso
+        ? selectedCo && selectedCo !== '전체'
+          ? selectedCo
+          : null
+        : user?.company ?? null;
+
+    const { data } = await withMissingColumnFallback(
+      async () => {
+        let query = supabase.from('board_posts').select('*').eq('board_type', activeBoard).order('created_at', { ascending: false });
+        if (scopedCompanyId) {
+          query = query.eq('company_id', scopedCompanyId);
+        } else if (scopedCompanyName) {
+          query = query.eq('company', scopedCompanyName);
+        }
+        return query;
+      },
+      async () => {
+        let query = supabase.from('board_posts').select('*').eq('board_type', activeBoard).order('created_at', { ascending: false });
+        if (scopedCompanyName) {
+          query = query.eq('company', scopedCompanyName);
+        }
+        return query;
+      }
+    );
     if (data) {
       if (activeBoard === '익명소리함') {
         const isAdmin = user?.permissions?.mso || user?.role === 'admin' || user?.permissions?.hr;
@@ -193,7 +220,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, ini
     if (activeBoard === '수술일정' || activeBoard === 'MRI일정') {
       setCalendarMonth(new Date());
     }
-  }, [activeBoard]);
+  }, [activeBoard, selectedCo, selectedCompanyId, user?.id, user?.company, user?.company_id]);
 
   // 수술/검사 템플릿 필터링 로직 (유지)
 
@@ -205,7 +232,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, ini
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [activeBoard]);
+  }, [activeBoard, selectedCo, selectedCompanyId, user?.id, user?.company, user?.company_id]);
 
   // 근무현황 Effect 제거됨
 
@@ -398,7 +425,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, ini
 
   const sendScheduleApprovalRequest = async (post: any, actionType: '삭제' | '수정', updatedData?: any) => {
     try {
-      const { error } = await supabase.from('approvals').insert([{
+      const rows: any[] = [{
         sender_id: user.id,
         sender_name: user.name,
         sender_company: user.company,
@@ -412,7 +439,17 @@ export default function BoardView({ user, subView, setSubView, initialBoard, ini
           updated_data: updatedData || null,
           is_schedule_approval: true
         }
-      }]);
+      }];
+      if (user?.company_id) {
+        rows[0].company_id = user.company_id;
+      }
+      const { error } = await withMissingColumnFallback(
+        () => supabase.from('approvals').insert(rows),
+        () => {
+          const legacyRows = rows.map(({ company_id, ...rest }: any) => rest);
+          return supabase.from('approvals').insert(legacyRows);
+        }
+      );
       if (error) throw error;
       alert(`해당 일정의 ${actionType} 처리를 위해 부서장/관리자에게 승인 요청 문서가 상신되었습니다.`);
     } catch (err) {
@@ -532,6 +569,7 @@ export default function BoardView({ user, subView, setSubView, initialBoard, ini
         board_type: activeBoard,
         title: title,
         content: content || null,
+        company: user?.company || null,
         tags: tags,
         schedule_date: scheduleDate || null,
         schedule_time: scheduleTime || null,
@@ -542,6 +580,9 @@ export default function BoardView({ user, subView, setSubView, initialBoard, ini
         likes_count: 0,
         created_at: new Date().toISOString(),
       };
+      if (user?.company_id) {
+        postData.company_id = user.company_id;
+      }
 
       // 수술/검사 일정의 경우 수술 관련 체크값을 함께 저장
       if (activeBoard === '수술일정' || activeBoard === 'MRI일정') {
@@ -612,7 +653,13 @@ export default function BoardView({ user, subView, setSubView, initialBoard, ini
           return;
         }
 
-        const { error: updateError } = await supabase.from('board_posts').update(postData).eq('id', editingPostId);
+        const { error: updateError } = await withMissingColumnFallback(
+          () => supabase.from('board_posts').update(postData).eq('id', editingPostId),
+          () => {
+            const { company_id, ...legacyPostData } = postData;
+            return supabase.from('board_posts').update(legacyPostData).eq('id', editingPostId);
+          }
+        );
         if (!updateError) {
           alert('게시물이 수정되었습니다.');
           setPosts((prev) => prev.map(p => p.id === editingPostId ? { ...p, ...postData } : p));
@@ -626,8 +673,14 @@ export default function BoardView({ user, subView, setSubView, initialBoard, ini
         return;
       }
 
-      const { data: insertedPost, error } = await supabase.from('board_posts').insert([postData]).select().single();
-      if (!error) {
+      const { data: insertedPost, error } = await withMissingColumnFallback<any>(
+        () => supabase.from('board_posts').insert([postData]).select().single(),
+        () => {
+          const { company_id, ...legacyPostData } = postData;
+          return supabase.from('board_posts').insert([legacyPostData]).select().single();
+        }
+      );
+      if (!error && insertedPost) {
         if (attachmentFiles.length > 0 && (!insertedPost.attachments || (Array.isArray(insertedPost.attachments) && insertedPost.attachments.length === 0))) {
           console.warn('첨부파일이 저장되지 않았을 수 있습니다. Supabase에 board_posts_attachments.sql 적용 및 board-attachments 버킷 생성 여부를 확인하세요.');
         }
@@ -674,7 +727,10 @@ export default function BoardView({ user, subView, setSubView, initialBoard, ini
   };
 
   return (
-    <div className="flex flex-col h-full min-h-0 app-page overflow-hidden">
+    <div
+      className="flex flex-col h-full min-h-0 app-page overflow-hidden"
+      data-testid="board-view"
+    >
       {/* 상세 메뉴(공지사항·자유게시판 등)는 메인 좌측 사이드바에서 게시판 호버/클릭 시 플라이아웃으로 선택 */}
       {activeBoard !== '사내위키' && (
         <div className="flex-1 flex flex-col min-w-0 overflow-y-auto custom-scrollbar p-4 md:p-8 space-y-6 md:space-y-8 pb-24 md:pb-8">

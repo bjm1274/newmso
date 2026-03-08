@@ -4,7 +4,7 @@ const decoder = new TextDecoder();
 export const SESSION_COOKIE_NAME = 'erp_session';
 export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 12;
 
-export type SessionUser = {
+export type SessionUser = Record<string, unknown> & {
   id: string | null;
   employee_no?: string | null;
   name: string;
@@ -118,21 +118,26 @@ async function verifySignature(value: string, signature: string) {
 }
 
 export function normalizeSessionUser(input: any): SessionUser {
+  const rest = { ...(input || {}) };
+  delete rest.password;
+  delete rest.passwd;
   return {
-    id: input?.id ?? null,
-    employee_no: input?.employee_no ?? null,
-    name: input?.name ?? '',
-    role: input?.role ?? null,
-    department: input?.department ?? null,
-    company: input?.company ?? null,
-    company_id: input?.company_id ?? null,
-    position: input?.position ?? null,
-    photo_url: input?.photo_url ?? null,
-    email: input?.email ?? null,
-    phone: input?.phone ?? null,
+    ...rest,
+    id: rest?.id ?? null,
+    employee_no: rest?.employee_no ?? null,
+    name: rest?.name ?? '',
+    role: rest?.role ?? null,
+    department: rest?.department ?? null,
+    company: rest?.company ?? null,
+    company_id: rest?.company_id ?? null,
+    position: rest?.position ?? null,
+    photo_url: rest?.photo_url ?? null,
+    avatar_url: rest?.avatar_url ?? null,
+    email: rest?.email ?? null,
+    phone: rest?.phone ?? null,
     permissions:
-      input?.permissions && typeof input.permissions === 'object' && !Array.isArray(input.permissions)
-        ? input.permissions
+      rest?.permissions && typeof rest.permissions === 'object' && !Array.isArray(rest.permissions)
+        ? rest.permissions
         : {},
   };
 }

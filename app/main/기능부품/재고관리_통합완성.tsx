@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
+import { withMissingColumnFallback } from '@/lib/supabase-compat';
 import UDIManagement from './재고관리서브/UDI관리';
 import InvoiceManagement from './재고관리서브/명세서관리';
 import PurchaseOrderManagement from './재고관리서브/발주관리';
@@ -24,7 +25,7 @@ const INV_VIEW_KEY = 'erp_inventory_view';
 
 const VALID_VIEWS = ['UDI', '명세서', '발주', '스캔', '등록', '현황', '이력', '자산', 'AS반품', '거래처', '재고실사', '유통기한', '이관', '카테고리', '소모품통계', '납품확인서', '수요예측'];
 
-export default function IntegratedInventoryManagement({ user, selectedCo, onRefresh, initialView }: any) {
+export default function IntegratedInventoryManagement({ user, selectedCo, selectedCompanyId, onRefresh, initialView }: any) {
   const [activeView, setActiveView] = useState(initialView && VALID_VIEWS.includes(initialView) ? initialView : '현황');
   const [viewCompany, setViewCompany] = useState<string>('전체'); // 현황 탭용 회사 선택
   const [selectedDept, setSelectedDept] = useState('전체');
@@ -203,7 +204,10 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
   };
 
   return (
-    <div className="flex flex-col h-full min-h-0 app-page overflow-hidden relative">
+    <div
+      className="flex flex-col h-full min-h-0 app-page overflow-hidden relative"
+      data-testid="inventory-view"
+    >
       <InventoryAlertBadge lowCount={lowStockItems.length} expiryCount={expiryImminentItems.length} />
       {/* 상세 메뉴(UDI·명세서 등)는 메인 좌측 사이드바에서 재고관리 호버/클릭 시 플라이아웃으로 선택 */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">

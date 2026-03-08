@@ -1,7 +1,8 @@
 'use client';
-import { Suspense, useState, useEffect } from 'react';
+import { Suspense, useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { withMissingColumnFallback } from '@/lib/supabase-compat';
 import { setSelectedCompanyId as persistSelectedCompanyId, getSelectedCompanyId } from '@/lib/useCompany';
 
 import Sidebar, { SUB_MENUS } from './기능부품/조직도서브/조직도측면창';
@@ -59,62 +60,107 @@ function MainPageContent() {
   });
   const [loginAt] = useState<string>(new Date().toISOString());
 
+  const clearClientSession = useCallback(async () => {
+    try {
+      await fetch('/api/auth/session', { method: 'DELETE' });
+    } catch {
+      // ignore
+    }
+    try {
+      localStorage.removeItem('erp_user');
+      localStorage.removeItem('erp_login_at');
+    } catch {
+      // ignore
+    }
+  }, []);
+
   // 1. 초기 로드 시 사용자 정보 및 이전 상태 복구
   useEffect(() => {
-    let storedUser: string | null = null;
-    try {
-      storedUser = localStorage.getItem('erp_user');
-    } catch {
-      router.replace('/');
-      return;
-    }
-    if (!storedUser) {
-      router.replace('/');
-      return;
-    }
-    let parsedUser;
-    try {
-      parsedUser = JSON.parse(storedUser);
-    } catch {
-      try { localStorage.removeItem('erp_user'); } catch { /* ignore */ }
-      router.replace('/');
-      return;
-    }
-    setUser(parsedUser);
+    let ignore = false;
 
-    // 이전 메뉴 상태 복구
-    const savedMenu = localStorage.getItem('erp_last_menu');
-    const savedSubView = localStorage.getItem('erp_last_subview');
-    const savedCo = localStorage.getItem('erp_last_co');
-
-    if (savedMenu) setMainMenu(savedMenu);
-    if (savedSubView) setSubView(savedSubView);
-
-    if (parsedUser.company !== 'SY INC.' && !parsedUser.permissions?.mso) {
-      setSelectedCo(parsedUser.company);
-    } else if (savedCo) {
-      setSelectedCo(savedCo);
-    }
-
-    if (parsedUser?.company === 'SY INC.' || parsedUser?.permissions?.mso) {
-      supabase.from('companies').select('id, name, type').eq('is_active', true).then(({ data: list, error }) => {
-        if (error) { console.error('companies 조회 오류:', error); return; }
-        const sorted = (list || []).sort((a: any, b: any) => {
-          const order = ['박철홍정형외과', '수연의원', 'SY INC.'];
-          const ia = order.indexOf(a.name);
-          const ib = order.indexOf(b.name);
-          if (ia >= 0 && ib >= 0) return ia - ib;
-          if (ia >= 0) return -1;
-          if (ib >= 0) return 1;
-          return (a.name || '').localeCompare(b.name || '');
+    const bootstrap = async () => {
+      try {
+        const response = await fetch('/api/auth/session', {
+          method: 'GET',
+          cache: 'no-store',
         });
-        setCompanies(sorted);
-      });
-      const savedId = getSelectedCompanyId();
-      if (savedId) setSelectedCompanyIdState(savedId);
-    }
-    setSelectedCompanyIdState(getSelectedCompanyId());
-  }, []); // 마운트 시 1회만 실행
+
+        if (!response.ok) {
+          await clearClientSession();
+          router.replace('/');
+          return;
+        }
+
+        const payload = await response.json();
+        const sessionUser = payload?.user;
+        if (!sessionUser) {
+          await clearClientSession();
+          router.replace('/');
+          return;
+        }
+
+        if (!ignore) {
+          setUser(sessionUser);
+        }
+
+        try {
+          localStorage.setItem('erp_user', JSON.stringify(sessionUser));
+        } catch {
+          // ignore
+        }
+
+        const savedMenu = localStorage.getItem('erp_last_menu');
+        const savedSubView = localStorage.getItem('erp_last_subview');
+        const savedCo = localStorage.getItem('erp_last_co');
+
+        if (savedMenu && !ignore) setMainMenu(savedMenu);
+        if (savedSubView && !ignore) setSubView(savedSubView);
+
+        if (sessionUser.company !== 'SY INC.' && !sessionUser.permissions?.mso) {
+          if (!ignore) setSelectedCo(sessionUser.company);
+        } else if (savedCo && !ignore) {
+          setSelectedCo(savedCo);
+        }
+
+        if (sessionUser?.company === 'SY INC.' || sessionUser?.permissions?.mso) {
+          supabase
+            .from('companies')
+            .select('id, name, type')
+            .eq('is_active', true)
+            .then(({ data: list, error }) => {
+              if (error) {
+                console.error('companies 조회 오류:', error);
+                return;
+              }
+              const sorted = (list || []).sort((a: any, b: any) => {
+                const order = ['박철홍정형외과', '수연의원', 'SY INC.'];
+                const ia = order.indexOf(a.name);
+                const ib = order.indexOf(b.name);
+                if (ia >= 0 && ib >= 0) return ia - ib;
+                if (ia >= 0) return -1;
+                if (ib >= 0) return 1;
+                return (a.name || '').localeCompare(b.name || '');
+              });
+              if (!ignore) setCompanies(sorted);
+            });
+          const savedId = getSelectedCompanyId();
+          if (savedId && !ignore) setSelectedCompanyIdState(savedId);
+        }
+
+        if (!ignore) {
+          setSelectedCompanyIdState(getSelectedCompanyId());
+        }
+      } catch {
+        await clearClientSession();
+        router.replace('/');
+      }
+    };
+
+    void bootstrap();
+    return () => {
+      ignore = true;
+    };
+  }, [clearClientSession, router]); // 마운트 시 1회만 실행
 
   // 1-1. 강제 로그아웃 실시간 감지 (Session Security)
   useEffect(() => {
@@ -124,13 +170,13 @@ function MainPageContent() {
         const forceLogoutAt = payload.new.force_logout_at;
         if (forceLogoutAt && new Date(forceLogoutAt).getTime() > new Date(loginAt).getTime()) {
           alert('관리자에 의해 강제 로그아웃 되었습니다. 다시 로그인해 주세요.');
-          localStorage.clear();
+          void clearClientSession();
           window.location.href = '/';
         }
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [user?.id, loginAt]);
+  }, [clearClientSession, user?.id, loginAt]);
 
   // 1-1. 강제 로그아웃(세션 만료) 체크 — 마운트 시 1회만 실행
   useEffect(() => {
@@ -149,8 +195,7 @@ function MainPageContent() {
 
           if (loginAtMs < minAuthTime) {
             alert("보안 정책 또는 시스템 업데이트로 인해 모든 세션이 만료되었습니다. 다시 로그인해 주세요.");
-            localStorage.removeItem('erp_user');
-            localStorage.removeItem('erp_login_at');
+            await clearClientSession();
             router.replace('/');
           }
         }
@@ -159,7 +204,7 @@ function MainPageContent() {
       }
     };
     checkForcedLogout();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [clearClientSession, router]);
 
   // 알림 클릭 시 open_chat_room 쿼리 처리 → 채팅 메뉴 + 해당 채팅방 연동 (웹/모바일 동일)
   useEffect(() => {
@@ -251,27 +296,49 @@ function MainPageContent() {
     try {
       const isMso = u?.company === 'SY INC.' || u?.permissions?.mso === true;
       const filterCompanyId = isMso ? companyIdFilter : u?.company_id;
+      const filterCompanyName =
+        isMso
+          ? selectedCo && selectedCo !== '전체'
+            ? selectedCo
+            : null
+          : u?.company ?? null;
 
       const { data: staffData } = await supabase
         .from('staff_members')
         .select('*')
         .order('employee_no', { ascending: true });
 
-      let postQuery = supabase.from('board_posts').select('*').order('created_at', { ascending: false });
-      if (filterCompanyId) {
-        postQuery = postQuery.eq('company_id', filterCompanyId);
-      }
-      const { data: postData } = await postQuery;
+      const { data: postData } = await withMissingColumnFallback(
+        async () => {
+          let postQuery = supabase.from('board_posts').select('*').order('created_at', { ascending: false });
+          if (filterCompanyId) {
+            postQuery = postQuery.eq('company_id', filterCompanyId);
+          } else if (filterCompanyName) {
+            postQuery = postQuery.eq('company', filterCompanyName);
+          }
+          return postQuery;
+        },
+        async () => {
+          let postQuery = supabase.from('board_posts').select('*').order('created_at', { ascending: false });
+          if (filterCompanyName) {
+            postQuery = postQuery.eq('company', filterCompanyName);
+          }
+          return postQuery;
+        }
+      );
 
       // 현재 사용자의 변경된 정보(팀/부서 등)가 있으면 세션 동기화
       if (staffData && u?.id) {
         const updatedSelf = staffData.find((s: any) => s.id === u.id);
         if (updatedSelf && JSON.stringify(updatedSelf) !== JSON.stringify(u)) {
+          const safeSelf = { ...updatedSelf };
+          delete safeSelf.password;
+          delete safeSelf.passwd;
           // 상태 및 스토리지 업데이트
-          setUser(updatedSelf);
-          localStorage.setItem('erp_user', JSON.stringify(updatedSelf));
+          setUser(safeSelf);
+          localStorage.setItem('erp_user', JSON.stringify(safeSelf));
           // user_session도 같이 갱신 (호환성)
-          localStorage.setItem('user_session', JSON.stringify(updatedSelf));
+          localStorage.setItem('user_session', JSON.stringify(safeSelf));
         }
       }
 
@@ -296,6 +363,16 @@ function MainPageContent() {
 
   // 현재 메인 메뉴에 해당하는 서브메뉴 목록
   const currentSubMenus = mainMenu === '인사관리' ? [] : (SUB_MENUS[mainMenu] || []);
+  const subgroupLabels: Record<string, string> = {
+    대시보드: '📊 대시보드',
+    '권한 / 조직': '🔐 권한 / 조직',
+    '시스템 설정': '⚙️ 시스템 설정',
+    '데이터 관리': '🗂️ 데이터 관리',
+    인력관리: '👥 인력관리',
+    '근태/급여': '💰 근태 · 급여',
+    '복무/복지': '🏥 복무 · 복지',
+    '문서/기타': '📂 문서 · 기타',
+  };
 
   // 메인 메뉴가 바뀌었는데 현재 subView가 해당 메뉴의 서브메뉴에 없다면, 첫 번째 서브메뉴로 보정
   useEffect(() => {
@@ -320,7 +397,10 @@ function MainPageContent() {
   }
 
   return (
-    <div className="flex flex-col md:flex-row h-screen w-full bg-[var(--background)] overflow-hidden min-h-[100dvh]">
+    <div
+      className="flex flex-col md:flex-row h-screen w-full bg-[var(--background)] overflow-hidden min-h-[100dvh]"
+      data-testid="main-shell"
+    >
       <Sidebar
         user={user}
         mainMenu={mainMenu}
@@ -342,18 +422,21 @@ function MainPageContent() {
               const groups = Array.from(new Set(currentSubMenus.map(s => s.group))).filter(Boolean);
 
               return groups.map(groupName => (
-                <div key={groupName!} className="flex flex-row md:flex-col space-x-1 md:space-x-0 md:space-y-1 mb-0 md:mb-4 shrink-0">
-                  <div className="hidden md:block px-3 py-1.5 text-[10px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">{groupName}</div>
+                  <div key={groupName!} className="flex flex-row md:flex-col space-x-1 md:space-x-0 md:space-y-1 mb-0 md:mb-4 shrink-0">
+                  <div className="hidden md:block px-3 py-1.5 text-[10px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">
+                    {subgroupLabels[groupName!] || groupName}
+                  </div>
                   {currentSubMenus.filter(s => s.group === groupName).map(sub => (
                     <button
                       key={sub.id}
                       onClick={() => setSubView(sub.id)}
-                      className={`flex-none md:w-full text-center md:text-left px-4 md:px-3 py-2 md:py-2.5 text-[11px] font-bold rounded-[12px] transition-all whitespace-nowrap ${subView === sub.id
+                      className={`flex-none md:w-full text-center md:text-left px-4 md:px-3 py-2 md:py-2.5 text-[11px] font-bold rounded-[12px] transition-all whitespace-nowrap md:flex md:items-center md:gap-2 ${subView === sub.id
                         ? 'bg-[var(--foreground)] text-white shadow-md'
                         : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
                         }`}
                     >
-                      {sub.label}
+                      <span className="hidden md:inline text-[13px] shrink-0">{sub.icon || '•'}</span>
+                      <span>{sub.label}</span>
                     </button>
                   ))}
                 </div>
@@ -364,12 +447,13 @@ function MainPageContent() {
               <button
                 key={sub.id}
                 onClick={() => setSubView(sub.id)}
-                className={`flex-none md:w-full text-center md:text-left px-4 md:px-3 py-2 md:py-2.5 text-[11px] font-bold rounded-[12px] transition-all whitespace-nowrap ${subView === sub.id
+                className={`flex-none md:w-full text-center md:text-left px-4 md:px-3 py-2 md:py-2.5 text-[11px] font-bold rounded-[12px] transition-all whitespace-nowrap md:flex md:items-center md:gap-2 ${subView === sub.id
                   ? 'bg-[var(--toss-blue)] text-white shadow-md'
                   : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
                   }`}
               >
-                {sub.label}
+                <span className="hidden md:inline text-[13px] shrink-0">{sub.icon || '•'}</span>
+                <span>{sub.label}</span>
               </button>
             ));
           })()}

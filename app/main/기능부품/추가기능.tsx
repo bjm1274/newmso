@@ -9,11 +9,14 @@ import 인계노트 from './인계노트';
 import 퇴원심사 from './퇴원심사';
 import 마감보고 from './마감보고';
 import 직원평가시스템 from './직원평가시스템';
+import 근무표자동편성 from './근무표자동편성';
 
 const EXTERNAL_LINKS = [
   { id: 'km-park', label: 'KM Park', url: 'http://kmp0001103.iptime.org/login?redirectTo=undefined', icon: '🏥' },
   { id: 'webfax', label: 'U+ 웹팩스', url: 'https://webfax.uplus.co.kr/m', icon: '📠' },
 ];
+
+const MANAGER_POSITION_KEYWORDS = ['팀장', '과장', '실장', '수간호사', '파트장', '센터장', '부장', '본부장', '이사', '원장', '병원장', '대표'];
 
 const FEATURE_CARDS = [
   { id: '조직도', label: '조직도', icon: '🏢', desc: '조직 구성 및 연락처 보기', subView: null, isOrgChart: true },
@@ -23,6 +26,7 @@ const FEATURE_CARDS = [
   { id: '퇴원심사', label: '퇴원심사', icon: '🏥', desc: '퇴원 체크리스트 점검 및 AI 분석', subView: '퇴원심사' },
   { id: '마감보고', label: '마감보고', icon: '💰', desc: '원무과 일일 정산 및 시재 관리', subView: '마감보고', restricted: true },
   { id: '직원평가', label: '직원평가', icon: '✍️', desc: '부서장 전용 성과 및 문제사항 기록', subView: '직원평가', restricted: true },
+  { id: '근무표자동편성', label: '근무표 자동편성', icon: '🧩', desc: '부서장 전용 2·3교대 자동 편성', subView: '근무표자동편성', managerOnly: true },
 ];
 
 const MAX_RECENT = 5;
@@ -48,6 +52,11 @@ export default function ExtraFeatures({
   const [subView, setSubView] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [recentFeatures, setRecentFeatures] = useState<string[]>([]);
+  const isManagerOrHigher =
+    user?.role === 'admin' ||
+    user?.company === 'SY INC.' ||
+    user?.permissions?.mso === true ||
+    MANAGER_POSITION_KEYWORDS.some((keyword) => String(user?.position || '').includes(keyword));
 
   useEffect(() => {
     try {
@@ -84,6 +93,9 @@ export default function ExtraFeatures({
   };
 
   const isRestricted = (card: typeof FEATURE_CARDS[number]) => {
+    if (card.managerOnly) {
+      return !isManagerOrHigher;
+    }
     if (!card.restricted) return false;
     return !(
       user?.department === '병동팀' ||
@@ -94,7 +106,7 @@ export default function ExtraFeatures({
       user?.permissions?.mso ||
       user?.permissions?.handover_read ||
       // 부서장 이상 권한 체크 (직원평가용)
-      ['팀장', '수간호사', '부장', '이사', '병원장', '원장'].includes(user?.position)
+      isManagerOrHigher
     );
   };
 
@@ -110,6 +122,7 @@ export default function ExtraFeatures({
   const getCardStyle = (id: string) => {
     if (id === '인계노트') return 'bg-red-50 text-red-500 group-hover:bg-red-100';
     if (id === '퇴원심사') return 'bg-purple-50 text-purple-500 group-hover:bg-purple-100';
+    if (id === '근무표자동편성') return 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-100';
     return 'bg-[var(--toss-gray-1)] group-hover:bg-[var(--toss-blue-light)]';
   };
 
@@ -248,6 +261,19 @@ export default function ExtraFeatures({
             <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] p-6 shadow-sm">
               <직원평가시스템 user={user || {}} staffs={staffs} />
             </div>
+          </div>
+        )}
+
+        {subView === '근무표자동편성' && (
+          <div className="space-y-4">
+            <button
+              type="button"
+              onClick={() => setSubView(null)}
+              className="text-[11px] font-bold text-[var(--toss-blue)] hover:underline"
+            >
+              ← 목록으로
+            </button>
+            <근무표자동편성 user={user || {}} staffs={staffs} />
           </div>
         )}
 
