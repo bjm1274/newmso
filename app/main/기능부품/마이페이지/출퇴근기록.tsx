@@ -258,9 +258,9 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-xl font-semibold text-[var(--foreground)] tracking-tight">근무 히스토리</h3>
           <div className="flex gap-2">
-            <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() - 1)))} className="p-2 border rounded-full hover:bg-[var(--toss-gray-1)]">◀</button>
+            <button onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))} className="p-2 border rounded-full hover:bg-[var(--toss-gray-1)]">◀</button>
             <span className="font-semibold px-2">{currentMonth.getFullYear()}. {currentMonth.getMonth() + 1}</span>
-            <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() + 1)))} className="p-2 border rounded-full hover:bg-[var(--toss-gray-1)]">▶</button>
+            <button onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))} className="p-2 border rounded-full hover:bg-[var(--toss-gray-1)]">▶</button>
           </div>
         </div>
 

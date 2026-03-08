@@ -18,7 +18,7 @@ export default function MyTodoList({ user: initialUser }: any) {
   const [viewRange, setViewRange] = useState<'day' | 'week' | 'month'>('day');
   const [loading, setLoading] = useState(false);
 
-  // 1. 유저 ID 확인 및 자동 복구 로직
+  // 1. 유저 ID 확인 및 자동 복구 로직 (user 변경 시에만 실행, selectedDate 변경 시 불필요한 재조회 방지)
   useEffect(() => {
     const checkAndRecoverUser = async () => {
       if (initialUser?.id) {
@@ -50,11 +50,11 @@ export default function MyTodoList({ user: initialUser }: any) {
     };
 
     checkAndRecoverUser();
-  }, [initialUser, selectedDate]);
+  }, [initialUser]);
 
   useEffect(() => {
     if (user?.id) fetchTasks(user.id);
-  }, [viewRange]);
+  }, [viewRange, selectedDate]);
 
   useEffect(() => {
     if (!user?.id) return;
