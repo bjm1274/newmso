@@ -20,6 +20,15 @@ import HealthCheckupManagement from './인사관리서브/건강검진관리';
 import CongratulationsCondolences from './인사관리서브/경조사관리';
 import PersonnelAppointment from './인사관리서브/인사발령관리';
 import RewardDisciplineManagement from './인사관리서브/포상징계관리';
+import BirthdayAnniversary from './인사관리서브/생일기념일알림';
+import OrgChartEditor from './인사관리서브/조직도편집기';
+import SkillMatrix from './인사관리서브/스킬매트릭스';
+import MeetingRoomBooking from './인사관리서브/회의실예약';
+import VehicleDispatch from './인사관리서브/차량배차관리';
+import NurseSchedule from './인사관리서브/간호근무표';
+import LicenseManager from './인사관리서브/면허자격증관리';
+import MedicalDeviceInspection from './인사관리서브/의료기기점검';
+import PraisesBadges from './인사관리서브/칭찬배지';
 
 // 기본 함수 이름을 영문 대문자로 시작하도록 변경해
 // React ESLint 규칙을 만족시킵니다. default export 이므로
@@ -28,7 +37,7 @@ const HR_TAB_KEY = 'erp_hr_tab';
 const HR_COMPANY_KEY = 'erp_hr_company';
 const HR_STATUS_KEY = 'erp_hr_status';
 
-const HR_MENU_IDS = ['구성원', '계약', '문서보관함', '교육', '근태', '교대근무', '급여', '연차/휴가', '캘린더', '비품대여', '증명서', '서류제출', '오프보딩', '원천징수파일', '4대보험', '건강검진', '경조사', '인사발령', '포상/징계'];
+const HR_MENU_IDS = ['구성원', '계약', '문서보관함', '교육', '근태', '교대근무', '급여', '연차/휴가', '캘린더', '비품대여', '증명서', '서류제출', '오프보딩', '원천징수파일', '4대보험', '건강검진', '경조사', '인사발령', '포상/징계', '생일/기념일', '조직도', '스킬매트릭스', '회의실예약', '차량배차', '간호근무표', '면허/자격증', '의료기기점검', '칭찬배지'];
 
 export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu }: any) {
   const [현재메뉴, 메뉴설정] = useState(initialMenu && HR_MENU_IDS.includes(initialMenu) ? initialMenu : '구성원');
@@ -46,15 +55,24 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
     { id: '인사발령', perm: 'hr_구성원', icon: '📋', group: '인력관리' },
     { id: '포상/징계', perm: 'hr_구성원', icon: '🏅', group: '인력관리' },
     { id: '교육', perm: 'hr_교육', icon: '📚', group: '인력관리' },
+    { id: '조직도', perm: 'hr_구성원', icon: '🌳', group: '인력관리' },
+    { id: '스킬매트릭스', perm: 'hr_구성원', icon: '📊', group: '인력관리' },
     { id: '오프보딩', perm: 'hr_구성원', icon: '🚪', group: '인력관리' },
     { id: '근태', perm: 'hr_근태', icon: '⏰', group: '근태/급여' },
     { id: '교대근무', perm: 'hr_교대근무', icon: '🔄', group: '근태/급여' },
     { id: '연차/휴가', perm: 'hr_연차휴가', icon: '🌴', group: '근태/급여' },
     { id: '급여', perm: 'hr_급여', icon: '💰', group: '근태/급여' },
     { id: '원천징수파일', perm: 'hr_급여', icon: '📊', group: '근태/급여' },
+    { id: '간호근무표', perm: 'hr_근태', icon: '🏥', group: '근태/급여' },
     { id: '4대보험', perm: 'hr_구성원', icon: '🏛️', group: '복무/복지' },
     { id: '건강검진', perm: 'hr_구성원', icon: '🩺', group: '복무/복지' },
     { id: '경조사', perm: 'hr_구성원', icon: '🎊', group: '복무/복지' },
+    { id: '생일/기념일', perm: 'hr_구성원', icon: '🎂', group: '복무/복지' },
+    { id: '회의실예약', perm: 'hr_구성원', icon: '🏢', group: '복무/복지' },
+    { id: '차량배차', perm: 'hr_구성원', icon: '🚗', group: '복무/복지' },
+    { id: '면허/자격증', perm: 'hr_구성원', icon: '📜', group: '복무/복지' },
+    { id: '의료기기점검', perm: 'hr_구성원', icon: '🔧', group: '복무/복지' },
+    { id: '칭찬배지', perm: 'hr_구성원', icon: '⭐', group: '복무/복지' },
     { id: '비품대여', perm: 'hr_비품대여', icon: '📦', group: '복무/복지' },
     { id: '계약', perm: 'hr_계약', icon: '📝', group: '문서/기타' },
     { id: '문서보관함', perm: 'hr_문서보관함', icon: '📁', group: '문서/기타' },
@@ -282,6 +300,15 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
           {activeMenu === '경조사' && <CongratulationsCondolences staffs={staffs} selectedCo={선택사업체} />}
           {activeMenu === '인사발령' && <PersonnelAppointment staffs={staffs} selectedCo={선택사업체} user={user} />}
           {activeMenu === '포상/징계' && <RewardDisciplineManagement staffs={staffs} selectedCo={선택사업체} user={user} />}
+          {activeMenu === '생일/기념일' && <BirthdayAnniversary staffs={staffs} user={user} />}
+          {activeMenu === '조직도' && <OrgChartEditor staffs={staffs} selectedCo={선택사업체} user={user} />}
+          {activeMenu === '스킬매트릭스' && <SkillMatrix staffs={staffs} selectedCo={선택사업체} user={user} />}
+          {activeMenu === '회의실예약' && <MeetingRoomBooking user={user} staffs={staffs} />}
+          {activeMenu === '차량배차' && <VehicleDispatch user={user} staffs={staffs} />}
+          {activeMenu === '간호근무표' && <NurseSchedule staffs={staffs} selectedCo={선택사업체} user={user} />}
+          {activeMenu === '면허/자격증' && <LicenseManager staffs={staffs} selectedCo={선택사업체} user={user} />}
+          {activeMenu === '의료기기점검' && <MedicalDeviceInspection selectedCo={선택사업체} user={user} />}
+          {activeMenu === '칭찬배지' && <PraisesBadges staffs={staffs} selectedCo={선택사업체} user={user} />}
         </section>
       </main>
     </div>
