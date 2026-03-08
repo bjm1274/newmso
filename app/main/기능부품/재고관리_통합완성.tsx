@@ -88,9 +88,22 @@ export default function IntegratedInventoryManagement({ user, selectedCo, select
     setLoading(true);
     try {
       let query = supabase.from('inventory').select('*').order('item_name', { ascending: true });
+      const isMso = user?.company === 'SY INC.' || user?.permissions?.mso === true;
       const effectiveCo = companyFilter !== undefined ? companyFilter : selectedCo;
+      const scopedCompanyId =
+        effectiveCo && effectiveCo !== '전체'
+          ? (isMso ? selectedCompanyId : user?.company_id)
+          : null;
+      if (scopedCompanyId) query = query.eq('company_id', scopedCompanyId);
       if (effectiveCo && effectiveCo !== '전체') query = query.eq('company', effectiveCo);
-      const { data, error } = await query;
+      const { data, error } = await withMissingColumnFallback(
+        async () => query,
+        async () => {
+          let legacyQuery = supabase.from('inventory').select('*').order('item_name', { ascending: true });
+          if (effectiveCo && effectiveCo !== '전체') legacyQuery = legacyQuery.eq('company', effectiveCo);
+          return legacyQuery;
+        }
+      );
       if (error) throw error;
       if (data) setInventory(data);
     } catch (err) {
@@ -98,7 +111,7 @@ export default function IntegratedInventoryManagement({ user, selectedCo, select
     } finally {
       setLoading(false);
     }
-  }, [selectedCo]);
+  }, [selectedCo, selectedCompanyId, user?.company, user?.company_id, user?.permissions?.mso]);
 
   const fetchSuppliers = useCallback(async () => {
     try {
@@ -157,7 +170,7 @@ export default function IntegratedInventoryManagement({ user, selectedCo, select
       // 해당 물품의 귀속 회사/부서를 완전히 변경하는 것이 아니라면 inventory 테이블의 소속 구조는 유지하고 로그에만 사유를 기록
       const { error } = await supabase.from('inventory').update({ quantity: newStock, stock: newStock }).eq('id', item.id);
       if (!error) {
-        await supabase.from('inventory_logs').insert([{
+        const logRows: any[] = [{
           item_id: item.id,
           inventory_id: item.id,
           type: type === 'in' ? '입고' : '출고',
@@ -167,7 +180,17 @@ export default function IntegratedInventoryManagement({ user, selectedCo, select
           next_quantity: newStock,
           actor_name: targetDept && targetDept !== '전체' ? `${user?.name} (${targetDept})` : user?.name,
           company: targetCompany || item.company
-        }]);
+        }];
+        if (item.company_id || user?.company_id || selectedCompanyId) {
+          logRows[0].company_id = item.company_id ?? (user?.company === 'SY INC.' ? selectedCompanyId : user?.company_id);
+        }
+        await withMissingColumnFallback(
+          () => supabase.from('inventory_logs').insert(logRows),
+          () => {
+            const legacyRows = logRows.map(({ company_id, ...rest }: any) => rest);
+            return supabase.from('inventory_logs').insert(legacyRows);
+          }
+        );
         alert(`${type === 'in' ? '입고' : '출고'} 처리가 완료되었습니다.`);
         fetchInventory();
         if (onRefresh) onRefresh();
@@ -180,7 +203,7 @@ export default function IntegratedInventoryManagement({ user, selectedCo, select
   const handleAutoApprovalRequest = async (item: any) => {
     if (!confirm(`[안전재고 부족] ${item.item_name} 품목의 비품구매 신청서를 자동으로 작성하여 MSO 결재 상신을 진행하시겠습니까?`)) return;
     try {
-      const { error } = await supabase.from('approvals').insert([{
+      const rows: any[] = [{
         sender_id: user.id,
         sender_name: user.name,
         sender_company: user.company,
@@ -189,7 +212,17 @@ export default function IntegratedInventoryManagement({ user, selectedCo, select
         content: `현재고(${item.quantity})가 안전재고(${item.min_quantity}) 이하로 떨어져 자동 기안되었습니다. \n보충 필요량: ${item.min_quantity * 2 - item.quantity}개`,
         status: '대기',
         meta_data: { item_name: item.item_name, quantity: item.min_quantity * 2 - item.quantity, current_stock: item.quantity, is_auto_generated: true }
-      }]);
+      }];
+      if (item.company_id || user?.company_id || selectedCompanyId) {
+        rows[0].company_id = item.company_id ?? (user?.company === 'SY INC.' ? selectedCompanyId : user?.company_id);
+      }
+      const { error } = await withMissingColumnFallback(
+        () => supabase.from('approvals').insert(rows),
+        () => {
+          const legacyRows = rows.map(({ company_id, ...rest }: any) => rest);
+          return supabase.from('approvals').insert(legacyRows);
+        }
+      );
       if (!error) alert("비품구매 신청서가 MSO 관리자에게 성공적으로 상신되었습니다.");
     } catch (err) {
       console.error('결재 상신 실패:', err);
@@ -308,7 +341,7 @@ export default function IntegratedInventoryManagement({ user, selectedCo, select
                               </td>
                               <td className="px-6 py-4 text-center">
                                 <p className="text-xs font-semibold text-[var(--toss-gray-4)]">{item.unit_price?.toLocaleString()}원</p>
-                                <p className="text-[8px] font-bold text-[var(--toss-gray-3)]">총액: {(item.unit_price * item.quantity)?.toLocaleString()}원</p>
+                                <p className="text-[8px] font-bold text-[var(--toss-gray-3)]">총액: {((item.unit_price ?? 0) * (item.quantity ?? 0)).toLocaleString()}원</p>
                               </td>
                               <td className="px-6 py-4 text-center">
                                 <p className={`text-[11px] font-semibold ${isExpiryImminent ? 'text-orange-600' : 'text-[var(--toss-gray-3)]'}`}>
