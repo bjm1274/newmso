@@ -5,9 +5,15 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import bcrypt from 'bcryptjs';
+import { isAdminSession, readSessionFromRequest } from '@/lib/server-session';
 
 export async function POST(req: Request) {
   try {
+    const session = await readSessionFromRequest(req);
+    if (!session || !isAdminSession(session.user)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await req.json();
     const { password } = body || {};
     const resetHash = process.env.RESET_SECRET_HASH;

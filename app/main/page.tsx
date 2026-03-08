@@ -3,6 +3,7 @@ import { Suspense, useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnFallback } from '@/lib/supabase-compat';
+import { persistSupabaseAccessToken } from '@/lib/supabase-bridge';
 import { setSelectedCompanyId as persistSelectedCompanyId, getSelectedCompanyId } from '@/lib/useCompany';
 
 import Sidebar, { SUB_MENUS } from './기능부품/조직도서브/조직도측면창';
@@ -69,6 +70,8 @@ function MainPageContent() {
     try {
       localStorage.removeItem('erp_user');
       localStorage.removeItem('erp_login_at');
+      persistSupabaseAccessToken(null);
+      void supabase.realtime.setAuth(null);
     } catch {
       // ignore
     }
@@ -105,6 +108,8 @@ function MainPageContent() {
 
         try {
           localStorage.setItem('erp_user', JSON.stringify(sessionUser));
+          persistSupabaseAccessToken(payload?.supabaseAccessToken ?? null);
+          void supabase.realtime.setAuth(payload?.supabaseAccessToken ?? null);
         } catch {
           // ignore
         }
@@ -279,7 +284,7 @@ function MainPageContent() {
   useEffect(() => {
     if (!user) return;
     fetchERPData(user, selectedCompanyId);
-  }, [user, selectedCompanyId]);
+  }, [user, selectedCompanyId, selectedCo]);
 
   // 2. 상태 변경 시마다 로컬 스토리지 업데이트
   useEffect(() => {
@@ -303,10 +308,30 @@ function MainPageContent() {
             : null
           : u?.company ?? null;
 
-      const { data: staffData } = await supabase
-        .from('staff_members')
-        .select('*')
-        .order('employee_no', { ascending: true });
+      const { data: staffData } = await withMissingColumnFallback(
+        async () => {
+          let staffQuery = supabase
+            .from('staff_members')
+            .select('*')
+            .order('employee_no', { ascending: true });
+          if (filterCompanyId) {
+            staffQuery = staffQuery.eq('company_id', filterCompanyId);
+          } else if (filterCompanyName) {
+            staffQuery = staffQuery.eq('company', filterCompanyName);
+          }
+          return staffQuery;
+        },
+        async () => {
+          let staffQuery = supabase
+            .from('staff_members')
+            .select('*')
+            .order('employee_no', { ascending: true });
+          if (filterCompanyName) {
+            staffQuery = staffQuery.eq('company', filterCompanyName);
+          }
+          return staffQuery;
+        }
+      );
 
       const { data: postData } = await withMissingColumnFallback(
         async () => {

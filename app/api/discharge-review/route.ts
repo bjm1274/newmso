@@ -3,6 +3,7 @@
  * 차트 데이터와 기본 템플릿을 비교 분석합니다.
  */
 import { NextResponse } from 'next/server';
+import { readSessionFromRequest } from '@/lib/server-session';
 
 const MODELS = [
     'gemini-2.5-pro',
@@ -60,6 +61,11 @@ async function callGemini(prompt: string): Promise<string> {
 
 export async function POST(req: Request) {
     try {
+        const session = await readSessionFromRequest(req);
+        if (!session) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const body = await req.json();
         const { patientName, birthDate, gender, department, admissionDate, dischargeDate, diagnosis,
             insuranceType, surgeryName, surgeryDate, roomGrade, doctorName, comorbidities,

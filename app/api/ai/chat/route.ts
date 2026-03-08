@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { readSessionFromRequest } from '@/lib/server-session';
 
 function getDemoResponse(messages: { role: string; content: string }[]): string {
   const last = messages[messages.length - 1]?.content?.toLowerCase() || '';
@@ -19,6 +20,11 @@ function getDemoResponse(messages: { role: string; content: string }[]): string 
  */
 export async function POST(req: NextRequest) {
   try {
+    const session = await readSessionFromRequest(req);
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await req.json();
     const { messages = [] } = body as { messages?: { role: string; content: string }[] };
 

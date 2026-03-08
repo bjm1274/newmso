@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:e2e": "playwright test --grep-invert @real-db",
+    "test:e2e:headed": "playwright test --grep-invert @real-db --headed",
+    "test:e2e:real": "playwright test --grep @real-db"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -25,6 +28,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
 interface Props {
@@ -41,7 +41,7 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
     company: selectedCo !== '전체' ? selectedCo : '',
   });
 
-  const fetchDocs = async () => {
+  const fetchDocs = useCallback(async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -56,11 +56,11 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchDocs();
-  }, [selectedCo]);
+  }, [fetchDocs, selectedCo]);
 
   const openAdd = () => {
     setEditingDoc(null);

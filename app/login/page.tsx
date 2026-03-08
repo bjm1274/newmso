@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { persistSupabaseAccessToken } from '@/lib/supabase-bridge';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -11,20 +12,49 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [checkingAuth, setCheckingAuth] = useState(true);
 
-  // 이미 로그인된 상태면(erp_user 있음) 메인으로 이동 — 로그아웃 누르기 전까지 유지
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const stored = localStorage.getItem('erp_user');
-    if (stored) {
+    let ignore = false;
+
+    const checkSession = async () => {
       try {
-        JSON.parse(stored);
+        const response = await fetch('/api/auth/session', {
+          method: 'GET',
+          cache: 'no-store',
+        });
+
+        if (!response.ok) {
+          localStorage.removeItem('erp_user');
+          localStorage.removeItem('erp_login_at');
+          persistSupabaseAccessToken(null);
+          if (!ignore) setCheckingAuth(false);
+          return;
+        }
+
+        const payload = await response.json();
+        if (!payload?.authenticated || !payload.user) {
+          localStorage.removeItem('erp_user');
+          localStorage.removeItem('erp_login_at');
+          persistSupabaseAccessToken(null);
+          if (!ignore) setCheckingAuth(false);
+          return;
+        }
+
+        localStorage.setItem('erp_user', JSON.stringify(payload.user));
+        persistSupabaseAccessToken(payload.supabaseAccessToken ?? null);
+        void supabase.realtime.setAuth(payload.supabaseAccessToken ?? null);
         router.replace('/main');
-        return;
       } catch {
-        // 잘못된 저장값이면 무시
+        localStorage.removeItem('erp_user');
+        localStorage.removeItem('erp_login_at');
+        persistSupabaseAccessToken(null);
+        if (!ignore) setCheckingAuth(false);
       }
-    }
-    setCheckingAuth(false);
+    };
+
+    void checkSession();
+    return () => {
+      ignore = true;
+    };
   }, [router]);
 
   const handleLogin = async () => {
@@ -35,115 +65,31 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
 
-    // 마스터 계정 체크 (서버에서 환경변수로 검증)
-    let masterData: any = { success: false };
     try {
-      const masterRes = await fetch('/api/auth/master-login', {
+      const loginRes = await fetch('/api/auth/master-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ loginId, password }),
       });
-      if (masterRes.ok) {
-        masterData = await masterRes.json();
+      const payload = await loginRes.json();
+
+      if (!loginRes.ok || !payload?.success || !payload?.user) {
+        setError(payload?.error || '로그인에 실패했습니다.');
+        setLoading(false);
+        return;
       }
+
+      localStorage.setItem('erp_user', JSON.stringify(payload.user));
+      localStorage.setItem('erp_login_at', new Date().toISOString());
+      persistSupabaseAccessToken(payload.supabaseAccessToken ?? null);
+      void supabase.realtime.setAuth(payload.supabaseAccessToken ?? null);
+      setLoading(false);
+      if (payload.notice) {
+        alert(payload.notice);
+      }
+      router.push('/main');
     } catch {
-      // 마스터 로그인 API 오류 시 일반 로그인으로 진행
-    }
-    if (masterData.success) {
-      localStorage.setItem('erp_user', JSON.stringify(masterData.user));
-      localStorage.setItem('erp_login_at', new Date().toISOString());
-      setLoading(false);
-      router.push('/main');
-      return;
-    }
-
-    try {
-      const idTrim = loginId.trim();
-      // 1) 사번(employee_no)으로 조회 — 고유하므로 동명이인 구분 가능
-      const { data: byNo } = await supabase
-        .from('staff_members')
-        .select('*')
-        .eq('employee_no', idTrim)
-        .maybeSingle();
-      if (byNo) {
-        const user = byNo;
-        const savedPassword = (user.password ?? user.passwd ?? '').toString().trim();
-        const isFirstLogin = !savedPassword;
-        if (isFirstLogin) {
-          const { error: pwErr } = await supabase.from('staff_members').update({ password }).eq('id', user.id);
-          if (pwErr) {
-            setError("비밀번호 설정 중 오류가 발생했습니다.");
-            setLoading(false);
-            return;
-          }
-        } else if (savedPassword !== password) {
-          setError("비밀번호가 일치하지 않습니다.");
-          setLoading(false);
-          return;
-        }
-        const toStore = { ...user, password: isFirstLogin ? password : user.password, company_id: user.company_id ?? null };
-        localStorage.setItem('erp_user', JSON.stringify(toStore));
-        localStorage.setItem('erp_login_at', new Date().toISOString());
-        setLoading(false);
-        if (isFirstLogin) alert("비밀번호가 설정되었습니다. 다음 로그인부터 이 비밀번호를 사용해 주세요.");
-        router.push('/main');
-        return;
-      }
-
-      // 2) 이름으로 조회 — 동명이인 있으면 사번 입력 유도
-      const { data: rows, error: dbError } = await supabase
-        .from('staff_members')
-        .select('*')
-        .eq('name', idTrim);
-      if (dbError) {
-        setError("등록된 아이디가 없습니다. 확인 후 다시 시도하세요.");
-        setLoading(false);
-        return;
-      }
-      if (!rows?.length) {
-        setError("등록된 사번 또는 이름이 없습니다. 확인 후 다시 시도하세요.");
-        setLoading(false);
-        return;
-      }
-      if (rows.length > 1) {
-        setError("동명이인이 있습니다. 로그인 아이디에 사번을 입력해 주세요.");
-        setLoading(false);
-        return;
-      }
-      let user = rows[0];
-
-      // 직원 생성 시 비밀번호 없이 등록되므로, 처음 로그인할 때 입력한 값이 비밀번호로 설정됨
-      const savedPassword = (user.password ?? user.passwd ?? '').toString().trim();
-      const isFirstLogin = !savedPassword;
-
-      if (isFirstLogin) {
-        const { error: pwErr } = await supabase
-          .from('staff_members')
-          .update({ password })
-          .eq('id', user.id);
-        if (pwErr) {
-          console.error('password set error', pwErr);
-          setError("비밀번호를 설정하는 중 오류가 발생했습니다. 다시 시도하거나 관리자에게 문의해주세요.");
-          setLoading(false);
-          return;
-        }
-        user = { ...user, password };
-      } else if (savedPassword !== password) {
-        setError("비밀번호가 일치하지 않습니다.");
-        setLoading(false);
-        return;
-      }
-
-      const toStore = { ...user, company_id: user.company_id ?? null };
-      localStorage.setItem('erp_user', JSON.stringify(toStore));
-      localStorage.setItem('erp_login_at', new Date().toISOString());
-      setLoading(false);
-      if (isFirstLogin) {
-        alert("비밀번호가 설정되었습니다. 다음 로그인부터 이 비밀번호를 사용해 주세요.");
-      }
-      router.push('/main');
-    } catch (_err) {
-      setError("시스템 접속 중 오류가 발생했습니다.");
+      setError('시스템 접속 중 오류가 발생했습니다.');
       setLoading(false);
     }
   };
@@ -158,7 +104,10 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen min-h-[100dvh] bg-[var(--background)] flex flex-col justify-center py-8 px-4 lg:px-8">
+    <div
+      className="min-h-screen min-h-[100dvh] bg-[var(--background)] flex flex-col justify-center py-8 px-4 lg:px-8"
+      data-testid="login-page"
+    >
       <div className="sm:mx-auto sm:w-full sm:max-w-sm text-center">
         <h2 className="text-2xl md:text-3xl font-bold text-[var(--foreground)] tracking-tight">
           SY INC. 통합 시스템
@@ -170,13 +119,14 @@ export default function LoginPage() {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-sm">
         <div className="bg-[var(--toss-card)] py-8 px-6 rounded-[20px] shadow-sm border border-[var(--toss-border)] animate-in slide-in-from-bottom-10 duration-500">
-          <div className="space-y-6">
+          <div className="space-y-6" data-testid="login-form">
             <div>
               <label className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-2 ml-1">아이디 (사번 또는 이름)</label>
               <input
                 type="text"
                 value={loginId}
                 onChange={(e) => setLoginId(e.target.value)}
+                data-testid="login-id-input"
                 className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] text-sm font-medium outline-none focus:ring-2 ring-[var(--toss-blue)]/30 border border-transparent focus:border-[var(--toss-blue)] transition-all text-[var(--foreground)]"
                 placeholder="사번 또는 이름 (동명이인은 사번 입력)"
                 onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
@@ -188,6 +138,7 @@ export default function LoginPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                data-testid="login-password-input"
                 className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] text-sm font-medium outline-none focus:ring-2 ring-[var(--toss-blue)]/30 border border-transparent focus:border-[var(--toss-blue)] transition-all text-[var(--foreground)]"
                 placeholder="비밀번호 입력"
                 onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
@@ -201,6 +152,7 @@ export default function LoginPage() {
             <button
               onClick={handleLogin}
               disabled={loading}
+              data-testid="login-submit-button"
               className="w-full py-4 bg-[var(--toss-blue)] text-white rounded-[12px] font-semibold text-[15px] hover:bg-[var(--toss-blue)] active:scale-[0.98] transition-all disabled:opacity-50"
             >
               {loading ? '인증 진행 중...' : '로그인'}
