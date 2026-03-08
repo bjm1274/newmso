@@ -15,7 +15,7 @@ interface Evaluation {
     evaluator_position?: string;
 }
 
-export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any; staffs: any[] }) {
+export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any; staffs?: any[] }) {
     const [selectedStaff, setSelectedStaff] = useState<any>(null);
     const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
     const [loading, setLoading] = useState(false);
