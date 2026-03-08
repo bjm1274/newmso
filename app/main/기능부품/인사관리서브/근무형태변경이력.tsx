@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
 interface Props {
@@ -49,7 +49,7 @@ export default function WorkTypeChangeHistory({ staffs, selectedCo, user }: Prop
 
   const filtered = selectedCo === '전체' ? staffs : staffs.filter((s: any) => s.company === selectedCo);
 
-  const fetchRecords = async () => {
+  const fetchRecords = useCallback(async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -64,11 +64,11 @@ export default function WorkTypeChangeHistory({ staffs, selectedCo, user }: Prop
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchRecords();
-  }, [selectedCo]);
+  }, [fetchRecords, selectedCo]);
 
   const handleSave = async () => {
     if (!form.staff_id || !form.changed_date || !form.new_type) {

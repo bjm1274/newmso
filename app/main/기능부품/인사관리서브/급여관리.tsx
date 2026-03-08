@@ -38,7 +38,7 @@ import PayrollAdvancedCenter from './급여명세/급여고도화센터';
 import UnpaidAbsenceDeduction from './급여명세/무급결근차감';
 
 type Staff = {
-  id: number;
+  id: string | number;
   name: string;
   company?: string;
   position?: string;
@@ -47,7 +47,7 @@ type Staff = {
 
 export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any) {
   const [activeTab, setActiveTab] = useState('대시보드');
-  const [selectedStaffId, setSelectedStaffId] = useState(1);
+  const [selectedStaffId, setSelectedStaffId] = useState<string | number | null>(null);
   const [checkedIds, setCheckedIds] = useState<number[]>([]);
   const [yearMonth, setYearMonth] = useState<string>(() => new Date().toISOString().slice(0, 7));
   const [payrollRecords, setPayrollRecords] = useState<any[]>([]);
