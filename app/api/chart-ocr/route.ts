@@ -4,6 +4,7 @@
  */
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { readSessionFromRequest } from '@/lib/server-session';
 
 const MODELS = [
     'gemini-2.5-pro',
@@ -40,6 +41,11 @@ async function callGeminiVision(prompt: string, imageBase64: string, mimeType: s
 
 export async function POST(req: Request) {
     try {
+        const session = await readSessionFromRequest(req);
+        if (!session) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const body = await req.json();
         const { image, mimeType } = body;
 

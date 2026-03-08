@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { getStoredSupabaseAccessToken } from './supabase-bridge';
 
 const PLACEHOLDER_URL = 'https://placeholder.supabase.co';
 const PLACEHOLDER_KEY = 'placeholder-anon-key';
@@ -19,4 +20,6 @@ if (url === PLACEHOLDER_URL || key === PLACEHOLDER_KEY) {
   );
 }
 
-export const supabase: SupabaseClient = createClient(url, key);
+export const supabase: SupabaseClient = createClient(url, key, {
+  accessToken: async () => getStoredSupabaseAccessToken(),
+});

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createSupabaseAccessToken } from '@/lib/server-supabase-bridge';
 import {
   clearSessionCookie,
   readSessionFromRequest,
@@ -14,10 +15,13 @@ export async function GET(request: NextRequest) {
     return clearSessionCookie(response);
   }
 
+  const supabaseAccessToken = await createSupabaseAccessToken(session.user);
+
   return NextResponse.json({
     authenticated: true,
     user: session.user,
     expiresAt: session.exp,
+    supabaseAccessToken,
   });
 }
 

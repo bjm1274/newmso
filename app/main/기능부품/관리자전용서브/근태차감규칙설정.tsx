@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 
 export default function AttendanceDeductionRules({ selectedCo = '전체' }: any) {
@@ -7,7 +7,7 @@ export default function AttendanceDeductionRules({ selectedCo = '전체' }: any)
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const fetchRules = async () => {
+  const fetchRules = useCallback(async () => {
     setLoading(true);
     const { data } = await supabase
       .from('attendance_deduction_rules')
@@ -20,11 +20,11 @@ export default function AttendanceDeductionRules({ selectedCo = '전체' }: any)
       setRules(all || { company_name: selectedCo, late_deduction_type: 'fixed', late_deduction_amount: 10000, early_leave_deduction_type: 'fixed', early_leave_deduction_amount: 10000 });
     }
     setLoading(false);
-  };
+  }, [selectedCo]);
 
   useEffect(() => {
     fetchRules();
-  }, [selectedCo]);
+  }, [fetchRules]);
 
   const handleSave = async () => {
     if (!rules) return;
