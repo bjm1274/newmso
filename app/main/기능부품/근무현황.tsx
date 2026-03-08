@@ -1,5 +1,5 @@
-/* eslint-disable react-hooks/rules-of-hooks */
 'use client';
+/* eslint-disable react-hooks/rules-of-hooks */
 
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
