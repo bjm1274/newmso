@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
 interface Props {
@@ -44,7 +44,7 @@ export default function EarlyLeavingDetection({ staffs, selectedCo, user }: Prop
   const filtered = selectedCo === '전체' ? staffs : staffs.filter((s: any) => s.company === selectedCo);
   const depts = ['전체', ...Array.from(new Set(filtered.map((s: any) => s.dept || s.department || '미분류').filter(Boolean)))];
 
-  const fetchRecords = async () => {
+  const fetchRecords = useCallback(async () => {
     setLoading(true);
     try {
       const startDate = `${yearMonth}-01`;
@@ -66,11 +66,11 @@ export default function EarlyLeavingDetection({ staffs, selectedCo, user }: Prop
     } finally {
       setLoading(false);
     }
-  };
+  }, [yearMonth]);
 
   useEffect(() => {
     fetchRecords();
-  }, [yearMonth, selectedCo]);
+  }, [fetchRecords, selectedCo]);
 
   const handleApprove = async (id: number) => {
     try {

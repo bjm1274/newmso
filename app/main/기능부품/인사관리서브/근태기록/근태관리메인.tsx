@@ -20,7 +20,10 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
   const [bulkStatus, setBulkStatus] = useState<string>('present');
   const [bulkSaving, setBulkSaving] = useState(false);
 
-  const filtered = selectedCo === '전체' ? staffs : staffs.filter((s: any) => s.company === selectedCo);
+  const filtered = useMemo(
+    () => selectedCo === '전체' ? staffs : staffs.filter((s: any) => s.company === selectedCo),
+    [selectedCo, staffs]
+  );
 
   const fetchAttendance = async () => {
     setLoading(true);
