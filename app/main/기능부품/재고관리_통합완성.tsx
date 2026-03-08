@@ -14,10 +14,14 @@ import ASReturnManagement from './재고관리서브/AS반품관리';
 import SupplierManagement from './재고관리서브/거래처관리';
 import InventoryCount from './재고관리서브/재고실사';
 import ExpirationAlert from './재고관리서브/유효기간알림';
+import InventoryTransfer from './재고관리서브/재고이관';
+import CategoryManager from './재고관리서브/카테고리관리';
+import ConsumableStats from './재고관리서브/소모품통계';
+import DeliveryConfirmation from './재고관리서브/납품확인서';
 
 const INV_VIEW_KEY = 'erp_inventory_view';
 
-const VALID_VIEWS = ['UDI', '명세서', '발주', '스캔', '등록', '현황', '이력', '자산', 'AS반품', '거래처', '재고실사', '유통기한'];
+const VALID_VIEWS = ['UDI', '명세서', '발주', '스캔', '등록', '현황', '이력', '자산', 'AS반품', '거래처', '재고실사', '유통기한', '이관', '카테고리', '소모품통계', '납품확인서'];
 
 export default function IntegratedInventoryManagement({ user, selectedCo, onRefresh, initialView }: any) {
   const [activeView, setActiveView] = useState(initialView && VALID_VIEWS.includes(initialView) ? initialView : '현황');
@@ -408,6 +412,10 @@ export default function IntegratedInventoryManagement({ user, selectedCo, onRefr
           {activeView === '거래처' && <SupplierManagement user={user} />}
           {activeView === '재고실사' && <InventoryCount user={user} inventory={inventory} fetchInventory={() => fetchInventory(selectedCo)} />}
           {activeView === '유통기한' && <ExpirationAlert />}
+          {activeView === '이관' && <InventoryTransfer user={user} inventory={inventory} fetchInventory={() => fetchInventory(selectedCo)} />}
+          {activeView === '카테고리' && <CategoryManager user={user} />}
+          {activeView === '소모품통계' && <ConsumableStats user={user} selectedCo={selectedCo} />}
+          {activeView === '납품확인서' && <DeliveryConfirmation user={user} selectedCo={selectedCo} />}
         </main>
       </div>
 

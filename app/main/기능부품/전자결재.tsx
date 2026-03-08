@@ -8,11 +8,12 @@ import FormRequest from './전자결재서브/양식신청';
 import AttendanceCorrectionForm from './전자결재서브/출결정정양식';
 import RepairRequestForm from './전자결재서브/수리요청서양식';
 import AnnualLeavePlanForm from './전자결재서브/연차사용계획서양식';
+import ApprovalCalendar from './전자결재서브/결재캘린더';
 
 const APPROVAL_VIEW_KEY = 'erp_approval_view';
 const DRAFT_STORAGE_KEY = 'erp_draft_approval';
 
-const APPROVAL_VIEWS = ['기안함', '결재함', '작성하기'];
+const APPROVAL_VIEWS = ['기안함', '결재함', '작성하기', '캘린더'];
 
 export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, selectedCompanyId, onRefresh, initialView }: any) {
   const [viewMode, setViewMode] = useState(initialView && APPROVAL_VIEWS.includes(initialView) ? initialView : '기안함');
@@ -21,6 +22,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const [formTitle, setFormTitle] = useState('');
   const [formContent, setFormContent] = useState('');
   const [approverLine, setApproverLine] = useState<any[]>([]);
+  const [ccLine, setCcLine] = useState<any[]>([]);
   const [extraData, setExtraData] = useState<any>({});
   const [customFormTypes, setCustomFormTypes] = useState<{ name: string; slug: string }[]>([]);
   const [lastDraftByType, setLastDraftByType] = useState<Record<string, any>>({});
@@ -435,6 +437,12 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     const extraCc = Array.isArray((extraData as any)?.cc_departments) ? (extraData as any).cc_departments : [];
     const cc_departments = Array.from(new Set([...extraCc, ...requiredCc]));
 
+    // 문서번호 자동 채번: 연도-월-순번
+    const now = new Date();
+    const docPrefix = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const { count } = await supabase.from('approvals').select('id', { count: 'exact', head: true });
+    const docNumber = `${docPrefix}-${String((count || 0) + 1).padStart(4, '0')}`;
+
     const row: any = {
       sender_id: user.id,
       sender_name: user.name || '이름 없음',
@@ -444,7 +452,8 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       type: formType,
       title: formTitle,
       content: formContent || '',
-      meta_data: { ...extraData, cc_departments },
+      meta_data: { ...extraData, cc_departments, cc_users: ccLine.map(c => ({ id: c.id, name: c.name })) },
+      doc_number: docNumber,
       status: '대기',
     };
     const companyId = user.company_id ?? selectedCompanyId ?? null;
@@ -514,7 +523,9 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       {/* 상세 메뉴(기안함·결재함·작성하기)는 메인 좌측 사이드바에서 전자결재 호버/클릭 시 플라이아웃으로 선택 */}
       {/* 메인 콘텐츠 */}
       <main className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden p-4 md:p-10 bg-[var(--page-bg)] custom-scrollbar">
-        {viewMode === '작성하기' ? (
+        {viewMode === '캘린더' ? (
+          <ApprovalCalendar user={user} />
+        ) : viewMode === '작성하기' ? (
           <div className="max-w-4xl mx-auto space-y-6 md:space-y-8">
             {/* 임시저장 복구 배너 */}
             {draftBanner && (
@@ -611,6 +622,30 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                   </div>
                 </div>
                 <div className="flex gap-2 flex-wrap">{approverLine.map((a, i) => <div key={i} className="bg-[var(--toss-card)] px-4 py-3 rounded-[12px] border border-[var(--toss-border)] text-[11px] font-bold shadow-sm text-[var(--toss-blue)] flex items-center gap-2">{i + 1}. {a.name} {a.position} <button onClick={() => setApproverLine(approverLine.filter((_, idx) => idx !== i))} className="ml-1 text-[var(--toss-gray-3)] hover:text-red-500">✕</button></div>)}</div>
+
+                {/* CC 참조자 */}
+                <div className="mt-3">
+                  <p className="text-[11px] font-bold text-[var(--toss-gray-3)] mb-1">참조자 (CC)</p>
+                  <div className="flex gap-2 mb-2">
+                    <select onChange={e => {
+                      const s = staffs.find((sf: any) => String(sf.id) === e.target.value);
+                      if (s && !ccLine.find(c => c.id === s.id)) setCcLine(prev => [...prev, { id: s.id, name: s.name, position: s.position }]);
+                      e.target.value = '';
+                    }} className="flex-1 px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-[11px] bg-[var(--toss-card)] outline-none">
+                      <option value="">참조자 추가...</option>
+                      {staffs.filter((s: any) => !ccLine.find(c => c.id === s.id)).map((s: any) => <option key={s.id} value={s.id}>{s.name} ({s.position})</option>)}
+                    </select>
+                  </div>
+                  {ccLine.length > 0 && (
+                    <div className="flex gap-2 flex-wrap">
+                      {ccLine.map((c, i) => (
+                        <div key={i} className="bg-yellow-50 border border-yellow-200 px-3 py-1.5 rounded-[10px] text-[11px] font-bold text-yellow-700 flex items-center gap-1.5">
+                          CC {c.name} <button onClick={() => setCcLine(prev => prev.filter((_, idx) => idx !== i))} className="text-yellow-400 hover:text-red-500">✕</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="flex gap-2 p-1.5 bg-[var(--toss-gray-1)] rounded-[12px] w-full overflow-x-auto no-scrollbar">
@@ -803,7 +838,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                             <span className="px-2 py-0.5 bg-[var(--toss-blue-light)] rounded-md text-[11px] md:text-[11px] font-semibold text-[var(--toss-blue)]">{item.sender_company}</span>
                           </div>
                           <h3 className="font-semibold text-[var(--foreground)] text-sm md:text-base tracking-tight line-clamp-1">{item.title}</h3>
-                          <p className="text-[11px] md:text-[11px] text-[var(--toss-gray-3)] font-bold mt-1">기안자: {item.sender_name || '사용자'} | {new Date(item.created_at).toLocaleDateString()}</p>
+                          <p className="text-[11px] md:text-[11px] text-[var(--toss-gray-3)] font-bold mt-1">기안자: {item.sender_name || '사용자'} | {new Date(item.created_at).toLocaleDateString()}{item.doc_number && ` | 문서번호: ${item.doc_number}`}</p>
                           {steps.length > 0 && (
                             <div className="mt-2 flex flex-wrap gap-1.5">
                               <span className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">결재선</span>
@@ -817,12 +852,20 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                         </div>
                       </div>
 
-                      {(viewMode === '결재함' || (viewMode === '기안함' && item.status === '대기')) && item.status === '대기' && String(item.current_approver_id) === String(user?.id) && (
-                        <div className="flex gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
-                          <button type="button" onClick={() => handleApproveAction(item)} className="px-5 py-3 bg-[var(--toss-blue)] text-white rounded-[12px] text-[11px] font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all">승인</button>
-                          <button type="button" onClick={() => handleRejectAction(item)} className="px-5 py-3 bg-red-50 text-red-600 border border-red-200 rounded-[12px] text-[11px] font-bold shadow-sm hover:bg-red-100 active:scale-[0.98] transition-all">반려</button>
-                        </div>
-                      )}
+                      <div className="flex gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <button type="button" onClick={() => {
+                          const win = window.open('', '_blank');
+                          if (!win) return;
+                          win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>결재문서</title><style>body{font-family:'Malgun Gothic',sans-serif;padding:30px;max-width:800px;margin:0 auto}h1{font-size:20px;text-align:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:20px}.meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;font-size:12px}.meta div{border:1px solid #ccc;padding:8px;border-radius:4px}.content{border:1px solid #ccc;padding:15px;min-height:200px;font-size:13px;line-height:1.6;border-radius:4px}.approval-line{margin-top:20px;display:flex;gap:10px}.sig-box{border:1px solid #ccc;padding:10px;min-width:80px;text-align:center;font-size:11px}@media print{button{display:none}}</style></head><body><h1>결 재 문 서</h1><div class="meta"><div><strong>문서번호:</strong> ${item.doc_number || '-'}</div><div><strong>기안일:</strong> ${new Date(item.created_at).toLocaleDateString('ko-KR')}</div><div><strong>기안자:</strong> ${item.sender_name}</div><div><strong>소속:</strong> ${item.sender_company}</div><div><strong>문서종류:</strong> ${item.type}</div><div><strong>상태:</strong> ${item.status}</div></div><h3 style="font-size:16px;margin-bottom:10px">${item.title}</h3><div class="content">${(item.content || '').replace(/\n/g, '<br>')}</div><div class="approval-line">${(item.approver_line || []).map((id: string, i: number) => `<div class="sig-box">${i + 1}단계<br><br><br>(인)</div>`).join('')}</div><script>window.onload=()=>window.print()</script></body></html>`);
+                          win.document.close();
+                        }} className="px-3 py-2 bg-gray-50 text-gray-600 border border-gray-200 rounded-[10px] text-[10px] font-bold hover:bg-gray-100">PDF</button>
+                        {(viewMode === '결재함' || (viewMode === '기안함' && item.status === '대기')) && item.status === '대기' && String(item.current_approver_id) === String(user?.id) && (
+                          <>
+                            <button type="button" onClick={() => handleApproveAction(item)} className="px-5 py-3 bg-[var(--toss-blue)] text-white rounded-[12px] text-[11px] font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all">승인</button>
+                            <button type="button" onClick={() => handleRejectAction(item)} className="px-5 py-3 bg-red-50 text-red-600 border border-red-200 rounded-[12px] text-[11px] font-bold shadow-sm hover:bg-red-100 active:scale-[0.98] transition-all">반려</button>
+                          </>
+                        )}
+                      </div>
                     </div>
                   );
                 })}

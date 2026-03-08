@@ -25,6 +25,10 @@ import NotificationTemplatesPanel from './급여명세/알림템플릿관리';
 import TaxInsuranceRatesPanel from './급여명세/세율보험요율관리';
 import IntegratedHRSettings from './인사통합설정';
 import SalarySimulator from './급여명세/급여시뮬레이터';
+import InsuranceEDI from './급여명세/4대보험EDI';
+import RetirementPensionManager from './급여명세/퇴직연금관리';
+import WagePeakCalculator from './급여명세/임금피크제';
+import MinWageChecker from './급여명세/최저임금체크';
 
 type Staff = {
   id: number;
@@ -84,6 +88,10 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
     { id: '연말퇴직정산', label: '연말퇴직정산', icon: '🗓️' },
     { id: '통합설정', label: '통합설정', icon: '⚙️' },
     { id: '급여시뮬레이터', label: '급여 시뮬레이터', icon: '🧮' },
+    { id: '4대보험EDI', label: '4대보험 EDI', icon: '🏛️' },
+    { id: '퇴직연금', label: '퇴직연금', icon: '💼' },
+    { id: '임금피크제', label: '임금피크제', icon: '📉' },
+    { id: '최저임금', label: '최저임금 체크', icon: '⚠️' },
   ];
 
   return (
@@ -209,6 +217,10 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
                 <SalarySimulator />
               </div>
             )}
+            {activeTab === '4대보험EDI' && <InsuranceEDI staffs={filtered} selectedCo={selectedCo} user={null} />}
+            {activeTab === '퇴직연금' && <RetirementPensionManager staffs={filtered} selectedCo={selectedCo} user={null} />}
+            {activeTab === '임금피크제' && <WagePeakCalculator staffs={filtered} selectedCo={selectedCo} user={null} />}
+            {activeTab === '최저임금' && <MinWageChecker staffs={filtered} selectedCo={selectedCo} user={null} />}
           </>
         ) : (
           <div className="h-full flex items-center justify-center bg-[var(--toss-card)] border border-dashed border-[var(--toss-border)] rounded-[24px] p-20">
