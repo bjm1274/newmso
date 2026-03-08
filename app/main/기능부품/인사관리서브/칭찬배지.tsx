@@ -122,7 +122,7 @@ export default function PraisesBadges({ staffs = [], selectedCo, user }: { staff
                       <span>{b.recipient_name}</span>
                     </p>
                     <p className="text-xs font-bold mt-0.5">{b.badge_label || badgeInfo?.label} 배지</p>
-                    {b.message && <p className="text-xs mt-1 italic opacity-80">"{b.message}"</p>}
+                    {b.message && <p className="text-xs mt-1 italic opacity-80">&quot;{b.message}&quot;</p>}
                     <p className="text-[9px] mt-1 opacity-60">{b.created_at?.slice(0, 16)}</p>
                   </div>
                 </div>

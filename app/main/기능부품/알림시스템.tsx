@@ -110,9 +110,12 @@ export async function initNotificationService(staffId?: string) {
   if (!window.isSecureContext) return;
   try {
     const reg = await navigator.serviceWorker.register('/sw.js');
+    if (!reg || typeof reg !== 'object' || !('pushManager' in reg) || !reg.pushManager) {
+      return;
+    }
     if (Notification.permission === 'default') await Notification.requestPermission();
     const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-    if (reg.pushManager && Notification.permission === 'granted' && vapidKey) {
+    if (Notification.permission === 'granted' && vapidKey) {
       let sub = await reg.pushManager.getSubscription();
       if (!sub) {
         try { sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidKey) }); }
@@ -124,7 +127,7 @@ export async function initNotificationService(staffId?: string) {
           await supabase.from('push_subscriptions').upsert({ staff_id: staffId || null, endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth }, { onConflict: 'staff_id,endpoint' });
       }
     }
-  } catch (e) { console.error('SW 등록 실패:', e); }
+  } catch (e) { console.warn('SW 등록 건너뜀:', e); }
 }
 
 export function sendNotification(title: string, options?: NotificationOptions) {
@@ -341,12 +344,14 @@ export default function NotificationSystem({
         const msg = p.new;
         if (String(msg.sender_id) === uid) return;
         const [roomRes, senderRes] = await Promise.all([
-          supabase.from('chat_rooms').select('members').eq('id', msg.room_id).maybeSingle(),
+          supabase.from('chat_rooms').select('type, members').eq('id', msg.room_id).maybeSingle(),
           msg.sender_id ? supabase.from('staff_members').select('name').eq('id', msg.sender_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
         ]);
         if (roomRes.error || !roomRes.data) return;
         const members: string[] = Array.isArray(roomRes.data?.members) ? roomRes.data.members.map((id: any) => String(id)) : [];
-        if (!members.includes(uid)) return;
+        const isNoticeRoom = String(msg.room_id) === '00000000-0000-0000-0000-000000000000' || roomRes.data?.type === 'notice';
+        const canReceive = isNoticeRoom || members.includes(uid);
+        if (!canReceive) return;
         const senderName = (senderRes.data as any)?.name || '알 수 없음';
         const content = (msg.content || '').trim();
         const isMention = user?.name && content.includes(`@${user.name}`);

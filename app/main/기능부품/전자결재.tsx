@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { withMissingColumnFallback } from '@/lib/supabase-compat';
 import AttendanceForms from './전자결재서브/근태신청양식';
 import SuppliesForm from './전자결재서브/비품구매양식';
 import AdminForms from './전자결재서브/관리행정양식';
@@ -101,16 +102,25 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   }, [initialView]);
 
   const fetchApprovals = async () => {
-    let query = supabase.from('approvals').select('*').order('created_at', { ascending: false });
-    if (!isMso && user?.company_id) query = query.eq('company_id', user.company_id);
-    else if (isMso && selectedCompanyId) query = query.eq('company_id', selectedCompanyId);
-    else if (!isMso && user?.company) query = query.eq('sender_company', user.company);
-
-    const { data } = await query;
+    const scopedCompanyId = !isMso ? user?.company_id : selectedCompanyId;
+    const scopedCompanyName = !isMso ? user?.company : selectedCo !== '전체' ? selectedCo : null;
+    const { data } = await withMissingColumnFallback(
+      async () => {
+        let query = supabase.from('approvals').select('*').order('created_at', { ascending: false });
+        if (scopedCompanyId) query = query.eq('company_id', scopedCompanyId);
+        else if (scopedCompanyName) query = query.eq('sender_company', scopedCompanyName);
+        return query;
+      },
+      async () => {
+        let query = supabase.from('approvals').select('*').order('created_at', { ascending: false });
+        if (scopedCompanyName) query = query.eq('sender_company', scopedCompanyName);
+        return query;
+      }
+    );
     if (data) setApprovals(data as any);
   };
 
-  useEffect(() => { fetchApprovals(); }, [selectedCompanyId, user?.id]);
+  useEffect(() => { fetchApprovals(); }, [selectedCompanyId, selectedCo, user?.id, user?.company, user?.company_id]);
 
   // 작성하기에서 선택한 유형별로 내가 마지막 상신한 결재 조회 (이전 기안 불러오기용)
   const fetchMyLastApproval = async (type: string) => {
@@ -461,7 +471,13 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     const companyId = user.company_id ?? selectedCompanyId ?? null;
     if (companyId != null) row.company_id = companyId;
 
-    const { error } = await supabase.from('approvals').insert([row]);
+    const { error } = await withMissingColumnFallback(
+      () => supabase.from('approvals').insert([row]),
+      () => {
+        const { company_id, ...legacyRow } = row;
+        return supabase.from('approvals').insert([legacyRow]);
+      }
+    );
 
     if (error) {
       console.error('기안 상신 실패:', error);
@@ -521,7 +537,10 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   };
 
   return (
-    <div className="flex flex-col h-full min-h-0 app-page overflow-hidden">
+    <div
+      className="flex flex-col h-full min-h-0 app-page overflow-hidden"
+      data-testid="approval-view"
+    >
       {/* 상세 메뉴(기안함·결재함·작성하기)는 메인 좌측 사이드바에서 전자결재 호버/클릭 시 플라이아웃으로 선택 */}
       {/* 메인 콘텐츠 */}
       <main className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden p-4 md:p-10 bg-[var(--page-bg)] custom-scrollbar">

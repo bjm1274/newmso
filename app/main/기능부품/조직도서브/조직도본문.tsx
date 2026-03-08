@@ -10,7 +10,6 @@ import ApprovalView from '../전자결재';
 import HRView from '../인사관리';
 import InventoryView from '../재고관리_통합완성';
 import AdminView from '../관리자전용';
-import AttendanceView from '../근태시스템';
 import 추가기능 from '../추가기능';
 
 export default function MainContent({
@@ -61,7 +60,7 @@ export default function MainContent({
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative bg-[var(--page-bg)]">
       {mainMenu === '내정보' && (
-        <div className="w-full flex-1 min-h-0 overflow-hidden">
+        <div className="w-full flex-1 min-h-0 overflow-hidden" data-testid="mypage-view">
           <MyPage
             user={user}
             initialMyPageTab={initialMyPageTab}
@@ -80,6 +79,8 @@ export default function MainContent({
             posts={data.posts?.filter((p: any) => p.board_type === (subView || '공지사항')) || []}
             subView={subView || '공지사항'}
             setSubView={setSubView}
+            selectedCo={selectedCo}
+            selectedCompanyId={selectedCompanyId}
             initialBoard={subView || '공지사항'}
             initialPostId={initialOpenPostId}
             onConsumePostId={onConsumeOpenPostId}
@@ -91,11 +92,21 @@ export default function MainContent({
         </div>
       )}
       {mainMenu === '전자결재' && <div className="flex-1 overflow-hidden"><ApprovalView user={user} staffs={data.staffs} selectedCo={selectedCo} setSelectedCo={setSelectedCo} selectedCompanyId={selectedCompanyId} onRefresh={onRefresh} initialView={subView} /></div>}
-      {mainMenu === '근태관리' && <div className="flex-1 overflow-hidden"><AttendanceView user={user} staffs={data.staffs} selectedCo={selectedCo} /></div>}
-      {mainMenu === '인사관리' && <div className="flex-1 overflow-hidden"><HRView user={user} staffs={data.staffs} depts={data.depts} selectedCo={selectedCo} onRefresh={onRefresh} initialMenu={subView} /></div>}
-      {mainMenu === '재고관리' && <div className="flex-1 overflow-hidden"><InventoryView user={user} depts={data.depts} onRefresh={onRefresh} selectedCo={selectedCo} initialView={subView} /></div>}
+      {mainMenu === '인사관리' && (
+        <div className="flex-1 overflow-hidden" data-testid="hr-view">
+          <HRView
+            user={user}
+            staffs={data.staffs}
+            depts={data.depts}
+            selectedCo={selectedCo}
+            onRefresh={onRefresh}
+            initialMenu={subView}
+          />
+        </div>
+      )}
+      {mainMenu === '재고관리' && <div className="flex-1 overflow-hidden"><InventoryView user={user} depts={data.depts} onRefresh={onRefresh} selectedCo={selectedCo} selectedCompanyId={selectedCompanyId} initialView={subView} /></div>}
       {mainMenu === '추가기능' && (
-        <div className="flex-1 overflow-hidden flex flex-col">
+        <div className="flex-1 overflow-hidden flex flex-col" data-testid="extra-view">
           <추가기능
             user={user}
             staffs={data.staffs}

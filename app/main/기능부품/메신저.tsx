@@ -1,15 +1,15 @@
-'use client';
+﻿'use client';
 import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import SmartDatePicker from './공통/SmartDatePicker';
 
 const NOTICE_ROOM_ID = '00000000-0000-0000-0000-000000000000';
 const NOTICE_ROOM_NAME = '공지메시지';
-const CAN_WRITE_NOTICE_POSITIONS = ['팀장', '부장', '실장', '원장', '병원장', '대표이사', '이사', '본부장', '총무부장', '진료부장', '간호부장'];
+const CAN_WRITE_NOTICE_POSITIONS = ['대표', '부장', '팀장', '실장', '병원장', '이사', '본부장', '총무부장', '진료부장', '간호부장'];
 const CHAT_ROOM_KEY = 'erp_chat_last_room';
 const CHAT_FOCUS_KEY = 'erp_chat_focus_keyword';
+const CHAT_ROOM_PREFS_KEY = 'erp_chat_room_prefs';
 
-/** 카카오워크 스타일: 마지막 메시지 시각 기준으로 채팅방 목록 정렬 (최신 대화가 위로) */
 function sortChatRoomsWithNoticeFirst(rooms: any[]): any[] {
   const notice = rooms.find((r: any) => r.id === NOTICE_ROOM_ID);
   const others = rooms.filter((r: any) => r.id !== NOTICE_ROOM_ID).sort((a: any, b: any) => {
@@ -20,31 +20,100 @@ function sortChatRoomsWithNoticeFirst(rooms: any[]): any[] {
   return notice ? [notice, ...others] : others;
 }
 
-// 파일 URL이 이미지인지 확인
 function isImageUrl(url: string): boolean {
   const ext = url.split('.').pop()?.toLowerCase();
   return /^(jpg|jpeg|png|gif|webp|bmp|svg)$/.test(ext || '');
 }
 
-// 파일 URL이 동영상인지 확인
 function isVideoUrl(url: string): boolean {
   const ext = url.split('.').pop()?.toLowerCase();
   return /^(mp4|webm|mov|m4v|avi|mkv)$/.test(ext || '');
 }
 
+function normalizeMemberIds(members: any): string[] {
+  return Array.isArray(members) ? members.map((id: any) => String(id)) : [];
+}
+
+type RoomPreference = {
+  pinned?: boolean;
+  hidden?: boolean;
+};
+
+type PresenceInfo = {
+  userId: string;
+  name: string;
+  roomId: string | null;
+  onlineAt: string;
+};
+
+type MessageRetryPayload = {
+  roomId: string;
+  content: string;
+  fileUrl: string | null;
+  fileSizeBytes: number | null;
+  fileKind: 'image' | 'video' | 'file' | null;
+  replyToId: string | null;
+};
+
+type DeliveryState = {
+  status: 'sending' | 'failed' | 'sent';
+  retryPayload?: MessageRetryPayload;
+  error?: string | null;
+};
+
+function getRoomPrefsStorageKey(userId: string | null | undefined): string {
+  return `${CHAT_ROOM_PREFS_KEY}:${userId || 'guest'}`;
+}
+
+function getRoomDisplayName(room: any, staffs: any[], currentUserId: string | null | undefined): string {
+  if (!room) return '채팅방';
+  if (room.id === NOTICE_ROOM_ID) return NOTICE_ROOM_NAME;
+  if (room.type === 'direct') {
+    const members = normalizeMemberIds(room.members);
+    const otherStaff = staffs.find(
+      (staff: any) =>
+        members.includes(String(staff.id)) &&
+        String(staff.id) !== String(currentUserId)
+    );
+    if (otherStaff?.name) return otherStaff.name;
+  }
+  return room.name || '채팅방';
+}
+
+function getRoomPreviewText(room: any): string {
+  return room?.last_message_preview || room?.last_message || '대화가 없습니다.';
+}
+
+function sortRoomsForSidebar(rooms: any[], prefs: Record<string, RoomPreference>): any[] {
+  const notice = rooms.find((room: any) => room.id === NOTICE_ROOM_ID);
+  const rest = rooms
+    .filter((room: any) => room.id !== NOTICE_ROOM_ID)
+    .sort((a: any, b: any) => {
+      const at = new Date(a.last_message_at || a.created_at || 0).getTime();
+      const bt = new Date(b.last_message_at || b.created_at || 0).getTime();
+      return bt - at;
+    });
+  const pinned = rest.filter((room: any) => prefs[room.id]?.pinned);
+  const regular = rest.filter((room: any) => !prefs[room.id]?.pinned);
+  return notice ? [notice, ...pinned, ...regular] : [...pinned, ...regular];
+}
+
 export default function ChatView({ user, onRefresh, staffs = [], initialOpenChatRoomId, initialOpenMessageId, onConsumeOpenChatRoomId }: any) {
   const [messages, setMessages] = useState<any[]>([]);
   const pendingScrollMsgIdRef = useRef<string | null>(null);
-  const [omniSearch, setOmniSearch] = useState(''); // 통합 검색 (Omni-Search)
-  const [chatSearch, setChatSearch] = useState(''); // 대화 내용 검색
+  const [omniSearch, setOmniSearch] = useState('');
+  const [chatSearch, setChatSearch] = useState('');
   const [inputMsg, setInputMsg] = useState('');
   const [activeActionMsg, setActiveActionMsg] = useState<any>(null);
   const [replyTo, setReplyTo] = useState<any>(null);
+  const [deliveryStates, setDeliveryStates] = useState<Record<string, DeliveryState>>({});
+  const [showScrollToLatest, setShowScrollToLatest] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const messageListRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const msgRefs = useRef<any>({});
 
-  // 메시지 스크롤 이동을 위한 참조 (답글 클릭 시 원문 이동)
   const scrollToMessage = (messageId: string) => {
     const el = msgRefs.current[messageId];
     if (el) {
@@ -83,7 +152,6 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   const lastReadAtRef = useRef<string | null>(null);
   const isFocusedRef = useRef(true);
 
-  // 추가된 상태
   const [viewMode, setViewMode] = useState<'chat' | 'org'>('chat');
   const [chatRooms, setChatRooms] = useState<any[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
@@ -92,14 +160,17 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [readCounts, setReadCounts] = useState<Record<string, number>>({});
   const [roomUnreadCounts, setRoomUnreadCounts] = useState<Record<string, number>>({});
-  const [showSettings, setShowSettings] = useState(false); // 통합 설정 드롭다운
-  const [showDrawer, setShowDrawer] = useState(false); // 채팅방 상세 정보 드로어 (프리미엄)
+  const [showSettings, setShowSettings] = useState(false);
+  const [showDrawer, setShowDrawer] = useState(false);
 
   const [roomNotifyOn, setRoomNotifyOn] = useState(true);
   const [editingRoomName, setEditingRoomName] = useState(false);
   const [roomNameDraft, setRoomNameDraft] = useState('');
+  const [roomPrefs, setRoomPrefs] = useState<Record<string, RoomPreference>>({});
+  const [showHiddenRooms, setShowHiddenRooms] = useState(false);
+  const [presenceMap, setPresenceMap] = useState<Record<string, PresenceInfo>>({});
+  const [typingUsers, setTypingUsers] = useState<Record<string, string>>({});
 
-  // 통합 메시지 검색
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
   const [globalSearchResults, setGlobalSearchResults] = useState<any[]>([]);
@@ -107,22 +178,27 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
 
 
   const chatRoomsRef = useRef<any[]>([]);
+  const deliveryStatesRef = useRef<Record<string, DeliveryState>>({});
+  const presenceChannelRef = useRef<any>(null);
+  const typingChannelRef = useRef<any>(null);
+  const typingClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const typingPeersTimeoutRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const syncChannelRef = useRef<BroadcastChannel | null>(null);
+  const isNearBottomRef = useRef(true);
+  const selectedRoomIdRef = useRef<string | null>(null);
+  const fetchDataRef = useRef<(() => Promise<void>) | null>(null);
 
-  // @멘션 자동완성용 상태
   const [mentionQuery, setMentionQuery] = useState('');
   const [showMentionList, setShowMentionList] = useState(false);
 
-  // 공지/중요 메시지 미열람자 조회용 상태
   const [unreadModalMsg, setUnreadModalMsg] = useState<any | null>(null);
   const [unreadUsers, setUnreadUsers] = useState<any[]>([]);
   const [unreadLoading, setUnreadLoading] = useState(false);
 
-  // 권한/역할 정보
   const permissions = user?.permissions || {};
   const isMso = user?.company === 'SY INC.' || permissions.mso === true || user?.role === 'admin';
+  const canWriteNotice = isMso || Boolean(user?.position && CAN_WRITE_NOTICE_POSITIONS.includes(user.position));
 
-  // 현재 선택된 채팅방을 로컬스토리지에 함께 저장해서
-  // 새로고침 이후에도 마지막으로 보던 방으로 복원되도록 처리
   const setRoom = (roomId: string | null) => {
     setSelectedRoomId(roomId);
     if (typeof window === 'undefined') return;
@@ -133,40 +209,144 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
         window.localStorage.removeItem(CHAT_ROOM_KEY);
       }
     } catch {
-      // 로컬스토리지 오류는 앱 동작에 치명적이지 않으므로 무시
     }
   };
 
-  // DB 연동: 투표, 반응, 고정 (폴백: 로컬)
+  const updateRoomPreference = useCallback((roomId: string, patch: RoomPreference) => {
+    setRoomPrefs((prev) => {
+      const next = {
+        ...prev,
+        [roomId]: {
+          ...(prev[roomId] || {}),
+          ...patch,
+        },
+      };
+      if (typeof window !== 'undefined') {
+        try {
+          window.localStorage.setItem(getRoomPrefsStorageKey(user?.id), JSON.stringify(next));
+        } catch {
+          // ignore
+        }
+      }
+      return next;
+    });
+  }, [user?.id]);
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    const listEl = messageListRef.current;
+    if (listEl) {
+      listEl.scrollTo({ top: listEl.scrollHeight, behavior });
+    } else {
+      scrollRef.current?.scrollIntoView({ behavior, block: 'end' });
+    }
+    isNearBottomRef.current = true;
+    setShowScrollToLatest(false);
+  }, []);
+
+  const updateScrollPositionState = useCallback(() => {
+    const listEl = messageListRef.current;
+    if (!listEl) return;
+    const nearBottom = listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight < 96;
+    isNearBottomRef.current = nearBottom;
+    setShowScrollToLatest(!nearBottom && Boolean(selectedRoomId));
+  }, [selectedRoomId]);
+
+  const broadcastChatSync = useCallback((action: string, roomId?: string | null) => {
+    if (!syncChannelRef.current) return;
+    try {
+      syncChannelRef.current.postMessage({
+        action,
+        roomId: roomId || selectedRoomId || null,
+        at: Date.now(),
+      });
+    } catch {
+      // ignore
+    }
+  }, [selectedRoomId]);
+
+  const emitTypingState = useCallback((isTyping: boolean) => {
+    if (!typingChannelRef.current || !selectedRoomId || !user?.id) return;
+    typingChannelRef.current.send({
+      type: 'broadcast',
+      event: 'typing',
+      payload: {
+        roomId: selectedRoomId,
+        userId: String(user.id),
+        name: user.name || 'Unknown',
+        isTyping,
+      },
+    });
+  }, [selectedRoomId, user?.id, user?.name]);
+
+  const handleComposerChange = useCallback((value: string, caret: number) => {
+    setInputMsg(value);
+    const upToCaret = value.slice(0, caret);
+    const match = upToCaret.match(/@([^\s@]{0,20})$/);
+    if (match) {
+      setMentionQuery(match[1] || '');
+      setShowMentionList(true);
+    } else {
+      setShowMentionList(false);
+      setMentionQuery('');
+    }
+
+    if (typingClearRef.current) {
+      clearTimeout(typingClearRef.current);
+      typingClearRef.current = null;
+    }
+
+    if (value.trim()) {
+      emitTypingState(true);
+      typingClearRef.current = setTimeout(() => {
+        emitTypingState(false);
+        typingClearRef.current = null;
+      }, 1800);
+    } else {
+      emitTypingState(false);
+    }
+  }, [emitTypingState]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = window.localStorage.getItem(getRoomPrefsStorageKey(user?.id));
+      setRoomPrefs(raw ? JSON.parse(raw) : {});
+    } catch {
+      setRoomPrefs({});
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    deliveryStatesRef.current = deliveryStates;
+  }, [deliveryStates]);
+
+  useEffect(() => {
+    const composerEl = composerRef.current;
+    if (!composerEl) return;
+    composerEl.style.height = '0px';
+    composerEl.style.height = `${Math.min(120, composerEl.scrollHeight)}px`;
+  }, [inputMsg]);
+
   const [polls, setPolls] = useState<any[]>([]);
   const [pollVotes, setPollVotes] = useState<any>({});
   const [reactions, setReactions] = useState<any>({});
   const [pinnedIds, setPinnedIds] = useState<string[]>([]);
   const [showPollModal, setShowPollModal] = useState(false);
   const [pollQuestion, setPollQuestion] = useState('');
-  const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
+const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
   const [showMediaPanel, setShowMediaPanel] = useState(false);
   const [mediaFilter, setMediaFilter] = useState<'all' | 'image' | 'video' | 'file'>('all');
 
-  // 메시지 전달/공유용 상태
   const [showForwardModal, setShowForwardModal] = useState(false);
   const [forwardSourceMsg, setForwardSourceMsg] = useState<any>(null);
 
-  // 채팅방 멤버 추가용 상태
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [addMemberSearch, setAddMemberSearch] = useState('');
   const [addMemberSelectingIds, setAddMemberSelectingIds] = useState<string[]>([]);
 
-  // 스레드 뷰(특정 메시지만 모아보기) 상태
   const [threadRoot, setThreadRoot] = useState<any | null>(null);
 
-  // 메시지 예약 발송 상태
-  const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [scheduledAt, setScheduledAt] = useState('');
-  const [scheduledMessages, setScheduledMessages] = useState<any[]>([]);
-
-  // 슬래시 명령(/연차, /발주)용 상태
   const [slashCommand, setSlashCommand] = useState<'annual_leave' | 'purchase' | null>(null);
   const [showSlashModal, setShowSlashModal] = useState(false);
   const [slashForm, setSlashForm] = useState<any>({
@@ -208,7 +388,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
         }
         setRoomUnreadCounts(counts);
       } catch (e) {
-        console.error('채팅방 별 안읽은 메시지 계산 실패:', e);
+        console.error('채팅방별 안읽은 메시지 계산 실패:', e);
       }
     },
     [user?.id]
@@ -218,7 +398,10 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     chatRoomsRef.current = chatRooms;
   }, [chatRooms]);
 
-  // 마지막으로 보던 채팅방 복구
+  useEffect(() => {
+    selectedRoomIdRef.current = selectedRoomId;
+  }, [selectedRoomId]);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
@@ -233,7 +416,6 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     }
   }, []);
 
-  // 알림 클릭으로 진입 시 해당 채팅방 자동 선택
   useEffect(() => {
     if (initialOpenChatRoomId) {
       setRoom(initialOpenChatRoomId);
@@ -242,9 +424,9 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       }
       onConsumeOpenChatRoomId?.();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialOpenChatRoomId, initialOpenMessageId]);
 
-  // 특정 메시지로 스크롤 대기
   useEffect(() => {
     const targetMsgId = pendingScrollMsgIdRef.current;
     if (targetMsgId && messages.length > 0) {
@@ -265,13 +447,23 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       .eq('room_id', selectedRoomId)
       .order('created_at', { ascending: true });
     const { data: msgs } = await query;
-    if (msgs) setMessages(msgs);
+    if (msgs) {
+      setMessages((prev) => {
+        const localOnly = prev.filter((msg: any) => {
+          const id = String(msg.id || '');
+          return id.startsWith('temp-') && deliveryStatesRef.current[id]?.status !== 'sent';
+        });
+        return [...msgs, ...localOnly].sort(
+          (a: any, b: any) =>
+            new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
+        );
+      });
+    }
 
     const { data: rooms } = await supabase.from('chat_rooms').select('*');
     const list = sortChatRoomsWithNoticeFirst(rooms || []);
     setChatRooms(list);
 
-    // 읽음 수 집계
     if (msgs?.length) {
       const ids = msgs.map((m: any) => m.id);
       const { data: reads } = await supabase.from('message_reads').select('message_id').in('message_id', ids);
@@ -280,7 +472,6 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       setReadCounts(counts);
     }
 
-    // DB: 고정, 반응, 투표 로드
     try {
       const { data: pinned } = await supabase.from('pinned_messages').select('message_id').eq('room_id', selectedRoomId);
       if (pinned) setPinnedIds(pinned.map((p: any) => p.message_id));
@@ -302,26 +493,20 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
         vMap[v.poll_id][v.option_index] = (vMap[v.poll_id][v.option_index] || 0) + 1;
       });
       setPollVotes(vMap);
-    } catch (_) { /* 테이블 없으면 무시 */ }
+    } catch (_) {}
 
-    // 모든 방에 대해 안 읽은 개수 갱신
     await updateUnreadForRooms(list);
 
-    // [추가] 채팅방 진입 시 현재 방의 안 읽은 메시지 자동 읽음 처리
     if (selectedRoomId && msgs?.length) {
       const unreadMsgIds = msgs
-        .filter((m: any) => m.sender_id !== user?.id) // 내가 보낸 게 아닌 것
+        .filter((m: any) => m.sender_id !== user?.id)
         .filter((m: any) => {
-          // 이미 읽었는지 확인 (readCounts는 message_id 별 전체 읽음 수이므로, 
-          // 정확히 내가 읽었는지는 message_reads 테이블 조회가 필요하지만 
-          // 성능상 룸 진입 시 전체 upsert 처리)
           return true;
         })
         .map((m: any) => m.id);
 
       if (unreadMsgIds.length > 0) {
         try {
-          // message_reads에 내 읽음 기록 추가
           const readPayloads = unreadMsgIds.map(id => ({
             user_id: user.id,
             message_id: id,
@@ -341,18 +526,14 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
             console.warn('room_read_cursors upsert skip');
           }
 
-          // 읽음 수 로컬 상태 갱신 (즉시 반영 목적)
           setReadCounts(prev => {
             const next = { ...prev };
             unreadMsgIds.forEach(id => {
               if (!next[id]) next[id] = 0;
-              // 내가 읽은 기록이 추가되었으므로 +1 (중복 합산 방지 로직은 upsert가 처리)
-              // 여기서는 단순 fetchData 호출로 동기화하는 것이 안전함
             });
             return next;
           });
 
-          // 전역 안읽음 카운트 갱신
           setRoomUnreadCounts(prev => ({ ...prev, [selectedRoomId]: 0 }));
         } catch (e) {
           console.error('자동 읽음 처리 실패:', e);
@@ -364,21 +545,37 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   const roomNotifyRef = useRef(true);
   useEffect(() => { roomNotifyRef.current = roomNotifyOn; }, [roomNotifyOn]);
 
+  // fetchDataRef를 항상 최신 fetchData로 동기화
+  useEffect(() => { fetchDataRef.current = fetchData; }, [fetchData]);
+
   useEffect(() => {
     const loadRooms = async () => {
-      await supabase.from('chat_rooms').upsert(
-        { id: NOTICE_ROOM_ID, name: NOTICE_ROOM_NAME, type: 'notice', members: [] },
-        { onConflict: 'id' }
-      );
+      const { data: noticeRoom } = await supabase
+        .from('chat_rooms')
+        .select('id')
+        .eq('id', NOTICE_ROOM_ID)
+        .maybeSingle();
+
+      if (!noticeRoom) {
+        await supabase.from('chat_rooms').insert([
+          { id: NOTICE_ROOM_ID, name: NOTICE_ROOM_NAME, type: 'notice', members: [] },
+        ]);
+      } else {
+        await supabase
+          .from('chat_rooms')
+          .update({ name: NOTICE_ROOM_NAME, type: 'notice' })
+          .eq('id', NOTICE_ROOM_ID);
+      }
       const { data: rooms } = await supabase.from('chat_rooms').select('*');
       const list = sortChatRoomsWithNoticeFirst(rooms || []);
       setChatRooms(list);
       await updateUnreadForRooms(list);
     };
     loadRooms();
-  }, [selectedRoomId, updateUnreadForRooms]);
+    // selectedRoomId는 의도적으로 제외 — 채팅방 목록은 마운트 시 1회만 로드
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [updateUnreadForRooms]);
 
-  // 채팅방 테이블 변경 시 항상 방 목록 갱신 (신규 방 생성·새 메시지로 순서 변경 시 실시간 반영, 카카오워크 스타일)
   useEffect(() => {
     const channel = supabase.channel('chat-rooms-list')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_rooms' }, () => {
@@ -393,7 +590,61 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     return () => { supabase.removeChannel(channel); };
   }, [updateUnreadForRooms]);
 
-  // 다른 화면(수술·검사 일정 등)에서 설정한 검색 키워드 복원
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase.channel('chat-presence-hub', {
+      config: { presence: { key: String(user.id) } },
+    });
+
+    const syncPresence = () => {
+      const next: Record<string, PresenceInfo> = {};
+      const state = channel.presenceState();
+      Object.values(state).forEach((entries: any) => {
+        if (!Array.isArray(entries) || entries.length === 0) return;
+        const latest = entries[entries.length - 1];
+        if (!latest?.userId) return;
+        next[String(latest.userId)] = {
+          userId: String(latest.userId),
+          name: latest.name || 'Unknown',
+          roomId: latest.roomId || null,
+          onlineAt: latest.onlineAt || new Date().toISOString(),
+        };
+      });
+      setPresenceMap(next);
+    };
+
+    channel
+      .on('presence', { event: 'sync' }, syncPresence)
+      .subscribe(async (status: string) => {
+        if (status !== 'SUBSCRIBED') return;
+        presenceChannelRef.current = channel;
+        await channel.track({
+          userId: String(user.id),
+          name: user.name || 'Unknown',
+          roomId: selectedRoomId || null,
+          onlineAt: new Date().toISOString(),
+        });
+      });
+
+    return () => {
+      if (presenceChannelRef.current === channel) {
+        presenceChannelRef.current = null;
+      }
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, user?.name]);
+
+  useEffect(() => {
+    if (!presenceChannelRef.current || !user?.id) return;
+    presenceChannelRef.current.track({
+      userId: String(user.id),
+      name: user.name || 'Unknown',
+      roomId: selectedRoomId || null,
+      onlineAt: new Date().toISOString(),
+    });
+  }, [selectedRoomId, user?.id, user?.name]);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
@@ -407,7 +658,6 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     }
   }, []);
 
-  // 전역 신규 메시지 감지: 안 읽은 개수 갱신 (현재 방 메시지는 위 room 채널에서 즉시 반영하므로 fetchData 생략)
   useEffect(() => {
     if (!user?.id) return;
     const channel = supabase
@@ -421,7 +671,6 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
           if (chatRoomsRef.current.length) {
             await updateUnreadForRooms(chatRoomsRef.current);
           }
-          // 현재 방 메시지는 chat-realtime-${selectedRoomId}에서 이미 즉시 추가함 — fetchData 중복 호출 방지
         }
       )
       .subscribe();
@@ -429,7 +678,9 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id, selectedRoomId, updateUnreadForRooms]);
+    // selectedRoomId는 의도적으로 제외 — 전역 메시지 채널은 user 기준으로만 구독
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, updateUnreadForRooms]);
 
   useEffect(() => {
     if (!selectedRoomId) return;
@@ -438,16 +689,29 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${selectedRoomId}` }, (payload: any) => {
         const row = payload.new;
         if (!row?.id) return;
-        // 카카오톡처럼 상대 메시지 실시간 즉시 반영 (fetch 없이 목록에 바로 추가)
         setMessages((prev) => {
           if (prev.some((m: any) => m.id === row.id)) return prev;
           const sender = Array.isArray(staffs) ? staffs.find((s: any) => String(s.id) === String(row.sender_id)) : null;
           const newMsg = {
             ...row,
-            staff: sender ? { name: sender.name, photo_url: sender.avatar_url || sender.photo_url || null } : { name: '알 수 없음', photo_url: null },
+            staff: sender ? { name: sender.name, photo_url: sender.avatar_url || sender.photo_url || null } : { name: '이름 없음', photo_url: null },
           };
           return [...prev, newMsg];
         });
+        setChatRooms((prev) =>
+          sortChatRoomsWithNoticeFirst(
+            prev.map((room: any) =>
+              room.id === row.room_id
+                ? {
+                    ...room,
+                    last_message: row.content || (row.file_url ? '첨부파일' : room.last_message),
+                    last_message_preview: row.content || (row.file_url ? '첨부파일' : room.last_message_preview),
+                    last_message_at: row.created_at || new Date().toISOString(),
+                  }
+                : room
+            )
+          )
+        );
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `room_id=eq.${selectedRoomId}` }, () => fetchData())
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages', filter: `room_id=eq.${selectedRoomId}` }, () => fetchData())
@@ -461,6 +725,73 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   }, [selectedRoomId, fetchData, user?.id, staffs]);
 
   useEffect(() => {
+    if (!selectedRoomId) {
+      setTypingUsers({});
+      if (typingChannelRef.current) {
+        supabase.removeChannel(typingChannelRef.current);
+        typingChannelRef.current = null;
+      }
+      return;
+    }
+
+    const channel = supabase.channel(`chat-typing-${selectedRoomId}`);
+    typingChannelRef.current = channel;
+
+    channel
+      .on('broadcast', { event: 'typing' }, ({ payload }: any) => {
+        if (!payload || payload.roomId !== selectedRoomId || payload.userId === String(user?.id)) return;
+
+        const peerId = String(payload.userId);
+        if (typingPeersTimeoutRef.current[peerId]) {
+          clearTimeout(typingPeersTimeoutRef.current[peerId]);
+          delete typingPeersTimeoutRef.current[peerId];
+        }
+
+        if (!payload.isTyping) {
+          setTypingUsers((prev) => {
+            const next = { ...prev };
+            delete next[peerId];
+            return next;
+          });
+          return;
+        }
+
+        setTypingUsers((prev) => ({
+          ...prev,
+          [peerId]: payload.name || 'Unknown',
+        }));
+
+        typingPeersTimeoutRef.current[peerId] = setTimeout(() => {
+          setTypingUsers((prev) => {
+            const next = { ...prev };
+            delete next[peerId];
+            return next;
+          });
+          delete typingPeersTimeoutRef.current[peerId];
+        }, 2500);
+      })
+      .subscribe((status: string) => {
+        if (status === 'SUBSCRIBED') {
+          emitTypingState(false);
+        }
+      });
+
+    return () => {
+      if (typingClearRef.current) {
+        clearTimeout(typingClearRef.current);
+        typingClearRef.current = null;
+      }
+      Object.values(typingPeersTimeoutRef.current).forEach((timer) => clearTimeout(timer));
+      typingPeersTimeoutRef.current = {};
+      setTypingUsers({});
+      if (typingChannelRef.current === channel) {
+        typingChannelRef.current = null;
+      }
+      supabase.removeChannel(channel);
+    };
+  }, [selectedRoomId, user?.id, emitTypingState]);
+
+  useEffect(() => {
     const onFocus = () => { isFocusedRef.current = true; };
     const onBlur = () => { isFocusedRef.current = false; };
     window.addEventListener('focus', onFocus);
@@ -468,75 +799,70 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     return () => { window.removeEventListener('focus', onFocus); window.removeEventListener('blur', onBlur); };
   }, []);
 
-  // 예약 발송: 1분마다 만료된 예약 메시지 자동 전송
   useEffect(() => {
-    if (!user?.id) return;
-    const checkAndSendScheduled = async () => {
-      const now = new Date().toISOString();
-      const { data } = await supabase.from('scheduled_messages')
-        .select('*')
-        .eq('sender_id', user.id)
-        .eq('is_sent', false)
-        .lte('scheduled_at', now);
-      if (!data?.length) return;
-      for (const sm of data) {
-        await supabase.from('messages').insert([{
-          room_id: sm.room_id,
-          sender_id: sm.sender_id,
-          content: sm.content,
-          reply_to_id: sm.reply_to_id || null,
-        }]);
-        await supabase.from('scheduled_messages').update({ is_sent: true }).eq('id', sm.id);
-      }
-      if (data.length > 0) {
-        fetchData();
-        loadScheduledMessages();
+    if (typeof window === 'undefined' || typeof BroadcastChannel === 'undefined') return;
+    const channel = new BroadcastChannel('erp-chat-sync');
+    syncChannelRef.current = channel;
+    channel.onmessage = (event) => {
+      const payload = event.data;
+      if (!payload?.roomId) return;
+      // ref를 통해 항상 최신 selectedRoomId와 fetchData를 참조 (채널 재생성 없이)
+      if (payload.roomId === selectedRoomIdRef.current) {
+        fetchDataRef.current?.();
+      } else if (chatRoomsRef.current.length > 0) {
+        updateUnreadForRooms(chatRoomsRef.current);
       }
     };
-    checkAndSendScheduled();
-    const interval = setInterval(checkAndSendScheduled, 60000);
-    return () => clearInterval(interval);
-  }, [user?.id, fetchData]);
-
-  const loadScheduledMessages = useCallback(async () => {
-    if (!user?.id || !selectedRoomId) return;
-    const { data } = await supabase.from('scheduled_messages')
-      .select('*')
-      .eq('sender_id', user.id)
-      .eq('room_id', selectedRoomId)
-      .eq('is_sent', false)
-      .order('scheduled_at');
-    setScheduledMessages(data || []);
-  }, [user?.id, selectedRoomId]);
-
-  useEffect(() => { loadScheduledMessages(); }, [loadScheduledMessages]);
-
-  const handleScheduleSend = async () => {
-    const trimmed = inputMsg.trim();
-    if (!trimmed) return alert('메시지를 입력하세요.');
-    if (!scheduledAt) return alert('발송 시간을 선택하세요.');
-    if (new Date(scheduledAt) <= new Date()) return alert('발송 시간은 현재 시간 이후여야 합니다.');
-    try {
-      await supabase.from('scheduled_messages').insert([{
-        room_id: selectedRoomId,
-        sender_id: user.id,
-        content: trimmed,
-        scheduled_at: new Date(scheduledAt).toISOString(),
-        is_sent: false,
-      }]);
-      setInputMsg('');
-      setScheduledAt('');
-      setShowScheduleModal(false);
-      loadScheduledMessages();
-      alert(`${new Date(scheduledAt).toLocaleString('ko-KR')}에 예약 발송되었습니다.`);
-    } catch {
-      alert('예약 발송 등록에 실패했습니다.');
-    }
-  };
+    return () => {
+      if (syncChannelRef.current === channel) {
+        syncChannelRef.current = null;
+      }
+      channel.close();
+    };
+    // 마운트 시 1회만 실행 — selectedRoomId·fetchData는 ref로 최신값 참조
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [updateUnreadForRooms]);
 
   useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length]);
+    if (!user?.id) return;
+    const refreshRealtimeFallback = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      if (selectedRoomId) {
+        fetchData();
+      } else if (chatRoomsRef.current.length > 0) {
+        updateUnreadForRooms(chatRoomsRef.current);
+      }
+    };
+
+    const interval = setInterval(refreshRealtimeFallback, 15000);
+    window.addEventListener('focus', refreshRealtimeFallback);
+    document.addEventListener('visibilitychange', refreshRealtimeFallback);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', refreshRealtimeFallback);
+      document.removeEventListener('visibilitychange', refreshRealtimeFallback);
+    };
+  }, [selectedRoomId, user?.id, fetchData, updateUnreadForRooms]);
+
+  useEffect(() => {
+    if (!selectedRoomId || messages.length === 0) return;
+    const lastMessage = messages[messages.length - 1];
+    const shouldStick =
+      isNearBottomRef.current ||
+      String(lastMessage?.sender_id) === String(user?.id) ||
+      String(lastMessage?.id || '').startsWith('temp-');
+    if (shouldStick) {
+      requestAnimationFrame(() => scrollToBottom(String(lastMessage?.sender_id) === String(user?.id) ? 'smooth' : 'auto'));
+    } else {
+      setShowScrollToLatest(true);
+    }
+  }, [messages, selectedRoomId, scrollToBottom, user?.id]);
+
+  useEffect(() => {
+    if (!selectedRoomId) return;
+    requestAnimationFrame(() => scrollToBottom('auto'));
+  }, [selectedRoomId, scrollToBottom]);
 
   const pinnedMessages = useMemo(
     () => messages.filter((m) => pinnedIds.includes(m.id)),
@@ -558,7 +884,11 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     [chatRooms, selectedRoomId]
   );
 
-  // 현재 방에서 아직 포함되지 않은 직원들 (대화상대 추가용)
+  const selectedRoomLabel = useMemo(
+    () => getRoomDisplayName(selectedRoom, staffs, user?.id),
+    [selectedRoom, staffs, user?.id]
+  );
+
   const addableMembers = useMemo(() => {
     if (!selectedRoom) return [];
     const currentMemberIds = new Set(
@@ -583,19 +913,40 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     () =>
       chatRooms.filter((room: any) => {
         if (room.id === NOTICE_ROOM_ID) return true;
-        // 공지메시지 방 하나만 특별 취급, 나머지는 일반 채팅방
-        // members 배열이 존재하는 방은 "멤버 기반 방"으로 간주하고,
-        // 내 ID가 포함된 경우에만 목록에 노출
         if (Array.isArray(room.members)) {
           return room.members.some((id: any) => String(id) === String(user?.id));
         }
-        // members가 아직 설정되지 않은(구 버전) 방은 기존과 동일하게 모두에게 표시
         return true;
       }),
-    [chatRooms, user?.id, isMso]
+    [chatRooms, user?.id]
   );
 
-  // 현재 선택된 스레드에 포함되는 메시지들 (루트 + 해당 루트를 reply_to_id로 참조하는 메시지)
+  const sidebarRooms = useMemo(() => {
+    const keyword = omniSearch.trim().toLowerCase();
+    const filtered = visibleRooms.filter((room: any) => {
+      const label = getRoomDisplayName(room, staffs, user?.id).toLowerCase();
+      const isHidden = roomPrefs[room.id]?.hidden === true;
+      if (isHidden && !showHiddenRooms) return false;
+      if (!keyword) return true;
+      return label.includes(keyword);
+    });
+    return sortRoomsForSidebar(filtered, roomPrefs);
+  }, [visibleRooms, omniSearch, roomPrefs, showHiddenRooms, staffs, user?.id]);
+
+  const typingNoticeText = useMemo(() => {
+    const names = Object.values(typingUsers).filter(Boolean);
+    if (!names.length) return '';
+    if (names.length === 1) return `${names[0]}님이 입력 중`;
+    return `${names[0]} 외 ${names.length - 1}명이 입력 중`;
+  }, [typingUsers]);
+
+  const selectedPeer = useMemo(() => {
+    if (!selectedRoom || selectedRoom.type !== 'direct') return null;
+    return roomMembers.find((member: any) => String(member.id) !== String(user?.id)) || null;
+  }, [selectedRoom, roomMembers, user?.id]);
+
+  const selectedPeerPresence = selectedPeer ? presenceMap[String(selectedPeer.id)] : null;
+
   const threadMessages = useMemo(() => {
     if (!threadRoot) return [];
     const rootId = threadRoot.id;
@@ -611,7 +962,6 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       );
   }, [threadRoot, messages]);
 
-  // 특정 메시지의 열람/미열람자 목록 불러오기
   const [readUsers, setReadUsers] = useState<any[]>([]);
   const loadReadStatusForMessage = useCallback(
     async (msg: any) => {
@@ -621,28 +971,25 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       setReadUsers([]);
       setUnreadModalMsg(msg);
       try {
-        // 1. 해당 메시지를 읽은 기록 가져오기
         const { data: reads } = await supabase
           .from('message_reads')
           .select('user_id')
           .eq('message_id', msg.id);
         const readUserIds = new Set((reads || []).map((r: any) => r.user_id));
 
-        // 2. 현재 채팅방 멤버 목록 가져오기 (selectedRoom.members 기반)
         const roomMemberIds = selectedRoom.id === NOTICE_ROOM_ID
           ? staffs.map((s: any) => String(s.id))
           : Array.isArray(selectedRoom.members)
             ? selectedRoom.members.map((id: string) => String(id))
             : [];
 
-        // 3. 멤버 정보 매칭
         const allRoomStaffs = staffs.filter((s: any) => roomMemberIds.includes(String(s.id)));
 
         const readers: any[] = [];
         const nonReaders: any[] = [];
 
         allRoomStaffs.forEach((s: any) => {
-          if (s.id === msg.sender_id) return; // 보낸 사람은 제외
+          if (s.id === msg.sender_id) return;
           if (readUserIds.has(s.id)) {
             readers.push(s);
           } else {
@@ -650,13 +997,12 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
           }
         });
 
-        // 정렬
         const sorter = (a: any, b: any) => (a.department || '').localeCompare(b.department || '') || (a.name || '').localeCompare(b.name || '');
         setReadUsers(readers.sort(sorter));
         setUnreadUsers(nonReaders.sort(sorter));
       } catch (e) {
         console.error('loadReadStatusForMessage error', e);
-        alert('열람 현황을 불러오지 못했습니다.');
+        alert('읽음 현황을 불러오지 못했습니다.');
       } finally {
         setUnreadLoading(false);
       }
@@ -667,10 +1013,10 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   const handleLeaveRoom = async () => {
     if (!selectedRoom) return;
     if (selectedRoom.id === NOTICE_ROOM_ID && !isMso) {
-      alert('공지메시지 방은 관리자 승인 없이 직원 임의로 나갈 수 없습니다.');
+      alert('공지 메시지 방은 관리자 확인 없이 직원 임의로 나갈 수 없습니다.');
       return;
     }
-    if (!confirm('이 채팅방에서 나가시겠습니까? 나간 후에는 다시 초대 받아야 합니다.')) return;
+    if (!confirm('이 채팅방에서 나가시겠습니까? 나간 뒤에는 다시 초대를 받아야 입장할 수 있습니다.')) return;
 
     try {
       const currentMembers: any[] = Array.isArray(selectedRoom.members)
@@ -685,7 +1031,6 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
         .update({ members: newMembers })
         .eq('id', selectedRoom.id);
 
-      // 목록에서 즉시 숨기기
       setChatRooms((prev) =>
         prev.map((room: any) =>
           room.id === selectedRoom.id ? { ...room, members: newMembers } : room
@@ -700,71 +1045,162 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   };
 
 
-  const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20MB (동영상 업로드 비허용)
-  const handleSendMessage = async (
+  const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;
+  const handleSendMessage = useCallback(async (
     fileUrl?: string,
     fileSizeBytes?: number,
-    fileKind?: 'image' | 'video' | 'file'
+    fileKind?: 'image' | 'video' | 'file',
+    retryMessageId?: string
   ) => {
+    const retryPayload = retryMessageId
+      ? deliveryStatesRef.current[retryMessageId]?.retryPayload || null
+      : null;
     const trimmed = inputMsg.trim();
-    if (!trimmed && !fileUrl) return;
+    const roomId = retryPayload?.roomId || selectedRoomId;
+    const content = retryPayload ? retryPayload.content : trimmed;
+    const resolvedFileUrl = retryPayload?.fileUrl ?? fileUrl ?? null;
+    const resolvedFileSizeBytes = retryPayload?.fileSizeBytes ?? fileSizeBytes ?? null;
+    const resolvedFileKind = retryPayload?.fileKind ?? fileKind ?? null;
+    const resolvedReplyToId = retryPayload?.replyToId ?? replyTo?.id ?? null;
+    if (!content && !resolvedFileUrl) return;
+    if (!roomId) return;
 
-    // 슬래시 명령 처리: /연차, /발주
-    if (!fileUrl && trimmed.startsWith('/')) {
-      if (trimmed.startsWith('/연차')) {
+    if (!resolvedFileUrl && content.startsWith('/')) {
+      if (content.startsWith('/연차') || content.startsWith('/?곗감')) {
         setSlashCommand('annual_leave');
         setSlashForm({
           startDate: '',
           endDate: '',
-          reason: trimmed.replace('/연차', '').trim(),
+          reason: content.startsWith('/연차')
+            ? content.replace('/연차', '').trim()
+            : content.replace('/?곗감', '').trim(),
           itemName: '',
           quantity: 1,
         });
         setShowSlashModal(true);
         return;
       }
-      if (trimmed.startsWith('/발주')) {
+      if (content.startsWith('/발주') || content.startsWith('/諛쒖＜')) {
         setSlashCommand('purchase');
         setSlashForm({
           startDate: '',
           endDate: '',
           reason: '',
-          itemName: trimmed.replace('/발주', '').trim(),
+          itemName: content.startsWith('/발주')
+            ? content.replace('/발주', '').trim()
+            : content.replace('/諛쒖＜', '').trim(),
           quantity: 1,
         });
         setShowSlashModal(true);
         return;
       }
     }
-    if (selectedRoomId === NOTICE_ROOM_ID) {
-      const canWrite = user?.position && CAN_WRITE_NOTICE_POSITIONS.includes(user.position);
-      if (!canWrite) {
-        alert('공지메시지 방에는 부서장 이상만 작성할 수 있습니다.');
+    if (roomId === NOTICE_ROOM_ID) {
+      if (!canWriteNotice) {
+        alert('공지 메시지 방에는 부서장 이상만 작성할 수 있습니다.');
         return;
       }
     }
-    const content = trimmed;
-    const payload: Record<string, unknown> = {
-      room_id: selectedRoomId,
+
+    const retrySnapshot: MessageRetryPayload = {
+      roomId,
+      content,
+      fileUrl: resolvedFileUrl,
+      fileSizeBytes: resolvedFileSizeBytes,
+      fileKind: resolvedFileKind,
+      replyToId: resolvedReplyToId,
+    };
+
+    const optimisticId = retryMessageId || `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const optimisticMessage = {
+      id: optimisticId,
+      room_id: roomId,
       sender_id: user.id,
       content,
-      file_url: fileUrl || null,
-      file_size_bytes: fileSizeBytes || null,
-      file_kind: fileKind || null,
-      reply_to_id: replyTo?.id || null,
+      file_url: resolvedFileUrl,
+      file_size_bytes: resolvedFileSizeBytes,
+      file_kind: resolvedFileKind,
+      reply_to_id: resolvedReplyToId,
+      created_at: new Date().toISOString(),
+      is_deleted: false,
+      staff: { name: user.name, photo_url: user.avatar_url || null },
+    };
+
+    if (retryMessageId) {
+      setMessages((prev) =>
+        prev.map((message: any) =>
+          message.id === retryMessageId
+            ? { ...message, created_at: optimisticMessage.created_at }
+            : message
+        )
+      );
+    } else {
+      setMessages((prev) => [...prev, optimisticMessage]);
+    }
+
+    setDeliveryStates((prev) => ({
+      ...prev,
+      [optimisticId]: {
+        status: 'sending',
+        retryPayload: retrySnapshot,
+        error: null,
+      },
+    }));
+    setInputMsg('');
+    setReplyTo(null);
+    requestAnimationFrame(() => scrollToBottom('smooth'));
+
+    if (typingClearRef.current) {
+      clearTimeout(typingClearRef.current);
+      typingClearRef.current = null;
+    }
+    emitTypingState(false);
+
+    const payload: Record<string, unknown> = {
+      room_id: roomId,
+      sender_id: user.id,
+      content,
+      file_url: resolvedFileUrl,
+      file_size_bytes: resolvedFileSizeBytes,
+      file_kind: resolvedFileKind,
+      reply_to_id: resolvedReplyToId,
     };
     const { data: inserted, error } = await supabase.from('messages').insert([payload]).select().single();
     if (!error && inserted) {
-      setInputMsg('');
-      setReplyTo(null);
-      // 카카오톡처럼 내 메시지 즉시 표시 (낙관적 업데이트)
       const optimisticMsg = {
         ...inserted,
         staff: { name: user.name, photo_url: user.avatar_url || null },
       };
-      setMessages((prev) => [...prev, optimisticMsg]);
-      fetchData(); // 읽음/고정 등 서버 상태 동기화
-      // 백엔드 Edge Function을 통해 Web Push 발송 (앱이 닫혀 있어도 푸시)
+      setMessages((prev) =>
+        prev.map((message: any) =>
+          message.id === optimisticId ? optimisticMsg : message
+        )
+      );
+      setDeliveryStates((prev) => {
+        const next = { ...prev };
+        delete next[optimisticId];
+        next[String(inserted.id)] = {
+          status: 'sent',
+          retryPayload: retrySnapshot,
+          error: null,
+        };
+        return next;
+      });
+      setChatRooms((prev) =>
+        sortChatRoomsWithNoticeFirst(
+          prev.map((room: any) =>
+            room.id === roomId
+              ? {
+                  ...room,
+                  last_message: content || (resolvedFileUrl ? '첨부파일' : room.last_message),
+                  last_message_preview: content || (resolvedFileUrl ? '첨부파일' : room.last_message_preview),
+                  last_message_at: inserted.created_at || new Date().toISOString(),
+                }
+              : room
+          )
+        )
+      );
+      broadcastChatSync('message-sent', roomId);
       try {
         await supabase.functions.invoke('send-web-push', {
           body: {
@@ -776,9 +1212,22 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
         console.error('send-web-push 호출 실패:', e);
       }
     } else {
-      alert('메시지 전송에 실패했습니다.');
+      setDeliveryStates((prev) => ({
+        ...prev,
+        [optimisticId]: {
+          status: 'failed',
+          retryPayload: retrySnapshot,
+          error: error?.message || '메시지 전송 실패',
+        },
+      }));
+      console.error('message send failed', error);
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedRoomId, user?.id, user?.name, user?.avatar_url, replyTo, inputMsg, canWriteNotice, scrollToBottom, broadcastChatSync, emitTypingState]);
+
+  const retryFailedMessage = useCallback(async (messageId: string) => {
+    await handleSendMessage(undefined, undefined, undefined, messageId);
+  }, [handleSendMessage]);
 
   const [fileUploading, setFileUploading] = useState(false);
   const getFileKind = (mime: string): 'image' | 'video' | 'file' => {
@@ -813,7 +1262,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       console.error('파일 업로드 실패:', err);
       const msg = err?.message || String(err);
       const hint = msg.includes('Bucket not found') || msg.includes('not found')
-        ? 'Supabase 대시보드에서 Storage > New bucket > 이름 "pchos-files" (Public) 생성 후 다시 시도해 주세요.'
+        ? 'Supabase 대시보드에서 Storage > New bucket > 이름 "pchos-files" (Public)을 만든 뒤 다시 시도해 주세요.'
         : msg.includes('policy') || msg.includes('RLS')
           ? 'Storage 버킷 pchos-files의 RLS 정책에서 INSERT를 허용해 주세요.'
           : '버킷 생성 여부와 RLS 정책을 확인해 주세요.';
@@ -838,13 +1287,13 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
         title: `[채팅] ${activeActionMsg.content}`,
         status: 'pending'
       }]);
-      if (!error) { alert("할일 등록 완료"); if (onRefresh) onRefresh(); }
+      if (!error) { alert('할 일 등록 완료'); if (onRefresh) onRefresh(); }
     }
     setActiveActionMsg(null);
   };
 
   const createGroupChat = async () => {
-    if (!groupName.trim() || selectedMembers.length === 0) return alert("방 이름과 멤버를 선택해주세요.");
+    if (!groupName.trim() || selectedMembers.length === 0) return alert('방 이름과 멤버를 선택해 주세요.');
     const { data: room, error } = await supabase.from('chat_rooms').insert([{
       name: groupName,
       type: 'group',
@@ -887,7 +1336,6 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     });
   }, [mediaMessages, mediaFilter]);
 
-  // 현재 선택된 방 멤버 중에서 @멘션 자동완성 후보
   const mentionCandidates = useMemo(() => {
     if (!showMentionList) return [];
     const base =
@@ -974,7 +1422,8 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
         { user_id: user.id, message_id: msg.id, read_at: new Date().toISOString() },
         { onConflict: 'user_id,message_id' }
       );
-      fetchData(); // 읽음 수 갱신
+      broadcastChatSync('message-read', msg.room_id);
+      fetchData();
     } catch (_) { }
   };
 
@@ -982,7 +1431,6 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     if (!globalSearchQuery.trim()) return;
     setGlobalSearchLoading(true);
     try {
-      // 본인이 열람 가능한(참여중인) 방들의 아이디 목록
       const roomIds = visibleRooms.map(r => r.id);
       if (roomIds.length === 0) {
         setGlobalSearchResults([]);
@@ -1036,15 +1484,14 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   };
 
   const deleteMessage = async (msg: any) => {
-    // 공지메시지 방은 일반 사용자가 삭제 불가
     if (selectedRoom?.id === NOTICE_ROOM_ID && !isMso) {
-      alert('공지 채널의 메시지는 삭제할 수 없습니다.');
+      alert('공지 채널 메시지는 삭제할 수 없습니다.');
       return;
     }
     if (msg.sender_id !== user.id && !isMso) return;
     if (!confirm('이 메시지를 삭제하시겠습니까?')) return;
     await supabase.from('messages').update({ is_deleted: true }).eq('id', msg.id);
-    // 감사 로그 기록
+    // 媛먯궗 濡쒓렇 湲곕줉
     try {
       await supabase.from('audit_logs').insert([
         {
@@ -1060,7 +1507,6 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
         },
       ]);
     } catch {
-      // 감사 로그 실패는 무시
     }
     fetchData();
     setActiveActionMsg(null);
@@ -1074,7 +1520,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       .from('messages')
       .update({ content: editContent, edited_at: new Date().toISOString() })
       .eq('id', editingMsg.id);
-    // 감사 로그 기록
+    // 媛먯궗 濡쒓렇 湲곕줉
     try {
       await supabase.from('audit_logs').insert([
         {
@@ -1099,8 +1545,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   };
 
   return (
-    <div className="flex flex-1 min-h-0 overflow-hidden relative font-sans h-full bg-[var(--background)] md:bg-[var(--toss-card)]">
-      {/* 좌측 사이드바: 모바일에서는 채팅방 미선택 시에만 전체 표시, 선택 시 숨김 */}
+    <div data-testid="chat-view" className="flex flex-1 min-h-0 overflow-hidden relative font-sans h-full bg-[var(--background)] md:bg-[var(--toss-card)]">
       <aside className={`${selectedRoomId ? 'hidden md:flex' : 'flex'} w-full md:w-80 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 flex-col shrink-0 z-50 transition-all`}>
         <div className="p-4 md:p-6 space-y-4 flex flex-col min-h-0">
           <div className="flex gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl glass">
@@ -1134,7 +1579,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                 className="text-[12px] text-zinc-400 hover:text-blue-500 transition-colors p-1 flex items-center justify-center shrink-0"
                 title="채팅 내용 전체 검색"
               >
-                🔍
+                검색
               </button>
             )}
           </div>
@@ -1143,32 +1588,36 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
         <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-6 space-y-2 custom-scrollbar">
           {viewMode === 'chat' ? (
             <>
-              {[...visibleRooms]
-                .filter(r => {
-                  const name = r.id === NOTICE_ROOM_ID ? NOTICE_ROOM_NAME : (r.name || '');
-                  return r.id === NOTICE_ROOM_ID || name.toLowerCase().includes(omniSearch.toLowerCase());
-                })
-                .sort((a, b) => {
-                  if (a.id === NOTICE_ROOM_ID) return -1;
-                  if (b.id === NOTICE_ROOM_ID) return 1;
-                  const at = new Date(a.last_message_at || a.created_at || 0).getTime();
-                  const bt = new Date(b.last_message_at || b.created_at || 0).getTime();
-                  return bt - at;
-                })
-                .map(room => {
+              <div className="flex items-center justify-between px-1 pb-2">
+                <span className="text-[10px] font-medium text-zinc-400">
+                  {showHiddenRooms ? '숨김 대화 포함' : '숨김 대화 제외'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowHiddenRooms((prev) => !prev)}
+                  className="text-[10px] font-semibold text-blue-500 hover:text-blue-600"
+                >
+                  {showHiddenRooms ? '숨김방 닫기' : '숨김방 보기'}
+                </button>
+              </div>
+              {sidebarRooms.map(room => {
                   const unread = roomUnreadCounts[room.id] || 0;
                   const isSelected = selectedRoomId === room.id;
                   const isNoticeChannel = room.id === NOTICE_ROOM_ID;
-
-                  let label = room.name || '채팅방';
-                  if (isNoticeChannel) {
-                    label = NOTICE_ROOM_NAME;
-                  } else if (room.type === 'direct' && Array.isArray(room.members)) {
-                    // 1:1 채팅방의 경우 내 이름이 아닌 상대방 이름으로 보이도록 (이름이 'A,B' 형태로 되어있을 때)
-                    // 현재 DB에 저장된 name이 있으면 그걸 쓰되, 상대방 이름을 추출하려는 시도
-                    const otherStaff = staffs.find((s: any) => room.members.includes(String(s.id)) && String(s.id) !== String(user?.id));
-                    if (otherStaff) label = otherStaff.name;
-                  }
+                  const label = getRoomDisplayName(room, staffs, user?.id);
+                  const preview = getRoomPreviewText(room);
+                  const members = normalizeMemberIds(room.members);
+                  const peer =
+                    room.type === 'direct'
+                      ? staffs.find(
+                          (staff: any) =>
+                            members.includes(String(staff.id)) &&
+                            String(staff.id) !== String(user?.id)
+                        )
+                      : null;
+                  const isPeerOnline = peer ? Boolean(presenceMap[String(peer.id)]) : false;
+                  const isPinned = roomPrefs[room.id]?.pinned === true;
+                  const isHidden = roomPrefs[room.id]?.hidden === true;
 
                   return (
                     <div
@@ -1183,23 +1632,58 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                         <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500"></div>
                       )}
                       <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm ${isNoticeChannel ? 'bg-blue-100 text-blue-600' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500'}`}>
-                          {isNoticeChannel ? '📢' : '👥'}
+                        <div className={`relative w-8 h-8 rounded-lg flex items-center justify-center text-sm ${isNoticeChannel ? 'bg-blue-100 text-blue-600' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500'}`}>
+                          {isNoticeChannel ? '📢' : '💬'}
+                          {!isNoticeChannel && isPeerOnline && (
+                            <span className="absolute -right-0.5 -bottom-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border border-white dark:border-zinc-900" />
+                          )}
                         </div>
                         <div className="flex flex-col min-w-0">
-                          <p className={`text-[12px] font-bold truncate ${isSelected ? 'text-white' : 'text-zinc-600 dark:text-zinc-300'}`}>
-                            {label}
-                          </p>
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <p className={`text-[12px] font-bold truncate ${isSelected ? 'text-white' : 'text-zinc-600 dark:text-zinc-300'}`}>
+                              {label}
+                            </p>
+                            {isPinned && <span className="text-[9px] font-bold text-amber-400">PIN</span>}
+                            {isHidden && <span className="text-[9px] font-bold text-zinc-400">HIDE</span>}
+                          </div>
                           <p className="text-[10px] text-zinc-400 font-medium truncate">
-                            {room.last_message || '대화가 없습니다.'}
+                            {preview}
                           </p>
                         </div>
                       </div>
-                      {unread > 0 && (
-                        <span className="ml-2 min-w-[16px] h-[16px] px-1 flex items-center justify-center rounded-full bg-blue-600 text-white text-[9px] font-bold shadow-soft">
-                          {unread > 99 ? '99+' : unread}
-                        </span>
-                      )}
+                      <div className="flex items-center gap-1 shrink-0">
+                        {!isNoticeChannel && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                updateRoomPreference(room.id, { pinned: !isPinned });
+                              }}
+                              className={`px-1.5 py-1 rounded-md text-[9px] font-bold ${isSelected ? 'text-white/80 hover:bg-white/10' : 'text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
+                              title={isPinned ? '고정 해제' : '상단 고정'}
+                            >
+                              {isPinned ? '해제' : '고정'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                updateRoomPreference(room.id, { hidden: !isHidden });
+                              }}
+                              className={`px-1.5 py-1 rounded-md text-[9px] font-bold ${isSelected ? 'text-white/80 hover:bg-white/10' : 'text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
+                              title={isHidden ? '숨김 해제' : '대화 숨김'}
+                            >
+                              {isHidden ? '표시' : '숨김'}
+                            </button>
+                          </>
+                        )}
+                        {unread > 0 && (
+                          <span className="ml-1 min-w-[16px] h-[16px] px-1 flex items-center justify-center rounded-full bg-blue-600 text-white text-[9px] font-bold shadow-soft">
+                            {unread > 99 ? '99+' : unread}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -1262,22 +1746,26 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
         </div>
       </aside>
 
-      {/* 우측: 채팅창 본문 — 모바일에서는 채팅방 선택 시에만 표시 */}
       <main className={`${!selectedRoomId ? 'hidden md:flex' : 'flex'} flex-1 min-h-0 flex-col bg-[var(--toss-gray-1)] relative pb-16 md:pb-0`}>
-        {/* 선택된 채팅방 정보 및 액션 버튼들 */}
         {selectedRoomId && selectedRoom && (
           <header className="px-6 py-3.5 flex items-center justify-between border-b border-zinc-200/50 dark:border-zinc-800/50 glass glass-border shrink-0 z-40">
             <div className="flex items-center gap-3 min-w-0">
-              <button onClick={() => setRoom(null)} className="md:hidden text-zinc-400">←</button>
+              <button onClick={() => setRoom(null)} className="md:hidden text-zinc-400">뒤로</button>
               <div className="w-9 h-9 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-lg">
-                {selectedRoom.id === NOTICE_ROOM_ID ? '📢' : '👥'}
+                {selectedRoom.id === NOTICE_ROOM_ID ? '📢' : '💬'}
               </div>
               <div className="min-w-0">
                 <h3 className="text-[13px] font-bold text-foreground truncate">
-                  {selectedRoom.id === NOTICE_ROOM_ID ? NOTICE_ROOM_NAME : selectedRoom.name || '채팅방'}
+                  {selectedRoomLabel}
                 </h3>
                 <p className="text-[10px] text-zinc-500 font-medium">
-                  {roomMembers.length || 0} 참여중
+                  {typingNoticeText
+                    ? typingNoticeText
+                    : selectedPeer
+                      ? selectedPeerPresence
+                        ? '온라인'
+                        : '오프라인'
+                      : `${roomMembers.length || 0}명 참여중`}
                 </p>
               </div>
             </div>
@@ -1286,19 +1774,35 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
               <button
                 onClick={() => setShowDrawer(true)}
                 className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-foreground"
-                title="채팅방 정보 및 대화상대 보기"
+                title="채팅방 정보 및 참여자 보기"
               >
-                <span className="text-xl">☰</span>
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 20 20"
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                >
+                  <path d="M4 5.5H16" />
+                  <path d="M4 10H16" />
+                  <path d="M4 14.5H16" />
+                </svg>
               </button>
             </div>
           </header>
         )}
 
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6 pb-24 md:pb-6 space-y-3 custom-scrollbar">
+        <div
+          ref={messageListRef}
+          onScroll={updateScrollPositionState}
+          className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6 pb-24 md:pb-6 space-y-3 custom-scrollbar"
+        >
           {!selectedRoomId ? (
             <div className="h-full flex flex-col items-center justify-center text-[var(--toss-gray-3)]">
               <span className="text-4xl mb-2">💬</span>
-              <p className="text-sm font-bold">채팅방을 선택하세요</p>
+              <p className="text-sm font-bold">채팅방을 선택하세요.</p>
             </div>
           ) : messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center opacity-20">
@@ -1308,6 +1812,10 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
           ) : (
             (() => {
               let lastDateLabel = '';
+              const totalRecipients = Math.max(
+                0,
+                roomMembers.filter((member: any) => String(member.id) !== String(user?.id)).length
+              );
               return combinedTimeline.map((item) => {
                 if (item.type === 'poll') {
                   const votes = pollVotes[item.id] || {};
@@ -1315,7 +1823,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                   return (
                     <div key={`poll-${item.id}`} className="max-w-[85%] md:max-w-[70%] bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 rounded-2xl p-4 shadow-soft">
                       <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                        <span className="text-sm">📊</span> 투표
+                        <span className="text-sm">🗳️</span> 투표
                       </p>
                       <p className="mb-4 text-xs font-bold text-foreground leading-relaxed">{item.question}</p>
                       <div className="space-y-1.5">
@@ -1342,13 +1850,22 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                 const msgReacts = reactions[msg.id] || {};
                 const hasReacts = Object.keys(msgReacts).some(e => (msgReacts[e] || 0) > 0);
 
-                // 라인/텔레그램 스타일 계산: 읽은 사람 수 직접 카운트
-                // 본인이 보낸 메시지도 0부터 시작하게 설정, 총 참여자 수는 드로어에서 확인 가능
                 const readersCount = readCounts[msg.id] || 0;
-                // UI 표기를 '읽은 사람 수'로 변경
-                const displayReadCount = Math.max(0, readersCount);
+                const unreadRecipients = isMine ? Math.max(0, totalRecipients - readersCount) : 0;
+                const deliveryState = deliveryStates[msg.id]?.status || (String(msg.id).startsWith('temp-') ? 'sending' : 'sent');
+                const deliveryLabel = !isMine
+                  ? null
+                  : deliveryState === 'sending'
+                    ? '전송중'
+                    : deliveryState === 'failed'
+                      ? '전송 실패'
+                      : unreadRecipients > 0
+                        ? `안읽음 ${unreadRecipients}`
+                        : totalRecipients > 0
+                          ? '읽음'
+                          : '전송됨';
 
-                const TOOLBAR_EMOJIS = ['👍', '👌', '😎', '😍', '😂', '😕', '😢', '😠'];
+                const TOOLBAR_EMOJIS = ['👍', '❤️', '👏', '🎉', '🔥', '✅', '👀', '🙏'];
 
                 const created = new Date(msg.created_at);
                 const dateLabel = created.toLocaleDateString('ko-KR', {
@@ -1375,7 +1892,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                     {isSystemInvite ? (
                       <div className="flex justify-center my-2">
                         <span className="px-3 py-1.5 rounded-full bg-[var(--toss-blue-light)] text-[11px] font-bold text-[var(--toss-blue)]">
-                          👥 {systemText}
+                          초대 {systemText}
                         </span>
                       </div>
                     ) : (
@@ -1392,7 +1909,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                           onClick={(e) => {
                             e.stopPropagation();
                             markMessageRead(msg);
-                            setActiveActionMsg(msg); // [복구] 메시지 클릭 시 액션 메뉴 표시
+                            setActiveActionMsg(msg);
                           }}
                           className={`group relative ${!msg.content ? 'p-0 bg-transparent shadow-none border-none' : 'px-3 py-2 shadow-sm border'} rounded-[12px] text-[13px] md:text-sm cursor-pointer transition-all max-w-[75%] md:max-w-[70%] ${!msg.content ? '' : isMine
                             ? 'bg-emerald-600 text-white border-transparent rounded-tr-none'
@@ -1401,7 +1918,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                           role="button"
                           tabIndex={0}
                           onKeyDown={(e) => e.key === 'Enter' && markMessageRead(msg)}
-                          aria-label={`${msg.staff?.name || '알 수 없음'} 메시지`}
+                          aria-label={`${msg.staff?.name || '이름 없음'} 메시지`}
                         >
                           {msg.reply_to_id && (() => {
                             const parent = messages.find((m: any) => m.id === msg.reply_to_id);
@@ -1414,8 +1931,8 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                                   scrollToMessage(msg.reply_to_id);
                                 }}
                               >
-                                <span className="font-bold opacity-80">↩️ {parent.staff?.name}: </span>
-                                <span className="truncate block mt-0.5">{parent.content || '📎 파일'}</span>
+                                <span className="font-bold opacity-80">답글 {parent.staff?.name}: </span>
+                                <span className="truncate block mt-0.5">{parent.content || '첨부 파일'}</span>
                               </div>
                             ) : null;
                           })()}
@@ -1434,9 +1951,9 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                                     />
                                   </a>
                                   <div className="absolute opacity-0 group-hover:opacity-100 transition-opacity inset-0 flex items-center justify-center bg-black/40 rounded-[12px] gap-2 pointer-events-none">
-                                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(msg.file_url, '_blank') }} className="pointer-events-auto p-1.5 bg-white/20 hover:bg-white/40 rounded-full text-white" title="미리보기">👁️</button>
-                                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigator.clipboard.writeText(msg.file_url).then(() => alert('안전하게 링크가 복사되었습니다.')) }} className="pointer-events-auto p-1.5 bg-white/20 hover:bg-white/40 rounded-full text-white" title="공유">🔗</button>
-                                    <a href={msg.file_url} download target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="pointer-events-auto p-1.5 bg-white/20 hover:bg-white/40 rounded-full text-white" title="저장">💾</a>
+                                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(msg.file_url, '_blank') }} className="pointer-events-auto p-1.5 bg-white/20 hover:bg-white/40 rounded-full text-white" title="미리보기">보기</button>
+                                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigator.clipboard.writeText(msg.file_url).then(() => alert('공유 링크를 복사했습니다.')) }} className="pointer-events-auto p-1.5 bg-white/20 hover:bg-white/40 rounded-full text-white" title="공유">공유</button>
+                                    <a href={msg.file_url} download target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="pointer-events-auto p-1.5 bg-white/20 hover:bg-white/40 rounded-full text-white" title="다운로드">저장</a>
                                   </div>
                                 </div>
                               ) : isVideoUrl(msg.file_url) ? (
@@ -1447,13 +1964,13 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                                 </div>
                               ) : (
                                 <div className={`p-3 rounded-[12px] border ${isMine ? 'bg-white/10 border-white/20 text-white' : 'bg-[var(--toss-gray-0)] border-[var(--toss-border)] text-[var(--foreground)]'} flex items-start gap-3 shadow-sm min-w-[200px]`}>
-                                  <div className="text-3xl">📄</div>
+                                  <div className="text-3xl">📎</div>
                                   <div className="flex-1 min-w-0 pt-0.5">
                                     <p className={`font-bold text-[12px] truncate mb-1`}>첨부 파일</p>
                                     <div className="flex items-center gap-1.5 mt-2">
                                       <button onClick={() => window.open(msg.file_url, '_blank')} className="text-[10px] font-bold text-[var(--toss-blue)] hover:text-blue-600 px-2 py-1 bg-blue-50 dark:bg-blue-900/30 rounded-md">미리보기</button>
-                                      <button onClick={() => { navigator.clipboard.writeText(msg.file_url).then(() => alert('공유 링크가 복사되었습니다.')) }} className="text-[10px] font-bold text-zinc-500 hover:text-zinc-600 px-2 py-1 bg-zinc-100 dark:bg-zinc-800 rounded-md">공유</button>
-                                      <a href={msg.file_url} download target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 px-2 py-1 bg-emerald-50 dark:bg-emerald-900/30 rounded-md inline-block">저장</a>
+                                      <button onClick={() => { navigator.clipboard.writeText(msg.file_url).then(() => alert('공유 링크를 복사했습니다.')) }} className="text-[10px] font-bold text-zinc-500 hover:text-zinc-600 px-2 py-1 bg-zinc-100 dark:bg-zinc-800 rounded-md">공유</button>
+                                  <a href={msg.file_url} download target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 px-2 py-1 bg-emerald-50 dark:bg-emerald-900/30 rounded-md inline-block">다운로드</a>
                                     </div>
                                   </div>
                                 </div>
@@ -1483,9 +2000,9 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                             className={`absolute bottom-0 ${isMine ? 'right-full mr-2 items-end' : 'left-full ml-2 items-start'
                               } flex flex-col gap-0.5 whitespace-nowrap`}
                           >
-                            {displayReadCount > 0 && (
-                              <span className={`text-[10px] font-bold ${isMine ? 'text-emerald-500' : 'text-emerald-500'}`}>
-                                {displayReadCount}
+                            {deliveryLabel && (
+                              <span className={`text-[10px] font-bold ${deliveryState === 'failed' ? 'text-red-500' : 'text-emerald-500'}`}>
+                                {deliveryLabel}
                               </span>
                             )}
                             <span className="text-[8px] font-bold text-[var(--toss-gray-4)]">
@@ -1493,6 +2010,20 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                             </span>
                           </div>
                         </div>
+                        {isMine && deliveryState === 'failed' && (
+                          <div className="mt-1 flex justify-end">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                retryFailedMessage(String(msg.id));
+                              }}
+                              className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-50 text-red-500 hover:bg-red-100"
+                            >
+                              재전송
+                            </button>
+                          </div>
+                        )}
                         <div
                           className={`flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity ${isMine ? 'flex-row-reverse' : ''}`}
                           onClick={e => e.stopPropagation()}
@@ -1523,9 +2054,20 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
           <div ref={scrollRef} />
         </div>
 
-        {/* 입력창 — 모바일에서 하단 네비 위에 고정 */}
+        {showScrollToLatest && selectedRoomId && (
+          <div className="absolute right-4 bottom-24 md:bottom-20 z-20">
+            <button
+              type="button"
+              onClick={() => scrollToBottom('smooth')}
+              className="px-3 py-2 rounded-full bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-lg text-[11px] font-bold text-[var(--foreground)]"
+            >
+              최신 메시지
+            </button>
+          </div>
+        )}
+
         <div
-          className={`absolute left-0 right-0 bottom-0 md:relative p-2 md:p-3 bg-[var(--toss-card)] shrink-0 transition-all z-10 ${isDragging ? 'border-t-2 border-[var(--toss-blue)] border-dashed bg-blue-50 dark:bg-blue-900/20' : 'border-t border-[var(--toss-border)]'}`}
+          className={`absolute left-0 right-0 bottom-0 md:relative p-2 md:p-3 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] bg-[var(--toss-card)] shrink-0 transition-all z-10 ${isDragging ? 'border-t-2 border-[var(--toss-blue)] border-dashed bg-blue-50 dark:bg-blue-900/20' : 'border-t border-[var(--toss-border)]'}`}
           onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
           onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }}
           onDrop={async (e) => {
@@ -1537,11 +2079,17 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
           {replyTo && (
             <div className="mb-3 flex items-center justify-between bg-[var(--toss-blue-light)] p-3 rounded-[16px] border border-[var(--toss-blue-light)] animate-in slide-in-from-bottom-2">
               <p className="text-[11px] font-bold text-[var(--toss-blue)]">@{replyTo.staff?.name}님에게 답글 작성 중...</p>
-              <button onClick={() => setReplyTo(null)} className="text-[var(--toss-blue)] hover:text-[var(--toss-blue)] font-semibold">✕</button>
+              <button onClick={() => setReplyTo(null)} className="text-[var(--toss-blue)] hover:text-[var(--toss-blue)] font-semibold">닫기</button>
             </div>
           )}
 
-          <div className={`flex items-center gap-3 p-3 rounded-[16px] border transition-all ${selectedRoomId === NOTICE_ROOM_ID && user?.position && !CAN_WRITE_NOTICE_POSITIONS.includes(user.position)
+          {typingNoticeText && (
+            <div className="mb-2 px-1 text-[11px] font-medium text-blue-500">
+              {typingNoticeText}
+            </div>
+          )}
+
+          <div className={`flex items-end gap-3 p-3 rounded-[16px] border transition-all ${selectedRoomId === NOTICE_ROOM_ID && !canWriteNotice
             ? 'bg-[var(--toss-gray-1)] border-[var(--toss-border)] opacity-80 pointer-events-none'
             : 'bg-[var(--toss-gray-1)] border-[var(--toss-border)] focus-within:bg-[var(--toss-card)] focus-within:ring-4 focus-within:ring-[var(--toss-blue)]'
             }`}>
@@ -1552,28 +2100,26 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
               title="파일 첨부"
               className="w-8 h-8 flex items-center justify-center text-[var(--toss-gray-3)] hover:text-[var(--toss-blue)] transition-colors disabled:opacity-50"
             >
-              {fileUploading ? <span className="animate-pulse text-xs">...</span> : '📎'}
+              {fileUploading ? <span className="animate-pulse text-xs">...</span> : '첨부'}
             </button>
             <div className="relative flex-1">
-              <input
-                className="w-full bg-transparent p-1 px-2 outline-none text-[15px] md:text-sm font-bold min-w-0"
-                placeholder={selectedRoomId === NOTICE_ROOM_ID && user?.position && !CAN_WRITE_NOTICE_POSITIONS.includes(user.position) ? "부서장 이상만 작성 가능" : "메시지를 입력하세요&hellip; (예: @이름 메모) "}
+              <textarea
+                ref={composerRef}
+                data-testid="chat-message-input"
+                rows={1}
+                className="w-full bg-transparent p-1 px-2 outline-none text-[15px] md:text-sm font-bold min-w-0 resize-none max-h-28 leading-5"
+                placeholder={selectedRoomId === NOTICE_ROOM_ID && !canWriteNotice ? "부서장 이상만 공지 작성 가능" : "메시지를 입력하세요... (@이름 멘션 가능)"}
                 value={inputMsg}
                 onChange={e => {
                   const value = e.target.value;
-                  setInputMsg(value);
-                  const caret = e.target.selectionStart ?? value.length;
-                  const upToCaret = value.slice(0, caret);
-                  const match = upToCaret.match(/@([^\s@]{0,20})$/);
-                  if (match) {
-                    setMentionQuery(match[1] || '');
-                    setShowMentionList(true);
-                  } else {
-                    setShowMentionList(false);
-                    setMentionQuery('');
+                  handleComposerChange(value, e.target.selectionStart ?? value.length);
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
                   }
                 }}
-                onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
               />
               {showMentionList && mentionCandidates.length > 0 && (
                 <div className="absolute left-0 bottom-full mb-1 w-full max-h-48 overflow-y-auto bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[12px] shadow-lg z-20 text-xs">
@@ -1582,7 +2128,6 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                       key={m.id}
                       type="button"
                       onClick={() => {
-                        // 마지막 @쿼리 부분을 실제 이름으로 교체
                         const value = inputMsg;
                         const match = value.match(/@([^\s@]{0,20})$/);
                         if (match) {
@@ -1596,96 +2141,27 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                     >
                       <span className="text-[11px] font-semibold text-[var(--foreground)] truncate">{m.name}</span>
                       <span className="text-[11px] text-[var(--toss-gray-3)] truncate">
-                        {(m.department || '')}{m.position ? ` · ${m.position}` : ''}
+                        {(m.department || '')}{m.position ? ` 쨌 ${m.position}` : ''}
                       </span>
                     </button>
                   ))}
                 </div>
               )}
             </div>
-            <button
-              onClick={() => setShowScheduleModal(true)}
-              title="예약 발송"
-              className="bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] w-8 h-8 rounded-full hover:bg-[var(--toss-border)] transition-all flex items-center justify-center text-sm relative"
-            >
-              🕐
-              {scheduledMessages.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-orange-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center">{scheduledMessages.length}</span>
-              )}
-            </button>
-            <button onClick={() => handleSendMessage()} className="bg-[var(--toss-blue)] text-white w-8 h-8 rounded-full shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center justify-center text-sm">↑</button>
+            <button data-testid="chat-send-button" onClick={() => handleSendMessage()} className="bg-[var(--toss-blue)] text-white w-8 h-8 rounded-full shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center justify-center text-sm">전송</button>
           </div>
         </div>
 
-        {/* 예약 발송 모달 */}
-        {showScheduleModal && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-end md:items-center justify-center p-4" onClick={() => setShowScheduleModal(false)}>
-            <div className="bg-[var(--toss-card)] rounded-t-[20px] md:rounded-[20px] shadow-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base font-bold text-[var(--foreground)]">메시지 예약 발송</h3>
-                <button onClick={() => setShowScheduleModal(false)} className="p-1 hover:bg-[var(--toss-gray-1)] rounded-full text-[var(--toss-gray-3)]">✕</button>
-              </div>
-
-              {/* 예약된 메시지 목록 */}
-              {scheduledMessages.length > 0 && (
-                <div className="mb-4 space-y-2">
-                  <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">대기 중인 예약 메시지</p>
-                  {scheduledMessages.map(sm => (
-                    <div key={sm.id} className="flex items-center justify-between p-3 bg-orange-50 border border-orange-100 rounded-[12px]">
-                      <div>
-                        <p className="text-xs font-semibold text-[var(--foreground)] truncate max-w-[200px]">{sm.content}</p>
-                        <p className="text-[10px] text-orange-500 font-bold mt-0.5">{new Date(sm.scheduled_at).toLocaleString('ko-KR')}</p>
-                      </div>
-                      <button
-                        onClick={async () => {
-                          await supabase.from('scheduled_messages').delete().eq('id', sm.id);
-                          loadScheduledMessages();
-                        }}
-                        className="ml-2 text-xs text-red-400 hover:text-red-600 font-bold"
-                      >취소</button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="space-y-3">
-                <div>
-                  <label className="text-[11px] font-bold text-[var(--toss-gray-3)] block mb-1">메시지 내용</label>
-                  <p className="text-sm font-medium text-[var(--foreground)] p-3 bg-[var(--toss-gray-1)] rounded-[12px] min-h-[48px]">
-                    {inputMsg.trim() || <span className="text-[var(--toss-gray-3)]">입력창에 메시지를 먼저 작성하세요.</span>}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-[11px] font-bold text-[var(--toss-gray-3)] block mb-1">발송 시간</label>
-                  <input
-                    type="datetime-local"
-                    value={scheduledAt}
-                    onChange={e => setScheduledAt(e.target.value)}
-                    min={new Date(Date.now() + 60000).toISOString().slice(0, 16)}
-                    className="w-full px-4 py-3 border border-[var(--toss-border)] rounded-[12px] text-sm font-bold bg-[var(--toss-card)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20"
-                  />
-                </div>
-                <div className="flex gap-2 pt-2">
-                  <button onClick={() => setShowScheduleModal(false)} className="flex-1 py-3 rounded-[12px] bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] font-semibold text-sm">닫기</button>
-                  <button onClick={handleScheduleSend} className="flex-1 py-3 rounded-[12px] bg-orange-500 text-white font-semibold text-sm hover:opacity-90">예약 등록</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 채팅방 상세 정보 드로어 (프리미엄 - 이미지 2 스타일) */}
         {showDrawer && (
           <>
             <div className="absolute inset-0 bg-black/10 z-50 animate-in fade-in duration-200" onClick={() => setShowDrawer(false)} aria-hidden="true" />
             <div className="absolute top-0 right-0 bottom-0 w-full md:w-80 bg-white dark:bg-zinc-900 shadow-2xl z-[60] flex flex-col animate-in slide-in-from-right duration-300 border-l border-[var(--toss-border)]">
               <div className="p-4 border-b border-[var(--toss-border)] flex items-center justify-between bg-[var(--toss-card)]">
                 <span className="text-sm font-bold">채팅방 정보</span>
-                <button onClick={() => setShowDrawer(false)} className="p-2 text-[var(--toss-gray-3)] hover:text-black dark:hover:text-white rounded-full">✕</button>
+              <button onClick={() => setShowDrawer(false)} className="p-2 text-[var(--toss-gray-3)] hover:text-black dark:hover:text-white rounded-full">닫기</button>
               </div>
 
               <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
-                {/* 알림 설정 */}
                 <div className="flex items-center justify-between p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl">
                   <span className="text-sm font-semibold">알림 설정</span>
                   <button
@@ -1696,35 +2172,32 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                   </button>
                 </div>
 
-                {/* 투표 액션 버튼 */}
                 <button onClick={() => { setShowPollModal(true); setShowDrawer(false); }} className="w-full flex items-center justify-between p-3.5 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800/50 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors group">
                   <div className="flex items-center gap-3">
-                    <span className="text-lg">📊</span>
-                    <span className="text-xs font-bold text-blue-700 dark:text-blue-300">새로운 투표 만들기</span>
+                    <span className="text-lg">🗳️</span>
+                    <span className="text-xs font-bold text-blue-700 dark:text-blue-300">새 투표 만들기</span>
                   </div>
-                  <span className="text-[10px] text-blue-400 font-bold group-hover:translate-x-1 transition-transform">＞</span>
+                  <span className="text-[10px] text-blue-400 font-bold group-hover:translate-x-1 transition-transform">열기</span>
                 </button>
 
-                {/* 공지사항 섹션 */}
                 <div className="space-y-3">
-                  <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider px-1">소식 / 공지</p>
+                  <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider px-1">상단 공지</p>
                   <div className="p-4 bg-orange-50 dark:bg-orange-950/20 rounded-2xl border border-orange-100 dark:border-orange-900/30">
-                    <p className="text-xs font-bold text-orange-800 dark:text-orange-300 mb-1">📢 공지</p>
+                    <p className="text-xs font-bold text-orange-800 dark:text-orange-300 mb-1">공지</p>
                     <p className="text-xs text-orange-900/70 dark:text-orange-200/50 leading-relaxed whitespace-pre-wrap">
                       {selectedRoom?.notice_message?.content || '등록된 공지가 없습니다.'}
                     </p>
                   </div>
                 </div>
 
-                {/* 사진/동영상 (Media) Grid */}
                 <div className="space-y-3">
                   <div className="flex justify-between items-center px-1">
-                    <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider">사진 · 동영상</p>
+                <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider">사진 및 동영상</p>
                     <button className="text-[10px] font-bold text-[var(--toss-blue)]">전체보기</button>
                   </div>
                   <div className="grid grid-cols-3 gap-1 rounded-2xl overflow-hidden">
-                    {messages.filter(m => m.file_kind === 'image' || m.file_kind === 'video').slice(-6).map((m, idx) => (
-                      <div key={idx} className="aspect-square bg-zinc-100 dark:bg-zinc-800 relative group cursor-pointer">
+                    {messages.filter(m => m.file_kind === 'image' || m.file_kind === 'video').slice(-6).map((m) => (
+                      <div key={m.id} className="aspect-square bg-zinc-100 dark:bg-zinc-800 relative group cursor-pointer">
                         {m.file_kind === 'image' ? (
                           <img src={m.file_url} alt="Attached image" className="w-full h-full object-cover" />
                         ) : (
@@ -1740,17 +2213,16 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                   </div>
                 </div>
 
-                {/* 링크 (Links) */}
                 <div className="space-y-3">
                   <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider px-1">링크</p>
                   <div className="space-y-2">
-                    {messages.filter(m => m.content && m.content.includes('http')).slice(-3).map((m, idx) => {
+                    {messages.filter(m => m.content && m.content.includes('http')).slice(-3).map((m) => {
                       const urlMatch = m.content.match(/https?:\/\/[^\s]+/);
                       const url = urlMatch ? urlMatch[0] : '';
                       return (
-                        <a key={idx} href={url} target="_blank" rel="noreferrer" className="block p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-100 dark:border-zinc-800 hover:border-emerald-500 transition-colors">
+                        <a key={m.id} href={url} target="_blank" rel="noreferrer" className="block p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-100 dark:border-zinc-800 hover:border-emerald-500 transition-colors">
                           <p className="text-[11px] font-bold truncate text-emerald-600 mb-0.5">{url}</p>
-                          <p className="text-[10px] text-[var(--toss-gray-4)] truncate">{m.staff?.name} · {new Date(m.created_at).toLocaleDateString()}</p>
+                          <p className="text-[10px] text-[var(--toss-gray-4)] truncate">{m.staff?.name} 쨌 {new Date(m.created_at).toLocaleDateString()}</p>
                         </a>
                       );
                     })}
@@ -1762,11 +2234,10 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                   </div>
                 </div>
 
-                {/* 대화 상대 (Participants) */}
                 <div className="space-y-3">
                   <div className="flex justify-between items-center px-1">
-                    <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider">대화 상대 ({selectedRoom?.members?.length || 0})</p>
-                    <button onClick={() => setShowGroupModal(true)} className="w-6 h-6 flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 rounded-full text-zinc-500 hover:text-emerald-500 transition-colors">＋</button>
+                    <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider">참여자 ({selectedRoom?.members?.length || 0})</p>
+              <button onClick={() => setShowGroupModal(true)} className="w-6 h-6 flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 rounded-full text-zinc-500 hover:text-emerald-500 transition-colors">+</button>
                   </div>
                   <div className="space-y-3">
                     {selectedRoom?.members?.map((memberId: string) => {
@@ -1779,8 +2250,8 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                               {s?.photo_url ? <img src={s.photo_url} alt={`${s.name}'s profile`} className="w-full h-full rounded-full object-cover" /> : (s?.name?.[0] || '?')}
                             </div>
                             <div>
-                              <p className="text-xs font-bold text-foreground">{s?.name || '알 수 없음'}</p>
-                              <p className="text-[10px] text-[var(--toss-gray-4)] font-medium">{(s?.department || '')} · {s?.position}</p>
+                              <p className="text-xs font-bold text-foreground">{s?.name || '이름 없음'}</p>
+                              <p className="text-[10px] text-[var(--toss-gray-4)] font-medium">{(s?.department || '')} 쨌 {s?.position}</p>
                             </div>
                           </div>
                           {isOwner && memberId !== user.id && (
@@ -1793,41 +2264,36 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                 </div>
               </div>
 
-              {/* 하단 액션 */}
               <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 border-t border-[var(--toss-border)] flex gap-2">
-                <button onClick={() => { if (confirm('채팅방을 나가시겠습니까?')) { /* 채팅방 나가기 로직 */ } }} className="flex-1 py-3 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-xl text-[11px] font-bold hover:bg-red-100 transition-colors">방 나가기</button>
+            <button onClick={() => { setShowDrawer(false); handleLeaveRoom(); }} className="flex-1 py-3 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-xl text-[11px] font-bold hover:bg-red-100 transition-colors">방 나가기</button>
                 <button onClick={() => { setEditingRoomName(true); setRoomNameDraft(selectedRoom?.name || ''); }} className="flex-1 py-3 bg-[var(--toss-gray-1)] text-foreground rounded-xl text-[11px] font-bold hover:bg-[var(--toss-gray-2)] transition-colors">이름 수정</button>
               </div>
             </div>
           </>
         )}
 
-        {/* 메시지 액션 패널 - PC: 사이드 / 모바일: 바텀시트 */}
         {activeActionMsg && (
           <>
             <div className="absolute inset-0 bg-black/10 z-30 animate-in fade-in duration-200" onClick={() => { setActiveActionMsg(null); setEditingMsg(null); }} aria-hidden="true" />
 
-            {/* 모바일 전용 바텀 시트 (이미지 1 스타일) */}
             <div className="md:hidden absolute left-0 right-0 bottom-0 bg-white dark:bg-zinc-900 rounded-t-[24px] shadow-2xl z-40 flex flex-col animate-in slide-in-from-bottom duration-300 max-h-[85vh] overflow-hidden">
               <div className="w-12 h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-full mx-auto my-3 shrink-0" />
               <div className="px-4 pb-8 space-y-4 overflow-y-auto">
-                {/* 이모티콘 반응바 */}
                 <div className="flex justify-between items-center bg-zinc-100 dark:bg-zinc-800/50 p-2 rounded-[20px] gap-1 px-4">
-                  {['👍', '👌', '👏', '😍', '😆', '😲', '😢', '😡'].map(emoji => (
+                  {['👍', '❤️', '👏', '🎉', '🔥', '✅', '👀', '🙏'].map(emoji => (
                     <button key={emoji} onClick={() => { toggleReaction(activeActionMsg.id, emoji); setActiveActionMsg(null); }} className="text-2xl hover:scale-110 transition-transform p-1">{emoji}</button>
                   ))}
                 </div>
-                {/* 메뉴 리스트 */}
                 <div className="space-y-1">
                   <button onClick={() => { handleAction('task'); setActiveActionMsg(null) }} className="w-full flex items-center gap-4 p-4 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[12px] transition-colors">
                     <span className="text-xl">✅</span>
-                    <span className="text-sm font-bold">할일 추가</span>
+                    <span className="text-sm font-bold">할 일 추가</span>
                   </button>
-                  <button onClick={async () => { if (!activeActionMsg) return; await supabase.from('chat_rooms').update({ notice_message_id: activeActionMsg.id }).eq('id', selectedRoomId); alert('공지로 등록되었습니다.'); fetchData(); setActiveActionMsg(null); }} className="w-full flex items-center gap-4 p-4 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[12px] transition-colors">
+                  <button onClick={async () => { if (!activeActionMsg) return; await supabase.from('chat_rooms').update({ notice_message_id: activeActionMsg.id }).eq('id', selectedRoomId); alert('공지로 등록했습니다.'); fetchData(); setActiveActionMsg(null); }} className="w-full flex items-center gap-4 p-4 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[12px] transition-colors">
                     <span className="text-xl">📢</span>
                     <span className="text-sm font-bold">공지</span>
                   </button>
-                  <button onClick={async () => { await navigator.clipboard?.writeText(activeActionMsg.content || ''); alert('복사되었습니다.'); setActiveActionMsg(null); }} className="w-full flex items-center gap-4 p-4 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[12px] transition-colors">
+                  <button onClick={async () => { await navigator.clipboard?.writeText(activeActionMsg.content || ''); alert('복사했습니다.'); setActiveActionMsg(null); }} className="w-full flex items-center gap-4 p-4 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[12px] transition-colors">
                     <span className="text-xl">📋</span>
                     <span className="text-sm font-bold">복사</span>
                   </button>
@@ -1849,16 +2315,15 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
               </div>
             </div>
 
-            {/* PC 전용 우측 사이드 패널 (기존 유지) */}
             <div className="hidden md:flex absolute top-0 right-0 bottom-0 w-80 bg-[var(--toss-card)] border-l border-[var(--toss-border)] shadow-2xl z-40 flex-col animate-in slide-in-from-right duration-300">
               <div className="p-4 border-b border-[var(--toss-border)] flex items-center justify-between">
-                <span className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">메시지 액션</span>
-                <button onClick={() => { setActiveActionMsg(null); setEditingMsg(null) }} className="p-2 text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] rounded-[12px] hover:bg-[var(--toss-gray-1)]">✕</button>
+                <span className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">메시지 작업</span>
+            <button onClick={() => { setActiveActionMsg(null); setEditingMsg(null) }} className="p-2 text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] rounded-[12px] hover:bg-[var(--toss-gray-1)]">닫기</button>
               </div>
               <div className="p-4 space-y-4 overflow-y-auto flex-1">
-                <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">감정 표현</p>
+                <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">빠른 반응</p>
                 <div className="flex gap-2 flex-wrap">
-                  {['👍', '😂', '❤️', '😮', '😢'].map(emoji => (
+                  {['👍', '❤️', '👏', '🔥', '🙏'].map(emoji => (
                     <button key={emoji} onClick={() => { toggleReaction(activeActionMsg.id, emoji); }} className="w-11 h-11 flex items-center justify-center rounded-[12px] bg-[var(--toss-gray-1)] hover:bg-[var(--toss-blue-light)] text-xl transition-colors" title={emoji}>
                       {emoji}
                     </button>
@@ -1873,12 +2338,12 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                     }}
                     className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors"
                   >
-                    💬 답글 달기
+                    답글 달기
                   </button>
                   {activeActionMsg.sender_id === user.id && (
                     <>
-                      <button onClick={() => { setEditingMsg(activeActionMsg); setEditContent(activeActionMsg.content || ''); setActiveActionMsg(null) }} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">✏️ 수정</button>
-                      <button onClick={() => { deleteMessage(activeActionMsg); setActiveActionMsg(null) }} className="w-full p-3 text-left hover:bg-red-50 rounded-[12px] text-xs font-semibold text-red-600 transition-colors">🗑️ 삭제</button>
+                      <button onClick={() => { setEditingMsg(activeActionMsg); setEditContent(activeActionMsg.content || ''); setActiveActionMsg(null) }} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">메시지 수정</button>
+                      <button onClick={() => { deleteMessage(activeActionMsg); setActiveActionMsg(null) }} className="w-full p-3 text-left hover:bg-red-50 rounded-[12px] text-xs font-semibold text-red-600 transition-colors">메시지 삭제</button>
                     </>
                   )}
                   <button
@@ -1890,7 +2355,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                           .update({ notice_message_id: activeActionMsg.id })
                           .eq('id', selectedRoomId);
                         if (error) throw error;
-                        alert('공지로 등록되었습니다.');
+                        alert('공지로 등록했습니다.');
                         fetchData();
                       } catch (err) {
                         alert('공지 등록 중 오류가 발생했습니다.');
@@ -1899,9 +2364,9 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                     }}
                     className="w-full p-3 text-left hover:bg-orange-50 rounded-[12px] text-xs font-semibold text-orange-600 transition-colors"
                   >
-                    📢 공지로 등록
+                    공지로 등록
                   </button>
-                  <button onClick={() => { handleAction('task'); setActiveActionMsg(null) }} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">✅ 할일로 등록</button>
+                  <button onClick={() => { handleAction('task'); setActiveActionMsg(null) }} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">할 일로 등록</button>
                   <button
                     onClick={() => {
                       loadReadStatusForMessage(activeActionMsg);
@@ -1909,7 +2374,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                     }}
                     className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors"
                   >
-                    👀 읽음 확인
+                    읽음 확인
                   </button>
                   <button
                     onClick={() => {
@@ -1919,11 +2384,11 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                     }}
                     className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors"
                   >
-                    📤 다른 채팅방으로 전달
+                    다른 채팅방으로 전달
                   </button>
-                  <button onClick={() => { setThreadRoot(activeActionMsg); setActiveActionMsg(null); }} className="w-full p-3 text-left hover:bg-[var(--toss-blue-light)] rounded-[12px] text-xs font-semibold text-[var(--toss-blue)] transition-colors">🧵 이 메시지 스레드 보기</button>
-                  <button onClick={async () => { try { const base = `[채팅] ${activeActionMsg.staff?.name || '알 수 없음'} (${new Date(activeActionMsg.created_at).toLocaleString('ko-KR')})\n${activeActionMsg.content || ''}${activeActionMsg.file_url ? `\n파일: ${activeActionMsg.file_url}` : ''}`; await navigator.clipboard?.writeText(`[전자결재 메모]\n${base}`); alert('전자결재용으로 복사되었습니다.'); } catch { alert('복사 실패'); } setActiveActionMsg(null); }} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">📋 전자결재용 내용 복사</button>
-                  <button onClick={async () => { try { const base = `[채팅] ${activeActionMsg.staff?.name || '알 수 없음'} (${new Date(activeActionMsg.created_at).toLocaleString('ko-KR')})\n${activeActionMsg.content || ''}${activeActionMsg.file_url ? `\n파일: ${activeActionMsg.file_url}` : ''}`; await navigator.clipboard?.writeText(`[게시판 메모]\n${base}`); alert('게시판용으로 복사되었습니다.'); } catch { alert('복사 실패'); } setActiveActionMsg(null); }} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">📝 게시판용 내용 복사</button>
+                  <button onClick={() => { setThreadRoot(activeActionMsg); setActiveActionMsg(null); }} className="w-full p-3 text-left hover:bg-[var(--toss-blue-light)] rounded-[12px] text-xs font-semibold text-[var(--toss-blue)] transition-colors">이 메시지 스레드 보기</button>
+                  <button onClick={async () => { try { const base = `[채팅] ${activeActionMsg.staff?.name || '이름 없음'} (${new Date(activeActionMsg.created_at).toLocaleString('ko-KR')})\n${activeActionMsg.content || ''}${activeActionMsg.file_url ? `\n파일: ${activeActionMsg.file_url}` : ''}`; await navigator.clipboard?.writeText(`[전자결재 메모]\n${base}`); alert('전자결재용으로 복사했습니다.'); } catch { alert('복사 실패'); } setActiveActionMsg(null); }} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">전자결재용 내용 복사</button>
+                  <button onClick={async () => { try { const base = `[채팅] ${activeActionMsg.staff?.name || '이름 없음'} (${new Date(activeActionMsg.created_at).toLocaleString('ko-KR')})\n${activeActionMsg.content || ''}${activeActionMsg.file_url ? `\n파일: ${activeActionMsg.file_url}` : ''}`; await navigator.clipboard?.writeText(`[게시판 메모]\n${base}`); alert('게시판용으로 복사했습니다.'); } catch { alert('복사 실패'); } setActiveActionMsg(null); }} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">게시판용 내용 복사</button>
                   <button
                     onClick={async () => {
                       try {
@@ -1956,16 +2421,15 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                     }}
                     className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors"
                   >
-                    {bookmarkedIds.has(activeActionMsg.id) ? '⭐ 북마크 해제' : '⭐ 중요 메시지 북마크'}
+                    {bookmarkedIds.has(activeActionMsg.id) ? '북마크 해제' : '중요 메시지 북마크'}
                   </button>
-                  <button onClick={() => { togglePin(activeActionMsg.id); setActiveActionMsg(null) }} className={`w-full p-3 text-left rounded-[12px] text-xs font-semibold transition-colors ${pinnedIds.includes(activeActionMsg.id) ? 'hover:bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]' : 'hover:bg-orange-50 text-orange-500'}`}>{pinnedIds.includes(activeActionMsg.id) ? '📢 공지 해제' : '📢 공지로 등록'}</button>
+                  <button onClick={() => { togglePin(activeActionMsg.id); setActiveActionMsg(null) }} className={`w-full p-3 text-left rounded-[12px] text-xs font-semibold transition-colors ${pinnedIds.includes(activeActionMsg.id) ? 'hover:bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]' : 'hover:bg-orange-50 text-orange-500'}`}>{pinnedIds.includes(activeActionMsg.id) ? '공지 해제' : '공지로 등록'}</button>
                 </div>
               </div>
             </div>
           </>
         )}
 
-        {/* 수정 모달 */}
         {editingMsg && (
           <div className="absolute inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-30" onClick={() => { setEditingMsg(null); setEditContent(''); }}>
             <div className="bg-[var(--toss-card)] p-6 rounded-[12px] w-80 shadow-2xl" onClick={e => e.stopPropagation()}>
@@ -1973,21 +2437,20 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
               <input value={editContent} onChange={e => setEditContent(e.target.value)} className="w-full p-3 border rounded-[16px] text-sm mb-4" />
               <div className="flex gap-2">
                 <button onClick={() => { setEditingMsg(null); setEditContent(''); }} className="flex-1 py-2 bg-[var(--toss-gray-1)] rounded-[16px] text-xs font-semibold">취소</button>
-                <button onClick={saveEditMessage} className="flex-1 py-2 bg-[var(--toss-blue)] text-white rounded-[16px] text-xs font-semibold">저장</button>
+            <button onClick={saveEditMessage} className="flex-1 py-2 bg-[var(--toss-blue)] text-white rounded-[16px] text-xs font-semibold">저장</button>
               </div>
             </div>
           </div>
         )}
 
-        {/* 단체방 생성 모달 */}
         {showGroupModal && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-[110] p-4" onClick={() => setShowGroupModal(false)}>
             <div className="bg-[var(--toss-card)] w-full max-w-md rounded-[3rem] p-10 shadow-2xl space-y-8" onClick={e => e.stopPropagation()}>
-              <h3 className="text-xl font-semibold text-[var(--foreground)] italic">새 단체 채팅방</h3>
+              <h3 className="text-xl font-semibold text-[var(--foreground)] italic">새 그룹 채팅방</h3>
               <div className="space-y-6">
                 <div className="space-y-2">
                   <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest ml-1">방 이름</label>
-                  <input value={groupName} onChange={e => setGroupName(e.target.value)} className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]" placeholder="예: 행정팀 단체방" />
+                  <input value={groupName} onChange={e => setGroupName(e.target.value)} className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]" placeholder="예: 운영팀 공지방" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest ml-1">멤버 선택 ({selectedMembers.length}명)</label>
@@ -2013,13 +2476,12 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
         )}
       </main>
 
-      {/* 투표 생성 모달 */}
       {showPollModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4">
           <div className="bg-[var(--toss-card)] w-full max-w-md rounded-3xl p-6 space-y-4 shadow-2xl border border-[var(--toss-border)]">
-            <h3 className="text-lg font-semibold text-[var(--foreground)]">새 투표 만들기</h3>
+              <h3 className="text-lg font-semibold text-[var(--foreground)]">새 투표 만들기</h3>
             <p className="text-[11px] text-[var(--toss-gray-3)] font-bold">
-              질문과 선택지를 입력하세요. 선택지는 콤마(,)로 구분합니다.
+              질문과 선택지를 입력해 주세요. 선택지는 항목별로 따로 입력합니다.
             </p>
             <div className="space-y-3">
               <div>
@@ -2052,7 +2514,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                           onClick={() => setPollOptions(pollOptions.filter((_, i) => i !== idx))}
                           className="w-10 h-10 flex items-center justify-center bg-red-50 text-red-500 rounded-xl hover:bg-red-100"
                         >
-                          ✕
+                          삭제
                         </button>
                       )}
                     </div>
@@ -2087,17 +2549,16 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
         </div>
       )}
 
-      {/* 슬래시 명령 폼 모달 (/연차, /발주) */}
       {showSlashModal && slashCommand && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4" onClick={() => setShowSlashModal(false)}>
           <div className="bg-[var(--toss-card)] w-full max-w-md rounded-3xl p-6 space-y-4 shadow-2xl border border-[var(--toss-border)]" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-[var(--foreground)]">
-              {slashCommand === 'annual_leave' ? '🗓️ 연차 신청 초안 만들기' : '📦 발주 요청 초안 만들기'}
+              {slashCommand === 'annual_leave' ? '연차 요청 초안 만들기' : '발주 요청 초안 만들기'}
             </h3>
             {slashCommand === 'annual_leave' ? (
               <>
                 <p className="text-[11px] text-[var(--toss-gray-3)] font-bold">
-                  시작일/종료일과 사유를 입력하면 전자결재에 연차/휴가 기안 초안이 생성됩니다.
+                  시작일, 종료일, 사유를 입력하면 전자결재용 연차/휴가 초안을 생성합니다.
                 </p>
                 <div className="space-y-3 text-xs font-bold">
                   <div className="grid grid-cols-2 gap-2">
@@ -2126,7 +2587,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                       type="text"
                       value={slashForm.reason}
                       onChange={e => setSlashForm((f: any) => ({ ...f, reason: e.target.value }))}
-                      placeholder="예: 개인 일정, 병원 방문 등"
+                      placeholder="예: 개인 일정, 병원 방문"
                       className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[16px] text-xs"
                     />
                   </div>
@@ -2149,11 +2610,11 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                       try {
                         const title = `[채팅]/연차 자동 기안 - ${user.name}`;
                         const contentLines = [
-                          `신청자: ${user.name} (${user.department || ''} ${user.position || ''})`,
+                          `요청자: ${user.name} (${user.department || ''} ${user.position || ''})`,
                           `기간: ${slashForm.startDate} ~ ${slashForm.endDate}`,
                           slashForm.reason ? `사유: ${slashForm.reason}` : '',
                           '',
-                          `※ 이 신청서는 채팅 명령어(/연차)로 자동 생성되었습니다.`,
+                          '이 요청서는 채팅 명령어(/연차)로 자동 생성되었습니다.',
                         ].filter(Boolean);
                         await supabase.from('approvals').insert([
                           {
@@ -2166,7 +2627,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                             status: '대기',
                           },
                         ]);
-                        alert('연차/휴가 전자결재 초안이 생성되었습니다. 전자결재 메뉴에서 내용을 확인·제출해 주세요.');
+                        alert('연차/휴가 전자결재 초안을 생성했습니다. 전자결재 메뉴에서 내용을 확인 후 제출해 주세요.');
                       } catch {
                         alert('연차 초안 생성 중 오류가 발생했습니다.');
                       } finally {
@@ -2182,7 +2643,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
             ) : (
               <>
                 <p className="text-[11px] text-[var(--toss-gray-3)] font-bold">
-                  품목명과 수량을 입력하면 비품구매(발주) 결재 초안이 생성됩니다.
+                  품목명과 수량을 입력하면 비품구매(발주) 결재 초안을 생성합니다.
                 </p>
                 <div className="space-y-3 text-xs font-bold">
                   <div>
@@ -2191,7 +2652,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                       type="text"
                       value={slashForm.itemName}
                       onChange={e => setSlashForm((f: any) => ({ ...f, itemName: e.target.value }))}
-                      placeholder="예: A사 프린터 토너"
+                      placeholder="예: A4 용지, 프린터 토너"
                       className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[16px] text-xs"
                     />
                   </div>
@@ -2212,7 +2673,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                         type="text"
                         value={slashForm.reason}
                         onChange={e => setSlashForm((f: any) => ({ ...f, reason: e.target.value }))}
-                        placeholder="예: 재고 부족, 교체 주기 도래 등"
+                        placeholder="예: 재고 부족, 교체 주기 도래"
                         className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[16px] text-xs"
                       />
                     </div>
@@ -2241,7 +2702,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                           `수량: ${slashForm.quantity}`,
                           slashForm.reason ? `비고: ${slashForm.reason}` : '',
                           '',
-                          `※ 이 신청서는 채팅 명령어(/발주)로 자동 생성되었습니다.`,
+                          '이 요청서는 채팅 명령어(/발주)로 자동 생성되었습니다.',
                         ].filter(Boolean);
                         await supabase.from('approvals').insert([
                           {
@@ -2254,7 +2715,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                             status: '대기',
                           },
                         ]);
-                        alert('비품구매 전자결재 초안이 생성되었습니다. 전자결재 메뉴에서 내용을 확인·제출해 주세요.');
+                        alert('비품구매 전자결재 초안을 생성했습니다. 전자결재 메뉴에서 내용을 확인 후 제출해 주세요.');
                       } catch {
                         alert('발주 초안 생성 중 오류가 발생했습니다.');
                       } finally {
@@ -2272,7 +2733,6 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
         </div>
       )}
 
-      {/* 스레드 뷰 패널 */}
       {threadRoot && (
         <>
           <div
@@ -2287,14 +2747,14 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                   스레드
                 </p>
                 <p className="text-xs font-semibold text-[var(--foreground)] mt-0.5 line-clamp-2">
-                  {threadRoot.content || '📎 파일 메시지'}
+                  {threadRoot.content || '첨부 파일 메시지'}
                 </p>
               </div>
               <button
                 onClick={() => setThreadRoot(null)}
                 className="p-2 text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] rounded-[12px] hover:bg-[var(--toss-gray-1)]"
               >
-                ✕
+                닫기
               </button>
             </div>
             <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-3">
@@ -2315,7 +2775,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-semibold text-[var(--foreground)] truncate">
-                          {staff?.name || '알 수 없음'} {staff?.position || ''}
+                          {staff?.name || '이름 없음'} {staff?.position || ''}
                         </span>
                         <span className="text-[11px] text-[var(--toss-gray-3)]">
                           {createdAt.toLocaleDateString('ko-KR', {
@@ -2329,7 +2789,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                         </span>
                       </div>
                       <p className="text-[11px] text-[var(--foreground)] whitespace-pre-wrap break-words">
-                        {m.content || '📎 파일 메시지'}
+                        {m.content || '첨부 파일 메시지'}
                       </p>
                       {m.file_url && (
                         <a
@@ -2338,7 +2798,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-1 px-2 py-1 mt-1 rounded-[12px] bg-[var(--toss-card)] border border-[var(--toss-border)] text-[11px] font-bold text-[var(--toss-blue)] hover:bg-[var(--toss-blue-light)]"
                         >
-                          📎 파일 열기
+                          첨부 파일 열기
                         </a>
                       )}
                     </div>
@@ -2350,7 +2810,6 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
         </>
       )}
 
-      {/* 읽음 확인 상세 모달 */}
       {unreadModalMsg && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4" onClick={() => setUnreadModalMsg(null)}>
           <div className="bg-[var(--toss-card)] w-full max-w-md rounded-3xl p-6 space-y-4 shadow-2xl border border-[var(--toss-border)]" onClick={e => e.stopPropagation()}>
@@ -2360,14 +2819,14 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                   읽음 확인 상세
                 </p>
                 <p className="text-xs font-semibold text-[var(--foreground)] mt-0.5 line-clamp-1 opacity-60">
-                  {unreadModalMsg.content || '📎 파일 메시지'}
+                  {unreadModalMsg.content || '첨부 파일 메시지'}
                 </p>
               </div>
               <button
                 onClick={() => setUnreadModalMsg(null)}
                 className="p-2 text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] rounded-[12px] hover:bg-[var(--toss-gray-1)]"
               >
-                ✕
+                닫기
               </button>
             </div>
 
@@ -2378,13 +2837,12 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                 </div>
               ) : (
                 <>
-                  {/* 안 읽은 멤버 섹션 */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between px-1">
                       <p className="text-[11px] font-bold text-red-500 uppercase tracking-wider">읽지 않음 ({unreadUsers.length})</p>
                     </div>
                     {unreadUsers.length === 0 ? (
-                      <p className="text-[10px] text-zinc-400 font-bold py-2 px-1">모두가 읽었습니다.</p>
+                      <p className="text-[10px] text-zinc-400 font-bold py-2 px-1">모두 읽었습니다.</p>
                     ) : (
                       <div className="grid grid-cols-1 gap-1">
                         {unreadUsers.map((u: any) => (
@@ -2402,7 +2860,6 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                     )}
                   </div>
 
-                  {/* 읽은 멤버 섹션 */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between px-1">
                       <p className="text-[11px] font-bold text-emerald-500 uppercase tracking-wider">읽음 ({readUsers.length})</p>
@@ -2432,11 +2889,10 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
         </div>
       )}
 
-      {/* 메시지 전달 모달 */}
       {showForwardModal && forwardSourceMsg && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4" onClick={() => { setShowForwardModal(false); setForwardSourceMsg(null); }}>
           <div className="bg-[var(--toss-card)] w-full max-w-md rounded-3xl p-6 space-y-4 shadow-2xl border border-[var(--toss-border)]" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-[var(--foreground)]">📤 다른 채팅방으로 전달</h3>
+            <h3 className="text-lg font-semibold text-[var(--foreground)]">다른 채팅방으로 전달</h3>
             <p className="text-[11px] text-[var(--toss-gray-3)] font-bold">
               선택한 메시지를 전달할 채팅방을 선택하세요.
             </p>
@@ -2454,12 +2910,12 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                             room_id: room.id,
                             sender_id: user.id,
                             content:
-                              `[전달] ${forwardSourceMsg.staff?.name || '알 수 없음'}: ` +
-                              (forwardSourceMsg.content || '📎 파일'),
+                              `[전달] ${forwardSourceMsg.staff?.name || '이름 없음'}: ` +
+                              (forwardSourceMsg.content || '첨부 파일'),
                             file_url: forwardSourceMsg.file_url || null,
                           },
                         ]);
-                        alert(`"${room.name || '채팅방'}"으로 메시지가 전달되었습니다.`);
+                        alert(`"${room.name || '채팅방'}"으로 메시지를 전달했습니다.`);
                       } catch {
                         alert('메시지 전달 중 오류가 발생했습니다.');
                       } finally {
@@ -2470,7 +2926,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                     className="w-full flex items-center justify-between px-4 py-3 rounded-[12px] border border-[var(--toss-border)] hover:bg-[var(--toss-blue-light)] text-left text-xs font-bold text-[var(--foreground)]"
                   >
                     <span className="truncate">
-                      {room.id === NOTICE_ROOM_ID ? '📢 ' : '👥 '}
+                      {room.id === NOTICE_ROOM_ID ? '공 ' : '채 '}
                       {room.name || '채팅방'}
                     </span>
                     <span className="text-[11px] text-[var(--toss-gray-3)]">
@@ -2492,7 +2948,6 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
         </div>
       )}
 
-      {/* 채팅방 대화상대 추가 모달 */}
       {showAddMemberModal && selectedRoom && (
         <div
           className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4"
@@ -2506,7 +2961,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-lg font-semibold text-[var(--foreground)]">
-              👥 대화상대 추가
+              참여자 추가
             </h3>
             <p className="text-[11px] text-[var(--toss-gray-3)] font-bold">
               현재 채팅방에 새로 초대할 직원을 선택하세요.
@@ -2554,7 +3009,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                         <span className="ml-1 text-[var(--toss-gray-3)]">
                           {s.position ? ` ${s.position}` : ''}
                           {s.company || s.department
-                            ? ` · ${s.company || s.department}`
+                            ? ` 쨌 ${s.company || s.department}`
                             : ''}
                         </span>
                       </span>
@@ -2599,9 +3054,9 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                       .eq('id', selectedRoom.id);
 
                     const invitedNames = addMemberSelectingIds
-                      .map((id) => staffs.find((s: any) => s.id === id)?.name || '알 수 없음')
+                      .map((id) => staffs.find((s: any) => s.id === id)?.name || '이름 없음')
                       .join(', ');
-                    const inviterName = user?.name || '알 수 없음';
+                    const inviterName = user?.name || '이름 없음';
                     const systemContent = `[초대] ${inviterName}님이 ${invitedNames}님을 초대했습니다.`;
                     await supabase.from('messages').insert([{
                       room_id: selectedRoom.id,
@@ -2619,10 +3074,10 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                     setShowAddMemberModal(false);
                     setAddMemberSelectingIds([]);
                     fetchData();
-                    alert('대화상대가 추가되었습니다.');
+                    alert('참여자가 추가되었습니다.');
                   } catch (e) {
                     console.error('add members error', e);
-                    alert('대화상대 추가 중 오류가 발생했습니다.');
+                    alert('참여자 추가 중 오류가 발생했습니다.');
                   }
                 }}
                 className="flex-1 py-3 rounded-[16px] text-[11px] font-semibold text-white bg-[var(--toss-blue)] disabled:bg-[var(--toss-gray-3)] hover:bg-[var(--toss-blue)]"
@@ -2634,14 +3089,13 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
         </div>
       )}
 
-      {/* 우측 미디어 패널 */}
       {showMediaPanel && (
         <>
           <div className="fixed inset-0 bg-black/5 z-[100] md:z-30 animate-in fade-in" onClick={() => setShowMediaPanel(false)} />
           <aside className="fixed top-0 right-0 bottom-0 w-80 bg-[var(--toss-card)] border-l border-[var(--toss-border)] shadow-2xl z-[101] md:z-40 flex flex-col animate-in slide-in-from-right duration-300">
             <div className="p-4 border-b border-[var(--toss-border)] flex items-center justify-between">
               <span className="text-xs font-black text-zinc-500 uppercase tracking-widest">파일/링크 내역</span>
-              <button onClick={() => setShowMediaPanel(false)} className="p-2 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl">✕</button>
+            <button onClick={() => setShowMediaPanel(false)} className="p-2 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl">닫기</button>
             </div>
 
             <div className="flex p-2 gap-1 bg-zinc-50 dark:bg-zinc-900 border-b border-[var(--toss-border)]">
@@ -2659,7 +3113,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
             <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
               {filteredMediaMessages.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center opacity-30 text-zinc-400">
-                  <span className="text-4xl mb-2">📂</span>
+                  <span className="text-4xl mb-2">📭</span>
                   <p className="text-[11px] font-bold">내역이 없습니다.</p>
                 </div>
               ) : (
@@ -2671,10 +3125,10 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                       <div className="w-full h-12 bg-zinc-100 dark:bg-zinc-800 rounded-lg mb-2 flex items-center justify-center text-xl">📄</div>
                     )}
                     <div className="flex flex-col gap-1 min-w-0">
-                      <p className="text-[11px] font-bold text-foreground truncate">{m.content || '이름 없음'}</p>
+                      <p className="text-[11px] font-bold text-foreground truncate">{m.content || '내용 없음'}</p>
                       <div className="flex items-center justify-between">
                         <span className="text-[9px] font-bold text-zinc-400">{new Date(m.created_at).toLocaleDateString()}</span>
-                        <a href={m.file_url} target="_blank" className="text-[10px] font-bold text-blue-600 hover:underline">다운로드</a>
+                        <a href={m.file_url} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-blue-600 hover:underline">다운로드</a>
                       </div>
                     </div>
                   </div>
@@ -2685,95 +3139,11 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
         </>
       )}
 
-      {/* 투표 생성 모달 */}
-      {showPollModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[200] p-4 animate-in fade-in" onClick={() => setShowPollModal(false)}>
-          <div className="bg-[var(--toss-card)] w-full max-w-sm rounded-3xl p-6 space-y-5 shadow-2xl border border-[var(--toss-border)]" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-black text-foreground">📊 새로운 투표</h3>
-              <button onClick={() => setShowPollModal(false)} className="text-zinc-400 text-xl font-bold">✕</button>
-            </div>
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-black text-zinc-400 uppercase tracking-widest pl-1">질문</label>
-                <input
-                  className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500/30 transition-all"
-                  placeholder="무엇을 투표할까요?"
-                  value={pollQuestion}
-                  onChange={e => setPollQuestion(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-black text-zinc-400 uppercase tracking-widest pl-1">선택지</label>
-                <div className="space-y-2">
-                  {pollOptions.map((opt, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      <input
-                        className="flex-1 px-4 py-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500/30 transition-all"
-                        placeholder={`선택지 ${idx + 1}`}
-                        value={opt}
-                        onChange={e => {
-                          const newOpts = [...pollOptions];
-                          newOpts[idx] = e.target.value;
-                          setPollOptions(newOpts);
-                        }}
-                      />
-                      {pollOptions.length > 2 && (
-                        <button
-                          onClick={() => setPollOptions(pollOptions.filter((_, i) => i !== idx))}
-                          className="w-10 h-10 flex items-center justify-center bg-red-50 dark:bg-red-900/20 text-red-500 rounded-xl hover:bg-red-100 transition-colors"
-                        >
-                          ✕
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                  <button
-                    onClick={() => setPollOptions([...pollOptions, ''])}
-                    className="w-full py-3 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl text-xs font-bold text-zinc-500 hover:text-blue-500 hover:border-blue-300 transition-colors"
-                  >
-                    + 항목 추가
-                  </button>
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={async () => {
-                const validOptions = pollOptions.map(o => o.trim()).filter(Boolean);
-                if (!pollQuestion.trim() || validOptions.length === 0) return alert("질문과 선택지를 입력해주세요.");
-                if (validOptions.length < 2) return alert("최소 2개 이상의 선택지가 필요합니다.");
-
-                const { error } = await supabase.from('polls').insert([{
-                  room_id: selectedRoomId,
-                  creator_id: user.id,
-                  question: pollQuestion,
-                  options: validOptions
-                }]);
-
-                if (!error) {
-                  setPollQuestion('');
-                  setPollOptions(['찬성', '반대']);
-                  setShowPollModal(false);
-                  fetchData();
-                  alert("투표가 생성되었습니다.");
-                } else {
-                  alert("투표 생성에 실패했습니다.");
-                }
-              }}
-              className="w-full py-4 bg-blue-600 text-white rounded-2xl text-[13px] font-black shadow-lg shadow-blue-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
-            >
-              투표 만들기
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* 전역 메시지 검색 모달 */}
       {showGlobalSearch && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-start md:items-center justify-center p-4 pt-12 md:p-6 animate-in fade-in" onClick={() => setShowGlobalSearch(false)}>
           <div className="bg-white dark:bg-zinc-900 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh] md:max-h-[85vh] border border-zinc-200 dark:border-zinc-800" onClick={e => e.stopPropagation()}>
             <div className="p-4 md:p-6 border-b border-zinc-100 dark:border-zinc-800 flex items-center gap-3">
-              <span className="text-xl">🔍</span>
+              <span className="text-xl">🔎</span>
               <input
                 autoFocus
                 value={globalSearchQuery}
@@ -2788,12 +3158,12 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
               >
                 {globalSearchLoading ? '검색중...' : '검색'}
               </button>
-              <button onClick={() => setShowGlobalSearch(false)} className="ml-2 text-zinc-400 hover:text-zinc-600 text-lg font-bold">✕</button>
+              <button onClick={() => setShowGlobalSearch(false)} className="ml-2 text-zinc-400 hover:text-zinc-600 text-lg font-bold">닫기</button>
             </div>
             <div className="flex-1 overflow-y-auto custom-scrollbar bg-zinc-50 dark:bg-zinc-950 p-4 md:p-6">
               {!globalSearchLoading && globalSearchResults.length === 0 && globalSearchQuery.trim() && (
                 <div className="h-40 flex flex-col items-center justify-center text-zinc-400">
-                  <span className="text-3xl mb-2">🤔</span>
+                  <span className="text-3xl mb-2">무</span>
                   <p className="text-sm font-bold">검색 결과가 없습니다.</p>
                 </div>
               )}
@@ -2818,14 +3188,14 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
                           <span className="px-2 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 rounded text-[10px] font-bold truncate shrink-0 max-w-[120px]">
                             {roomName}
                           </span>
-                          <span className="text-[11px] font-bold text-foreground truncate">{msg.staff?.name || '알 수 없음'}</span>
+                          <span className="text-[11px] font-bold text-foreground truncate">{msg.staff?.name || '이름 없음'}</span>
                         </div>
                         <span className="text-[10px] font-bold text-zinc-400 shrink-0">
                           {new Date(msg.created_at).toLocaleDateString()} {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
                       <p className="text-[12px] font-semibold text-zinc-700 dark:text-zinc-300 line-clamp-2 leading-relaxed">
-                        {msg.content || (msg.file_url ? '📎 첨부 파일' : '')}
+                        {msg.content || (msg.file_url ? '첨부 파일' : '')}
                       </p>
                     </div>
                   );
