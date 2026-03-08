@@ -1,163 +1,193 @@
-import { useState, useRef, useEffect } from 'react';
 import NotificationCenter from '../NotificationCenter';
 
 const MYPAGE_TAB_KEY = 'erp_mypage_tab';
 
-/** 상세 메뉴가 있는 메뉴 정의 (페이지 우측 본문에서 사용, 전역 상수로 export) */
-export const SUB_MENUS: Record<string, { id: string; label: string; group?: string }[]> = {
+type SubMenuItem = {
+  id: string;
+  label: string;
+  group?: string;
+  icon?: string;
+};
+
+export const SUB_MENUS: Record<string, SubMenuItem[]> = {
   재고관리: [
-    { id: 'UDI', label: '📡 UDI' },
-    { id: '명세서', label: '📄 명세서' },
-    { id: '발주', label: '📝 발주' },
-    { id: '스캔', label: '🔍 스캔' },
-    { id: '등록', label: '+ 등록' },
-    { id: '현황', label: '📊 현황' },
-    { id: '이력', label: '📋 이력' },
-    { id: 'AS반품', label: '🔧 AS·반품' },
+    { id: '현황', label: '현황', icon: '📊' },
+    { id: '이력', label: '이력', icon: '🕘' },
+    { id: 'UDI', label: 'UDI', icon: '🏷️' },
+    { id: '명세서', label: '명세서', icon: '🧾' },
+    { id: '발주', label: '발주', icon: '📦' },
+    { id: '스캔', label: '스캔', icon: '📷' },
+    { id: '등록', label: '등록', icon: '📝' },
+    { id: '자산', label: '자산 QR', icon: '🔖' },
+    { id: 'AS반품', label: 'AS / 반품', icon: '↩️' },
+    { id: '거래처', label: '거래처', icon: '🏭' },
+    { id: '재고실사', label: '재고 실사', icon: '🔎' },
+    { id: '유통기한', label: '유통기한 알림', icon: '⏰' },
+    { id: '이관', label: '재고 이관', icon: '🔄' },
+    { id: '카테고리', label: '카테고리', icon: '🗂️' },
+    { id: '소모품통계', label: '소모품 통계', icon: '📉' },
+    { id: '납품확인서', label: '납품 확인서', icon: '📋' },
+    { id: '수요예측', label: '수요 예측', icon: '🔮' },
   ],
   게시판: [
-    { id: '공지사항', label: '📢 공지사항' },
-    { id: '자유게시판', label: '💬 자유게시판' },
-    { id: '경조사', label: '🎉 경조사' },
-    { id: '수술일정', label: '🏥 수술일정' },
-    { id: 'MRI일정', label: '🔬 MRI일정' },
+    { id: '공지사항', label: '공지사항', icon: '📢' },
+    { id: '자유게시판', label: '자유게시판', icon: '📝' },
+    { id: '경조사', label: '경조사', icon: '🎊' },
+    { id: '수술일정', label: '수술일정', icon: '🏥' },
+    { id: 'MRI일정', label: 'MRI일정', icon: '🧠' },
   ],
   전자결재: [
-    { id: '기안함', label: '📥 기안함' },
-    { id: '결재함', label: '📤 결재함' },
-    { id: '작성하기', label: '✍️ 작성하기' },
+    { id: '기안함', label: '기안함', icon: '📝' },
+    { id: '결재함', label: '결재함', icon: '✅' },
+    { id: '작성하기', label: '작성하기', icon: '✍️' },
+    { id: '캘린더', label: '결재 캘린더', icon: '📅' },
+    { id: '양식빌더', label: '양식 빌더', icon: '🧱' },
+    { id: '서명관리', label: '전자 서명', icon: '✒️' },
+    { id: '직인관리', label: '직인 관리', icon: '🔏' },
   ],
   인사관리: [
-    { id: '구성원', label: '👥 구성원', group: '인력관리' },
-    { id: '인사발령', label: '📋 인사발령', group: '인력관리' },
-    { id: '포상/징계', label: '🏅 포상/징계', group: '인력관리' },
-    { id: '교육', label: '📚 교육', group: '인력관리' },
-    { id: '오프보딩', label: '🚪 오프보딩', group: '인력관리' },
-    { id: '근태', label: '⏰ 근태', group: '근태/급여' },
-    { id: '교대근무', label: '🔄 교대근무', group: '근태/급여' },
-    { id: '연차/휴가', label: '🌴 연차/휴가', group: '근태/급여' },
-    { id: '급여', label: '💰 급여', group: '근태/급여' },
-    { id: '원천징수파일', label: '📊 세무 신고 파일', group: '근태/급여' },
-    { id: '4대보험', label: '🏛️ 4대보험', group: '복무/복지' },
-    { id: '건강검진', label: '🩺 건강검진', group: '복무/복지' },
-    { id: '경조사', label: '🎊 경조사', group: '복무/복지' },
-    { id: '비품대여', label: '📦 비품대여', group: '복무/복지' },
-    { id: '계약', label: '📝 계약', group: '문서/기타' },
-    { id: '문서보관함', label: '📁 문서보관함', group: '문서/기타' },
-    { id: '증명서', label: '📄 증명서', group: '문서/기타' },
-    { id: '서류제출', label: '📤 서류제출', group: '문서/기타' },
-    { id: '캘린더', label: '📅 캘린더', group: '문서/기타' },
+    { id: '구성원', label: '구성원', group: '인력관리', icon: '👥' },
+    { id: '인사발령', label: '인사발령', group: '인력관리', icon: '📋' },
+    { id: '포상/징계', label: '포상/징계', group: '인력관리', icon: '🏅' },
+    { id: '교육', label: '교육', group: '인력관리', icon: '📚' },
+    { id: '오프보딩', label: '오프보딩', group: '인력관리', icon: '🚪' },
+    { id: '근태', label: '근태', group: '근태/급여', icon: '⏰' },
+    { id: '교대근무', label: '교대근무', group: '근태/급여', icon: '🔄' },
+    { id: '연차/휴가', label: '연차/휴가', group: '근태/급여', icon: '🌴' },
+    { id: '급여', label: '급여', group: '근태/급여', icon: '💰' },
+    { id: '원천징수파일', label: '세무파일', group: '근태/급여', icon: '📊' },
+    { id: '4대보험', label: '4대보험', group: '복무/복지', icon: '🏛️' },
+    { id: '건강검진', label: '건강검진', group: '복무/복지', icon: '🩺' },
+    { id: '경조사', label: '경조사', group: '복무/복지', icon: '🎊' },
+    { id: '비품대여', label: '비품대여', group: '복무/복지', icon: '📦' },
+    { id: '계약', label: '계약', group: '문서/기타', icon: '📝' },
+    { id: '문서보관함', label: '문서보관함', group: '문서/기타', icon: '📁' },
+    { id: '증명서', label: '증명서', group: '문서/기타', icon: '📄' },
+    { id: '서류제출', label: '서류제출', group: '문서/기타', icon: '📤' },
+    { id: '캘린더', label: '캘린더', group: '문서/기타', icon: '📅' },
+    { id: '계약서생성기', label: '계약서 생성기', group: '문서/기타', icon: '🧾' },
+    { id: '근무형태이력', label: '근무형태 변경이력', group: '근태/급여', icon: '🔁' },
+    { id: '조기퇴근감지', label: '조기퇴근 감지', group: '근태/급여', icon: '🚶' },
   ],
   관리자: [
-    { id: '경영대시보드', label: '분석 요약', group: '📊 대시보드' },
-    { id: '재무대시보드', label: 'C레벨 재무', group: '📊 대시보드' },
-    { id: '예산관리', label: '예산 관리', group: '📊 대시보드' },
-    { id: '통합보고서', label: '통합 보고서', group: '📊 대시보드' },
-    { id: '회사관리', label: '회사/조직', group: '👥 인사·권한' },
-    { id: '직원권한', label: '직원·권한', group: '👥 인사·권한' },
-    { id: '연차부여', label: '연차 부여', group: '👥 인사·권한' },
-    { id: '알림자동화', label: '알림 자동화', group: '🛠️ 시스템 설정' },
-    { id: '수술검사템플릿', label: '수술·검사명', group: '🛠️ 시스템 설정' },
-    { id: '팝업관리', label: '팝업', group: '🛠️ 시스템 설정' },
-    { id: '양식빌더', label: '양식 빌더', group: '🛠️ 시스템 설정' },
-    { id: '엑셀등록', label: '엑셀 일괄', group: '📁 데이터 관리' },
-    { id: '감사로그', label: '감사 로그', group: '📁 데이터 관리' },
-    { id: '데이터백업', label: '백업/복원', group: '📁 데이터 관리' },
-    { id: '데이터초기화', label: '초기화', group: '📁 데이터 관리' },
+    { id: '경영대시보드', label: '경영 대시보드', group: '대시보드', icon: '📈' },
+    { id: '재무대시보드', label: '재무 대시보드', group: '대시보드', icon: '💹' },
+    { id: '예산관리', label: '예산 관리', group: '대시보드', icon: '🧮' },
+    { id: '통합보고서', label: '통합 보고서', group: '대시보드', icon: '🗂️' },
+    { id: '회사관리', label: '회사 / 조직', group: '권한 / 조직', icon: '🏢' },
+    { id: '직원권한', label: '직원 권한', group: '권한 / 조직', icon: '🔐' },
+    { id: '연차수동부여', label: '연차 수동 부여', group: '권한 / 조직', icon: '🗓️' },
+    { id: '알림자동화', label: '알림 자동화', group: '시스템 설정', icon: '🔔' },
+    { id: '수술검사템플릿', label: '수술 / 검사 템플릿', group: '시스템 설정', icon: '🧪' },
+    { id: '팝업관리', label: '팝업 관리', group: '시스템 설정', icon: '🪟' },
+    { id: '양식빌더', label: '양식 빌더', group: '시스템 설정', icon: '🧱' },
+    { id: '문서서식', label: '문서 서식', group: '시스템 설정', icon: '📄' },
+    { id: '엑셀등록', label: '엑셀 일괄 등록', group: '데이터 관리', icon: '📥' },
+    { id: '급여이상치', label: '급여 이상치 감지', group: '데이터 관리', icon: '⚠️' },
+    { id: '접근감사로그', label: '접근 감사 로그', group: '데이터 관리', icon: '🔍' },
+    { id: '법인손익', label: '법인 손익 현황', group: '데이터 관리', icon: '📊' },
+    { id: '감사로그', label: '감사 로그', group: '데이터 관리', icon: '📜' },
+    { id: '데이터백업', label: '백업 / 복원', group: '데이터 관리', icon: '💾' },
+    { id: '데이터초기화', label: '데이터 초기화', group: '데이터 관리', icon: '♻️' },
+    { id: '공문서대장', label: '공문서 발송 대장', group: '데이터 관리', icon: '📮' },
   ],
 };
 
-export default function Sidebar({ user, mainMenu, subView, onMenuChange, onOpenNotifications }: any) {
+const MAIN_MENUS = [
+  { id: '내정보', icon: '👤', label: '내정보', testId: 'sidebar-menu-home' },
+  { id: '추가기능', icon: '➕', label: '추가기능', testId: 'sidebar-menu-extra' },
+  { id: '채팅', icon: '💬', label: '채팅', testId: 'sidebar-menu-chat' },
+  { id: '게시판', icon: '📋', label: '게시판', testId: 'sidebar-menu-board' },
+  { id: '전자결재', icon: '✍️', label: '전자결재', testId: 'sidebar-menu-approval' },
+  { id: '인사관리', icon: '👥', label: '인사관리', testId: 'sidebar-menu-hr' },
+  { id: '재고관리', icon: '📦', label: '재고관리', testId: 'sidebar-menu-inventory' },
+  { id: '관리자', icon: '⚙️', label: '관리자', testId: 'sidebar-menu-admin' },
+];
 
-  /* 토스 스타일 통일: 단순 아이콘 + 동일 라운드/색상
-   * 조직도는 메인 메뉴에서 제거하고, 추가기능 내부 카드로 진입하도록 구성
-   */
-  const menus = [
-    { id: '내정보', icon: '👤', label: '내 정보' },
-    { id: '추가기능', icon: '➕', label: '추가기능' },
-    { id: '채팅', icon: '💬', label: '채팅' },
-    { id: '게시판', icon: '📌', label: '게시판' },
-    { id: '전자결재', icon: '📝', label: '전자결재' },
-    { id: '인사관리', icon: '👥', label: '인사관리' },
-    { id: '재고관리', icon: '📦', label: '재고관리' },
-    { id: '관리자', icon: '⚙️', label: '관리자' }
-  ];
+export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
+  const permissions = user?.permissions || {};
+  const isMso = user?.company === 'SY INC.' || permissions.mso === true;
 
-  const p = user?.permissions || {};
-  const isMso = user?.company === 'SY INC.' || p.mso === true;
-
-  // 좌측 메인 메뉴는 권한과 상관없이 기본적으로 모두 노출하되,
-  // 관리자 메뉴만 MSO/관리자 또는 명시적 허용(p.menu_관리자 === true)일 때만 표시.
   const canSeeMenu = (menuId: string) => {
     if (menuId === '관리자') {
-      return isMso || user?.role === 'admin' || p.menu_관리자 === true;
+      return isMso || user?.role === 'admin' || permissions.menu_관리자 === true;
     }
+
     if (menuId === '인사관리') {
-      return isMso || p.hr === true || p.menu_인사관리 === true;
+      return isMso || permissions.hr === true || permissions.menu_인사관리 === true;
     }
-    // 개별 메뉴가 명시적으로 false인 경우에만 숨김
-    if (p[`menu_${menuId}`] === false) return false;
-    return true;
+
+    return permissions[`menu_${menuId}`] !== false;
   };
 
-  const visibleMenus = menus.filter(m => canSeeMenu(m.id));
+  const visibleMenus = MAIN_MENUS.filter((menu) => canSeeMenu(menu.id));
 
-  const primaryMenus = visibleMenus.slice(0, 4);
-  const secondaryMenus = visibleMenus.slice(4);
-
-  const handleMenuClick = (menuId: string, subId?: string) => {
-    if (menuId === '내정보') {
+  const handleMenuClick = (menuId: string) => {
+    if (menuId === '내정보' && typeof window !== 'undefined') {
       try {
-        if (typeof window !== 'undefined') window.localStorage.removeItem(MYPAGE_TAB_KEY);
-      } catch { /* ignore */ }
+        window.localStorage.removeItem(MYPAGE_TAB_KEY);
+      } catch {
+        // ignore localStorage failures
+      }
     }
-    onMenuChange(menuId, subId);
+
+    onMenuChange(menuId);
   };
 
   return (
     <>
-      {/* PC 사이드바 — 알림 상단, 메뉴 아래. 클릭 시 해당 메뉴로 이동 (서브메뉴는 본문 영역에서 별도 표시) */}
-      <aside className="hidden md:flex w-[72px] bg-[var(--toss-card)] border-r border-[var(--toss-border)] flex-col items-center py-4 space-y-1 shrink-0 z-50 h-screen shadow-sm relative">
-        <div className="flex flex-col items-center shrink-0 w-full px-2 mb-3">
+      <aside
+        className="relative hidden h-screen w-[72px] shrink-0 flex-col items-center border-r border-[var(--toss-border)] bg-[var(--toss-card)] py-4 shadow-sm md:flex"
+        data-testid="desktop-sidebar"
+      >
+        <div className="mb-3 flex w-full shrink-0 flex-col items-center px-2">
           {user && <NotificationCenter user={user} />}
         </div>
-        <div className="flex-1 flex flex-col space-y-1 overflow-y-auto no-scrollbar w-full px-2">
-          {visibleMenus.map(m => (
+
+        <div className="no-scrollbar flex w-full flex-1 flex-col space-y-1 overflow-y-auto px-2">
+          {visibleMenus.map((menu) => (
             <button
-              key={m.id}
-              onClick={() => handleMenuClick(m.id)}
-              className={`w-full py-2.5 flex flex-col items-center justify-center rounded-[12px] transition-all ${mainMenu === m.id
-                ? 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)]'
-                : 'text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)] hover:text-[var(--foreground)]'
-                }`}
+              key={menu.id}
+              type="button"
+              data-testid={menu.testId}
+              onClick={() => handleMenuClick(menu.id)}
+              className={`flex w-full flex-col items-center justify-center rounded-[12px] py-2.5 transition-all ${
+                mainMenu === menu.id
+                  ? 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)]'
+                  : 'text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)] hover:text-[var(--foreground)]'
+              }`}
             >
-              <span className="text-lg leading-none">{m.icon}</span>
-              <span className="text-[11px] font-medium mt-1">{m.label}</span>
+              <span className="text-[18px] leading-none">{menu.icon}</span>
+              <span className="mt-1 text-[11px] font-medium">{menu.label}</span>
             </button>
           ))}
         </div>
       </aside>
 
-      {/* 모바일 하단 탭바 — 토스 스타일, 전체 메뉴 가로 슬라이드 */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[var(--toss-card)] border-t border-[var(--toss-border)] flex items-center gap-1 py-1 px-2 z-[100] shadow-[0_-2px_8px_rgba(0,0,0,0.04)] safe-area-pb overflow-x-auto no-scrollbar scroll-smooth">
-        {visibleMenus.map(m => (
+      <nav
+        className="safe-area-pb no-scrollbar fixed bottom-0 left-0 right-0 z-[100] flex items-center gap-1 overflow-x-auto border-t border-[var(--toss-border)] bg-[var(--toss-card)] px-2 py-1 shadow-[0_-2px_8px_rgba(0,0,0,0.04)] md:hidden"
+        data-testid="mobile-tabbar"
+      >
+        {visibleMenus.map((menu) => (
           <button
-            key={m.id}
-            onClick={() => handleMenuClick(m.id)}
-            className={`flex flex-col items-center justify-center min-h-[50px] touch-manipulation py-1.5 px-3 min-w-[70px] flex-none transition-all rounded-[12px] ${mainMenu === m.id ? 'text-[var(--toss-blue)]' : 'text-[var(--toss-gray-3)]'
-              }`}
+            key={menu.id}
+            type="button"
+            data-testid={`${menu.testId}-mobile`}
+            onClick={() => handleMenuClick(menu.id)}
+            className={`flex min-h-[50px] min-w-[70px] flex-none touch-manipulation flex-col items-center justify-center rounded-[12px] px-3 py-1.5 transition-all ${
+              mainMenu === menu.id ? 'text-[var(--toss-blue)]' : 'text-[var(--toss-gray-3)]'
+            }`}
           >
-            <span className="text-xl leading-none">{m.icon}</span>
-            <span className="text-[10px] font-bold mt-1 truncate w-full text-center">{m.label}</span>
+            <span className="text-[16px] leading-none">{menu.icon}</span>
+            <span className="mt-1 w-full truncate text-center text-[10px] font-bold">{menu.label}</span>
           </button>
         ))}
         {user && (
-          <div className="flex flex-col items-center justify-center min-h-[50px] py-1.5 px-2 flex-none translate-y-[-2px]">
+          <div className="flex min-h-[50px] flex-none translate-y-[-2px] flex-col items-center justify-center px-2 py-1.5">
             <NotificationCenter user={user} />
           </div>
         )}
       </nav>
-
     </>
   );
 }
