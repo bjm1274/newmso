@@ -23,7 +23,7 @@ export default function AnnualLeavePlanForm({ user, staffs, setExtraData, setFor
             remainingLeave,
             type: 'annual_leave_plan'
         });
-    }, [planDates, remainingLeave, user.name]);
+    }, [planDates, remainingLeave, user.name, setFormTitle, setExtraData]);
 
     const addDateRow = () => {
         setPlanDates([...planDates, { date: '', reason: '연차 촉진에 따른 사용 계획' }]);

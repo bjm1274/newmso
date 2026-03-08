@@ -44,6 +44,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const [draftBanner, setDraftBanner] = useState<boolean>(false);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoSaveMsgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fetchApprovalsRef = useRef<() => void>(() => {});
   const isMso = user?.company === 'SY INC.' || user?.permissions?.mso === true;
 
   const BUILTIN_FORM_TYPES = ['인사명령', '연차/휴가', '연차계획서', '연장근무', '물품신청', '수리요청서', '업무기안', '업무협조', '양식신청', '출결정정'];
@@ -101,7 +102,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     } catch { /* ignore */ }
   }, [initialView]);
 
-  const fetchApprovals = async () => {
+  const fetchApprovals = useCallback(async () => {
     const scopedCompanyId = !isMso ? user?.company_id : selectedCompanyId;
     const scopedCompanyName = !isMso ? user?.company : selectedCo !== '전체' ? selectedCo : null;
     const { data } = await withMissingColumnFallback(
@@ -118,9 +119,12 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       }
     );
     if (data) setApprovals(data as any);
-  };
+  }, [isMso, user?.company_id, user?.company, selectedCompanyId, selectedCo]);
 
-  useEffect(() => { fetchApprovals(); }, [selectedCompanyId, selectedCo, user?.id, user?.company, user?.company_id]);
+  // 항상 최신 fetchApprovals를 ref에 유지 (realtime 클로저 stale 방지)
+  useEffect(() => { fetchApprovalsRef.current = fetchApprovals; }, [fetchApprovals]);
+
+  useEffect(() => { fetchApprovals(); }, [fetchApprovals]);
 
   // 작성하기에서 선택한 유형별로 내가 마지막 상신한 결재 조회 (이전 기안 불러오기용)
   const fetchMyLastApproval = async (type: string) => {
@@ -153,7 +157,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     setExtraData({});
   }, [formType, viewMode]);
 
-  const loadLastDraft = () => {
+  const loadLastDraft = useCallback(() => {
     const last = lastDraftByType[formType];
     if (!last) return;
     setFormTitle(last.title || '');
@@ -166,7 +170,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       if (line.length > 0) setApproverLine(line);
     }
     if (formType === '물품신청' && last.meta_data?.items?.length) setSuppliesLoadKey((k) => k + 1);
-  };
+  }, [lastDraftByType, formType, staffs]);
 
   // 물품신청은 같은 내용을 자주 쓰므로,
   // 작성하기 탭에서 '물품신청'으로 들어왔을 때 마지막 기안을 자동으로 한번 불러와 주고 수정해서 상신할 수 있게 처리
@@ -179,7 +183,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     // 이미 한번 불러온 상태라면(품목 초기화용 키 사용) 다시 불러오지 않음
     if (suppliesLoadKey > 0) return;
     loadLastDraft();
-  }, [viewMode, formType, lastDraftByType, formTitle, formContent, suppliesLoadKey]);
+  }, [viewMode, formType, lastDraftByType, formTitle, formContent, suppliesLoadKey, loadLastDraft]);
 
   // 작성하기 마운트 시 임시저장 여부 확인
   useEffect(() => {
@@ -289,7 +293,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     const channel = supabase
       .channel('approvals-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'approvals' }, () => {
-        fetchApprovals();
+        fetchApprovalsRef.current();
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
