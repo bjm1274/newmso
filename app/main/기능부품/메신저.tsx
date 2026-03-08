@@ -361,7 +361,16 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     async (rooms: any[]) => {
       if (!user?.id || !rooms?.length) return;
       try {
-        const roomIds = rooms.map((r: any) => r.id);
+        // 내가 멤버인 방만 카운트 (NOTICE_ROOM_ID 포함)
+        const myRooms = rooms.filter((r: any) => {
+          if (r.id === NOTICE_ROOM_ID) return true;
+          if (Array.isArray(r.members)) {
+            return r.members.some((id: any) => String(id) === String(user.id));
+          }
+          return false;
+        });
+        if (!myRooms.length) return;
+        const roomIds = myRooms.map((r: any) => r.id);
         const { data: cursors } = await supabase
           .from('room_read_cursors')
           .select('room_id, last_read_at')
@@ -916,7 +925,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         if (Array.isArray(room.members)) {
           return room.members.some((id: any) => String(id) === String(user?.id));
         }
-        return true;
+        return false;
       }),
     [chatRooms, user?.id]
   );
@@ -1031,11 +1040,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         .update({ members: newMembers })
         .eq('id', selectedRoom.id);
 
-      setChatRooms((prev) =>
-        prev.map((room: any) =>
-          room.id === selectedRoom.id ? { ...room, members: newMembers } : room
-        )
-      );
+      const leftRoomId = selectedRoom.id;
+      // 방 목록에서 즉시 제거 (실시간 재로드로 덮어쓰이기 전에)
+      setChatRooms((prev) => prev.filter((room: any) => room.id !== leftRoomId));
+      setRoomUnreadCounts((prev) => {
+        const next = { ...prev };
+        delete next[leftRoomId];
+        return next;
+      });
       setRoom(null);
       setMessages([]);
       alert('채팅방에서 나갔습니다.');
