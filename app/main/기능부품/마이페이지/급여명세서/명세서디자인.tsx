@@ -126,7 +126,7 @@ function TableRow({ label, value }: any) {
   return (
     <tr>
       <td className="py-2.5 text-[var(--toss-gray-4)] font-bold">{label}</td>
-      <td className="py-2.5 text-right text-[var(--foreground)] font-semibold text-base">₩{value.toLocaleString()}</td>
+      <td className="py-2.5 text-right text-[var(--foreground)] font-semibold text-base">₩{(value ?? 0).toLocaleString()}</td>
     </tr>
   );
 }

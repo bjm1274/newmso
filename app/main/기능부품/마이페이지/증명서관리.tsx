@@ -9,6 +9,10 @@ export default function MyCertificates({ user }: any) {
 
   useEffect(() => {
     const fetchData = async () => {
+      if (!user?.id) {
+        setLoading(false);
+        return;
+      }
       const approvalRes = await supabase.from('approvals').select('*').eq('sender_id', user.id).eq('status', '승인').eq('type', '양식신청').order('created_at', { ascending: false });
       setApprovedDocs(approvalRes.data || []);
       const certRes = await supabase.from('certificate_issuances').select('*, staff_members(name)').eq('staff_id', user.id).order('issued_at', { ascending: false }).limit(20);
