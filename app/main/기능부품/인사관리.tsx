@@ -33,6 +33,9 @@ import AnnualLeaveExpiryAlert from './인사관리서브/연차소멸알림';
 import HolidayCalendar from './인사관리서브/공휴일달력';
 import LatenessPatternAnalysis from './인사관리서브/지각조퇴분석';
 import IncidentReport from './인사관리서브/사고보고서';
+import WorkTypeChangeHistory from './인사관리서브/근무형태변경이력';
+import EarlyLeavingDetection from './인사관리서브/조기퇴근감지';
+import ContractAutoGenerator from './인사관리서브/계약서자동생성';
 
 // 기본 함수 이름을 영문 대문자로 시작하도록 변경해
 // React ESLint 규칙을 만족시킵니다. default export 이므로
@@ -41,7 +44,7 @@ const HR_TAB_KEY = 'erp_hr_tab';
 const HR_COMPANY_KEY = 'erp_hr_company';
 const HR_STATUS_KEY = 'erp_hr_status';
 
-const HR_MENU_IDS = ['구성원', '계약', '문서보관함', '교육', '근태', '교대근무', '급여', '연차/휴가', '캘린더', '비품대여', '증명서', '서류제출', '오프보딩', '원천징수파일', '4대보험', '건강검진', '경조사', '인사발령', '포상/징계', '생일/기념일', '조직도', '스킬매트릭스', '회의실예약', '차량배차', '간호근무표', '면허/자격증', '의료기기점검', '칭찬배지', '연차소멸알림', '공휴일달력', '지각조퇴분석', '사고보고서'];
+const HR_MENU_IDS = ['구성원', '계약', '문서보관함', '교육', '근태', '교대근무', '급여', '연차/휴가', '캘린더', '비품대여', '증명서', '서류제출', '오프보딩', '원천징수파일', '4대보험', '건강검진', '경조사', '인사발령', '포상/징계', '생일/기념일', '조직도', '스킬매트릭스', '회의실예약', '차량배차', '간호근무표', '면허/자격증', '의료기기점검', '칭찬배지', '연차소멸알림', '공휴일달력', '지각조퇴분석', '사고보고서', '근무형태이력', '조기퇴근감지', '계약서생성기'];
 
 export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu }: any) {
   const [현재메뉴, 메뉴설정] = useState(initialMenu && HR_MENU_IDS.includes(initialMenu) ? initialMenu : '구성원');
@@ -87,6 +90,9 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
     { id: '공휴일달력', perm: 'hr_근태', icon: '📅', group: '근태/급여' },
     { id: '지각조퇴분석', perm: 'hr_근태', icon: '📊', group: '근태/급여' },
     { id: '사고보고서', perm: 'hr_구성원', icon: '🚨', group: '복무/복지' },
+    { id: '근무형태이력', perm: 'hr_구성원', icon: '🔄', group: '근태/급여' },
+    { id: '조기퇴근감지', perm: 'hr_근태', icon: '🚶', group: '근태/급여' },
+    { id: '계약서생성기', perm: 'hr_계약', icon: '📝', group: '문서/기타' },
   ];
   const visibleHrTabs = HR_TABS.filter(t => p[t.perm] !== false);
   const activeMenu = visibleHrTabs.some(t => t.id === 현재메뉴) ? 현재메뉴 : (visibleHrTabs[0]?.id || '구성원');
@@ -321,6 +327,9 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
           {activeMenu === '공휴일달력' && <HolidayCalendar staffs={staffs} selectedCo={선택사업체} user={user} />}
           {activeMenu === '지각조퇴분석' && <LatenessPatternAnalysis staffs={staffs} selectedCo={선택사업체} user={user} />}
           {activeMenu === '사고보고서' && <IncidentReport staffs={staffs} selectedCo={선택사업체} user={user} />}
+          {activeMenu === '근무형태이력' && <WorkTypeChangeHistory staffs={staffs} selectedCo={선택사업체} user={user} />}
+          {activeMenu === '조기퇴근감지' && <EarlyLeavingDetection staffs={staffs} selectedCo={선택사업체} user={user} />}
+          {activeMenu === '계약서생성기' && <ContractAutoGenerator staffs={staffs} selectedCo={선택사업체} user={user} />}
         </section>
       </main>
     </div>
