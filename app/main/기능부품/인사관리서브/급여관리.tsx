@@ -29,6 +29,11 @@ import InsuranceEDI from './급여명세/4대보험EDI';
 import RetirementPensionManager from './급여명세/퇴직연금관리';
 import WagePeakCalculator from './급여명세/임금피크제';
 import MinWageChecker from './급여명세/최저임금체크';
+import OrdinaryWageCalculator from './급여명세/통상임금계산기';
+import TaxFreeLimitChecker from './급여명세/비과세한도체크';
+import TotalLaborCostForecast from './급여명세/총인건비예측';
+import GrossNetComparison from './급여명세/세전세후비교';
+import UnpaidAllowanceAlert from './급여명세/미지급수당알림';
 
 type Staff = {
   id: number;
@@ -92,6 +97,11 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
     { id: '퇴직연금', label: '퇴직연금', icon: '💼' },
     { id: '임금피크제', label: '임금피크제', icon: '📉' },
     { id: '최저임금', label: '최저임금 체크', icon: '⚠️' },
+    { id: '통상임금', label: '통상임금 계산기', icon: '🧮' },
+    { id: '비과세체크', label: '비과세 한도 체크', icon: '⚠️' },
+    { id: '총인건비예측', label: '총인건비 예측', icon: '📈' },
+    { id: '세전세후', label: '세전/세후 비교', icon: '💹' },
+    { id: '미지급수당', label: '미지급 수당 알림', icon: '🔔' },
   ];
 
   return (
@@ -221,6 +231,11 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
             {activeTab === '퇴직연금' && <RetirementPensionManager staffs={filtered} selectedCo={selectedCo} user={null} />}
             {activeTab === '임금피크제' && <WagePeakCalculator staffs={filtered} selectedCo={selectedCo} user={null} />}
             {activeTab === '최저임금' && <MinWageChecker staffs={filtered} selectedCo={selectedCo} user={null} />}
+            {activeTab === '통상임금' && <OrdinaryWageCalculator staffs={filtered} selectedCo={selectedCo} user={null} />}
+            {activeTab === '비과세체크' && <TaxFreeLimitChecker staffs={filtered} selectedCo={selectedCo} user={null} />}
+            {activeTab === '총인건비예측' && <TotalLaborCostForecast staffs={filtered} selectedCo={selectedCo} user={null} />}
+            {activeTab === '세전세후' && <GrossNetComparison staffs={filtered} selectedCo={selectedCo} user={null} />}
+            {activeTab === '미지급수당' && <UnpaidAllowanceAlert staffs={filtered} selectedCo={selectedCo} user={null} />}
           </>
         ) : (
           <div className="h-full flex items-center justify-center bg-[var(--toss-card)] border border-dashed border-[var(--toss-border)] rounded-[24px] p-20">
