@@ -29,6 +29,10 @@ import NurseSchedule from './인사관리서브/간호근무표';
 import LicenseManager from './인사관리서브/면허자격증관리';
 import MedicalDeviceInspection from './인사관리서브/의료기기점검';
 import PraisesBadges from './인사관리서브/칭찬배지';
+import AnnualLeaveExpiryAlert from './인사관리서브/연차소멸알림';
+import HolidayCalendar from './인사관리서브/공휴일달력';
+import LatenessPatternAnalysis from './인사관리서브/지각조퇴분석';
+import IncidentReport from './인사관리서브/사고보고서';
 
 // 기본 함수 이름을 영문 대문자로 시작하도록 변경해
 // React ESLint 규칙을 만족시킵니다. default export 이므로
@@ -37,7 +41,7 @@ const HR_TAB_KEY = 'erp_hr_tab';
 const HR_COMPANY_KEY = 'erp_hr_company';
 const HR_STATUS_KEY = 'erp_hr_status';
 
-const HR_MENU_IDS = ['구성원', '계약', '문서보관함', '교육', '근태', '교대근무', '급여', '연차/휴가', '캘린더', '비품대여', '증명서', '서류제출', '오프보딩', '원천징수파일', '4대보험', '건강검진', '경조사', '인사발령', '포상/징계', '생일/기념일', '조직도', '스킬매트릭스', '회의실예약', '차량배차', '간호근무표', '면허/자격증', '의료기기점검', '칭찬배지'];
+const HR_MENU_IDS = ['구성원', '계약', '문서보관함', '교육', '근태', '교대근무', '급여', '연차/휴가', '캘린더', '비품대여', '증명서', '서류제출', '오프보딩', '원천징수파일', '4대보험', '건강검진', '경조사', '인사발령', '포상/징계', '생일/기념일', '조직도', '스킬매트릭스', '회의실예약', '차량배차', '간호근무표', '면허/자격증', '의료기기점검', '칭찬배지', '연차소멸알림', '공휴일달력', '지각조퇴분석', '사고보고서'];
 
 export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu }: any) {
   const [현재메뉴, 메뉴설정] = useState(initialMenu && HR_MENU_IDS.includes(initialMenu) ? initialMenu : '구성원');
@@ -79,6 +83,10 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
     { id: '증명서', perm: 'hr_증명서', icon: '📄', group: '문서/기타' },
     { id: '서류제출', perm: 'hr_구성원', icon: '📤', group: '문서/기타' },
     { id: '캘린더', perm: 'hr_캘린더', icon: '📅', group: '문서/기타' },
+    { id: '연차소멸알림', perm: 'hr_연차휴가', icon: '⏰', group: '근태/급여' },
+    { id: '공휴일달력', perm: 'hr_근태', icon: '📅', group: '근태/급여' },
+    { id: '지각조퇴분석', perm: 'hr_근태', icon: '📊', group: '근태/급여' },
+    { id: '사고보고서', perm: 'hr_구성원', icon: '🚨', group: '복무/복지' },
   ];
   const visibleHrTabs = HR_TABS.filter(t => p[t.perm] !== false);
   const activeMenu = visibleHrTabs.some(t => t.id === 현재메뉴) ? 현재메뉴 : (visibleHrTabs[0]?.id || '구성원');
@@ -309,6 +317,10 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
           {activeMenu === '면허/자격증' && <LicenseManager staffs={staffs} selectedCo={선택사업체} user={user} />}
           {activeMenu === '의료기기점검' && <MedicalDeviceInspection selectedCo={선택사업체} user={user} />}
           {activeMenu === '칭찬배지' && <PraisesBadges staffs={staffs} selectedCo={선택사업체} user={user} />}
+          {activeMenu === '연차소멸알림' && <AnnualLeaveExpiryAlert staffs={staffs} selectedCo={선택사업체} user={user} />}
+          {activeMenu === '공휴일달력' && <HolidayCalendar staffs={staffs} selectedCo={선택사업체} user={user} />}
+          {activeMenu === '지각조퇴분석' && <LatenessPatternAnalysis staffs={staffs} selectedCo={선택사업체} user={user} />}
+          {activeMenu === '사고보고서' && <IncidentReport staffs={staffs} selectedCo={선택사업체} user={user} />}
         </section>
       </main>
     </div>
