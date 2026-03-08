@@ -34,6 +34,8 @@ import TaxFreeLimitChecker from './급여명세/비과세한도체크';
 import TotalLaborCostForecast from './급여명세/총인건비예측';
 import GrossNetComparison from './급여명세/세전세후비교';
 import UnpaidAllowanceAlert from './급여명세/미지급수당알림';
+import PayrollAdvancedCenter from './급여명세/급여고도화센터';
+import UnpaidAbsenceDeduction from './급여명세/무급결근차감';
 
 type Staff = {
   id: number;
@@ -102,10 +104,15 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
     { id: '총인건비예측', label: '총인건비 예측', icon: '📈' },
     { id: '세전세후', label: '세전/세후 비교', icon: '💹' },
     { id: '미지급수당', label: '미지급 수당 알림', icon: '🔔' },
+    { id: '급여고도화', label: '급여 고도화', icon: '🧩' },
+    { id: '무급결근차감', label: '무급 결근 차감', icon: '📉' },
   ];
 
   return (
-    <div className="flex flex-col h-full animate-in fade-in duration-500 app-page">
+    <div
+      className="flex flex-col h-full animate-in fade-in duration-500 app-page"
+      data-testid="payroll-view"
+    >
       {/* 🚀 Header: Reordered and group context with tabs */}
       <header className="sticky top-0 z-30 flex flex-col md:flex-row md:items-center justify-between p-6 md:p-8 bg-[var(--toss-card)] border-b border-[var(--toss-border)] gap-6 shadow-sm">
         <div className="flex flex-col gap-1 shrink-0">
@@ -236,6 +243,16 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
             {activeTab === '총인건비예측' && <TotalLaborCostForecast staffs={filtered} selectedCo={selectedCo} user={null} />}
             {activeTab === '세전세후' && <GrossNetComparison staffs={filtered} selectedCo={selectedCo} user={null} />}
             {activeTab === '미지급수당' && <UnpaidAllowanceAlert staffs={filtered} selectedCo={selectedCo} user={null} />}
+            {activeTab === '급여고도화' && (
+              <PayrollAdvancedCenter
+                staffs={staffs}
+                selectedCo={selectedCo}
+                yearMonth={yearMonth}
+                payrollRecords={payrollRecords}
+                onRefresh={onRefresh}
+              />
+            )}
+            {activeTab === '무급결근차감' && <UnpaidAbsenceDeduction staffs={filtered} selectedCo={selectedCo} user={null} />}
           </>
         ) : (
           <div className="h-full flex items-center justify-center bg-[var(--toss-card)] border border-dashed border-[var(--toss-border)] rounded-[24px] p-20">
