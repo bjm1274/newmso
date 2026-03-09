@@ -38,6 +38,8 @@ export type MockFixtures = {
   payrollRecords?: any[];
   boardPosts?: any[];
   companies?: any[];
+  workShifts?: any[];
+  orgTeams?: any[];
   approvalFormTypes?: any[];
   systemConfigs?: any[];
 };
@@ -115,6 +117,8 @@ function buildFixtures(overrides: MockFixtures = {}) {
           is_active: true,
         },
       ],
+    workShifts: overrides.workShifts ?? [],
+    orgTeams: overrides.orgTeams ?? [],
     approvalFormTypes: overrides.approvalFormTypes ?? [],
     systemConfigs:
       overrides.systemConfigs ?? [
@@ -216,6 +220,7 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
   const approvals = [...fixtures.approvals];
   let messages = [...fixtures.messages];
   let chatRooms = [...fixtures.chatRooms];
+  let workShifts = [...fixtures.workShifts];
   let messageInsertFailures = fixtures.messageInsertFailures;
 
   const updateChatRoomMeta = (roomId?: string, content?: string | null, createdAt?: string) => {
@@ -286,6 +291,10 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
       return json(route, fixtures.companies);
     }
 
+    if (path.includes('/org_teams')) {
+      return json(route, fixtures.orgTeams);
+    }
+
     if (path.includes('/approval_form_types')) {
       return json(route, fixtures.approvalFormTypes);
     }
@@ -333,6 +342,43 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
         return json(route, approvals);
       }
       return json(route, approvals);
+    }
+
+    if (path.includes('/work_shifts')) {
+      if (method === 'GET') {
+        return json(route, workShifts);
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const inserted = payloads.map((payload: any, index: number) => ({
+          id: payload.id || `shift-${workShifts.length + index + 1}`,
+          created_at: payload.created_at || new Date().toISOString(),
+          is_active: payload.is_active ?? true,
+          ...payload,
+        }));
+        workShifts = [...workShifts, ...inserted];
+        return json(route, wantsObject ? inserted[0] : inserted);
+      }
+
+      if (method === 'PATCH') {
+        const targetId = url.searchParams.get('id')?.replace('eq.', '') || null;
+        const body = request.postDataJSON();
+        workShifts = workShifts.map((shift: any) =>
+          !targetId || shift.id === targetId ? { ...shift, ...body } : shift
+        );
+        const updated = targetId ? workShifts.find((shift: any) => shift.id === targetId) ?? null : workShifts;
+        return json(route, wantsObject ? updated : Array.isArray(updated) ? updated : [updated]);
+      }
+
+      if (method === 'DELETE') {
+        const targetId = url.searchParams.get('id')?.replace('eq.', '') || null;
+        workShifts = workShifts.filter((shift: any) => shift.id !== targetId);
+        return json(route, []);
+      }
+
+      return json(route, workShifts);
     }
 
     if (path.includes('/payroll_records')) {

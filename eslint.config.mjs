@@ -35,9 +35,13 @@ const eslintConfig = defineConfig([
     ".next/**",
     "out/**",
     "build/**",
+    "test-results/**",
+    "playwright-report/**",
     "next-env.d.ts",
     // Next.js에서 사용하지 않는 레거시 샘플 디렉터리
     "main/**",
+    // 작업 중 생성된 별도 worktree는 실제 앱 검증 대상에서 제외
+    ".claude/**",
   ]),
 ]);
 

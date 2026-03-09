@@ -433,7 +433,6 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       }
       onConsumeOpenChatRoomId?.();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialOpenChatRoomId, initialOpenMessageId]);
 
   useEffect(() => {
@@ -582,7 +581,6 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     };
     loadRooms();
     // selectedRoomId는 의도적으로 제외 — 채팅방 목록은 마운트 시 1회만 로드
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [updateUnreadForRooms]);
 
   useEffect(() => {
@@ -688,7 +686,6 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       supabase.removeChannel(channel);
     };
     // selectedRoomId는 의도적으로 제외 — 전역 메시지 채널은 user 기준으로만 구독
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, updateUnreadForRooms]);
 
   useEffect(() => {
@@ -829,7 +826,6 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       channel.close();
     };
     // 마운트 시 1회만 실행 — selectedRoomId·fetchData는 ref로 최신값 참조
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [updateUnreadForRooms]);
 
   useEffect(() => {
@@ -1234,7 +1230,6 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       }));
       console.error('message send failed', error);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedRoomId, user?.id, user?.name, user?.avatar_url, replyTo, inputMsg, canWriteNotice, scrollToBottom, broadcastChatSync, emitTypingState]);
 
   const retryFailedMessage = useCallback(async (messageId: string) => {

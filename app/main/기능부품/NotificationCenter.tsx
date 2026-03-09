@@ -83,9 +83,14 @@ export default function NotificationCenter({ user }: { user: any }) {
     window.addEventListener('erp-new-notification', handleNewNotification);
     document.addEventListener('mousedown', handleClickOutside);
 
+    const fallbackPoll = window.setInterval(() => {
+      void fetchNotifications();
+    }, 10000);
+
     return () => {
       window.removeEventListener('erp-new-notification', handleNewNotification);
       document.removeEventListener('mousedown', handleClickOutside);
+      window.clearInterval(fallbackPoll);
     };
   }, [user?.id, fetchNotifications]);
 
@@ -178,6 +183,7 @@ export default function NotificationCenter({ user }: { user: any }) {
         data-testid="notification-bell"
         onClick={() => {
           setIsOpen(!isOpen);
+          if (!isOpen) void fetchNotifications();
           if (!isOpen) sound.playSystem();
         }}
         className="relative p-2.5 rounded-[14px] hover:bg-[var(--toss-gray-1)] transition-all group touch-manipulation"
