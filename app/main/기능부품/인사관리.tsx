@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { canAccessHrSection, canAccessMainMenu } from '@/lib/access-control';
 import 구성원관리 from './인사관리서브/구성원현황';
 import CertificateGenerator from './인사관리서브/증명서발급';
 import PayrollMain from './인사관리서브/급여관리';
@@ -37,87 +38,131 @@ import WorkTypeChangeHistory from './인사관리서브/근무형태변경이력
 import EarlyLeavingDetection from './인사관리서브/조기퇴근감지';
 import ContractAutoGenerator from './인사관리서브/계약서자동생성';
 
-// 기본 함수 이름을 영문 대문자로 시작하도록 변경해
-// React ESLint 규칙을 만족시킵니다. default export 이므로
-// 외부에서의 import 이름(인사관리)은 그대로 유지됩니다.
 const HR_TAB_KEY = 'erp_hr_tab';
 const HR_COMPANY_KEY = 'erp_hr_company';
 const HR_STATUS_KEY = 'erp_hr_status';
+const HR_WORKSPACE_KEY = 'erp_hr_workspace';
 
-const HR_MENU_IDS = ['구성원', '계약', '문서보관함', '교육', '근태', '교대근무', '급여', '연차/휴가', '캘린더', '비품대여', '증명서', '서류제출', '오프보딩', '원천징수파일', '4대보험', '건강검진', '경조사', '인사발령', '포상/징계', '생일/기념일', '조직도', '스킬매트릭스', '회의실예약', '차량배차', '간호근무표', '면허/자격증', '의료기기점검', '칭찬배지', '연차소멸알림', '공휴일달력', '지각조퇴분석', '사고보고서', '근무형태이력', '조기퇴근감지', '계약서생성기'];
+type HrWorkspaceId = '인력관리' | '근태 · 급여' | '복지 · 문서';
+
+const HR_WORKSPACES: { id: HrWorkspaceId; label: string; icon: string; groups: string[] }[] = [
+  { id: '인력관리', label: '인력관리', icon: '👥', groups: ['인력관리'] },
+  { id: '근태 · 급여', label: '근태 · 급여', icon: '💰', groups: ['근태/급여'] },
+  { id: '복지 · 문서', label: '복지 · 문서', icon: '📂', groups: ['복무/복지', '문서/기타'] },
+];
+
+const HR_GROUP_LABELS: Record<string, string> = {
+  인력관리: '👥 인력관리',
+  '근태/급여': '💰 근태 · 급여',
+  '복무/복지': '🏥 복무 · 복지',
+  '문서/기타': '📂 문서 · 기타',
+};
+
+const HR_TAB_DEFS = [
+  { id: '구성원', label: '구성원', perm: 'hr_구성원', icon: '👥', group: '인력관리' },
+  { id: '인사발령', label: '인사발령', perm: 'hr_구성원', icon: '📋', group: '인력관리' },
+  { id: '포상/징계', label: '포상 / 징계', perm: 'hr_구성원', icon: '🏅', group: '인력관리' },
+  { id: '교육', label: '교육', perm: 'hr_교육', icon: '📚', group: '인력관리' },
+  { id: '조직도', label: '조직도 편집', perm: 'hr_구성원', icon: '🌳', group: '인력관리' },
+  { id: '스킬매트릭스', label: '스킬매트릭스', perm: 'hr_구성원', icon: '📊', group: '인력관리' },
+  { id: '오프보딩', label: '오프보딩', perm: 'hr_구성원', icon: '🚪', group: '인력관리' },
+  { id: '근태', label: '근태', perm: 'hr_근태', icon: '⏰', group: '근태/급여' },
+  { id: '교대근무', label: '교대근무', perm: 'hr_교대근무', icon: '🔄', group: '근태/급여' },
+  { id: '연차/휴가', label: '연차 / 휴가', perm: 'hr_연차휴가', icon: '🌴', group: '근태/급여' },
+  { id: '급여', label: '급여', perm: 'hr_급여', icon: '💰', group: '근태/급여' },
+  { id: '원천징수파일', label: '세무 파일', perm: 'hr_급여', icon: '📊', group: '근태/급여' },
+  { id: '간호근무표', label: '간호근무표', perm: 'hr_근태', icon: '🏥', group: '근태/급여' },
+  { id: '연차소멸알림', label: '연차소멸알림', perm: 'hr_연차휴가', icon: '⏰', group: '근태/급여' },
+  { id: '공휴일달력', label: '공휴일달력', perm: 'hr_근태', icon: '📅', group: '근태/급여' },
+  { id: '지각조퇴분석', label: '지각조퇴분석', perm: 'hr_근태', icon: '📊', group: '근태/급여' },
+  { id: '근무형태이력', label: '근무형태이력', perm: 'hr_구성원', icon: '🔄', group: '근태/급여' },
+  { id: '조기퇴근감지', label: '조기퇴근감지', perm: 'hr_근태', icon: '🚶', group: '근태/급여' },
+  { id: '4대보험', label: '4대보험', perm: 'hr_구성원', icon: '🏛️', group: '복무/복지' },
+  { id: '건강검진', label: '건강검진', perm: 'hr_구성원', icon: '🩺', group: '복무/복지' },
+  { id: '경조사', label: '경조사 지원', perm: 'hr_구성원', icon: '🎊', group: '복무/복지' },
+  { id: '생일/기념일', label: '생일 / 기념일', perm: 'hr_구성원', icon: '🎂', group: '복무/복지' },
+  { id: '회의실예약', label: '회의실예약', perm: 'hr_구성원', icon: '🏢', group: '복무/복지' },
+  { id: '차량배차', label: '차량배차', perm: 'hr_구성원', icon: '🚗', group: '복무/복지' },
+  { id: '면허/자격증', label: '면허 / 자격증', perm: 'hr_구성원', icon: '📜', group: '복무/복지' },
+  { id: '의료기기점검', label: '의료기기점검', perm: 'hr_구성원', icon: '🔧', group: '복무/복지' },
+  { id: '칭찬배지', label: '칭찬배지', perm: 'hr_구성원', icon: '⭐', group: '복무/복지' },
+  { id: '비품대여', label: '비품대여', perm: 'hr_비품대여', icon: '📦', group: '복무/복지' },
+  { id: '사고보고서', label: '사고보고서', perm: 'hr_구성원', icon: '🚨', group: '복무/복지' },
+  { id: '계약', label: '계약 관리', perm: 'hr_계약', icon: '📝', group: '문서/기타' },
+  { id: '문서보관함', label: '문서보관함', perm: 'hr_문서보관함', icon: '📁', group: '문서/기타' },
+  { id: '증명서', label: '증명서 발급', perm: 'hr_증명서', icon: '📄', group: '문서/기타' },
+  { id: '서류제출', label: '서류 제출 관리', perm: 'hr_구성원', icon: '📤', group: '문서/기타' },
+  { id: '캘린더', label: '캘린더', perm: 'hr_캘린더', icon: '📅', group: '문서/기타' },
+  { id: '계약서생성기', label: '계약서 생성기', perm: 'hr_계약', icon: '📝', group: '문서/기타' },
+];
+
+const HR_MENU_IDS = HR_TAB_DEFS.map((tab) => tab.id);
+
+function getWorkspaceForHrMenu(menuId: string): HrWorkspaceId {
+  const tab = HR_TAB_DEFS.find((item) => item.id === menuId);
+  if (!tab) return '인력관리';
+  if (tab.group === '인력관리') return '인력관리';
+  if (tab.group === '근태/급여') return '근태 · 급여';
+  return '복지 · 문서';
+}
 
 export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu }: any) {
   const [현재메뉴, 메뉴설정] = useState(initialMenu && HR_MENU_IDS.includes(initialMenu) ? initialMenu : '구성원');
+  const [선택워크스페이스, 워크스페이스설정] = useState<HrWorkspaceId>(
+    getWorkspaceForHrMenu(initialMenu && HR_MENU_IDS.includes(initialMenu) ? initialMenu : '구성원')
+  );
   const [선택사업체, 사업체설정] = useState('전체');
   const [등록창상태, 창상태설정] = useState(false);
   const [직원상태필터, 직원상태필터설정] = useState<'재직' | '퇴사'>('재직');
   const [문서연결대상, 문서연결대상설정] = useState<{ id?: string; name?: string } | undefined>(undefined);
 
-  const 사업체목록 = ["전체", "박철홍정형외과", "수연의원", "SY INC."];
-  const p = user?.permissions || {};
-  const hasAccess = p.mso === true || user?.company === 'SY INC.' || p.hr === true || p.menu_인사관리 === true;
+  const 사업체목록 = ['전체', '박철홍정형외과', '수연의원', 'SY INC.'];
+  const hasAccess = canAccessMainMenu(user, '인사관리');
+  const visibleHrTabs = HR_TAB_DEFS.filter((tab) => canAccessHrSection(user, tab.perm));
+  const visibleHrTabIds = visibleHrTabs.map((tab) => tab.id);
+  const visibleHrTabKey = visibleHrTabIds.join('|');
+  const activeMenu = visibleHrTabs.some((tab) => tab.id === 현재메뉴) ? 현재메뉴 : (visibleHrTabs[0]?.id || '구성원');
+  const availableWorkspaces = HR_WORKSPACES.filter((workspace) =>
+    visibleHrTabs.some((tab) => workspace.groups.includes(tab.group))
+  );
+  const activeWorkspace = availableWorkspaces.some((workspace) => workspace.id === 선택워크스페이스)
+    ? 선택워크스페이스
+    : (availableWorkspaces[0]?.id || '인력관리');
+  const activeWorkspaceConfig = HR_WORKSPACES.find((workspace) => workspace.id === activeWorkspace) || HR_WORKSPACES[0];
+  const workspaceTabs = visibleHrTabs.filter((tab) => activeWorkspaceConfig.groups.includes(tab.group));
 
-  const HR_TABS = [
-    { id: '구성원', perm: 'hr_구성원', icon: '👥', group: '인력관리' },
-    { id: '인사발령', perm: 'hr_구성원', icon: '📋', group: '인력관리' },
-    { id: '포상/징계', perm: 'hr_구성원', icon: '🏅', group: '인력관리' },
-    { id: '교육', perm: 'hr_교육', icon: '📚', group: '인력관리' },
-    { id: '조직도', perm: 'hr_구성원', icon: '🌳', group: '인력관리' },
-    { id: '스킬매트릭스', perm: 'hr_구성원', icon: '📊', group: '인력관리' },
-    { id: '오프보딩', perm: 'hr_구성원', icon: '🚪', group: '인력관리' },
-    { id: '근태', perm: 'hr_근태', icon: '⏰', group: '근태/급여' },
-    { id: '교대근무', perm: 'hr_교대근무', icon: '🔄', group: '근태/급여' },
-    { id: '연차/휴가', perm: 'hr_연차휴가', icon: '🌴', group: '근태/급여' },
-    { id: '급여', perm: 'hr_급여', icon: '💰', group: '근태/급여' },
-    { id: '원천징수파일', perm: 'hr_급여', icon: '📊', group: '근태/급여' },
-    { id: '간호근무표', perm: 'hr_근태', icon: '🏥', group: '근태/급여' },
-    { id: '4대보험', perm: 'hr_구성원', icon: '🏛️', group: '복무/복지' },
-    { id: '건강검진', perm: 'hr_구성원', icon: '🩺', group: '복무/복지' },
-    { id: '경조사', perm: 'hr_구성원', icon: '🎊', group: '복무/복지' },
-    { id: '생일/기념일', perm: 'hr_구성원', icon: '🎂', group: '복무/복지' },
-    { id: '회의실예약', perm: 'hr_구성원', icon: '🏢', group: '복무/복지' },
-    { id: '차량배차', perm: 'hr_구성원', icon: '🚗', group: '복무/복지' },
-    { id: '면허/자격증', perm: 'hr_구성원', icon: '📜', group: '복무/복지' },
-    { id: '의료기기점검', perm: 'hr_구성원', icon: '🔧', group: '복무/복지' },
-    { id: '칭찬배지', perm: 'hr_구성원', icon: '⭐', group: '복무/복지' },
-    { id: '비품대여', perm: 'hr_비품대여', icon: '📦', group: '복무/복지' },
-    { id: '계약', perm: 'hr_계약', icon: '📝', group: '문서/기타' },
-    { id: '문서보관함', perm: 'hr_문서보관함', icon: '📁', group: '문서/기타' },
-    { id: '증명서', perm: 'hr_증명서', icon: '📄', group: '문서/기타' },
-    { id: '서류제출', perm: 'hr_구성원', icon: '📤', group: '문서/기타' },
-    { id: '캘린더', perm: 'hr_캘린더', icon: '📅', group: '문서/기타' },
-    { id: '연차소멸알림', perm: 'hr_연차휴가', icon: '⏰', group: '근태/급여' },
-    { id: '공휴일달력', perm: 'hr_근태', icon: '📅', group: '근태/급여' },
-    { id: '지각조퇴분석', perm: 'hr_근태', icon: '📊', group: '근태/급여' },
-    { id: '사고보고서', perm: 'hr_구성원', icon: '🚨', group: '복무/복지' },
-    { id: '근무형태이력', perm: 'hr_구성원', icon: '🔄', group: '근태/급여' },
-    { id: '조기퇴근감지', perm: 'hr_근태', icon: '🚶', group: '근태/급여' },
-    { id: '계약서생성기', perm: 'hr_계약', icon: '📝', group: '문서/기타' },
-  ];
-  const visibleHrTabs = HR_TABS.filter(t => p[t.perm] !== false);
-  const activeMenu = visibleHrTabs.some(t => t.id === 현재메뉴) ? 현재메뉴 : (visibleHrTabs[0]?.id || '구성원');
+  const handleWorkspaceChange = (workspaceId: HrWorkspaceId) => {
+    워크스페이스설정(workspaceId);
+    const workspaceConfig = HR_WORKSPACES.find((workspace) => workspace.id === workspaceId);
+    if (!workspaceConfig) return;
+    if (!workspaceConfig.groups.some((group) => visibleHrTabs.some((tab) => tab.id === activeMenu && tab.group === group))) {
+      const nextTab = visibleHrTabs.find((tab) => workspaceConfig.groups.includes(tab.group));
+      if (nextTab) {
+        메뉴설정(nextTab.id);
+      }
+    }
+  };
 
-  // 그룹 순서 및 라벨
-  const GROUP_ORDER = ['인력관리', '근태/급여', '복무/복지', '문서/기타'];
-  const GROUP_LABELS: Record<string, string> = { '인력관리': '👥 인력관리', '근태/급여': '💰 근태 · 급여', '복무/복지': '🏥 복무 · 복지', '문서/기타': '📂 문서 · 기타' };
-
-  // 현재메뉴가 URL이나 외부에서 들어온 경우에 대비
   useEffect(() => {
     if (initialMenu && HR_MENU_IDS.includes(initialMenu)) {
       메뉴설정(initialMenu);
+      워크스페이스설정(getWorkspaceForHrMenu(initialMenu));
     }
   }, [initialMenu]);
 
-  // 새로고침해도 HR 내에서 보던 탭·필터를 유지 (initialMenu 없을 때만 탭 복원)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
       const savedTab = window.localStorage.getItem(HR_TAB_KEY);
       const savedCo = window.localStorage.getItem(HR_COMPANY_KEY);
       const savedStatus = window.localStorage.getItem(HR_STATUS_KEY) as '재직' | '퇴사' | null;
+      const savedWorkspace = window.localStorage.getItem(HR_WORKSPACE_KEY) as HrWorkspaceId | null;
 
-      if (!initialMenu && savedTab && HR_TABS.some(t => t.id === savedTab)) {
+      if (!initialMenu && savedTab && visibleHrTabIds.includes(savedTab)) {
         메뉴설정(savedTab);
+        워크스페이스설정(getWorkspaceForHrMenu(savedTab));
+      } else if (!initialMenu && savedWorkspace && HR_WORKSPACES.some((workspace) => workspace.id === savedWorkspace)) {
+        워크스페이스설정(savedWorkspace);
       }
       if (savedCo) {
         사업체설정(savedCo);
@@ -128,18 +173,19 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
     } catch {
       // ignore
     }
-  }, []);
+  }, [hasAccess, initialMenu, user?.id, visibleHrTabKey]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
       window.localStorage.setItem(HR_TAB_KEY, activeMenu);
+      window.localStorage.setItem(HR_WORKSPACE_KEY, activeWorkspace);
       window.localStorage.setItem(HR_COMPANY_KEY, 선택사업체);
       window.localStorage.setItem(HR_STATUS_KEY, 직원상태필터);
     } catch {
       // ignore
     }
-  }, [activeMenu, 선택사업체, 직원상태필터]);
+  }, [activeMenu, activeWorkspace, 선택사업체, 직원상태필터]);
 
   const 퇴사서류보기 = (직원: any) => {
     문서연결대상설정({ id: 직원.id, name: 직원.name });
@@ -159,44 +205,64 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
 
   return (
     <div className="flex flex-row h-full min-h-0 app-page overflow-hidden">
-      {/* 좌측 사이드바 - 그룹별 메뉴 */}
-      <aside className="flex flex-col md:flex-col h-auto md:h-full bg-[var(--toss-card)] border-b md:border-b-0 md:border-r border-[var(--toss-border)] shrink-0 w-full md:w-48 overflow-hidden">
-        {/* 모바일: 가로 스크롤, PC: 그룹별 세로 리스트 */}
-        <div className="flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-y-auto no-scrollbar min-h-0 p-2 md:p-3 md:flex-1">
-          {/* 모바일: 단순 가로 목록 */}
-          <div className="flex md:hidden gap-1">
-            {visibleHrTabs.map(({ id, icon }) => (
+      <aside className="flex flex-col md:flex-col h-auto md:h-full bg-[var(--toss-card)] border-b md:border-b-0 md:border-r border-[var(--toss-border)] shrink-0 w-full md:w-56 overflow-hidden">
+        <div className="border-b border-[var(--toss-border)] p-2 md:p-3 shrink-0">
+          <p className="px-1 pb-2 text-[10px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">업무 공간</p>
+          <div className="flex gap-1 overflow-x-auto md:flex-col md:overflow-visible no-scrollbar">
+            {availableWorkspaces.map((workspace) => (
               <button
-                key={id}
-                onClick={() => 메뉴설정(id)}
-                className={`flex-none px-3 py-2 text-[11px] font-bold rounded-[10px] transition-all whitespace-nowrap ${activeMenu === id
-                  ? 'bg-[var(--toss-blue)] text-white shadow-md'
-                  : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
-                  }`}
+                key={workspace.id}
+                type="button"
+                onClick={() => handleWorkspaceChange(workspace.id)}
+                className={`flex min-w-[110px] items-center justify-center gap-2 rounded-[12px] px-3 py-2 text-[11px] font-bold transition-all md:w-full md:justify-start ${
+                  activeWorkspace === workspace.id
+                    ? 'bg-[var(--foreground)] text-white shadow-md'
+                    : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-blue-light)] hover:text-[var(--foreground)]'
+                }`}
               >
-                {icon} {id}
+                <span className="text-[13px]">{workspace.icon}</span>
+                <span>{workspace.label}</span>
               </button>
             ))}
           </div>
-          {/* PC: 그룹별 세로 목록 */}
+        </div>
+
+        <div className="flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-y-auto no-scrollbar min-h-0 p-2 md:p-3 md:flex-1">
+          <div className="flex md:hidden gap-1">
+            {workspaceTabs.map(({ id, label, icon }) => (
+              <button
+                key={id}
+                onClick={() => 메뉴설정(id)}
+                className={`flex-none px-3 py-2 text-[11px] font-bold rounded-[10px] transition-all whitespace-nowrap ${
+                  activeMenu === id
+                    ? 'bg-[var(--toss-blue)] text-white shadow-md'
+                    : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
+                }`}
+              >
+                {icon} {label}
+              </button>
+            ))}
+          </div>
+
           <div className="hidden md:flex md:flex-col gap-0.5">
-            {GROUP_ORDER.map((group, gi) => {
-              const groupTabs = visibleHrTabs.filter(t => t.group === group);
+            {activeWorkspaceConfig.groups.map((group, groupIndex) => {
+              const groupTabs = workspaceTabs.filter((tab) => tab.group === group);
               if (groupTabs.length === 0) return null;
               return (
-                <div key={group} className={gi > 0 ? 'mt-2 pt-2 border-t border-[var(--toss-border)]' : ''}>
-                  <p className="text-[9px] font-bold text-[var(--toss-gray-3)] px-2.5 py-1.5 uppercase tracking-wider">{GROUP_LABELS[group]}</p>
-                  {groupTabs.map(({ id, icon }) => (
+                <div key={group} className={groupIndex > 0 ? 'mt-2 pt-2 border-t border-[var(--toss-border)]' : ''}>
+                  <p className="text-[9px] font-bold text-[var(--toss-gray-3)] px-2.5 py-1.5 uppercase tracking-wider">{HR_GROUP_LABELS[group]}</p>
+                  {groupTabs.map(({ id, label, icon }) => (
                     <button
                       key={id}
                       onClick={() => 메뉴설정(id)}
-                      className={`w-full px-2.5 py-2 text-[11px] font-bold rounded-[10px] transition-all text-left flex items-center gap-2 ${activeMenu === id
-                        ? 'bg-[var(--toss-blue)] text-white shadow-md'
-                        : 'text-[var(--toss-gray-4)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
-                        }`}
+                      className={`w-full px-2.5 py-2 text-[11px] font-bold rounded-[10px] transition-all text-left flex items-center gap-2 ${
+                        activeMenu === id
+                          ? 'bg-[var(--toss-blue)] text-white shadow-md'
+                          : 'text-[var(--toss-gray-4)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
+                      }`}
                     >
                       <span className="text-[13px] shrink-0">{icon}</span>
-                      <span className="truncate">{id}</span>
+                      <span className="truncate">{label}</span>
                     </button>
                   ))}
                 </div>
@@ -205,7 +271,6 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
           </div>
         </div>
 
-        {/* 하단 필터 */}
         <div className="grid grid-cols-2 md:grid-cols-1 gap-2 md:gap-3 p-2 md:p-3 shrink-0 border-t border-[var(--toss-border)]">
           <div className="flex flex-col gap-1">
             <label className="text-[10px] md:text-[11px] font-bold text-[var(--toss-gray-4)]">사업자</label>
@@ -214,7 +279,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
               onChange={(e) => 사업체설정(e.target.value)}
               className="w-full px-2 py-2 md:px-3 md:py-2.5 text-[11px] font-bold rounded-[12px] border border-[var(--toss-border)] bg-emerald-50 dark:bg-emerald-950/20 text-[var(--foreground)] focus:ring-2 focus:ring-emerald-500/30 outline-none"
             >
-              {사업체목록.map(회사 => (
+              {사업체목록.map((회사) => (
                 <option key={회사} value={회사}>{회사}</option>
               ))}
             </select>
@@ -233,7 +298,6 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
         </div>
       </aside>
 
-      {/* 우측: 실제 인사관리 콘텐츠 */}
       <main className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden">
         <section className="flex-1 overflow-y-auto bg-[var(--page-bg)] custom-scrollbar p-4 md:p-0">
           {activeMenu === '구성원' && (

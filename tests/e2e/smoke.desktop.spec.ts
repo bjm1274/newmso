@@ -284,6 +284,29 @@ test('payroll view opens through HR menu state', async ({ page }) => {
   await expect(page.getByTestId('payroll-view')).toBeVisible();
 });
 
+test('hr workspace navigation switches between the new grouped menus', async ({ page }) => {
+  await mockSupabase(page);
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: '인사관리',
+      erp_hr_tab: '구성원',
+      erp_hr_workspace: '인력관리',
+    },
+  });
+
+  await page.goto('/main?open_menu=인사관리');
+
+  await expect(page).toHaveURL(/\/main$/);
+  await expect(page.getByRole('button', { name: '인력관리' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '근태 · 급여' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '복지 · 문서' })).toBeVisible();
+
+  await page.getByRole('button', { name: '근태 · 급여' }).click();
+  await page.getByRole('button', { name: '💰 급여' }).click();
+
+  await expect(page.getByTestId('payroll-view')).toBeVisible();
+});
+
 test('admin view opens for an MSO session', async ({ page }) => {
   const adminUser = {
     ...fakeUser,
@@ -306,6 +329,67 @@ test('admin view opens for an MSO session', async ({ page }) => {
 
   await expect(page).toHaveURL(/\/main$/);
   await expect(page.getByTestId('admin-view')).toBeVisible();
+});
+
+test('shift created in company manager is selectable for a new staff member in the same company', async ({ page }) => {
+  const adminUser = {
+    ...fakeUser,
+    company: 'SY INC.',
+    company_id: 'mso-company-id',
+    permissions: {
+      ...fakeUser.permissions,
+      hr: true,
+      mso: true,
+      admin: true,
+      menu_관리자: true,
+      menu_인사관리: true,
+    },
+    role: 'admin',
+  };
+
+  await mockSupabase(page, {
+    staffMembers: [adminUser],
+    companies: [
+      { id: 'hospital-1', name: '박철홍정형외과', type: 'HOSPITAL', is_active: true },
+      { id: 'hospital-2', name: '수연의원', type: 'HOSPITAL', is_active: true },
+      { id: 'mso-company-id', name: 'SY INC.', type: 'MSO', is_active: true },
+    ],
+    workShifts: [],
+    orgTeams: [
+      { company_name: '박철홍정형외과', team_name: '외래팀', division: '진료부' },
+      { company_name: '수연의원', team_name: '외래팀', division: '진료부' },
+      { company_name: 'SY INC.', team_name: '인사팀', division: '경영지원' },
+    ],
+  });
+  await seedSession(page, {
+    user: adminUser,
+    localStorage: {
+      erp_last_subview: '회사관리',
+    },
+  });
+
+  await page.goto('/main?open_menu=관리자');
+  await page.getByRole('button', { name: '근무형태' }).click();
+  await page.getByTestId('shift-create-button').click();
+
+  await expect(page.getByTestId('shift-modal')).toBeVisible();
+  await expect(page.getByTestId('shift-company-박철홍정형외과')).not.toBeChecked();
+  await expect(page.getByTestId('shift-company-수연의원')).not.toBeChecked();
+
+  await page.getByTestId('shift-name-input').fill('수연의원-데이');
+  await page.getByTestId('shift-company-수연의원').check();
+  await page.getByTestId('shift-save-button').click();
+
+  await expect(page.getByText('수연의원-데이')).toBeVisible();
+
+  await page.getByRole('button', { name: '👥 인사관리' }).click();
+  await expect(page.getByTestId('new-staff-button')).toBeVisible();
+  await page.getByTestId('new-staff-button').click();
+  await page.getByRole('button', { name: '🏢 소속/근무' }).click();
+  await page.getByTestId('new-staff-company-select').selectOption('수연의원');
+
+  const shiftSelect = page.getByTestId('new-staff-shift-select');
+  await expect(shiftSelect.locator('option', { hasText: '수연의원-데이' })).toHaveCount(1);
 });
 
 test('notification dropdown opens and clicking an approval notification navigates correctly', async ({ page }) => {

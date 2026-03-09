@@ -17,25 +17,34 @@ type Shift = {
   is_shift?: boolean | null;
 };
 
-export default function ShiftManagement({ selectedCo }: any) {
-  const [shifts, setShifts] = useState<Shift[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
-  const [newShift, setNewShift] = useState({
+const DEFAULT_COMPANY_OPTIONS = ['박철홍정형외과', '수연의원', 'SY INC.'];
+
+function createEmptyShiftState(selectedCo?: string) {
+  const fixedCompany = selectedCo && selectedCo !== '전체' ? selectedCo : '';
+
+  return {
     name: '',
     start_time: '09:00',
     end_time: '18:00',
     description: '',
-    company_name: '박철홍정형외과',
-    selectedCompanies: [] as string[],
+    company_name: fixedCompany,
+    selectedCompanies: fixedCompany ? [fixedCompany] : ([] as string[]),
     break_start_time: '',
     break_end_time: '',
     shift_type: '',
     weekly_work_days: 5,
     is_weekend_work: false,
     is_shift: false,
-  });
+  };
+}
+
+export default function ShiftManagement({ selectedCo }: any) {
+  const [shifts, setShifts] = useState<Shift[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
+  const [companyOptions, setCompanyOptions] = useState<string[]>(DEFAULT_COMPANY_OPTIONS);
+  const [newShift, setNewShift] = useState(() => createEmptyShiftState(selectedCo));
 
   const fetchShifts = async () => {
     setLoading(true);
@@ -77,6 +86,31 @@ export default function ShiftManagement({ selectedCo }: any) {
     fetchShifts();
   }, [selectedCo]);
 
+  useEffect(() => {
+    const fetchCompanies = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('companies')
+          .select('name')
+          .eq('is_active', true)
+          .order('name');
+
+        if (error) throw error;
+        const names = (data || [])
+          .map((company: any) => company.name)
+          .filter((name: string | undefined): name is string => Boolean(name));
+
+        if (names.length > 0) {
+          setCompanyOptions(names);
+        }
+      } catch (err) {
+        console.error('회사 목록 조회 실패:', err);
+      }
+    };
+
+    fetchCompanies();
+  }, []);
+
   // 커스텀 근무 패턴 목록
   const [customPatterns, setCustomPatterns] = useState<string[]>([]);
   const [showPatternInput, setShowPatternInput] = useState(false);
@@ -97,12 +131,25 @@ export default function ShiftManagement({ selectedCo }: any) {
   const handleSaveShift = async () => {
     if (!newShift.name) return alert('근무 형태 명칭을 입력하세요.');
 
+    const selectedCompanies = Array.from(
+      new Set(newShift.selectedCompanies.map((company) => company.trim()).filter(Boolean))
+    );
+    const selectedCompanyName = newShift.company_name?.trim() || selectedCompanies[0] || '';
+
+    if (editingShiftId && !selectedCompanyName) {
+      return alert('적용 사업체를 선택하세요.');
+    }
+
+    if (!editingShiftId && selectedCompanies.length === 0) {
+      return alert('적용 사업체를 하나 이상 선택하세요.');
+    }
+
     const fullPayload: any = {
       name: newShift.name,
       start_time: newShift.start_time,
       end_time: newShift.end_time,
       description: newShift.description || null,
-      company_name: newShift.company_name,
+      company_name: selectedCompanyName,
       shift_type: newShift.shift_type || null,
       weekly_work_days: newShift.weekly_work_days ?? null,
       is_weekend_work: newShift.is_weekend_work ?? null,
@@ -115,7 +162,7 @@ export default function ShiftManagement({ selectedCo }: any) {
       start_time: newShift.start_time,
       end_time: newShift.end_time,
       description: newShift.description || null,
-      company_name: newShift.company_name,
+      company_name: selectedCompanyName,
     };
 
     const tryUpsert = async (payload: any, label: string) => {
@@ -140,9 +187,7 @@ export default function ShiftManagement({ selectedCo }: any) {
         }
       } else {
         // 복수 사업장 등록
-        const companiesToInsert = newShift.selectedCompanies.length > 0
-          ? newShift.selectedCompanies
-          : [newShift.company_name];
+        const companiesToInsert = selectedCompanies;
 
         for (const co of companiesToInsert) {
           const currentFullPayload = { ...fullPayload, company_name: co };
@@ -159,11 +204,7 @@ export default function ShiftManagement({ selectedCo }: any) {
       alert(editingShiftId ? '근무 형태가 수정되었습니다.' : '근무 형태가 등록되었습니다.');
       setShowAddModal(false);
       setEditingShiftId(null);
-      setNewShift({
-        name: '', start_time: '09:00', end_time: '18:00', description: '',
-        company_name: '박철홍정형외과', selectedCompanies: [], break_start_time: '', break_end_time: '',
-        shift_type: '', weekly_work_days: 5, is_weekend_work: false, is_shift: false,
-      });
+      setNewShift(createEmptyShiftState(selectedCo));
       fetchShifts();
     } catch (err: any) {
       console.error('근무형태 저장 최종 실패:', err);
@@ -188,7 +229,7 @@ export default function ShiftManagement({ selectedCo }: any) {
   };
 
   return (
-    <div className="p-8 space-y-8 animate-in fade-in duration-500">
+    <div className="p-8 space-y-8 animate-in fade-in duration-500" data-testid="shift-management">
       <header className="flex justify-between items-center">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)] tracking-tight">근무 형태 관리 <span className="text-sm text-[var(--toss-blue)]">[{selectedCo}]</span></h2>
@@ -198,23 +239,11 @@ export default function ShiftManagement({ selectedCo }: any) {
           type="button"
           onClick={() => {
             setEditingShiftId(null);
-            setNewShift({
-              name: '',
-              start_time: '09:00',
-              end_time: '18:00',
-              description: '',
-              company_name: selectedCo && selectedCo !== '전체' ? selectedCo : '박철홍정형외과',
-              selectedCompanies: selectedCo && selectedCo !== '전체' ? [selectedCo] : ['박철홍정형외과'],
-              break_start_time: '',
-              break_end_time: '',
-              shift_type: '',
-              weekly_work_days: 5,
-              is_weekend_work: false,
-              is_shift: false,
-            });
+            setNewShift(createEmptyShiftState(selectedCo));
             setShowAddModal(true);
           }}
           className="px-8 py-4 bg-[var(--toss-blue)] text-white text-sm font-bold rounded-[14px] shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all flex items-center gap-2"
+          data-testid="shift-create-button"
         >
           <span className="text-lg">＋</span> 신규 근무 형태 생성
         </button>
@@ -300,14 +329,14 @@ export default function ShiftManagement({ selectedCo }: any) {
 
       {showAddModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
-          <div className="bg-[var(--toss-card)] w-full max-w-md p-6 md:p-10 border-2 border-[var(--toss-border)] shadow-2xl space-y-6 radius-toss-xl max-h-[90vh] overflow-y-auto custom-scrollbar">
+          <div className="bg-[var(--toss-card)] w-full max-w-md p-6 md:p-10 border-2 border-[var(--toss-border)] shadow-2xl space-y-6 radius-toss-xl max-h-[90vh] overflow-y-auto custom-scrollbar" data-testid="shift-modal">
             <h3 className="page-title border-b-2 border-[var(--toss-border)] pb-2">
               {editingShiftId ? '근무 형태 수정' : '근무 형태 생성'}
             </h3>
             <div className="space-y-4">
               <div>
                 <label className="caption uppercase block mb-1">명칭 (예: 3교대-데이, 나이트전담)</label>
-                <input type="text" value={newShift.name} onChange={e => setNewShift({ ...newShift, name: e.target.value })} className="w-full p-3 bg-[var(--input-bg)] border border-[var(--toss-border)] font-semibold text-xs outline-none focus:border-[var(--foreground)] radius-toss" placeholder="근무 형태 이름을 입력하세요" />
+                <input type="text" value={newShift.name} onChange={e => setNewShift({ ...newShift, name: e.target.value })} className="w-full p-3 bg-[var(--input-bg)] border border-[var(--toss-border)] font-semibold text-xs outline-none focus:border-[var(--foreground)] radius-toss" placeholder="근무 형태 이름을 입력하세요" data-testid="shift-name-input" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -326,27 +355,33 @@ export default function ShiftManagement({ selectedCo }: any) {
                     value={newShift.company_name}
                     onChange={e => setNewShift({ ...newShift, company_name: e.target.value })}
                     className="w-full p-3 bg-[var(--input-bg)] border border-[var(--toss-border)] font-semibold text-xs radius-toss"
+                    data-testid="shift-company-select"
                   >
-                    <option value="박철홍정형외과">박철홍정형외과</option>
-                    <option value="수연의원">수연의원</option>
-                    <option value="SY INC.">SY INC.</option>
+                    <option value="">사업체 선택</option>
+                    {companyOptions.map((companyName) => (
+                      <option key={companyName} value={companyName}>{companyName}</option>
+                    ))}
                   </select>
                 ) : (
                   <div className="p-3 bg-[var(--toss-gray-1)] rounded-xl border border-[var(--toss-border)] space-y-2">
                     <label className="flex items-center gap-2 pb-2 border-b border-[var(--toss-border)] mb-2 cursor-pointer">
                       <input
                         type="checkbox"
-                        checked={newShift.selectedCompanies.length === 3}
+                        checked={companyOptions.length > 0 && newShift.selectedCompanies.length === companyOptions.length}
                         onChange={e => {
-                          if (e.target.checked) setNewShift({ ...newShift, selectedCompanies: ['박철홍정형외과', '수연의원', 'SY INC.'] });
-                          else setNewShift({ ...newShift, selectedCompanies: [] });
+                          if (e.target.checked) {
+                            setNewShift({ ...newShift, company_name: companyOptions[0] || '', selectedCompanies: companyOptions });
+                          } else {
+                            setNewShift({ ...newShift, company_name: '', selectedCompanies: [] });
+                          }
                         }}
                         className="w-4 h-4 text-[var(--toss-blue)]"
+                        data-testid="shift-company-all"
                       />
                       <span className="text-[11px] font-bold text-[var(--toss-blue)]">전체 선택</span>
                     </label>
                     <div className="grid grid-cols-1 gap-2">
-                      {['박철홍정형외과', '수연의원', 'SY INC.'].map(co => (
+                      {companyOptions.map(co => (
                         <label key={co} className="flex items-center gap-2 cursor-pointer hover:bg-white p-1 rounded-md transition-colors">
                           <input
                             type="checkbox"
@@ -355,14 +390,20 @@ export default function ShiftManagement({ selectedCo }: any) {
                               const next = e.target.checked
                                 ? [...newShift.selectedCompanies, co]
                                 : newShift.selectedCompanies.filter(c => c !== co);
-                              setNewShift({ ...newShift, selectedCompanies: next });
+                              setNewShift({ ...newShift, company_name: next[0] || '', selectedCompanies: next });
                             }}
                             className="w-4 h-4 text-[var(--toss-blue)]"
+                            data-testid={`shift-company-${co}`}
                           />
                           <span className="text-xs font-semibold text-[var(--foreground)]">{co}</span>
                         </label>
                       ))}
                     </div>
+                    {newShift.selectedCompanies.length === 0 && (
+                      <p className="text-[10px] font-semibold text-red-500">
+                        전체 화면에서는 저장 전에 적용 사업체를 하나 이상 선택해야 합니다.
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
@@ -454,7 +495,7 @@ export default function ShiftManagement({ selectedCo }: any) {
             </div>
             <div className="flex gap-2 pt-4">
               <button type="button" onClick={() => { setShowAddModal(false); setEditingShiftId(null); }} className="flex-1 py-4 text-[11px] font-semibold btn-toss-secondary">취소</button>
-              <button type="button" onClick={handleSaveShift} className="flex-[2] py-4 btn-toss-primary text-[11px]">
+              <button type="button" onClick={handleSaveShift} className="flex-[2] py-4 btn-toss-primary text-[11px]" data-testid="shift-save-button">
                 {editingShiftId ? '수정 완료' : '생성 완료'}
               </button>
             </div>

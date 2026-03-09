@@ -148,6 +148,7 @@ function ToastCard({ notif, onClose, onAction }: { notif: ToastItem; onClose: (i
   const initials = notif.senderName ? getInitials(notif.senderName) : null;
   return (
     <div
+      data-testid={`notification-toast-${notif.id}`}
       className={`relative group flex items-start gap-3 p-3.5 rounded-2xl shadow-2xl border border-white/10 dark:border-white/5 overflow-hidden cursor-pointer select-none
         bg-white/97 dark:bg-gray-900/97 backdrop-blur-md
         ${notif.exiting ? 'animate-slide-out-right-toast' : 'animate-slide-in-right-toast'}
@@ -200,6 +201,7 @@ export default function NotificationSystem({
   const [unreadCount, setUnreadCount] = useState(0);
   const shownIdsRef = useRef<Set<string>>(new Set());
   const lastHiddenRef = useRef(0);
+  const didPrimeNotificationsRef = useRef(false);
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const onActionRef = useRef<(n: ToastItem) => void>(() => { });
 
@@ -230,6 +232,50 @@ export default function NotificationSystem({
     timersRef.current.set(item.id, setTimeout(() => removeToast(item.id), 7000));
   }, [removeToast]);
 
+  const emitIncomingNotification = useCallback((row: any) => {
+    if (!row?.id) return;
+    const rowId = String(row.id);
+    if (shownIdsRef.current.has(rowId)) return;
+    shownIdsRef.current.add(rowId);
+
+    const settings = loadNotifSettings();
+    const type = row.type || 'notification';
+    if (settings.types[type] === false) return;
+
+    addToast({
+      id: rowId,
+      title: row.title || '알림',
+      body: row.body || '',
+      type,
+      senderName: row.metadata?.sender_name,
+      data: row.metadata || {},
+    });
+
+    if (typeof window !== 'undefined') {
+      const evt = (type === 'message' || type === 'mention') ? 'erp-chat-notification' : 'erp-alert';
+      window.dispatchEvent(new CustomEvent(evt, {
+        detail: {
+          title: row.title,
+          body: row.body,
+          type,
+          room_id: row.metadata?.room_id,
+          data: row.metadata,
+        },
+      }));
+      window.dispatchEvent(new CustomEvent('erp-new-notification', { detail: row }));
+    }
+
+    const isDND = isInDND(settings);
+    if (settings.sound && !isDND) {
+      if (type === 'message' || type === 'mention') sound.playTalk();
+      else sound.playSystem();
+    }
+    if (settings.vibration && !isDND) vibrateIfSupported();
+
+    sendNotification(row.title, { body: row.body, tag: type, data: row.metadata });
+    void syncBadge();
+  }, [addToast, syncBadge]);
+
   useEffect(() => {
     onActionRef.current = (notif: ToastItem) => {
       removeToast(notif.id);
@@ -252,7 +298,8 @@ export default function NotificationSystem({
     if (!user?.id) return;
     initNotificationService(user.id);
     const uid = String(user.id);
-    syncBadge();
+    const mountedAt = new Date().toISOString();
+    void syncBadge();
 
     // insertNoti: 이벤트 → notifications 테이블 INSERT (그러면 nTableChannel이 toast 표시)
     const insertNoti = async (n: { type: string; title: string; body: string; data?: any; senderName?: string }) => {
@@ -266,37 +313,7 @@ export default function NotificationSystem({
     // A. notifications 테이블 INSERT 수신 → Toast + 소리 + 진동
     const nTableChannel = supabase.channel(`noti-db-${uid}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${uid}` }, (payload: any) => {
-        const row = payload.new;
-        if (shownIdsRef.current.has(String(row.id))) return;
-        shownIdsRef.current.add(String(row.id));
-
-        const settings = loadNotifSettings();
-        const type = row.type || 'notification';
-        if (settings.types[type] === false) return;
-
-        // Toast 표시
-        addToast({ id: String(row.id), title: row.title || '알림', body: row.body || '', type, senderName: row.metadata?.sender_name, data: row.metadata || {} });
-
-        // 이벤트 디스패치 (채팅알림배너용)
-        if (typeof window !== 'undefined') {
-          const evt = (type === 'message' || type === 'mention') ? 'erp-chat-notification' : 'erp-alert';
-          window.dispatchEvent(new CustomEvent(evt, { detail: { title: row.title, body: row.body, type, room_id: row.metadata?.room_id, data: row.metadata } }));
-          window.dispatchEvent(new CustomEvent('erp-new-notification', { detail: row }));
-        }
-
-        // 소리 / 진동
-        const isDND = isInDND(settings);
-        if (settings.sound && !isDND) {
-          if (type === 'message' || type === 'mention') sound.playTalk();
-          else sound.playSystem();
-        }
-        if (settings.vibration && !isDND) vibrateIfSupported();
-
-        // 브라우저 네이티브 알림
-        sendNotification(row.title, { body: row.body, tag: type, data: row.metadata });
-
-        // 배지 갱신
-        syncBadge();
+        emitIncomingNotification(payload.new);
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${uid}` }, () => syncBadge())
       .subscribe();
@@ -381,13 +398,48 @@ export default function NotificationSystem({
 
     const channels = [nTableChannel, approvalsCh, inventoryCh, payrollCh, educationCh, messagesCh, attendanceCh];
 
+    if (!didPrimeNotificationsRef.current) {
+      didPrimeNotificationsRef.current = true;
+      supabase
+        .from('notifications')
+        .select('id')
+        .eq('user_id', uid)
+        .lt('created_at', mountedAt)
+        .order('created_at', { ascending: false })
+        .limit(50)
+        .then(({ data: rows }) => {
+          rows?.forEach((row: any) => {
+            if (row?.id) shownIdsRef.current.add(String(row.id));
+          });
+        });
+    }
+
+    const fallbackPoll = setInterval(() => {
+      supabase
+        .from('notifications')
+        .select('id,title,body,type,metadata,read_at,created_at')
+        .eq('user_id', uid)
+        .order('created_at', { ascending: false })
+        .limit(20)
+        .then(({ data: rows }) => {
+          rows?.forEach((row: any) => {
+            if (!row?.read_at) emitIncomingNotification(row);
+          });
+          void syncBadge();
+        });
+    }, 5000);
+
     // 30초 헬스체크
     const hc = setInterval(() => {
       channels.forEach(ch => { try { const s = (ch as any).state; if (s === 'closed' || s === 'errored') ch.subscribe(); } catch { /* ignore */ } });
     }, 30_000);
 
-    return () => { clearInterval(hc); channels.forEach(ch => supabase.removeChannel(ch)); };
-  }, [user?.id]);
+    return () => {
+      clearInterval(hc);
+      clearInterval(fallbackPoll);
+      channels.forEach(ch => supabase.removeChannel(ch));
+    };
+  }, [user?.id, addToast, emitIncomingNotification, syncBadge]);
 
   // 백그라운드 복귀 시 놓친 알림 재조회
   useEffect(() => {
@@ -398,23 +450,26 @@ export default function NotificationSystem({
       supabase.from('notifications').select('id,title,body,type,metadata,created_at').eq('user_id', user.id).gte('created_at', since).order('created_at', { ascending: false }).limit(20)
         .then(({ data: rows }) => {
           rows?.forEach((row: any) => {
-            if (shownIdsRef.current.has(String(row.id))) return;
-            shownIdsRef.current.add(String(row.id));
-            addToast({ id: String(row.id), title: row.title || '알림', body: row.body || '', type: row.type || 'notification', data: row.metadata || {} });
+            emitIncomingNotification(row);
           });
-          syncBadge();
+          void syncBadge();
         });
     };
     document.addEventListener('visibilitychange', onVis);
     return () => document.removeEventListener('visibilitychange', onVis);
-  }, [user?.id, syncBadge]);
+  }, [emitIncomingNotification, syncBadge, user?.id]);
 
   useEffect(() => () => { timersRef.current.forEach(t => clearTimeout(t)); timersRef.current.clear(); }, []);
 
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed bottom-20 right-3 md:bottom-5 md:right-5 z-[999] flex flex-col-reverse gap-2.5 items-end" aria-live="polite" aria-label="알림">
+    <div
+      className="fixed bottom-20 right-3 md:bottom-5 md:right-5 z-[999] flex flex-col-reverse gap-2.5 items-end"
+      aria-live="polite"
+      aria-label="알림"
+      data-testid="notification-toast-stack"
+    >
       {toasts.map(notif => (
         <ToastCard key={notif.id} notif={notif} onClose={removeToast} onAction={n => onActionRef.current(n)} />
       ))}

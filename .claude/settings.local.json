@@ -15,7 +15,8 @@
       "WebFetch(domain:ai.google.dev)",
       "Bash(__NEW_LINE_2fe8fbdb1230d24e__ curl:*)",
       "Bash(grep:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(npx next build)"
     ]
   }
 }

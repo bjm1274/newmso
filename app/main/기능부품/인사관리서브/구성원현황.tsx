@@ -1,10 +1,28 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import StaffHistoryTimeline from './인사이력타임라인';
 import OnboardingChecklist from './급여명세/입퇴사온보딩';
 import CertTransferPanel from './교육자격인사이동패널';
 import SmartDatePicker from '../공통/SmartDatePicker';
+
+function createEmptyStaffForm(selectedCompany?: string) {
+  const company = selectedCompany && selectedCompany !== '전체' ? selectedCompany : '박철홍정형외과';
+
+  return {
+    성명: '', 전화번호: '', 내선번호: '', 사업체: company, 팀: '원무팀', 직함: '', 입사일: '', 퇴사일: '',
+    주민번호: '', 이메일: '', 주소: '', 면허사항: '', 면허번호: '', 취득일자: '', 계좌정보: '', 임금정보: '', 상태: '재직',
+    연차총개수: 0, 연차사용개수: 0, 근무형태ID: '',
+    고용형태: '정규직' as string, 계약종료일: '' as string,
+    probation_months: 0,
+    base_salary: 0,
+    meal_allowance: 0, night_duty_allowance: 0, vehicle_allowance: 0, childcare_allowance: 0, research_allowance: 0, other_taxfree: 0, position_allowance: 0,
+    overtime_allowance: 0, night_work_allowance: 0, holiday_work_allowance: 0, annual_leave_pay: 0,
+    ins_national: true, ins_health: true, ins_employment: true, ins_injury: true, is_basic_living: false, other_welfare: '',
+    ins_duru_nuri: false, duru_nuri_start: '', duru_nuri_end: '', is_medical_benefit: false,
+    working_hours_per_week: 40, working_days_per_week: 5,
+  };
+}
 
 // ESLint가 React 컴포넌트로 인식하도록 함수 이름을
 // 영문 대문자로 시작하는 형태로 지정합니다.
@@ -15,23 +33,20 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   const [근무형태목록, 근무형태목록설정] = useState<any[]>([]);
   const [팀목록캐시, 팀목록캐시설정] = useState<Record<string, string[]>>({});
   const [activeTab, setActiveTab] = useState('기본'); // '기본', '소속', '급여'
-  const [신규직원, 신규직원설정] = useState({
-    성명: '', 전화번호: '', 내선번호: '', 사업체: '박철홍정형외과', 팀: '원무팀', 직함: '', 입사일: '', 퇴사일: '',
-    주민번호: '', 이메일: '', 주소: '', 면허사항: '', 면허번호: '', 취득일자: '', 계좌정보: '', 임금정보: '', 상태: '재직',
-    연차총개수: 0, 연차사용개수: 0, 근무형태ID: '',
-    고용형태: '정규직' as string, 계약종료일: '' as string,
-    probation_months: 0,
-    base_salary: 0,
-    meal_allowance: 0, night_duty_allowance: 0, vehicle_allowance: 0, childcare_allowance: 0, research_allowance: 0, other_taxfree: 0, position_allowance: 0,
-    overtime_allowance: 0, night_work_allowance: 0, holiday_work_allowance: 0, annual_leave_pay: 0,
-    ins_national: true, ins_health: true, ins_employment: true, ins_injury: true, is_basic_living: false, other_welfare: '',
-    ins_duru_nuri: false, duru_nuri_start: '', duru_nuri_end: '', is_medical_benefit: false,
-    working_hours_per_week: 40, working_days_per_week: 5
-  });
+  const [신규직원, 신규직원설정] = useState(() => createEmptyStaffForm(선택사업체));
+  const previousModalOpenRef = useRef(false);
 
   // ESS (직원 셀프 서비스) 승인 대기함 관련
   const [essRequests, setEssRequests] = useState<any[]>([]);
   const [showEssModal, setShowEssModal] = useState(false);
+
+  const getVisibleShiftOptions = (companyName: string) =>
+    근무형태목록.filter((shift: any) => {
+      const isActive = shift?.is_active !== false;
+      const shiftCompany = shift?.company_name || shift?.company || '';
+
+      return isActive && shiftCompany === companyName;
+    });
 
   useEffect(() => {
     const fetchEssRequests = async () => {
@@ -96,6 +111,18 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   }, []);
 
   useEffect(() => {
+    if (!신규직원.근무형태ID) return;
+
+    const hasSelectedShift = getVisibleShiftOptions(신규직원.사업체).some(
+      (shift: any) => shift.id === 신규직원.근무형태ID
+    );
+
+    if (!hasSelectedShift) {
+      신규직원설정((prev) => ({ ...prev, 근무형태ID: '' }));
+    }
+  }, [신규직원.사업체, 신규직원.근무형태ID, 근무형태목록]);
+
+  useEffect(() => {
     const fetchTeams = async () => {
       const { data } = await supabase.from('org_teams').select('company_name, team_name, division').order('division').order('sort_order');
       if (!data) return;
@@ -132,6 +159,21 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     if (회사 === 'SY INC.') return ['경영지원팀', '진료지원팀', '관리팀', '재무팀', '인사팀', '전략기획팀', '마케팅팀'];
     return ['진료부', '간호부', '총무부', '진료팀', '병동팀', '수술팀', '외래팀', '외래간호팀', '검사팀', '원무팀', '총무팀', '행정팀', '관리팀', '영양팀'];
   };
+
+  useEffect(() => {
+    const justOpened = 창상태 && !previousModalOpenRef.current;
+    previousModalOpenRef.current = 창상태;
+
+    if (!justOpened || 편집모드) return;
+
+    const defaultCompany = 선택사업체 && 선택사업체 !== '전체' ? 선택사업체 : '박철홍정형외과';
+    const defaultTeam = 팀목록가져오기(defaultCompany)[0] ?? '원무팀';
+
+    신규직원설정({
+      ...createEmptyStaffForm(defaultCompany),
+      팀: defaultTeam,
+    });
+  }, [창상태, 편집모드, 선택사업체, 팀목록캐시]);
 
   const 정보저장 = async () => {
     if (!신규직원.성명 || !신규직원.입사일 || 신규직원.입사일 === '0000-00-00' || 신규직원.입사일 === '') return alert('성함과 실제 입사일은 필수 입력 사항입니다.');
@@ -270,17 +312,10 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
   const 닫기함수 = () => {
     편집모드설정(false); 선택된직원ID설정(null);
+    const defaultCompany = 선택사업체 && 선택사업체 !== '전체' ? 선택사업체 : '박철홍정형외과';
     신규직원설정({
-      성명: '', 전화번호: '', 내선번호: '', 사업체: '박철홍정형외과', 팀: '원무팀', 직함: '', 입사일: '', 퇴사일: '',
-      주민번호: '', 이메일: '', 주소: '', 면허사항: '', 면허번호: '', 취득일자: '', 계좌정보: '', 임금정보: '', 상태: '재직',
-      연차총개수: 0, 연차사용개수: 0, 근무형태ID: '',
-      고용형태: '정규직', 계약종료일: '',
-      probation_months: 0,
-      base_salary: 0, meal_allowance: 0, night_duty_allowance: 0, vehicle_allowance: 0, childcare_allowance: 0, research_allowance: 0, other_taxfree: 0, position_allowance: 0,
-      overtime_allowance: 0, night_work_allowance: 0, holiday_work_allowance: 0, annual_leave_pay: 0,
-      ins_national: true, ins_health: true, ins_employment: true, ins_injury: true, is_basic_living: false, other_welfare: '',
-      ins_duru_nuri: false, duru_nuri_start: '', duru_nuri_end: '', is_medical_benefit: false,
-      working_hours_per_week: 40, working_days_per_week: 5
+      ...createEmptyStaffForm(defaultCompany),
+      팀: 팀목록가져오기(defaultCompany)[0] ?? '원무팀',
     });
     창닫기?.();
   };
@@ -346,6 +381,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
             type="button"
             onClick={() => onOpenNewStaff && onOpenNewStaff()}
             className="bg-[var(--toss-blue)] text-white px-5 py-2.5 text-[11px] font-bold rounded-[12px] shadow-md hover:opacity-95 transition-all"
+            data-testid="new-staff-button"
           >
             신규 직원 등록
           </button>
@@ -621,7 +657,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">사업체</label>
-                          <select value={신규직원.사업체} onChange={e => 신규직원설정({ ...신규직원, 사업체: e.target.value, 팀: 팀목록가져오기(e.target.value)[0] ?? '' })} className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/30 appearance-none">
+                          <select value={신규직원.사업체} onChange={e => 신규직원설정({ ...신규직원, 사업체: e.target.value, 팀: 팀목록가져오기(e.target.value)[0] ?? '', 근무형태ID: '' })} className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/30 appearance-none" data-testid="new-staff-company-select">
                             <option value="박철홍정형외과">박철홍정형외과</option>
                             <option value="수연의원">수연의원</option>
                             <option value="SY INC.">SY INC.</option>
@@ -736,9 +772,9 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                       )}
                       <div className="space-y-2">
                         <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">지정 스케줄 (근무형태)</label>
-                        <select value={신규직원.근무형태ID} onChange={e => 신규직원설정({ ...신규직원, 근무형태ID: e.target.value })} className="w-full p-4 bg-[var(--toss-blue-light)] rounded-[16px] border-none outline-none font-bold text-sm text-[var(--toss-blue)] focus:ring-2 focus:ring-[var(--toss-blue)]/30 appearance-none">
+                        <select value={신규직원.근무형태ID} onChange={e => 신규직원설정({ ...신규직원, 근무형태ID: e.target.value })} className="w-full p-4 bg-[var(--toss-blue-light)] rounded-[16px] border-none outline-none font-bold text-sm text-[var(--toss-blue)] focus:ring-2 focus:ring-[var(--toss-blue)]/30 appearance-none" data-testid="new-staff-shift-select">
                           <option value="">근무형태 선택</option>
-                          {근무형태목록.filter((s: any) => s.company_name === 신규직원.사업체 || s.company === 신규직원.사업체).map((s: any) => (
+                          {getVisibleShiftOptions(신규직원.사업체).map((s: any) => (
                             <option key={s.id} value={s.id}>
                               {s.name} ({s.start_time}~{s.end_time})
                             </option>
