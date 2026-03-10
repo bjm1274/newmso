@@ -1,5 +1,5 @@
 ﻿'use client';
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import AnnualLeavePromotion from './연차촉진시스템';
 import LeaveDashboard from '../급여명세/연차종합대시보드';
@@ -47,10 +47,14 @@ export default function LeaveManagement({
   const staffList = Array.isArray(staffs) ? staffs : [];
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [showPendingModal, setShowPendingModal] = useState(false);
-  const availableTabs = LEAVE_TAB_DEFS.filter((tab) => {
-    if (tab.id === '공휴일 달력') return allowHolidayTab;
-    return allowLeaveTabs;
-  });
+  const availableTabs = useMemo(
+    () =>
+      LEAVE_TAB_DEFS.filter((tab) => {
+        if (tab.id === '공휴일 달력') return allowHolidayTab;
+        return allowLeaveTabs;
+      }),
+    [allowHolidayTab, allowLeaveTabs]
+  );
 
   const fetchLeaves = async () => {
     setLoading(true);
@@ -84,13 +88,14 @@ export default function LeaveManagement({
   useEffect(() => {
     if (initialTab && availableTabs.some((tab) => tab.id === initialTab)) {
       setActiveTab(initialTab);
-      return;
     }
+  }, [availableTabs, initialTab]);
 
+  useEffect(() => {
     if (!availableTabs.some((tab) => tab.id === activeTab)) {
       setActiveTab(availableTabs[0]?.id || '연차/휴가 신청내역');
     }
-  }, [activeTab, availableTabs, initialTab]);
+  }, [activeTab, availableTabs]);
 
   // 로컬 세션 기준 현재 사용자 찾기 (연차 대시보드 개인뷰용)
   useEffect(() => {

@@ -1,4 +1,10 @@
+'use client';
+
+import { useCallback, useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
 import NotificationCenter from '../NotificationCenter';
+
+const NOTICE_ROOM_ID = '00000000-0000-0000-0000-000000000000';
 
 const MYPAGE_TAB_KEY = 'erp_mypage_tab';
 
@@ -92,6 +98,7 @@ const MAIN_MENUS = [
 export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
   const permissions = user?.permissions || {};
   const isMso = user?.company === 'SY INC.' || permissions.mso === true;
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
 
   const canSeeMenu = (menuId: string) => {
     if (menuId === '관리자') {
@@ -106,6 +113,94 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
   };
 
   const visibleMenus = MAIN_MENUS.filter((menu) => canSeeMenu(menu.id));
+
+  const fetchChatUnreadCount = useCallback(async () => {
+    if (!user?.id) {
+      setChatUnreadCount(0);
+      return;
+    }
+
+    try {
+      const { data: rooms, error: roomsError } = await supabase
+        .from('chat_rooms')
+        .select('id, members');
+
+      if (roomsError) throw roomsError;
+
+      const myRooms = (rooms || []).filter((room: any) => {
+        if (room.id === NOTICE_ROOM_ID) return true;
+        return Array.isArray(room.members) && room.members.some((id: any) => String(id) === String(user.id));
+      });
+
+      if (myRooms.length === 0) {
+        setChatUnreadCount(0);
+        return;
+      }
+
+      const roomIds = myRooms.map((room: any) => room.id);
+      const { data: cursors, error: cursorError } = await supabase
+        .from('room_read_cursors')
+        .select('room_id, last_read_at')
+        .eq('user_id', user.id)
+        .in('room_id', roomIds);
+
+      if (cursorError) throw cursorError;
+
+      const cursorMap: Record<string, string | null> = {};
+      (cursors || []).forEach((cursor: any) => {
+        cursorMap[cursor.room_id] = cursor.last_read_at;
+      });
+
+      let totalUnread = 0;
+      for (const roomId of roomIds) {
+        let query = supabase
+          .from('messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('room_id', roomId)
+          .neq('sender_id', user.id)
+          .eq('is_deleted', false);
+
+        const lastReadAt = cursorMap[roomId];
+        if (lastReadAt) {
+          query = query.gt('created_at', lastReadAt);
+        }
+
+        const { count, error: countError } = await query;
+        if (countError) throw countError;
+        totalUnread += count || 0;
+      }
+
+      setChatUnreadCount(totalUnread);
+    } catch (error) {
+      console.error('메인 메뉴 채팅 안읽음 계산 실패:', error);
+      setChatUnreadCount(0);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    void fetchChatUnreadCount();
+  }, [fetchChatUnreadCount]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel(`sidebar-chat-unread-${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
+        void fetchChatUnreadCount();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'room_read_cursors' }, () => {
+        void fetchChatUnreadCount();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_rooms' }, () => {
+        void fetchChatUnreadCount();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchChatUnreadCount, user?.id]);
 
   const handleMenuClick = (menuId: string) => {
     if (menuId === '내정보' && typeof window !== 'undefined') {
@@ -142,7 +237,14 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
                   : 'text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)] hover:text-[var(--foreground)]'
               }`}
             >
-              <span className="text-[18px] leading-none">{menu.icon}</span>
+              <span className="relative text-[18px] leading-none">
+                {menu.icon}
+                {menu.id === '채팅' && chatUnreadCount > 0 && (
+                  <span className="absolute -top-2 -right-3 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow-sm">
+                    {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+                  </span>
+                )}
+              </span>
               <span className="mt-1 text-[11px] font-medium">{menu.label}</span>
             </button>
           ))}
@@ -163,7 +265,14 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
               mainMenu === menu.id ? 'text-[var(--toss-blue)]' : 'text-[var(--toss-gray-3)]'
             }`}
           >
-            <span className="text-[16px] leading-none">{menu.icon}</span>
+            <span className="relative text-[16px] leading-none">
+              {menu.icon}
+              {menu.id === '채팅' && chatUnreadCount > 0 && (
+                <span className="absolute -top-2 -right-3 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow-sm">
+                  {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+                </span>
+              )}
+            </span>
             <span className="mt-1 w-full truncate text-center text-[10px] font-bold">{menu.label}</span>
           </button>
         ))}
