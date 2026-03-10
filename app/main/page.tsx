@@ -62,6 +62,41 @@ function MainPageContent() {
     mris: []
   });
   const [loginAt] = useState<string>(new Date().toISOString());
+  const isMsoUser = user?.company === 'SY INC.' || user?.permissions?.mso === true;
+
+  const handleSelectedCompanyIdChange = useCallback(
+    (id: string | null) => {
+      persistSelectedCompanyId(id);
+      setSelectedCompanyIdState(id);
+      if (!isMsoUser) return;
+      if (!id) {
+        setSelectedCo('전체');
+        return;
+      }
+      const matchedCompany = companies.find((company) => company.id === id);
+      if (matchedCompany?.name) {
+        setSelectedCo(matchedCompany.name);
+      }
+    },
+    [companies, isMsoUser]
+  );
+
+  const handleSelectedCoChange = useCallback(
+    (nextCo: string) => {
+      setSelectedCo(nextCo);
+      if (!isMsoUser) return;
+      if (!nextCo || nextCo === '전체') {
+        persistSelectedCompanyId(null);
+        setSelectedCompanyIdState(null);
+        return;
+      }
+      const matchedCompany = companies.find((company) => company.name === nextCo);
+      const nextCompanyId = matchedCompany?.id ?? null;
+      persistSelectedCompanyId(nextCompanyId);
+      setSelectedCompanyIdState(nextCompanyId);
+    },
+    [companies, isMsoUser]
+  );
 
   const resolveLegacyNavigation = useCallback(
     (menuId?: string | null, subViewId?: string | null, candidateUser?: any) => {
@@ -322,6 +357,26 @@ function MainPageContent() {
     fetchERPData(user, selectedCompanyId);
   }, [user, selectedCompanyId, selectedCo]);
 
+  useEffect(() => {
+    if (!isMsoUser) return;
+
+    if (!selectedCo || selectedCo === '전체') {
+      if (selectedCompanyId) {
+        persistSelectedCompanyId(null);
+        setSelectedCompanyIdState(null);
+      }
+      return;
+    }
+
+    const matchedCompany = companies.find((company) => company.name === selectedCo);
+    if (!matchedCompany) return;
+
+    if (selectedCompanyId !== matchedCompany.id) {
+      persistSelectedCompanyId(matchedCompany.id);
+      setSelectedCompanyIdState(matchedCompany.id);
+    }
+  }, [companies, isMsoUser, selectedCo, selectedCompanyId]);
+
   // 2. 상태 변경 시마다 로컬 스토리지 업데이트
   useEffect(() => {
     if (user) {
@@ -336,13 +391,19 @@ function MainPageContent() {
     const u = currentUser ?? user;
     try {
       const isMso = u?.company === 'SY INC.' || u?.permissions?.mso === true;
-      const filterCompanyId = isMso ? companyIdFilter : u?.company_id;
       const filterCompanyName =
         isMso
           ? selectedCo && selectedCo !== '전체'
             ? selectedCo
             : null
           : u?.company ?? null;
+      const filterCompanyId = isMso
+        ? (() => {
+            if (!filterCompanyName) return null;
+            const matchedCompanyId = companies.find((company) => company.name === filterCompanyName)?.id ?? null;
+            return matchedCompanyId ?? companyIdFilter ?? null;
+          })()
+        : u?.company_id;
 
       const { data: staffData } = await withMissingColumnFallback(
         async () => {
@@ -564,13 +625,10 @@ function MainPageContent() {
           subView={subView}
           setSubView={setSubView}
           selectedCo={selectedCo}
-          setSelectedCo={setSelectedCo}
+          setSelectedCo={handleSelectedCoChange}
           companies={companies}
           selectedCompanyId={selectedCompanyId}
-          setSelectedCompanyId={(id: string | null) => {
-            persistSelectedCompanyId(id);
-            setSelectedCompanyIdState(id);
-          }}
+          setSelectedCompanyId={handleSelectedCompanyIdChange}
           onRefresh={() => fetchERPData(user, selectedCompanyId)}
           initialMyPageTab={initialMyPageTab}
           onConsumeMyPageInitialTab={() => setInitialMyPageTab(null)}

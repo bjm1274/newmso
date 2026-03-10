@@ -26,12 +26,14 @@ const INV_VIEW_KEY = 'erp_inventory_view';
 const VALID_VIEWS = ['UDI', '명세서', '발주', '스캔', '등록', '현황', '이력', '자산', 'AS반품', '거래처', '재고실사', '유통기한', '이관', '카테고리', '소모품통계', '납품확인서', '수요예측'];
 const EXPIRY_SOON_MS = 30 * 24 * 60 * 60 * 1000;
 
-const INVENTORY_VIEW_GROUPS = [
-  { label: '재고 대시보드', views: ['현황', '이력', '유통기한', '수요예측'] },
-  { label: '입출고 운영', views: ['등록', '스캔', '발주', '재고실사', '이관'] },
-  { label: '문서 · 자산', views: ['명세서', '납품확인서', 'UDI', '자산'] },
-  { label: '기준 정보', views: ['거래처', '카테고리', 'AS반품', '소모품통계'] },
+const INVENTORY_WORK_SECTIONS = [
+  { id: '조회', label: '조회', description: '재고 상태와 변동을 확인합니다.', views: ['현황', '이력', '유통기한', '수요예측'] },
+  { id: '입출고', label: '입출고', description: '현장에서 바로 처리하는 작업들입니다.', views: ['등록', '스캔', '재고실사', '이관'] },
+  { id: '발주문서', label: '발주 · 문서', description: '발주와 문서 처리 흐름을 모았습니다.', views: ['발주', '명세서', '납품확인서', 'UDI'] },
+  { id: '설정', label: '설정', description: '기준정보와 부가 관리를 정리합니다.', views: ['거래처', '카테고리', '자산', 'AS반품', '소모품통계'] },
 ] as const;
+
+type InventorySectionId = typeof INVENTORY_WORK_SECTIONS[number]['id'];
 
 const INVENTORY_VIEW_META: Record<string, { title: string; description: string }> = {
   현황: { title: '재고 현황', description: '회사별 재고를 한 화면에서 보고 바로 입고·출고·발주까지 처리합니다.' },
@@ -53,6 +55,26 @@ const INVENTORY_VIEW_META: Record<string, { title: string; description: string }
   이관: { title: '재고 이관', description: '회사·부서 간 재고 이동을 기록하고 관리합니다.' },
 };
 
+const INVENTORY_VIEW_ICONS: Record<string, string> = {
+  현황: '📊',
+  이력: '🕘',
+  유통기한: '⏰',
+  수요예측: '🔮',
+  등록: '📝',
+  스캔: '📷',
+  발주: '📦',
+  재고실사: '🔎',
+  이관: '🔄',
+  명세서: '🧾',
+  납품확인서: '📋',
+  UDI: '🏷️',
+  자산: '🔖',
+  거래처: '🏭',
+  카테고리: '🗂️',
+  AS반품: '↩️',
+  소모품통계: '📉',
+};
+
 function getItemQuantity(item: any) {
   return Number(item?.quantity ?? item?.stock ?? 0);
 }
@@ -69,6 +91,10 @@ function formatCurrency(value: number) {
   return `${Number(value || 0).toLocaleString('ko-KR')}원`;
 }
 
+function getInventorySectionId(view: string): InventorySectionId {
+  return INVENTORY_WORK_SECTIONS.find((section) => (section.views as readonly string[]).includes(view))?.id || '조회';
+}
+
 export default function IntegratedInventoryManagement({
   user,
   depts = [],
@@ -78,7 +104,10 @@ export default function IntegratedInventoryManagement({
   initialView,
   onViewChange,
 }: any) {
-  const [activeView, setActiveView] = useState(initialView && VALID_VIEWS.includes(initialView) ? initialView : '현황');
+  const [activeView, setActiveView] = useState(initialView && (VALID_VIEWS as readonly string[]).includes(initialView) ? initialView : '현황');
+  const [activeSectionId, setActiveSectionId] = useState<InventorySectionId>(
+    getInventorySectionId(initialView && (VALID_VIEWS as readonly string[]).includes(initialView) ? initialView : '현황'),
+  );
   const [viewCompany, setViewCompany] = useState<string>('전체'); // 현황 탭용 회사 선택
   const [selectedDept, setSelectedDept] = useState('전체');
   const [inventory, setInventory] = useState<any[]>([]);
@@ -197,6 +226,34 @@ export default function IntegratedInventoryManagement({
     [filteredInventory],
   );
 
+  const outOfStockItems = useMemo(
+    () => baseFilteredInventory.filter((item: any) => getItemQuantity(item) === 0),
+    [baseFilteredInventory],
+  );
+
+  const inventoryNameById = useMemo(
+    () => new Map(inventory.map((item: any) => [String(item.id), item.item_name || item.name || '품목'])),
+    [inventory],
+  );
+
+  const todayLogCount = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return logs.filter((log: any) => String(log.created_at || '').slice(0, 10) === today).length;
+  }, [logs]);
+
+  const recentLogPreview = useMemo(
+    () =>
+      logs.slice(0, 5).map((log: any) => ({
+        ...log,
+        itemLabel:
+          inventoryNameById.get(String(log.item_id || log.inventory_id || '')) ||
+          log.item_name ||
+          log.inventory_name ||
+          '품목',
+      })),
+    [inventoryNameById, logs],
+  );
+
   const currentViewMeta = INVENTORY_VIEW_META[activeView] || {
     title: activeView,
     description: '재고관리 화면을 확인합니다.',
@@ -210,6 +267,18 @@ export default function IntegratedInventoryManagement({
     const companyLabel = viewCompany === '전체' ? '전체 회사' : viewCompany;
     return selectedDept !== '전체' ? `${companyLabel} · ${selectedDept}` : companyLabel;
   }, [activeView, selectedDept, selectedCo, viewCompany]);
+
+  const getViewBadgeCount = useCallback((view: string) => {
+    if (view === '현황') return filteredInventory.length;
+    if (view === '이력') return logs.length;
+    if (view === '유통기한') return expiryFilteredItems.length;
+    if (view === '발주') return lowStockFilteredItems.length;
+    if (view === '거래처') return suppliers.length;
+    return null;
+  }, [expiryFilteredItems.length, filteredInventory.length, logs.length, lowStockFilteredItems.length, suppliers.length]);
+
+  const activeSection =
+    INVENTORY_WORK_SECTIONS.find((section) => section.id === activeSectionId) || INVENTORY_WORK_SECTIONS[0];
 
   const fetchInventory = useCallback(async (companyFilter?: string) => {
     setLoading(true);
@@ -253,19 +322,19 @@ export default function IntegratedInventoryManagement({
   // 로컬스토리지 복구 또는 initialView 반영
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (initialView && VALID_VIEWS.includes(initialView)) {
+    if (initialView && (VALID_VIEWS as readonly string[]).includes(initialView)) {
       setActiveView(initialView);
       try { window.localStorage.setItem(INV_VIEW_KEY, initialView); } catch { /* ignore */ }
       return;
     }
     try {
       const saved = window.localStorage.getItem(INV_VIEW_KEY);
-      if (saved && VALID_VIEWS.includes(saved)) setActiveView(saved);
+      if (saved && (VALID_VIEWS as readonly string[]).includes(saved)) setActiveView(saved);
     } catch { /* ignore */ }
   }, [initialView]);
 
   useEffect(() => {
-    if (activeView === '이력') {
+    if (activeView === '이력' || activeView === '현황') {
       void fetchLogs();
     }
   }, [activeView, fetchLogs]);
@@ -280,6 +349,10 @@ export default function IntegratedInventoryManagement({
     }
     onViewChange?.(activeView);
   }, [activeView, onViewChange]);
+
+  useEffect(() => {
+    setActiveSectionId(getInventorySectionId(activeView));
+  }, [activeView]);
 
   useEffect(() => {
     fetchSuppliers();
@@ -306,14 +379,23 @@ export default function IntegratedInventoryManagement({
 
   const openInventoryView = useCallback(
     (view: string, nextRegistrationMode?: 'form' | 'excel' | 'auto_extract') => {
-      if (!VALID_VIEWS.includes(view)) return;
+      if (!(VALID_VIEWS as readonly string[]).includes(view)) return;
       setActiveView(view);
+      setActiveSectionId(getInventorySectionId(view));
       if (view === '등록' && nextRegistrationMode) {
         setRegistrationMode(nextRegistrationMode);
       }
     },
     [],
   );
+
+  const handleSectionChange = useCallback((sectionId: InventorySectionId) => {
+    setActiveSectionId(sectionId);
+    const nextSection = INVENTORY_WORK_SECTIONS.find((section) => section.id === sectionId);
+    if (nextSection && !(nextSection.views as readonly string[]).includes(activeView)) {
+      setActiveView(nextSection.views[0]);
+    }
+  }, [activeView]);
 
   const handleStockUpdate = async (item: any, type: 'in' | 'out', amount: number, targetCompany: string, targetDept: string) => {
     if (amount <= 0) return alert("수량은 0보다 커야 합니다.");
@@ -347,6 +429,7 @@ export default function IntegratedInventoryManagement({
         );
         alert(`${type === 'in' ? '입고' : '출고'} 처리가 완료되었습니다.`);
         refreshCurrentInventory();
+        void fetchLogs();
         if (onRefresh) onRefresh();
       }
     } catch (err) {
@@ -454,11 +537,79 @@ export default function IntegratedInventoryManagement({
                   </button>
                 </div>
               </div>
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    openInventoryView('현황');
+                    setStatusFilter('재고부족');
+                  }}
+                  className="rounded-[18px] border border-red-100 bg-red-50 px-4 py-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm"
+                >
+                  <p className="text-[11px] font-bold text-red-500">오늘 할 일</p>
+                  <div className="mt-2 flex items-end justify-between gap-3">
+                    <div>
+                      <p className="text-base font-bold text-red-700">부족 재고 확인</p>
+                      <p className="mt-1 text-[11px] font-semibold text-red-500">안전재고 미달 품목만 바로 봅니다.</p>
+                    </div>
+                    <span className="text-2xl font-black text-red-600">{lowStockFilteredItems.length}</span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    openInventoryView('현황');
+                    setStatusFilter('유통기한임박');
+                  }}
+                  className="rounded-[18px] border border-orange-100 bg-orange-50 px-4 py-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm"
+                >
+                  <p className="text-[11px] font-bold text-orange-500">선제 점검</p>
+                  <div className="mt-2 flex items-end justify-between gap-3">
+                    <div>
+                      <p className="text-base font-bold text-orange-700">기한 임박 점검</p>
+                      <p className="mt-1 text-[11px] font-semibold text-orange-500">유효기간 임박 품목을 한 번에 확인합니다.</p>
+                    </div>
+                    <span className="text-2xl font-black text-orange-600">{expiryFilteredItems.length}</span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => openInventoryView('이력')}
+                  className="rounded-[18px] border border-[var(--toss-border)] bg-[var(--page-bg)] px-4 py-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm"
+                >
+                  <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">작업 추적</p>
+                  <div className="mt-2 flex items-end justify-between gap-3">
+                    <div>
+                      <p className="text-base font-bold text-[var(--foreground)]">오늘 변동 이력</p>
+                      <p className="mt-1 text-[11px] font-semibold text-[var(--toss-gray-3)]">오늘 처리된 입출고 흐름을 바로 확인합니다.</p>
+                    </div>
+                    <span className="text-2xl font-black text-[var(--foreground)]">{todayLogCount}</span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => openInventoryView('등록', 'form')}
+                  className="rounded-[18px] border border-[var(--toss-blue)]/20 bg-[var(--toss-blue-light)] px-4 py-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm"
+                >
+                  <p className="text-[11px] font-bold text-[var(--toss-blue)]">업무 시작</p>
+                  <div className="mt-2 flex items-end justify-between gap-3">
+                    <div>
+                      <p className="text-base font-bold text-[var(--foreground)]">신규 품목 등록</p>
+                      <p className="mt-1 text-[11px] font-semibold text-[var(--toss-blue)]">새 물품을 바로 등록하거나 엑셀 등록으로 이동합니다.</p>
+                    </div>
+                    <span className="text-2xl font-black text-[var(--toss-blue)]">+</span>
+                  </div>
+                </button>
+              </div>
             </div>
 
             <div className="rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4 shadow-sm">
               <div className="space-y-4">
-                {INVENTORY_VIEW_GROUPS.map((group) => (
+                {INVENTORY_WORK_SECTIONS.map((group) => (
                   <div key={group.label} className="space-y-2">
                     <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">{group.label}</p>
                     <div className="flex flex-wrap gap-2">
@@ -473,7 +624,17 @@ export default function IntegratedInventoryManagement({
                               : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-blue-light)] hover:text-[var(--foreground)]'
                           }`}
                         >
+                          <span className="mr-1.5">{INVENTORY_VIEW_ICONS[view] || '•'}</span>
                           {view}
+                          {getViewBadgeCount(view) !== null && (
+                            <span className={`ml-2 rounded-full px-1.5 py-0.5 text-[10px] font-black ${
+                              activeView === view
+                                ? 'bg-white/20 text-white'
+                                : 'bg-white text-[var(--foreground)]'
+                            }`}>
+                              {getViewBadgeCount(view)}
+                            </span>
+                          )}
                         </button>
                       ))}
                     </div>
@@ -556,6 +717,24 @@ export default function IntegratedInventoryManagement({
                       </button>
                     </div>
                   </div>
+
+                  <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[var(--toss-border)] pt-4">
+                    <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">현재 필터</span>
+                    <span className="rounded-full bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--toss-blue)]">
+                      회사 {viewCompany === '전체' ? '전체' : viewCompany}
+                    </span>
+                    <span className="rounded-full bg-[var(--toss-gray-1)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-4)]">
+                      부서 {selectedDept === '전체' ? '전체' : selectedDept}
+                    </span>
+                    <span className="rounded-full bg-[var(--toss-gray-1)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-4)]">
+                      상태 {statusFilter === '유통기한임박' ? '유통기한 임박' : statusFilter}
+                    </span>
+                    {searchKeyword.trim() && (
+                      <span className="rounded-full border border-[var(--toss-border)] bg-white px-3 py-1 text-[11px] font-bold text-[var(--foreground)]">
+                        검색어 {searchKeyword.trim()}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
                   <div className="bg-[var(--toss-card)] p-6 rounded-[16px] border border-[var(--toss-border)] shadow-sm text-center">
@@ -578,6 +757,36 @@ export default function IntegratedInventoryManagement({
                     <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">재고 평가 금액</p>
                     <p className="text-sm font-semibold text-[var(--foreground)] mt-2 break-keep">{formatCurrency(totalInventoryValue)}</p>
                   </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-3">
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter('재고부족')}
+                    className="rounded-[18px] border border-red-100 bg-red-50 px-5 py-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm"
+                  >
+                    <p className="text-[11px] font-bold text-red-500">우선 처리</p>
+                    <p className="mt-2 text-base font-bold text-red-700">부족 재고만 보기</p>
+                    <p className="mt-1 text-[11px] text-red-500">지금 보충이 필요한 품목 {lowStockFilteredItems.length}건</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter('유통기한임박')}
+                    className="rounded-[18px] border border-orange-100 bg-orange-50 px-5 py-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm"
+                  >
+                    <p className="text-[11px] font-bold text-orange-500">품질 점검</p>
+                    <p className="mt-2 text-base font-bold text-orange-700">유통기한 임박만 보기</p>
+                    <p className="mt-1 text-[11px] text-orange-500">빠른 확인이 필요한 품목 {expiryFilteredItems.length}건</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSearchKeyword('')}
+                    className="rounded-[18px] border border-[var(--toss-border)] bg-[var(--page-bg)] px-5 py-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm"
+                  >
+                    <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">현황 확인</p>
+                    <p className="mt-2 text-base font-bold text-[var(--foreground)]">품절 품목 빠르게 파악</p>
+                    <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">현재 범위에서 재고 0개 품목 {outOfStockItems.length}건</p>
+                  </button>
                 </div>
 
                 <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">

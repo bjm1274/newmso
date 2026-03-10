@@ -9,7 +9,7 @@ const CAN_WRITE_NOTICE_POSITIONS = ['대표', '부장', '팀장', '실장', '병
 const CHAT_ROOM_KEY = 'erp_chat_last_room';
 const CHAT_FOCUS_KEY = 'erp_chat_focus_keyword';
 const CHAT_ROOM_PREFS_KEY = 'erp_chat_room_prefs';
-const MESSAGE_READ_WRITES_ENABLED = false;
+const MESSAGE_READ_WRITES_ENABLED = true;
 
 function sortChatRoomsWithNoticeFirst(rooms: any[]): any[] {
   const notice = rooms.find((r: any) => r.id === NOTICE_ROOM_ID);
@@ -255,38 +255,15 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     candidateIds.forEach((id) => readWriteInFlightRef.current.add(id));
 
     try {
-    const readAt = new Date().toISOString();
-    const { data: existingReads, error } = await supabase
-      .from('message_reads')
-      .select('id, message_id')
-      .eq('user_id', user.id)
-      .in('message_id', candidateIds);
-
-    if (error) return;
-
-    const existingIds = new Set(
-      Array.isArray(existingReads) ? existingReads.map((row: any) => String(row.message_id)) : []
-    );
-    const idsToInsert = candidateIds.filter((id) => !existingIds.has(id));
-    const idsToUpdate = candidateIds.filter((id) => existingIds.has(id));
-
-    if (idsToInsert.length > 0) {
-      await supabase.from('message_reads').insert(
-        idsToInsert.map((id) => ({
+      const readAt = new Date().toISOString();
+      await supabase.from('message_reads').upsert(
+        candidateIds.map((id) => ({
           user_id: user.id,
           message_id: id,
           read_at: readAt,
-        }))
+        })),
+        { onConflict: 'user_id,message_id' }
       );
-    }
-
-    if (idsToUpdate.length > 0) {
-      await supabase
-        .from('message_reads')
-        .update({ read_at: readAt })
-        .eq('user_id', user.id)
-        .in('message_id', idsToUpdate);
-    }
     } finally {
       candidateIds.forEach((id) => readWriteInFlightRef.current.delete(id));
     }
@@ -551,6 +528,17 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       const counts: Record<string, number> = {};
       reads?.forEach((r: any) => { counts[r.message_id] = (counts[r.message_id] || 0) + 1; });
       setReadCounts(counts);
+      if (user?.id) {
+        const { data: bookmarks } = await supabase
+          .from('message_bookmarks')
+          .select('message_id')
+          .eq('user_id', user.id)
+          .in('message_id', ids);
+        setBookmarkedIds(new Set((bookmarks || []).map((bookmark: any) => bookmark.message_id)));
+      }
+    } else {
+      setReadCounts({});
+      setBookmarkedIds(new Set());
     }
 
     try {
@@ -563,7 +551,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         if (!reactMap[r.message_id]) reactMap[r.message_id] = {};
         reactMap[r.message_id][r.emoji] = (reactMap[r.message_id][r.emoji] || 0) + 1;
       });
-      setReactions((prev: any) => ({ ...prev, ...reactMap }));
+      setReactions(reactMap);
 
       const { data: dbPolls } = await supabase.from('polls').select('*').eq('room_id', selectedRoomId);
       if (dbPolls?.length) setPolls(dbPolls);
@@ -589,6 +577,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       if (unreadMsgIds.length > 0) {
         try {
           await persistMessageReads(unreadMsgIds);
+          broadcastChatSync('message-read', selectedRoomId);
 
           // table notification_settings might not exist
           try {
@@ -615,7 +604,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         }
       }
     }
-  }, [selectedRoomId, user?.id, updateUnreadForRooms]);
+  }, [selectedRoomId, user?.id, updateUnreadForRooms, persistMessageReads, broadcastChatSync, staffs]);
 
   const roomNotifyRef = useRef(true);
   useEffect(() => { roomNotifyRef.current = roomNotifyOn; }, [roomNotifyOn]);
@@ -789,7 +778,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `room_id=eq.${selectedRoomId}` }, () => fetchData())
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages', filter: `room_id=eq.${selectedRoomId}` }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_rooms' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reads' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_bookmarks', filter: `user_id=eq.${user?.id}` }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pinned_messages' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'polls' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'poll_votes' }, () => fetchData())
@@ -1047,7 +1038,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           .from('message_reads')
           .select('user_id')
           .eq('message_id', msg.id);
-        const readUserIds = new Set((reads || []).map((r: any) => r.user_id));
+        const readUserIds = new Set((reads || []).map((r: any) => String(r.user_id)));
 
         const roomMemberIds = selectedRoom.id === NOTICE_ROOM_ID
           ? staffs.map((s: any) => String(s.id))
@@ -1061,8 +1052,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         const nonReaders: any[] = [];
 
         allRoomStaffs.forEach((s: any) => {
-          if (s.id === msg.sender_id) return;
-          if (readUserIds.has(s.id)) {
+          if (String(s.id) === String(msg.sender_id)) return;
+          if (readUserIds.has(String(s.id))) {
             readers.push(s);
           } else {
             nonReaders.push(s);
@@ -1347,12 +1338,19 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   const handleAction = async (type: 'task') => {
     if (!activeActionMsg) return;
     if (type === 'task') {
-      const { error } = await supabase.from('tasks').insert([{
-        assignee_id: user.id,
-        title: `[채팅] ${activeActionMsg.content}`,
-        status: 'pending'
+      const content = (activeActionMsg.content || '').trim() || '첨부 파일 확인';
+      const { error } = await supabase.from('todos').insert([{
+        user_id: user.id,
+        content: `[채팅] ${content}`,
+        is_complete: false,
+        task_date: new Date().toISOString().slice(0, 10),
       }]);
-      if (!error) { alert('할 일 등록 완료'); if (onRefresh) onRefresh(); }
+      if (!error) {
+        alert('할 일 등록 완료');
+        if (onRefresh) onRefresh();
+      } else {
+        alert('할 일 등록 중 오류가 발생했습니다.');
+      }
     }
     setActiveActionMsg(null);
   };
@@ -1461,8 +1459,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       } else {
         await supabase.from('message_reactions').insert([{ message_id: messageId, user_id: user.id, emoji }]);
       }
-      fetchData();
-    } catch (_) { }
+      await fetchData();
+    } catch (error) {
+      console.error('toggleReaction error', error);
+    }
   };
 
   const togglePin = async (messageId: string) => {
@@ -1477,6 +1477,40 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       fetchData();
     } catch (_) {
       setPinnedIds((p) => (isPinned ? p.filter((id) => id !== messageId) : [...p, messageId]));
+    }
+  };
+
+  const toggleBookmark = async (messageId: string) => {
+    const isBookmarked = bookmarkedIds.has(messageId);
+    try {
+      if (isBookmarked) {
+        await supabase
+          .from('message_bookmarks')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('message_id', messageId);
+        setBookmarkedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(messageId);
+          return next;
+        });
+      } else {
+        await supabase.from('message_bookmarks').upsert(
+          [
+            {
+              user_id: user.id,
+              message_id: messageId,
+              room_id: selectedRoomId,
+            },
+          ],
+          { onConflict: 'user_id,message_id' }
+        );
+        setBookmarkedIds((prev) => new Set(prev).add(messageId));
+      }
+      await fetchData();
+    } catch (error) {
+      console.error('toggleBookmark error', error);
+      alert('북마크 처리 중 오류가 발생했습니다.');
     }
   };
 
@@ -1620,6 +1654,46 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     setEditContent('');
   };
 
+  const openMessageActions = useCallback((msg: any) => {
+    markMessageRead(msg);
+    setActiveActionMsg(msg);
+  }, [markMessageRead]);
+
+  const startReplyToMessage = useCallback((msg: any) => {
+    setReplyTo(msg);
+    setActiveActionMsg(null);
+    requestAnimationFrame(() => {
+      composerRef.current?.focus();
+      composerRef.current?.scrollIntoView({ block: 'nearest' });
+    });
+  }, []);
+
+  const startEditMessage = useCallback((msg: any) => {
+    setEditingMsg(msg);
+    setEditContent(msg.content || '');
+    setActiveActionMsg(null);
+  }, []);
+
+  const startForwardMessage = useCallback((msg: any) => {
+    setForwardSourceMsg(msg);
+    setShowForwardModal(true);
+    setActiveActionMsg(null);
+  }, []);
+
+  const openReadStatusPanel = useCallback((msg: any) => {
+    void loadReadStatusForMessage(msg);
+    setActiveActionMsg(null);
+  }, [loadReadStatusForMessage]);
+
+  const openThreadPanel = useCallback((msg: any) => {
+    setThreadRoot(msg);
+    setActiveActionMsg(null);
+  }, []);
+
+  const deleteMessageFromActions = useCallback(async (msg: any) => {
+    await deleteMessage(msg);
+  }, [deleteMessage]);
+
   return (
     <div data-testid="chat-view" className="flex flex-1 min-h-0 overflow-hidden relative font-sans h-full bg-[var(--background)] md:bg-[var(--toss-card)]">
       <aside className={`${selectedRoomId ? 'hidden md:flex' : 'flex'} w-full md:w-80 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 flex-col shrink-0 z-50 transition-all`}>
@@ -1713,9 +1787,13 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                           {!isNoticeChannel && isPeerOnline && (
                             <span className="absolute -right-0.5 -bottom-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border border-white dark:border-zinc-900" />
                           )}
-                        </div>
-                        <div className="flex flex-col min-w-0">
+                        </div>                        <div className="flex flex-col min-w-0">
                           <div className="flex items-center gap-1.5 min-w-0">
+                            {unread > 0 && (
+                              <span className="shrink-0 min-w-[18px] h-[18px] px-1.5 inline-flex items-center justify-center rounded-full bg-blue-600 text-white text-[9px] font-bold shadow-soft">
+                                {unread > 99 ? '99+' : unread}
+                              </span>
+                            )}
                             <p className={`text-[12px] font-bold truncate ${isSelected ? 'text-white' : 'text-zinc-600 dark:text-zinc-300'}`}>
                               {label}
                             </p>
@@ -1753,11 +1831,6 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                               {isHidden ? '표시' : '숨김'}
                             </button>
                           </>
-                        )}
-                        {unread > 0 && (
-                          <span className="ml-1 min-w-[16px] h-[16px] px-1 flex items-center justify-center rounded-full bg-blue-600 text-white text-[9px] font-bold shadow-soft">
-                            {unread > 99 ? '99+' : unread}
-                          </span>
                         )}
                       </div>
                     </div>
@@ -1870,6 +1943,26 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           </header>
         )}
 
+        {selectedRoomId && pinnedMessages.length > 0 && (
+          <div className="shrink-0 border-b border-orange-100 bg-orange-50/80 px-4 py-3 md:px-6">
+            <div className="flex flex-wrap gap-2">
+              {pinnedMessages.map((pinnedMessage) => (
+                <button
+                  key={`pin-${pinnedMessage.id}`}
+                  type="button"
+                  onClick={() => scrollToMessage(pinnedMessage.id)}
+                  className="min-w-0 max-w-full rounded-[14px] border border-orange-200 bg-white px-3 py-2 text-left shadow-sm transition-colors hover:bg-orange-100"
+                >
+                  <p className="text-[10px] font-bold text-orange-500">공지 메시지</p>
+                  <p className="mt-1 max-w-[280px] truncate text-xs font-semibold text-[var(--foreground)]">
+                    {pinnedMessage.content || '첨부 파일 메시지'}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div
           ref={messageListRef}
           onScroll={updateScrollPositionState}
@@ -1929,17 +2022,20 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 const readersCount = readCounts[msg.id] || 0;
                 const unreadRecipients = isMine ? Math.max(0, totalRecipients - readersCount) : 0;
                 const deliveryState = deliveryStates[msg.id]?.status || (String(msg.id).startsWith('temp-') ? 'sending' : 'sent');
-                const deliveryLabel = !isMine
+                const readStatusSummary = !isMine
                   ? null
                   : deliveryState === 'sending'
                     ? '전송중'
                     : deliveryState === 'failed'
                       ? '전송 실패'
-                      : unreadRecipients > 0
-                        ? `안읽음 ${unreadRecipients}`
-                        : totalRecipients > 0
-                          ? '읽음'
-                          : '전송됨';
+                      : totalRecipients > 0 && unreadRecipients > 0
+                        ? `${unreadRecipients}`
+                        : null;
+                const canOpenReadStatus = Boolean(
+                  isMine &&
+                  deliveryState === 'sent' &&
+                  totalRecipients > 0
+                );
 
                 const TOOLBAR_EMOJIS = ['👍', '❤️', '👏', '🎉', '🔥', '✅', '👀', '🙏'];
 
@@ -1984,8 +2080,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                         <div
                           onClick={(e) => {
                             e.stopPropagation();
-                            markMessageRead(msg);
-                            setActiveActionMsg(msg);
+                            openMessageActions(msg);
                           }}
                           className={`group relative ${!msg.content ? 'p-0 bg-transparent shadow-none border-none' : 'px-3 py-2 shadow-sm border'} rounded-[12px] text-[13px] md:text-sm cursor-pointer transition-all max-w-[75%] md:max-w-[70%] ${!msg.content ? '' : isMine
                             ? 'bg-emerald-600 text-white border-transparent rounded-tr-none'
@@ -2076,10 +2171,23 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                             className={`absolute bottom-0 ${isMine ? 'right-full mr-2 items-end' : 'left-full ml-2 items-start'
                               } flex flex-col gap-0.5 whitespace-nowrap`}
                           >
-                            {deliveryLabel && (
-                              <span className={`text-[10px] font-bold ${deliveryState === 'failed' ? 'text-red-500' : 'text-emerald-500'}`}>
-                                {deliveryLabel}
-                              </span>
+                            {readStatusSummary && (
+                              canOpenReadStatus ? (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    loadReadStatusForMessage(msg);
+                                  }}
+                                  className="text-[10px] font-bold text-emerald-500 hover:text-emerald-600 underline underline-offset-2"
+                                >
+                                  {readStatusSummary}
+                                </button>
+                              ) : (
+                                <span className={`text-[10px] font-bold ${deliveryState === 'failed' ? 'text-red-500' : 'text-emerald-500'}`}>
+                                  {readStatusSummary}
+                                </span>
+                              )
                             )}
                             <span className="text-[8px] font-bold text-[var(--toss-gray-4)]">
                               {created.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -2106,14 +2214,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                         >
                           <button
                             type="button"
-                            onClick={() => { setReplyTo(msg); }}
+                            onClick={() => { startReplyToMessage(msg); }}
                             className="p-1 px-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-[10px] font-bold text-zinc-400 hover:text-blue-500 transition-colors"
                           >
                             답장
                           </button>
                           <button
                             type="button"
-                            onClick={() => { setActiveActionMsg(msg); }}
+                            onClick={() => { openMessageActions(msg); }}
                             className="p-1 px-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-[10px] font-bold text-zinc-400 hover:text-zinc-600 transition-colors"
                           >
                             더보기
@@ -2365,25 +2473,29 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     <span className="text-xl">✅</span>
                     <span className="text-sm font-bold">할 일 추가</span>
                   </button>
-                  <button onClick={async () => { if (!activeActionMsg) return; await supabase.from('chat_rooms').update({ notice_message_id: activeActionMsg.id }).eq('id', selectedRoomId); alert('공지로 등록했습니다.'); fetchData(); setActiveActionMsg(null); }} className="w-full flex items-center gap-4 p-4 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[12px] transition-colors">
+                  <button onClick={() => { if (!activeActionMsg) return; void togglePin(activeActionMsg.id); setActiveActionMsg(null); }} className="w-full flex items-center gap-4 p-4 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[12px] transition-colors">
                     <span className="text-xl">📢</span>
-                    <span className="text-sm font-bold">공지</span>
+                    <span className="text-sm font-bold">{pinnedIds.includes(activeActionMsg.id) ? '공지 해제' : '공지 등록'}</span>
+                  </button>
+                  <button onClick={() => { if (!activeActionMsg) return; void toggleBookmark(activeActionMsg.id); setActiveActionMsg(null); }} className="w-full flex items-center gap-4 p-4 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[12px] transition-colors">
+                    <span className="text-xl">🔖</span>
+                    <span className="text-sm font-bold">{bookmarkedIds.has(activeActionMsg.id) ? '북마크 해제' : '북마크 등록'}</span>
                   </button>
                   <button onClick={async () => { await navigator.clipboard?.writeText(activeActionMsg.content || ''); alert('복사했습니다.'); setActiveActionMsg(null); }} className="w-full flex items-center gap-4 p-4 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[12px] transition-colors">
                     <span className="text-xl">📋</span>
                     <span className="text-sm font-bold">복사</span>
                   </button>
                   {activeActionMsg.sender_id === user.id && (
-                    <button onClick={() => { deleteMessage(activeActionMsg); setActiveActionMsg(null) }} className="w-full flex items-center gap-4 p-4 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-[12px] transition-colors text-red-500">
+                    <button onClick={() => { void deleteMessageFromActions(activeActionMsg); }} className="w-full flex items-center gap-4 p-4 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-[12px] transition-colors text-red-500">
                       <span className="text-xl">🗑️</span>
                       <span className="text-sm font-bold">삭제</span>
                     </button>
                   )}
-                  <button onClick={() => { setReplyTo(activeActionMsg); setActiveActionMsg(null) }} className="w-full flex items-center gap-4 p-4 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[12px] transition-colors">
+                  <button onClick={() => { startReplyToMessage(activeActionMsg); }} className="w-full flex items-center gap-4 p-4 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[12px] transition-colors">
                     <span className="text-xl">↩️</span>
                     <span className="text-sm font-bold">답장</span>
                   </button>
-                  <button onClick={() => { setForwardSourceMsg(activeActionMsg); setShowForwardModal(true); setActiveActionMsg(null); }} className="w-full flex items-center gap-4 p-4 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[12px] transition-colors">
+                  <button onClick={() => { startForwardMessage(activeActionMsg); }} className="w-full flex items-center gap-4 p-4 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[12px] transition-colors">
                     <span className="text-xl">📤</span>
                     <span className="text-sm font-bold">전달</span>
                   </button>
@@ -2408,18 +2520,15 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase pt-2">기능</p>
                 <div className="space-y-1">
                   <button
-                    onClick={() => {
-                      setReplyTo(activeActionMsg);
-                      setActiveActionMsg(null);
-                    }}
+                    onClick={() => { startReplyToMessage(activeActionMsg); }}
                     className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors"
                   >
                     답글 달기
                   </button>
                   {activeActionMsg.sender_id === user.id && (
                     <>
-                      <button onClick={() => { setEditingMsg(activeActionMsg); setEditContent(activeActionMsg.content || ''); setActiveActionMsg(null) }} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">메시지 수정</button>
-                      <button onClick={() => { deleteMessage(activeActionMsg); setActiveActionMsg(null) }} className="w-full p-3 text-left hover:bg-red-50 rounded-[12px] text-xs font-semibold text-red-600 transition-colors">메시지 삭제</button>
+                      <button onClick={() => { startEditMessage(activeActionMsg); }} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">메시지 수정</button>
+                      <button onClick={() => { void deleteMessageFromActions(activeActionMsg); }} className="w-full p-3 text-left hover:bg-red-50 rounded-[12px] text-xs font-semibold text-red-600 transition-colors">메시지 삭제</button>
                     </>
                   )}
                   <button
@@ -2444,25 +2553,18 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   </button>
                   <button onClick={() => { handleAction('task'); setActiveActionMsg(null) }} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">할 일로 등록</button>
                   <button
-                    onClick={() => {
-                      loadReadStatusForMessage(activeActionMsg);
-                      setActiveActionMsg(null);
-                    }}
+                    onClick={() => { openReadStatusPanel(activeActionMsg); }}
                     className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors"
                   >
                     읽음 확인
                   </button>
                   <button
-                    onClick={() => {
-                      setForwardSourceMsg(activeActionMsg);
-                      setShowForwardModal(true);
-                      setActiveActionMsg(null);
-                    }}
+                    onClick={() => { startForwardMessage(activeActionMsg); }}
                     className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors"
                   >
                     다른 채팅방으로 전달
                   </button>
-                  <button onClick={() => { setThreadRoot(activeActionMsg); setActiveActionMsg(null); }} className="w-full p-3 text-left hover:bg-[var(--toss-blue-light)] rounded-[12px] text-xs font-semibold text-[var(--toss-blue)] transition-colors">이 메시지 스레드 보기</button>
+                  <button onClick={() => { openThreadPanel(activeActionMsg); }} className="w-full p-3 text-left hover:bg-[var(--toss-blue-light)] rounded-[12px] text-xs font-semibold text-[var(--toss-blue)] transition-colors">이 메시지 스레드 보기</button>
                   <button onClick={async () => { try { const base = `[채팅] ${activeActionMsg.staff?.name || '이름 없음'} (${new Date(activeActionMsg.created_at).toLocaleString('ko-KR')})\n${activeActionMsg.content || ''}${activeActionMsg.file_url ? `\n파일: ${activeActionMsg.file_url}` : ''}`; await navigator.clipboard?.writeText(`[전자결재 메모]\n${base}`); alert('전자결재용으로 복사했습니다.'); } catch { alert('복사 실패'); } setActiveActionMsg(null); }} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">전자결재용 내용 복사</button>
                   <button onClick={async () => { try { const base = `[채팅] ${activeActionMsg.staff?.name || '이름 없음'} (${new Date(activeActionMsg.created_at).toLocaleString('ko-KR')})\n${activeActionMsg.content || ''}${activeActionMsg.file_url ? `\n파일: ${activeActionMsg.file_url}` : ''}`; await navigator.clipboard?.writeText(`[게시판 메모]\n${base}`); alert('게시판용으로 복사했습니다.'); } catch { alert('복사 실패'); } setActiveActionMsg(null); }} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">게시판용 내용 복사</button>
                   <button
@@ -3292,3 +3394,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     </div>
   );
 }
+
+
+
+
+
+
+
