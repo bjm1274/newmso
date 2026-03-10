@@ -25,7 +25,7 @@ const INV_VIEW_KEY = 'erp_inventory_view';
 
 const VALID_VIEWS = ['UDI', '명세서', '발주', '스캔', '등록', '현황', '이력', '자산', 'AS반품', '거래처', '재고실사', '유통기한', '이관', '카테고리', '소모품통계', '납품확인서', '수요예측'];
 
-export default function IntegratedInventoryManagement({ user, selectedCo, selectedCompanyId, onRefresh, initialView }: any) {
+export default function IntegratedInventoryManagement({ user, depts = [], selectedCo, selectedCompanyId, onRefresh, initialView }: any) {
   const [activeView, setActiveView] = useState(initialView && VALID_VIEWS.includes(initialView) ? initialView : '현황');
   const [viewCompany, setViewCompany] = useState<string>('전체'); // 현황 탭용 회사 선택
   const [selectedDept, setSelectedDept] = useState('전체');
@@ -53,15 +53,28 @@ export default function IntegratedInventoryManagement({ user, selectedCo, select
     Array.from(new Set(inventory.map((i: any) => (i.company || '').trim()).filter(Boolean))).sort(),
     [inventory]
   );
+  const getDepartmentsForCompany = useCallback((companyName: string) => {
+    if (!companyName || companyName === '전체') return [];
+    const inventoryDepartments = inventory
+      .filter((i: any) => (i.company || '').trim() === companyName)
+      .map((i: any) => (i.department || '').trim())
+      .filter(Boolean);
+    const configuredDepartments = Array.isArray(depts)
+      ? depts
+          .map((dept: any) => (typeof dept === 'string' ? dept : dept?.name || ''))
+          .map((name: string) => name.trim())
+          .filter(Boolean)
+      : [];
+    return Array.from(new Set([...inventoryDepartments, ...configuredDepartments])).sort();
+  }, [inventory, depts]);
   const departmentsByViewCompany = useMemo(() => {
     if (!viewCompany || viewCompany === '전체') return [];
-    return Array.from(new Set(
-      inventory
-        .filter((i: any) => (i.company || '').trim() === viewCompany)
-        .map((i: any) => (i.department || '').trim())
-        .filter(Boolean)
-    )).sort();
-  }, [inventory, viewCompany]);
+    return getDepartmentsForCompany(viewCompany);
+  }, [viewCompany, getDepartmentsForCompany]);
+  const departmentsByStockCompany = useMemo(() => {
+    if (!stockModal?.targetCompany || stockModal.targetCompany === '전체') return [];
+    return getDepartmentsForCompany(stockModal.targetCompany);
+  }, [stockModal?.targetCompany, getDepartmentsForCompany]);
 
   const filteredInventory = useMemo(() => {
     let list = inventory;
@@ -161,6 +174,13 @@ export default function IntegratedInventoryManagement({ user, selectedCo, select
     setSelectedDept('전체');
   }, [viewCompany]);
 
+  const refreshCurrentInventory = useCallback(() => {
+    if (activeView === '?꾪솴') {
+      return fetchInventory('?꾩껜');
+    }
+    return fetchInventory(selectedCo);
+  }, [activeView, fetchInventory, selectedCo]);
+
   const handleStockUpdate = async (item: any, type: 'in' | 'out', amount: number, targetCompany: string, targetDept: string) => {
     if (amount <= 0) return alert("수량은 0보다 커야 합니다.");
     const currentQty = item.quantity ?? item.stock ?? 0;
@@ -192,7 +212,7 @@ export default function IntegratedInventoryManagement({ user, selectedCo, select
           }
         );
         alert(`${type === 'in' ? '입고' : '출고'} 처리가 완료되었습니다.`);
-        fetchInventory();
+        refreshCurrentInventory();
         if (onRefresh) onRefresh();
       }
     } catch (err) {
@@ -354,19 +374,20 @@ export default function IntegratedInventoryManagement({ user, selectedCo, select
                                   {item.quantity <= item.min_quantity ? '재고부족' : '정상'}
                                 </span>
                               </td>
-                              <td className="px-6 py-4 text-right space-x-1">
-                                <button onClick={() => { setStockModal({ item, type: 'in', targetCompany: item.company || '전체', targetDept: item.department || '전체' }); setStockAmount(1); }} className="px-2 py-1 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] text-[11px] font-semibold rounded-md hover:bg-[var(--toss-blue-light)]">입고</button>
-                                <button onClick={() => { setStockModal({ item, type: 'out', targetCompany: item.company || '전체', targetDept: item.department || '전체' }); setStockAmount(1); }} className="px-2 py-1 bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] text-[11px] font-semibold rounded-md hover:bg-[var(--toss-gray-1)]/80">출고</button>
+                              <td data-testid={`inventory-actions-${item.id}`} className="px-6 py-4 text-right space-x-1">
+                                <button data-testid={`inventory-stock-in-${item.id}`} onClick={() => { setStockModal({ item, type: 'in', targetCompany: item.company || '전체', targetDept: item.department || '전체' }); setStockAmount(1); }} className="px-2 py-1 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] text-[11px] font-semibold rounded-md hover:bg-[var(--toss-blue-light)]">입고</button>
+                                <button data-testid={`inventory-stock-out-${item.id}`} onClick={() => { setStockModal({ item, type: 'out', targetCompany: item.company || '전체', targetDept: item.department || '전체' }); setStockAmount(1); }} className="px-2 py-1 bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] text-[11px] font-semibold rounded-md hover:bg-[var(--toss-gray-1)]/80">출고</button>
                                 {item.quantity <= item.min_quantity && (
-                                  <button onClick={() => handleAutoApprovalRequest(item)} className="px-2 py-1 bg-orange-600 text-white text-[11px] font-semibold rounded-md shadow-sm">발주</button>
+                                  <button data-testid={`inventory-reorder-${item.id}`} onClick={() => handleAutoApprovalRequest(item)} className="px-2 py-1 bg-orange-600 text-white text-[11px] font-semibold rounded-md shadow-sm">발주</button>
                                 )}
                                 <button
+                                  data-testid={`inventory-delete-${item.id}`}
                                   onClick={async () => {
                                     if (confirm(`[${item.item_name}] 품목을 정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
                                       try {
                                         await supabase.from('inventory').delete().eq('id', item.id);
                                         alert('삭제되었습니다.');
-                                        fetchInventory();
+                                        refreshCurrentInventory();
                                       } catch (err) {
                                         alert('삭제 오류가 발생했습니다.');
                                       }
@@ -461,7 +482,7 @@ export default function IntegratedInventoryManagement({ user, selectedCo, select
       {/* 입출고 수량 입력 모달 */}
       {stockModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[110] flex items-center justify-center p-4" onClick={() => setStockModal(null)}>
-          <div className="bg-[var(--toss-card)] rounded-[16px] shadow-2xl p-8 max-w-sm w-full" onClick={e => e.stopPropagation()}>
+          <div data-testid="inventory-stock-modal" className="bg-[var(--toss-card)] rounded-[16px] shadow-2xl p-8 max-w-sm w-full" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-[var(--foreground)] mb-4">{stockModal.type === 'in' ? '입고' : '출고'} 상세 입력</h3>
             <p className="text-xs font-bold text-[var(--toss-gray-3)] mb-2">{stockModal.item.item_name || stockModal.item.name}</p>
             <p className="text-[11px] text-[var(--toss-gray-3)] mb-4">현재고: {stockModal.item.quantity ?? stockModal.item.stock ?? 0}</p>
@@ -469,21 +490,21 @@ export default function IntegratedInventoryManagement({ user, selectedCo, select
             <div className="space-y-4 mb-6">
               <div>
                 <label className="text-[11px] font-bold text-[var(--toss-gray-3)] mb-1 block">수량 (개/단위)</label>
-                <input type="number" min={1} max={stockModal.type === 'out' ? (stockModal.item.quantity ?? stockModal.item.stock ?? 0) : 99999} value={stockAmount} onChange={e => setStockAmount(Math.max(1, parseInt(e.target.value) || 1))} className="w-full px-4 py-3 rounded-[12px] border border-[var(--toss-border)] text-sm font-semibold" />
+                <input data-testid="inventory-stock-amount-input" type="number" min={1} max={stockModal.type === 'out' ? (stockModal.item.quantity ?? stockModal.item.stock ?? 0) : 99999} value={stockAmount} onChange={e => setStockAmount(Math.max(1, parseInt(e.target.value) || 1))} className="w-full px-4 py-3 rounded-[12px] border border-[var(--toss-border)] text-sm font-semibold" />
               </div>
               <div className="flex gap-2">
                 <div className="flex-1">
                   <label className="text-[11px] font-bold text-[var(--toss-gray-3)] mb-1 block">대상 회사</label>
-                  <select value={stockModal.targetCompany} onChange={e => setStockModal({ ...stockModal, targetCompany: e.target.value })} className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[12px] text-xs font-bold">
+                  <select data-testid="inventory-stock-company-select" value={stockModal.targetCompany} onChange={e => setStockModal({ ...stockModal, targetCompany: e.target.value })} className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[12px] text-xs font-bold">
                     <option value="전체">미지정</option>
                     {companiesInInventory.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <div className="flex-1">
                   <label className="text-[11px] font-bold text-[var(--toss-gray-3)] mb-1 block">대상 부서</label>
-                  <select value={stockModal.targetDept} onChange={e => setStockModal({ ...stockModal, targetDept: e.target.value })} className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[12px] text-xs font-bold">
+                  <select data-testid="inventory-stock-dept-select" value={stockModal.targetDept} onChange={e => setStockModal({ ...stockModal, targetDept: e.target.value })} className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[12px] text-xs font-bold">
                     <option value="전체">미지정</option>
-                    {departmentsByViewCompany.map(d => <option key={d} value={d}>{d}</option>)}
+                    {departmentsByStockCompany.map(d => <option key={d} value={d}>{d}</option>)}
                   </select>
                 </div>
               </div>

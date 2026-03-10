@@ -47,7 +47,7 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: any) 
   const leaveUsageTrend: number[] = []; // Virtual data removed
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-700">
+    <div className="space-y-8 animate-in fade-in duration-700" data-testid="admin-analysis-business">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-slate-200/60 pb-6">
         <div>
           <h2 className="text-2xl font-black text-slate-800 tracking-tight">HR 데이터 시각화 & 경영 분석 보드 📊</h2>

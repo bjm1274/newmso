@@ -118,7 +118,7 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: any) {
     }));
 
     return (
-        <div className="flex flex-col h-full animate-in fade-in duration-300">
+        <div className="flex flex-col h-full animate-in fade-in duration-300" data-testid="payroll-utility-insurance">
             {/* 헤더 */}
             <header className="p-6 md:p-8 border-b border-[var(--toss-border)] bg-[var(--toss-card)] shrink-0">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">

@@ -1,0 +1,58 @@
+{
+  "id": "04_chat",
+  "title": "채팅 화면",
+  "subtitle": "채팅방 목록, 메시지 영역, 입력창을 중심으로 사용합니다.",
+  "role": "사원",
+  "image": "C:\\Users\\baek_\\newmso\\docs\\manuals\\ppt_assets\\raw\\04_chat.png",
+  "notes": [
+    "좌측은 채팅방 목록입니다.",
+    "가운데는 대화 내용입니다.",
+    "하단 입력창과 전송 버튼으로 메시지를 보냅니다."
+  ],
+  "hotspots": [
+    {
+      "index": 1,
+      "label": "채팅방 목록",
+      "note": "공지방과 그룹방 선택",
+      "box": {
+        "x": 70,
+        "y": 110,
+        "width": 290,
+        "height": 620
+      }
+    },
+    {
+      "index": 2,
+      "label": "대화 내용",
+      "note": "메시지 확인",
+      "box": {
+        "x": 390,
+        "y": 110,
+        "width": 720,
+        "height": 560
+      }
+    },
+    {
+      "index": 3,
+      "label": "입력창",
+      "note": "메시지 작성",
+      "box": {
+        "x": 461,
+        "y": 661,
+        "width": 750,
+        "height": 28
+      }
+    },
+    {
+      "index": 4,
+      "label": "전송 버튼",
+      "note": "메시지 보내기",
+      "box": {
+        "x": 1223,
+        "y": 663,
+        "width": 32,
+        "height": 32
+      }
+    }
+  ]
+}

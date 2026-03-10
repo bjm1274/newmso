@@ -200,7 +200,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
   };
 
   return (
-    <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-[2.5rem] px-6 py-7 sm:p-8 h-full flex flex-col space-y-7">
+    <div data-testid="commute-record-view" className="bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-[2.5rem] px-6 py-7 sm:p-8 h-full flex flex-col space-y-7">
 
       {/* 실시간 상태 카드 */}
       <div className="flex justify-between items-center bg-[var(--foreground)] px-6 py-6 sm:px-8 sm:py-7 rounded-[16px] text-white shadow-2xl relative overflow-hidden">
@@ -225,6 +225,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
         <div className="flex gap-4 z-10">
           {!todayLog && (
             <button
+              data-testid="commute-check-in-button"
               onClick={() => handleCommute('in')}
               disabled={isProcessing}
               className="px-10 py-5 bg-[var(--toss-blue)] hover:opacity-90 rounded-[12px] font-semibold text-lg shadow-lg active:scale-95 transition-all flex flex-col items-center leading-none gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -235,6 +236,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
           )}
           {todayLog && !todayLog.check_out && (
             <button
+              data-testid="commute-check-out-button"
               onClick={() => handleCommute('out')}
               disabled={isProcessing}
               className="px-10 py-5 bg-red-600 hover:bg-red-500 rounded-[12px] font-semibold text-lg shadow-lg active:scale-95 transition-all flex flex-col items-center leading-none gap-1 disabled:opacity-50 disabled:cursor-not-allowed"

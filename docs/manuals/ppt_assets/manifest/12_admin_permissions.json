@@ -1,0 +1,47 @@
+{
+  "id": "12_admin_permissions",
+  "title": "직원 권한 관리 화면",
+  "subtitle": "직원별 메뉴와 기능 접근 권한을 조정하는 핵심 운영 화면입니다.",
+  "role": "관리자",
+  "image": "C:\\Users\\baek_\\newmso\\docs\\manuals\\ppt_assets\\raw\\12_admin_permissions.png",
+  "notes": [
+    "권한 변경은 화면 노출과 데이터 접근 범위에 직접 영향을 줍니다.",
+    "직원 선택 후 필요한 권한만 최소 범위로 부여하는 것이 원칙입니다.",
+    "운영 반영 전후로 실제 노출 메뉴를 확인하는 것이 안전합니다."
+  ],
+  "hotspots": [
+    {
+      "index": 1,
+      "label": "직원 권한 탭",
+      "note": "권한 관리 진입",
+      "box": {
+        "x": 84,
+        "y": 220.5,
+        "width": 151,
+        "height": 39.5
+      }
+    },
+    {
+      "index": 2,
+      "label": "직원 목록",
+      "note": "권한 대상 선택",
+      "box": {
+        "x": 290,
+        "y": 180,
+        "width": 360,
+        "height": 560
+      }
+    },
+    {
+      "index": 3,
+      "label": "권한 상세 영역",
+      "note": "메뉴/기능 권한 조정",
+      "box": {
+        "x": 670,
+        "y": 180,
+        "width": 670,
+        "height": 560
+      }
+    }
+  ]
+}

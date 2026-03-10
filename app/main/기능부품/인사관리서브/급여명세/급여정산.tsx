@@ -4,6 +4,12 @@ import { supabase } from '@/lib/supabase';
 import { calculateAttendanceDeduction } from '@/lib/attendance-deduction';
 import { logAudit } from '@/lib/audit';
 import { fetchTaxFreeSettings, DEFAULT_SETTINGS, type TaxFreeSettings } from '@/lib/use-tax-free-settings';
+import {
+  fetchTaxInsuranceRates,
+  DEFAULT_TAX_INSURANCE_RATES,
+  hasExactIncomeTaxBracket,
+  type TaxInsuranceRates,
+} from '@/lib/use-tax-insurance-rates';
 
 export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any) {
   const [step, setStep] = useState(1);
@@ -12,12 +18,22 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
   const [settlementData, setSettlementData] = useState<any>({});
   const [loading, setLoading] = useState(false);
   const [taxFreeLimits, setTaxFreeLimits] = useState<TaxFreeSettings>(DEFAULT_SETTINGS);
+  const [taxInsuranceRates, setTaxInsuranceRates] = useState<TaxInsuranceRates>(DEFAULT_TAX_INSURANCE_RATES);
 
   useEffect(() => {
     let ok = true;
     (async () => {
       const s = await fetchTaxFreeSettings(selectedCo || '전체', parseInt(yearMonth.slice(0, 4)));
       if (ok) setTaxFreeLimits(s);
+    })();
+    return () => { ok = false; };
+  }, [selectedCo, yearMonth]);
+
+  useEffect(() => {
+    let ok = true;
+    (async () => {
+      const rates = await fetchTaxInsuranceRates(selectedCo || '전체', parseInt(yearMonth.slice(0, 4), 10));
+      if (ok) setTaxInsuranceRates(rates);
     })();
     return () => { ok = false; };
   }, [selectedCo, yearMonth]);
@@ -157,21 +173,21 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
       isDuruNuriActive = (current >= insSettings.duru_nuri_start && current <= insSettings.duru_nuri_end);
     }
 
-    // 공제 상세: 4대보험·소득세는 과세표준(급여−비과세) 기준, 항목별 계산 (학습 문서 §8·§14.3)
+    // 공제 상세: 4대보험은 저장된 연도별 요율을 사용합니다.
     let national_pension = 0, health_insurance = 0, long_term_care = 0, employment_insurance = 0, income_tax = 0, local_tax = 0;
     if (data.apply_insurance) {
-      // 1. 국민연금 (4.5%) - 두루누리 80% 지원 적용 시 20%만 부과
-      const full_national = Math.floor(total_taxable * 0.045);
+      // 1. 국민연금 - 두루누리 80% 지원 적용 시 20%만 부과
+      const full_national = Math.floor(total_taxable * taxInsuranceRates.national_pension_rate);
       national_pension = isDuruNuriActive ? Math.floor(full_national * 0.2) : full_national;
 
-      // 2. 건강보험 (3.545%) - 의료급여 수급자는 제외(0원)
+      // 2. 건강보험 - 의료급여 수급자는 제외(0원)
       if (!isMedicalBenefit) {
-        health_insurance = Math.floor(total_taxable * 0.03545);
-        long_term_care = Math.floor(health_insurance * 0.1295); // 장기요양 12.95%
+        health_insurance = Math.floor(total_taxable * taxInsuranceRates.health_insurance_rate);
+        long_term_care = Math.floor(total_taxable * taxInsuranceRates.long_term_care_rate);
       }
 
-      // 3. 고용보험 (0.9%) - 두루누리 80% 지원 적용 시 20%만 부과
-      const full_employment = Math.floor(total_taxable * 0.009);
+      // 3. 고용보험 - 두루누리 80% 지원 적용 시 20%만 부과
+      const full_employment = Math.floor(total_taxable * taxInsuranceRates.employment_insurance_rate);
       employment_insurance = isDuruNuriActive ? Math.floor(full_employment * 0.2) : full_employment;
     }
     if (data.apply_tax) {
@@ -189,7 +205,8 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
       local_tax,
       custom_deduction,
       is_duru_nuri: isDuruNuriActive,
-      is_medical_benefit: isMedicalBenefit
+      is_medical_benefit: isMedicalBenefit,
+      tax_estimated: data.apply_tax && !hasExactIncomeTaxBracket(taxInsuranceRates),
     };
 
     return {
@@ -205,6 +222,15 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
 
   const handleFinalize = async () => {
     if (!confirm(`${selectedStaffs.length}명의 급여 정산을 확정하고 명세서를 생성하시겠습니까?`)) return;
+
+    const needsExactIncomeTax = selectedStaffs.some((staff: any) => settlementData[staff.id]?.apply_tax);
+    if (needsExactIncomeTax && !hasExactIncomeTaxBracket(taxInsuranceRates)) {
+      alert(
+        '근로소득세 간이세액표가 설정되지 않아 급여를 안전하게 확정할 수 없습니다.\n\n' +
+        '세율·보험요율 관리에서 income_tax_bracket을 먼저 설정한 뒤 다시 진행해 주세요.'
+      );
+      return;
+    }
 
     setLoading(true);
     try {
@@ -254,7 +280,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
   };
 
   return (
-    <div className="bg-[var(--toss-card)] rounded-[12px] border border-[var(--toss-border)] shadow-sm overflow-hidden animate-in fade-in duration-300">
+    <div className="bg-[var(--toss-card)] rounded-[12px] border border-[var(--toss-border)] shadow-sm overflow-hidden animate-in fade-in duration-300" data-testid="salary-settlement-view">
       <div className="bg-[var(--page-bg)] border-b border-[var(--toss-border)] px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)]">급여 정산</h2>
@@ -276,18 +302,27 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
       <div className="p-6">
         {step === 1 && (
           <div className="space-y-5">
+            {!hasExactIncomeTaxBracket(taxInsuranceRates) && (
+              <div data-testid="salary-settlement-missing-tax-warning" className="rounded-[12px] border border-amber-200 bg-amber-50 px-4 py-3">
+                <p className="text-sm font-bold text-amber-800">주의: 근로소득세 간이세액표가 설정되지 않았습니다.</p>
+                <p className="mt-1 text-xs font-medium text-amber-700">
+                  보험요율은 반영되지만, 소득세는 운영 확정에 사용할 수 없습니다. 정확한 세액표를 먼저 입력해야 합니다.
+                </p>
+              </div>
+            )}
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <label className="text-sm text-[var(--toss-gray-4)]">정산 월</label>
-                <input type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="h-9 px-3 border border-[var(--toss-border)] rounded-md text-sm font-medium" />
+                <input data-testid="salary-settlement-month-input" type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="h-9 px-3 border border-[var(--toss-border)] rounded-md text-sm font-medium" />
               </div>
               <p className="text-sm text-[var(--toss-gray-3)]">정산 대상을 선택하세요. (근태 자동 반영)</p>
-              <button onClick={() => setSelectedStaffs(filteredStaffs)} className="text-sm font-medium text-[var(--toss-blue)] hover:underline">전체 선택</button>
+              <button data-testid="salary-settlement-select-all" onClick={() => setSelectedStaffs(filteredStaffs)} className="text-sm font-medium text-[var(--toss-blue)] hover:underline">전체 선택</button>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[380px] overflow-y-auto custom-scrollbar">
               {filteredStaffs.map((s: any) => (
                 <div
                   key={s.id}
+                  data-testid={`salary-settlement-staff-${s.id}`}
                   onClick={() => toggleStaff(s)}
                   className={`p-4 rounded-[12px] border cursor-pointer transition-colors flex items-center gap-3 ${selectedStaffs.find(ts => ts.id === s.id) ? 'border-[var(--toss-blue)] bg-[var(--toss-blue-light)]/70 ring-1 ring-[var(--toss-blue)]/30' : 'border-[var(--toss-border)] bg-[var(--toss-card)] hover:bg-[var(--toss-gray-1)]'
                     }`}
@@ -300,12 +335,20 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
                 </div>
               ))}
             </div>
-            <button onClick={handleNextStep} disabled={loading} className="w-full py-3.5 bg-[var(--toss-blue)] text-white text-sm font-semibold rounded-[12px] hover:opacity-90 transition-colors disabled:opacity-50">{loading ? '로딩 중...' : '다음: 수당 설정 및 정산'}</button>
+            <button data-testid="salary-settlement-next-button" onClick={handleNextStep} disabled={loading} className="w-full py-3.5 bg-[var(--toss-blue)] text-white text-sm font-semibold rounded-[12px] hover:opacity-90 transition-colors disabled:opacity-50">{loading ? '로딩 중...' : '다음: 수당 설정 및 정산'}</button>
           </div>
         )}
 
         {step === 2 && (
           <div className="space-y-8">
+            {!hasExactIncomeTaxBracket(taxInsuranceRates) && (
+              <div data-testid="salary-settlement-finalize-block-warning" className="rounded-[12px] border border-red-200 bg-red-50 px-4 py-3">
+                <p className="text-sm font-bold text-red-700">급여 확정 차단: 정확한 근로소득세표가 없습니다.</p>
+                <p className="mt-1 text-xs font-medium text-red-600">
+                  보험요율은 적용되지만, 소득세는 아직 근사 계산입니다. 세액표가 설정되기 전에는 저장을 막습니다.
+                </p>
+              </div>
+            )}
             <div className="max-h-[500px] overflow-y-auto space-y-6 p-2 custom-scrollbar">
               {selectedStaffs.map((s: any) => {
                 const data = settlementData[s.id];
@@ -313,7 +356,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
                 const isAdvanceOnly = advancePay > 0;
                 const res = isAdvanceOnly ? { net: advancePay, taxable: 0, taxfree: 0 } : calculateSalary(s.id);
                 return (
-                  <div key={s.id} className="p-4 bg-white border border-[var(--toss-border)] rounded-[16px] shadow-sm space-y-4 hover:border-[var(--toss-blue)] transition-all">
+                  <div key={s.id} data-testid={`salary-settlement-card-${s.id}`} className="p-4 bg-white border border-[var(--toss-border)] rounded-[16px] shadow-sm space-y-4 hover:border-[var(--toss-blue)] transition-all">
                     <div className="flex justify-between items-center border-b border-[var(--toss-gray-1)] pb-3">
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-full bg-[var(--toss-blue-light)] flex items-center justify-center text-xs font-bold text-[var(--toss-blue)]">{s.name[0]}</div>
@@ -371,8 +414,8 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
               })}
             </div>
             <div className="flex gap-3 pt-2">
-              <button onClick={() => setStep(1)} className="flex-1 py-3 bg-[var(--toss-card)] border border-[var(--toss-border)] text-[var(--toss-gray-4)] text-sm font-medium rounded-[12px] hover:bg-[var(--toss-gray-1)]">이전</button>
-              <button onClick={handleFinalize} disabled={loading} className="flex-[2] py-3 bg-[var(--toss-blue)] text-white text-sm font-semibold rounded-[12px] hover:opacity-90 disabled:opacity-50">
+              <button data-testid="salary-settlement-back-button" onClick={() => setStep(1)} className="flex-1 py-3 bg-[var(--toss-card)] border border-[var(--toss-border)] text-[var(--toss-gray-4)] text-sm font-medium rounded-[12px] hover:bg-[var(--toss-gray-1)]">이전</button>
+              <button data-testid="salary-settlement-finalize-button" onClick={handleFinalize} disabled={loading || !hasExactIncomeTaxBracket(taxInsuranceRates)} className="flex-[2] py-3 bg-[var(--toss-blue)] text-white text-sm font-semibold rounded-[12px] hover:opacity-90 disabled:opacity-50">
                 {loading ? '처리 중...' : '저장하기 · 정산 확정'}
               </button>
             </div>

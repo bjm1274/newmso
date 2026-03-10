@@ -30,7 +30,7 @@ export default function TaxFileGenerator({ staffs, selectedCo }: { staffs: any[]
     };
 
     return (
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 shadow-sm animate-in fade-in duration-500">
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 shadow-sm animate-in fade-in duration-500" data-testid="payroll-utility-tax-file">
             <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-lg">
                     📑
@@ -77,6 +77,7 @@ export default function TaxFileGenerator({ staffs, selectedCo }: { staffs: any[]
                 <button
                     onClick={handleDownload}
                     disabled={isGenerating}
+                    data-testid="payroll-tax-download-button"
                     className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-2 disabled:opacity-50"
                 >
                     {isGenerating ? (

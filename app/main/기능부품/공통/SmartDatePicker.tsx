@@ -8,6 +8,7 @@ interface SmartDatePickerProps {
     className?: string; // Container className
     inputClassName?: string; // Internal input className
     disabled?: boolean;
+    'data-testid'?: string;
 }
 
 export default function SmartDatePicker({
@@ -16,7 +17,8 @@ export default function SmartDatePicker({
     placeholder = "0000-00-00",
     className = "",
     inputClassName = "",
-    disabled = false
+    disabled = false,
+    'data-testid': dataTestId
 }: SmartDatePickerProps) {
     const dateInputRef = useRef<HTMLInputElement>(null);
 
@@ -58,6 +60,7 @@ export default function SmartDatePicker({
     return (
         <div className={`relative flex items-center group ${className}`}>
             <input
+                data-testid={dataTestId}
                 type="text"
                 value={value || ''}
                 onChange={handleTextChange}

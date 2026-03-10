@@ -10,15 +10,14 @@ import AttendanceCorrectionForm from './전자결재서브/출결정정양식';
 import RepairRequestForm from './전자결재서브/수리요청서양식';
 import AnnualLeavePlanForm from './전자결재서브/연차사용계획서양식';
 import ApprovalCalendar from './전자결재서브/결재캘린더';
-import ApprovalFormBuilder from './전자결재서브/결재양식빌더';
-import SealManager from './전자결재서브/직인관리';
 
 const APPROVAL_VIEW_KEY = 'erp_approval_view';
 const DRAFT_STORAGE_KEY = 'erp_draft_approval';
+const LOCAL_APPROVAL_FORM_TYPES_KEY = 'erp_approval_form_types_custom';
 
-const APPROVAL_VIEWS = ['기안함', '결재함', '작성하기', '캘린더', '양식빌더', '서명관리', '직인관리'];
+const APPROVAL_VIEWS = ['기안함', '결재함', '작성하기', '캘린더'];
 
-export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, selectedCompanyId, onRefresh, initialView }: any) {
+export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, selectedCompanyId, onRefresh, initialView, onViewChange }: any) {
   const [viewMode, setViewMode] = useState(initialView && APPROVAL_VIEWS.includes(initialView) ? initialView : '기안함');
   const [approvals, setApprovals] = useState<any[]>([]);
   const [formType, setFormType] = useState('연차/휴가');
@@ -61,6 +60,30 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   }, [staffs]);
 
   useEffect(() => {
+    const fallbackTypes = [
+      { name: '?닿??좎껌', slug: 'leave' },
+      { name: '?곗옣洹쇰Τ', slug: 'overtime' },
+      { name: '鍮꾪뭹援щℓ', slug: 'purchase' },
+      { name: '異쒓껐?뺤젙', slug: 'attendance_fix' },
+      { name: '?묒떇?좎껌', slug: 'generic' }
+    ];
+
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = window.localStorage.getItem(LOCAL_APPROVAL_FORM_TYPES_KEY);
+        const parsed = stored ? JSON.parse(stored) : [];
+        const activeCustomTypes = Array.isArray(parsed)
+          ? parsed
+              .filter((row: any) => row?.is_active !== false)
+              .map((row: any) => ({ name: row.name, slug: row.slug }))
+              .filter((row: any) => row.name && row.slug)
+          : [];
+        setCustomFormTypes(activeCustomTypes.length ? activeCustomTypes : fallbackTypes);
+      } catch {
+        setCustomFormTypes(fallbackTypes);
+      }
+      return;
+    }
     supabase.from('approval_form_types').select('name, slug').eq('is_active', true).order('sort_order').then(({ data, error }) => {
       if (!error && data?.length) {
         setCustomFormTypes(data.map((r: any) => ({ name: r.name, slug: r.slug })));
@@ -491,6 +514,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     clearDraftFromStorage();
     alert("상신 완료!");
     setViewMode('기안함');
+    if (typeof onViewChange === 'function') onViewChange('기안함');
     fetchApprovals();
     if (onRefresh) onRefresh();
   };
@@ -548,13 +572,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       {/* 상세 메뉴(기안함·결재함·작성하기)는 메인 좌측 사이드바에서 전자결재 호버/클릭 시 플라이아웃으로 선택 */}
       {/* 메인 콘텐츠 */}
       <main className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden p-4 md:p-10 bg-[var(--page-bg)] custom-scrollbar">
-        {viewMode === '양식빌더' ? (
-          <ApprovalFormBuilder user={user} />
-        ) : viewMode === '서명관리' ? (
-          <div className="p-8"><p className="text-sm text-[var(--toss-gray-3)]">결재 작성 시 서명 기능이 제공됩니다.</p></div>
-        ) : viewMode === '직인관리' ? (
-          <SealManager user={user} selectedCo={selectedCo} />
-        ) : viewMode === '캘린더' ? (
+        {viewMode === '캘린더' ? (
           <ApprovalCalendar user={user} />
         ) : viewMode === '작성하기' ? (
           <div className="max-w-4xl mx-auto space-y-6 md:space-y-8">
@@ -600,7 +618,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-2">
-                  <select onChange={(e) => {
+                  <select data-testid="approval-approver-select" onChange={(e) => {
                     const s = approverCandidates.find((st: any) => st.id === e.target.value);
                     if (s && !approverLine.find(al => al.id === s.id)) setApproverLine([...approverLine, s]);
                     e.target.value = '';
@@ -686,6 +704,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                     <button
                       type="button"
                       key={`${t}-${idx}`}
+                      data-testid={`approval-form-type-${idx}`}
                       onClick={() => setFormType(t)}
                       className={`flex-1 min-w-0 shrink-0 px-4 md:px-6 py-3 rounded-[12px] text-[11px] font-bold transition-all whitespace-nowrap cursor-pointer touch-manipulation ${formType === t ? 'bg-[var(--toss-card)] text-[var(--toss-blue)] shadow-sm' : 'text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)]'}`}
                     >
@@ -731,18 +750,21 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
               {formType !== '양식신청' && (
                 <div className="space-y-6 pt-8 md:pt-10 border-t border-[var(--toss-border)]">
                   <input
+                    data-testid="approval-title-input"
                     value={formTitle}
                     onChange={e => setFormTitle(e.target.value)}
                     className="w-full p-4 md:p-5 bg-[var(--toss-gray-1)] rounded-[12px] font-bold outline-none text-lg md:text-xl focus:ring-2 focus:ring-[var(--toss-blue)]/20 border border-[var(--toss-border)] transition-all"
                     placeholder="기안 제목을 입력하세요"
                   />
                   <textarea
+                    data-testid="approval-content-input"
                     value={formContent}
                     onChange={e => setFormContent(e.target.value)}
                     className="w-full h-48 md:h-56 p-6 md:p-8 bg-[var(--toss-gray-1)] rounded-[16px] outline-none text-sm font-bold leading-relaxed border border-[var(--toss-border)] focus:ring-2 focus:ring-[var(--toss-blue)]/20 transition-all"
                     placeholder="상세 사유 및 내용을 입력하세요."
                   />
                   <button
+                    data-testid="approval-submit-button"
                     onClick={handleSubmit}
                     className="w-full py-4 md:py-5 bg-[var(--toss-blue)] text-white rounded-[12px] font-bold text-sm shadow-sm hover:opacity-95 active:scale-[0.99] transition-all"
                   >
@@ -840,6 +862,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                   return (
                     <div
                       key={item.id}
+                      data-testid={`approval-card-${item.id}`}
                       role="button"
                       tabIndex={0}
                       onClick={() => setSelectedApprovalId(item.id)}
@@ -918,7 +941,10 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       {/* 모바일 전용 기안 작성 FAB (작성하기 아닐 때만 노출) */}
       {viewMode !== '작성하기' && (
         <button
-          onClick={() => setViewMode('작성하기')}
+          onClick={() => {
+            setViewMode('작성하기');
+            if (typeof onViewChange === 'function') onViewChange('작성하기');
+          }}
           className="md:hidden fixed bottom-24 right-6 w-14 h-14 bg-[var(--toss-blue)] text-white rounded-full shadow-2xl flex items-center justify-center z-[80] active:scale-90 transition-transform animate-in zoom-in duration-300"
           aria-label="기안 작성하기"
         >

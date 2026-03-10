@@ -1,0 +1,47 @@
+{
+  "id": "08_inventory",
+  "title": "재고관리 화면",
+  "subtitle": "재고 현황, 검색, 회사/부서 필터를 중심으로 사용합니다.",
+  "role": "부서장",
+  "image": "C:\\Users\\baek_\\newmso\\docs\\manuals\\ppt_assets\\raw\\08_inventory.png",
+  "notes": [
+    "상단에서 회사와 부서를 바꿔서 재고를 봅니다.",
+    "검색으로 품목명을 빠르게 찾습니다.",
+    "저재고, 유통기한 임박 품목은 운영 우선순위가 높습니다."
+  ],
+  "hotspots": [
+    {
+      "index": 1,
+      "label": "회사/부서 필터",
+      "note": "조회 범위 변경",
+      "box": {
+        "x": 310,
+        "y": 175,
+        "width": 420,
+        "height": 90
+      }
+    },
+    {
+      "index": 2,
+      "label": "검색 영역",
+      "note": "품목 검색",
+      "box": {
+        "x": 740,
+        "y": 175,
+        "width": 260,
+        "height": 90
+      }
+    },
+    {
+      "index": 3,
+      "label": "재고 목록",
+      "note": "현재 수량과 품목 확인",
+      "box": {
+        "x": 300,
+        "y": 280,
+        "width": 1040,
+        "height": 470
+      }
+    }
+  ]
+}

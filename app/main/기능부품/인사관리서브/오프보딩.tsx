@@ -65,7 +65,7 @@ export default function OffboardingView({ staffs, selectedCo = '전체', onRefre
     };
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-500 max-w-6xl mx-auto">
+        <div className="space-y-6 animate-in fade-in duration-500 max-w-6xl mx-auto" data-testid="offboarding-view">
             <div className="flex justify-between items-end border-b border-[var(--toss-border)] pb-4">
                 <div>
                     <h2 className="text-xl md:text-2xl font-bold text-[var(--foreground)] tracking-tight">원클릭 오프보딩 파이프라인</h2>
@@ -88,6 +88,7 @@ export default function OffboardingView({ staffs, selectedCo = '전체', onRefre
 
                             <div className="flex flex-col sm:flex-row gap-3 mt-6">
                                 <select
+                                    data-testid="offboarding-staff-select"
                                     className="px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white font-bold text-sm flex-1 focus:ring-2 focus:ring-[var(--toss-blue)]"
                                     value={selectedStaff}
                                     onChange={e => setSelectedStaff(e.target.value)}
@@ -98,11 +99,12 @@ export default function OffboardingView({ staffs, selectedCo = '전체', onRefre
                                     ))}
                                 </select>
                                 <SmartDatePicker
+                                    data-testid="offboarding-date-input"
                                     inputClassName="px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white font-bold text-sm shrink-0"
                                     value={exitDate}
                                     onChange={val => setExitDate(val)}
                                 />
-                                <select className="px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white font-bold text-sm">
+                                <select data-testid="offboarding-reason-select" value={reason} onChange={e => setReason(e.target.value)} className="px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white font-bold text-sm">
                                     <option value="개인 사유">개인 사유 (자발적)</option>
                                     <option value="권고사직">권고사직</option>
                                     <option value="계약만료">계약만료</option>
@@ -110,6 +112,7 @@ export default function OffboardingView({ staffs, selectedCo = '전체', onRefre
                             </div>
                         </div>
                         <button
+                            data-testid="offboarding-start-button"
                             onClick={handleStartOffboarding}
                             disabled={loading}
                             className="z-10 w-full md:w-auto px-8 py-4 bg-[var(--toss-blue)] text-white text-sm font-black rounded-xl hover:scale-105 active:scale-95 transition-transform shadow-md disabled:opacity-50"
@@ -160,7 +163,7 @@ export default function OffboardingView({ staffs, selectedCo = '전체', onRefre
                                     </label>
                                 </div>
 
-                                <button onClick={() => concludeOffboarding(s.id, s.name)} className="w-full py-3 bg-slate-900 text-white text-[11px] font-black rounded-xl hover:bg-slate-800 transition-colors">최종 퇴사 처리 (계정 비활성화)</button>
+                                <button data-testid={`offboarding-finalize-${s.id}`} onClick={() => concludeOffboarding(s.id, s.name)} className="w-full py-3 bg-slate-900 text-white text-[11px] font-black rounded-xl hover:bg-slate-800 transition-colors">최종 퇴사 처리 (계정 비활성화)</button>
                             </div>
                         ))}
                     </div>

@@ -22,11 +22,16 @@ export default function RoleDashboard({ user, setMainMenu }: Props) {
 
     // 결재 대기 수 조회
     const fetchPending = async () => {
-      const { count } = await supabase
+      const { count, error } = await supabase
         .from('approvals')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'exact', head: true })
         .eq('status', '대기')
-        .filter('approver_line', 'cs', `["${user.id}"]`);
+        .eq('current_approver_id', user.id);
+      if (error) {
+        console.error('Failed to load pending approvals:', error);
+        setPendingApprovals(0);
+        return;
+      }
       setPendingApprovals(count || 0);
     };
 

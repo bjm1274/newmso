@@ -1,0 +1,47 @@
+{
+  "id": "01_login",
+  "title": "로그인 화면",
+  "subtitle": "사번 또는 이름과 비밀번호를 입력해 접속합니다.",
+  "role": "공통",
+  "image": "C:\\Users\\baek_\\newmso\\docs\\manuals\\ppt_assets\\raw\\01_login.png",
+  "notes": [
+    "사번 또는 이름 입력칸입니다.",
+    "비밀번호를 입력합니다.",
+    "로그인 버튼을 누르면 메인 화면으로 이동합니다."
+  ],
+  "hotspots": [
+    {
+      "index": 1,
+      "label": "아이디 입력",
+      "note": "사번 또는 이름 입력",
+      "box": {
+        "x": 473,
+        "y": 228.75,
+        "width": 334,
+        "height": 54
+      }
+    },
+    {
+      "index": 2,
+      "label": "비밀번호 입력",
+      "note": "비밀번호 입력",
+      "box": {
+        "x": 473,
+        "y": 331.25,
+        "width": 334,
+        "height": 54
+      }
+    },
+    {
+      "index": 3,
+      "label": "로그인 버튼",
+      "note": "입력 후 접속",
+      "box": {
+        "x": 473,
+        "y": 409.25,
+        "width": 334,
+        "height": 54.5
+      }
+    }
+  ]
+}

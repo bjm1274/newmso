@@ -2,6 +2,51 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { readSessionFromRequest } from '@/lib/server-session';
 
+const MODELS = ['gemini-2.5-pro', 'gemini-2.5-flash'];
+
+async function extractWithGemini(prompt: string, base64Data: string, mimeType: string) {
+    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+    if (!apiKey) {
+        throw new Error('GEMINI_API_KEY 환경 변수가 서버에 설정되어 있지 않습니다. 서버 설정을 확인해 주세요.');
+    }
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    let lastError = '';
+
+    for (const modelName of MODELS) {
+        try {
+            const model = genAI.getGenerativeModel({
+                model: modelName,
+                generationConfig: { temperature: 0.1 }
+            });
+
+            const result = await model.generateContent([
+                prompt,
+                {
+                    inlineData: {
+                        data: base64Data,
+                        mimeType,
+                    },
+                },
+            ]);
+
+            const text = result.response.text();
+            if (text) {
+                return text;
+            }
+
+            lastError = `[${modelName}] empty response`;
+        } catch (error: any) {
+            lastError = error?.message || String(error);
+            if (lastError.includes('404') || lastError.includes('429')) {
+                continue;
+            }
+        }
+    }
+
+    throw new Error(lastError || '명세서 정보 추출에 실패했습니다.');
+}
+
 export async function POST(req: NextRequest) {
     try {
         const session = await readSessionFromRequest(req);
@@ -9,16 +54,13 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const apiKey = process.env.GEMINI_API_KEY;
+        const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
         if (!apiKey) {
             return NextResponse.json(
                 { error: 'GEMINI_API_KEY 환경 변수가 서버에 설정되어 있지 않습니다. 서버 설정을 확인해 주세요.' },
                 { status: 500 }
             );
         }
-
-        // Initialize the Google Generative AI within the request to ensure process.env is ready
-        const genAI = new GoogleGenerativeAI(apiKey);
 
         const formData = await req.formData();
         const file = formData.get('file') as File;
@@ -29,12 +71,6 @@ export async function POST(req: NextRequest) {
         const mimeType = file.type;
         const arrayBuffer = await file.arrayBuffer();
         const base64Data = Buffer.from(arrayBuffer).toString('base64');
-
-        // 현재 가용한 최상위 고정밀 모델 적용 (기존 flash 모델에서 Pro로 업그레이드)
-        const model = genAI.getGenerativeModel({
-            model: 'gemini-1.5-pro',
-            generationConfig: { temperature: 0.1 }
-        });
 
         const prompt = `
 당신은 의료기기 및 소모품 명세서(영수증/인보이스) 데이터 추출 전문가입니다. 
@@ -54,17 +90,7 @@ export async function POST(req: NextRequest) {
 ]
 `;
 
-        const result = await model.generateContent([
-            prompt,
-            {
-                inlineData: {
-                    data: base64Data,
-                    mimeType,
-                },
-            },
-        ]);
-
-        const text = result.response.text();
+        const text = await extractWithGemini(prompt, base64Data, mimeType);
         console.log('Gemini Raw Result:', text);
 
         // JSON 부분만 정규식으로 안전하게 추출

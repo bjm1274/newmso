@@ -136,7 +136,7 @@ export default function EarlyLeavingDetection({ staffs, selectedCo, user }: Prop
   const unapprovedCount = records.filter((r) => !r.is_approved).length;
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-6" data-testid="attendance-analysis-early-leaving">
       {/* 헤더 */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

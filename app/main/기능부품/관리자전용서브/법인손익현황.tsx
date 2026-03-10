@@ -130,7 +130,7 @@ export default function CompanyPnL({ staffs, selectedCo, user }: Props) {
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-5 max-w-5xl mx-auto">
+    <div className="p-4 md:p-6 space-y-5 max-w-5xl mx-auto" data-testid="admin-analysis-pnl">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)]">법인별 손익 현황</h2>

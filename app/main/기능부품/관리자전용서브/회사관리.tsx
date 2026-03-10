@@ -144,7 +144,7 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="space-y-6 animate-in fade-in duration-300" data-testid="company-manager-view">
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)]">회사 관리</h2>
@@ -152,12 +152,14 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
         </div>
         <div className="flex gap-0.5 p-1 app-tab-bar flex-wrap">
           <button
+            data-testid="company-manager-tab-company"
             className={`px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'company' ? 'bg-[var(--toss-card)] text-[var(--toss-blue)] shadow-sm' : 'text-[var(--toss-gray-3)] hover:bg-[var(--toss-card)]/60'}`}
             onClick={() => setActiveTab('company')}
           >
             회사 기본정보
           </button>
           <button
+            data-testid="company-manager-tab-team"
             className={`px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'team' ? 'bg-[var(--toss-card)] text-[var(--toss-blue)] shadow-sm' : 'text-[var(--toss-gray-3)] hover:bg-[var(--toss-card)]/60'}`}
             onClick={() => setActiveTab('team')}
           >
@@ -224,6 +226,7 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
                       <td className="px-6 py-4">{c.is_active ? '활성' : '비활성'}</td>
                       <td className="px-6 py-4 text-right">
                         <button
+                          data-testid={`company-manager-edit-${c.id}`}
                           onClick={() => handleEdit(c)}
                           className="px-3 py-1.5 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] rounded-[12px] text-xs font-bold hover:bg-[var(--toss-blue-light)]"
                         >
@@ -243,6 +246,7 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
               <div>
                 <label className="block text-xs font-bold text-[var(--toss-gray-3)] mb-2">회사명</label>
                 <input
+                  data-testid="company-manager-name-input"
                   value={form.name}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                   className="w-full px-4 py-3 border border-[var(--toss-border)] rounded-[12px] focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)]"
@@ -252,6 +256,7 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
               <div>
                 <label className="block text-xs font-bold text-[var(--toss-gray-3)] mb-2">유형</label>
                 <select
+                  data-testid="company-manager-type-select"
                   value={form.type}
                   onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as CompanyType }))}
                   className="w-full px-4 py-3 border border-[var(--toss-border)] rounded-[16px] focus:ring-2 focus:ring-[var(--toss-blue)]/20"
@@ -309,6 +314,7 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
             </div>
             <div className="flex gap-3 mt-6">
               <button
+                data-testid="company-manager-save-button"
                 onClick={handleSave}
                 className="px-6 py-3 bg-[var(--toss-blue)] text-white rounded-[12px] font-bold text-sm hover:bg-[var(--toss-blue)]"
               >

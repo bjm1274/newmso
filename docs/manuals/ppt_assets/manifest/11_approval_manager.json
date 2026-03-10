@@ -1,0 +1,36 @@
+{
+  "id": "11_approval_manager",
+  "title": "부서장 결재함",
+  "subtitle": "팀원이 올린 문서를 검토하고 승인 또는 반려하는 화면입니다.",
+  "role": "부서장",
+  "image": "C:\\Users\\baek_\\newmso\\docs\\manuals\\ppt_assets\\raw\\11_approval_manager.png",
+  "notes": [
+    "부서장은 결재함에서 팀원 요청을 가장 많이 처리합니다.",
+    "대기 문서 카드에서 승인 또는 반려 버튼이 나타납니다.",
+    "연차, 출결정정, 물품신청은 실제 운영 데이터에 영향을 줍니다."
+  ],
+  "hotspots": [
+    {
+      "index": 1,
+      "label": "결재함 탭",
+      "note": "승인 대상 문서 보기",
+      "box": {
+        "x": 84,
+        "y": 59.5,
+        "width": 151,
+        "height": 39.5
+      }
+    },
+    {
+      "index": 2,
+      "label": "문서 목록",
+      "note": "대기 문서 검토",
+      "box": {
+        "x": 280,
+        "y": 165,
+        "width": 1060,
+        "height": 520
+      }
+    }
+  ]
+}

@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { withMissingColumnFallback } from '@/lib/supabase-compat';
 import { persistSupabaseAccessToken } from '@/lib/supabase-bridge';
 import { setSelectedCompanyId as persistSelectedCompanyId, getSelectedCompanyId } from '@/lib/useCompany';
+import { hasUserPayloadChanged } from '@/lib/access-control';
 
 import Sidebar, { SUB_MENUS } from './기능부품/조직도서브/조직도측면창';
 import MainContent from './기능부품/조직도서브/조직도본문';
@@ -355,15 +356,15 @@ function MainPageContent() {
       // 현재 사용자의 변경된 정보(팀/부서 등)가 있으면 세션 동기화
       if (staffData && u?.id) {
         const updatedSelf = staffData.find((s: any) => s.id === u.id);
-        if (updatedSelf && JSON.stringify(updatedSelf) !== JSON.stringify(u)) {
+        if (updatedSelf) {
           const safeSelf = { ...updatedSelf };
           delete safeSelf.password;
           delete safeSelf.passwd;
-          // 상태 및 스토리지 업데이트
-          setUser(safeSelf);
-          localStorage.setItem('erp_user', JSON.stringify(safeSelf));
-          // user_session도 같이 갱신 (호환성)
-          localStorage.setItem('user_session', JSON.stringify(safeSelf));
+          if (hasUserPayloadChanged(u, safeSelf)) {
+            setUser(safeSelf);
+            localStorage.setItem('erp_user', JSON.stringify(safeSelf));
+            localStorage.setItem('user_session', JSON.stringify(safeSelf));
+          }
         }
       }
 
@@ -389,10 +390,11 @@ function MainPageContent() {
   // 현재 메인 메뉴에 해당하는 서브메뉴 목록
   const currentSubMenus = mainMenu === '인사관리' ? [] : (SUB_MENUS[mainMenu] || []);
   const subgroupLabels: Record<string, string> = {
-    대시보드: '📊 대시보드',
-    '권한 / 조직': '🔐 권한 / 조직',
+    '경영 분석': '📊 경영 분석',
+    '조직 / 권한': '🔐 조직 / 권한',
     '시스템 설정': '⚙️ 시스템 설정',
     '데이터 관리': '🗂️ 데이터 관리',
+    '감사 센터': '🔍 감사 센터',
     인력관리: '👥 인력관리',
     '근태/급여': '💰 근태 · 급여',
     '복무/복지': '🏥 복무 · 복지',
@@ -506,7 +508,10 @@ function MainPageContent() {
         />
 
         {loading && (
-          <div className="absolute inset-0 bg-[var(--toss-card)]/60 z-40 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-[var(--toss-card)]/60 z-40 flex items-center justify-center"
+            data-testid="main-loading-overlay"
+          >
             <div className="w-10 h-10 border-2 border-[var(--toss-blue)] rounded-full border-t-transparent animate-spin" />
           </div>
         )}
