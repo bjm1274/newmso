@@ -311,10 +311,10 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
 
   return (
     <div
-      className="flex flex-col md:flex-row h-full min-h-0 bg-[var(--toss-card)] rounded-[12px] md:rounded-3xl shadow-sm border border-[var(--toss-border)] overflow-hidden"
+      className="flex min-h-full flex-col rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] shadow-sm md:flex-row md:rounded-3xl"
       data-testid="staff-permission-view"
     >
-      <div className="w-full md:w-[260px] lg:w-[280px] md:border-r border-[var(--toss-border)] flex min-h-0 flex-col md:min-w-[260px] max-h-[42vh] md:max-h-none shrink-0">
+      <div className="flex w-full max-h-[42vh] shrink-0 flex-col border-[var(--toss-border)] md:sticky md:top-0 md:max-h-[calc(100vh-8rem)] md:min-w-[260px] md:self-start md:w-[260px] md:border-r lg:w-[280px]">
         <div className="p-6 border-b border-[var(--toss-border)] bg-[var(--toss-gray-1)]">
           <h3 className="text-sm font-semibold text-[var(--foreground)]">직원 명단</h3>
           <p className="text-[11px] text-[var(--toss-gray-3)] font-bold">직원 선택 시 역할·권한 설정</p>
@@ -364,7 +364,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 bg-[var(--toss-gray-1)]/50 flex flex-col overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col bg-[var(--toss-gray-1)]/50">
         <div className="shrink-0 mx-4 mt-4 rounded-[12px] border border-[var(--toss-border)] border-l-4 border-l-[var(--toss-blue)] bg-[var(--toss-card)] p-4 shadow-sm md:mx-8 md:mt-8 md:p-5">
           <p className="text-sm font-semibold text-[var(--foreground)] mb-3">📋 권한 한번에 복사 (A → B)</p>
           <p className="text-[11px] text-[var(--toss-gray-3)] font-bold mb-4">한 직원의 권한·역할을 다른 직원에게 그대로 적용합니다.</p>
@@ -442,7 +442,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
         </div>
 
         {selectedStaff ? (
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-24 pt-1 md:px-8 md:pb-28 md:pt-2">
+          <div className="flex-1 px-4 pb-24 pt-1 md:px-8 md:pb-28 md:pt-2" data-testid="staff-permission-detail">
             <div className="max-w-6xl space-y-8">
             <div className="border-b-4 border-[var(--foreground)] pb-4">
               <h3 className="text-2xl font-semibold text-[var(--foreground)] tracking-tight">

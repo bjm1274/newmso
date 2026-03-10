@@ -1,8 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import AnnualLeaveManualGrant from './연차수동부여';
+import { SYSTEM_MASTER_ACCOUNT_ID, isNamedSystemMasterAccount } from '@/lib/system-master';
 
-type MasterTabId = '개요' | '변경이력' | '전체채팅';
+type MasterTabId = '개요' | '변경이력' | '전체채팅' | '연차수동부여';
 
 function formatCurrency(value: unknown) {
   const amount = Number(value || 0);
@@ -42,7 +44,17 @@ async function readJson(url: string) {
   return payload;
 }
 
-export default function SystemMasterCenter({ user }: { user?: any }) {
+export default function SystemMasterCenter({
+  user,
+  staffs = [],
+  onRefresh,
+  initialTab,
+}: {
+  user?: any;
+  staffs?: any[];
+  onRefresh?: () => void;
+  initialTab?: MasterTabId;
+}) {
   const [activeTab, setActiveTab] = useState<MasterTabId>('개요');
   const [overview, setOverview] = useState<any>(null);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
@@ -56,7 +68,12 @@ export default function SystemMasterCenter({ user }: { user?: any }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const isSystemMaster = user?.permissions?.system_master === true || user?.is_system_master === true;
+  const isSystemMaster = isNamedSystemMasterAccount(user);
+
+  useEffect(() => {
+    if (!initialTab || !isSystemMaster) return;
+    setActiveTab(initialTab);
+  }, [initialTab, isSystemMaster]);
 
   const loadOverview = useCallback(async () => {
     setLoading(true);
@@ -152,7 +169,8 @@ export default function SystemMasterCenter({ user }: { user?: any }) {
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-2xl">🔒</div>
         <h2 className="text-lg font-bold text-[var(--foreground)]">시스템마스터 전용 화면입니다.</h2>
         <p className="mt-2 text-sm text-[var(--toss-gray-3)]">
-          `bjm127` 시스템마스터 계정으로 로그인한 경우에만 접근할 수 있습니다.
+          <code className="rounded bg-[var(--toss-gray-1)] px-1.5 py-0.5 font-mono text-[11px]">{SYSTEM_MASTER_ACCOUNT_ID}</code>
+          {' '}시스템마스터 계정으로 로그인한 경우에만 접근할 수 있습니다.
         </p>
       </div>
     );
@@ -166,11 +184,11 @@ export default function SystemMasterCenter({ user }: { user?: any }) {
             <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[var(--toss-gray-3)]">System Master</p>
             <h2 className="mt-2 text-2xl font-black tracking-tight text-[var(--foreground)]">시스템마스터센터</h2>
             <p className="mt-2 text-sm text-[var(--toss-gray-3)]">
-              직원 민감정보, 급여 변경 이력, 전 직원 채팅 대화 내용을 한곳에서 점검합니다.
+              직원 민감정보, 급여 변경 이력, 전 직원 채팅 대화, 연차 수동 조정을 한곳에서 점검합니다.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {(['개요', '변경이력', '전체채팅'] as MasterTabId[]).map((tab) => (
+            {(['개요', '변경이력', '전체채팅', '연차수동부여'] as MasterTabId[]).map((tab) => (
               <button
                 key={tab}
                 type="button"
@@ -181,7 +199,7 @@ export default function SystemMasterCenter({ user }: { user?: any }) {
                     : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-blue-light)] hover:text-[var(--foreground)]'
                 }`}
               >
-                {tab}
+                {tab === '연차수동부여' ? '연차 수동 부여' : tab}
               </button>
             ))}
             <button
@@ -190,6 +208,7 @@ export default function SystemMasterCenter({ user }: { user?: any }) {
                 if (activeTab === '개요') void loadOverview();
                 if (activeTab === '변경이력') void loadAuditLogs();
                 if (activeTab === '전체채팅') void loadChats();
+                onRefresh?.();
               }}
               className="rounded-full border border-[var(--toss-border)] px-4 py-2 text-[11px] font-bold text-[var(--foreground)] transition-all hover:bg-[var(--toss-gray-1)]"
             >
@@ -489,6 +508,19 @@ export default function SystemMasterCenter({ user }: { user?: any }) {
               </table>
             </div>
           </article>
+        </section>
+      )}
+
+      {activeTab === '연차수동부여' && (
+        <section className="space-y-4">
+          <div className="rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-5 shadow-sm">
+            <h3 className="text-base font-bold text-[var(--foreground)]">연차 수동 부여</h3>
+            <p className="mt-1 text-xs text-[var(--toss-gray-3)]">
+              <code className="rounded bg-[var(--toss-gray-1)] px-1.5 py-0.5 font-mono text-[11px]">{SYSTEM_MASTER_ACCOUNT_ID}</code>
+              {' '}시스템마스터 계정 전용 기능입니다. 자동 부여 규칙과 별개로 직원별 연차 총량과 사용량을 직접 조정합니다.
+            </p>
+          </div>
+          <AnnualLeaveManualGrant user={user} staffs={staffs} onRefresh={onRefresh} />
         </section>
       )}
     </div>

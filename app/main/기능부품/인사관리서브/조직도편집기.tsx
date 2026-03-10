@@ -1,7 +1,6 @@
 'use client';
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import CompanyManager from '../관리자전용서브/회사관리';
 
 type OrgNode = {
   id: string;
@@ -80,19 +79,17 @@ export default function OrgChartEditor({
   staffs = [],
   selectedCo,
   user,
-  onRefresh,
 }: {
   staffs: any[];
   selectedCo: string;
   user: any;
-  onRefresh?: () => void;
 }) {
   const [nodes, setNodes] = useState<OrgNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editNode, setEditNode] = useState<Partial<OrgNode> | null>(null);
   const [saving, setSaving] = useState(false);
-  const [viewMode, setViewMode] = useState<'chart' | 'list' | 'management'>('chart');
+  const [viewMode, setViewMode] = useState<'chart' | 'list'>('chart');
   const sourceStaffs =
     selectedCo && selectedCo !== '전체'
       ? staffs.filter((staff: any) => staff.company === selectedCo)
@@ -182,7 +179,7 @@ export default function OrgChartEditor({
       <div className="p-4 md:p-6 border-b border-[var(--toss-border)] flex flex-col md:flex-row gap-3 items-start md:items-center justify-between shrink-0">
         <div>
           <h2 className="text-base font-bold text-[var(--foreground)]">조직도 편집기</h2>
-          <p className="text-xs text-[var(--toss-gray-3)]">조직 구조 편집과 조직 관리 설정을 한 화면에서 처리합니다.</p>
+          <p className="text-xs text-[var(--toss-gray-3)]">직원 기반 조직 구조를 편집하고 차트로 관리합니다.</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <button onClick={() => setViewMode('chart')} className={`px-3 py-1.5 rounded-[10px] text-xs font-bold ${viewMode === 'chart' ? 'bg-[var(--foreground)] text-white' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'}`}>
@@ -190,9 +187,6 @@ export default function OrgChartEditor({
           </button>
           <button onClick={() => setViewMode('list')} className={`px-3 py-1.5 rounded-[10px] text-xs font-bold ${viewMode === 'list' ? 'bg-[var(--foreground)] text-white' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'}`}>
             목록 보기
-          </button>
-          <button onClick={() => setViewMode('management')} className={`px-3 py-1.5 rounded-[10px] text-xs font-bold ${viewMode === 'management' ? 'bg-[var(--toss-blue)] text-white' : 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)]'}`}>
-            조직 관리 통합
           </button>
           <button onClick={importFromStaff} disabled={saving} className="px-3 py-1.5 bg-purple-500 text-white rounded-[10px] text-xs font-bold disabled:opacity-50">직원 자동 구성</button>
           <button onClick={() => openAdd()} className="px-3 py-1.5 bg-[var(--toss-blue)] text-white rounded-[10px] text-xs font-bold">+ 노드 추가</button>
@@ -208,16 +202,6 @@ export default function OrgChartEditor({
             <button onClick={() => openAdd()} className="px-4 py-2 bg-[var(--toss-blue)] text-white rounded-[12px] text-sm font-bold">직접 추가</button>
             <button onClick={importFromStaff} disabled={saving} className="px-4 py-2 bg-purple-500 text-white rounded-[12px] text-sm font-bold disabled:opacity-50">직원으로 자동 생성</button>
           </div>
-        </div>
-      ) : viewMode === 'management' ? (
-        <div className="flex-1 overflow-y-auto p-4 md:p-6">
-          <div className="mb-4 rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4">
-            <p className="text-sm font-bold text-[var(--foreground)]">인사관리 조직도 관리</p>
-            <p className="mt-1 text-xs text-[var(--toss-gray-3)]">
-              회사, 팀, 근무형태, 근태 규칙, 법인카드, 계약 설정을 이 화면에서 함께 관리할 수 있습니다.
-            </p>
-          </div>
-          <CompanyManager staffs={staffs} onRefresh={onRefresh} />
         </div>
       ) : viewMode === 'chart' ? (
         <div className="flex-1 overflow-auto p-8">

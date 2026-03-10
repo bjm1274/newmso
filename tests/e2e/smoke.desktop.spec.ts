@@ -373,6 +373,33 @@ test("hr workspace navigation switches between the new grouped menus", async ({
   await page.getByRole("button", { name: "💰 급여" }).click();
   await expect(page.getByTestId("payroll-view")).toBeVisible();
 });
+test("legacy HR org chart entry opens company manager for admin users", async ({
+  page,
+}) => {
+  const adminUser = {
+    ...fakeUser,
+    company: "SY INC.",
+    permissions: { ...fakeUser.permissions, mso: true, admin: true },
+    role: "admin",
+  };
+
+  await mockSupabase(page, { staffMembers: [adminUser] });
+  await seedSession(page, {
+    user: adminUser,
+    localStorage: {
+      erp_last_menu: "인사관리",
+      erp_last_subview: "조직도",
+      erp_hr_tab: "조직도",
+      erp_hr_workspace: "인력관리",
+    },
+  });
+
+  await page.goto("/main?open_menu=인사관리");
+  await expect(page).toHaveURL(/\/main$/);
+  await expect(page.getByTestId("admin-view")).toBeVisible();
+  await expect(page.getByTestId("company-manager-view")).toBeVisible();
+});
+
 test("admin view opens for an MSO session", async ({ page }) => {
   const adminUser = {
     ...fakeUser,

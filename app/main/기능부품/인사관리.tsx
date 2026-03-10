@@ -22,7 +22,6 @@ import HealthCheckupManagement from './인사관리서브/건강검진관리';
 import CongratulationsCondolences from './인사관리서브/경조사관리';
 import PersonnelAppointment from './인사관리서브/인사발령관리';
 import RewardDisciplineManagement from './인사관리서브/포상징계관리';
-import OrgChartEditor from './인사관리서브/조직도편집기';
 import LicenseManager from './인사관리서브/면허자격증관리';
 import MedicalDeviceInspection from './인사관리서브/의료기기점검';
 import AnnualLeaveExpiryAlert from './인사관리서브/연차소멸알림';
@@ -46,7 +45,6 @@ type HrMenuId =
   | '인사발령'
   | '포상/징계'
   | '교육'
-  | '조직도'
   | '오프보딩'
   | '근태'
   | '교대근무'
@@ -109,7 +107,6 @@ const HR_TABS: HrTabDef[] = [
   { id: '인사발령', label: '인사발령', perm: 'hr_구성원', icon: '📋', group: '인력관리' },
   { id: '포상/징계', label: '포상 / 징계', perm: 'hr_구성원', icon: '🏅', group: '인력관리' },
   { id: '교육', label: '교육', perm: 'hr_구성원', icon: '📚', group: '인력관리' },
-  { id: '조직도', label: '조직도 편집', perm: 'hr_구성원', icon: '🌳', group: '인력관리' },
   { id: '오프보딩', label: '오프보딩', perm: 'hr_구성원', icon: '🚪', group: '인력관리' },
   { id: '근태', label: '근태', perm: 'hr_근태', icon: '⏰', group: '근태/급여' },
   { id: '교대근무', label: '교대근무', perm: 'hr_교대근무', icon: '🔄', group: '근태/급여' },
@@ -161,7 +158,8 @@ const REMOVED_MENU_FALLBACKS: Record<string, HrMenuId> = {
   생일기념일: '경조사',
   '생일/기념일': '경조사',
   칭찬배지: '포상/징계',
-  스킬매트릭스: '조직도',
+  조직도: '구성원',
+  스킬매트릭스: '구성원',
   회의실예약: '구성원',
   차량배차: '구성원',
   원천징수파일: '급여',
@@ -196,6 +194,11 @@ const ATTENDANCE_ANALYSIS_MENU_MAP: Record<string, AttendanceAnalysisTabId> = {
   지각조퇴분석: '지각조퇴분석',
   근무형태이력: '근무형태이력',
   조기퇴근감지: '조기퇴근감지',
+};
+
+const LEGACY_WORKSPACE_MAP: Record<string, HrWorkspaceId> = {
+  '근태 및 급여': '근태 · 급여',
+  '복지 및 문서': '복지 · 문서',
 };
 
 function normalizeHrMenu(menuId?: string | null): HrMenuId {
@@ -238,6 +241,14 @@ function getAttendanceInitialTab(menuId?: string | null): AttendanceAnalysisTabI
   return ATTENDANCE_ANALYSIS_MENU_MAP[menuId || ''] || '근태관리';
 }
 
+function normalizeWorkspaceId(workspaceId?: string | null): HrWorkspaceId | null {
+  if (!workspaceId) return null;
+  if (HR_WORKSPACES.some((workspace) => workspace.id === workspaceId)) {
+    return workspaceId as HrWorkspaceId;
+  }
+  return LEGACY_WORKSPACE_MAP[workspaceId] || null;
+}
+
 function normalizeAttendanceTabForUser(user: any, requestedTab: AttendanceAnalysisTabId): AttendanceAnalysisTabId {
   const visibleTabs = ATTENDANCE_ANALYSIS_TABS.filter((tab) => canAccessHrSection(user, tab.perm));
   if (visibleTabs.some((tab) => tab.id === requestedTab)) {
@@ -261,8 +272,8 @@ function SectionTabBar({
   onChange,
   testIdPrefix,
 }: {
-  title: string;
-  description: string;
+  title?: string;
+  description?: string;
   tabs: { id: string; label: string; icon: string }[];
   activeTab: string;
   onChange: (tabId: string) => void;
@@ -273,10 +284,14 @@ function SectionTabBar({
       className="border-b border-[var(--toss-border)] bg-[var(--toss-card)] px-4 py-4 md:px-6"
       data-testid={testIdPrefix ? `${testIdPrefix}-bar` : undefined}
     >
-      <div className="mb-3">
-        <h3 className="text-sm font-bold text-[var(--foreground)]">{title}</h3>
-        <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{description}</p>
-      </div>
+      {title || description ? (
+        <div className="mb-3">
+          {title ? <h3 className="text-sm font-bold text-[var(--foreground)]">{title}</h3> : null}
+          {description ? (
+            <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{description}</p>
+          ) : null}
+        </div>
+      ) : null}
       <div className="no-scrollbar flex gap-2 overflow-x-auto">
         {tabs.map((tab, index) => (
           <button
@@ -387,13 +402,13 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
       const savedTab = window.localStorage.getItem(HR_TAB_KEY);
       const savedCo = window.localStorage.getItem(HR_COMPANY_KEY);
       const savedStatus = window.localStorage.getItem(HR_STATUS_KEY) as StaffStatus | null;
-      const savedWorkspace = window.localStorage.getItem(HR_WORKSPACE_KEY) as HrWorkspaceId | null;
+      const savedWorkspace = normalizeWorkspaceId(window.localStorage.getItem(HR_WORKSPACE_KEY));
 
       if (!initialMenu && savedTab) {
         적용입장메뉴(savedTab);
       }
 
-      if (savedWorkspace && HR_WORKSPACES.some((workspace) => workspace.id === savedWorkspace)) {
+      if (savedWorkspace) {
         워크스페이스설정(savedWorkspace);
       }
 
@@ -583,8 +598,6 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
             </div>
           )}
 
-          {activeMenu === '조직도' && <OrgChartEditor staffs={staffs} selectedCo={선택사업체} user={user} onRefresh={onRefresh} />}
-
           {activeMenu === '오프보딩' && (
             <div className="p-4 md:p-10">
               <OffboardingView staffs={staffs} selectedCo={선택사업체} onRefresh={onRefresh} />
@@ -595,7 +608,6 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
             <div className="flex h-full flex-col">
               <SectionTabBar
                 title="근태 분석"
-                description="근태 현황과 연차, 지각/조퇴, 근무형태 변경 이력을 한곳에서 확인합니다."
                 tabs={visibleAttendanceTabs}
                 activeTab={activeAttendanceTab}
                 onChange={(tabId) => 근태분석탭설정(tabId as AttendanceAnalysisTabId)}
@@ -622,7 +634,6 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
             <div className="flex h-full flex-col">
               <SectionTabBar
                 title="교대근무 통합"
-                description="교대 캘린더와 팀별 생성 마법사를 한 워크스페이스에서 이어서 관리합니다."
                 tabs={[...SHIFT_SUITE_TABS]}
                 activeTab={교대근무탭}
                 onChange={(tabId) => 교대근무탭설정(tabId as ShiftSuiteTabId)}
@@ -637,21 +648,21 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
             </div>
           )}
           {activeMenu === '연차/휴가' && (
-            <LeaveManagement
-              staffs={staffs}
-              selectedCo={선택사업체}
-              onRefresh={onRefresh}
-              user={user}
-              initialTab={휴가내부탭}
-              allowLeaveTabs={canAccessHrSection(user, 'hr_연차휴가')}
-              allowHolidayTab={canAccessHrSection(user, 'hr_근태')}
-            />
+            <div className="flex h-full flex-col overflow-hidden">
+              <LeaveManagement
+                staffs={staffs}
+                selectedCo={선택사업체}
+                onRefresh={onRefresh}
+                user={user}
+                initialTab={휴가내부탭}
+                allowLeaveTabs={canAccessHrSection(user, 'hr_연차휴가')}
+                allowHolidayTab={canAccessHrSection(user, 'hr_근태')}
+              />
+            </div>
           )}
           {activeMenu === '급여' && (
             <div className="flex h-full flex-col">
               <SectionTabBar
-                title="급여관리"
-                description="급여 정산 화면과 세무/보험 유틸을 한 곳에서 관리합니다."
                 tabs={[...PAYROLL_UTILITY_TABS]}
                 activeTab={급여내부탭}
                 onChange={(tabId) => 급여내부탭설정(tabId as PayrollEmbeddedTabId)}

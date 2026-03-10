@@ -166,8 +166,6 @@ export default function ExtraFeatures({
     <div className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar bg-[var(--page-bg)]">
       <div className="max-w-5xl mx-auto w-full">
         <h2 className="text-lg font-bold text-[var(--foreground)] mb-1">추가 기능</h2>
-        <p className="text-[11px] text-[var(--toss-gray-3)] mb-4">모드 선택, 검색, 외부 서비스, 부서별 재고</p>
-
         <div className="flex flex-col sm:flex-row gap-3 mb-6 p-4 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] shadow-sm">
           <div className="flex items-center gap-2 shrink-0">
             <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">모드</span>

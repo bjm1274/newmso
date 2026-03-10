@@ -43,6 +43,7 @@ export default function PopupManager() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deletingPopupId, setDeletingPopupId] = useState<string | null>(null);
   const [newPopup, setNewPopup] = useState<PopupDraft>({
     title: '',
     media_url: '',
@@ -150,6 +151,38 @@ export default function PopupManager() {
     }
   };
 
+  const handleDeletePopup = async (popup: any) => {
+    if (!popup?.id) return;
+    if (!confirm(`"${popup.title || '제목 없음'}" 팝업을 삭제하시겠습니까?`)) {
+      return;
+    }
+
+    setDeletingPopupId(popup.id);
+    try {
+      const response = await fetch('/api/admin/popups/delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ popupId: popup.id }),
+      });
+
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(payload?.error || '팝업 삭제에 실패했습니다.');
+      }
+
+      alert(payload?.warning || payload?.message || '팝업이 삭제되었습니다.');
+      await loadPopups();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : '팝업 삭제 중 오류가 발생했습니다.';
+      alert(message);
+    } finally {
+      setDeletingPopupId(null);
+    }
+  };
+
   return (
     <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
       <div className="bg-white p-10 border border-[var(--toss-border)] shadow-sm space-y-8">
@@ -226,6 +259,84 @@ export default function PopupManager() {
           >
             {saving ? '업로드 중...' : '팝업 즉시 생성'}
           </button>
+        </div>
+
+        <div className="border-t border-[var(--toss-border)] pt-8 space-y-4">
+          <div className="flex items-center justify-between">
+            <h4 className="text-base font-semibold text-[var(--foreground)]">등록된 팝업 목록</h4>
+            <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">최신순</span>
+          </div>
+
+          {popups.length === 0 ? (
+            <div className="border border-dashed border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-6 py-10 text-center text-sm font-semibold text-[var(--toss-gray-3)]">
+              등록된 팝업이 없습니다.
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {popups.map((popup) => (
+                <div
+                  key={popup.id}
+                  className="flex gap-4 border border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-4 shadow-sm"
+                >
+                  <div className="w-28 h-36 shrink-0 overflow-hidden bg-white border border-[var(--toss-border)]">
+                    {popup.media_type === 'video' ? (
+                      <video
+                        src={popup.media_url}
+                        className="w-full h-full object-cover"
+                        muted
+                        playsInline
+                      />
+                    ) : (
+                      <img
+                        src={popup.media_url}
+                        alt={popup.title || '팝업 이미지'}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    )}
+                  </div>
+
+                  <div className="min-w-0 flex-1 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-[var(--foreground)] truncate">
+                          {popup.title || '제목 없음'}
+                        </p>
+                        <p className="mt-1 text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                          {popup.media_type === 'video' ? '동영상' : '이미지'} · {popup.width}x{popup.height}
+                        </p>
+                        <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
+                          등록일 {popup.created_at ? new Date(popup.created_at).toLocaleString('ko-KR') : '-'}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void handleDeletePopup(popup)}
+                        disabled={deletingPopupId === popup.id}
+                        data-testid={`popup-delete-button-${popup.id}`}
+                        className="shrink-0 px-3 py-2 bg-red-50 border border-red-200 text-red-600 text-[11px] font-bold hover:bg-red-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {deletingPopupId === popup.id ? '삭제 중...' : '삭제'}
+                      </button>
+                    </div>
+
+                    <a
+                      href={popup.media_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex text-[11px] font-semibold text-[var(--toss-blue)] hover:underline"
+                    >
+                      미디어 열기
+                    </a>
+
+                    <p className="break-all text-[10px] text-[var(--toss-gray-3)]">
+                      {popup.media_url}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

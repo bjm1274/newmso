@@ -12,7 +12,6 @@ import BusinessDashboard from './관리자전용서브/경영대시보드';
 import CompanyManager from './관리자전용서브/회사관리';
 import ExcelBulkUpload from './관리자전용서브/엑셀일괄등록';
 import NotificationAutomation from './관리자전용서브/알림자동화설정';
-import AnnualLeaveGrantTool from './관리자전용서브/연차수동부여';
 import SurgeryExamTemplateManager from './관리자전용서브/수술검사템플릿관리';
 import FormBuilder from './전자결재서브/양식빌더';
 import FinancialDashboard from './관리자전용서브/재무대시보드';
@@ -21,9 +20,9 @@ import IntegratedReport from './관리자전용서브/통합보고서';
 import SalaryAnomalyDetector from './관리자전용서브/급여이상치감지';
 import AccessAuditLog from './관리자전용서브/접근감사로그';
 import CompanyPnL from './관리자전용서브/법인손익현황';
-import PayrollDocumentDesignManager from './관리자전용서브/급여명세서서식관리';
 import OfficialDocumentLog from './관리자전용서브/공문서발송대장';
 import SystemMasterCenter from './관리자전용서브/시스템마스터센터';
+import { isNamedSystemMasterAccount } from '@/lib/system-master';
 
 type AnalysisTabId = '경영대시보드' | '재무대시보드' | '예산관리' | '통합보고서' | '법인손익';
 type AuditTabId = '감사로그' | '접근감사로그';
@@ -33,15 +32,13 @@ type AdminOuterTabId =
   | '시스템마스터센터'
   | '엑셀등록'
   | '알림자동화'
-  | '연차수동부여'
   | '회사관리'
   | '직원권한'
   | '수술검사템플릿'
   | '팝업관리'
   | '데이터백업'
   | '데이터초기화'
-  | '양식빌더'
-  | '문서서식'
+  | '문서양식'
   | '급여이상치'
   | '공문서대장';
 
@@ -61,15 +58,13 @@ const AUDIT_TABS: { id: AuditTabId; label: string; icon: string }[] = [
 const DIRECT_ADMIN_TABS: AdminOuterTabId[] = [
   '엑셀등록',
   '알림자동화',
-  '연차수동부여',
   '회사관리',
   '직원권한',
   '수술검사템플릿',
   '팝업관리',
   '데이터백업',
   '데이터초기화',
-  '양식빌더',
-  '문서서식',
+  '문서양식',
   '급여이상치',
   '공문서대장',
   '시스템마스터센터',
@@ -107,6 +102,22 @@ function normalizeAdminEntry(tabId?: string | null): {
   if (tabId === '경영분석' || tabId === '감사센터') {
     return {
       activeTab: tabId,
+      analysisTab: '경영대시보드',
+      auditTab: '접근감사로그',
+    };
+  }
+
+  if (tabId === '양식빌더' || tabId === '문서서식' || tabId === '문서양식') {
+    return {
+      activeTab: '문서양식',
+      analysisTab: '경영대시보드',
+      auditTab: '접근감사로그',
+    };
+  }
+
+  if (tabId === '연차수동부여') {
+    return {
+      activeTab: '시스템마스터센터',
       analysisTab: '경영대시보드',
       auditTab: '접근감사로그',
     };
@@ -181,7 +192,7 @@ export default function AdminView({ user, staffs = [], onRefresh, initialTab }: 
   const [inventory, setInventory] = useState<any[]>([]);
 
   const isMso = user?.company === 'SY INC.' || user?.permissions?.mso === true;
-  const isSystemMaster = user?.permissions?.system_master === true || user?.is_system_master === true;
+  const isSystemMaster = isNamedSystemMasterAccount(user);
 
   useEffect(() => {
     const nextState = normalizeAdminEntry(initialTab);
@@ -259,18 +270,23 @@ export default function AdminView({ user, staffs = [], onRefresh, initialTab }: 
 
         {activeTab === '엑셀등록' && <ExcelBulkUpload onRefresh={onRefresh} />}
         {activeTab === '알림자동화' && <NotificationAutomation user={user} />}
-        {activeTab === '연차수동부여' && <AnnualLeaveGrantTool staffs={staffs} onRefresh={onRefresh} />}
         {activeTab === '회사관리' && <CompanyManager staffs={staffs} onRefresh={onRefresh} />}
         {activeTab === '직원권한' && <StaffPermissionManager onRefresh={onRefresh} />}
         {activeTab === '수술검사템플릿' && <SurgeryExamTemplateManager />}
         {activeTab === '팝업관리' && <PopupManager />}
         {activeTab === '데이터백업' && <DataBackup />}
         {activeTab === '데이터초기화' && <DataReseter onRefresh={onRefresh} />}
-        {activeTab === '양식빌더' && <FormBuilder user={user} />}
-        {activeTab === '문서서식' && <PayrollDocumentDesignManager />}
+        {activeTab === '문서양식' && <FormBuilder user={user} />}
         {activeTab === '급여이상치' && <SalaryAnomalyDetector staffs={staffs} />}
         {activeTab === '공문서대장' && <OfficialDocumentLog staffs={staffs} selectedCo="전체" user={user} />}
-        {activeTab === '시스템마스터센터' && <SystemMasterCenter user={user} />}
+        {activeTab === '시스템마스터센터' && (
+          <SystemMasterCenter
+            user={user}
+            staffs={staffs}
+            onRefresh={onRefresh}
+            initialTab={initialTab === '연차수동부여' ? '연차수동부여' : undefined}
+          />
+        )}
       </main>
     </div>
   );

@@ -113,15 +113,8 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
       className="flex flex-col h-full animate-in fade-in duration-500 app-page"
       data-testid="payroll-view"
     >
-      {/* 🚀 Header: Reordered and group context with tabs */}
       <header className="sticky top-0 z-30 flex flex-col md:flex-row md:items-center justify-between p-6 md:p-8 bg-[var(--toss-card)] border-b border-[var(--toss-border)] gap-6 shadow-sm">
-        <div className="flex flex-col gap-1 shrink-0">
-          <h1 className="text-xl md:text-2xl font-bold text-[var(--foreground)] tracking-tight">급여 관리 시스템</h1>
-          <p className="text-xs font-bold text-[var(--toss-blue)] uppercase tracking-wider">Payroll & Tax Management</p>
-        </div>
-
         <div className="flex flex-wrap items-center gap-4 bg-[var(--toss-gray-1)] p-1.5 rounded-[22px] border border-[var(--toss-border)]">
-          {/* Calendar Picker moved here */}
           <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-[18px] shadow-sm ring-1 ring-black/5">
             <span className="text-sm">📅</span>
             <input
@@ -134,7 +127,6 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
 
           <div className="h-6 w-[1px] bg-[var(--toss-border)] mx-1" />
 
-          {/* Navigation Tabs next to Calendar */}
           <nav className="flex gap-1">
             {tabs.map((tab) => (
               <button
@@ -271,7 +263,6 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
   );
 }
 
-// 🚀 RUN PAYROLL 마법사 컴포넌트
 function RunPayrollWizard({ staffs, selectedCo, onRefresh }: any) {
   const [mode, setMode] = useState<'select' | 'regular' | 'interim'>('select');
 
@@ -300,11 +291,6 @@ function RunPayrollWizard({ staffs, selectedCo, onRefresh }: any) {
   return (
     <div className="flex flex-col items-center justify-center py-20 px-4 min-h-[60vh] animate-in zoom-in-95 duration-500" data-testid="run-payroll-wizard">
       <div className="bg-white/80 dark:bg-black/20 backdrop-blur-3xl p-10 rounded-[32px] border border-[var(--toss-border)] shadow-2xl text-center max-w-3xl w-full">
-        <h2 className="text-3xl md:text-4xl font-extrabold text-[var(--foreground)] tracking-tight mb-4">
-          <span className="bg-clip-text text-transparent bg-gradient-to-r from-[var(--toss-blue)] to-purple-500">RUN PAYROLL</span> 마법사
-        </h2>
-        <p className="text-[var(--toss-gray-4)] font-medium mb-12">시스템이 근태와 세법을 자동 계산합니다. 어떤 정산을 진행하시겠습니까?</p>
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <button
             data-testid="run-payroll-regular-button"

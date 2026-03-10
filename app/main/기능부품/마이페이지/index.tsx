@@ -15,6 +15,7 @@ import RoleDashboard from './역할별대시보드';
 import { supabase } from '@/lib/supabase';
 
 const MYPAGE_TAB_KEY = 'erp_mypage_tab';
+const MYPAGE_RECORDS_VIEW_KEY = 'erp_mypage_records_view';
 const FAVORITES_KEY = 'erp_mypage_favorites';
 const HR_TAB_KEY = 'erp_hr_tab';
 const INV_VIEW_KEY = 'erp_inventory_view';
@@ -23,6 +24,7 @@ type FavoriteId =
   | 'mypage_profile'
   | 'mypage_commute'
   | 'mypage_todo'
+  | 'mypage_records'
   | 'mypage_certificates'
   | 'mypage_salary'
   | 'mypage_documents'
@@ -42,8 +44,7 @@ const FAVORITE_OPTIONS: { id: FavoriteId; label: string; icon: string }[] = [
   { id: 'mypage_profile', label: '내 정보', icon: '👤' },
   { id: 'mypage_commute', label: '출퇴근', icon: '⏰' },
   { id: 'mypage_todo', label: '할일', icon: '✅' },
-  { id: 'mypage_certificates', label: '증명서', icon: '📄' },
-  { id: 'mypage_salary', label: '급여명세서', icon: '💰' },
+  { id: 'mypage_records', label: '급여·증명서', icon: '📑' },
   { id: 'mypage_documents', label: '서류제출', icon: '📤' },
   { id: 'hr_payroll', label: '인사관리 · 급여', icon: '👥' },
   { id: 'inv_purchase', label: '재고관리 · 발주', icon: '📦' },
@@ -59,8 +60,14 @@ const FAVORITE_OPTIONS: { id: FavoriteId; label: string; icon: string }[] = [
   { id: 'menu_admin', label: '관리자', icon: '⚙️' },
 ];
 
+const LEGACY_FAVORITE_MAP: Partial<Record<FavoriteId, FavoriteId>> = {
+  mypage_certificates: 'mypage_records',
+  mypage_salary: 'mypage_records',
+};
+
 export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInitialTab, onOpenApproval, setMainMenu }: any) {
-  const [activeTab, setActiveTab] = useState<'profile' | 'salary' | 'todo' | 'commute' | 'certificates' | 'documents' | 'notifications'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'records' | 'todo' | 'commute' | 'documents' | 'notifications'>('profile');
+  const [recordsView, setRecordsView] = useState<'salary' | 'certificates'>('salary');
   const [favorites, setFavorites] = useState<FavoriteId[]>([]);
   const [showFavPicker, setShowFavPicker] = useState(false);
   const [pendingFav, setPendingFav] = useState<FavoriteId | ''>('');
@@ -120,7 +127,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
         read_at: null
       });
 
-      alert('근로계약서 서명이 성공적으로 완료되었습니다. 마이페이지 > 급여 또는 문서보관함에서 확인하실 수 있습니다.');
+      alert('근로계약서 서명이 성공적으로 완료되었습니다. 마이페이지 > 급여·증명서 또는 문서보관함에서 확인하실 수 있습니다.');
       setPendingContract(null);
       setShowSignaturePad(false);
     } catch (e) {
@@ -138,9 +145,15 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
     if (typeof window === 'undefined') return;
     try {
       const saved = window.localStorage.getItem(MYPAGE_TAB_KEY) as any;
-      const allowed = ['profile', 'salary', 'todo', 'commute', 'certificates', 'documents', 'notifications'];
+      const allowed = ['profile', 'records', 'salary', 'todo', 'commute', 'certificates', 'documents', 'notifications'];
       if (saved && allowed.includes(saved)) {
-        setActiveTab(saved);
+        if (saved === 'salary' || saved === 'certificates') {
+          setActiveTab('records');
+          setRecordsView(saved);
+          window.localStorage.setItem(MYPAGE_RECORDS_VIEW_KEY, saved);
+        } else {
+          setActiveTab(saved);
+        }
       }
     } catch {
       // ignore
@@ -157,6 +170,30 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
     }
   }, [activeTab]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const saved = window.localStorage.getItem(MYPAGE_RECORDS_VIEW_KEY) as any;
+      if (saved === 'salary' || saved === 'certificates') {
+        setRecordsView(saved);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(MYPAGE_RECORDS_VIEW_KEY, recordsView);
+      if (activeTab === 'records') {
+        window.localStorage.setItem(MYPAGE_TAB_KEY, 'records');
+      }
+    } catch {
+      // ignore
+    }
+  }, [activeTab, recordsView]);
+
   // 즐겨찾기 목록 복구
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -166,7 +203,11 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
         const validIds = FAVORITE_OPTIONS.map(o => o.id);
-        setFavorites(parsed.filter((id: any) => validIds.includes(id)));
+        const normalized = parsed
+          .map((id: FavoriteId) => LEGACY_FAVORITE_MAP[id] || id)
+          .filter((id: FavoriteId, index: number, array: FavoriteId[]) => array.indexOf(id) === index)
+          .filter((id: FavoriteId) => validIds.includes(id));
+        setFavorites(normalized);
       }
     } catch {
       // ignore
@@ -187,8 +228,16 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
     if (fav === 'mypage_profile') setActiveTab('profile');
     else if (fav === 'mypage_commute') setActiveTab('commute');
     else if (fav === 'mypage_todo') setActiveTab('todo');
-    else if (fav === 'mypage_certificates') setActiveTab('certificates');
-    else if (fav === 'mypage_salary') setActiveTab('salary');
+    else if (fav === 'mypage_records') {
+      setActiveTab('records');
+    }
+    else if (fav === 'mypage_certificates') {
+      setActiveTab('records');
+      setRecordsView('certificates');
+    } else if (fav === 'mypage_salary') {
+      setActiveTab('records');
+      setRecordsView('salary');
+    }
     else if (fav === 'mypage_documents') setActiveTab('documents');
     else if (fav === 'hr_payroll') {
       if (typeof window !== 'undefined') {
@@ -277,8 +326,9 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
                   (id === 'mypage_profile' && activeTab === 'profile') ||
                   (id === 'mypage_commute' && activeTab === 'commute') ||
                   (id === 'mypage_todo' && activeTab === 'todo') ||
-                  (id === 'mypage_certificates' && activeTab === 'certificates') ||
-                  (id === 'mypage_salary' && activeTab === 'salary') ||
+                  (id === 'mypage_records' && activeTab === 'records') ||
+                  (id === 'mypage_certificates' && activeTab === 'records' && recordsView === 'certificates') ||
+                  (id === 'mypage_salary' && activeTab === 'records' && recordsView === 'salary') ||
                   (id === 'mypage_documents' && activeTab === 'documents');
                 return (
                   <QuickFavoriteButton
@@ -336,14 +386,9 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
             label="할일" icon="✅"
           />
           <TabButton
-            isActive={activeTab === 'certificates'}
-            onClick={() => setActiveTab('certificates')}
-            label="증명서" icon="📄"
-          />
-          <TabButton
-            isActive={activeTab === 'salary'}
-            onClick={() => setActiveTab('salary')}
-            label="급여" icon="💰"
+            isActive={activeTab === 'records'}
+            onClick={() => setActiveTab('records')}
+            label="급여·증명서" icon="📑"
           />
           <TabButton
             isActive={activeTab === 'documents'}
@@ -384,13 +429,128 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
             </div>
           )}
           {activeTab === 'todo' && <div data-testid="mypage-todo-tab"><MyTodoList user={user} /></div>}
-          {activeTab === 'salary' && <div data-testid="mypage-salary-tab"><SalarySlipContainer user={user} /></div>}
-          {activeTab === 'certificates' && <div data-testid="mypage-certificates-tab"><MyCertificates user={user} /></div>}
+          {activeTab === 'records' && (
+            <div data-testid="mypage-records-tab">
+              <PayrollAndCertificatesHub
+                user={user}
+                activeView={recordsView}
+                onChangeView={setRecordsView}
+              />
+            </div>
+          )}
           {activeTab === 'documents' && <div data-testid="mypage-documents-tab"><MyDocuments user={user} /></div>}
           {activeTab === 'notifications' && <div data-testid="mypage-notifications-tab"><NotificationInbox user={user} onRefresh={() => { }} /></div>}
         </div>
       </div>
 
+    </div>
+  );
+}
+
+function PayrollAndCertificatesHub({
+  user,
+  activeView,
+  onChangeView,
+}: {
+  user: any;
+  activeView: 'salary' | 'certificates';
+  onChangeView: (view: 'salary' | 'certificates') => void;
+}) {
+  const [summary, setSummary] = useState({ salaryCount: 0, certificateCount: 0 });
+
+  useEffect(() => {
+    if (!user?.id) {
+      setSummary({ salaryCount: 0, certificateCount: 0 });
+      return;
+    }
+
+    const fetchSummary = async () => {
+      const [salaryRes, certRes, approvedDocsRes] = await Promise.all([
+        supabase
+          .from('payroll_records')
+          .select('id', { count: 'exact', head: true })
+          .eq('staff_id', user.id),
+        supabase
+          .from('certificate_issuances')
+          .select('id', { count: 'exact', head: true })
+          .eq('staff_id', user.id),
+        supabase
+          .from('approvals')
+          .select('id', { count: 'exact', head: true })
+          .eq('sender_id', user.id)
+          .eq('status', '승인')
+          .eq('type', '양식신청'),
+      ]);
+
+      setSummary({
+        salaryCount: salaryRes.count || 0,
+        certificateCount: (certRes.count || 0) + (approvedDocsRes.count || 0),
+      });
+    };
+
+    fetchSummary();
+  }, [user?.id]);
+
+  return (
+    <div className="space-y-5 p-4 md:p-6">
+      <section className="rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-5 shadow-sm">
+        <div className="flex flex-col gap-4">
+          <div>
+            <h2 className="text-xl font-bold tracking-tight text-[var(--foreground)]">급여·증명서</h2>
+            <p className="mt-1 text-sm text-[var(--toss-gray-3)]">급여명세서와 발급된 증명서를 한 화면에서 구분해서 확인합니다.</p>
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => onChangeView('salary')}
+              className={`rounded-[20px] border px-5 py-4 text-left transition-all ${
+                activeView === 'salary'
+                  ? 'border-[var(--toss-blue)] bg-[var(--toss-blue-light)]/60 shadow-sm'
+                  : 'border-[var(--toss-border)] bg-white hover:bg-[var(--toss-gray-1)]'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">급여명세서</p>
+                  <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">월별 급여 정산 내역 확인</p>
+                </div>
+                <span className="rounded-full bg-white px-3 py-1 text-sm font-black text-[var(--toss-blue)] shadow-sm">
+                  {summary.salaryCount}건
+                </span>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => onChangeView('certificates')}
+              className={`rounded-[20px] border px-5 py-4 text-left transition-all ${
+                activeView === 'certificates'
+                  ? 'border-[var(--toss-blue)] bg-[var(--toss-blue-light)]/60 shadow-sm'
+                  : 'border-[var(--toss-border)] bg-white hover:bg-[var(--toss-gray-1)]'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">발급된 증명서</p>
+                  <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">발급 완료 및 승인 문서 확인</p>
+                </div>
+                <span className="rounded-full bg-white px-3 py-1 text-sm font-black text-[var(--toss-blue)] shadow-sm">
+                  {summary.certificateCount}건
+                </span>
+              </div>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {activeView === 'salary' ? (
+        <div data-testid="mypage-salary-tab">
+          <SalarySlipContainer user={user} />
+        </div>
+      ) : (
+        <div data-testid="mypage-certificates-tab">
+          <MyCertificates user={user} />
+        </div>
+      )}
     </div>
   );
 }

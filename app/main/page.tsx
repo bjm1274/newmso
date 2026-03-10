@@ -6,6 +6,7 @@ import { withMissingColumnFallback } from '@/lib/supabase-compat';
 import { persistSupabaseAccessToken } from '@/lib/supabase-bridge';
 import { setSelectedCompanyId as persistSelectedCompanyId, getSelectedCompanyId } from '@/lib/useCompany';
 import { hasUserPayloadChanged } from '@/lib/access-control';
+import { isNamedSystemMasterAccount } from '@/lib/system-master';
 
 import Sidebar, { SUB_MENUS } from './기능부품/조직도서브/조직도측면창';
 import MainContent from './기능부품/조직도서브/조직도본문';
@@ -61,6 +62,25 @@ function MainPageContent() {
     mris: []
   });
   const [loginAt] = useState<string>(new Date().toISOString());
+
+  const resolveLegacyNavigation = useCallback(
+    (menuId?: string | null, subViewId?: string | null, candidateUser?: any) => {
+      const canOpenAdmin =
+        candidateUser?.company === 'SY INC.' ||
+        candidateUser?.permissions?.mso === true ||
+        candidateUser?.role === 'admin' ||
+        candidateUser?.permissions?.menu_관리자 === true;
+
+      if (menuId === '인사관리' && subViewId === '조직도') {
+        return canOpenAdmin
+          ? { menuId: '관리자', subViewId: '회사관리' }
+          : { menuId: '인사관리', subViewId: '구성원' };
+      }
+
+      return { menuId, subViewId };
+    },
+    [],
+  );
 
   const clearClientSession = useCallback(async () => {
     try {
@@ -119,9 +139,10 @@ function MainPageContent() {
         const savedMenu = localStorage.getItem('erp_last_menu');
         const savedSubView = localStorage.getItem('erp_last_subview');
         const savedCo = localStorage.getItem('erp_last_co');
+        const normalizedNavigation = resolveLegacyNavigation(savedMenu, savedSubView, sessionUser);
 
-        if (savedMenu && !ignore) setMainMenu(savedMenu);
-        if (savedSubView && !ignore) setSubView(savedSubView);
+        if (normalizedNavigation.menuId && !ignore) setMainMenu(normalizedNavigation.menuId);
+        if (normalizedNavigation.subViewId && !ignore) setSubView(normalizedNavigation.subViewId);
 
         if (sessionUser.company !== 'SY INC.' && !sessionUser.permissions?.mso) {
           if (!ignore) setSelectedCo(sessionUser.company);
@@ -167,7 +188,20 @@ function MainPageContent() {
     return () => {
       ignore = true;
     };
-  }, [clearClientSession, router]); // 마운트 시 1회만 실행
+  }, [clearClientSession, resolveLegacyNavigation, router]); // 마운트 시 1회만 실행
+
+  useEffect(() => {
+    if (!user) return;
+    const normalizedNavigation = resolveLegacyNavigation(mainMenu, subView, user);
+
+    if (normalizedNavigation.menuId && normalizedNavigation.menuId !== mainMenu) {
+      setMainMenu(normalizedNavigation.menuId);
+    }
+
+    if (normalizedNavigation.subViewId && normalizedNavigation.subViewId !== subView) {
+      setSubView(normalizedNavigation.subViewId);
+    }
+  }, [mainMenu, resolveLegacyNavigation, subView, user]);
 
   // 1-1. 강제 로그아웃 실시간 감지 (Session Security)
   useEffect(() => {
@@ -389,10 +423,14 @@ function MainPageContent() {
   };
 
   // 현재 메인 메뉴에 해당하는 서브메뉴 목록
-  const isSystemMaster = user?.permissions?.system_master === true || user?.is_system_master === true;
+  const isSystemMaster = isNamedSystemMasterAccount(user);
   const currentSubMenus = (mainMenu === '인사관리' ? [] : (SUB_MENUS[mainMenu] || []))
     .filter((subMenu) => subMenu.id !== '시스템마스터센터' || isSystemMaster);
   const subgroupLabels: Record<string, string> = {
+    '재고 대시보드': '📊 재고 대시보드',
+    '입출고 운영': '📦 입출고 운영',
+    '문서 · 자산': '🧾 문서 · 자산',
+    '기준 정보': '🗂️ 기준 정보',
     '경영 분석': '📊 경영 분석',
     '조직 / 권한': '🔐 조직 / 권한',
     '시스템 설정': '⚙️ 시스템 설정',
@@ -449,7 +487,7 @@ function MainPageContent() {
       {currentSubMenus.length > 0 && (
         <aside className="flex flex-row md:flex-col w-full md:w-44 bg-[var(--toss-card)] border-b md:border-b-0 md:border-r border-[var(--toss-border)] p-2 md:py-4 md:px-3 space-x-1 md:space-x-0 md:space-y-1 shrink-0 overflow-x-auto md:overflow-x-visible no-scrollbar">
           {(() => {
-            if (mainMenu === '관리자') {
+            if (mainMenu === '관리자' || mainMenu === '재고관리') {
               const groups = Array.from(new Set(currentSubMenus.map(s => s.group))).filter(Boolean);
 
               return groups.map(groupName => (
