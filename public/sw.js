@@ -50,6 +50,9 @@ self.addEventListener('notificationclick', (event) => {
   // 딥링크 라우팅 로직
   if (data.room_id) {
     targetUrl += '?open_chat_room=' + encodeURIComponent(data.room_id);
+    if (data.message_id) {
+      targetUrl += '&open_msg=' + encodeURIComponent(data.message_id);
+    }
   } else if (data.type === 'approval') {
     targetUrl += '?open_menu=전자결재';
   } else if (data.type === 'inventory') {

@@ -104,6 +104,46 @@ function urlBase64ToUint8Array(b64: string): ArrayBuffer {
   return out.buffer;
 }
 
+function uint8ArrayToBase64Url(value: ArrayBuffer | null | undefined) {
+  if (!value) return '';
+  const bytes = new Uint8Array(value);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return window.btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+function getPushVapidStorageKey(staffId?: string) {
+  return `erp_push_vapid_public_key:${staffId || 'guest'}`;
+}
+
+async function syncPushSubscriptionOnServer(staffId: string | undefined, subscription: PushSubscriptionJSON) {
+  if (!staffId || !subscription.endpoint || !subscription.keys?.p256dh || !subscription.keys?.auth) return;
+
+  const response = await fetch('/api/notifications/push-subscription', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      endpoint: subscription.endpoint,
+      p256dh: subscription.keys.p256dh,
+      auth: subscription.keys.auth,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`push subscription sync failed (${response.status})`);
+  }
+}
+
+async function deletePushSubscriptionOnServer(endpoint?: string | null) {
+  if (!endpoint) return;
+
+  await fetch('/api/notifications/push-subscription', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ endpoint }),
+  });
+}
+
 export async function initNotificationService(staffId?: string) {
   if (typeof window === 'undefined') return;
   if (!('serviceWorker' in navigator) || !('Notification' in window)) return;
@@ -114,17 +154,43 @@ export async function initNotificationService(staffId?: string) {
       return;
     }
     if (Notification.permission === 'default') await Notification.requestPermission();
-    const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim();
     if (Notification.permission === 'granted' && vapidKey) {
       let sub = await reg.pushManager.getSubscription();
+      const savedVapidKey = window.localStorage.getItem(getPushVapidStorageKey(staffId));
+      const subscribedVapidKey = sub
+        ? uint8ArrayToBase64Url((sub.options?.applicationServerKey as ArrayBuffer | null | undefined) || null)
+        : '';
+      const hasVapidMismatch = Boolean(
+        sub && (
+          (savedVapidKey && savedVapidKey !== vapidKey) ||
+          (subscribedVapidKey && subscribedVapidKey !== vapidKey)
+        )
+      );
+      if (sub && hasVapidMismatch) {
+        const oldEndpoint = sub.endpoint;
+        try {
+          await sub.unsubscribe();
+        } catch (unsubscribeError) {
+          console.warn('기존 푸시 구독 해제 실패:', unsubscribeError);
+        }
+        try {
+          await deletePushSubscriptionOnServer(oldEndpoint);
+        } catch (deleteError) {
+          console.warn('기존 푸시 구독 서버 정리 실패:', deleteError);
+        }
+        sub = null;
+      }
       if (!sub) {
         try { sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidKey) }); }
         catch (e) { console.warn('푸시 구독 실패:', e); }
       }
       if (sub) {
         const j: any = sub.toJSON();
-        if (j.endpoint && j.keys?.p256dh && j.keys?.auth)
-          await supabase.from('push_subscriptions').upsert({ staff_id: staffId || null, endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth }, { onConflict: 'staff_id,endpoint' });
+        if (j.endpoint && j.keys?.p256dh && j.keys?.auth) {
+          await syncPushSubscriptionOnServer(staffId, j);
+          window.localStorage.setItem(getPushVapidStorageKey(staffId), vapidKey);
+        }
       }
     }
   } catch (e) { console.warn('SW 등록 건너뜀:', e); }
@@ -202,6 +268,7 @@ export default function NotificationSystem({
   const shownIdsRef = useRef<Set<string>>(new Set());
   const lastHiddenRef = useRef(0);
   const didPrimeNotificationsRef = useRef(false);
+  const mountedAtRef = useRef(new Date().toISOString());
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const onActionRef = useRef<(n: ToastItem) => void>(() => { });
 
@@ -298,7 +365,7 @@ export default function NotificationSystem({
     if (!user?.id) return;
     initNotificationService(user.id);
     const uid = String(user.id);
-    const mountedAt = new Date().toISOString();
+    const mountedAt = mountedAtRef.current;
     void syncBadge();
 
     // insertNoti: 이벤트 → notifications 테이블 INSERT (그러면 nTableChannel이 toast 표시)
@@ -413,6 +480,21 @@ export default function NotificationSystem({
           });
         });
     }
+
+    // 초기 렌더와 realtime 구독 사이에 들어온 unread 알림을 놓치지 않도록 한 번 더 보강 조회합니다.
+    supabase
+      .from('notifications')
+      .select('id,title,body,type,metadata,read_at,created_at')
+      .eq('user_id', uid)
+      .gte('created_at', mountedAt)
+      .order('created_at', { ascending: true })
+      .limit(20)
+      .then(({ data: rows }) => {
+        rows?.forEach((row: any) => {
+          if (!row?.read_at) emitIncomingNotification(row);
+        });
+        void syncBadge();
+      });
 
     const fallbackPoll = setInterval(() => {
       supabase

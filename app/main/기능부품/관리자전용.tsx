@@ -80,6 +80,14 @@ function normalizeAdminEntry(tabId?: string | null): {
   analysisTab: AnalysisTabId;
   auditTab: AuditTabId;
 } {
+  if (tabId === '회사관리') {
+    return {
+      activeTab: '회사관리',
+      analysisTab: '경영대시보드',
+      auditTab: '접근감사로그',
+    };
+  }
+
   if (tabId && ANALYSIS_TABS.some((tab) => tab.id === tabId)) {
     return {
       activeTab: '경영분석',

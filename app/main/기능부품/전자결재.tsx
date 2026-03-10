@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { withMissingColumnFallback } from '@/lib/supabase-compat';
+import { isMissingColumnError, withMissingColumnFallback } from '@/lib/supabase-compat';
 import AttendanceForms from './전자결재서브/근태신청양식';
 import SuppliesForm from './전자결재서브/비품구매양식';
 import AdminForms from './전자결재서브/관리행정양식';
@@ -14,6 +14,7 @@ import ApprovalCalendar from './전자결재서브/결재캘린더';
 const APPROVAL_VIEW_KEY = 'erp_approval_view';
 const DRAFT_STORAGE_KEY = 'erp_draft_approval';
 const LOCAL_APPROVAL_FORM_TYPES_KEY = 'erp_approval_form_types_custom';
+const APPROVAL_OPTIONAL_INSERT_COLUMNS = ['company_id', 'approver_line', 'doc_number'];
 
 const APPROVAL_VIEWS = ['기안함', '결재함', '작성하기', '캘린더'];
 const SYSTEM_FORM_TYPE_SLUGS = new Set(['leave', 'overtime', 'purchase', 'attendance_fix', 'generic', 'personnel_order']);
@@ -94,6 +95,79 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     };
     return [...staffs].sort((a: any, b: any) => order(a) - order(b) || (a.name || '').localeCompare(b.name || ''));
   }, [staffs]);
+  const normalizeApprovalLineIds = useCallback((line: any): string[] => {
+    if (!Array.isArray(line)) return [];
+    const ids = line
+      .map((entry: any) => {
+        if (entry == null) return null;
+        if (typeof entry === 'string' || typeof entry === 'number') return String(entry);
+        if (typeof entry === 'object' && entry.id != null) return String(entry.id);
+        return null;
+      })
+      .filter(Boolean) as string[];
+    return Array.from(new Set(ids));
+  }, []);
+  const resolveApprovalLineIds = useCallback((item: any): string[] => {
+    const explicitLineIds = normalizeApprovalLineIds(item?.approver_line ?? item?.meta_data?.approver_line);
+    if (explicitLineIds.length > 0) return explicitLineIds;
+    if (item?.current_approver_id != null) return [String(item.current_approver_id)];
+    return [];
+  }, [normalizeApprovalLineIds]);
+  const resolveCurrentApproverId = useCallback((item: any): string | null => {
+    if (item?.current_approver_id != null) return String(item.current_approver_id);
+    const lineIds = resolveApprovalLineIds(item);
+    return lineIds[0] ?? null;
+  }, [resolveApprovalLineIds]);
+  const insertApprovalWithLegacyFallback = useCallback(async (row: any) => {
+    let candidateRow = { ...row };
+
+    while (true) {
+      const result = await supabase.from('approvals').insert([candidateRow]);
+      const missingColumn = APPROVAL_OPTIONAL_INSERT_COLUMNS.find(
+        (columnName) => columnName in candidateRow && isMissingColumnError(result.error, columnName)
+      );
+
+      if (!missingColumn) return result;
+
+      const { [missingColumn]: _removed, ...legacyRow } = candidateRow;
+      candidateRow = legacyRow;
+    }
+  }, []);
+  const canUserApproveItem = useCallback((item: any) => {
+    if (item?.status !== '대기' || !user?.id) return false;
+    return String(resolveCurrentApproverId(item) || '') === String(user.id);
+  }, [resolveCurrentApproverId, user?.id]);
+  const syncApprovalRouting = useCallback(async (item: any, currentApproverId: string | null) => {
+    if (!item?.id || !currentApproverId) return null;
+    const storedLineIds = normalizeApprovalLineIds(item.approver_line ?? item?.meta_data?.approver_line);
+    const updates: any = {};
+
+    if (!item.current_approver_id) {
+      updates.current_approver_id = currentApproverId;
+    }
+    if (storedLineIds.length === 0) {
+      updates.approver_line = [currentApproverId];
+    }
+    if (Object.keys(updates).length === 0) return null;
+
+    let effectiveUpdates = { ...updates };
+    while (true) {
+      if (Object.keys(effectiveUpdates).length === 0) return null;
+
+      const { error } = await supabase.from('approvals').update(effectiveUpdates).eq('id', item.id);
+      if (!isMissingColumnError(error, 'approver_line') || !('approver_line' in effectiveUpdates)) {
+        if (!error) {
+          setApprovals((prev) => prev.map((approval: any) => (
+            approval.id === item.id ? { ...approval, ...effectiveUpdates } : approval
+          )));
+        }
+        return error;
+      }
+
+      const { approver_line, ...legacyUpdates } = effectiveUpdates;
+      effectiveUpdates = legacyUpdates;
+    }
+  }, [normalizeApprovalLineIds]);
 
   useEffect(() => {
     const fallbackTypes = [
@@ -232,8 +306,13 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     setFormTitle(last.title || '');
     setFormContent(last.content || '');
     setExtraData(last.meta_data || {});
-    if (Array.isArray(last.approver_line) && last.approver_line.length > 0 && Array.isArray(staffs)) {
-      const line = last.approver_line
+    const storedApproverLine = Array.isArray(last.approver_line)
+      ? last.approver_line
+      : Array.isArray(last.meta_data?.approver_line)
+        ? last.meta_data.approver_line
+        : [];
+    if (storedApproverLine.length > 0 && Array.isArray(staffs)) {
+      const line = storedApproverLine
         .map((id: string) => staffs.find((s: any) => s.id === id))
         .filter(Boolean);
       if (line.length > 0) setApproverLine(line);
@@ -316,8 +395,12 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     const results = await Promise.all(selectedApprovalIds.map(async (id) => {
       const item = approvals.find((a: any) => a.id === id);
       if (!item) return null;
-      const lineIds = Array.isArray(item.approver_line) ? item.approver_line : [];
-      const currentIndex = lineIds.findIndex((lid: string) => String(lid) === String(item.current_approver_id));
+      const currentApproverId = resolveCurrentApproverId(item);
+      if (!currentApproverId || String(currentApproverId) !== String(user?.id)) return id;
+      const routingError = await syncApprovalRouting(item, currentApproverId);
+      if (routingError) return id;
+      const lineIds = resolveApprovalLineIds({ ...item, current_approver_id: currentApproverId, approver_line: normalizeApprovalLineIds(item.approver_line).length > 0 ? item.approver_line : [currentApproverId] });
+      const currentIndex = lineIds.findIndex((lid: string) => String(lid) === String(currentApproverId));
       const isFinal = currentIndex === lineIds.length - 1 || currentIndex === -1;
       const updateData: any = isFinal ? { status: '승인' } : { current_approver_id: lineIds[currentIndex + 1] };
       const { error } = await supabase.from('approvals').update(updateData).eq('id', id);
@@ -342,6 +425,10 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     const results = await Promise.all(selectedApprovalIds.map(async (id) => {
       const item = approvals.find((a: any) => a.id === id);
       if (!item) return null;
+      const currentApproverId = resolveCurrentApproverId(item);
+      if (!currentApproverId || String(currentApproverId) !== String(user?.id)) return id;
+      const routingError = await syncApprovalRouting(item, currentApproverId);
+      if (routingError) return id;
       const { error } = await supabase.from('approvals').update({
         status: '반려',
         meta_data: { ...(item.meta_data || {}), reject_reason: reason },
@@ -371,8 +458,30 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const handleApproveAction = async (item: any) => {
     if (!confirm("승인하시겠습니까? 관련 데이터가 즉시 업데이트됩니다.")) return;
 
-    const lineIds = Array.isArray(item.approver_line) ? item.approver_line : [];
-    const currentIndex = lineIds.findIndex((id: string) => String(id) === String(item.current_approver_id));
+    const currentApproverId = resolveCurrentApproverId(item);
+    if (!currentApproverId) {
+      alert("결재자가 지정되지 않아 승인할 수 없습니다. 결재선을 다시 확인해 주세요.");
+      return;
+    }
+    if (String(currentApproverId) !== String(user?.id)) {
+      alert("현재 결재자만 승인할 수 있습니다.");
+      return;
+    }
+    const routingError = await syncApprovalRouting(item, currentApproverId);
+    if (routingError) {
+      alert("결재선을 초기화하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      return;
+    }
+
+    const lineIds = resolveApprovalLineIds({
+      ...item,
+      current_approver_id: currentApproverId,
+      approver_line:
+        normalizeApprovalLineIds(item.approver_line ?? item?.meta_data?.approver_line).length > 0
+          ? (item.approver_line ?? item?.meta_data?.approver_line)
+          : [currentApproverId],
+    });
+    const currentIndex = lineIds.findIndex((id: string) => String(id) === String(currentApproverId));
     const isFinalApproval = currentIndex === lineIds.length - 1 || currentIndex === -1;
 
     const updateData: any = {};
@@ -494,8 +603,22 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   };
 
   const handleRejectAction = async (item: any) => {
+    const currentApproverId = resolveCurrentApproverId(item);
+    if (!currentApproverId) {
+      alert("결재자가 지정되지 않아 반려할 수 없습니다. 결재선을 다시 확인해 주세요.");
+      return;
+    }
+    if (String(currentApproverId) !== String(user?.id)) {
+      alert("현재 결재자만 반려할 수 있습니다.");
+      return;
+    }
     const reason = window.prompt("반려 사유를 입력해 주세요. (선택)");
     if (reason === null) return;
+    const routingError = await syncApprovalRouting(item, currentApproverId);
+    if (routingError) {
+      alert("결재선을 초기화하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      return;
+    }
     const { error } = await supabase
       .from('approvals')
       .update({ status: '반려', meta_data: { ...(item.meta_data || {}), reject_reason: reason } })
@@ -537,20 +660,20 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       type: formType,
       title: formTitle,
       content: formContent || '',
-      meta_data: { ...extraData, cc_departments, cc_users: ccLine.map(c => ({ id: c.id, name: c.name })) },
+      meta_data: {
+        ...extraData,
+        cc_departments,
+        cc_users: ccLine.map(c => ({ id: c.id, name: c.name })),
+        approver_line: approverLine.map((a: any) => a.id),
+        doc_number: docNumber,
+      },
       doc_number: docNumber,
       status: '대기',
     };
     const companyId = user.company_id ?? selectedCompanyId ?? null;
     if (companyId != null) row.company_id = companyId;
 
-    const { error } = await withMissingColumnFallback(
-      () => supabase.from('approvals').insert([row]),
-      () => {
-        const { company_id, ...legacyRow } = row;
-        return supabase.from('approvals').insert([legacyRow]);
-      }
-    );
+    const { error } = await insertApprovalWithLegacyFallback(row);
 
     if (error) {
       console.error('기안 상신 실패:', error);
@@ -578,11 +701,14 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
 
   const approvalBoxList = useMemo(() => {
     const uid = user?.id != null ? String(user.id) : '';
-    const lineIds = (a: any) => Array.isArray(a.approver_line) ? a.approver_line : [];
-    const mine = byCompany.filter((a: any) => lineIds(a).some((id: any) => String(id) === uid));
+    const mine = byCompany.filter((a: any) => {
+      const lineIds = resolveApprovalLineIds(a);
+      const currentApproverId = resolveCurrentApproverId(a);
+      return lineIds.some((id: string) => String(id) === uid) || String(currentApproverId || '') === uid;
+    });
     if (approvalStatusFilter === '전체') return mine;
     return mine.filter((a: any) => a.status === approvalStatusFilter);
-  }, [byCompany, user?.id, approvalStatusFilter]);
+  }, [approvalStatusFilter, byCompany, resolveApprovalLineIds, resolveCurrentApproverId, user?.id]);
 
   const listForView = viewMode === '기안함' ? draftBoxList : approvalBoxList;
 
@@ -590,9 +716,9 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const bulkTargetList = useMemo(() => {
     if (viewMode !== '결재함') return [];
     return approvalBoxList.filter(
-      (a: any) => a.status === '대기' && String(a.current_approver_id) === String(user?.id)
+      (a: any) => canUserApproveItem(a)
     );
-  }, [approvalBoxList, viewMode, user?.id]);
+  }, [approvalBoxList, canUserApproveItem, viewMode]);
 
   const allBulkSelected = bulkTargetList.length > 0 && bulkTargetList.every((a: any) => selectedApprovalIds.includes(a.id));
 
@@ -743,21 +869,31 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                 </div>
               </div>
 
-              <div className="grid w-full grid-cols-2 gap-2 rounded-[16px] bg-[var(--toss-gray-1)] p-2 sm:grid-cols-3 xl:grid-cols-5">
-                {composeFormTabs.map((t, idx) => {
-                  const label = BUILTIN_FORM_TYPES.includes(t) ? t : (customFormTypes.find(c => c.slug === t)?.name ?? t);
-                  return (
-                    <button
-                      type="button"
-                      key={`${t}-${idx}`}
-                      data-testid={`approval-form-type-${idx}`}
-                      onClick={() => setFormType(normalizeComposeFormType(t))}
-                      className={`flex min-h-[52px] w-full items-center justify-center rounded-[12px] px-3 py-3 text-center text-[11px] font-bold leading-[1.35] transition-all whitespace-normal break-keep cursor-pointer touch-manipulation ${formType === t ? 'bg-[var(--toss-card)] text-[var(--toss-blue)] shadow-sm' : 'text-[var(--toss-gray-3)] hover:bg-white/70 hover:text-[var(--toss-gray-4)]'}`}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-[0.18em]">양식 선택</p>
+                  <span className="text-[10px] font-semibold text-[var(--toss-gray-3)]">좌우 슬라이드</span>
+                </div>
+                <div className="relative">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-5 bg-gradient-to-r from-[var(--toss-card)] to-transparent" />
+                  <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-5 bg-gradient-to-l from-[var(--toss-card)] to-transparent" />
+                  <div className="flex w-full gap-1.5 overflow-x-auto no-scrollbar rounded-[16px] border border-[var(--toss-border)]/70 bg-[var(--toss-gray-1)] p-1.5 scroll-smooth snap-x snap-mandatory">
+                    {composeFormTabs.map((t, idx) => {
+                      const label = BUILTIN_FORM_TYPES.includes(t) ? t : (customFormTypes.find(c => c.slug === t)?.name ?? t);
+                      return (
+                        <button
+                          type="button"
+                          key={`${t}-${idx}`}
+                          data-testid={`approval-form-type-${idx}`}
+                          onClick={() => setFormType(normalizeComposeFormType(t))}
+                          className={`snap-start shrink-0 rounded-[12px] px-3 py-2.5 text-[11px] font-bold leading-tight whitespace-nowrap transition-all cursor-pointer touch-manipulation min-w-[88px] sm:min-w-[96px] ${formType === t ? 'bg-[var(--toss-card)] text-[var(--toss-blue)] shadow-sm ring-1 ring-[var(--toss-blue)]/10' : 'text-[var(--toss-gray-3)] hover:bg-white/80 hover:text-[var(--toss-gray-5)]'}`}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
 
               {formType !== '양식신청' && lastDraftByType[formType] && (
@@ -894,16 +1030,18 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-1.5 sm:[grid-template-columns:repeat(auto-fill,minmax(176px,176px))] sm:justify-start">
                 {listForView.map((item: any) => {
-                  const lineIds = Array.isArray(item.approver_line) ? item.approver_line : [];
+                  const lineIds = resolveApprovalLineIds(item);
+                  const currentApproverId = resolveCurrentApproverId(item);
                   const steps = lineIds.map((id: string, i: number) => {
                     const staff = Array.isArray(staffs) ? staffs.find((s: any) => s.id === id) : null;
                     const name = staff?.name || '?';
-                    const isCurrent = id === item.current_approver_id;
+                    const isCurrent = String(id) === String(currentApproverId || '');
                     return { step: i + 1, name, isCurrent };
                   });
-                  const isBulkTarget = viewMode === '결재함' && item.status === '대기' && String(item.current_approver_id) === String(user?.id);
+                  const currentStep = steps.find((s: { step: number; name: string; isCurrent: boolean }) => s.isCurrent) || null;
+                  const isBulkTarget = viewMode === '결재함' && canUserApproveItem(item);
                   const isChecked = selectedApprovalIds.includes(item.id);
                   return (
                     <div
@@ -913,12 +1051,12 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                       tabIndex={0}
                       onClick={() => setSelectedApprovalId(item.id)}
                       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedApprovalId(item.id); } }}
-                      className={`bg-[var(--toss-card)] p-6 md:p-8 border rounded-[16px] shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6 group hover:border-[var(--toss-blue)]/30 hover:shadow-md transition-all animate-in fade-in-up cursor-pointer ${isChecked ? 'border-[var(--toss-blue)]/50 bg-[var(--toss-blue-light)]' : 'border-[var(--toss-border)]'}`}
+                      className={`w-full min-h-[112px] bg-[var(--toss-card)] px-2 py-1.5 border rounded-[10px] shadow-sm flex flex-col justify-between gap-1 group hover:border-[var(--toss-blue)]/30 hover:shadow-md transition-all animate-in fade-in-up cursor-pointer ${isChecked ? 'border-[var(--toss-blue)]/50 bg-[var(--toss-blue-light)]' : 'border-[var(--toss-border)]'}`}
                     >
-                      <div className="flex gap-4 md:gap-6 items-center flex-1 min-w-0">
+                      <div className="flex gap-1 items-start flex-1 min-w-0">
                         {/* 일괄 처리 체크박스 (결재함 대기 항목에만 표시) */}
                         {isBulkTarget && (
-                          <div onClick={(e) => { e.stopPropagation(); toggleSelectOne(item.id); }} className="shrink-0 cursor-pointer p-1">
+                          <div onClick={(e) => { e.stopPropagation(); toggleSelectOne(item.id); }} className="shrink-0 cursor-pointer">
                             <input
                               type="checkbox"
                               checked={isChecked}
@@ -928,41 +1066,41 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                             />
                           </div>
                         )}
-                        <div className="w-14 h-14 md:w-16 md:h-16 bg-[var(--toss-gray-1)] shrink-0 rounded-[12px] flex items-center justify-center text-xl md:text-2xl shadow-inner group-hover:bg-[var(--toss-blue-light)] transition-colors">
+                        <div className="w-6 h-6 bg-[var(--toss-gray-1)] shrink-0 rounded-[6px] flex items-center justify-center text-[10px] shadow-inner group-hover:bg-[var(--toss-blue-light)] transition-colors">
                           {item.type === '물품신청' ? '📦' : item.type === '양식신청' ? '📄' : item.type === '인사명령' ? '🎖️' : item.type === '수리요청서' ? '🔧' : '📋'}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap gap-2 mb-2 items-center">
-                            <span className="px-2 py-0.5 bg-[var(--toss-gray-1)] rounded-md text-[11px] md:text-[11px] font-semibold text-[var(--toss-gray-3)]">{item.type}</span>
-                            <span className={`px-2 py-0.5 rounded-md text-[11px] md:text-[11px] font-semibold ${item.status === '승인' ? 'bg-green-100 text-green-600' : item.status === '반려' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-500'}`}>{item.status}</span>
-                            <span className="px-2 py-0.5 bg-[var(--toss-blue-light)] rounded-md text-[11px] md:text-[11px] font-semibold text-[var(--toss-blue)]">{item.sender_company}</span>
+                          <div className="flex flex-wrap gap-0.5 mb-0 items-center">
+                            <span className="px-1 py-[1px] bg-[var(--toss-gray-1)] rounded-md text-[9px] font-semibold text-[var(--toss-gray-3)]">{item.type}</span>
+                            <span className={`px-1 py-[1px] rounded-md text-[9px] font-semibold ${item.status === '승인' ? 'bg-green-100 text-green-600' : item.status === '반려' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-500'}`}>{item.status}</span>
+                            <span className="px-1 py-[1px] bg-[var(--toss-blue-light)] rounded-md text-[9px] font-semibold text-[var(--toss-blue)]">{item.sender_company}</span>
                           </div>
-                          <h3 className="font-semibold text-[var(--foreground)] text-sm md:text-base tracking-tight line-clamp-1">{item.title}</h3>
-                          <p className="text-[11px] md:text-[11px] text-[var(--toss-gray-3)] font-bold mt-1">기안자: {item.sender_name || '사용자'} | {new Date(item.created_at).toLocaleDateString()}{item.doc_number && ` | 문서번호: ${item.doc_number}`}</p>
+                          <h3 className="font-semibold text-[11px] text-[var(--foreground)] tracking-tight line-clamp-2 leading-[1.3]">{item.title}</h3>
+                          <p className="text-[9px] text-[var(--toss-gray-3)] font-medium mt-0 line-clamp-2 leading-[1.3]">기안자: {item.sender_name || '사용자'} | {new Date(item.created_at).toLocaleDateString()}{item.doc_number && ` | 문서번호: ${item.doc_number}`}</p>
                           {steps.length > 0 && (
-                            <div className="mt-2 flex flex-wrap gap-1.5">
-                              <span className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">결재선</span>
-                              {steps.map((s: { step: number; name: string; isCurrent: boolean }) => (
-                                <span key={s.step} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold ${item.status === '승인' ? 'bg-green-50 text-green-600' : s.isCurrent ? 'bg-amber-100 text-amber-700' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]'}`}>
-                                  {s.step}. {s.name} {item.status === '승인' ? '(승인)' : s.isCurrent ? '(결재대기)' : '(대기)'}
-                                </span>
-                              ))}
+                            <div className="mt-0.5 flex flex-wrap gap-0.5">
+                              <span className="inline-flex items-center px-1 py-[1px] rounded-md text-[9px] font-semibold bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]">결재선 {steps.length}명</span>
+                              {item.status === '승인' ? (
+                                <span className="inline-flex items-center px-1 py-[1px] rounded-md text-[9px] font-semibold bg-green-50 text-green-600">최종 승인</span>
+                              ) : currentStep ? (
+                                <span className="inline-flex items-center px-1 py-[1px] rounded-md text-[9px] font-semibold bg-amber-100 text-amber-700">현재 {currentStep.step}. {currentStep.name}</span>
+                              ) : null}
                             </div>
                           )}
                         </div>
                       </div>
 
-                      <div className="flex gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex flex-wrap gap-1 shrink-0 pt-0" onClick={(e) => e.stopPropagation()}>
                         <button type="button" onClick={() => {
                           const win = window.open('', '_blank');
                           if (!win) return;
                           win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>결재문서</title><style>body{font-family:'Malgun Gothic',sans-serif;padding:30px;max-width:800px;margin:0 auto}h1{font-size:20px;text-align:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:20px}.meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;font-size:12px}.meta div{border:1px solid #ccc;padding:8px;border-radius:4px}.content{border:1px solid #ccc;padding:15px;min-height:200px;font-size:13px;line-height:1.6;border-radius:4px}.approval-line{margin-top:20px;display:flex;gap:10px}.sig-box{border:1px solid #ccc;padding:10px;min-width:80px;text-align:center;font-size:11px}@media print{button{display:none}}</style></head><body><h1>결 재 문 서</h1><div class="meta"><div><strong>문서번호:</strong> ${item.doc_number || '-'}</div><div><strong>기안일:</strong> ${new Date(item.created_at).toLocaleDateString('ko-KR')}</div><div><strong>기안자:</strong> ${item.sender_name}</div><div><strong>소속:</strong> ${item.sender_company}</div><div><strong>문서종류:</strong> ${item.type}</div><div><strong>상태:</strong> ${item.status}</div></div><h3 style="font-size:16px;margin-bottom:10px">${item.title}</h3><div class="content">${(item.content || '').replace(/\n/g, '<br>')}</div><div class="approval-line">${(item.approver_line || []).map((id: string, i: number) => `<div class="sig-box">${i + 1}단계<br><br><br>(인)</div>`).join('')}</div><script>window.onload=()=>window.print()</script></body></html>`);
                           win.document.close();
-                        }} className="px-3 py-2 bg-gray-50 text-gray-600 border border-gray-200 rounded-[10px] text-[10px] font-bold hover:bg-gray-100">PDF</button>
-                        {(viewMode === '결재함' || (viewMode === '기안함' && item.status === '대기')) && item.status === '대기' && String(item.current_approver_id) === String(user?.id) && (
+                        }} className="px-1.5 py-0.5 bg-gray-50 text-gray-600 border border-gray-200 rounded-[6px] text-[9px] font-semibold hover:bg-gray-100">PDF</button>
+                        {(viewMode === '결재함' || (viewMode === '기안함' && item.status === '대기')) && canUserApproveItem(item) && (
                           <>
-                            <button type="button" onClick={() => handleApproveAction(item)} className="px-5 py-3 bg-[var(--toss-blue)] text-white rounded-[12px] text-[11px] font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all">승인</button>
-                            <button type="button" onClick={() => handleRejectAction(item)} className="px-5 py-3 bg-red-50 text-red-600 border border-red-200 rounded-[12px] text-[11px] font-bold shadow-sm hover:bg-red-100 active:scale-[0.98] transition-all">반려</button>
+                            <button type="button" onClick={() => handleApproveAction(item)} className="px-1.5 py-0.5 bg-[var(--toss-blue)] text-white rounded-[6px] text-[9px] font-semibold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all">승인</button>
+                            <button type="button" onClick={() => handleRejectAction(item)} className="px-1.5 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded-[6px] text-[9px] font-semibold shadow-sm hover:bg-red-100 active:scale-[0.98] transition-all">반려</button>
                           </>
                         )}
                       </div>
@@ -1022,7 +1160,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
               </div>
               {item.status === '대기' && (
                 <div className="p-4 md:p-6 border-t border-[var(--toss-border)] safe-area-pb">
-                  {String(item.current_approver_id) === String(user?.id) ? (
+                  {canUserApproveItem(item) ? (
                     <div className="flex gap-3">
                       <button type="button" onClick={async () => { await handleApproveAction(item); setSelectedApprovalId(null); }} className="flex-1 py-3 bg-[var(--toss-blue)] text-white rounded-[16px] text-sm font-bold">승인</button>
                       <button type="button" onClick={async () => { await handleRejectAction(item); setSelectedApprovalId(null); }} className="flex-1 py-3 bg-red-50 border border-red-200 text-red-600 rounded-[16px] text-sm font-bold hover:bg-red-100 transition-all">반려</button>

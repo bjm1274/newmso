@@ -204,7 +204,7 @@ export default function NotificationCenter({ user }: { user: any }) {
 
       {isOpen && (
         <div
-          className="absolute right-0 top-full mt-2 w-80 bg-[var(--toss-card)]/95 backdrop-blur-xl border border-[var(--toss-border)] rounded-[20px] shadow-2xl z-[200] overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-top-right"
+          className="absolute bottom-[calc(100%+12px)] right-0 w-[min(20rem,calc(100vw-16px))] max-w-[calc(100vw-16px)] bg-[var(--toss-card)]/95 backdrop-blur-xl border border-[var(--toss-border)] rounded-[20px] shadow-2xl z-[200] overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-bottom-right md:bottom-auto md:top-0 md:left-[calc(100%+12px)] md:right-auto md:w-80 md:max-w-none md:origin-top-left"
           data-testid="notification-dropdown"
         >
           <div className="px-4 py-3 border-b border-[var(--toss-border)] flex items-center justify-between">

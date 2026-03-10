@@ -63,8 +63,6 @@ export const SUB_MENUS: Record<string, SubMenuItem[]> = {
   ],
   관리자: [
     { id: '경영분석', label: '경영 분석', group: '경영 분석', icon: '📈' },
-    { id: '예산관리', label: '예산 관리', group: '경영 분석', icon: '🧮' },
-    { id: '회사관리', label: '회사 / 조직', group: '조직 / 권한', icon: '🏢' },
     { id: '직원권한', label: '직원 권한', group: '조직 / 권한', icon: '🔐' },
     { id: '연차수동부여', label: '연차 수동 부여', group: '조직 / 권한', icon: '🗓️' },
     { id: '알림자동화', label: '알림 자동화', group: '시스템 설정', icon: '🔔' },

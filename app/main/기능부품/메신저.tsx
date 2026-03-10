@@ -313,6 +313,23 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     }
   }, [selectedRoomId]);
 
+  const triggerChatPush = useCallback(async (roomId: string, messageId: string) => {
+    try {
+      const response = await fetch('/api/notifications/chat-push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomId, messageId }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error || `push trigger failed (${response.status})`);
+      }
+    } catch (error) {
+      console.error('chat push trigger failed', error);
+    }
+  }, []);
+
   const emitTypingState = useCallback((isTyping: boolean) => {
     if (!typingChannelRef.current || !selectedRoomId || !user?.id) return;
     typingChannelRef.current.send({
@@ -1259,16 +1276,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         )
       );
       broadcastChatSync('message-sent', roomId);
-      try {
-        await supabase.functions.invoke('send-web-push', {
-          body: {
-            room_id: inserted.room_id,
-            message_id: inserted.id,
-          },
-        });
-      } catch (e) {
-        console.error('send-web-push 호출 실패:', e);
-      }
+      await triggerChatPush(String(inserted.room_id), String(inserted.id));
     } else {
       setDeliveryStates((prev) => ({
         ...prev,
@@ -1280,7 +1288,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       }));
       console.error('message send failed', error);
     }
-  }, [selectedRoomId, user?.id, user?.name, user?.avatar_url, replyTo, inputMsg, canWriteNotice, scrollToBottom, broadcastChatSync, emitTypingState]);
+  }, [selectedRoomId, user?.id, user?.name, user?.avatar_url, replyTo, inputMsg, canWriteNotice, scrollToBottom, broadcastChatSync, emitTypingState, triggerChatPush]);
 
   const retryFailedMessage = useCallback(async (messageId: string) => {
     await handleSendMessage(undefined, undefined, undefined, messageId);
@@ -2973,7 +2981,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     type="button"
                     onClick={async () => {
                       try {
-                        await supabase.from('messages').insert([
+                        const { data: forwardedMessage, error } = await supabase.from('messages').insert([
                           {
                             room_id: room.id,
                             sender_id: user.id,
@@ -2982,7 +2990,11 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                               (forwardSourceMsg.content || '첨부 파일'),
                             file_url: forwardSourceMsg.file_url || null,
                           },
-                        ]);
+                        ]).select('id, room_id').single();
+                        if (error) throw error;
+                        if (forwardedMessage?.id && forwardedMessage?.room_id) {
+                          await triggerChatPush(String(forwardedMessage.room_id), String(forwardedMessage.id));
+                        }
                         alert(`"${room.name || '채팅방'}"으로 메시지를 전달했습니다.`);
                       } catch {
                         alert('메시지 전달 중 오류가 발생했습니다.');
@@ -3126,11 +3138,15 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       .join(', ');
                     const inviterName = user?.name || '이름 없음';
                     const systemContent = `[초대] ${inviterName}님이 ${invitedNames}님을 초대했습니다.`;
-                    await supabase.from('messages').insert([{
+                    const { data: inviteMessage, error: inviteMessageError } = await supabase.from('messages').insert([{
                       room_id: selectedRoom.id,
                       sender_id: user.id,
                       content: systemContent,
-                    }]);
+                    }]).select('id, room_id').single();
+                    if (inviteMessageError) throw inviteMessageError;
+                    if (inviteMessage?.id && inviteMessage?.room_id) {
+                      await triggerChatPush(String(inviteMessage.room_id), String(inviteMessage.id));
+                    }
 
                     setChatRooms((prev) =>
                       prev.map((room: any) =>
