@@ -165,7 +165,7 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
   ];
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="space-y-6 animate-in fade-in duration-300" data-testid="admin-analysis-budget">
       {/* 헤더 */}
       <div className="flex items-center justify-between">
         <div>

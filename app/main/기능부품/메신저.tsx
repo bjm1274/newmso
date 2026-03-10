@@ -9,6 +9,7 @@ const CAN_WRITE_NOTICE_POSITIONS = ['대표', '부장', '팀장', '실장', '병
 const CHAT_ROOM_KEY = 'erp_chat_last_room';
 const CHAT_FOCUS_KEY = 'erp_chat_focus_keyword';
 const CHAT_ROOM_PREFS_KEY = 'erp_chat_room_prefs';
+const MESSAGE_READ_WRITES_ENABLED = false;
 
 function sortChatRoomsWithNoticeFirst(rooms: any[]): any[] {
   const notice = rooms.find((r: any) => r.id === NOTICE_ROOM_ID);
@@ -184,6 +185,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   const typingClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingPeersTimeoutRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const syncChannelRef = useRef<BroadcastChannel | null>(null);
+  const readWriteInFlightRef = useRef<Set<string>>(new Set());
   const isNearBottomRef = useRef(true);
   const selectedRoomIdRef = useRef<string | null>(null);
   const fetchDataRef = useRef<(() => Promise<void>) | null>(null);
@@ -242,6 +244,53 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     isNearBottomRef.current = true;
     setShowScrollToLatest(false);
   }, []);
+
+  const persistMessageReads = useCallback(async (messageIds: string[]) => {
+    if (!user?.id || messageIds.length === 0) return;
+    if (!MESSAGE_READ_WRITES_ENABLED) return;
+
+    const uniqueMessageIds = Array.from(new Set(messageIds.map((id) => String(id))));
+    const candidateIds = uniqueMessageIds.filter((id) => !readWriteInFlightRef.current.has(id));
+    if (candidateIds.length === 0) return;
+    candidateIds.forEach((id) => readWriteInFlightRef.current.add(id));
+
+    try {
+    const readAt = new Date().toISOString();
+    const { data: existingReads, error } = await supabase
+      .from('message_reads')
+      .select('id, message_id')
+      .eq('user_id', user.id)
+      .in('message_id', candidateIds);
+
+    if (error) return;
+
+    const existingIds = new Set(
+      Array.isArray(existingReads) ? existingReads.map((row: any) => String(row.message_id)) : []
+    );
+    const idsToInsert = candidateIds.filter((id) => !existingIds.has(id));
+    const idsToUpdate = candidateIds.filter((id) => existingIds.has(id));
+
+    if (idsToInsert.length > 0) {
+      await supabase.from('message_reads').insert(
+        idsToInsert.map((id) => ({
+          user_id: user.id,
+          message_id: id,
+          read_at: readAt,
+        }))
+      );
+    }
+
+    if (idsToUpdate.length > 0) {
+      await supabase
+        .from('message_reads')
+        .update({ read_at: readAt })
+        .eq('user_id', user.id)
+        .in('message_id', idsToUpdate);
+    }
+    } finally {
+      candidateIds.forEach((id) => readWriteInFlightRef.current.delete(id));
+    }
+  }, [user?.id]);
 
   const updateScrollPositionState = useCallback(() => {
     const listEl = messageListRef.current;
@@ -451,17 +500,24 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     if (!selectedRoomId) return;
     const query = supabase
       .from('messages')
-      .select('*, staff:staff_members(name, photo_url)')
+      .select('*')
       .eq('room_id', selectedRoomId)
       .order('created_at', { ascending: true });
     const { data: msgs } = await query;
     if (msgs) {
+      const enrichedMessages = msgs.map((msg: any) => {
+        const matchedStaff = staffs.find((staff: any) => String(staff.id) === String(msg.sender_id));
+        return {
+          ...msg,
+          staff: msg.staff || (matchedStaff ? { name: matchedStaff.name, photo_url: matchedStaff.photo_url || null } : null),
+        };
+      });
       setMessages((prev) => {
         const localOnly = prev.filter((msg: any) => {
           const id = String(msg.id || '');
           return id.startsWith('temp-') && deliveryStatesRef.current[id]?.status !== 'sent';
         });
-        return [...msgs, ...localOnly].sort(
+        return [...enrichedMessages, ...localOnly].sort(
           (a: any, b: any) =>
             new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
         );
@@ -515,13 +571,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
       if (unreadMsgIds.length > 0) {
         try {
-          const readPayloads = unreadMsgIds.map(id => ({
-            user_id: user.id,
-            message_id: id,
-            read_at: new Date().toISOString()
-          }));
-
-          await supabase.from('message_reads').upsert(readPayloads, { onConflict: 'user_id,message_id' });
+          await persistMessageReads(unreadMsgIds);
 
           // table notification_settings might not exist
           try {
@@ -1425,12 +1475,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   const markMessageRead = async (msg: any) => {
     if (msg.sender_id === user.id) return;
     try {
-      await supabase.from('message_reads').upsert(
-        { user_id: user.id, message_id: msg.id, read_at: new Date().toISOString() },
-        { onConflict: 'user_id,message_id' }
-      );
-      broadcastChatSync('message-read', msg.room_id);
-      fetchData();
+        await persistMessageReads([msg.id]);
+        broadcastChatSync('message-read', msg.room_id);
+        fetchData();
     } catch (_) { }
   };
 
@@ -1480,12 +1527,26 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
   useEffect(() => {
     const load = async () => {
-      const { data } = await supabase.from('room_notification_settings').select('notifications_enabled').eq('user_id', user?.id).eq('room_id', selectedRoomId).single();
+      if (!user?.id || !selectedRoomId) {
+        setRoomNotifyOn(true);
+        return;
+      }
+      const { data, error } = await supabase
+        .from('room_notification_settings')
+        .select('notifications_enabled')
+        .eq('user_id', user?.id)
+        .eq('room_id', selectedRoomId)
+        .maybeSingle();
+      if (error) {
+        setRoomNotifyOn(true);
+        return;
+      }
       setRoomNotifyOn(data?.notifications_enabled !== false);
     };
     load();
   }, [selectedRoomId, user?.id]);
   const toggleRoomNotify = async () => {
+    if (!user?.id || !selectedRoomId) return;
     setRoomNotifyOn((p) => !p);
     await supabase.from('room_notification_settings').upsert({ user_id: user.id, room_id: selectedRoomId, notifications_enabled: !roomNotifyOn }, { onConflict: 'user_id,room_id' });
   };

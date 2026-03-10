@@ -42,18 +42,18 @@ export default function AttendanceForms({ user, staffs, formType, setExtraData, 
           <div className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 bg-gray-50/30">
             <div className="space-y-2">
               <label className="text-[11px] font-bold text-[var(--toss-blue)] ml-1 uppercase">휴가 종류</label>
-              <select className="w-full p-4 rounded-[12px] bg-[var(--toss-card)] font-bold text-xs border-none shadow-sm focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+              <select data-testid="approval-leave-type-select" className="w-full p-4 rounded-[12px] bg-[var(--toss-card)] font-bold text-xs border-none shadow-sm focus:ring-2 focus:ring-[var(--toss-blue)]/30"
                 onChange={e => setExtraData((prev: any) => ({ ...prev, vType: e.target.value }))}>
                 <option>연차 (1.0)</option><option>반차 (0.5)</option><option>병가</option>
               </select>
             </div>
             <div className="space-y-2">
               <label className="text-[11px] font-bold text-[var(--toss-blue)] ml-1 uppercase">시작 일자</label>
-              <SmartDatePicker value={localStartDate} onChange={val => { setLocalStartDate(val); setExtraData((prev: any) => ({ ...prev, startDate: val })); }} inputClassName="w-full h-[46px] px-4 rounded-[12px] bg-[var(--toss-card)] font-bold text-xs" />
+              <SmartDatePicker data-testid="approval-leave-start-date" value={localStartDate} onChange={val => { setLocalStartDate(val); setExtraData((prev: any) => ({ ...prev, startDate: val })); }} inputClassName="w-full h-[46px] px-4 rounded-[12px] bg-[var(--toss-card)] font-bold text-xs" />
             </div>
             <div className="space-y-2">
               <label className="text-[11px] font-bold text-[var(--toss-blue)] ml-1 uppercase">종료 일자</label>
-              <SmartDatePicker value={localEndDate} onChange={val => { setLocalEndDate(val); setExtraData((prev: any) => ({ ...prev, endDate: val })); }} inputClassName="w-full h-[46px] px-4 rounded-[12px] bg-[var(--toss-card)] font-bold text-xs" />
+              <SmartDatePicker data-testid="approval-leave-end-date" value={localEndDate} onChange={val => { setLocalEndDate(val); setExtraData((prev: any) => ({ ...prev, endDate: val })); }} inputClassName="w-full h-[46px] px-4 rounded-[12px] bg-[var(--toss-card)] font-bold text-xs" />
             </div>
           </div>
         </>

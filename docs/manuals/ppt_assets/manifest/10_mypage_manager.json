@@ -1,0 +1,47 @@
+{
+  "id": "10_mypage_manager",
+  "title": "부서장 대시보드",
+  "subtitle": "결재 대기, 팀 인원, 부족 재고를 빠르게 확인하는 시작 화면입니다.",
+  "role": "부서장",
+  "image": "C:\\Users\\baek_\\newmso\\docs\\manuals\\ppt_assets\\raw\\10_mypage_manager.png",
+  "notes": [
+    "부서장은 일반 직원보다 운영 요약 카드가 더 많이 보입니다.",
+    "결재 대기와 부족 재고는 우선 확인해야 하는 항목입니다.",
+    "내정보 화면을 하루 업무 시작점으로 쓰는 것이 좋습니다."
+  ],
+  "hotspots": [
+    {
+      "index": 1,
+      "label": "팀 인원 카드",
+      "note": "현재 부서 인원 수",
+      "box": {
+        "x": 120,
+        "y": 150,
+        "width": 280,
+        "height": 100
+      }
+    },
+    {
+      "index": 2,
+      "label": "결재 대기 카드",
+      "note": "승인할 문서 건수",
+      "box": {
+        "x": 410,
+        "y": 150,
+        "width": 280,
+        "height": 100
+      }
+    },
+    {
+      "index": 3,
+      "label": "재고 부족 카드",
+      "note": "부족 품목 건수",
+      "box": {
+        "x": 995,
+        "y": 150,
+        "width": 240,
+        "height": 100
+      }
+    }
+  ]
+}

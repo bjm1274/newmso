@@ -24,11 +24,39 @@ import CompanyPnL from './관리자전용서브/법인손익현황';
 import PayrollDocumentDesignManager from './관리자전용서브/급여명세서서식관리';
 import OfficialDocumentLog from './관리자전용서브/공문서발송대장';
 
-const ADMIN_TAB_IDS = [
-  '경영대시보드',
-  '재무대시보드',
-  '예산관리',
-  '통합보고서',
+type AnalysisTabId = '경영대시보드' | '재무대시보드' | '예산관리' | '통합보고서' | '법인손익';
+type AuditTabId = '감사로그' | '접근감사로그';
+type AdminOuterTabId =
+  | '경영분석'
+  | '감사센터'
+  | '엑셀등록'
+  | '알림자동화'
+  | '연차수동부여'
+  | '회사관리'
+  | '직원권한'
+  | '수술검사템플릿'
+  | '팝업관리'
+  | '데이터백업'
+  | '데이터초기화'
+  | '양식빌더'
+  | '문서서식'
+  | '급여이상치'
+  | '공문서대장';
+
+const ANALYSIS_TABS: { id: AnalysisTabId; label: string; icon: string }[] = [
+  { id: '경영대시보드', label: '경영대시보드', icon: '📊' },
+  { id: '재무대시보드', label: '재무대시보드', icon: '💸' },
+  { id: '예산관리', label: '예산관리', icon: '🧮' },
+  { id: '통합보고서', label: '통합보고서', icon: '🧾' },
+  { id: '법인손익', label: '법인손익', icon: '📈' },
+];
+
+const AUDIT_TABS: { id: AuditTabId; label: string; icon: string }[] = [
+  { id: '접근감사로그', label: '접근감사로그', icon: '🔐' },
+  { id: '감사로그', label: '감사로그', icon: '🧾' },
+];
+
+const DIRECT_ADMIN_TABS: AdminOuterTabId[] = [
   '엑셀등록',
   '알림자동화',
   '연차수동부여',
@@ -36,30 +64,118 @@ const ADMIN_TAB_IDS = [
   '직원권한',
   '수술검사템플릿',
   '팝업관리',
-  '감사로그',
   '데이터백업',
   '데이터초기화',
   '양식빌더',
   '문서서식',
   '급여이상치',
-  '접근감사로그',
-  '법인손익',
   '공문서대장',
-] as const;
+];
+
+function normalizeAdminEntry(tabId?: string | null): {
+  activeTab: AdminOuterTabId;
+  analysisTab: AnalysisTabId;
+  auditTab: AuditTabId;
+} {
+  if (tabId && ANALYSIS_TABS.some((tab) => tab.id === tabId)) {
+    return {
+      activeTab: '경영분석',
+      analysisTab: tabId as AnalysisTabId,
+      auditTab: '접근감사로그',
+    };
+  }
+
+  if (tabId && AUDIT_TABS.some((tab) => tab.id === tabId)) {
+    return {
+      activeTab: '감사센터',
+      analysisTab: '경영대시보드',
+      auditTab: tabId as AuditTabId,
+    };
+  }
+
+  if (tabId === '경영분석' || tabId === '감사센터') {
+    return {
+      activeTab: tabId,
+      analysisTab: '경영대시보드',
+      auditTab: '접근감사로그',
+    };
+  }
+
+  if (tabId && DIRECT_ADMIN_TABS.includes(tabId as AdminOuterTabId)) {
+    return {
+      activeTab: tabId as AdminOuterTabId,
+      analysisTab: '경영대시보드',
+      auditTab: '접근감사로그',
+    };
+  }
+
+  return {
+    activeTab: '경영분석',
+    analysisTab: '경영대시보드',
+    auditTab: '접근감사로그',
+  };
+}
+
+function InnerTabBar({
+  title,
+  description,
+  tabs,
+  activeTab,
+  onChange,
+  testIdPrefix,
+}: {
+  title: string;
+  description: string;
+  tabs: { id: string; label: string; icon: string }[];
+  activeTab: string;
+  onChange: (tabId: string) => void;
+  testIdPrefix?: string;
+}) {
+  return (
+    <div
+      className="mb-6 rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4 shadow-sm"
+      data-testid={testIdPrefix ? `${testIdPrefix}-bar` : undefined}
+    >
+      <div className="mb-3">
+        <h3 className="text-sm font-bold text-[var(--foreground)]">{title}</h3>
+        <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{description}</p>
+      </div>
+      <div className="no-scrollbar flex gap-2 overflow-x-auto">
+        {tabs.map((tab, index) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => onChange(tab.id)}
+            data-testid={testIdPrefix ? `${testIdPrefix}-${index}` : undefined}
+            className={`flex items-center gap-2 rounded-full px-4 py-2 text-[11px] font-bold transition-all ${
+              activeTab === tab.id
+                ? 'bg-[var(--toss-blue)] text-white shadow-md'
+                : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-blue-light)] hover:text-[var(--foreground)]'
+            }`}
+          >
+            <span>{tab.icon}</span>
+            <span>{tab.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function AdminView({ user, staffs = [], onRefresh, initialTab }: any) {
-  const [activeTab, setActiveTab] = useState<string>(
-    initialTab && ADMIN_TAB_IDS.includes(initialTab as (typeof ADMIN_TAB_IDS)[number])
-      ? initialTab
-      : '경영대시보드',
-  );
+  const initialState = normalizeAdminEntry(initialTab);
+  const [activeTab, setActiveTab] = useState<AdminOuterTabId>(initialState.activeTab);
+  const [analysisTab, setAnalysisTab] = useState<AnalysisTabId>(initialState.analysisTab);
+  const [auditTab, setAuditTab] = useState<AuditTabId>(initialState.auditTab);
   const [inventory, setInventory] = useState<any[]>([]);
 
   const isMso = user?.company === 'SY INC.' || user?.permissions?.mso === true;
 
   useEffect(() => {
-    if (!initialTab || !ADMIN_TAB_IDS.includes(initialTab as (typeof ADMIN_TAB_IDS)[number])) return;
-    setActiveTab(initialTab);
+    const nextState = normalizeAdminEntry(initialTab);
+    setActiveTab(nextState.activeTab);
+    setAnalysisTab(nextState.analysisTab);
+    setAuditTab(nextState.auditTab);
   }, [initialTab]);
 
   useEffect(() => {
@@ -78,7 +194,7 @@ export default function AdminView({ user, staffs = [], onRefresh, initialTab }: 
   if (!isMso) {
     return (
       <div className="flex h-full flex-col items-center justify-center bg-[var(--toss-gray-1)] p-6 text-center">
-        <div className="mb-4 text-6xl">권한</div>
+        <div className="mb-4 text-6xl">🔒</div>
         <h2 className="text-xl font-bold text-[var(--foreground)]">관리자 메뉴 접근 권한이 없습니다.</h2>
         <p className="mt-2 text-sm font-semibold text-[var(--toss-gray-3)]">
           이 메뉴는 MSO 권한이 있는 계정만 사용할 수 있습니다.
@@ -89,14 +205,43 @@ export default function AdminView({ user, staffs = [], onRefresh, initialTab }: 
 
   return (
     <div
-      className="relative flex h-full flex-1 flex-col min-h-0 bg-[var(--page-bg)] animate-in fade-in duration-500"
+      className="relative flex min-h-0 flex-1 flex-col bg-[var(--page-bg)] animate-in fade-in duration-500"
       data-testid="admin-view"
     >
       <main className="custom-scrollbar flex-1 min-h-0 min-w-0 overflow-y-auto bg-[var(--toss-gray-1)]/30 p-4 md:p-10">
-        {activeTab === '경영대시보드' && <BusinessDashboard staffs={staffs} inventory={inventory} />}
-        {activeTab === '재무대시보드' && <FinancialDashboard />}
-        {activeTab === '예산관리' && <BudgetManagement staffs={staffs} />}
-        {activeTab === '통합보고서' && <IntegratedReport staffs={staffs} />}
+        {activeTab === '경영분석' && (
+          <>
+            <InnerTabBar
+              title="경영분석"
+              description="경영, 재무, 예산, 통합보고서, 법인 손익을 하나의 분석 공간으로 묶었습니다."
+              tabs={ANALYSIS_TABS}
+              activeTab={analysisTab}
+              onChange={(tabId) => setAnalysisTab(tabId as AnalysisTabId)}
+              testIdPrefix="admin-analysis-tab"
+            />
+            {analysisTab === '경영대시보드' && <BusinessDashboard staffs={staffs} inventory={inventory} />}
+            {analysisTab === '재무대시보드' && <FinancialDashboard />}
+            {analysisTab === '예산관리' && <BudgetManagement staffs={staffs} />}
+            {analysisTab === '통합보고서' && <IntegratedReport staffs={staffs} />}
+            {analysisTab === '법인손익' && <CompanyPnL staffs={staffs} selectedCo="전체" user={user} />}
+          </>
+        )}
+
+        {activeTab === '감사센터' && (
+          <>
+            <InnerTabBar
+              title="감사센터"
+              description="접근 감사와 일반 감사 로그를 한곳에서 조회합니다."
+              tabs={AUDIT_TABS}
+              activeTab={auditTab}
+              onChange={(tabId) => setAuditTab(tabId as AuditTabId)}
+              testIdPrefix="admin-audit-tab"
+            />
+            {auditTab === '접근감사로그' && <AccessAuditLog user={user} />}
+            {auditTab === '감사로그' && <AuditLogViewer />}
+          </>
+        )}
+
         {activeTab === '엑셀등록' && <ExcelBulkUpload onRefresh={onRefresh} />}
         {activeTab === '알림자동화' && <NotificationAutomation user={user} />}
         {activeTab === '연차수동부여' && <AnnualLeaveGrantTool staffs={staffs} onRefresh={onRefresh} />}
@@ -104,14 +249,11 @@ export default function AdminView({ user, staffs = [], onRefresh, initialTab }: 
         {activeTab === '직원권한' && <StaffPermissionManager onRefresh={onRefresh} />}
         {activeTab === '수술검사템플릿' && <SurgeryExamTemplateManager />}
         {activeTab === '팝업관리' && <PopupManager />}
-        {activeTab === '감사로그' && <AuditLogViewer />}
         {activeTab === '데이터백업' && <DataBackup />}
         {activeTab === '데이터초기화' && <DataReseter onRefresh={onRefresh} />}
         {activeTab === '양식빌더' && <FormBuilder user={user} />}
         {activeTab === '문서서식' && <PayrollDocumentDesignManager />}
         {activeTab === '급여이상치' && <SalaryAnomalyDetector staffs={staffs} />}
-        {activeTab === '접근감사로그' && <AccessAuditLog user={user} />}
-        {activeTab === '법인손익' && <CompanyPnL staffs={staffs} selectedCo="전체" user={user} />}
         {activeTab === '공문서대장' && <OfficialDocumentLog staffs={staffs} selectedCo="전체" user={user} />}
       </main>
     </div>

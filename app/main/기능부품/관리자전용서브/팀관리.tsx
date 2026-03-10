@@ -72,19 +72,19 @@ export default function TeamManager({ onRefresh }: { onRefresh?: () => void }) {
   }));
 
   return (
-    <div className="bg-white rounded-3xl border border-[var(--toss-border)] shadow-sm p-8 animate-in fade-in">
+    <div className="bg-white rounded-3xl border border-[var(--toss-border)] shadow-sm p-8 animate-in fade-in" data-testid="team-manager-view">
       <div className="flex justify-between items-center mb-8">
         <div>
           <h3 className="text-xl font-semibold text-[var(--foreground)] tracking-tight">팀 관리</h3>
           <p className="text-[11px] text-[var(--toss-blue)] font-bold uppercase tracking-widest">병원장 → 진료부/간호부/총무부 → 팀</p>
         </div>
         <div className="flex gap-2">
-          <select value={company} onChange={(e) => setCompany(e.target.value)} className="p-2 border rounded-[16px] text-sm font-bold">
+          <select data-testid="team-manager-company-select" value={company} onChange={(e) => setCompany(e.target.value)} className="p-2 border rounded-[16px] text-sm font-bold">
             {COMPANIES.map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
-          <button onClick={() => setAdding(true)} className="px-4 py-2 bg-[var(--toss-blue)] text-white text-xs font-semibold rounded-[16px]">+ 팀 추가</button>
+          <button data-testid="team-manager-open-add" onClick={() => setAdding(true)} className="px-4 py-2 bg-[var(--toss-blue)] text-white text-xs font-semibold rounded-[16px]">+ 팀 추가</button>
         </div>
       </div>
 
@@ -107,16 +107,16 @@ export default function TeamManager({ onRefresh }: { onRefresh?: () => void }) {
 
       {adding && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]" onClick={() => setAdding(false)}>
-          <div className="bg-white p-8 rounded-[12px] max-w-sm w-full space-y-4" onClick={(e) => e.stopPropagation()}>
+          <div data-testid="team-manager-add-modal" className="bg-white p-8 rounded-[12px] max-w-sm w-full space-y-4" onClick={(e) => e.stopPropagation()}>
             <h4 className="font-semibold">팀 추가</h4>
-            <select value={newTeam.division} onChange={(e) => setNewTeam({ ...newTeam, division: e.target.value })} className="w-full p-3 border rounded-[16px]">
+            <select data-testid="team-manager-division-select" value={newTeam.division} onChange={(e) => setNewTeam({ ...newTeam, division: e.target.value })} className="w-full p-3 border rounded-[16px]">
               {currentDivisions.map((d) => (
                 <option key={d} value={d}>{d}</option>
               ))}
             </select>
-            <input type="text" value={newTeam.team_name} onChange={(e) => setNewTeam({ ...newTeam, team_name: e.target.value })} placeholder="팀명" className="w-full p-3 border rounded-[16px]" />
+            <input data-testid="team-manager-name-input" type="text" value={newTeam.team_name} onChange={(e) => setNewTeam({ ...newTeam, team_name: e.target.value })} placeholder="팀명" className="w-full p-3 border rounded-[16px]" />
             <div className="flex gap-2">
-              <button onClick={handleAdd} className="flex-1 py-3 bg-[var(--toss-blue)] text-white font-semibold rounded-[16px]">추가</button>
+              <button data-testid="team-manager-save-button" onClick={handleAdd} className="flex-1 py-3 bg-[var(--toss-blue)] text-white font-semibold rounded-[16px]">추가</button>
               <button onClick={() => setAdding(false)} className="flex-1 py-3 bg-[var(--toss-gray-2)] font-semibold rounded-[16px]">취소</button>
             </div>
           </div>

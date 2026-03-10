@@ -202,7 +202,7 @@ export default function ContractAutoGenerator({ staffs, selectedCo, user }: Prop
   );
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-6" data-testid="contract-utility-auto-generator">
       {/* 인쇄 전용 스타일 */}
       <style>{`
         @media print {
@@ -221,7 +221,10 @@ export default function ContractAutoGenerator({ staffs, selectedCo, user }: Prop
 
       {/* 메시지 */}
       {message && (
-        <div className={`px-4 py-3 rounded-xl text-sm font-bold ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+        <div
+          data-testid="contract-generator-message"
+          className={`px-4 py-3 rounded-xl text-sm font-bold ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}
+        >
           {message.text}
         </div>
       )}
@@ -256,6 +259,7 @@ export default function ContractAutoGenerator({ staffs, selectedCo, user }: Prop
           <label className="text-xs font-bold text-[var(--toss-gray-4)] block mb-1">직원 선택 (자동 입력)</label>
           <select
             onChange={(e) => handleStaffSelect(e.target.value)}
+            data-testid="contract-generator-staff-select"
             className="w-full sm:w-64 px-3 py-2 text-sm border border-[var(--toss-border)] rounded-xl bg-[var(--toss-card)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30"
           >
             <option value="">-- 직원 선택하면 자동 입력 --</option>
@@ -281,6 +285,7 @@ export default function ContractAutoGenerator({ staffs, selectedCo, user }: Prop
                 type={type}
                 value={(form as any)[field]}
                 onChange={(e) => setField(field as keyof ContractForm, e.target.value)}
+                data-testid={`contract-generator-field-${field}`}
                 placeholder={placeholder}
                 className="w-full px-3 py-2 text-sm border border-[var(--toss-border)] rounded-xl bg-[var(--toss-card)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30"
               />
@@ -326,6 +331,7 @@ export default function ContractAutoGenerator({ staffs, selectedCo, user }: Prop
         <button
           onClick={handleSave}
           disabled={saving}
+          data-testid="contract-generator-save-button"
           className="px-5 py-2.5 bg-[var(--toss-blue)] text-white text-xs font-bold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
         >
           {saving ? '저장 중...' : 'DB 저장'}

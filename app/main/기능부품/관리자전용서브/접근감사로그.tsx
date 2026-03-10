@@ -101,7 +101,7 @@ export default function AccessAuditLog({ user }: Props) {
 
   if (!tableExists) {
     return (
-      <div className="p-6 space-y-4 max-w-3xl mx-auto">
+      <div className="p-6 space-y-4 max-w-3xl mx-auto" data-testid="admin-audit-access">
         <h2 className="text-lg font-bold text-[var(--foreground)]">접근 권한 감사 로그</h2>
         <div className="p-6 bg-amber-50 border border-amber-200 rounded-[12px]">
           <p className="text-sm font-bold text-amber-700">access_logs 테이블이 없습니다.</p>
@@ -123,7 +123,7 @@ export default function AccessAuditLog({ user }: Props) {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-5 max-w-5xl mx-auto">
+    <div className="p-4 md:p-6 space-y-5 max-w-5xl mx-auto" data-testid="admin-audit-access">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)]">접근 권한 감사 로그</h2>

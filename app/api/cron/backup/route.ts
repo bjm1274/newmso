@@ -8,8 +8,15 @@ import { runBackup } from '@/lib/backup-cron';
 const CRON_SECRET = process.env.CRON_SECRET;
 
 export async function GET(req: Request) {
+  if (!CRON_SECRET) {
+    return NextResponse.json(
+      { error: 'CRON_SECRET is not configured', ok: false },
+      { status: 500 }
+    );
+  }
+
   const authHeader = req.headers.get('authorization');
-  if (CRON_SECRET && authHeader !== `Bearer ${CRON_SECRET}`) {
+  if (authHeader !== `Bearer ${CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

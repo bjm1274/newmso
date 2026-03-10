@@ -139,6 +139,7 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
             {tabs.map((tab) => (
               <button
                 key={tab.id}
+                data-testid={`payroll-tab-${tab.id}`}
                 onClick={() => {
                   setActiveTab(tab.id);
                   if (tab.id !== '급여정산') setSelectedStaffId(null as any);
@@ -297,7 +298,7 @@ function RunPayrollWizard({ staffs, selectedCo, onRefresh }: any) {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center py-20 px-4 min-h-[60vh] animate-in zoom-in-95 duration-500">
+    <div className="flex flex-col items-center justify-center py-20 px-4 min-h-[60vh] animate-in zoom-in-95 duration-500" data-testid="run-payroll-wizard">
       <div className="bg-white/80 dark:bg-black/20 backdrop-blur-3xl p-10 rounded-[32px] border border-[var(--toss-border)] shadow-2xl text-center max-w-3xl w-full">
         <h2 className="text-3xl md:text-4xl font-extrabold text-[var(--foreground)] tracking-tight mb-4">
           <span className="bg-clip-text text-transparent bg-gradient-to-r from-[var(--toss-blue)] to-purple-500">RUN PAYROLL</span> 마법사
@@ -306,6 +307,7 @@ function RunPayrollWizard({ staffs, selectedCo, onRefresh }: any) {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <button
+            data-testid="run-payroll-regular-button"
             onClick={() => setMode('regular')}
             className="group flex flex-col items-start p-8 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[24px] hover:border-[var(--toss-blue)] hover:shadow-lg transition-all text-left"
           >
@@ -315,6 +317,7 @@ function RunPayrollWizard({ staffs, selectedCo, onRefresh }: any) {
           </button>
 
           <button
+            data-testid="run-payroll-interim-button"
             onClick={() => setMode('interim')}
             className="group flex flex-col items-start p-8 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[24px] hover:border-amber-500 hover:shadow-lg transition-all text-left"
           >

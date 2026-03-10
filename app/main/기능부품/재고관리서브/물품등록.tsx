@@ -100,7 +100,7 @@ export default function ProductRegistration({ user, suppliers, fetchInventory, f
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500" data-testid="inventory-registration-view">
       <div className="bg-[var(--toss-card)] p-6 md:p-10 border border-[var(--toss-border)] shadow-xl rounded-[2.5rem]">
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-[var(--foreground)] tracking-tight">신규 물품 자산 등록</h2>
@@ -111,11 +111,11 @@ export default function ProductRegistration({ user, suppliers, fetchInventory, f
           {/* 기본 정보 */}
           <div className="space-y-2">
             <label className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">제품명 *</label>
-            <input value={productForm.item_name} onChange={e => setProductForm({ ...productForm, item_name: e.target.value })} className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/20" placeholder="제품명을 입력하세요" />
+            <input data-testid="inventory-registration-item-name" value={productForm.item_name} onChange={e => setProductForm({ ...productForm, item_name: e.target.value })} className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/20" placeholder="제품명을 입력하세요" />
           </div>
           <div className="space-y-2">
             <label className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">분류 *</label>
-            <select value={productForm.category} onChange={e => setProductForm({ ...productForm, category: e.target.value })} className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/20">
+            <select data-testid="inventory-registration-category" value={productForm.category} onChange={e => setProductForm({ ...productForm, category: e.target.value })} className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/20">
               <option value="">분류 선택</option>
               <option value="의료기기">의료기기</option>
               <option value="소모품">소모품</option>
@@ -127,7 +127,7 @@ export default function ProductRegistration({ user, suppliers, fetchInventory, f
           {/* 수량 및 단가 */}
           <div className="space-y-2">
             <label className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">현재 수량</label>
-            <input type="number" value={productForm.quantity} onChange={e => setProductForm({ ...productForm, quantity: parseInt(e.target.value) || 0 })} className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/20" />
+            <input data-testid="inventory-registration-quantity" type="number" value={productForm.quantity} onChange={e => setProductForm({ ...productForm, quantity: parseInt(e.target.value) || 0 })} className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/20" />
           </div>
           <div className="space-y-2">
             <label className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">단가 (원)</label>
@@ -179,6 +179,7 @@ export default function ProductRegistration({ user, suppliers, fetchInventory, f
           <div className="space-y-2">
             <label className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">귀속 회사 *</label>
             <select
+              data-testid="inventory-registration-company"
               value={productForm.company}
               onChange={e => setProductForm({ ...productForm, company: e.target.value })}
               className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/20"
@@ -192,6 +193,7 @@ export default function ProductRegistration({ user, suppliers, fetchInventory, f
           <div className="space-y-2">
             <label className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">배정 부서 (부서별 현황에 표시)</label>
             <select
+              data-testid="inventory-registration-department"
               value={productForm.department}
               onChange={e => setProductForm({ ...productForm, department: e.target.value })}
               className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/20"
@@ -214,7 +216,7 @@ export default function ProductRegistration({ user, suppliers, fetchInventory, f
           </div>
         </div>
 
-        <button onClick={handleRegisterProduct} disabled={loading} className="w-full py-5 bg-[var(--toss-blue)] text-white rounded-[16px] font-bold text-sm shadow-sm hover:scale-[0.98] transition-all">✅ 물품 자산 등록하기</button>
+        <button data-testid="inventory-registration-submit" onClick={handleRegisterProduct} disabled={loading} className="w-full py-5 bg-[var(--toss-blue)] text-white rounded-[16px] font-bold text-sm shadow-sm hover:scale-[0.98] transition-all">✅ 물품 자산 등록하기</button>
       </div>
     </div>
   );

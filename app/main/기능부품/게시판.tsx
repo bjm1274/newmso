@@ -1089,18 +1089,18 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                     {/* 부위 클릭 영역: 아래 좌표는 위 이미지(2:3 비율)에 맞춰 고정됨 */}
                     <div className="absolute inset-0">
                       {[
-                        { id: 'cervical', top: '13%', left: '50%' },    // 목/경추
-                        { id: 'chest', top: '24%', left: '50%' },       // 흉부
-                        { id: 'lumbar', top: '38%', left: '50%' },      // 요추/허리
-                        { id: 'hip', top: '52%', left: '50%' },         // 골반/고관절
-                        { id: 'shoulder', top: '20%', left: '30%' },    // 좌 어깨
-                        { id: 'shoulder', top: '20%', left: '70%' },    // 우 어깨
-                        { id: 'upper_arm', top: '30%', left: '26%' },   // 좌 위팔
-                        { id: 'upper_arm', top: '30%', left: '74%' },   // 우 위팔
-                        { id: 'forearm', top: '50%', left: '22%' },     // 좌 아래팔
-                        { id: 'forearm', top: '50%', left: '78%' },     // 우 아래팔
-                        { id: 'knee', top: '74%', left: '50%' },        // 무릎
-                        { id: 'ankle', top: '92%', left: '50%' },       // 발목/발
+                        { id: 'cervical', top: '12.5%', left: '50%', areaClass: 'w-11 h-11 md:w-12 md:h-12' }, // 목/경추
+                        { id: 'chest', top: '24.5%', left: '50%', areaClass: 'w-12 h-12 md:w-14 md:h-14' }, // 흉부
+                        { id: 'lumbar', top: '39%', left: '50%', areaClass: 'w-12 h-12 md:w-14 md:h-14' }, // 요추/허리
+                        { id: 'hip', top: '55%', left: '50%', areaClass: 'w-12 h-12 md:w-14 md:h-14' }, // 골반/고관절
+                        { id: 'shoulder', top: '20.5%', left: '34%', areaClass: 'w-10 h-10 md:w-12 md:h-12' }, // 좌 어깨
+                        { id: 'shoulder', top: '20.5%', left: '66%', areaClass: 'w-10 h-10 md:w-12 md:h-12' }, // 우 어깨
+                        { id: 'upper_arm', top: '31.5%', left: '28%', areaClass: 'w-10 h-10 md:w-12 md:h-12' }, // 좌 위팔
+                        { id: 'upper_arm', top: '31.5%', left: '72%', areaClass: 'w-10 h-10 md:w-12 md:h-12' }, // 우 위팔
+                        { id: 'forearm', top: '49%', left: '23%', areaClass: 'w-10 h-10 md:w-12 md:h-12' }, // 좌 아래팔
+                        { id: 'forearm', top: '49%', left: '77%', areaClass: 'w-10 h-10 md:w-12 md:h-12' }, // 우 아래팔
+                        { id: 'knee', top: '78%', left: '50%', areaClass: 'w-10 h-10 md:w-12 md:h-12' }, // 무릎
+                        { id: 'ankle', top: '92.5%', left: '50%', areaClass: 'w-10 h-10 md:w-12 md:h-12' }, // 발목/발
                       ].map((spot, idx) => {
                         const isActive = resolvedBodyPart === spot.id;
                         return (
@@ -1108,20 +1108,31 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                             key={idx}
                             type="button"
                             onClick={() => setSelectedBodyPart(spot.id)}
+                            aria-label={`${spot.id} 선택`}
                             style={{ top: spot.top, left: spot.left }}
                             className={`
                         group absolute -translate-x-1/2 -translate-y-1/2
                         flex items-center justify-center
-                        w-16 h-16 md:w-20 md:h-20 rounded-full border-none bg-transparent
+                        ${spot.areaClass} rounded-full border-none bg-transparent
                       `}
                           >
                             {/* 호버/선택 시에만 부위 전체가 은은하게 빛나는 하이라이트 (기본 상태에서는 사람 사진만 보임) */}
                             <span
                               className={`
-                          absolute inset-0 rounded-full bg-sky-400/35 blur-xl opacity-0
+                          absolute inset-0 rounded-full bg-sky-400/30 blur-lg opacity-0
                           transition-opacity duration-200
-                          group-hover:opacity-90
-                          ${isActive ? 'opacity-90' : ''}
+                          group-hover:opacity-100
+                          ${isActive ? 'opacity-100' : ''}
+                        `}
+                            />
+                            <span
+                              className={`
+                          relative w-2.5 h-2.5 md:w-3 md:h-3 rounded-full
+                          border border-white/80 bg-sky-400/90
+                          shadow-[0_0_0_3px_rgba(14,165,233,0.22)]
+                          transition-transform duration-200
+                          group-hover:scale-110
+                          ${isActive ? 'scale-110' : ''}
                         `}
                             />
                           </button>

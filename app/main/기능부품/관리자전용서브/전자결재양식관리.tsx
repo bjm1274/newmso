@@ -45,6 +45,8 @@ const builtinTemplates = [
 ];
 
 /** 관리자: 전자결재 서식/양식 + 디자인 통합 관리 */
+const LOCAL_APPROVAL_FORM_TYPES_KEY = 'erp_approval_form_types_custom';
+
 export default function ApprovalFormTypesManager() {
   const [list, setList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,6 +67,17 @@ export default function ApprovalFormTypesManager() {
 
   const fetchList = async () => {
     setLoading(true);
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = window.localStorage.getItem(LOCAL_APPROVAL_FORM_TYPES_KEY);
+        const parsed = stored ? JSON.parse(stored) : [];
+        setList(Array.isArray(parsed) ? parsed : []);
+      } catch {
+        setList([]);
+      }
+      setLoading(false);
+      return;
+    }
     const { data, error } = await supabase
       .from('approval_form_types')
       .select('*')
@@ -118,6 +131,24 @@ export default function ApprovalFormTypesManager() {
       alert('급여명세서는 기본 서식으로 고정되어 있어, 별도로 추가할 수 없습니다.');
       return;
     }
+    if (typeof window !== 'undefined') {
+      const next = [
+        ...list,
+        {
+          id: globalThis.crypto?.randomUUID?.() || `local-${Date.now()}`,
+          name,
+          slug,
+          sort_order: list.length,
+          is_active: true,
+          created_at: new Date().toISOString(),
+        },
+      ];
+      window.localStorage.setItem(LOCAL_APPROVAL_FORM_TYPES_KEY, JSON.stringify(next));
+      setList(next);
+      setAddName('');
+      setAddSlug('');
+      return;
+    }
     const { error } = await supabase.from('approval_form_types').insert({
       name,
       slug,
@@ -144,6 +175,15 @@ export default function ApprovalFormTypesManager() {
     const name = editName.trim();
     if (!name) return alert('이름을 입력하세요.');
     const slug = (editSlug.trim() || slugFromName(name)).slice(0, 50);
+    if (typeof window !== 'undefined') {
+      const next = list.map((row: any) =>
+        row.id === editingId ? { ...row, name, slug, updated_at: new Date().toISOString() } : row
+      );
+      window.localStorage.setItem(LOCAL_APPROVAL_FORM_TYPES_KEY, JSON.stringify(next));
+      setList(next);
+      setEditingId(null);
+      return;
+    }
     const { error } = await supabase
       .from('approval_form_types')
       .update({ name, slug, updated_at: new Date().toISOString() })
@@ -157,6 +197,14 @@ export default function ApprovalFormTypesManager() {
   };
 
   const toggleActive = async (row: any) => {
+    if (typeof window !== 'undefined') {
+      const next = list.map((item: any) =>
+        item.id === row.id ? { ...item, is_active: !row.is_active, updated_at: new Date().toISOString() } : item
+      );
+      window.localStorage.setItem(LOCAL_APPROVAL_FORM_TYPES_KEY, JSON.stringify(next));
+      setList(next);
+      return;
+    }
     const { error } = await supabase
       .from('approval_form_types')
       .update({ is_active: !row.is_active, updated_at: new Date().toISOString() })
@@ -166,6 +214,12 @@ export default function ApprovalFormTypesManager() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('이 양식을 삭제하시겠습니까?')) return;
+    if (typeof window !== 'undefined') {
+      const next = list.filter((row: any) => row.id !== id);
+      window.localStorage.setItem(LOCAL_APPROVAL_FORM_TYPES_KEY, JSON.stringify(next));
+      setList(next);
+      return;
+    }
     const { error } = await supabase.from('approval_form_types').delete().eq('id', id);
     if (!error) fetchList();
     else alert('삭제 실패: ' + error.message);

@@ -34,7 +34,7 @@ export default function FinancialDashboard() {
     }, [period]);
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-500 max-w-7xl mx-auto pb-20">
+        <div className="space-y-6 animate-in fade-in duration-500 max-w-7xl mx-auto pb-20" data-testid="admin-analysis-financial">
             <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-[var(--toss-border)] pb-4 space-y-4 md:space-y-0">
                 <div>
                     <h2 className="text-xl md:text-2xl font-bold text-[var(--foreground)] tracking-tight">C-Level 재무분석 보드</h2>

@@ -124,7 +124,7 @@ export default function WorkTypeChangeHistory({ staffs, selectedCo, user }: Prop
     : records;
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-6" data-testid="attendance-analysis-worktype-history">
       {/* 헤더 */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

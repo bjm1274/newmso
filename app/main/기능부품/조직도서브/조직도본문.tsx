@@ -91,7 +91,7 @@ export default function MainContent({
           />
         </div>
       )}
-      {mainMenu === '전자결재' && <div className="flex-1 overflow-hidden"><ApprovalView user={user} staffs={data.staffs} selectedCo={selectedCo} setSelectedCo={setSelectedCo} selectedCompanyId={selectedCompanyId} onRefresh={onRefresh} initialView={subView} /></div>}
+      {mainMenu === '전자결재' && <div className="flex-1 overflow-hidden"><ApprovalView user={user} staffs={data.staffs} selectedCo={selectedCo} setSelectedCo={setSelectedCo} selectedCompanyId={selectedCompanyId} onRefresh={onRefresh} initialView={subView} onViewChange={setSubView} /></div>}
       {mainMenu === '인사관리' && (
         <div className="flex-1 overflow-hidden" data-testid="hr-view">
           <HRView

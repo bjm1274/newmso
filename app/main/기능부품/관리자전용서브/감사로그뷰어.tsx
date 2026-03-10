@@ -17,7 +17,7 @@ export default function AuditLogViewer() {
   }, []);
 
   return (
-    <div className="bg-white border border-[var(--toss-border)] rounded-[12px] overflow-hidden shadow-xl">
+    <div className="bg-white border border-[var(--toss-border)] rounded-[12px] overflow-hidden shadow-xl" data-testid="admin-audit-general">
       <div className="p-6 border-b border-[var(--toss-border)]">
         <h3 className="text-xl font-semibold text-[var(--foreground)]">감사 로그</h3>
         <p className="text-[11px] text-[var(--toss-gray-3)] font-bold mt-1">급여·결재·인사 등 주요 변경 이력</p>

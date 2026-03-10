@@ -108,6 +108,7 @@ export default function SuppliesForm({ setExtraData, initialItems }: any) {
                 <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] ml-1">품목명 (재고 검색)</label>
                 <div className="flex items-center gap-2">
                   <input
+                    data-testid={`supplies-item-name-${idx}`}
                     value={item.name}
                     onChange={e => handleSearch(idx, e.target.value)}
                     className="flex-1 p-3.5 bg-[var(--toss-gray-1)] text-xs font-bold outline-none rounded-[12px] border-none focus:bg-white focus:ring-2 focus:ring-[var(--toss-blue)]/20 transition-all"
@@ -140,6 +141,7 @@ export default function SuppliesForm({ setExtraData, initialItems }: any) {
               <div className="space-y-1.5">
                 <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] ml-1">신청수량</label>
                 <input
+                  data-testid={`supplies-item-qty-${idx}`}
                   type="number"
                   min="1"
                   value={item.qty}
@@ -154,6 +156,7 @@ export default function SuppliesForm({ setExtraData, initialItems }: any) {
               <div className="space-y-1.5">
                 <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] ml-1">수령부서</label>
                 <select
+                  data-testid={`supplies-item-dept-${idx}`}
                   className="w-full p-3.5 bg-[var(--toss-gray-1)] border-none text-[11px] font-bold rounded-[12px] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20 text-[var(--foreground)]"
                   value={item.dept}
                   onChange={e => {
@@ -170,6 +173,7 @@ export default function SuppliesForm({ setExtraData, initialItems }: any) {
               <div className="col-span-1 md:col-span-2 space-y-1.5">
                 <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] ml-1">용도</label>
                 <input
+                  data-testid={`supplies-item-purpose-${idx}`}
                   value={item.purpose}
                   onChange={e => {
                     const nl = [...items];
@@ -187,6 +191,7 @@ export default function SuppliesForm({ setExtraData, initialItems }: any) {
 
       <div className="p-4 bg-white border-t border-[var(--toss-border)] text-center">
         <button
+          data-testid="supplies-add-row-button"
           onClick={() => setItems([...items, { name: '', qty: 1, currentStock: null, dept: '', purpose: '', suggestions: [] }])}
           className="inline-flex items-center justify-center gap-1.5 px-6 py-2.5 bg-[var(--toss-gray-1)] text-[var(--foreground)] text-[11px] font-bold rounded-full hover:bg-[var(--toss-gray-2)] transition-colors"
         >

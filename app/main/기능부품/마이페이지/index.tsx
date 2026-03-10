@@ -362,7 +362,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
       <div className="flex-1 min-h-0 overflow-hidden relative">
         <div className="absolute inset-0 overflow-y-auto overflow-x-hidden transition-all duration-300">
           {activeTab === 'profile' && (
-            <div>
+            <div data-testid="mypage-profile-tab">
               <div className="p-4 md:p-6">
                 <RoleDashboard user={user} setMainMenu={setMainMenu} />
               </div>
@@ -370,7 +370,8 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
             </div>
           )}
           {activeTab === 'commute' && (
-            <CommuteRecord
+            <div data-testid="mypage-commute-tab">
+              <CommuteRecord
               user={user}
               onRequestCorrection={(log: any) =>
                 onOpenApproval?.({
@@ -379,13 +380,14 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
                   todayLog: log,
                 })
               }
-            />
+              />
+            </div>
           )}
-          {activeTab === 'todo' && <MyTodoList user={user} />}
-          {activeTab === 'salary' && <SalarySlipContainer user={user} />}
-          {activeTab === 'certificates' && <MyCertificates user={user} />}
-          {activeTab === 'documents' && <MyDocuments user={user} />}
-          {activeTab === 'notifications' && <NotificationInbox user={user} onRefresh={() => { }} />}
+          {activeTab === 'todo' && <div data-testid="mypage-todo-tab"><MyTodoList user={user} /></div>}
+          {activeTab === 'salary' && <div data-testid="mypage-salary-tab"><SalarySlipContainer user={user} /></div>}
+          {activeTab === 'certificates' && <div data-testid="mypage-certificates-tab"><MyCertificates user={user} /></div>}
+          {activeTab === 'documents' && <div data-testid="mypage-documents-tab"><MyDocuments user={user} /></div>}
+          {activeTab === 'notifications' && <div data-testid="mypage-notifications-tab"><NotificationInbox user={user} onRefresh={() => { }} /></div>}
         </div>
       </div>
 

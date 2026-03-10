@@ -114,7 +114,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
   };
 
   return (
-    <div className="bg-[var(--toss-card)] p-6 md:p-8 rounded-[12px] border border-[var(--toss-border)] shadow-sm animate-in fade-in duration-300">
+    <div className="bg-[var(--toss-card)] p-6 md:p-8 rounded-[12px] border border-[var(--toss-border)] shadow-sm animate-in fade-in duration-300" data-testid="interim-settlement-view">
       <div className="mb-6 pb-4 border-b border-[var(--toss-border)]">
         <h2 className="text-lg font-bold text-[var(--foreground)]">중간정산</h2>
         <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">퇴직·중도 퇴사자 급여 일할 계산</p>
@@ -137,8 +137,9 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
           <div className="space-y-1">
             <label className="text-xs font-medium text-[var(--toss-gray-4)]">정산 대상자</label>
             <select
+              data-testid="interim-settlement-staff-select"
               value={selectedStaff?.id ?? ''}
-              onChange={(e) => setSelectedStaff(candidates.find((s: any) => s.id === parseInt(e.target.value)) || null)}
+              onChange={(e) => setSelectedStaff(candidates.find((s: any) => String(s.id) === e.target.value) || null)}
               className="w-full h-10 px-3 bg-[var(--input-bg)] border border-[var(--toss-border)] rounded-md text-sm font-medium focus:ring-2 focus:ring-[var(--toss-blue)] focus:border-[var(--toss-blue)]"
             >
               <option value="">직원을 선택하세요</option>
@@ -160,7 +161,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
             </div>
             <div className="space-y-1">
               <label className="text-xs font-medium text-[var(--toss-gray-4)]">정산 사유</label>
-              <select value={reason} onChange={(e) => setReason(e.target.value)} className="w-full h-10 px-3 bg-[var(--input-bg)] border border-[var(--toss-border)] rounded-md text-sm font-medium focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+              <select data-testid="interim-settlement-reason-select" value={reason} onChange={(e) => setReason(e.target.value)} className="w-full h-10 px-3 bg-[var(--input-bg)] border border-[var(--toss-border)] rounded-md text-sm font-medium focus:ring-2 focus:ring-[var(--toss-blue)]/30"
               >
                 <option value="퇴사">중도 퇴사</option>
                 <option value="휴직">휴직 시작</option>
@@ -213,7 +214,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
                   </div>
                 )}
               </div>
-              <button onClick={handleConfirm} disabled={loading} className="w-full py-3 bg-[var(--toss-blue)] text-white text-sm font-semibold rounded-[12px] hover:opacity-90 disabled:opacity-50">
+              <button data-testid="interim-settlement-save-button" onClick={handleConfirm} disabled={loading} className="w-full py-3 bg-[var(--toss-blue)] text-white text-sm font-semibold rounded-[12px] hover:opacity-90 disabled:opacity-50">
                 {loading ? '저장 중...' : '저장하기'}
               </button>
             </div>
