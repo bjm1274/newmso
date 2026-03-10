@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import bcrypt from 'bcryptjs';
+import { existsSync, readFileSync } from 'fs';
+import path from 'path';
 import { createSupabaseAccessToken } from '@/lib/server-supabase-bridge';
 import {
   clearSessionCookie,
@@ -10,9 +12,51 @@ import {
   SESSION_COOKIE_NAME,
 } from '@/lib/server-session';
 
+function readEnvFileValue(key: string) {
+  const envFiles = ['.env.local', '.env'];
+
+  for (const envFile of envFiles) {
+    const envPath = path.join(process.cwd(), envFile);
+    if (!existsSync(envPath)) continue;
+
+    const content = readFileSync(envPath, 'utf8');
+    const lines = content.split(/\r?\n/);
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+
+      const normalized = trimmed.startsWith('export ') ? trimmed.slice(7).trim() : trimmed;
+      const separatorIndex = normalized.indexOf('=');
+      if (separatorIndex === -1) continue;
+
+      const name = normalized.slice(0, separatorIndex).trim();
+      if (name !== key) continue;
+
+      const rawValue = normalized.slice(separatorIndex + 1).trim();
+      if (!rawValue) return '';
+
+      if (
+        (rawValue.startsWith('"') && rawValue.endsWith('"')) ||
+        (rawValue.startsWith("'") && rawValue.endsWith("'"))
+      ) {
+        return rawValue.slice(1, -1);
+      }
+
+      return rawValue;
+    }
+  }
+
+  return '';
+}
+
+function getRuntimeEnv(key: string) {
+  return process.env[key] || readEnvFileValue(key);
+}
+
 function getAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = getRuntimeEnv('NEXT_PUBLIC_SUPABASE_URL');
+  const serviceKey = getRuntimeEnv('SUPABASE_SERVICE_ROLE_KEY');
 
   if (!supabaseUrl || !serviceKey) {
     throw new Error('Supabase URL 또는 Service Role Key가 설정되지 않았습니다.');
@@ -78,13 +122,13 @@ export async function POST(request: NextRequest) {
     return failureResponse('아이디와 비밀번호를 모두 입력해주세요.', 400);
   }
 
-  const adminName = process.env.ADMIN_NAME;
-  const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH;
-  const masterId = process.env.MASTER_ID;
-  const masterPasswordHash = process.env.MASTER_PASSWORD_HASH;
+  const adminName = getRuntimeEnv('ADMIN_NAME');
+  const adminPasswordHash = getRuntimeEnv('ADMIN_PASSWORD_HASH');
+  const masterId = getRuntimeEnv('MASTER_ID');
+  const masterPasswordHash = getRuntimeEnv('MASTER_PASSWORD_HASH');
 
   if (!adminName || !adminPasswordHash || !masterId || !masterPasswordHash) {
-    return failureResponse('마스터 계정 환경변수가 설정되지 않았습니다.', 500);
+    return failureResponse('마스터 로그인 환경변수를 읽지 못했습니다. 서버를 재시작한 뒤 다시 시도해주세요.', 500);
   }
 
   let adminMatch = false;
@@ -149,6 +193,7 @@ export async function POST(request: NextRequest) {
       employee_no: '0',
       name: '시스템관리자',
       role: 'admin',
+      is_system_master: true,
       department: '경영지원팀',
       company: 'SY INC.',
       company_id: null,
@@ -158,6 +203,7 @@ export async function POST(request: NextRequest) {
         approval: true,
         admin: true,
         mso: true,
+        system_master: true,
         hr_교대근무: true,
       },
     });

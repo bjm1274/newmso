@@ -50,7 +50,6 @@ export const SUB_MENUS: Record<string, SubMenuItem[]> = {
     { id: '오프보딩', label: '오프보딩', group: '인력관리', icon: '🚪' },
     { id: '근태', label: '근태', group: '근태/급여', icon: '⏰' },
     { id: '교대근무', label: '교대근무', group: '근태/급여', icon: '🔄' },
-    { id: '근무표자동편성', label: '근무표 자동편성', group: '근태/급여', icon: '🧩' },
     { id: '연차/휴가', label: '연차/휴가', group: '근태/급여', icon: '🌴' },
     { id: '급여', label: '급여', group: '근태/급여', icon: '💰' },
     { id: '건강검진', label: '건강검진', group: '복무/복지', icon: '🩺' },
@@ -79,6 +78,7 @@ export const SUB_MENUS: Record<string, SubMenuItem[]> = {
     { id: '데이터초기화', label: '데이터 초기화', group: '데이터 관리', icon: '♻️' },
     { id: '공문서대장', label: '공문서 발송 대장', group: '데이터 관리', icon: '📮' },
     { id: '감사센터', label: '감사 센터', group: '감사 센터', icon: '🔍' },
+    { id: '시스템마스터센터', label: '시스템마스터센터', group: '시스템 마스터', icon: '🛡️' },
   ],
 };
 

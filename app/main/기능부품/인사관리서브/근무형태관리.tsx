@@ -15,9 +15,141 @@ type Shift = {
   weekly_work_days?: number | null;
   is_weekend_work?: boolean | null;
   is_shift?: boolean | null;
+  monthly_night_days?: number | null;
+  additional_work_hours?: number | null;
+  extra_contract_allowance?: number | null;
 };
 
 const DEFAULT_COMPANY_OPTIONS = ['박철홍정형외과', '수연의원', 'SY INC.'];
+const SHIFT_META_MARKER = '[SHIFT_META]';
+
+type ShiftContractMeta = {
+  monthly_night_days: number;
+  additional_work_hours: number;
+  extra_contract_allowance: number;
+};
+
+type ShiftContractMetaInput = {
+  monthly_night_days?: number | null;
+  additional_work_hours?: number | null;
+  extra_contract_allowance?: number | null;
+};
+
+function normalizeShiftContractMeta(meta?: ShiftContractMetaInput | null): ShiftContractMeta {
+  return {
+    monthly_night_days: Math.max(0, Math.floor(Number(meta?.monthly_night_days) || 0)),
+    additional_work_hours: Math.max(0, Math.round((Number(meta?.additional_work_hours) || 0) * 10) / 10),
+    extra_contract_allowance: Math.max(0, Math.floor(Number(meta?.extra_contract_allowance) || 0)),
+  };
+}
+
+function hasShiftContractMeta(meta?: ShiftContractMetaInput | null) {
+  const normalized = normalizeShiftContractMeta(meta);
+  return Object.values(normalized).some((value) => value > 0);
+}
+
+function parseShiftDescription(rawDescription?: string | null) {
+  const description = String(rawDescription || '');
+  const markerIndex = description.lastIndexOf(SHIFT_META_MARKER);
+  if (markerIndex === -1) {
+    return {
+      description: description.trim(),
+      meta: normalizeShiftContractMeta(),
+    };
+  }
+
+  const baseDescription = description.slice(0, markerIndex).trimEnd();
+  const metaText = description.slice(markerIndex + SHIFT_META_MARKER.length).trim();
+
+  try {
+    return {
+      description: baseDescription,
+      meta: normalizeShiftContractMeta(JSON.parse(metaText)),
+    };
+  } catch {
+    return {
+      description: description.trim(),
+      meta: normalizeShiftContractMeta(),
+    };
+  }
+}
+
+function buildShiftDescription(description: string, meta?: ShiftContractMetaInput | null) {
+  const cleanDescription = description.trim();
+  const normalized = normalizeShiftContractMeta(meta);
+
+  if (!hasShiftContractMeta(normalized)) {
+    return cleanDescription;
+  }
+
+  const serializedMeta = `${SHIFT_META_MARKER}${JSON.stringify(normalized)}`;
+  return cleanDescription ? `${cleanDescription}\n${serializedMeta}` : serializedMeta;
+}
+
+function timeToMinutes(value?: string | null) {
+  if (!value) return 0;
+  const [hours, minutes] = value.split(':').map(Number);
+  return (Number.isFinite(hours) ? hours : 0) * 60 + (Number.isFinite(minutes) ? minutes : 0);
+}
+
+function calculateWorkMinutes({
+  start_time,
+  end_time,
+  break_start_time,
+  break_end_time,
+}: {
+  start_time?: string | null;
+  end_time?: string | null;
+  break_start_time?: string | null;
+  break_end_time?: string | null;
+}) {
+  const start = timeToMinutes(start_time);
+  let end = timeToMinutes(end_time);
+  if (end <= start) end += 24 * 60;
+
+  let workMinutes = Math.max(0, end - start);
+
+  if (break_start_time && break_end_time) {
+    let breakStart = timeToMinutes(break_start_time);
+    let breakEnd = timeToMinutes(break_end_time);
+    if (breakStart < start) breakStart += 24 * 60;
+    if (breakEnd <= breakStart) breakEnd += 24 * 60;
+    workMinutes = Math.max(0, workMinutes - Math.max(0, breakEnd - breakStart));
+  }
+
+  return workMinutes;
+}
+
+function calculateWeeklyWorkHours(shift: {
+  start_time?: string | null;
+  end_time?: string | null;
+  break_start_time?: string | null;
+  break_end_time?: string | null;
+  weekly_work_days?: number | null;
+}) {
+  const weeklyDays = Math.max(0, Number(shift.weekly_work_days) || 0);
+  const workMinutes = calculateWorkMinutes(shift);
+  return Math.round(((workMinutes * weeklyDays) / 60) * 10) / 10;
+}
+
+function needsExtendedContractSettings(shift: {
+  shift_type?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  break_start_time?: string | null;
+  break_end_time?: string | null;
+  weekly_work_days?: number | null;
+  monthly_night_days?: number | null;
+  additional_work_hours?: number | null;
+  extra_contract_allowance?: number | null;
+}) {
+  const pattern = String(shift.shift_type || '');
+  return (
+    pattern.includes('3교대') ||
+    calculateWeeklyWorkHours(shift) > 40 ||
+    hasShiftContractMeta(shift)
+  );
+}
 
 function createEmptyShiftState(selectedCo?: string) {
   const fixedCompany = selectedCo && selectedCo !== '전체' ? selectedCo : '';
@@ -35,6 +167,9 @@ function createEmptyShiftState(selectedCo?: string) {
     weekly_work_days: 5,
     is_weekend_work: false,
     is_shift: false,
+    monthly_night_days: 0,
+    additional_work_hours: 0,
+    extra_contract_allowance: 0,
   };
 }
 
@@ -56,20 +191,26 @@ export default function ShiftManagement({ selectedCo }: any) {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      let list = (data || []).map((s: any) => ({
-        id: s.id,
-        name: s.name,
-        start_time: s.start_time?.slice(0, 5) || '09:00',
-        end_time: s.end_time?.slice(0, 5) || '18:00',
-        description: s.description,
-        company_name: s.company_name,
-        break_start_time: s.break_start_time?.slice(0, 5) || null,
-        break_end_time: s.break_end_time?.slice(0, 5) || null,
-        shift_type: s.shift_type || null,
-        weekly_work_days: s.weekly_work_days ?? null,
-        is_weekend_work: s.is_weekend_work ?? null,
-        is_shift: s.is_shift ?? false,
-      }));
+      let list = (data || []).map((s: any) => {
+        const parsedDescription = parseShiftDescription(s.description);
+        return {
+          id: s.id,
+          name: s.name,
+          start_time: s.start_time?.slice(0, 5) || '09:00',
+          end_time: s.end_time?.slice(0, 5) || '18:00',
+          description: parsedDescription.description,
+          company_name: s.company_name,
+          break_start_time: s.break_start_time?.slice(0, 5) || null,
+          break_end_time: s.break_end_time?.slice(0, 5) || null,
+          shift_type: s.shift_type || null,
+          weekly_work_days: s.weekly_work_days ?? null,
+          is_weekend_work: s.is_weekend_work ?? null,
+          is_shift: s.is_shift ?? false,
+          monthly_night_days: parsedDescription.meta.monthly_night_days,
+          additional_work_hours: parsedDescription.meta.additional_work_hours,
+          extra_contract_allowance: parsedDescription.meta.extra_contract_allowance,
+        };
+      });
       if (selectedCo && selectedCo !== '전체') {
         list = list.filter((s: any) => s.company_name === selectedCo);
       }
@@ -148,8 +289,14 @@ export default function ShiftManagement({ selectedCo }: any) {
       name: newShift.name,
       start_time: newShift.start_time,
       end_time: newShift.end_time,
-      description: newShift.description || null,
+      description: buildShiftDescription(newShift.description || '', {
+        monthly_night_days: newShift.monthly_night_days,
+        additional_work_hours: newShift.additional_work_hours,
+        extra_contract_allowance: newShift.extra_contract_allowance,
+      }) || null,
       company_name: selectedCompanyName,
+      break_start_time: newShift.break_start_time || null,
+      break_end_time: newShift.break_end_time || null,
       shift_type: newShift.shift_type || null,
       weekly_work_days: newShift.weekly_work_days ?? null,
       is_weekend_work: newShift.is_weekend_work ?? null,
@@ -161,7 +308,11 @@ export default function ShiftManagement({ selectedCo }: any) {
       name: newShift.name,
       start_time: newShift.start_time,
       end_time: newShift.end_time,
-      description: newShift.description || null,
+      description: buildShiftDescription(newShift.description || '', {
+        monthly_night_days: newShift.monthly_night_days,
+        additional_work_hours: newShift.additional_work_hours,
+        extra_contract_allowance: newShift.extra_contract_allowance,
+      }) || null,
       company_name: selectedCompanyName,
     };
 
@@ -228,6 +379,9 @@ export default function ShiftManagement({ selectedCo }: any) {
     }
   };
 
+  const estimatedWeeklyHours = calculateWeeklyWorkHours(newShift);
+  const showContractSettings = needsExtendedContractSettings(newShift);
+
   return (
     <div className="p-8 space-y-8 animate-in fade-in duration-500" data-testid="shift-management">
       <header className="flex justify-between items-center">
@@ -271,6 +425,9 @@ export default function ShiftManagement({ selectedCo }: any) {
                       weekly_work_days: shift.weekly_work_days ?? 5,
                       is_weekend_work: !!shift.is_weekend_work,
                       is_shift: !!shift.is_shift,
+                      monthly_night_days: shift.monthly_night_days ?? 0,
+                      additional_work_hours: shift.additional_work_hours ?? 0,
+                      extra_contract_allowance: shift.extra_contract_allowance ?? 0,
                     });
                     setShowAddModal(true);
                   }}
@@ -302,7 +459,7 @@ export default function ShiftManagement({ selectedCo }: any) {
                 </div>
               )}
             </div>
-            {(shift.shift_type || shift.weekly_work_days || shift.is_weekend_work || shift.is_shift) && (
+            {(shift.shift_type || shift.weekly_work_days || shift.is_weekend_work || shift.is_shift || hasShiftContractMeta(shift)) && (
               <div className="mt-2 text-[9px] font-bold text-white flex flex-wrap gap-1">
                 {shift.is_shift && <span className="px-1.5 py-0.5 rounded-full bg-indigo-600 border border-indigo-700 shadow-sm">교대</span>}
                 {shift.shift_type && <span className="px-1.5 py-0.5 rounded-full bg-slate-700 border border-slate-800 shadow-sm">{shift.shift_type}</span>}
@@ -311,11 +468,29 @@ export default function ShiftManagement({ selectedCo }: any) {
                     {shift.weekly_work_days}일
                   </span>
                 )}
+                <span className="px-1.5 py-0.5 rounded-full bg-slate-700 border border-slate-800 shadow-sm">
+                  주 {calculateWeeklyWorkHours(shift)}시간
+                </span>
                 {shift.is_weekend_work && (
                   <span className="px-1.5 py-0.5 rounded-full bg-slate-700 border border-slate-800 shadow-sm">
                     주말
                   </span>
                 )}
+                {shift.monthly_night_days ? (
+                  <span className="px-1.5 py-0.5 rounded-full bg-purple-700 border border-purple-800 shadow-sm">
+                    나이트 {shift.monthly_night_days}일
+                  </span>
+                ) : null}
+                {shift.additional_work_hours ? (
+                  <span className="px-1.5 py-0.5 rounded-full bg-orange-600 border border-orange-700 shadow-sm">
+                    추가근무 {shift.additional_work_hours}시간
+                  </span>
+                ) : null}
+                {shift.extra_contract_allowance ? (
+                  <span className="px-1.5 py-0.5 rounded-full bg-emerald-700 border border-emerald-800 shadow-sm">
+                    약정 {shift.extra_contract_allowance.toLocaleString()}원
+                  </span>
+                ) : null}
               </div>
             )}
           </div>
@@ -477,6 +652,66 @@ export default function ShiftManagement({ selectedCo }: any) {
                   </div>
                 </div>
               </div>
+
+              <div className="rounded-xl border border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">근무 조건 분석</p>
+                    <p className="mt-1 text-[12px] font-semibold text-[var(--foreground)]">예상 주간 근로시간 {estimatedWeeklyHours}시간</p>
+                  </div>
+                  <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${showContractSettings ? 'bg-orange-100 text-orange-700' : 'bg-zinc-200 text-zinc-600'}`}>
+                    {showContractSettings ? '추가 약정 대상' : '일반 근무'}
+                  </span>
+                </div>
+                <p className="mt-2 text-[11px] leading-5 text-[var(--toss-gray-3)]">
+                  3교대 근무이거나 주 40시간을 초과하는 근무형태는 월간 나이트 일수, 추가근무 시간, 추가 약정수당을 함께 관리할 수 있습니다.
+                </p>
+              </div>
+
+              {showContractSettings && (
+                <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 space-y-4">
+                  <div>
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-orange-700">추가 약정 설정</p>
+                    <p className="mt-1 text-[11px] font-semibold text-orange-600">
+                      3교대 근무자 또는 주 40시간 초과 근무자 기준입니다.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <label className="flex flex-col gap-1">
+                      <span className="text-[11px] font-bold text-orange-700">월간 나이트 일수</span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={newShift.monthly_night_days}
+                        onChange={e => setNewShift({ ...newShift, monthly_night_days: Number(e.target.value) || 0 })}
+                        className="w-full p-3 bg-white border border-orange-200 font-semibold text-xs radius-toss"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-[11px] font-bold text-orange-700">월 추가근무 시간</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step={0.5}
+                        value={newShift.additional_work_hours}
+                        onChange={e => setNewShift({ ...newShift, additional_work_hours: Number(e.target.value) || 0 })}
+                        className="w-full p-3 bg-white border border-orange-200 font-semibold text-xs radius-toss"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-[11px] font-bold text-orange-700">추가 약정수당</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step={10000}
+                        value={newShift.extra_contract_allowance}
+                        onChange={e => setNewShift({ ...newShift, extra_contract_allowance: Number(e.target.value) || 0 })}
+                        className="w-full p-3 bg-white border border-orange-200 font-semibold text-xs radius-toss"
+                      />
+                    </label>
+                  </div>
+                </div>
+              )}
 
               <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800/30">
                 <label className="flex items-start gap-3 cursor-pointer">

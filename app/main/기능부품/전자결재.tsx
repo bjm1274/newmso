@@ -16,6 +16,35 @@ const DRAFT_STORAGE_KEY = 'erp_draft_approval';
 const LOCAL_APPROVAL_FORM_TYPES_KEY = 'erp_approval_form_types_custom';
 
 const APPROVAL_VIEWS = ['기안함', '결재함', '작성하기', '캘린더'];
+const SYSTEM_FORM_TYPE_SLUGS = new Set(['leave', 'overtime', 'purchase', 'attendance_fix', 'generic', 'personnel_order']);
+
+function normalizeComposeFormType(value?: string) {
+  if (!value || value === '인사명령') return '연차/휴가';
+  return value;
+}
+
+function sanitizeCustomFormTypes(
+  rows: Array<{ name?: string; slug?: string; is_active?: boolean }> = [],
+  builtInFormTypes: string[] = []
+) {
+  const seen = new Set<string>();
+
+  return rows
+    .filter((row) => row?.is_active !== false)
+    .map((row) => ({
+      name: String(row?.name || '').trim(),
+      slug: String(row?.slug || '').trim(),
+    }))
+    .filter((row) => row.name && row.slug)
+    .filter((row) => row.name !== '인사명령')
+    .filter((row) => !SYSTEM_FORM_TYPE_SLUGS.has(row.slug))
+    .filter((row) => !builtInFormTypes.includes(row.name))
+    .filter((row) => {
+      if (seen.has(row.slug)) return false;
+      seen.add(row.slug);
+      return true;
+    });
+}
 
 export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, selectedCompanyId, onRefresh, initialView, onViewChange }: any) {
   const [viewMode, setViewMode] = useState(initialView && APPROVAL_VIEWS.includes(initialView) ? initialView : '기안함');
@@ -46,7 +75,14 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const fetchApprovalsRef = useRef<() => void>(() => {});
   const isMso = user?.company === 'SY INC.' || user?.permissions?.mso === true;
 
-  const BUILTIN_FORM_TYPES = ['인사명령', '연차/휴가', '연차계획서', '연장근무', '물품신청', '수리요청서', '업무기안', '업무협조', '양식신청', '출결정정'];
+  const BUILTIN_FORM_TYPES = useMemo(
+    () => ['연차/휴가', '연차계획서', '연장근무', '물품신청', '수리요청서', '업무기안', '업무협조', '양식신청', '출결정정'],
+    []
+  );
+  const composeFormTabs = useMemo(
+    () => [...BUILTIN_FORM_TYPES, ...customFormTypes.map((item) => item.slug)],
+    [customFormTypes]
+  );
 
   // 결재자 후보: 부서장 이상(팀장·부장·병원장 등)을 목록 상단에, 그 다음 나머지 직원 (staffs는 이미 메인에서 회사별로 불러옴)
   const APPROVER_POSITIONS = ['팀장', '간호과장', '실장', '부장', '이사', '병원장'];
@@ -99,6 +135,16 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       }
     });
   }, []);
+
+  useEffect(() => {
+    setCustomFormTypes((prev) => {
+      const next = sanitizeCustomFormTypes(prev, BUILTIN_FORM_TYPES);
+      const changed =
+        next.length !== prev.length ||
+        next.some((item, index) => item.name !== prev[index]?.name || item.slug !== prev[index]?.slug);
+      return changed ? next : prev;
+    });
+  }, [BUILTIN_FORM_TYPES]);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && user?.id) {
@@ -252,7 +298,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       if (parsed?.formTitle) setFormTitle(parsed.formTitle);
       if (parsed?.formContent) setFormContent(parsed.formContent);
       if (parsed?.extraData) setExtraData(parsed.extraData);
-      if (parsed?.formType) setFormType(parsed.formType);
+      if (parsed?.formType) setFormType(normalizeComposeFormType(parsed.formType));
     } catch { /* ignore */ }
     setDraftBanner(false);
   }, []);
@@ -697,16 +743,16 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                 </div>
               </div>
 
-              <div className="flex gap-2 p-1.5 bg-[var(--toss-gray-1)] rounded-[12px] w-full overflow-x-auto no-scrollbar">
-                {[...BUILTIN_FORM_TYPES, ...customFormTypes.map(c => c.slug)].map((t, idx) => {
+              <div className="grid w-full grid-cols-2 gap-2 rounded-[16px] bg-[var(--toss-gray-1)] p-2 sm:grid-cols-3 xl:grid-cols-5">
+                {composeFormTabs.map((t, idx) => {
                   const label = BUILTIN_FORM_TYPES.includes(t) ? t : (customFormTypes.find(c => c.slug === t)?.name ?? t);
                   return (
                     <button
                       type="button"
                       key={`${t}-${idx}`}
                       data-testid={`approval-form-type-${idx}`}
-                      onClick={() => setFormType(t)}
-                      className={`flex-1 min-w-0 shrink-0 px-4 md:px-6 py-3 rounded-[12px] text-[11px] font-bold transition-all whitespace-nowrap cursor-pointer touch-manipulation ${formType === t ? 'bg-[var(--toss-card)] text-[var(--toss-blue)] shadow-sm' : 'text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)]'}`}
+                      onClick={() => setFormType(normalizeComposeFormType(t))}
+                      className={`flex min-h-[52px] w-full items-center justify-center rounded-[12px] px-3 py-3 text-center text-[11px] font-bold leading-[1.35] transition-all whitespace-normal break-keep cursor-pointer touch-manipulation ${formType === t ? 'bg-[var(--toss-card)] text-[var(--toss-blue)] shadow-sm' : 'text-[var(--toss-gray-3)] hover:bg-white/70 hover:text-[var(--toss-gray-4)]'}`}
                     >
                       {label}
                     </button>

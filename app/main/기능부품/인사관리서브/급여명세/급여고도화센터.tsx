@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import TaxInsuranceRatesPanel from './세율보험요율관리';
 import PayrollLockPanel from './급여월마감잠금';
-import ShiftPatternManager from './교대제스케줄관리';
 import InterimSettlement from './중간정산';
 
 type BonusItem = {
@@ -808,7 +807,6 @@ export default function PayrollAdvancedCenter({
 
             <TaxInsuranceRatesPanel companyName={selectedCo} />
             <PayrollLockPanel yearMonth={yearMonth} companyName={selectedCo} onLockChange={onRefresh} />
-            <ShiftPatternManager selectedCo={selectedCo} />
             <InterimSettlement staffs={staffs} selectedCo={selectedCo} onRefresh={onRefresh} />
           </div>
         </div>

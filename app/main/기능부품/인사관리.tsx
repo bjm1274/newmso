@@ -23,12 +23,9 @@ import CongratulationsCondolences from './인사관리서브/경조사관리';
 import PersonnelAppointment from './인사관리서브/인사발령관리';
 import RewardDisciplineManagement from './인사관리서브/포상징계관리';
 import OrgChartEditor from './인사관리서브/조직도편집기';
-import SkillMatrix from './인사관리서브/스킬매트릭스';
-import NurseSchedule from './인사관리서브/간호근무표';
 import LicenseManager from './인사관리서브/면허자격증관리';
 import MedicalDeviceInspection from './인사관리서브/의료기기점검';
 import AnnualLeaveExpiryAlert from './인사관리서브/연차소멸알림';
-import HolidayCalendar from './인사관리서브/공휴일달력';
 import LatenessPatternAnalysis from './인사관리서브/지각조퇴분석';
 import IncidentReport from './인사관리서브/사고보고서';
 import WorkTypeChangeHistory from './인사관리서브/근무형태변경이력';
@@ -50,15 +47,11 @@ type HrMenuId =
   | '포상/징계'
   | '교육'
   | '조직도'
-  | '스킬매트릭스'
   | '오프보딩'
   | '근태'
   | '교대근무'
-  | '근무표자동편성'
   | '연차/휴가'
   | '급여'
-  | '간호근무표'
-  | '공휴일달력'
   | '건강검진'
   | '경조사'
   | '면허/자격증'
@@ -80,6 +73,8 @@ type AttendanceAnalysisTabId =
 
 type PayrollEmbeddedTabId = '기본' | '원천징수파일' | '4대보험';
 type ContractEmbeddedTabId = '기본' | '계약서생성기';
+type ShiftSuiteTabId = '캘린더' | '생성마법사';
+type LeaveSuiteTabId = '연차/휴가 신청내역' | '공휴일 달력';
 
 type HrTabDef = {
   id: HrMenuId;
@@ -115,15 +110,11 @@ const HR_TABS: HrTabDef[] = [
   { id: '포상/징계', label: '포상 / 징계', perm: 'hr_구성원', icon: '🏅', group: '인력관리' },
   { id: '교육', label: '교육', perm: 'hr_구성원', icon: '📚', group: '인력관리' },
   { id: '조직도', label: '조직도 편집', perm: 'hr_구성원', icon: '🌳', group: '인력관리' },
-  { id: '스킬매트릭스', label: '스킬매트릭스', perm: 'hr_구성원', icon: '📊', group: '인력관리' },
   { id: '오프보딩', label: '오프보딩', perm: 'hr_구성원', icon: '🚪', group: '인력관리' },
   { id: '근태', label: '근태', perm: 'hr_근태', icon: '⏰', group: '근태/급여' },
   { id: '교대근무', label: '교대근무', perm: 'hr_교대근무', icon: '🔄', group: '근태/급여' },
-  { id: '근무표자동편성', label: '근무표 자동편성', perm: 'hr_교대근무', icon: '🧩', group: '근태/급여' },
   { id: '연차/휴가', label: '연차 / 휴가', perm: 'hr_연차휴가', icon: '🌴', group: '근태/급여' },
   { id: '급여', label: '급여', perm: 'hr_급여', icon: '💰', group: '근태/급여' },
-  { id: '간호근무표', label: '간호근무표', perm: 'hr_교대근무', icon: '🏥', group: '근태/급여' },
-  { id: '공휴일달력', label: '공휴일달력', perm: 'hr_근태', icon: '📅', group: '근태/급여' },
   { id: '건강검진', label: '건강검진', perm: 'hr_구성원', icon: '🩺', group: '복무/복지' },
   { id: '경조사', label: '경조사 지원', perm: 'hr_구성원', icon: '🎊', group: '복무/복지' },
   { id: '면허/자격증', label: '면허 / 자격증', perm: 'hr_구성원', icon: '📜', group: '복무/복지' },
@@ -156,10 +147,21 @@ const CONTRACT_UTILITY_TABS = [
   { id: '계약서생성기', label: '계약서 자동생성', icon: '🧾' },
 ] as const;
 
+const SHIFT_SUITE_TABS = [
+  { id: '캘린더', label: '교대 캘린더', icon: '🔄' },
+  { id: '생성마법사', label: '생성 마법사', icon: '🧩' },
+] as const;
+
+const LEAVE_SUITE_MENU_MAP: Record<string, LeaveSuiteTabId> = {
+  '연차/휴가': '연차/휴가 신청내역',
+  공휴일달력: '공휴일 달력',
+};
+
 const REMOVED_MENU_FALLBACKS: Record<string, HrMenuId> = {
   생일기념일: '경조사',
   '생일/기념일': '경조사',
   칭찬배지: '포상/징계',
+  스킬매트릭스: '조직도',
   회의실예약: '구성원',
   차량배차: '구성원',
   원천징수파일: '급여',
@@ -169,6 +171,9 @@ const REMOVED_MENU_FALLBACKS: Record<string, HrMenuId> = {
   지각조퇴분석: '근태',
   근무형태이력: '근태',
   조기퇴근감지: '근태',
+  근무표자동편성: '교대근무',
+  간호근무표: '교대근무',
+  공휴일달력: '연차/휴가',
 };
 
 const PAYROLL_UTILITY_MENU_MAP: Record<string, PayrollEmbeddedTabId> = {
@@ -178,6 +183,12 @@ const PAYROLL_UTILITY_MENU_MAP: Record<string, PayrollEmbeddedTabId> = {
 
 const CONTRACT_UTILITY_MENU_MAP: Record<string, ContractEmbeddedTabId> = {
   계약서생성기: '계약서생성기',
+};
+
+const SHIFT_SUITE_MENU_MAP: Record<string, ShiftSuiteTabId> = {
+  교대근무: '생성마법사',
+  근무표자동편성: '생성마법사',
+  간호근무표: '생성마법사',
 };
 
 const ATTENDANCE_ANALYSIS_MENU_MAP: Record<string, AttendanceAnalysisTabId> = {
@@ -215,6 +226,14 @@ function getContractInitialTab(menuId?: string | null): ContractEmbeddedTabId {
   return CONTRACT_UTILITY_MENU_MAP[menuId || ''] || '기본';
 }
 
+function getShiftSuiteInitialTab(menuId?: string | null): ShiftSuiteTabId {
+  return SHIFT_SUITE_MENU_MAP[menuId || ''] || '생성마법사';
+}
+
+function getLeaveSuiteInitialTab(menuId?: string | null): LeaveSuiteTabId {
+  return LEAVE_SUITE_MENU_MAP[menuId || ''] || '연차/휴가 신청내역';
+}
+
 function getAttendanceInitialTab(menuId?: string | null): AttendanceAnalysisTabId {
   return ATTENDANCE_ANALYSIS_MENU_MAP[menuId || ''] || '근태관리';
 }
@@ -225,6 +244,13 @@ function normalizeAttendanceTabForUser(user: any, requestedTab: AttendanceAnalys
     return requestedTab;
   }
   return visibleTabs[0]?.id || '근태관리';
+}
+
+function canAccessHrTab(user: any, tab: HrTabDef) {
+  if (tab.id === '연차/휴가') {
+    return canAccessHrSection(user, 'hr_연차휴가') || canAccessHrSection(user, 'hr_근태');
+  }
+  return canAccessHrSection(user, tab.perm);
 }
 
 function SectionTabBar({
@@ -273,7 +299,7 @@ function SectionTabBar({
   );
 }
 
-export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu }: any) {
+export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu, selectedCo: mainSelectedCo }: any) {
   const [현재메뉴, 메뉴설정] = useState<HrMenuId>(normalizeHrMenu(initialMenu));
   const [선택워크스페이스, 워크스페이스설정] = useState<HrWorkspaceId>(
     getWorkspaceForHrMenu(normalizeHrMenu(initialMenu))
@@ -285,9 +311,11 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
   const [근태분석탭, 근태분석탭설정] = useState<AttendanceAnalysisTabId>(getAttendanceInitialTab(initialMenu));
   const [급여내부탭, 급여내부탭설정] = useState<PayrollEmbeddedTabId>(getPayrollInitialTab(initialMenu));
   const [계약내부탭, 계약내부탭설정] = useState<ContractEmbeddedTabId>(getContractInitialTab(initialMenu));
+  const [교대근무탭, 교대근무탭설정] = useState<ShiftSuiteTabId>(getShiftSuiteInitialTab(initialMenu));
+  const [휴가내부탭, 휴가내부탭설정] = useState<LeaveSuiteTabId>(getLeaveSuiteInitialTab(initialMenu));
 
   const hasAccess = canAccessMainMenu(user, '인사관리');
-  const visibleHrTabs = HR_TABS.filter((tab) => canAccessHrSection(user, tab.perm));
+  const visibleHrTabs = HR_TABS.filter((tab) => canAccessHrTab(user, tab));
   const visibleHrTabIds = visibleHrTabs.map((tab) => tab.id);
   const activeMenu = visibleHrTabs.some((tab) => tab.id === 현재메뉴) ? 현재메뉴 : (visibleHrTabs[0]?.id || '구성원');
   const availableWorkspaces = HR_WORKSPACES.filter((workspace) =>
@@ -309,6 +337,17 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
     사업체목록.push('SY INC.');
   }
 
+  useEffect(() => {
+    if (사업체목록.includes(선택사업체)) return;
+
+    const fallbackCompany =
+      mainSelectedCo && 사업체목록.includes(mainSelectedCo)
+        ? mainSelectedCo
+        : '전체';
+
+    사업체설정(fallbackCompany);
+  }, [mainSelectedCo, 선택사업체, 사업체목록]);
+
   const 적용입장메뉴 = (requestedMenu?: string | null) => {
     const normalizedMenu = normalizeHrMenu(requestedMenu);
     메뉴설정(normalizedMenu);
@@ -316,6 +355,8 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
     근태분석탭설정(normalizeAttendanceTabForUser(user, getAttendanceInitialTab(requestedMenu)));
     급여내부탭설정(getPayrollInitialTab(requestedMenu));
     계약내부탭설정(getContractInitialTab(requestedMenu));
+    교대근무탭설정(getShiftSuiteInitialTab(requestedMenu));
+    휴가내부탭설정(getLeaveSuiteInitialTab(requestedMenu));
   };
 
   const handleWorkspaceChange = (workspaceId: HrWorkspaceId) => {
@@ -407,7 +448,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
   }
 
   return (
-    <div className="app-page flex h-full min-h-0 flex-row overflow-hidden">
+    <div className="app-page flex h-full min-h-0 flex-col overflow-hidden md:flex-row">
       <aside className="flex h-auto w-full shrink-0 flex-col overflow-hidden border-b border-[var(--toss-border)] bg-[var(--toss-card)] md:h-full md:w-56 md:border-b-0 md:border-r">
         <div className="shrink-0 border-b border-[var(--toss-border)] p-2 md:p-3">
           <p className="px-1 pb-2 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-4)]">업무 공간</p>
@@ -542,8 +583,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
             </div>
           )}
 
-          {activeMenu === '조직도' && <OrgChartEditor staffs={staffs} selectedCo={선택사업체} user={user} />}
-          {activeMenu === '스킬매트릭스' && <SkillMatrix staffs={staffs} selectedCo={선택사업체} user={user} />}
+          {activeMenu === '조직도' && <OrgChartEditor staffs={staffs} selectedCo={선택사업체} user={user} onRefresh={onRefresh} />}
 
           {activeMenu === '오프보딩' && (
             <div className="p-4 md:p-10">
@@ -578,9 +618,35 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
             </div>
           )}
 
-          {activeMenu === '교대근무' && <ShiftCalendar staffs={staffs} selectedCo={선택사업체} />}
-          {activeMenu === '근무표자동편성' && <AutoRosterPlanner user={user} staffs={staffs} />}
-          {activeMenu === '연차/휴가' && <LeaveManagement staffs={staffs} selectedCo={선택사업체} />}
+          {activeMenu === '교대근무' && (
+            <div className="flex h-full flex-col">
+              <SectionTabBar
+                title="교대근무 통합"
+                description="교대 캘린더와 팀별 생성 마법사를 한 워크스페이스에서 이어서 관리합니다."
+                tabs={[...SHIFT_SUITE_TABS]}
+                activeTab={교대근무탭}
+                onChange={(tabId) => 교대근무탭설정(tabId as ShiftSuiteTabId)}
+                testIdPrefix="shift-suite"
+              />
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                {교대근무탭 === '캘린더' && <ShiftCalendar staffs={staffs} selectedCo={선택사업체} />}
+                {교대근무탭 === '생성마법사' && (
+                  <AutoRosterPlanner user={user} staffs={staffs} selectedCo={선택사업체} />
+                )}
+              </div>
+            </div>
+          )}
+          {activeMenu === '연차/휴가' && (
+            <LeaveManagement
+              staffs={staffs}
+              selectedCo={선택사업체}
+              onRefresh={onRefresh}
+              user={user}
+              initialTab={휴가내부탭}
+              allowLeaveTabs={canAccessHrSection(user, 'hr_연차휴가')}
+              allowHolidayTab={canAccessHrSection(user, 'hr_근태')}
+            />
+          )}
           {activeMenu === '급여' && (
             <div className="flex h-full flex-col">
               <SectionTabBar
@@ -610,8 +676,6 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
               </div>
             </div>
           )}
-          {activeMenu === '간호근무표' && <NurseSchedule staffs={staffs} selectedCo={선택사업체} user={user} />}
-          {activeMenu === '공휴일달력' && <HolidayCalendar staffs={staffs} selectedCo={선택사업체} user={user} />}
           {activeMenu === '건강검진' && <HealthCheckupManagement staffs={staffs} selectedCo={선택사업체} />}
           {activeMenu === '경조사' && <CongratulationsCondolences staffs={staffs} selectedCo={선택사업체} />}
           {activeMenu === '면허/자격증' && <LicenseManager staffs={staffs} selectedCo={선택사업체} user={user} />}

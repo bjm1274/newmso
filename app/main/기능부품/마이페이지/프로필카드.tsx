@@ -1,10 +1,9 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { persistSupabaseAccessToken } from '@/lib/supabase-bridge';
 
 export default function MyProfileCard({ user: initialUser, onOpenApproval }: any) {
-  const router = useRouter();
   const [user, setUser] = useState<any>(initialUser || {});
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -72,12 +71,26 @@ export default function MyProfileCard({ user: initialUser, onOpenApproval }: any
     }
   };
 
-  const handleLogout = () => {
-    if (confirm('로그아웃 하시겠습니까?')) {
+  const handleLogout = async () => {
+    if (!confirm('로그아웃 하시겠습니까?')) return;
+
+    try {
+      await fetch('/api/auth/session', { method: 'DELETE' });
+    } catch {
+      // ignore
+    }
+
+    try {
       localStorage.removeItem('user_session');
       localStorage.removeItem('erp_user');
-      router.push('/');
+      localStorage.removeItem('erp_login_at');
+      persistSupabaseAccessToken(null);
+      void supabase.realtime.setAuth(null);
+    } catch {
+      // ignore
     }
+
+    window.location.replace('/');
   };
 
   const verifyPasswordAndRun = async (onSuccess: () => void) => {
