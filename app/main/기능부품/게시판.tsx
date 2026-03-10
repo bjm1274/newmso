@@ -148,6 +148,26 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     { id: '직원제안함', label: '💡 직원 제안함', icon: '💡' }
   ];
 
+  const boardMetaMap: Record<string, { title: string; description: string }> = {
+    공지사항: { title: '공지사항', description: '병원 공지와 주요 안내를 관리합니다.' },
+    자유게시판: { title: '자유게시판', description: '직원들이 자유롭게 소통하는 공간입니다.' },
+    익명소리함: { title: '익명 소리함', description: '익명 의견과 제안을 안전하게 확인합니다.' },
+    경조사: { title: '경조사', description: '축하와 부고 소식을 함께 공유합니다.' },
+    수술일정: { title: '수술일정', description: '수술 일정 캘린더와 접수 현황을 관리합니다.' },
+    MRI일정: { title: 'MRI일정', description: 'MRI 검사 일정과 예약 현황을 관리합니다.' },
+    직원제안함: { title: '직원 제안함', description: '업무 개선 제안을 모아 검토합니다.' },
+  };
+  const currentBoardMeta = boardMetaMap[activeBoard] || {
+    title: activeBoard || '게시판',
+    description: '게시판 내용을 확인하고 관리합니다.',
+  };
+  const canCreatePost =
+    activeBoard === '공지사항' ||
+    activeBoard === '자유게시판' ||
+    activeBoard === '경조사' ||
+    activeBoard === '수술일정' ||
+    activeBoard === 'MRI일정';
+
   // 오전/오후 + 시/분 드롭다운 값을 HH:MM 문자열로 변환
   const updateScheduleTime = (period: string, hour: string, minute: string) => {
     setScheduleTime(buildScheduleTimeValue(period, hour, minute));
@@ -783,21 +803,22 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       {/* 상세 메뉴(공지사항·자유게시판 등)는 메인 좌측 사이드바에서 게시판 호버/클릭 시 플라이아웃으로 선택 */}
       {activeBoard !== '사내위키' && (
         <div className="flex-1 flex flex-col min-w-0 overflow-y-auto custom-scrollbar p-4 md:p-8 space-y-6 md:space-y-8 pb-24 md:pb-8">
-          {/* 새 게시물 버튼을 공지사항(제목) 위에 배치 */}
-          {(activeBoard === '공지사항' || activeBoard === '자유게시판' || activeBoard === '경조사' || activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
-            <div className="shrink-0 flex justify-end">
-              <button
-                onClick={() => setShowNewPost(!showNewPost)}
-                className="px-4 md:px-6 py-2.5 md:py-3 bg-[var(--toss-blue)] text-white rounded-[12px] text-[11px] md:text-xs font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all"
-              >
-                {showNewPost ? '✕ 취소' : '+ 새 게시물'}
-              </button>
-            </div>
-          )}
-          <header className="flex justify-between items-end shrink-0">
-            <div>
-              <h2 className="text-xl md:text-2xl font-bold text-[var(--foreground)] tracking-tight">게시판</h2>
-              <p className="text-[11px] md:text-xs text-[var(--toss-gray-3)] font-bold uppercase mt-1">병원 공지 및 일정 관리</p>
+          <header className="shrink-0">
+            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+              <div>
+                <h2 className="text-xl md:text-2xl font-bold text-[var(--foreground)] tracking-tight">{currentBoardMeta.title}</h2>
+                <p className="mt-1 text-[11px] md:text-xs text-[var(--toss-gray-3)] font-bold">{currentBoardMeta.description}</p>
+              </div>
+              {canCreatePost && (
+                <div className="flex justify-start md:justify-end">
+                  <button
+                    onClick={() => setShowNewPost(!showNewPost)}
+                    className="px-4 md:px-6 py-2.5 md:py-3 bg-[var(--toss-blue)] text-white rounded-[12px] text-[11px] md:text-xs font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all"
+                  >
+                    {showNewPost ? '✕ 취소' : '+ 새 게시물'}
+                  </button>
+                </div>
+              )}
             </div>
           </header>
 

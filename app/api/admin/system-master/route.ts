@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { isSystemMasterSession, readSessionFromRequest } from '@/lib/server-session';
+import { readSessionFromRequest } from '@/lib/server-session';
+import { isNamedSystemMasterAccount } from '@/lib/system-master';
 
 const NOTICE_ROOM_ID = '00000000-0000-0000-0000-000000000000';
 
@@ -147,7 +148,7 @@ function normalizeMessage(message: Record<string, any>, rooms: Map<string, Recor
 export async function GET(request: NextRequest) {
   try {
     const session = await readSessionFromRequest(request);
-    if (!session || !isSystemMasterSession(session.user)) {
+    if (!session || !isNamedSystemMasterAccount(session.user)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

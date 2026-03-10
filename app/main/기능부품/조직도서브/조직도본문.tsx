@@ -104,7 +104,7 @@ export default function MainContent({
           />
         </div>
       )}
-      {mainMenu === '재고관리' && <div className="flex-1 min-h-0 overflow-hidden"><InventoryView user={user} depts={data.depts} onRefresh={onRefresh} selectedCo={selectedCo} selectedCompanyId={selectedCompanyId} initialView={subView} /></div>}
+      {mainMenu === '재고관리' && <div className="flex-1 min-h-0 overflow-hidden"><InventoryView user={user} depts={data.depts} onRefresh={onRefresh} selectedCo={selectedCo} selectedCompanyId={selectedCompanyId} initialView={subView} onViewChange={setSubView} /></div>}
       {mainMenu === '추가기능' && (
         <div className="flex-1 min-h-0 overflow-hidden flex flex-col" data-testid="extra-view">
           <추가기능

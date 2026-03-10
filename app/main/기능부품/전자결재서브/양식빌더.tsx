@@ -2,6 +2,8 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import SmartDatePicker from '../공통/SmartDatePicker';
+import ApprovalFormTypesManager from '../관리자전용서브/전자결재양식관리';
+import PayrollDocumentDesignManager from '../관리자전용서브/급여명세서서식관리';
 
 type FieldType = 'text' | 'textarea' | 'date' | 'number' | 'checkbox' | 'radio';
 
@@ -13,10 +15,8 @@ interface FormField {
     options?: string[]; // For radio
 }
 
-import ApprovalFormTypesManager from '../관리자전용서브/전자결재양식관리';
-
 export default function FormBuilder({ user }: any) {
-    const [mode, setMode] = useState<'design' | 'build'>('design');
+    const [mode, setMode] = useState<'approval' | 'build' | 'document'>('approval');
     const [formName, setFormName] = useState('');
     const [fields, setFields] = useState<FormField[]>([]);
     const [saving, setSaving] = useState(false);
@@ -86,22 +86,32 @@ export default function FormBuilder({ user }: any) {
         <div className="flex flex-col h-full animate-in fade-in">
             <div className="flex items-center gap-6 mb-6 px-2 border-b border-slate-200">
                 <button
-                    onClick={() => setMode('design')}
-                    className={`pb-3 text-sm font-bold transition-all border-b-2 ${mode === 'design' ? 'border-[var(--toss-blue)] text-[var(--toss-blue)]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                    onClick={() => setMode('approval')}
+                    className={`pb-3 text-sm font-bold transition-all border-b-2 ${mode === 'approval' ? 'border-[var(--toss-blue)] text-[var(--toss-blue)]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
                 >
-                    📑 전자결재 서식 & 템플릿 디자인
+                    📑 결재 양식
                 </button>
                 <button
                     onClick={() => setMode('build')}
                     className={`pb-3 text-sm font-bold transition-all border-b-2 ${mode === 'build' ? 'border-[var(--toss-blue)] text-[var(--toss-blue)]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
                 >
-                    🛠️ 커스텀 입력 양식 빌더
+                    🛠️ 양식 빌더
+                </button>
+                <button
+                    onClick={() => setMode('document')}
+                    className={`pb-3 text-sm font-bold transition-all border-b-2 ${mode === 'document' ? 'border-[var(--toss-blue)] text-[var(--toss-blue)]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                >
+                    📄 문서 양식
                 </button>
             </div>
 
-            {mode === 'design' ? (
+            {mode === 'approval' ? (
                 <div className="flex-1 overflow-y-auto pb-10 custom-scrollbar">
                     <ApprovalFormTypesManager />
+                </div>
+            ) : mode === 'document' ? (
+                <div className="flex-1 overflow-y-auto pb-10 custom-scrollbar">
+                    <PayrollDocumentDesignManager />
                 </div>
             ) : (
                 <div className="flex flex-col md:flex-row gap-6 flex-1 min-h-0">

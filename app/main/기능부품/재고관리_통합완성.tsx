@@ -24,8 +24,60 @@ import InventoryDemandForecast from './재고관리서브/재고수요예측';
 const INV_VIEW_KEY = 'erp_inventory_view';
 
 const VALID_VIEWS = ['UDI', '명세서', '발주', '스캔', '등록', '현황', '이력', '자산', 'AS반품', '거래처', '재고실사', '유통기한', '이관', '카테고리', '소모품통계', '납품확인서', '수요예측'];
+const EXPIRY_SOON_MS = 30 * 24 * 60 * 60 * 1000;
 
-export default function IntegratedInventoryManagement({ user, depts = [], selectedCo, selectedCompanyId, onRefresh, initialView }: any) {
+const INVENTORY_VIEW_GROUPS = [
+  { label: '재고 대시보드', views: ['현황', '이력', '유통기한', '수요예측'] },
+  { label: '입출고 운영', views: ['등록', '스캔', '발주', '재고실사', '이관'] },
+  { label: '문서 · 자산', views: ['명세서', '납품확인서', 'UDI', '자산'] },
+  { label: '기준 정보', views: ['거래처', '카테고리', 'AS반품', '소모품통계'] },
+] as const;
+
+const INVENTORY_VIEW_META: Record<string, { title: string; description: string }> = {
+  현황: { title: '재고 현황', description: '회사별 재고를 한 화면에서 보고 바로 입고·출고·발주까지 처리합니다.' },
+  이력: { title: '입출고 이력', description: '최근 입고·출고 변동과 처리자를 시간순으로 확인합니다.' },
+  등록: { title: '품목 등록', description: '신규 품목 등록, 엑셀 일괄 등록, AI 명세서 추출을 한곳에서 처리합니다.' },
+  발주: { title: '발주 관리', description: '재고 부족 품목을 발주로 연결하고 발주 상태를 관리합니다.' },
+  스캔: { title: '스캔 처리', description: '바코드와 스캔 기반으로 입출고 작업을 빠르게 처리합니다.' },
+  유통기한: { title: '유통기한 알림', description: '유효기간 임박 품목을 모아 선제적으로 대응합니다.' },
+  수요예측: { title: '수요 예측', description: '소모 흐름을 기반으로 향후 재고 수요를 예측합니다.' },
+  명세서: { title: '명세서 관리', description: '입고 관련 명세서를 관리하고 재고와 연결합니다.' },
+  납품확인서: { title: '납품 확인서', description: '납품 확인서 발행과 이력을 관리합니다.' },
+  UDI: { title: 'UDI 관리', description: 'UDI 대상 품목을 추적하고 식별 정보를 관리합니다.' },
+  자산: { title: '자산 QR', description: '비품과 자산의 QR 태그를 관리합니다.' },
+  거래처: { title: '거래처 관리', description: '공급사와 거래처 기본 정보를 정리합니다.' },
+  카테고리: { title: '카테고리 관리', description: '재고 분류 체계를 정리해 검색과 집계를 쉽게 만듭니다.' },
+  AS반품: { title: 'AS / 반품', description: 'AS와 반품 접수 내역을 관리합니다.' },
+  소모품통계: { title: '소모품 통계', description: '소모품 사용량과 흐름을 통계로 확인합니다.' },
+  재고실사: { title: '재고 실사', description: '실물 재고와 시스템 재고를 비교 점검합니다.' },
+  이관: { title: '재고 이관', description: '회사·부서 간 재고 이동을 기록하고 관리합니다.' },
+};
+
+function getItemQuantity(item: any) {
+  return Number(item?.quantity ?? item?.stock ?? 0);
+}
+
+function getItemMinQuantity(item: any) {
+  return Number(item?.min_quantity ?? item?.min_stock ?? 0);
+}
+
+function isExpirySoon(item: any, threshold: number) {
+  return Boolean(item?.expiry_date) && new Date(item.expiry_date).getTime() < threshold;
+}
+
+function formatCurrency(value: number) {
+  return `${Number(value || 0).toLocaleString('ko-KR')}원`;
+}
+
+export default function IntegratedInventoryManagement({
+  user,
+  depts = [],
+  selectedCo,
+  selectedCompanyId,
+  onRefresh,
+  initialView,
+  onViewChange,
+}: any) {
   const [activeView, setActiveView] = useState(initialView && VALID_VIEWS.includes(initialView) ? initialView : '현황');
   const [viewCompany, setViewCompany] = useState<string>('전체'); // 현황 탭용 회사 선택
   const [selectedDept, setSelectedDept] = useState('전체');
@@ -33,9 +85,9 @@ export default function IntegratedInventoryManagement({ user, depts = [], select
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchKeyword, setSearchKeyword] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'전체' | '재고부족' | '유통기한임박' | '정상'>('전체');
   const [stockModal, setStockModal] = useState<{ item: any; type: 'in' | 'out'; targetCompany: string; targetDept: string } | null>(null);
   const [stockAmount, setStockAmount] = useState(1);
-  const [showLogs, setShowLogs] = useState(false);
   const [logs, setLogs] = useState<any[]>([]);
   const [registrationMode, setRegistrationMode] = useState<'form' | 'excel' | 'auto_extract'>('form');
 
@@ -76,7 +128,8 @@ export default function IntegratedInventoryManagement({ user, depts = [], select
     return getDepartmentsForCompany(stockModal.targetCompany);
   }, [stockModal?.targetCompany, getDepartmentsForCompany]);
 
-  const filteredInventory = useMemo(() => {
+  const expiryThreshold = useMemo(() => Date.now() + EXPIRY_SOON_MS, []);
+  const baseFilteredInventory = useMemo(() => {
     let list = inventory;
     if (activeView === '현황' && viewCompany && viewCompany !== '전체') {
       list = list.filter((i: any) => (i.company || '').trim() === viewCompany);
@@ -96,6 +149,67 @@ export default function IntegratedInventoryManagement({ user, depts = [], select
     }
     return list;
   }, [inventory, searchKeyword, selectedDept, activeView, viewCompany]);
+
+  const filteredInventory = useMemo(() => {
+    if (statusFilter === '전체') return baseFilteredInventory;
+
+    return baseFilteredInventory.filter((item: any) => {
+      const quantity = getItemQuantity(item);
+      const minQuantity = getItemMinQuantity(item);
+      const expiryImminent = isExpirySoon(item, expiryThreshold);
+
+      if (statusFilter === '재고부족') return quantity <= minQuantity;
+      if (statusFilter === '유통기한임박') return expiryImminent;
+      if (statusFilter === '정상') return quantity > minQuantity && !expiryImminent;
+      return true;
+    });
+  }, [baseFilteredInventory, expiryThreshold, statusFilter]);
+
+  const lowStockFilteredItems = useMemo(
+    () => baseFilteredInventory.filter((item: any) => getItemQuantity(item) <= getItemMinQuantity(item)),
+    [baseFilteredInventory],
+  );
+
+  const expiryFilteredItems = useMemo(
+    () => baseFilteredInventory.filter((item: any) => isExpirySoon(item, expiryThreshold)),
+    [baseFilteredInventory, expiryThreshold],
+  );
+
+  const urgentActionItems = useMemo(() => {
+    return baseFilteredInventory
+      .filter((item: any) => getItemQuantity(item) <= getItemMinQuantity(item) || isExpirySoon(item, expiryThreshold))
+      .sort((a: any, b: any) => {
+        const aLow = getItemQuantity(a) <= getItemMinQuantity(a);
+        const bLow = getItemQuantity(b) <= getItemMinQuantity(b);
+        if (aLow !== bLow) return aLow ? -1 : 1;
+        return getItemQuantity(a) - getItemQuantity(b);
+      })
+      .slice(0, 6);
+  }, [baseFilteredInventory, expiryThreshold]);
+
+  const totalQuantity = useMemo(
+    () => filteredInventory.reduce((sum: number, item: any) => sum + getItemQuantity(item), 0),
+    [filteredInventory],
+  );
+
+  const totalInventoryValue = useMemo(
+    () => filteredInventory.reduce((sum: number, item: any) => sum + (Number(item.unit_price || 0) * getItemQuantity(item)), 0),
+    [filteredInventory],
+  );
+
+  const currentViewMeta = INVENTORY_VIEW_META[activeView] || {
+    title: activeView,
+    description: '재고관리 화면을 확인합니다.',
+  };
+
+  const currentScopeLabel = useMemo(() => {
+    if (activeView !== '현황') {
+      return selectedCo && selectedCo !== '전체' ? selectedCo : '전체 사업체';
+    }
+
+    const companyLabel = viewCompany === '전체' ? '전체 회사' : viewCompany;
+    return selectedDept !== '전체' ? `${companyLabel} · ${selectedDept}` : companyLabel;
+  }, [activeView, selectedDept, selectedCo, viewCompany]);
 
   const fetchInventory = useCallback(async (companyFilter?: string) => {
     setLoading(true);
@@ -150,13 +264,22 @@ export default function IntegratedInventoryManagement({ user, depts = [], select
     } catch { /* ignore */ }
   }, [initialView]);
 
-  // 플라이아웃에서 '이력' 선택 시 로그 모달 열기
   useEffect(() => {
     if (activeView === '이력') {
-      fetchLogs();
-      setShowLogs(true);
+      void fetchLogs();
     }
   }, [activeView, fetchLogs]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem(INV_VIEW_KEY, activeView);
+      } catch {
+        // ignore localStorage failures
+      }
+    }
+    onViewChange?.(activeView);
+  }, [activeView, onViewChange]);
 
   useEffect(() => {
     fetchSuppliers();
@@ -175,11 +298,22 @@ export default function IntegratedInventoryManagement({ user, depts = [], select
   }, [viewCompany]);
 
   const refreshCurrentInventory = useCallback(() => {
-    if (activeView === '?꾪솴') {
-      return fetchInventory('?꾩껜');
+    if (activeView === '현황') {
+      return fetchInventory('전체');
     }
     return fetchInventory(selectedCo);
   }, [activeView, fetchInventory, selectedCo]);
+
+  const openInventoryView = useCallback(
+    (view: string, nextRegistrationMode?: 'form' | 'excel' | 'auto_extract') => {
+      if (!VALID_VIEWS.includes(view)) return;
+      setActiveView(view);
+      if (view === '등록' && nextRegistrationMode) {
+        setRegistrationMode(nextRegistrationMode);
+      }
+    },
+    [],
+  );
 
   const handleStockUpdate = async (item: any, type: 'in' | 'out', amount: number, targetCompany: string, targetDept: string) => {
     if (amount <= 0) return alert("수량은 0보다 커야 합니다.");
@@ -221,17 +355,20 @@ export default function IntegratedInventoryManagement({ user, depts = [], select
   };
 
   const handleAutoApprovalRequest = async (item: any) => {
-    if (!confirm(`[안전재고 부족] ${item.item_name} 품목의 비품구매 신청서를 자동으로 작성하여 MSO 결재 상신을 진행하시겠습니까?`)) return;
+    const quantity = getItemQuantity(item);
+    const minQuantity = getItemMinQuantity(item);
+    const itemName = item.item_name || item.name || '품목';
+    if (!confirm(`[안전재고 부족] ${itemName} 품목의 비품구매 신청서를 자동으로 작성하여 MSO 결재 상신을 진행하시겠습니까?`)) return;
     try {
       const rows: any[] = [{
         sender_id: user.id,
         sender_name: user.name,
         sender_company: user.company,
         type: '비품구매',
-        title: `[자동기안] ${item.item_name} 재고 보충 요청 (${item.company})`,
-        content: `현재고(${item.quantity})가 안전재고(${item.min_quantity}) 이하로 떨어져 자동 기안되었습니다. \n보충 필요량: ${item.min_quantity * 2 - item.quantity}개`,
+        title: `[자동기안] ${itemName} 재고 보충 요청 (${item.company})`,
+        content: `현재고(${quantity})가 안전재고(${minQuantity}) 이하로 떨어져 자동 기안되었습니다. \n보충 필요량: ${Math.max(minQuantity * 2 - quantity, 1)}개`,
         status: '대기',
-        meta_data: { item_name: item.item_name, quantity: item.min_quantity * 2 - item.quantity, current_stock: item.quantity, is_auto_generated: true }
+        meta_data: { item_name: itemName, quantity: Math.max(minQuantity * 2 - quantity, 1), current_stock: quantity, is_auto_generated: true }
       }];
       if (item.company_id || user?.company_id || selectedCompanyId) {
         rows[0].company_id = item.company_id ?? (user?.company === 'SY INC.' ? selectedCompanyId : user?.company_id);
@@ -265,64 +402,265 @@ export default function IntegratedInventoryManagement({ user, depts = [], select
       {/* 상세 메뉴(UDI·명세서 등)는 메인 좌측 사이드바에서 재고관리 호버/클릭 시 플라이아웃으로 선택 */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <main className="flex-1 p-4 md:p-10 bg-[var(--page-bg)] overflow-y-auto custom-scrollbar">
+          <section className="mb-6 space-y-4 md:mb-8">
+            <div className="rounded-[24px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-6 shadow-sm md:p-8">
+              <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[var(--toss-gray-3)]">Inventory Workspace</p>
+                  <h2 className="mt-2 text-2xl font-black tracking-tight text-[var(--foreground)] md:text-3xl">{currentViewMeta.title}</h2>
+                  <p className="mt-2 text-sm text-[var(--toss-gray-3)]">{currentViewMeta.description}</p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <span className="rounded-full bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--toss-blue)]">
+                      현재 범위: {currentScopeLabel}
+                    </span>
+                    <span className="rounded-full bg-[var(--toss-gray-1)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-4)]">
+                      알림: 부족 {lowStockItems.length}건 · 임박 {expiryImminentItems.length}건
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => openInventoryView('현황')}
+                    className={`rounded-[14px] px-4 py-3 text-[11px] font-bold transition-all ${
+                      activeView === '현황'
+                        ? 'bg-[var(--foreground)] text-white shadow-sm'
+                        : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-blue-light)] hover:text-[var(--foreground)]'
+                    }`}
+                  >
+                    재고 현황
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openInventoryView('등록', 'form')}
+                    className="rounded-[14px] bg-[var(--toss-blue)] px-4 py-3 text-[11px] font-bold text-white shadow-sm transition-all hover:opacity-95"
+                  >
+                    품목 등록
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openInventoryView('발주')}
+                    className="rounded-[14px] bg-orange-500 px-4 py-3 text-[11px] font-bold text-white shadow-sm transition-all hover:opacity-95"
+                  >
+                    발주 관리
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openInventoryView('이력')}
+                    className="rounded-[14px] border border-[var(--toss-border)] bg-white px-4 py-3 text-[11px] font-bold text-[var(--foreground)] transition-all hover:bg-[var(--toss-gray-1)]"
+                  >
+                    입출고 이력
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4 shadow-sm">
+              <div className="space-y-4">
+                {INVENTORY_VIEW_GROUPS.map((group) => (
+                  <div key={group.label} className="space-y-2">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">{group.label}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {group.views.map((view) => (
+                        <button
+                          key={view}
+                          type="button"
+                          onClick={() => openInventoryView(view)}
+                          className={`rounded-full px-4 py-2 text-[11px] font-bold transition-all ${
+                            activeView === view
+                              ? 'bg-[var(--toss-blue)] text-white shadow-sm'
+                              : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-blue-light)] hover:text-[var(--foreground)]'
+                          }`}
+                        >
+                          {view}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+
           {activeView === '현황' && (
             loading ? (
               <div className="h-full flex items-center justify-center font-bold text-[var(--toss-gray-3)]">데이터 동기화 중...</div>
             ) : (
               <div className="space-y-6">
-                <div className="flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center">
-                  <div className="flex-1 flex flex-wrap items-center gap-2">
-                    <select
-                      value={viewCompany}
-                      onChange={(e) => setViewCompany(e.target.value)}
-                      className="px-3 py-3 rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-bold min-w-[140px]"
-                      title="회사 선택"
-                    >
-                      <option value="전체">전체 회사</option>
-                      {companiesInInventory.map((c) => (
-                        <option key={c} value={c}>{c}</option>
+                <div className="rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-5 shadow-sm">
+                  <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+                    <div className="flex-1 flex flex-wrap items-center gap-2">
+                      <select
+                        value={viewCompany}
+                        onChange={(e) => setViewCompany(e.target.value)}
+                        className="px-3 py-3 rounded-[12px] border border-[var(--toss-border)] bg-white text-sm font-bold min-w-[140px]"
+                        title="회사 선택"
+                      >
+                        <option value="전체">전체 회사</option>
+                        {companiesInInventory.map((c) => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                      <select
+                        value={selectedDept}
+                        onChange={(e) => setSelectedDept(e.target.value)}
+                        className="px-3 py-3 rounded-[12px] border border-[var(--toss-border)] bg-white text-sm font-bold min-w-[120px]"
+                        title="부서 선택 (선택한 회사 기준)"
+                      >
+                        <option value="전체">전체 부서</option>
+                        {departmentsByViewCompany.map((d) => (
+                          <option key={d} value={d}>{d}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="text"
+                        placeholder="품목명 · 분류 · LOT · 회사 검색"
+                        value={searchKeyword}
+                        onChange={(e) => setSearchKeyword(e.target.value)}
+                        className="flex-1 min-w-[160px] max-w-md px-4 py-3 rounded-[12px] border border-[var(--toss-border)] bg-white text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)] outline-none"
+                      />
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {(['전체', '재고부족', '유통기한임박', '정상'] as const).map((filter) => (
+                        <button
+                          key={filter}
+                          type="button"
+                          onClick={() => setStatusFilter(filter)}
+                          className={`rounded-full px-3 py-2 text-[11px] font-bold transition-all ${
+                            statusFilter === filter
+                              ? 'bg-[var(--foreground)] text-white shadow-sm'
+                              : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-blue-light)] hover:text-[var(--foreground)]'
+                          }`}
+                        >
+                          {filter === '유통기한임박' ? '유통기한 임박' : filter}
+                        </button>
                       ))}
-                    </select>
-                    <select
-                      value={selectedDept}
-                      onChange={(e) => setSelectedDept(e.target.value)}
-                      className="px-3 py-3 rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-bold min-w-[120px]"
-                      title="부서 선택 (선택한 회사 기준)"
-                    >
-                      <option value="전체">전체 부서</option>
-                      {departmentsByViewCompany.map((d) => (
-                        <option key={d} value={d}>{d}</option>
-                      ))}
-                    </select>
-                    <input
-                      type="text"
-                      placeholder="품목명·분류·LOT·회사 검색..."
-                      value={searchKeyword}
-                      onChange={(e) => setSearchKeyword(e.target.value)}
-                      className="flex-1 min-w-[160px] max-w-md px-4 py-3 rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)] outline-none"
-                    />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setViewCompany('전체');
+                          setSelectedDept('전체');
+                          setSearchKeyword('');
+                          setStatusFilter('전체');
+                        }}
+                        className="px-4 py-3 rounded-[12px] border border-[var(--toss-border)] bg-white text-[11px] font-bold text-[var(--foreground)] transition-all hover:bg-[var(--toss-gray-1)]"
+                      >
+                        초기화
+                      </button>
+                      <button
+                        onClick={() => void refreshCurrentInventory()}
+                        className="px-4 py-3 rounded-[12px] bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] text-xs font-semibold hover:bg-[var(--toss-border)] transition-all shrink-0"
+                      >
+                        새로고침
+                      </button>
+                    </div>
                   </div>
-                  <button onClick={() => activeView === '현황' ? fetchInventory('전체') : fetchInventory(selectedCo)} className="px-4 py-3 rounded-[12px] bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] text-xs font-semibold hover:bg-[var(--toss-border)] transition-all shrink-0">🔄 새로고침</button>
                 </div>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
                   <div className="bg-[var(--toss-card)] p-6 rounded-[16px] border border-[var(--toss-border)] shadow-sm text-center">
                     <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">조회 품목</p>
                     <p className="text-2xl font-semibold text-[var(--toss-blue)] mt-1">{filteredInventory.length}</p>
                   </div>
                   <div className="bg-[var(--toss-card)] p-6 rounded-[16px] border border-[var(--toss-border)] shadow-sm text-center">
                     <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">안전재고 미달</p>
-                    <p className="text-2xl font-semibold text-red-600 mt-1">{filteredInventory.filter(i => (i.quantity ?? i.stock ?? 0) <= (i.min_quantity ?? i.min_stock ?? 0)).length}</p>
+                    <p className="text-2xl font-semibold text-red-600 mt-1">{lowStockFilteredItems.length}</p>
                   </div>
                   <div className="bg-[var(--toss-card)] p-6 rounded-[16px] border border-[var(--toss-border)] shadow-sm text-center">
                     <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">유효기간 임박</p>
-                    <p className="text-2xl font-semibold text-orange-600 mt-1">
-                      {filteredInventory.filter(i => i.expiry_date && new Date(i.expiry_date).getTime() < new Date().getTime() + 30 * 24 * 60 * 60 * 1000).length}
-                    </p>
+                    <p className="text-2xl font-semibold text-orange-600 mt-1">{expiryFilteredItems.length}</p>
                   </div>
                   <div className="bg-[var(--toss-card)] p-6 rounded-[16px] border border-[var(--toss-border)] shadow-sm text-center">
-                    <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">조회 회사 / 부서</p>
-                    <p className="text-xs font-semibold text-[var(--foreground)] mt-1 truncate">{viewCompany === '전체' ? '전체' : viewCompany}{selectedDept !== '전체' ? ` · ${selectedDept}` : ''}</p>
+                    <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">총 재고 수량</p>
+                    <p className="text-2xl font-semibold text-[var(--foreground)] mt-1">{totalQuantity.toLocaleString('ko-KR')}</p>
                   </div>
+                  <div className="bg-[var(--toss-card)] p-6 rounded-[16px] border border-[var(--toss-border)] shadow-sm text-center">
+                    <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">재고 평가 금액</p>
+                    <p className="text-sm font-semibold text-[var(--foreground)] mt-2 break-keep">{formatCurrency(totalInventoryValue)}</p>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+                  <div className="rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-5 shadow-sm">
+                    <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <h3 className="text-base font-bold text-[var(--foreground)]">우선 확인 품목</h3>
+                        <p className="mt-1 text-xs text-[var(--toss-gray-3)]">재고부족과 유통기한 임박 품목을 먼저 확인하세요.</p>
+                      </div>
+                      <span className="rounded-full bg-red-50 px-3 py-1 text-[11px] font-bold text-red-600">
+                        {urgentActionItems.length}건
+                      </span>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                      {urgentActionItems.length === 0 && (
+                        <div className="col-span-full rounded-[16px] border border-dashed border-[var(--toss-border)] px-4 py-8 text-center text-sm text-[var(--toss-gray-3)]">
+                          긴급 조치가 필요한 품목이 없습니다.
+                        </div>
+                      )}
+
+                      {urgentActionItems.map((item) => {
+                        const quantity = getItemQuantity(item);
+                        const minQuantity = getItemMinQuantity(item);
+                        const expiryImminent = isExpirySoon(item, expiryThreshold);
+
+                        return (
+                          <article key={item.id} className="rounded-[16px] border border-[var(--toss-border)] bg-[var(--page-bg)] p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-bold text-[var(--foreground)]">{item.item_name || item.name}</p>
+                                <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{item.company || '-'} · {item.department || '부서 미지정'}</p>
+                              </div>
+                              <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                                quantity <= minQuantity ? 'bg-red-50 text-red-600' : 'bg-orange-50 text-orange-600'
+                              }`}>
+                                {quantity <= minQuantity ? '재고부족' : '기한임박'}
+                              </span>
+                            </div>
+                            <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold text-[var(--toss-gray-4)]">
+                              <span>현재고 {quantity}</span>
+                              <span>안전 {minQuantity}</span>
+                              {expiryImminent && <span>기한 {item.expiry_date}</span>}
+                            </div>
+                            <div className="mt-3 flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setStockModal({ item, type: 'in', targetCompany: item.company || '전체', targetDept: item.department || '전체' });
+                                  setStockAmount(Math.max(1, minQuantity - quantity + 1));
+                                }}
+                                className="flex-1 rounded-[12px] bg-[var(--toss-blue)] px-3 py-2 text-[11px] font-bold text-white"
+                              >
+                                입고
+                              </button>
+                              {quantity <= minQuantity && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleAutoApprovalRequest(item)}
+                                  className="flex-1 rounded-[12px] bg-orange-600 px-3 py-2 text-[11px] font-bold text-white"
+                                >
+                                  발주
+                                </button>
+                              )}
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <aside className="rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-5 shadow-sm">
+                    <h3 className="text-base font-bold text-[var(--foreground)]">빠른 작업</h3>
+                    <p className="mt-1 text-xs text-[var(--toss-gray-3)]">자주 쓰는 기능으로 바로 이동합니다.</p>
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      <button type="button" onClick={() => openInventoryView('등록', 'form')} className="rounded-[14px] bg-[var(--toss-gray-1)] px-3 py-3 text-[11px] font-bold text-[var(--foreground)] hover:bg-[var(--toss-blue-light)]">일반 등록</button>
+                      <button type="button" onClick={() => openInventoryView('등록', 'excel')} className="rounded-[14px] bg-[var(--toss-gray-1)] px-3 py-3 text-[11px] font-bold text-[var(--foreground)] hover:bg-[var(--toss-blue-light)]">엑셀 등록</button>
+                      <button type="button" onClick={() => openInventoryView('스캔')} className="rounded-[14px] bg-[var(--toss-gray-1)] px-3 py-3 text-[11px] font-bold text-[var(--foreground)] hover:bg-[var(--toss-blue-light)]">스캔 처리</button>
+                      <button type="button" onClick={() => openInventoryView('발주')} className="rounded-[14px] bg-[var(--toss-gray-1)] px-3 py-3 text-[11px] font-bold text-[var(--foreground)] hover:bg-[var(--toss-blue-light)]">발주 관리</button>
+                      <button type="button" onClick={() => openInventoryView('재고실사')} className="rounded-[14px] bg-[var(--toss-gray-1)] px-3 py-3 text-[11px] font-bold text-[var(--foreground)] hover:bg-[var(--toss-blue-light)]">재고 실사</button>
+                      <button type="button" onClick={() => openInventoryView('이력')} className="rounded-[14px] bg-[var(--toss-gray-1)] px-3 py-3 text-[11px] font-bold text-[var(--foreground)] hover:bg-[var(--toss-blue-light)]">입출고 이력</button>
+                    </div>
+                  </aside>
                 </div>
 
                 <div className="bg-[var(--toss-card)] rounded-[16px] md:rounded-[2.5rem] border border-[var(--toss-border)] shadow-xl overflow-hidden">
@@ -341,27 +679,29 @@ export default function IntegratedInventoryManagement({ user, depts = [], select
                       </thead>
                       <tbody className="divide-y divide-[var(--toss-border)]">
                         {filteredInventory.map(item => {
-                          const isExpiryImminent = item.expiry_date && new Date(item.expiry_date).getTime() < new Date().getTime() + 30 * 24 * 60 * 60 * 1000;
+                          const quantity = getItemQuantity(item);
+                          const minQuantity = getItemMinQuantity(item);
+                          const isExpiryImminent = isExpirySoon(item, expiryThreshold);
                           return (
                             <tr key={item.id} className="hover:bg-[var(--toss-blue-light)]/50 transition-all group">
                               <td className="px-6 py-4">
-                                <p className="text-[11px] font-semibold text-[var(--toss-blue)]">{item.company}</p>
-                                <p className="text-[8px] font-bold text-[var(--toss-gray-3)]">{item.category}</p>
+                                <p className="text-[11px] font-semibold text-[var(--toss-blue)]">{item.company || '-'}</p>
+                                <p className="text-[8px] font-bold text-[var(--toss-gray-3)]">{item.category || '미분류'}</p>
                               </td>
                               <td className="px-6 py-4">
-                                <p className="text-xs font-semibold text-[var(--foreground)] group-hover:text-[var(--toss-blue)] transition-colors">{item.item_name}</p>
+                                <p className="text-xs font-semibold text-[var(--foreground)] group-hover:text-[var(--toss-blue)] transition-colors">{item.item_name || item.name}</p>
                                 <div className="flex gap-1 mt-0.5">
                                   {item.lot_number && <span className="text-[7px] font-semibold bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] px-1 py-0.5 rounded">LOT: {item.lot_number}</span>}
                                   {item.is_udi && <span className="text-[7px] font-semibold bg-purple-50 text-purple-500 px-1 py-0.5 rounded uppercase">UDI</span>}
                                 </div>
                               </td>
                               <td className="px-6 py-4 text-center">
-                                <span className={`text-xs font-semibold ${item.quantity <= item.min_quantity ? 'text-red-600' : 'text-[var(--foreground)]'}`}>{item.quantity}</span>
-                                <p className="text-[8px] font-bold text-[var(--toss-gray-3)]">안전: {item.min_quantity}</p>
+                                <span className={`text-xs font-semibold ${quantity <= minQuantity ? 'text-red-600' : 'text-[var(--foreground)]'}`}>{quantity}</span>
+                                <p className="text-[8px] font-bold text-[var(--toss-gray-3)]">안전: {minQuantity}</p>
                               </td>
                               <td className="px-6 py-4 text-center">
-                                <p className="text-xs font-semibold text-[var(--toss-gray-4)]">{item.unit_price?.toLocaleString()}원</p>
-                                <p className="text-[8px] font-bold text-[var(--toss-gray-3)]">총액: {((item.unit_price ?? 0) * (item.quantity ?? 0)).toLocaleString()}원</p>
+                                <p className="text-xs font-semibold text-[var(--toss-gray-4)]">{formatCurrency(Number(item.unit_price || 0))}</p>
+                                <p className="text-[8px] font-bold text-[var(--toss-gray-3)]">총액: {formatCurrency((Number(item.unit_price || 0) * quantity))}</p>
                               </td>
                               <td className="px-6 py-4 text-center">
                                 <p className={`text-[11px] font-semibold ${isExpiryImminent ? 'text-orange-600' : 'text-[var(--toss-gray-3)]'}`}>
@@ -370,14 +710,14 @@ export default function IntegratedInventoryManagement({ user, depts = [], select
                                 {isExpiryImminent && <p className="text-[7px] font-semibold text-orange-400 animate-pulse">임박</p>}
                               </td>
                               <td className="px-6 py-4">
-                                <span className={`px-2 py-0.5 rounded-full text-[8px] font-semibold ${item.quantity <= item.min_quantity ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
-                                  {item.quantity <= item.min_quantity ? '재고부족' : '정상'}
+                                <span className={`px-2 py-0.5 rounded-full text-[8px] font-semibold ${quantity <= minQuantity ? 'bg-red-50 text-red-600' : isExpiryImminent ? 'bg-orange-50 text-orange-600' : 'bg-green-50 text-green-600'}`}>
+                                  {quantity <= minQuantity ? '재고부족' : isExpiryImminent ? '기한임박' : '정상'}
                                 </span>
                               </td>
                               <td data-testid={`inventory-actions-${item.id}`} className="px-6 py-4 text-right space-x-1">
                                 <button data-testid={`inventory-stock-in-${item.id}`} onClick={() => { setStockModal({ item, type: 'in', targetCompany: item.company || '전체', targetDept: item.department || '전체' }); setStockAmount(1); }} className="px-2 py-1 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] text-[11px] font-semibold rounded-md hover:bg-[var(--toss-blue-light)]">입고</button>
                                 <button data-testid={`inventory-stock-out-${item.id}`} onClick={() => { setStockModal({ item, type: 'out', targetCompany: item.company || '전체', targetDept: item.department || '전체' }); setStockAmount(1); }} className="px-2 py-1 bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] text-[11px] font-semibold rounded-md hover:bg-[var(--toss-gray-1)]/80">출고</button>
-                                {item.quantity <= item.min_quantity && (
+                                {quantity <= minQuantity && (
                                   <button data-testid={`inventory-reorder-${item.id}`} onClick={() => handleAutoApprovalRequest(item)} className="px-2 py-1 bg-orange-600 text-white text-[11px] font-semibold rounded-md shadow-sm">발주</button>
                                 )}
                                 <button
@@ -407,6 +747,63 @@ export default function IntegratedInventoryManagement({ user, depts = [], select
                 </div>
               </div>
             )
+          )}
+          {activeView === '이력' && (
+            <section className="rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] shadow-sm">
+              <div className="flex flex-col gap-3 border-b border-[var(--toss-border)] px-5 py-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <h3 className="text-base font-bold text-[var(--foreground)]">최근 입출고 이력</h3>
+                  <p className="mt-1 text-xs text-[var(--toss-gray-3)]">최근 100건의 재고 변동 내역을 시간순으로 보여줍니다.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void fetchLogs()}
+                  className="rounded-[12px] bg-[var(--toss-gray-1)] px-4 py-3 text-[11px] font-bold text-[var(--toss-gray-4)] transition-all hover:bg-[var(--toss-border)]"
+                >
+                  새로고침
+                </button>
+              </div>
+              <div className="overflow-x-auto no-scrollbar">
+                {logs.length === 0 ? (
+                  <div className="px-6 py-16 text-center text-sm font-semibold text-[var(--toss-gray-3)]">이력이 없습니다.</div>
+                ) : (
+                  <table className="min-w-[860px] w-full text-left text-xs">
+                    <thead className="bg-[var(--toss-gray-1)]/50 text-[11px] font-semibold uppercase text-[var(--toss-gray-3)]">
+                      <tr>
+                        <th className="px-4 py-3">일시</th>
+                        <th className="px-4 py-3">유형</th>
+                        <th className="px-4 py-3">수량</th>
+                        <th className="px-4 py-3">변동</th>
+                        <th className="px-4 py-3">처리자</th>
+                        <th className="px-4 py-3">회사</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {logs.map((log: any) => (
+                        <tr key={log.id} className="border-t border-[var(--toss-border)]">
+                          <td className="px-4 py-3 font-mono text-[11px] text-[var(--toss-gray-4)]">{new Date(log.created_at).toLocaleString('ko-KR')}</td>
+                          <td className="px-4 py-3">
+                            <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                              (log.change_type || log.type) === '입고'
+                                ? 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)]'
+                                : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'
+                            }`}>
+                              {log.change_type || log.type || '-'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 font-bold text-[var(--foreground)]">{log.quantity ?? '-'}</td>
+                          <td className="px-4 py-3 text-[var(--toss-gray-3)]">
+                            {(log.prev_quantity ?? '') !== '' ? `${log.prev_quantity} → ${log.next_quantity}` : '-'}
+                          </td>
+                          <td className="px-4 py-3 text-[var(--foreground)]">{log.actor_name || '-'}</td>
+                          <td className="px-4 py-3 text-[var(--toss-gray-4)]">{log.company || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </section>
           )}
           {activeView === 'UDI' && <UDIManagement user={user} inventory={inventory} fetchInventory={fetchInventory} />}
           {activeView === '명세서' && <InvoiceManagement user={user} inventory={inventory} suppliers={suppliers} fetchSuppliers={fetchSuppliers} />}
@@ -514,46 +911,6 @@ export default function IntegratedInventoryManagement({ user, depts = [], select
             <div className="flex gap-2">
               <button onClick={() => setStockModal(null)} className="flex-1 py-3 rounded-[12px] bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] font-semibold text-sm">취소</button>
               <button onClick={executeStockUpdate} className="flex-1 py-3 rounded-[12px] bg-[var(--toss-blue)] text-white font-semibold text-sm">확인</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 재고 이력 모달 */}
-      {showLogs && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[110] flex items-center justify-center p-4" onClick={() => setShowLogs(false)}>
-          <div className="bg-[var(--toss-card)] rounded-[16px] shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="p-6 border-b border-[var(--toss-border)] flex justify-between items-center">
-              <h3 className="text-lg font-semibold text-[var(--foreground)]">📋 재고 입출고 이력</h3>
-              <button onClick={() => setShowLogs(false)} className="p-2 hover:bg-[var(--toss-gray-1)] rounded-full">✕</button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4">
-              {logs.length === 0 ? (
-                <p className="text-center text-[var(--toss-gray-3)] font-bold py-12">이력이 없습니다.</p>
-              ) : (
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-[var(--toss-border)] text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">
-                      <th className="py-3 px-2">일시</th>
-                      <th className="py-3 px-2">유형</th>
-                      <th className="py-3 px-2">수량</th>
-                      <th className="py-3 px-2">변동</th>
-                      <th className="py-3 px-2">처리자</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {logs.map((l: any) => (
-                      <tr key={l.id} className="border-b border-[var(--toss-border)]">
-                        <td className="py-2 px-2 font-mono text-[11px]">{new Date(l.created_at).toLocaleString()}</td>
-                        <td className="py-2 px-2"><span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${(l.change_type || l.type) === '입고' ? 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)]' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'}`}>{l.change_type || l.type || '-'}</span></td>
-                        <td className="py-2 px-2 font-bold">{l.quantity ?? '-'}</td>
-                        <td className="py-2 px-2 text-[var(--toss-gray-3)]">{(l.prev_quantity ?? '') !== '' ? `${l.prev_quantity}→${l.next_quantity}` : '-'}</td>
-                        <td className="py-2 px-2">{l.actor_name || '-'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
             </div>
           </div>
         </div>

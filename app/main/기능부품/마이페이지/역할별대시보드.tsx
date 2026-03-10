@@ -98,11 +98,13 @@ export default function RoleDashboard({ user, setMainMenu }: Props) {
 
   return (
     <div className="mb-2">
-      <div className="flex items-center gap-2 mb-2">
-        <span className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider">
-          {isAdmin ? '관리자 현황' : isManager ? '팀장 현황' : '내 현황'}
-        </span>
-      </div>
+      {!isAdmin && (
+        <div className="mb-2 flex items-center gap-2">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">
+            {isManager ? '팀장 현황' : '내 현황'}
+          </span>
+        </div>
+      )}
       {isAdmin ? (
         <AdminDashboard
           pendingApprovals={pendingApprovals}
@@ -133,6 +135,52 @@ export default function RoleDashboard({ user, setMainMenu }: Props) {
 }
 
 // ─── 하위 컴포넌트 추출 (렌더링 외부) ───
+
+const AdminActionCard = ({
+  title,
+  value,
+  actionLabel,
+  icon,
+  onClick,
+  tone = 'default',
+}: any) => {
+  const toneClass =
+    tone === 'warning'
+      ? 'border-orange-200 bg-orange-50 hover:bg-orange-100'
+      : tone === 'danger'
+      ? 'border-red-200 bg-red-50 hover:bg-red-100'
+      : 'border-[var(--toss-border)] bg-[var(--toss-card)] hover:bg-[var(--toss-blue-light)]/30';
+
+  const valueClass =
+    tone === 'warning'
+      ? 'text-orange-600'
+      : tone === 'danger'
+        ? 'text-red-600'
+        : 'text-[var(--foreground)]';
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full sm:w-[calc(50%-0.375rem)] xl:w-[220px] rounded-[16px] border px-4 py-3 text-left transition-all ${toneClass}`}
+    >
+      <div className="flex items-center gap-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-white/85 text-lg shadow-sm ring-1 ring-black/5">
+          {icon}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">
+            {title}
+          </p>
+          <div className="mt-1 flex items-center justify-between gap-3">
+            <p className={`shrink-0 text-lg font-black ${valueClass}`}>{value}</p>
+            <p className="truncate text-[11px] font-semibold text-[var(--toss-blue)]">{actionLabel}</p>
+          </div>
+        </div>
+      </div>
+    </button>
+  );
+};
 
 const UserDashboard = ({ todayAttendance, annualLeave, pendingApprovals, setMainMenu, formatTime }: any) => (
   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
@@ -196,38 +244,36 @@ const ManagerDashboard = ({ teamCount, user, pendingApprovals, todayAttendance, 
 );
 
 const AdminDashboard = ({ pendingApprovals, lowStockCount, setMainMenu }: any) => (
-  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-    <div
-      className={`bg-[var(--toss-card)] border rounded-[16px] p-4 cursor-pointer transition-all ${pendingApprovals > 0 ? 'border-orange-200 bg-orange-50 hover:bg-orange-100' : 'border-[var(--toss-border)] hover:bg-[var(--toss-gray-1)]'}`}
+  <div className="mb-4 flex flex-wrap gap-3">
+    <AdminActionCard
+      title="결재 대기"
+      value={`${pendingApprovals}건`}
+      actionLabel="결재함 이동"
+      icon="✅"
+      tone={pendingApprovals > 0 ? 'warning' : 'default'}
       onClick={() => setMainMenu?.('전자결재')}
-    >
-      <p className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider mb-1">결재 대기</p>
-      <p className={`text-lg font-bold ${pendingApprovals > 0 ? 'text-orange-600' : 'text-[var(--foreground)]'}`}>{pendingApprovals}건</p>
-      <p className="text-[11px] text-[var(--toss-blue)]">결재함 →</p>
-    </div>
-    <div
-      className={`bg-[var(--toss-card)] border rounded-[16px] p-4 cursor-pointer transition-all ${lowStockCount > 0 ? 'border-red-200 bg-red-50 hover:bg-red-100' : 'border-[var(--toss-border)] hover:bg-[var(--toss-gray-1)]'}`}
+    />
+    <AdminActionCard
+      title="재고 부족"
+      value={`${lowStockCount}건`}
+      actionLabel="재고관리 이동"
+      icon="📦"
+      tone={lowStockCount > 0 ? 'danger' : 'default'}
       onClick={() => setMainMenu?.('재고관리')}
-    >
-      <p className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider mb-1">재고 부족</p>
-      <p className={`text-lg font-bold ${lowStockCount > 0 ? 'text-red-600' : 'text-[var(--foreground)]'}`}>{lowStockCount}건</p>
-      <p className="text-[11px] text-[var(--toss-blue)]">재고관리 →</p>
-    </div>
-    <div
-      className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] p-4 cursor-pointer hover:bg-[var(--toss-blue-light)]/30 transition-all"
+    />
+    <AdminActionCard
+      title="경영 대시보드"
+      value="📊"
+      actionLabel="관리자 이동"
+      icon="📈"
       onClick={() => setMainMenu?.('관리자')}
-    >
-      <p className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider mb-1">경영 대시보드</p>
-      <p className="text-lg font-bold text-[var(--foreground)]">📊</p>
-      <p className="text-[11px] text-[var(--toss-blue)]">관리자 →</p>
-    </div>
-    <div
-      className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] p-4 cursor-pointer hover:bg-[var(--toss-blue-light)]/30 transition-all"
+    />
+    <AdminActionCard
+      title="인사관리"
+      value="👥"
+      actionLabel="인사관리 이동"
+      icon="🧑‍💼"
       onClick={() => setMainMenu?.('인사관리')}
-    >
-      <p className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider mb-1">인사관리</p>
-      <p className="text-lg font-bold text-[var(--foreground)]">👥</p>
-      <p className="text-[11px] text-[var(--toss-blue)]">인사관리 →</p>
-    </div>
+    />
   </div>
 );

@@ -202,7 +202,7 @@ export default function PayrollSlipDesignManager() {
         setStore(designStore);
         setCompanies(Array.from(companyMap.values()).sort((a, b) => a.name.localeCompare(b.name)));
       } catch (error) {
-        console.error('문서 서식 설정 조회 실패:', error);
+        console.error('문서 양식 설정 조회 실패:', error);
       } finally {
         setLoading(false);
       }
@@ -254,10 +254,10 @@ export default function PayrollSlipDesignManager() {
       if (error) {
         throw error;
       }
-      alert('문서 서식 설정을 저장했습니다.');
+      alert('문서 양식 설정을 저장했습니다.');
     } catch (error) {
       console.error(error);
-      alert('문서 서식 저장 중 오류가 발생했습니다.');
+      alert('문서 양식 저장 중 오류가 발생했습니다.');
     } finally {
       setSaving(false);
     }
@@ -283,7 +283,7 @@ export default function PayrollSlipDesignManager() {
       <div className="rounded-[20px] border border-[var(--toss-border)] bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
           <div>
-            <h2 className="text-lg font-bold text-[var(--foreground)]">문서 서식 통합 관리</h2>
+            <h2 className="text-lg font-bold text-[var(--foreground)]">문서 양식 통합 관리</h2>
             <p className="mt-1 text-sm text-[var(--toss-gray-3)]">
               급여명세서와 증명서 발급 문서가 같은 브랜드 규칙을 사용하도록 맞춥니다.
             </p>
@@ -480,7 +480,7 @@ export default function PayrollSlipDesignManager() {
                 disabled={saving || loading}
                 className="rounded-[14px] bg-[var(--toss-blue)] px-5 py-3 text-sm font-semibold text-white hover:opacity-95 disabled:opacity-60"
               >
-                {saving ? '저장 중...' : '문서 서식 저장'}
+                  {saving ? '저장 중...' : '문서 양식 저장'}
               </button>
             </div>
           </div>
