@@ -37,6 +37,31 @@ function getToggleClasses(tone: FeaturePermissionItem['tone'], active: boolean) 
   return 'bg-[var(--toss-blue)] ring-blue-100';
 }
 
+function compareKoreanLabels(a: string, b: string) {
+  return a.localeCompare(b, 'ko', { numeric: true, sensitivity: 'base' });
+}
+
+function getStaffCompanyLabel(staff: any) {
+  return String(staff?.company || '미지정 회사').trim() || '미지정 회사';
+}
+
+function getStaffTeamLabel(staff: any) {
+  return String(staff?.department || '미지정 팀').trim() || '미지정 팀';
+}
+
+function sortStaffRows(a: any, b: any) {
+  const companyDiff = compareKoreanLabels(getStaffCompanyLabel(a), getStaffCompanyLabel(b));
+  if (companyDiff !== 0) return companyDiff;
+
+  const departmentDiff = compareKoreanLabels(getStaffTeamLabel(a), getStaffTeamLabel(b));
+  if (departmentDiff !== 0) return departmentDiff;
+
+  const employeeNoDiff = compareKoreanLabels(String(a?.employee_no || ''), String(b?.employee_no || ''));
+  if (employeeNoDiff !== 0) return employeeNoDiff;
+
+  return compareKoreanLabels(String(a?.name || ''), String(b?.name || ''));
+}
+
 export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () => void }) {
   const [staffs, setStaffs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,7 +69,6 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
   const [newPassword, setNewPassword] = useState('');
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [copySourceId, setCopySourceId] = useState<string>('');
-  const [copyTargetId, setCopyTargetId] = useState<string>('');
   const [copyRoleToo, setCopyRoleToo] = useState(true);
   const [copying, setCopying] = useState(false);
 
@@ -52,10 +76,11 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
     setLoading(true);
     const { data } = await supabase.from('staff_members').select('*').order('employee_no');
     if (data) {
-      setStaffs(data);
+      const sortedData = [...data].sort(sortStaffRows);
+      setStaffs(sortedData);
       setSelectedStaff((current: any) => {
         if (!current?.id) return current;
-        return data.find((staff: any) => staff.id === current.id) ?? current;
+        return sortedData.find((staff: any) => staff.id === current.id) ?? current;
       });
     }
     setLoading(false);
@@ -182,17 +207,17 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
   };
 
   const copyPermissionsToStaff = async () => {
-    if (!copySourceId || !copyTargetId) {
+    if (!copySourceId || !selectedStaff?.id) {
       alert('복사할 직원(A)과 붙여넣을 직원(B)을 모두 선택하세요.');
       return;
     }
-    if (copySourceId === copyTargetId) {
+    if (copySourceId === selectedStaff.id) {
       alert('복사할 직원과 붙여넣을 직원이 같을 수 없습니다.');
       return;
     }
 
     const source = staffs.find((staff) => staff.id === copySourceId);
-    const target = staffs.find((staff) => staff.id === copyTargetId);
+    const target = staffs.find((staff) => staff.id === selectedStaff.id);
     if (!source || !target) return;
 
     const actor = readClientAuditActor();
@@ -204,7 +229,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
       updates.role = source.role;
     }
 
-    const { error } = await updateStaffRecord(copyTargetId, updates);
+    const { error } = await updateStaffRecord(target.id, updates);
     setCopying(false);
 
     if (error) {
@@ -216,7 +241,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
     await logAudit(
       '권한복사',
       'staff_permission',
-      String(copyTargetId),
+      String(target.id),
       {
         source_staff: source.name,
         target_staff: target.name,
@@ -236,8 +261,40 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
       actor.userId,
       actor.userName
     );
-    setCopyTargetId('');
+    setCopySourceId('');
   };
+
+  const groupedStaffSections = useMemo(() => {
+    const companyMap = new Map<string, Map<string, any[]>>();
+
+    staffs.forEach((staff) => {
+      const company = getStaffCompanyLabel(staff);
+      const team = getStaffTeamLabel(staff);
+
+      if (!companyMap.has(company)) {
+        companyMap.set(company, new Map<string, any[]>());
+      }
+
+      const teamMap = companyMap.get(company)!;
+      if (!teamMap.has(team)) {
+        teamMap.set(team, []);
+      }
+
+      teamMap.get(team)!.push(staff);
+    });
+
+    return Array.from(companyMap.entries())
+      .sort(([companyA], [companyB]) => compareKoreanLabels(companyA, companyB))
+      .map(([company, teamMap]) => ({
+        company,
+        teams: Array.from(teamMap.entries())
+          .sort(([teamA], [teamB]) => compareKoreanLabels(teamA, teamB))
+          .map(([team, members]) => ({
+            team,
+            members: [...members].sort(sortStaffRows),
+          })),
+      }));
+  }, [staffs]);
 
   const selectedPermissions = selectedStaff?.permissions || {};
   const permissionStats = useMemo(() => {
@@ -257,73 +314,112 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
       className="flex flex-col md:flex-row h-full min-h-0 bg-[var(--toss-card)] rounded-[12px] md:rounded-3xl shadow-sm border border-[var(--toss-border)] overflow-hidden"
       data-testid="staff-permission-view"
     >
-      <div className="w-full md:w-[320px] md:border-r border-[var(--toss-border)] flex min-h-0 flex-col md:min-w-[300px] max-h-[40vh] md:max-h-none shrink-0">
+      <div className="w-full md:w-[260px] lg:w-[280px] md:border-r border-[var(--toss-border)] flex min-h-0 flex-col md:min-w-[260px] max-h-[42vh] md:max-h-none shrink-0">
         <div className="p-6 border-b border-[var(--toss-border)] bg-[var(--toss-gray-1)]">
           <h3 className="text-sm font-semibold text-[var(--foreground)]">직원 명단</h3>
           <p className="text-[11px] text-[var(--toss-gray-3)] font-bold">직원 선택 시 역할·권한 설정</p>
         </div>
-        <div className="flex-1 overflow-y-auto">
-          {staffs.map((staff) => (
-            <button
-              key={staff.id}
-              type="button"
-              data-testid={`staff-permission-row-${staff.id}`}
-              onClick={() => setSelectedStaff(staff)}
-              className={`w-full text-left p-4 border-b border-[var(--toss-border)] hover:bg-[var(--toss-blue-light)] transition-all ${
-                selectedStaff?.id === staff.id ? 'bg-[var(--toss-blue-light)] border-l-4 border-l-[var(--toss-blue)]' : ''
-              }`}
-            >
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-semibold text-[var(--foreground)]">{staff.name}</span>
-                <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">#{staff.employee_no}</span>
-              </div>
-              <p className="text-[11px] text-[var(--toss-gray-3)] mt-1">
-                {staff.department} / {staff.position}
-              </p>
-            </button>
-          ))}
+        <div className="flex-1 overflow-y-auto bg-[var(--toss-gray-1)]/40">
+          <div className="space-y-3 p-2.5">
+            {groupedStaffSections.map((companySection) => (
+              <section key={companySection.company} className="overflow-hidden rounded-[16px] border border-[var(--toss-border)] bg-white/90 shadow-sm">
+                <div className="border-b border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-3 py-2.5">
+                  <p className="text-[11px] font-bold text-[var(--foreground)]">{companySection.company}</p>
+                </div>
+                <div className="divide-y divide-[var(--toss-border)]">
+                  {companySection.teams.map((teamSection) => (
+                    <div key={`${companySection.company}-${teamSection.team}`} className="px-2 py-2">
+                      <p className="px-2 pb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--toss-gray-3)]">
+                        {teamSection.team}
+                      </p>
+                      <div className="space-y-1">
+                        {teamSection.members.map((staff) => (
+                          <button
+                            key={staff.id}
+                            type="button"
+                            data-testid={`staff-permission-row-${staff.id}`}
+                            onClick={() => setSelectedStaff(staff)}
+                            className={`w-full rounded-[12px] px-2.5 py-2 text-left transition-all ${
+                              selectedStaff?.id === staff.id
+                                ? 'bg-[var(--toss-blue-light)] ring-1 ring-[var(--toss-blue)]'
+                                : 'hover:bg-[var(--toss-gray-1)]'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="truncate text-[12px] font-bold text-[var(--foreground)]">{staff.name}</span>
+                              <span className="shrink-0 text-[10px] font-bold text-[var(--toss-gray-3)]">#{staff.employee_no}</span>
+                            </div>
+                            <p className="mt-1 truncate text-[10px] font-semibold text-[var(--toss-gray-3)]">
+                              {staff.position || '-'}
+                            </p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 p-4 pb-12 md:p-8 md:pb-16 bg-[var(--toss-gray-1)]/50 overflow-y-auto">
-        <div className="mb-8 bg-[var(--toss-card)] p-6 rounded-[12px] shadow-sm border border-[var(--toss-border)] border-l-4 border-l-[var(--toss-blue)]">
+      <div className="flex-1 min-h-0 bg-[var(--toss-gray-1)]/50 flex flex-col overflow-hidden">
+        <div className="shrink-0 mx-4 mt-4 rounded-[12px] border border-[var(--toss-border)] border-l-4 border-l-[var(--toss-blue)] bg-[var(--toss-card)] p-4 shadow-sm md:mx-8 md:mt-8 md:p-5">
           <p className="text-sm font-semibold text-[var(--foreground)] mb-3">📋 권한 한번에 복사 (A → B)</p>
           <p className="text-[11px] text-[var(--toss-gray-3)] font-bold mb-4">한 직원의 권한·역할을 다른 직원에게 그대로 적용합니다.</p>
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="min-w-[180px]">
-              <label className="block text-[11px] font-bold text-[var(--toss-gray-3)] mb-1">복사할 직원 (A)</label>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
+            <div className="min-w-[220px] flex-1">
+              <label className="mb-1 block text-[11px] font-bold text-[var(--toss-gray-3)]">권한 가져올 직원</label>
               <select
                 data-testid="staff-permission-copy-source"
                 value={copySourceId}
                 onChange={(e) => setCopySourceId(e.target.value)}
-                className="w-full px-3 py-2.5 border border-[var(--toss-border)] rounded-[16px] text-sm font-bold bg-[var(--input-bg)]"
+                className="w-full rounded-[14px] border border-[var(--toss-border)] bg-[var(--input-bg)] px-3 py-2.5 text-sm font-bold"
               >
-                <option value="">선택</option>
-                {staffs.map((staff) => (
-                  <option key={staff.id} value={staff.id}>
-                    {staff.name} #{staff.employee_no}
-                  </option>
-                ))}
+                <option value="">직원 선택</option>
+                {groupedStaffSections.map((companySection) =>
+                  companySection.teams.map((teamSection) => (
+                    <optgroup
+                      key={`${companySection.company}-${teamSection.team}`}
+                      label={`${companySection.company} / ${teamSection.team}`}
+                    >
+                      {teamSection.members.map((staff) => (
+                        <option key={staff.id} value={staff.id} disabled={staff.id === selectedStaff?.id}>
+                          {staff.name} #{staff.employee_no}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))
+                )}
               </select>
             </div>
-            <span className="text-[var(--toss-gray-3)] font-bold pb-2">→</span>
-            <div className="min-w-[180px]">
-              <label className="block text-[11px] font-bold text-[var(--toss-gray-3)] mb-1">붙여넣을 직원 (B)</label>
+            <div className="min-w-[220px] flex-1">
+              <label className="mb-1 block text-[11px] font-bold text-[var(--toss-gray-3)]">적용할 직원</label>
               <select
                 data-testid="staff-permission-copy-target"
-                value={copyTargetId}
-                onChange={(e) => setCopyTargetId(e.target.value)}
-                className="w-full px-3 py-2.5 border border-[var(--toss-border)] rounded-[16px] text-sm font-bold bg-[var(--input-bg)]"
+                value={selectedStaff?.id || ''}
+                onChange={(e) => setSelectedStaff(staffs.find((staff) => staff.id === e.target.value) ?? null)}
+                className="w-full rounded-[14px] border border-[var(--toss-border)] bg-[var(--input-bg)] px-3 py-2.5 text-sm font-bold"
               >
-                <option value="">선택</option>
-                {staffs.map((staff) => (
-                  <option key={staff.id} value={staff.id} disabled={staff.id === copySourceId}>
-                    {staff.name} #{staff.employee_no}
-                  </option>
-                ))}
+                <option value="">직원 선택</option>
+                {groupedStaffSections.map((companySection) =>
+                  companySection.teams.map((teamSection) => (
+                    <optgroup
+                      key={`target-${companySection.company}-${teamSection.team}`}
+                      label={`${companySection.company} / ${teamSection.team}`}
+                    >
+                      {teamSection.members.map((staff) => (
+                        <option key={staff.id} value={staff.id} disabled={staff.id === copySourceId}>
+                          {staff.name} #{staff.employee_no}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))
+                )}
               </select>
             </div>
-            <label className="flex items-center gap-2 pb-2 cursor-pointer">
+            <label className="flex items-center gap-2 rounded-[14px] border border-[var(--toss-border)] bg-white px-3 py-2.5 text-[11px] font-bold text-[var(--toss-gray-4)]">
               <input
                 data-testid="staff-permission-copy-role"
                 type="checkbox"
@@ -331,22 +427,23 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                 onChange={(e) => setCopyRoleToo(e.target.checked)}
                 className="rounded border-[var(--toss-border)]"
               />
-              <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">역할도 함께 복사</span>
+              역할도 함께 복사
             </label>
             <button
               type="button"
               data-testid="staff-permission-copy-apply"
               onClick={copyPermissionsToStaff}
-              disabled={copying || !copySourceId || !copyTargetId}
-              className="px-5 py-2.5 bg-[var(--toss-blue)] text-white rounded-[16px] text-xs font-bold hover:bg-[var(--toss-blue)] disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={copying || !copySourceId || !selectedStaff?.id || copySourceId === selectedStaff?.id}
+              className="rounded-[14px] bg-[var(--toss-blue)] px-5 py-2.5 text-xs font-bold text-white hover:bg-[var(--toss-blue)] disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {copying ? '적용 중…' : '복사 적용'}
+              {copying ? '적용 중...' : '현재 직원에 복사'}
             </button>
           </div>
         </div>
 
         {selectedStaff ? (
-          <div className="max-w-6xl space-y-8">
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-24 pt-1 md:px-8 md:pb-28 md:pt-2">
+            <div className="max-w-6xl space-y-8">
             <div className="border-b-4 border-[var(--foreground)] pb-4">
               <h3 className="text-2xl font-semibold text-[var(--foreground)] tracking-tight">
                 [{selectedStaff.name}] 직원·권한 설정
@@ -521,8 +618,9 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
               </div>
             </div>
           </div>
+          </div>
         ) : (
-          <div className="h-full flex flex-col items-center justify-center text-[var(--toss-gray-3)]">
+          <div className="flex-1 min-h-0 flex flex-col items-center justify-center px-6 text-[var(--toss-gray-3)]">
             <span className="text-5xl mb-4">👤</span>
             <p className="text-sm font-semibold">왼쪽에서 직원을 선택하여 역할·권한을 설정하세요</p>
           </div>

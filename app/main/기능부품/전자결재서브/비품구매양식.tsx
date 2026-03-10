@@ -1,8 +1,29 @@
 ﻿'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 
 const defaultRow = () => ({ name: '', qty: 1, currentStock: null as number | null, dept: '', purpose: '', suggestions: [] as any[] });
+const INVENTORY_COMPANY = 'SY INC.';
+const INVENTORY_DEPARTMENT = '경영지원팀';
+
+function getInventoryItemName(row: any) {
+  return String(row?.item_name || row?.name || '').trim();
+}
+
+function getInventoryStock(row: any) {
+  const raw = row?.quantity ?? row?.stock ?? 0;
+  return Number(raw) || 0;
+}
+
+function getInventoryMinStock(row: any) {
+  const raw = row?.min_quantity ?? row?.min_stock ?? 0;
+  return Number(raw) || 0;
+}
+
+function isTargetInventory(row: any) {
+  return String(row?.company || '').trim() === INVENTORY_COMPANY &&
+    String(row?.department || '').trim() === INVENTORY_DEPARTMENT;
+}
 
 export default function SuppliesForm({ setExtraData, initialItems }: any) {
   // MSO 삭제된 부서 목록
@@ -23,6 +44,24 @@ export default function SuppliesForm({ setExtraData, initialItems }: any) {
   const [bulkDept, setBulkDept] = useState('');
   const [inventory, setInventory] = useState<any[]>([]);
 
+  const inventoryCatalog = useMemo(() => {
+    const merged = new Map<string, { name: string; stock: number; min_stock: number }>();
+
+    inventory
+      .filter(isTargetInventory)
+      .forEach((row) => {
+        const name = getInventoryItemName(row);
+        if (!name) return;
+        const key = name.toLowerCase();
+        const current = merged.get(key) || { name, stock: 0, min_stock: 0 };
+        current.stock += getInventoryStock(row);
+        current.min_stock = Math.max(current.min_stock, getInventoryMinStock(row));
+        merged.set(key, current);
+      });
+
+    return Array.from(merged.values()).sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  }, [inventory]);
+
   useEffect(() => {
     const fetchInventory = async () => {
       const { data } = await supabase.from('inventory').select('*');
@@ -37,9 +76,20 @@ export default function SuppliesForm({ setExtraData, initialItems }: any) {
 
   const handleSearch = (idx: number, val: string) => {
     const nl = [...items];
+    const keyword = val.trim().toLowerCase();
+    const exactMatch = keyword
+      ? inventoryCatalog.find((entry) => entry.name.toLowerCase() === keyword)
+      : null;
     nl[idx].name = val;
-    nl[idx].currentStock = null;
-    nl[idx].suggestions = val ? inventory.filter(i => i.name.includes(val)) : [];
+    nl[idx].currentStock = exactMatch ? exactMatch.stock : null;
+    nl[idx].suggestions = keyword
+      ? inventoryCatalog
+          .filter((entry) => {
+            const name = entry.name.toLowerCase();
+            return name.startsWith(keyword) || name.includes(keyword);
+          })
+          .slice(0, 8)
+      : [];
     setItems(nl);
   };
 
@@ -105,18 +155,19 @@ export default function SuppliesForm({ setExtraData, initialItems }: any) {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="relative col-span-1 md:col-span-2 space-y-1.5">
-                <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] ml-1">품목명 (재고 검색)</label>
+                <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] ml-1">품목명 (SY INC. 경영지원팀 재고 검색)</label>
                 <div className="flex items-center gap-2">
                   <input
                     data-testid={`supplies-item-name-${idx}`}
                     value={item.name}
                     onChange={e => handleSearch(idx, e.target.value)}
+                    onFocus={e => handleSearch(idx, e.target.value)}
                     className="flex-1 p-3.5 bg-[var(--toss-gray-1)] text-xs font-bold outline-none rounded-[12px] border-none focus:bg-white focus:ring-2 focus:ring-[var(--toss-blue)]/20 transition-all"
                     placeholder="품목명 입력"
                   />
                   {item.currentStock !== null && (
                     <span className={`shrink-0 px-3 py-1.5 rounded-[10px] text-[11px] font-bold ${item.currentStock <= 5 ? 'bg-red-50 text-red-600 animate-pulse' : 'bg-blue-50 text-blue-600'}`}>
-                      현재고: {item.currentStock}
+                      경영지원팀 재고: {item.currentStock}
                     </span>
                   )}
                 </div>
@@ -130,7 +181,7 @@ export default function SuppliesForm({ setExtraData, initialItems }: any) {
                       >
                         <span className="text-[var(--foreground)]">{s.name}</span>
                         <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-md ${s.stock <= s.min_stock ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
-                          재고: {s.stock}
+                          경영지원팀 재고: {s.stock}
                         </span>
                       </div>
                     ))}

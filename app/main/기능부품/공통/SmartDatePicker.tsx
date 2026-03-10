@@ -58,7 +58,7 @@ export default function SmartDatePicker({
     };
 
     return (
-        <div className={`relative flex items-center group ${className}`}>
+        <div className={`relative flex w-full items-center group ${className}`}>
             <input
                 data-testid={dataTestId}
                 type="text"
@@ -66,7 +66,7 @@ export default function SmartDatePicker({
                 onChange={handleTextChange}
                 onFocus={handleFocus}
                 placeholder={placeholder}
-                className={`w-full h-full pr-10 outline-none transition-all ${inputClassName} ${disabled ? 'bg-transparent opacity-50' : ''}`}
+                className={`w-full pr-10 outline-none transition-all ${inputClassName} ${disabled ? 'bg-transparent opacity-50' : ''}`}
                 spellCheck={false}
                 disabled={disabled}
                 maxLength={10}
@@ -87,7 +87,7 @@ export default function SmartDatePicker({
             <button
                 type="button"
                 onClick={handleIconClick}
-                className="absolute right-3 text-[var(--toss-gray-3)] hover:text-[var(--toss-blue)] transition-colors cursor-pointer flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed group-hover:text-[var(--toss-blue)]"
+                className="absolute inset-y-0 right-3 text-[var(--toss-gray-3)] hover:text-[var(--toss-blue)] transition-colors cursor-pointer flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed group-hover:text-[var(--toss-blue)]"
                 tabIndex={-1}
                 disabled={disabled}
             >

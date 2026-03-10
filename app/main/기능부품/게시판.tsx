@@ -7,6 +7,64 @@ const CHAT_ROOM_KEY = 'erp_chat_last_room';
 const CHAT_FOCUS_KEY = 'erp_chat_focus_keyword';
 
 const BOARD_IDS = ['공지사항', '자유게시판', '익명소리함', '경조사', '수술일정', 'MRI일정', '직원제안함'];
+const BOARD_POST_OPTIONAL_COLUMNS = [
+  'company_id',
+  'tags',
+  'attachments',
+  'likes_count',
+  'surgery_fasting',
+  'surgery_inpatient',
+  'surgery_guardian',
+  'surgery_caregiver',
+  'surgery_transfusion',
+];
+
+function buildScheduleTimeValue(period: string, hour: string, minute: string) {
+  if (!period || !hour) return '';
+
+  const hNum = parseInt(hour, 10);
+  if (Number.isNaN(hNum)) return '';
+
+  let h24 = hNum;
+  if (period === '오전') {
+    if (h24 === 12) h24 = 0;
+  } else if (period === '오후') {
+    if (h24 !== 12) h24 += 12;
+  } else {
+    return '';
+  }
+
+  const hh = String(h24).padStart(2, '0');
+  const mm = String(minute || '00').padStart(2, '0');
+  return `${hh}:${mm}`;
+}
+
+function getMissingBoardPostColumn(error: any) {
+  if (!error) return null;
+  const message = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''}`.toLowerCase();
+  return BOARD_POST_OPTIONAL_COLUMNS.find((column) => message.includes(column.toLowerCase())) || null;
+}
+
+async function runBoardPostMutation<T>(
+  mutation: (payload: Record<string, any>) => PromiseLike<{ data: T | null; error: any }>,
+  payload: Record<string, any>
+) {
+  let nextPayload = { ...payload };
+  let result = await mutation(nextPayload);
+  let guard = 0;
+
+  while (result?.error && guard < BOARD_POST_OPTIONAL_COLUMNS.length) {
+    const missingColumn = getMissingBoardPostColumn(result.error);
+    if (!missingColumn || !(missingColumn in nextPayload)) break;
+
+    const { [missingColumn]: _removed, ...rest } = nextPayload;
+    nextPayload = rest;
+    result = await mutation(nextPayload);
+    guard += 1;
+  }
+
+  return { ...result, payload: nextPayload };
+}
 
 export default function BoardView({ user, subView, setSubView, selectedCo, selectedCompanyId, initialBoard, initialPostId, onConsumePostId, surgeries, mris, onRefresh, setMainMenu }: any) {
   const [activeBoard, setActiveBoard] = useState(initialBoard && BOARD_IDS.includes(initialBoard) ? initialBoard : (subView && BOARD_IDS.includes(subView) ? subView : '공지사항'));
@@ -92,25 +150,14 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
 
   // 오전/오후 + 시/분 드롭다운 값을 HH:MM 문자열로 변환
   const updateScheduleTime = (period: string, hour: string, minute: string) => {
-    if (!period || !hour || !minute) {
-      setScheduleTime('');
-      return;
-    }
-    const hNum = parseInt(hour, 10);
-    if (Number.isNaN(hNum)) {
-      setScheduleTime('');
-      return;
-    }
-    let h24 = hNum;
-    if (period === '오전') {
-      if (h24 === 12) h24 = 0;
-    } else if (period === '오후') {
-      if (h24 !== 12) h24 = h24 + 12;
-    }
-    const hh = String(h24).padStart(2, '0');
-    const mm = minute.padStart(2, '0');
-    setScheduleTime(`${hh}:${mm}`);
+    setScheduleTime(buildScheduleTimeValue(period, hour, minute));
   };
+
+  useEffect(() => {
+    if ((activeBoard === '수술일정' || activeBoard === 'MRI일정') && schedulePeriod && scheduleHour && !scheduleMinute) {
+      setScheduleMinute('00');
+    }
+  }, [activeBoard, scheduleHour, scheduleMinute, schedulePeriod]);
 
   const fetchPosts = async () => {
     const isMso = user?.company === 'SY INC.' || user?.permissions?.mso === true;
@@ -555,10 +602,18 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   };
 
   const handleNewPost = async () => {
-    if (!title) return alert('제목을 입력해주세요.');
-    if (activeBoard === '수술일정' || activeBoard === 'MRI일정') {
-      if (!scheduleDate || !scheduleTime) return alert('필수 정보를 입력해주세요.');
-    } else if (!content) {
+    const isScheduleBoard = activeBoard === '수술일정' || activeBoard === 'MRI일정';
+    const normalizedTitle = title.trim();
+    const normalizedContent = content.trim();
+    const normalizedScheduleRoom = scheduleRoom.trim();
+    const normalizedSchedulePatient = schedulePatient.trim();
+    const normalizedScheduleChartNo = scheduleChartNo.trim();
+    const resolvedScheduleTime = buildScheduleTimeValue(schedulePeriod, scheduleHour, scheduleMinute) || scheduleTime;
+
+    if (!normalizedTitle) return alert('제목을 입력해주세요.');
+    if (isScheduleBoard) {
+      if (!scheduleDate || !resolvedScheduleTime) return alert('필수 정보를 입력해주세요.');
+    } else if (!normalizedContent && attachmentFiles.length === 0) {
       return alert('내용을 입력해주세요.');
     }
 
@@ -567,14 +622,14 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       const tags = tagsInput ? tagsInput.split(',').map((t) => t.trim()).filter(Boolean) : [];
       const postData: any = {
         board_type: activeBoard,
-        title: title,
-        content: content || null,
+        title: normalizedTitle,
+        content: isScheduleBoard ? normalizedScheduleChartNo || null : normalizedContent || null,
         company: user?.company || null,
         tags: tags,
         schedule_date: scheduleDate || null,
-        schedule_time: scheduleTime || null,
-        schedule_room: scheduleRoom || null,
-        patient_name: schedulePatient || null,
+        schedule_time: resolvedScheduleTime || null,
+        schedule_room: normalizedScheduleRoom || null,
+        patient_name: normalizedSchedulePatient || null,
         author_name: activeBoard === '익명소리함' ? '익명' : (user?.name || '익명'),
         author_id: activeBoard === '익명소리함' ? null : user?.id,
         likes_count: 0,
@@ -585,7 +640,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       }
 
       // 수술/검사 일정의 경우 수술 관련 체크값을 함께 저장
-      if (activeBoard === '수술일정' || activeBoard === 'MRI일정') {
+      if (isScheduleBoard) {
         postData.surgery_fasting = scheduleFasting;
         postData.surgery_inpatient = scheduleInpatient;
         postData.surgery_guardian = scheduleGuardian;
@@ -641,7 +696,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
 
       // 수정 모드인 경우 업데이트
       if (editingPostId) {
-        if ((activeBoard === '수술일정' || activeBoard === 'MRI일정') && !isDepartmentHead) {
+        if (isScheduleBoard && !isDepartmentHead) {
           if (!confirm('부서장 이상 권한이 필요합니다. 관리자(간호과장 등)에게 일정 수정 승인 결재를 상신하시겠습니까?')) {
             setLoading(false);
             return;
@@ -653,16 +708,13 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
           return;
         }
 
-        const { error: updateError } = await withMissingColumnFallback(
-          () => supabase.from('board_posts').update(postData).eq('id', editingPostId),
-          () => {
-            const { company_id, ...legacyPostData } = postData;
-            return supabase.from('board_posts').update(legacyPostData).eq('id', editingPostId);
-          }
+        const { error: updateError, payload: persistedPostData } = await runBoardPostMutation(
+          (payload) => supabase.from('board_posts').update(payload).eq('id', editingPostId),
+          postData
         );
         if (!updateError) {
           alert('게시물이 수정되었습니다.');
-          setPosts((prev) => prev.map(p => p.id === editingPostId ? { ...p, ...postData } : p));
+          setPosts((prev) => prev.map(p => p.id === editingPostId ? { ...p, ...persistedPostData } : p));
           setSelectedPostId(editingPostId);
           resetForm();
           setShowNewPost(false);
@@ -673,12 +725,9 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
         return;
       }
 
-      const { data: insertedPost, error } = await withMissingColumnFallback<any>(
-        () => supabase.from('board_posts').insert([postData]).select().single(),
-        () => {
-          const { company_id, ...legacyPostData } = postData;
-          return supabase.from('board_posts').insert([legacyPostData]).select().single();
-        }
+      const { data: insertedPost, error } = await runBoardPostMutation<any>(
+        (payload) => supabase.from('board_posts').insert([payload]).select().single(),
+        postData
       );
       if (!error && insertedPost) {
         if (attachmentFiles.length > 0 && (!insertedPost.attachments || (Array.isArray(insertedPost.attachments) && insertedPost.attachments.length === 0))) {
