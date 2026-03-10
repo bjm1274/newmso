@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import AnnualLeavePromotion from './연차촉진시스템';
 import LeaveDashboard from '../급여명세/연차종합대시보드';
+import HolidayCalendar from '../공휴일달력';
 
 type Leave = {
   id: string;
@@ -15,14 +16,41 @@ type Leave = {
   staff_members?: { name: string; company?: string; department?: string };
 };
 
-export default function LeaveManagement({ staffs = [], selectedCo, onRefresh }: any) {
+type LeaveManagementTabId =
+  | '연차/휴가 신청내역'
+  | '연차 대시보드'
+  | '연차사용촉진 자동화'
+  | '연차 자동부여 설정'
+  | '공휴일 달력';
+
+const LEAVE_TAB_DEFS: { id: LeaveManagementTabId; label: string }[] = [
+  { id: '연차/휴가 신청내역', label: '연차/휴가 신청내역' },
+  { id: '연차 대시보드', label: '연차 대시보드' },
+  { id: '연차사용촉진 자동화', label: '연차사용촉진 자동화' },
+  { id: '연차 자동부여 설정', label: '연차 자동부여 설정' },
+  { id: '공휴일 달력', label: '공휴일 달력' },
+];
+
+export default function LeaveManagement({
+  staffs = [],
+  selectedCo,
+  onRefresh,
+  user,
+  initialTab,
+  allowLeaveTabs = true,
+  allowHolidayTab = true,
+}: any) {
   const [leaves, setLeaves] = useState<Leave[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('연차/휴가 신청내역');
+  const [activeTab, setActiveTab] = useState<LeaveManagementTabId>(initialTab || '연차/휴가 신청내역');
   const [leaveConfig, setLeaveConfig] = useState<'입사일 기준' | '회계연도 기준'>('입사일 기준');
   const staffList = Array.isArray(staffs) ? staffs : [];
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [showPendingModal, setShowPendingModal] = useState(false);
+  const availableTabs = LEAVE_TAB_DEFS.filter((tab) => {
+    if (tab.id === '공휴일 달력') return allowHolidayTab;
+    return allowLeaveTabs;
+  });
 
   const fetchLeaves = async () => {
     setLoading(true);
@@ -52,6 +80,17 @@ export default function LeaveManagement({ staffs = [], selectedCo, onRefresh }: 
   useEffect(() => {
     fetchLeaves();
   }, [selectedCo, staffs]);
+
+  useEffect(() => {
+    if (initialTab && availableTabs.some((tab) => tab.id === initialTab)) {
+      setActiveTab(initialTab);
+      return;
+    }
+
+    if (!availableTabs.some((tab) => tab.id === activeTab)) {
+      setActiveTab(availableTabs[0]?.id || '연차/휴가 신청내역');
+    }
+  }, [activeTab, availableTabs, initialTab]);
 
   // 로컬 세션 기준 현재 사용자 찾기 (연차 대시보드 개인뷰용)
   useEffect(() => {
@@ -137,19 +176,19 @@ export default function LeaveManagement({ staffs = [], selectedCo, onRefresh }: 
       <div className="p-4 md:p-8 border-b border-[var(--toss-border)] bg-[var(--toss-card)] flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
         <div>
           <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tight">전문 연차/휴가 통합 관리</h2>
-          <p className="text-[11px] text-[var(--toss-blue)] font-bold mt-1 tracking-widest">연차·휴가 통합 관리 시스템</p>
+          <p className="text-[11px] text-[var(--toss-blue)] font-bold mt-1 tracking-widest">연차·휴가·공휴일 통합 관리 시스템</p>
         </div>
         <div className="flex gap-2 w-full md:w-auto overflow-x-auto no-scrollbar">
-          {['연차/휴가 신청내역', '연차 대시보드', '연차사용촉진 자동화', '연차 자동부여 설정'].map(tab => (
+          {availableTabs.map((tab) => (
             <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-6 py-3 rounded-[12px] text-[11px] font-semibold whitespace-nowrap transition-all ${activeTab === tab
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-6 py-3 rounded-[12px] text-[11px] font-semibold whitespace-nowrap transition-all ${activeTab === tab.id
                 ? 'bg-[var(--foreground)] text-white shadow-xl'
                 : 'bg-[var(--toss-card)] text-[var(--toss-gray-3)] border border-[var(--toss-border)] hover:bg-[var(--toss-gray-1)]'
                 }`}
             >
-              {tab}
+              {tab.label}
             </button>
           ))}
         </div>
@@ -328,6 +367,10 @@ export default function LeaveManagement({ staffs = [], selectedCo, onRefresh }: 
               </p>
             </div>
           </div>
+        )}
+
+        {activeTab === '공휴일 달력' && (
+          <HolidayCalendar staffs={staffList} selectedCo={selectedCo} user={user} />
         )}
       </div>
 

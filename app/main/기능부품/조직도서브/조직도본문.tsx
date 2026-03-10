@@ -70,10 +70,10 @@ export default function MainContent({
           />
         </div>
       )}
-      {mainMenu === '조직도' && <div className="flex-1 overflow-hidden"><OrgChart user={user} staffs={data.staffs} selectedCo={selectedCo} setSelectedCo={setSelectedCo} /></div>}
-      {mainMenu === '채팅' && <div className="flex-1 overflow-hidden bg-[var(--toss-card)] z-20"><ChatView user={user} onRefresh={onRefresh} staffs={data.staffs} initialOpenChatRoomId={initialOpenChatRoomId} initialOpenMessageId={initialOpenMessageId} onConsumeOpenChatRoomId={onConsumeOpenChatRoomId} /></div>}
+      {mainMenu === '조직도' && <div className="flex-1 min-h-0 overflow-hidden"><OrgChart user={user} staffs={data.staffs} selectedCo={selectedCo} setSelectedCo={setSelectedCo} /></div>}
+      {mainMenu === '채팅' && <div className="flex-1 min-h-0 overflow-hidden bg-[var(--toss-card)] z-20"><ChatView user={user} onRefresh={onRefresh} staffs={data.staffs} initialOpenChatRoomId={initialOpenChatRoomId} initialOpenMessageId={initialOpenMessageId} onConsumeOpenChatRoomId={onConsumeOpenChatRoomId} /></div>}
       {mainMenu === '게시판' && (
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-hidden">
           <BoardView
             user={user}
             posts={data.posts?.filter((p: any) => p.board_type === (subView || '공지사항')) || []}
@@ -91,9 +91,9 @@ export default function MainContent({
           />
         </div>
       )}
-      {mainMenu === '전자결재' && <div className="flex-1 overflow-hidden"><ApprovalView user={user} staffs={data.staffs} selectedCo={selectedCo} setSelectedCo={setSelectedCo} selectedCompanyId={selectedCompanyId} onRefresh={onRefresh} initialView={subView} onViewChange={setSubView} /></div>}
+      {mainMenu === '전자결재' && <div className="flex-1 min-h-0 overflow-hidden"><ApprovalView user={user} staffs={data.staffs} selectedCo={selectedCo} setSelectedCo={setSelectedCo} selectedCompanyId={selectedCompanyId} onRefresh={onRefresh} initialView={subView} onViewChange={setSubView} /></div>}
       {mainMenu === '인사관리' && (
-        <div className="flex-1 overflow-hidden" data-testid="hr-view">
+        <div className="flex-1 min-h-0 overflow-hidden" data-testid="hr-view">
           <HRView
             user={user}
             staffs={data.staffs}
@@ -104,9 +104,9 @@ export default function MainContent({
           />
         </div>
       )}
-      {mainMenu === '재고관리' && <div className="flex-1 overflow-hidden"><InventoryView user={user} depts={data.depts} onRefresh={onRefresh} selectedCo={selectedCo} selectedCompanyId={selectedCompanyId} initialView={subView} /></div>}
+      {mainMenu === '재고관리' && <div className="flex-1 min-h-0 overflow-hidden"><InventoryView user={user} depts={data.depts} onRefresh={onRefresh} selectedCo={selectedCo} selectedCompanyId={selectedCompanyId} initialView={subView} /></div>}
       {mainMenu === '추가기능' && (
-        <div className="flex-1 overflow-hidden flex flex-col" data-testid="extra-view">
+        <div className="flex-1 min-h-0 overflow-hidden flex flex-col" data-testid="extra-view">
           <추가기능
             user={user}
             staffs={data.staffs}
@@ -121,7 +121,7 @@ export default function MainContent({
           />
         </div>
       )}
-      {mainMenu === '관리자' && <div className="flex-1 overflow-hidden"><AdminView user={user} staffs={data.staffs} depts={data.depts} onRefresh={onRefresh} initialTab={subView} /></div>}
+      {mainMenu === '관리자' && <div className="flex-1 min-h-0 overflow-hidden"><AdminView user={user} staffs={data.staffs} depts={data.depts} onRefresh={onRefresh} initialTab={subView} /></div>}
 
       {/* 근로계약서 서명 팝업 제거됨 (마이페이지에서 통합 관리) */}
 

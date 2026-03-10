@@ -6,6 +6,7 @@ export default function PopupManager() {
   const [popups, setPopups] = useState<any[]>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [newPopup, setNewPopup] = useState({ 
     title: '', media_url: '', media_type: 'image', width: 400, height: 500 
   });
@@ -22,29 +23,51 @@ export default function PopupManager() {
     return newPopup.media_url;
   };
 
+  const uploadSelectedFile = async () => {
+    if (!selectedFile) return newPopup.media_url;
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    formData.append('mediaType', newPopup.media_type);
+
+    const response = await fetch('/api/admin/popups/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload?.url) {
+      throw new Error(payload?.error || '파일 업로드에 실패했습니다.');
+    }
+
+    return payload.url as string;
+  };
+
   const handleAddPopup = async () => {
     if (!newPopup.title) return alert("팝업 제목을 입력해주세요.");
     if (!selectedFile && !newPopup.media_url) {
       return alert("팝업에 사용할 파일을 선택해주세요.");
     }
 
-    let finalUrl = newPopup.media_url;
+    setSaving(true);
 
-    if (selectedFile) {
-      const ext = selectedFile.name.split('.').pop() || (newPopup.media_type === 'video' ? 'mp4' : 'png');
-      const fileName = `popup_${Date.now()}.${ext}`;
-      const { error } = await supabase.storage.from('popups').upload(fileName, selectedFile, { upsert: true });
-      if (error) return alert("파일 업로드에 실패했습니다.");
-      const { data: urlData } = supabase.storage.from('popups').getPublicUrl(fileName);
-      finalUrl = urlData.publicUrl;
-    }
+    try {
+      const finalUrl = await uploadSelectedFile();
+      const { error } = await supabase.from('popups').insert([{ ...newPopup, media_url: finalUrl, is_active: true }]);
 
-    const { error } = await supabase.from('popups').insert([{ ...newPopup, media_url: finalUrl, is_active: true }]);
-    if (!error) {
+      if (error) {
+        throw new Error(error.message || '팝업 저장에 실패했습니다.');
+      }
+
       alert("새 팝업이 생성되었습니다.");
       setSelectedFile(null);
       setNewPopup({ title: '', media_url: '', media_type: 'image', width: 400, height: 500 });
-      loadPopups();
+      await loadPopups();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '파일 업로드에 실패했습니다.';
+      alert(message);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -86,7 +109,7 @@ export default function PopupManager() {
 
         <div className="grid grid-cols-2 gap-2 mt-4">
           <button onClick={() => setShowPreview(true)} className="w-full py-5 bg-orange-50 text-orange-600 border border-orange-100 text-[11px] font-semibold shadow-sm uppercase tracking-widest">👁️ 홈페이지 실시간 시뮬레이션</button>
-          <button onClick={handleAddPopup} className="w-full py-5 bg-gray-900 text-white text-[11px] font-semibold shadow-xl uppercase tracking-widest">팝업 즉시 생성</button>
+          <button onClick={handleAddPopup} disabled={saving} className="w-full py-5 bg-gray-900 text-white text-[11px] font-semibold shadow-xl uppercase tracking-widest disabled:opacity-60 disabled:cursor-not-allowed">{saving ? '업로드 중...' : '팝업 즉시 생성'}</button>
         </div>
       </div>
 
@@ -101,9 +124,13 @@ export default function PopupManager() {
                 </div>
                 <div className="flex-1 relative bg-[var(--toss-gray-1)] overflow-hidden">
                     <iframe src="https://www.pchos.kr" className="w-full h-full border-0 pointer-events-none opacity-40" />
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white shadow-2xl border border-[var(--foreground)]"
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white shadow-2xl border border-[var(--foreground)] overflow-hidden"
                          style={{ width: `${newPopup.width}px`, height: `${newPopup.height}px` }}>
-                        <img src={getPreviewUrl()} alt="Popup" className="w-full h-full object-fill" />
+                        {newPopup.media_type === 'video' ? (
+                          <video src={getPreviewUrl()} className="w-full h-full object-cover" muted loop autoPlay playsInline />
+                        ) : (
+                          <img src={getPreviewUrl()} alt="Popup" className="w-full h-full object-fill" />
+                        )}
                         <div className="absolute bottom-0 w-full h-8 bg-black text-white flex justify-between items-center px-3 text-[11px] font-semibold">
                             <span>오늘 하루 열지 않기</span><span>닫기 X</span>
                         </div>

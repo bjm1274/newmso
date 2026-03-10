@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { buildAuditDiff, logAudit, readClientAuditActor } from '@/lib/audit';
 import StaffHistoryTimeline from './인사이력타임라인';
 import OnboardingChecklist from './급여명세/입퇴사온보딩';
 import CertTransferPanel from './교육자격인사이동패널';
@@ -11,7 +12,7 @@ function createEmptyStaffForm(selectedCompany?: string) {
 
   return {
     성명: '', 전화번호: '', 내선번호: '', 사업체: company, 팀: '원무팀', 직함: '', 입사일: '', 퇴사일: '',
-    주민번호: '', 이메일: '', 주소: '', 면허사항: '', 면허번호: '', 취득일자: '', 계좌정보: '', 임금정보: '', 상태: '재직',
+    주민번호: '', 이메일: '', 주소: '', 면허사항: '', 면허번호: '', 취득일자: '', 면허기타내용: '', 계좌정보: '', 임금정보: '', 상태: '재직',
     연차총개수: 0, 연차사용개수: 0, 근무형태ID: '',
     고용형태: '정규직' as string, 계약종료일: '' as string,
     probation_months: 0,
@@ -40,13 +41,17 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   const [essRequests, setEssRequests] = useState<any[]>([]);
   const [showEssModal, setShowEssModal] = useState(false);
 
-  const getVisibleShiftOptions = (companyName: string) =>
-    근무형태목록.filter((shift: any) => {
-      const isActive = shift?.is_active !== false;
-      const shiftCompany = shift?.company_name || shift?.company || '';
+  const 한글정렬 = (a: string, b: string) => a.localeCompare(b, 'ko');
 
-      return isActive && shiftCompany === companyName;
-    });
+  const getVisibleShiftOptions = (companyName: string) =>
+    근무형태목록
+      .filter((shift: any) => {
+        const isActive = shift?.is_active !== false;
+        const shiftCompany = shift?.company_name || shift?.company || '';
+
+        return isActive && shiftCompany === companyName;
+      })
+      .sort((a: any, b: any) => 한글정렬(a?.name || '', b?.name || ''));
 
   useEffect(() => {
     const fetchEssRequests = async () => {
@@ -105,7 +110,11 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   useEffect(() => {
     const fetchShifts = async () => {
       const { data } = await supabase.from('work_shifts').select('*');
-      if (data) 근무형태목록설정(data);
+      if (data) {
+        근무형태목록설정(
+          [...data].sort((a: any, b: any) => 한글정렬(a?.name || '', b?.name || ''))
+        );
+      }
     };
     fetchShifts();
   }, []);
@@ -160,6 +169,24 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     return ['진료부', '간호부', '총무부', '진료팀', '병동팀', '수술팀', '외래팀', '외래간호팀', '검사팀', '원무팀', '총무팀', '행정팀', '관리팀', '영양팀'];
   };
 
+  const 직원고용형태 = (직원: any) => 직원?.permissions?.employment_type || '정규직';
+  const 직원면허요약 = (직원: any) => {
+    const parts = [직원?.license, 직원?.permissions?.license_no, 직원?.permissions?.license_note]
+      .map((value) => (typeof value === 'string' ? value.trim() : ''))
+      .filter(Boolean);
+    return parts.length ? parts.join(' · ') : '-';
+  };
+  const 직원연락요약 = (직원: any) => {
+    const parts = [
+      직원?.phone,
+      직원?.email,
+      직원?.permissions?.extension ? `내선 ${직원.permissions.extension}` : '',
+    ]
+      .map((value) => (typeof value === 'string' ? value.trim() : ''))
+      .filter(Boolean);
+    return parts.length ? parts.join(' · ') : '-';
+  };
+
   useEffect(() => {
     const justOpened = 창상태 && !previousModalOpenRef.current;
     previousModalOpenRef.current = 창상태;
@@ -178,6 +205,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   const 정보저장 = async () => {
     if (!신규직원.성명 || !신규직원.입사일 || 신규직원.입사일 === '0000-00-00' || 신규직원.입사일 === '') return alert('성함과 실제 입사일은 필수 입력 사항입니다.');
     try {
+      const actor = readClientAuditActor();
       const dateOrNull = (val: string) => (val === '0000-00-00' || val === '0000-00' || !val || val === '') ? null : val;
       const commonData = {
         name: 신규직원.성명,
@@ -199,6 +227,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           extension: 신규직원.내선번호 || null,
           license_no: 신규직원.면허번호 || null,
           license_date: dateOrNull(신규직원.취득일자),
+          license_note: 신규직원.면허기타내용?.trim() || null,
           employment_type: 신규직원.고용형태 || '정규직',
           contract_end_date: 신규직원.고용형태 === '계약직' ? dateOrNull(신규직원.계약종료일) : null,
           insurance: {
@@ -227,7 +256,15 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       };
 
       if (편집모드 && 선택된직원ID) {
-        const { error: updateErr, data: updatedData } = await supabase.from('staff_members').update({
+        const beforeStaff = 직원목록.find((staff: any) => String(staff.id) === String(선택된직원ID)) || null;
+        const afterStaff = {
+          ...beforeStaff,
+          ...commonData,
+          annual_leave_total: 신규직원.연차총개수,
+          annual_leave_used: 신규직원.연차사용개수,
+        };
+
+        const { error: updateErr } = await supabase.from('staff_members').update({
           ...commonData,
           annual_leave_total: 신규직원.연차총개수,
           annual_leave_used: 신규직원.연차사용개수
@@ -236,32 +273,76 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         if (updateErr) {
           throw updateErr;
         }
+
+        await logAudit(
+          '직원정보수정',
+          'staff_member',
+          String(선택된직원ID),
+          {
+            staff_name: 신규직원.성명,
+            employee_no: beforeStaff?.employee_no || null,
+            ...buildAuditDiff(beforeStaff, afterStaff, Object.keys(afterStaff)),
+          },
+          actor.userId,
+          actor.userName
+        );
         alert('직원 정보가 수정되었습니다.');
       } else {
-        // 사번 부여 로직: 박철홍이면 1, 아니면 2~9999 순차
+        // 사번 부여 로직: 박철홍이면 1, 아니면 기존 숫자 사번의 최대값 다음 번호 사용
         let newEmployeeNo = '';
         if (신규직원.성명 === '박철홍') {
           newEmployeeNo = '1';
         } else {
-          // 1번을 제외한 가장 큰 사번 찾기
-          const { data: maxNoData } = await supabase
+          const { data: employeeNos, error: employeeNoError } = await supabase
             .from('staff_members')
-            .select('employee_no')
-            .neq('employee_no', '1')
-            .order('employee_no', { ascending: false })
-            .limit(1);
+            .select('employee_no');
 
-          let lastNo = 1;
-          if (maxNoData && maxNoData.length > 0) {
-            lastNo = parseInt(String(maxNoData[0].employee_no), 10) || 1;
+          if (employeeNoError) {
+            throw employeeNoError;
           }
-          newEmployeeNo = String(Math.max(2, lastNo + 1));
+
+          const existingEmployeeNos = new Set(
+            (employeeNos || [])
+              .map((row: any) => String(row?.employee_no || '').trim())
+              .filter(Boolean)
+          );
+
+          const lastNo = (employeeNos || []).reduce((maxNo: number, row: any) => {
+            const parsed = Number.parseInt(String(row?.employee_no || ''), 10);
+            if (!Number.isFinite(parsed) || parsed < 2) {
+              return maxNo;
+            }
+            return Math.max(maxNo, parsed);
+          }, 1);
+
+          let nextNo = Math.max(2, lastNo + 1);
+          while (existingEmployeeNos.has(String(nextNo))) {
+            nextNo += 1;
+          }
+          newEmployeeNo = String(nextNo);
         }
 
-        const { error: insertErr } = await supabase.from('staff_members').insert([{ ...commonData, employee_no: newEmployeeNo, role: 'staff', password: '', join_date: dateOrNull(신규직원.입사일) }]);
+        const { error: insertErr, data: insertedStaff } = await supabase
+          .from('staff_members')
+          .insert([{ ...commonData, employee_no: newEmployeeNo, role: 'staff', password: '', join_date: dateOrNull(신규직원.입사일) }])
+          .select()
+          .single();
         if (insertErr) {
           return alert('직원 등록 실패: ' + (insertErr.message || 'DB 오류'));
         }
+
+        await logAudit(
+          '직원등록',
+          'staff_member',
+          String(insertedStaff?.id || newEmployeeNo),
+          {
+            staff_name: 신규직원.성명,
+            employee_no: newEmployeeNo,
+            created_fields: buildAuditDiff({}, insertedStaff || commonData, Object.keys(commonData)).after,
+          },
+          actor.userId,
+          actor.userName
+        );
         alert(`직원 등록 완료!\n로그인 아이디: 사번 ${newEmployeeNo} 또는 이름 ${신규직원.성명}\n(동명이인이 있으면 사번으로 로그인하세요)`);
       }
       닫기함수(); 새로고침();
@@ -281,6 +362,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       주소: 직원.address || '', 면허사항: 직원.license || '',
       면허번호: 직원.permissions?.license_no || '',
       취득일자: 직원.permissions?.license_date || '',
+      면허기타내용: 직원.permissions?.license_note || '',
       계좌정보: 직원.bank_account || '',
       임금정보: 직원.salary_info || '', 상태: 직원.status || '재직',
       연차총개수: typeof 직원.annual_leave_total === 'number' ? 직원.annual_leave_total : 0,
@@ -323,7 +405,13 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   const 직원삭제 = async (직원: any) => {
     if (!confirm(`${직원.name} 직원을 삭제(퇴사 처리) 하시겠습니까?`)) return;
     try {
+      const actor = readClientAuditActor();
       const today = new Date().toISOString().slice(0, 10);
+      const afterStaff = {
+        ...직원,
+        status: '퇴사',
+        resigned_at: 직원.resigned_at || today,
+      };
       await supabase
         .from('staff_members')
         .update({
@@ -331,6 +419,19 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           resigned_at: 직원.resigned_at || today,
         })
         .eq('id', 직원.id);
+
+      await logAudit(
+        '직원퇴사처리',
+        'staff_member',
+        String(직원.id),
+        {
+          staff_name: 직원.name,
+          employee_no: 직원.employee_no || null,
+          ...buildAuditDiff(직원, afterStaff, ['status', 'resigned_at']),
+        },
+        actor.userId,
+        actor.userName
+      );
       alert('직원이 삭제(퇴사 처리)되었습니다.');
       if (선택된직원ID === 직원.id) {
         닫기함수();
@@ -350,6 +451,9 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     // 기본은 재직자 위주
     return companyMatch && status !== '퇴사';
   });
+  const 면허등록인원수 = 필터목록.filter((직원: any) => Boolean(직원.license || 직원.permissions?.license_no)).length;
+  const 계약직인원수 = 필터목록.filter((직원: any) => 직원고용형태(직원) === '계약직').length;
+  const 부서수 = new Set(필터목록.map((직원: any) => 직원.department).filter(Boolean)).size;
 
   return (
     <div className="flex flex-col h-full app-page">
@@ -389,6 +493,20 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       </header>
 
       <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
+        <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+          {[
+            { label: 보기상태 === '퇴사' ? '퇴사자 수' : '재직자 수', value: 필터목록.length, tone: 'bg-[var(--toss-card)] border-[var(--toss-border)] text-[var(--foreground)]' },
+            { label: '면허/자격 등록', value: 면허등록인원수, tone: 'bg-amber-50 border-amber-200 text-amber-900' },
+            { label: '계약직', value: 계약직인원수, tone: 'bg-blue-50 border-blue-200 text-blue-900' },
+            { label: '부서 수', value: 부서수, tone: 'bg-emerald-50 border-emerald-200 text-emerald-900' },
+          ].map((card) => (
+            <div key={card.label} className={`rounded-[16px] border p-4 shadow-sm ${card.tone}`}>
+              <p className="text-[10px] font-bold uppercase tracking-widest opacity-70">{card.label}</p>
+              <p className="mt-2 text-2xl font-bold">{card.value}</p>
+            </div>
+          ))}
+        </div>
+
         {선택된직원ID && (
           <div className="mb-6 space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -402,10 +520,10 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           </div>
         )}
         {/* PC 버전 테이블 */}
-        <div className="hidden md:block bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] overflow-hidden shadow-xl">
+        <div className="hidden md:block bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] overflow-x-auto shadow-xl">
           <table className="w-full text-left border-collapse">
             <thead className="bg-[var(--toss-gray-1)] text-[11px] font-semibold text-[var(--toss-gray-3)] border-b border-[var(--toss-border)] uppercase tracking-widest">
-              <tr><th className="p-6">사번</th><th className="p-6">성명/직함</th><th className="p-6">소속</th><th className="p-6">부서/팀</th><th className="p-6">입사일</th><th className="p-6">근무형태</th><th className="p-6">상태</th><th className="p-6 text-right">관리</th></tr>
+              <tr><th className="p-6">사번</th><th className="p-6">성명/직함</th><th className="p-6">소속</th><th className="p-6">부서/팀</th><th className="p-6">연락/계정</th><th className="p-6">근무정보</th><th className="p-6">면허/자격</th><th className="p-6">상태</th><th className="p-6 text-right">관리</th></tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {필터목록.map((직원: any) => (
@@ -414,14 +532,27 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                   <td className="p-6">
                     <p className="text-sm font-semibold text-[var(--foreground)]">{직원.name}</p>
                     <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">{직원.position || '-'}</p>
+                    <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">{직원.resident_no ? '주민번호 등록' : '주민번호 미등록'}</p>
                   </td>
                   <td className="p-6 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">{직원.company}</td>
                   <td className="p-6 text-xs font-bold text-[var(--toss-gray-4)]">{직원.department}</td>
-                  <td className="p-6 text-xs font-bold text-[var(--toss-gray-4)]">{직원.joined_at || 직원.join_date || '-'}</td>
                   <td className="p-6">
-                    <span className="px-3 py-1 bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] text-[11px] font-semibold rounded-full">
-                      {근무형태목록.find(s => s.id === 직원.shift_id)?.name || '-'}
-                    </span>
+                    <p className="text-xs font-bold text-[var(--foreground)]">{직원연락요약(직원)}</p>
+                    <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">입사일 {직원.joined_at || 직원.join_date || '-'}</p>
+                  </td>
+                  <td className="p-6">
+                    <div className="flex flex-col gap-1">
+                      <span className="w-fit px-3 py-1 bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] text-[11px] font-semibold rounded-full">
+                        {근무형태목록.find(s => s.id === 직원.shift_id)?.name || '-'}
+                      </span>
+                      <span className={`w-fit px-3 py-1 text-[10px] font-semibold rounded-full ${직원고용형태(직원) === '계약직' ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                        {직원고용형태(직원)}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="p-6">
+                    <p className="text-xs font-bold text-[var(--foreground)]">{직원면허요약(직원)}</p>
+                    <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">취득일 {직원.permissions?.license_date || '-'}</p>
                   </td>
                   <td className="p-6">
                     <span className={`px-3 py-1 text-[11px] font-semibold rounded-full ${직원.status === '퇴사' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
@@ -479,6 +610,18 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                   <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">근무형태</p>
                   <p className="text-xs font-bold text-[var(--foreground)]">{근무형태목록.find(s => s.id === 직원.shift_id)?.name || '-'}</p>
                 </div>
+                <div>
+                  <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">연락처</p>
+                  <p className="text-xs font-bold text-[var(--foreground)] break-all">{직원연락요약(직원)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">고용형태</p>
+                  <p className="text-xs font-bold text-[var(--foreground)]">{직원고용형태(직원)}</p>
+                </div>
+              </div>
+              <div className="pt-4 border-t border-[var(--toss-border)]">
+                <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">면허/자격</p>
+                <p className="text-xs font-bold text-[var(--foreground)] break-words">{직원면허요약(직원)}</p>
               </div>
               <div className="flex gap-2">
                 <button
@@ -641,6 +784,15 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                             value={신규직원.취득일자}
                             onChange={val => 신규직원설정({ ...신규직원, 취득일자: val })}
                             inputClassName="w-full p-3 bg-white rounded-[12px] border-none outline-none text-xs font-bold text-amber-900 focus:ring-2 focus:ring-amber-300"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-amber-700 ml-1">기타 내용</label>
+                          <textarea
+                            value={신규직원.면허기타내용}
+                            onChange={e => 신규직원설정({ ...신규직원, 면허기타내용: e.target.value })}
+                            placeholder="발급기관, 세부 자격 범위, 특이사항 등을 자유롭게 입력"
+                            className="min-h-[88px] w-full resize-none p-3 bg-white rounded-[12px] border-none outline-none text-xs font-bold text-amber-900 focus:ring-2 focus:ring-amber-300"
                           />
                         </div>
                       </div>

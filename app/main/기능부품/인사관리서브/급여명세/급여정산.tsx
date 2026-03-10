@@ -267,7 +267,35 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
 
       await supabase.from('payroll_records').upsert(records, { onConflict: 'staff_id,year_month' });
       const u = typeof window !== 'undefined' ? (() => { try { return JSON.parse(localStorage.getItem('erp_user') || '{}'); } catch { return {}; } })() : {};
-      await logAudit('급여수정', 'payroll', yearMonth, { count: records.length, total: records.reduce((s: number, r: any) => s + (Number(r.net_pay) || 0), 0) }, u.id, u.name);
+      await logAudit(
+        '급여수정',
+        'payroll',
+        yearMonth,
+        {
+          count: records.length,
+          total: records.reduce((sum: number, record: any) => sum + (Number(record.net_pay) || 0), 0),
+          year_month: yearMonth,
+          records: records.map((record: any) => {
+            const staff = selectedStaffs.find((candidate: any) => candidate.id === record.staff_id);
+            return {
+              staff_id: record.staff_id,
+              staff_name: staff?.name || '-',
+              employee_no: staff?.employee_no || null,
+              company: staff?.company || '',
+              department: staff?.department || '',
+              base_salary: record.base_salary,
+              total_taxable: record.total_taxable,
+              total_taxfree: record.total_taxfree,
+              total_deduction: record.total_deduction,
+              attendance_deduction: record.attendance_deduction,
+              advance_pay: record.advance_pay,
+              net_pay: record.net_pay,
+            };
+          }),
+        },
+        u.id,
+        u.name
+      );
 
       alert("급여 정산 및 명세서 생성이 완료되었습니다. 법적 비과세 한도가 자동 적용되었습니다.");
       setStep(3);

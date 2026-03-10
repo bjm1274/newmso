@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { FEATURE_PERMISSION_GROUPS, type FeaturePermissionItem } from '@/lib/feature-permissions';
+import { buildAuditDiff, logAudit, readClientAuditActor } from '@/lib/audit';
 
 function getToneClasses(tone: FeaturePermissionItem['tone'], active: boolean) {
   if (!active) {
@@ -83,6 +84,8 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
       return;
     }
 
+    const actor = readClientAuditActor();
+    const beforeStaff = staffs.find((staff) => staff.id === selectedStaff.id) || selectedStaff;
     setPasswordSaving(true);
     const { error } = await updateStaffRecord(selectedStaff.id, { password: newPassword.trim() });
     setPasswordSaving(false);
@@ -93,26 +96,70 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
     }
 
     setNewPassword('');
+    await logAudit(
+      '비밀번호재설정',
+      'staff_permission',
+      String(selectedStaff.id),
+      {
+        staff_name: beforeStaff?.name || selectedStaff.name,
+        ...buildAuditDiff({ password: beforeStaff?.password || '' }, { password: '[PROTECTED]' }, ['password']),
+      },
+      actor.userId,
+      actor.userName
+    );
     alert('비밀번호가 변경되었습니다.');
   };
 
   const handleRoleChange = async (staffId: string, newRole: string) => {
+    const actor = readClientAuditActor();
+    const beforeStaff = staffs.find((staff) => staff.id === staffId);
     const { error } = await updateStaffRecord(staffId, { role: newRole });
     if (error) {
       alert('역할 변경 중 오류가 발생했습니다.');
+      return;
     }
+
+    await logAudit(
+      '직원권한수정',
+      'staff_permission',
+      String(staffId),
+      {
+        staff_name: beforeStaff?.name || '-',
+        ...buildAuditDiff({ role: beforeStaff?.role || null }, { role: newRole }, ['role']),
+      },
+      actor.userId,
+      actor.userName
+    );
   };
 
   const setPermissions = useCallback(
     async (staffId: string, nextPermissions: Record<string, any>) => {
+      const actor = readClientAuditActor();
+      const beforeStaff = staffs.find((staff) => staff.id === staffId);
       const { error } = await updateStaffRecord(staffId, { permissions: nextPermissions });
       if (error) {
         alert('권한 변경 중 오류가 발생했습니다.');
         return false;
       }
+
+      await logAudit(
+        '권한수정',
+        'staff_permission',
+        String(staffId),
+        {
+          staff_name: beforeStaff?.name || '-',
+          ...buildAuditDiff(
+            { permissions: beforeStaff?.permissions || {} },
+            { permissions: nextPermissions },
+            ['permissions']
+          ),
+        },
+        actor.userId,
+        actor.userName
+      );
       return true;
     },
-    [updateStaffRecord]
+    [staffs, updateStaffRecord]
   );
 
   const togglePermission = async (staffId: string, permKey: string) => {
@@ -148,6 +195,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
     const target = staffs.find((staff) => staff.id === copyTargetId);
     if (!source || !target) return;
 
+    const actor = readClientAuditActor();
     setCopying(true);
     const updates: { permissions: Record<string, any>; role?: string } = {
       permissions: { ...(source.permissions || {}) },
@@ -165,6 +213,29 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
     }
 
     alert(`[${source.name}]님의 권한${copyRoleToo ? '과 역할' : ''}을 [${target.name}]님에게 적용했습니다.`);
+    await logAudit(
+      '권한복사',
+      'staff_permission',
+      String(copyTargetId),
+      {
+        source_staff: source.name,
+        target_staff: target.name,
+        copy_role: copyRoleToo,
+        ...buildAuditDiff(
+          {
+            role: target.role || null,
+            permissions: target.permissions || {},
+          },
+          {
+            role: updates.role ?? target.role ?? null,
+            permissions: updates.permissions,
+          },
+          ['role', 'permissions']
+        ),
+      },
+      actor.userId,
+      actor.userName
+    );
     setCopyTargetId('');
   };
 
@@ -186,7 +257,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
       className="flex flex-col md:flex-row h-full min-h-0 bg-[var(--toss-card)] rounded-[12px] md:rounded-3xl shadow-sm border border-[var(--toss-border)] overflow-hidden"
       data-testid="staff-permission-view"
     >
-      <div className="w-full md:w-[320px] md:border-r border-[var(--toss-border)] flex flex-col md:min-w-[300px] max-h-[40vh] md:max-h-none shrink-0">
+      <div className="w-full md:w-[320px] md:border-r border-[var(--toss-border)] flex min-h-0 flex-col md:min-w-[300px] max-h-[40vh] md:max-h-none shrink-0">
         <div className="p-6 border-b border-[var(--toss-border)] bg-[var(--toss-gray-1)]">
           <h3 className="text-sm font-semibold text-[var(--foreground)]">직원 명단</h3>
           <p className="text-[11px] text-[var(--toss-gray-3)] font-bold">직원 선택 시 역할·권한 설정</p>
@@ -214,7 +285,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 p-4 md:p-8 bg-[var(--toss-gray-1)]/50 overflow-y-auto">
+      <div className="flex-1 min-h-0 p-4 pb-12 md:p-8 md:pb-16 bg-[var(--toss-gray-1)]/50 overflow-y-auto">
         <div className="mb-8 bg-[var(--toss-card)] p-6 rounded-[12px] shadow-sm border border-[var(--toss-border)] border-l-4 border-l-[var(--toss-blue)]">
           <p className="text-sm font-semibold text-[var(--foreground)] mb-3">📋 권한 한번에 복사 (A → B)</p>
           <p className="text-[11px] text-[var(--toss-gray-3)] font-bold mb-4">한 직원의 권한·역할을 다른 직원에게 그대로 적용합니다.</p>

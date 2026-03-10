@@ -23,12 +23,14 @@ import AccessAuditLog from './관리자전용서브/접근감사로그';
 import CompanyPnL from './관리자전용서브/법인손익현황';
 import PayrollDocumentDesignManager from './관리자전용서브/급여명세서서식관리';
 import OfficialDocumentLog from './관리자전용서브/공문서발송대장';
+import SystemMasterCenter from './관리자전용서브/시스템마스터센터';
 
 type AnalysisTabId = '경영대시보드' | '재무대시보드' | '예산관리' | '통합보고서' | '법인손익';
 type AuditTabId = '감사로그' | '접근감사로그';
 type AdminOuterTabId =
   | '경영분석'
   | '감사센터'
+  | '시스템마스터센터'
   | '엑셀등록'
   | '알림자동화'
   | '연차수동부여'
@@ -70,6 +72,7 @@ const DIRECT_ADMIN_TABS: AdminOuterTabId[] = [
   '문서서식',
   '급여이상치',
   '공문서대장',
+  '시스템마스터센터',
 ];
 
 function normalizeAdminEntry(tabId?: string | null): {
@@ -170,13 +173,17 @@ export default function AdminView({ user, staffs = [], onRefresh, initialTab }: 
   const [inventory, setInventory] = useState<any[]>([]);
 
   const isMso = user?.company === 'SY INC.' || user?.permissions?.mso === true;
+  const isSystemMaster = user?.permissions?.system_master === true || user?.is_system_master === true;
 
   useEffect(() => {
     const nextState = normalizeAdminEntry(initialTab);
-    setActiveTab(nextState.activeTab);
+    const nextActiveTab = nextState.activeTab === '시스템마스터센터' && !isSystemMaster
+      ? '감사센터'
+      : nextState.activeTab;
+    setActiveTab(nextActiveTab);
     setAnalysisTab(nextState.analysisTab);
     setAuditTab(nextState.auditTab);
-  }, [initialTab]);
+  }, [initialTab, isSystemMaster]);
 
   useEffect(() => {
     if (!isMso) return;
@@ -255,6 +262,7 @@ export default function AdminView({ user, staffs = [], onRefresh, initialTab }: 
         {activeTab === '문서서식' && <PayrollDocumentDesignManager />}
         {activeTab === '급여이상치' && <SalaryAnomalyDetector staffs={staffs} />}
         {activeTab === '공문서대장' && <OfficialDocumentLog staffs={staffs} selectedCo="전체" user={user} />}
+        {activeTab === '시스템마스터센터' && <SystemMasterCenter user={user} />}
       </main>
     </div>
   );

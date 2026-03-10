@@ -69,6 +69,7 @@ function MainPageContent() {
       // ignore
     }
     try {
+      localStorage.removeItem('user_session');
       localStorage.removeItem('erp_user');
       localStorage.removeItem('erp_login_at');
       persistSupabaseAccessToken(null);
@@ -388,13 +389,16 @@ function MainPageContent() {
   };
 
   // 현재 메인 메뉴에 해당하는 서브메뉴 목록
-  const currentSubMenus = mainMenu === '인사관리' ? [] : (SUB_MENUS[mainMenu] || []);
+  const isSystemMaster = user?.permissions?.system_master === true || user?.is_system_master === true;
+  const currentSubMenus = (mainMenu === '인사관리' ? [] : (SUB_MENUS[mainMenu] || []))
+    .filter((subMenu) => subMenu.id !== '시스템마스터센터' || isSystemMaster);
   const subgroupLabels: Record<string, string> = {
     '경영 분석': '📊 경영 분석',
     '조직 / 권한': '🔐 조직 / 권한',
     '시스템 설정': '⚙️ 시스템 설정',
     '데이터 관리': '🗂️ 데이터 관리',
     '감사 센터': '🔍 감사 센터',
+    '시스템 마스터': '🛡️ 시스템 마스터',
     인력관리: '👥 인력관리',
     '근태/급여': '💰 근태 · 급여',
     '복무/복지': '🏥 복무 · 복지',
