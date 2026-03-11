@@ -105,24 +105,24 @@ const HR_GROUP_LABELS: Record<HrTabDef['group'], string> = {
 
 const HR_TABS: HrTabDef[] = [
   { id: '구성원', label: '구성원', perm: 'hr_구성원', icon: '👥', group: '인력관리' },
-  { id: '인사발령', label: '인사발령', perm: 'hr_구성원', icon: '📋', group: '인력관리' },
-  { id: '포상/징계', label: '포상 / 징계', perm: 'hr_구성원', icon: '🏅', group: '인력관리' },
-  { id: '교육', label: '교육', perm: 'hr_구성원', icon: '📚', group: '인력관리' },
-  { id: '오프보딩', label: '오프보딩', perm: 'hr_구성원', icon: '🚪', group: '인력관리' },
+  { id: '인사발령', label: '인사발령', perm: 'hr_인사발령', icon: '📋', group: '인력관리' },
+  { id: '포상/징계', label: '포상 / 징계', perm: 'hr_포상징계', icon: '🏅', group: '인력관리' },
+  { id: '교육', label: '교육', perm: 'hr_교육', icon: '📚', group: '인력관리' },
+  { id: '오프보딩', label: '오프보딩', perm: 'hr_오프보딩', icon: '🚪', group: '인력관리' },
   { id: '근태', label: '근태', perm: 'hr_근태', icon: '⏰', group: '근태/급여' },
   { id: '교대근무', label: '교대근무', perm: 'hr_교대근무', icon: '🔄', group: '근태/급여' },
   { id: '연차/휴가', label: '연차 / 휴가', perm: 'hr_연차휴가', icon: '🌴', group: '근태/급여' },
   { id: '급여', label: '급여', perm: 'hr_급여', icon: '💰', group: '근태/급여' },
-  { id: '건강검진', label: '건강검진', perm: 'hr_구성원', icon: '🩺', group: '복무/복지' },
-  { id: '경조사', label: '경조사 지원', perm: 'hr_구성원', icon: '🎊', group: '복무/복지' },
-  { id: '면허/자격증', label: '면허 / 자격증', perm: 'hr_구성원', icon: '📜', group: '복무/복지' },
-  { id: '의료기기점검', label: '의료기기점검', perm: 'hr_구성원', icon: '🔧', group: '복무/복지' },
+  { id: '건강검진', label: '건강검진', perm: 'hr_건강검진', icon: '🩺', group: '복무/복지' },
+  { id: '경조사', label: '경조사 지원', perm: 'hr_경조사', icon: '🎊', group: '복무/복지' },
+  { id: '면허/자격증', label: '면허 / 자격증', perm: 'hr_면허자격증', icon: '📜', group: '복무/복지' },
+  { id: '의료기기점검', label: '의료기기점검', perm: 'hr_의료기기점검', icon: '🔧', group: '복무/복지' },
   { id: '비품대여', label: '비품대여', perm: 'hr_비품대여', icon: '📦', group: '복무/복지' },
-  { id: '사고보고서', label: '사고보고서', perm: 'hr_구성원', icon: '🚨', group: '복무/복지' },
+  { id: '사고보고서', label: '사고보고서', perm: 'hr_사고보고서', icon: '🚨', group: '복무/복지' },
   { id: '계약', label: '계약 관리', perm: 'hr_계약', icon: '📝', group: '문서/기타' },
   { id: '문서보관함', label: '문서보관함', perm: 'hr_문서보관함', icon: '📁', group: '문서/기타' },
   { id: '증명서', label: '증명서 발급', perm: 'hr_증명서', icon: '📄', group: '문서/기타' },
-  { id: '서류제출', label: '서류 제출 관리', perm: 'hr_구성원', icon: '📤', group: '문서/기타' },
+  { id: '서류제출', label: '서류 제출 관리', perm: 'hr_서류제출', icon: '📤', group: '문서/기타' },
   { id: '캘린더', label: '캘린더', perm: 'hr_캘린더', icon: '📅', group: '문서/기타' },
 ];
 
@@ -493,13 +493,13 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
     워크스페이스설정(getWorkspaceForHrMenu('문서보관함'));
   };
 
-  if (!hasAccess) {
+  if (!hasAccess || visibleHrTabs.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center bg-[var(--toss-gray-1)] p-6">
         <div className="mb-4 text-5xl">🔒</div>
         <h2 className="text-lg font-semibold text-[var(--foreground)]">인사관리 접근 권한이 없습니다.</h2>
         <p className="mt-2 text-sm font-bold text-[var(--toss-gray-4)]">
-          MSO 직원이거나 인사 조회 권한이 부여된 직원만 이용할 수 있습니다. 관리자에게 문의해 주세요.
+          메인 메뉴 권한과 세부 인사관리 권한을 확인해 주세요.
         </p>
       </div>
     );

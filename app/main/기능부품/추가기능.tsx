@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { canAccessExtraFeature } from '@/lib/access-control';
 import ThemeToggle from '@/app/components/ThemeToggle';
 import GlobalSearch from '@/app/components/GlobalSearch';
 import 부서별물품장비현황 from './재고관리서브/부서별물품장비현황';
@@ -15,26 +16,22 @@ const EXTERNAL_LINKS = [
   { id: 'webfax', label: 'U+ 웹팩스', url: 'https://webfax.uplus.co.kr/m', icon: '📠' },
 ];
 
-const MANAGER_POSITION_KEYWORDS = ['팀장', '과장', '실장', '수간호사', '파트장', '센터장', '부장', '본부장', '이사', '원장', '병원장', '대표'];
-
 type FeatureCard = {
   id: string;
   label: string;
   icon: string;
   subView: string | null;
   isOrgChart?: boolean;
-  restricted?: boolean;
-  managerOnly?: boolean;
 };
 
 const FEATURE_CARDS: FeatureCard[] = [
   { id: '조직도', label: '조직도', icon: '🏢', subView: null, isOrgChart: true },
   { id: '부서별재고', label: '부서별 재고', icon: '📦', subView: '부서별재고' },
   { id: '근무현황', label: '근무현황', icon: '📅', subView: '근무현황' },
-  { id: '인계노트', label: '인계노트', icon: '📝', subView: '인계노트', restricted: true },
+  { id: '인계노트', label: '인계노트', icon: '📝', subView: '인계노트' },
   { id: '퇴원심사', label: '퇴원심사', icon: '🏥', subView: '퇴원심사' },
-  { id: '마감보고', label: '마감보고', icon: '💰', subView: '마감보고', restricted: true },
-  { id: '직원평가', label: '직원평가', icon: '✍️', subView: '직원평가', restricted: true },
+  { id: '마감보고', label: '마감보고', icon: '💰', subView: '마감보고' },
+  { id: '직원평가', label: '직원평가', icon: '✍️', subView: '직원평가' },
 ];
 
 const MAX_RECENT = 5;
@@ -58,12 +55,6 @@ export default function ExtraFeatures({
   const [favorites, setFavorites] = useState<string[]>([]);
   const [recentFeatures, setRecentFeatures] = useState<string[]>([]);
 
-  const isManagerOrHigher =
-    user?.role === 'admin' ||
-    user?.company === 'SY INC.' ||
-    user?.permissions?.mso === true ||
-    MANAGER_POSITION_KEYWORDS.some((keyword) => String(user?.position || '').includes(keyword));
-
   useEffect(() => {
     try {
       const storedFav = localStorage.getItem(LS_FAVORITES);
@@ -74,6 +65,14 @@ export default function ExtraFeatures({
       // ignore
     }
   }, []);
+
+  useEffect(() => {
+    if (!subView) return;
+    const activeCard = FEATURE_CARDS.find((card) => card.subView === subView);
+    if (activeCard && !canAccessExtraFeature(user, activeCard.id)) {
+      setSubView(null);
+    }
+  }, [subView, user]);
 
   const toggleFavorite = (id: string, event: React.MouseEvent) => {
     event.stopPropagation();
@@ -89,6 +88,8 @@ export default function ExtraFeatures({
   };
 
   const handleFeatureClick = (featureId: string, targetSubView: string | null, isOrgChart?: boolean) => {
+    if (!canAccessExtraFeature(user, featureId)) return;
+
     setRecentFeatures((prev) => {
       const filtered = prev.filter((item) => item !== featureId);
       const next = [featureId, ...filtered].slice(0, MAX_RECENT);
@@ -110,25 +111,9 @@ export default function ExtraFeatures({
     }
   };
 
-  const isRestricted = (card: FeatureCard) => {
-    if (card.managerOnly) return !isManagerOrHigher;
-    if (!card.restricted) return false;
-
-    return !(
-      user?.department === '병동팀' ||
-      user?.team === '병동팀' ||
-      user?.department?.includes('원무') ||
-      user?.team?.includes('원무') ||
-      user?.role === 'admin' ||
-      user?.permissions?.mso ||
-      user?.permissions?.handover_read ||
-      isManagerOrHigher
-    );
-  };
-
   const visibleCards = FEATURE_CARDS.filter((card) => {
     if (card.isOrgChart && !onOpenOrgChart) return false;
-    if (isRestricted(card)) return false;
+    if (!canAccessExtraFeature(user, card.id)) return false;
     return true;
   });
 
@@ -149,7 +134,9 @@ export default function ExtraFeatures({
             posts={posts}
             onSelect={(type, id) => {
               if (type === 'handover') {
-                setSubView('인계노트');
+                if (canAccessExtraFeature(user, '인계노트')) {
+                  setSubView('인계노트');
+                }
                 return;
               }
               onSearchSelect(type, id);
@@ -281,6 +268,18 @@ export default function ExtraFeatures({
     );
   }
 
+  if (visibleCards.length === 0) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center bg-[var(--toss-gray-1)] p-6 text-center">
+        <div className="mb-4 text-6xl">🔒</div>
+        <h2 className="text-xl font-bold text-[var(--foreground)]">추가기능 접근 권한이 없습니다.</h2>
+        <p className="mt-2 text-sm font-semibold text-[var(--toss-gray-3)]">
+          메인 메뉴 권한과 추가기능 세부 권한을 확인해 주세요.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 overflow-y-auto bg-[var(--page-bg)] p-3 md:p-4 custom-scrollbar">
       <div className="mx-auto w-full max-w-5xl">
@@ -302,7 +301,7 @@ export default function ExtraFeatures({
               <div className="flex flex-wrap items-center gap-2">
                 {recentFeatures.map((featureId) => {
                   const card = FEATURE_CARDS.find((item) => item.id === featureId);
-                  if (!card || isRestricted(card)) return null;
+                  if (!card || !canAccessExtraFeature(user, card.id)) return null;
                   if (card.isOrgChart && !onOpenOrgChart) return null;
 
                   return (

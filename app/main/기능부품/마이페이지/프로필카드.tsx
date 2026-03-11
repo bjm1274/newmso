@@ -3,18 +3,12 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { persistSupabaseAccessToken } from '@/lib/supabase-bridge';
 import { isMissingColumnError } from '@/lib/supabase-compat';
-
-const getProfilePhotoUrl = (source: any) => source?.avatar_url || source?.photo_url || null;
-
-const normalizeProfileUser = (source: any) => {
-  if (!source) return source;
-  const photoUrl = getProfilePhotoUrl(source);
-  return {
-    ...source,
-    avatar_url: photoUrl,
-    photo_url: photoUrl,
-  };
-};
+import {
+  buildProfilePhotoUrlFromPath,
+  getProfilePhotoUrl,
+  normalizeProfileUser,
+  withProfilePhotoMetadata,
+} from '@/lib/profile-photo';
 
 export default function MyProfileCard({
   user: initialUser,
@@ -208,28 +202,43 @@ export default function MyProfileCard({
       }
 
       const file = event.target.files[0];
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${currentUser.id}_${Date.now()}.${fileExt}`;
-      const filePath = `${fileName}`;
+      const filePath = `${currentUser.id}/avatar`;
+      const uploadedAt = new Date().toISOString();
+      const currentPermissions =
+        currentUser?.permissions && typeof currentUser.permissions === 'object' && !Array.isArray(currentUser.permissions)
+          ? currentUser.permissions
+          : {};
+      const nextPermissions = {
+        ...currentPermissions,
+        profile_photo_path: filePath,
+        profile_photo_updated_at: uploadedAt,
+      };
 
       // 1. Storage 업로드
       const { error: uploadError } = await supabase.storage
         .from('profiles')
-        .upload(filePath, file, { upsert: true });
+        .upload(filePath, file, { upsert: true, contentType: file.type || undefined });
 
       if (uploadError) throw uploadError;
 
       // 2. 이미지 주소 획득
       const { data } = supabase.storage.from('profiles').getPublicUrl(filePath);
-      const newUrl = `${data.publicUrl}?t=${new Date().getTime()}`;
+      const newUrl =
+        buildProfilePhotoUrlFromPath(filePath, uploadedAt) ||
+        `${data.publicUrl}?v=${encodeURIComponent(uploadedAt)}`;
 
       // 3. DB 업데이트 (복구된/저장소 사용자 ID)
-      const avatarUpdate = await supabase
+      let persistedToLegacyColumn = false;
+      let legacyUploadError: any = null;
+      try {
+        const avatarUpdate = await supabase
         .from('staff_members')
         .update({ avatar_url: newUrl })
         .eq('id', currentUser.id);
 
-      if (avatarUpdate.error) {
+      if (!avatarUpdate.error) {
+        persistedToLegacyColumn = true;
+      } else {
         if (!isMissingColumnError(avatarUpdate.error, 'avatar_url')) throw avatarUpdate.error;
 
         const photoUpdate = await supabase
@@ -243,13 +252,40 @@ export default function MyProfileCard({
           }
           throw photoUpdate.error;
         }
+        persistedToLegacyColumn = true;
       }
 
       // 4. 화면 반영
+      } catch (error: any) {
+        legacyUploadError = error;
+      }
+      persistedToLegacyColumn = persistedToLegacyColumn || !legacyUploadError;
+
+      const permissionsUpdate = await supabase
+        .from('staff_members')
+        .update({ permissions: nextPermissions })
+        .eq('id', currentUser.id);
+
+      if (permissionsUpdate.error && !persistedToLegacyColumn) {
+        throw permissionsUpdate.error;
+      }
+      if (legacyUploadError && !persistedToLegacyColumn) {
+        throw legacyUploadError;
+      }
+
       setAvatarUrl(newUrl);
 
       // 5. 세션 강제 동기화 (새로고침 방어)
-      const updatedUser = normalizeProfileUser({ ...currentUser, avatar_url: newUrl, photo_url: newUrl });
+      const updatedUser = withProfilePhotoMetadata(
+        {
+          ...currentUser,
+          permissions: nextPermissions,
+          avatar_url: newUrl,
+          photo_url: newUrl,
+        },
+        filePath,
+        uploadedAt
+      );
       setUser(updatedUser);
       localStorage.setItem('user_session', JSON.stringify(updatedUser));
       localStorage.setItem('erp_user', JSON.stringify(updatedUser));

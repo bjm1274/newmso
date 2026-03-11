@@ -13,6 +13,7 @@ import NotificationInbox from '../알림인박스';
 import ContractSignatureModal from '../인사관리서브/계약문서/전자서명모달';
 import RoleDashboard from './역할별대시보드';
 import { supabase } from '@/lib/supabase';
+import { getProfilePhotoUrl } from '@/lib/profile-photo';
 
 const MYPAGE_TAB_KEY = 'erp_mypage_tab';
 const MYPAGE_RECORDS_VIEW_KEY = 'erp_mypage_records_view';
@@ -572,7 +573,7 @@ function buildProfileSummary(source: any) {
     name: source?.name || '',
     position: source?.position || '',
     department: source?.department || '',
-    avatarUrl: source?.avatar_url || source?.photo_url || null,
+    avatarUrl: getProfilePhotoUrl(source),
     employeeNo: source?.employee_no || '',
   };
 }

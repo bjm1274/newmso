@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { canAccessMainMenu } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
 import NotificationCenter from '../NotificationCenter';
 
@@ -94,23 +95,9 @@ const MAIN_MENUS = [
 ];
 
 export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
-  const permissions = user?.permissions || {};
-  const isMso = user?.company === 'SY INC.' || permissions.mso === true;
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
 
-  const canSeeMenu = (menuId: string) => {
-    if (menuId === '관리자') {
-      return isMso || user?.role === 'admin' || permissions.menu_관리자 === true;
-    }
-
-    if (menuId === '인사관리') {
-      return isMso || permissions.hr === true || permissions.menu_인사관리 === true;
-    }
-
-    return permissions[`menu_${menuId}`] !== false;
-  };
-
-  const visibleMenus = MAIN_MENUS.filter((menu) => canSeeMenu(menu.id));
+  const visibleMenus = MAIN_MENUS.filter((menu) => canAccessMainMenu(user, menu.id));
 
   const fetchChatUnreadCount = useCallback(async () => {
     if (!user?.id) {

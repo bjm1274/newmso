@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 
 export default function OrgChart({ user, staffs, depts, selectedCo, setSelectedCo, onRefresh }: any) {
@@ -22,6 +22,29 @@ export default function OrgChart({ user, staffs, depts, selectedCo, setSelectedC
     }
   }, [searchTerm, staffs]);
 
+  const normalizedDepts = useMemo(() => {
+    const fallbackDepts = Array.from(
+      new Set(
+        (Array.isArray(staffs) ? staffs : [])
+          .map((staff: any) => String(staff.department || '').trim())
+          .filter(Boolean)
+      )
+    ).map((name) => ({ id: name, name }));
+
+    const source = Array.isArray(depts) && depts.length > 0 ? depts : fallbackDepts;
+    return source
+      .map((dept: any) => {
+        if (typeof dept === 'string') {
+          const name = dept.trim();
+          return name ? { id: name, name } : null;
+        }
+        const name = String(dept?.name || dept?.id || '').trim();
+        const id = String(dept?.id || name).trim();
+        return name ? { id, name } : null;
+      })
+      .filter(Boolean);
+  }, [depts, staffs]);
+
   const toggleDept = (deptId: string) => {
     setExpandedDepts(prev =>
       prev.includes(deptId)
@@ -30,8 +53,15 @@ export default function OrgChart({ user, staffs, depts, selectedCo, setSelectedC
     );
   };
 
-  const getDeptStaffs = (deptId: string) => {
-    return staffs.filter((staff: any) => staff.department_id === deptId);
+  const getDeptStaffs = (dept: { id: string; name: string }) => {
+    return staffs.filter((staff: any) => {
+      const staffDeptId = String(staff.department_id || '').trim();
+      const staffDeptName = String(staff.department || '').trim();
+      if (staffDeptId && dept.id) {
+        return staffDeptId === dept.id;
+      }
+      return staffDeptName === dept.name;
+    });
   };
 
   const getPositionColor = (position: string) => {
@@ -112,7 +142,7 @@ export default function OrgChart({ user, staffs, depts, selectedCo, setSelectedC
         ) : (
           // 조직도 구조
           <div className="p-6">
-            {depts && depts.map((dept: any) => (
+            {normalizedDepts.map((dept: any) => (
               <div key={dept.id} className="mb-6">
                 {/* 부서 헤더 */}
                 <div
@@ -124,14 +154,14 @@ export default function OrgChart({ user, staffs, depts, selectedCo, setSelectedC
                   </span>
                   <span className="font-semibold text-lg text-[var(--foreground)]">📋 {dept.name}</span>
                   <span className="text-xs font-bold text-[var(--toss-gray-3)] ml-auto">
-                    ({getDeptStaffs(dept.id).length}명)
+                    ({getDeptStaffs(dept).length}명)
                   </span>
                 </div>
 
                 {/* 부서 직원 목록 */}
                 {expandedDepts.includes(dept.id) && (
                   <div className="ml-6 space-y-2 border-l-2 border-[var(--toss-border)] pl-4">
-                    {getDeptStaffs(dept.id).map((staff: any) => (
+                    {getDeptStaffs(dept).map((staff: any) => (
                       <div
                         key={staff.id}
                         onClick={() => setSelectedStaff(staff)}

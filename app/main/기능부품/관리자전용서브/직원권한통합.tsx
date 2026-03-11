@@ -566,16 +566,16 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 gap-1.5 xl:grid-cols-2">
+                      <div className="grid grid-cols-2 gap-1 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                         {group.items.map((item) => {
                           const isActive = selectedPermissions?.[item.key] === true;
                           return (
                             <div
                               key={item.key}
-                              className={`flex items-center justify-between gap-2 rounded-[10px] border px-2.5 py-2 transition-colors ${getToneClasses(item.tone, isActive)}` }
+                              className={`flex items-center justify-between gap-1.5 rounded-[8px] border px-2 py-1.5 transition-colors ${getToneClasses(item.tone, isActive)}` }
                             >
                               <div className="min-w-0">
-                                <p className={`truncate text-[11px] font-bold ${isActive ? 'text-[var(--foreground)]' : 'text-slate-700'}`}>
+                                <p className={`line-clamp-2 break-keep text-[10px] font-bold leading-tight ${isActive ? 'text-[var(--foreground)]' : 'text-slate-700'}`}>
                                   {item.label}
                                 </p>
                               </div>
@@ -584,11 +584,11 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                                 data-testid={`staff-permission-toggle-${item.key}`}
                                 aria-pressed={isActive}
                                 onClick={() => togglePermission(selectedStaff.id, item.key)}
-                                className={`relative h-[18px] w-[36px] shrink-0 rounded-full transition-all focus:outline-none focus:ring-3 ${getToggleClasses(item.tone, isActive)}` }
+                                className={`relative h-[14px] w-[28px] shrink-0 rounded-full transition-all focus:outline-none focus:ring-2 ${getToggleClasses(item.tone, isActive)}` }
                               >
                                 <div
-                                  className={`absolute top-0.5 h-[14px] w-[14px] rounded-full bg-white shadow-sm transition-all ${
-                                    isActive ? 'left-5' : 'left-0.5'
+                                  className={`absolute top-0.5 h-[10px] w-[10px] rounded-full bg-white shadow-sm transition-all ${
+                                    isActive ? 'left-[16px]' : 'left-0.5'
                                   }`}
                                 />
                               </button>

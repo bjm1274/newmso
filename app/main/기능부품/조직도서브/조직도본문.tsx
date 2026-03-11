@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { normalizeMainMenuForUser } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
 
 import OrgChart from './OrgChart';
@@ -77,7 +78,7 @@ export default function MainContent({
 
       {mainMenu === '조직도' && (
         <div className="min-h-0 flex-1 overflow-x-hidden">
-          <OrgChart user={user} staffs={data.staffs} selectedCo={selectedCo} setSelectedCo={setSelectedCo} />
+          <OrgChart user={user} staffs={data.staffs} depts={data.depts} selectedCo={selectedCo} setSelectedCo={setSelectedCo} />
         </div>
       )}
 
@@ -165,12 +166,12 @@ export default function MainContent({
             staffs={data.staffs}
             posts={data.posts}
             onSearchSelect={(type: string) => {
-              if (type === 'staff') setMainMenu('조직도');
+              if (type === 'staff') setMainMenu(normalizeMainMenuForUser(user, '조직도'));
               else if (type === 'post') setMainMenu('게시판');
               else if (type === 'approval') setMainMenu('전자결재');
               else if (type === 'message') setMainMenu('채팅');
             }}
-            onOpenOrgChart={() => setMainMenu('조직도')}
+            onOpenOrgChart={() => setMainMenu(normalizeMainMenuForUser(user, '조직도'))}
           />
         </div>
       )}
