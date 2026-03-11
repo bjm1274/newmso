@@ -46,7 +46,7 @@ function getStaffCompanyLabel(staff: any) {
 }
 
 function getStaffTeamLabel(staff: any) {
-  return String(staff?.department || '미지정 팀').trim() || '미지정 팀';
+  return String(staff?.department || '미지정 부서').trim() || '미지정 부서';
 }
 
 function sortStaffRows(a: any, b: any) {
@@ -105,7 +105,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
 
   const setPassword = async () => {
     if (!selectedStaff?.id || !newPassword.trim()) {
-      alert('새 비밀번호를 입력하세요.');
+      alert('새 비밀번호를 입력해주세요.');
       return;
     }
 
@@ -208,11 +208,11 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
 
   const copyPermissionsToStaff = async () => {
     if (!copySourceId || !selectedStaff?.id) {
-      alert('복사할 직원(A)과 붙여넣을 직원(B)을 모두 선택하세요.');
+      alert('복사할 직원(A)과 적용할 직원(B)을 모두 선택해주세요.');
       return;
     }
     if (copySourceId === selectedStaff.id) {
-      alert('복사할 직원과 붙여넣을 직원이 같을 수 없습니다.');
+      alert('복사할 직원과 적용할 직원은 같을 수 없습니다.');
       return;
     }
 
@@ -237,7 +237,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
       return;
     }
 
-    alert(`[${source.name}]님의 권한${copyRoleToo ? '과 역할' : ''}을 [${target.name}]님에게 적용했습니다.`);
+    alert(`[${source.name}]의 권한${copyRoleToo ? '과 역할' : ''}이 [${target.name}]에게 적용되었습니다.`);
     await logAudit(
       '권한복사',
       'staff_permission',
@@ -311,10 +311,10 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
 
   return (
     <div
-      className="flex min-h-full flex-col rounded-[10px] border border-[var(--toss-border)] bg-[var(--toss-card)] shadow-sm md:flex-row md:rounded-[20px]"
+      className="flex min-h-fit flex-col rounded-[10px] border border-[var(--toss-border)] bg-[var(--toss-card)] shadow-sm md:flex-row md:rounded-[16px]"
       data-testid="staff-permission-view"
     >
-      <div className="flex w-full max-h-[36vh] shrink-0 flex-col border-[var(--toss-border)] md:sticky md:top-0 md:max-h-[calc(100vh-8rem)] md:min-w-[220px] md:self-start md:w-[220px] md:border-r lg:w-[240px]">
+      <div className="flex w-full max-h-[34vh] shrink-0 flex-col border-[var(--toss-border)] md:sticky md:top-0 md:max-h-[calc(100vh-8rem)] md:min-w-[200px] md:self-start md:w-[200px] md:border-r lg:w-[216px]">
         <div className="p-4 border-b border-[var(--toss-border)] bg-[var(--toss-gray-1)]">
           <h3 className="text-sm font-semibold text-[var(--foreground)]">직원 명단</h3>
         </div>
@@ -363,17 +363,17 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
         </div>
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col bg-[var(--toss-gray-1)]/50">
-        <div className="shrink-0 mx-3 mt-3 rounded-[10px] border border-[var(--toss-border)] border-l-4 border-l-[var(--toss-blue)] bg-[var(--toss-card)] p-3 shadow-sm md:mx-5 md:mt-5 md:p-4">
-          <p className="mb-2 text-[13px] font-semibold text-[var(--foreground)]">📋 권한 한번에 복사 (A → B)</p>
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+      <div className="flex min-w-0 flex-1 flex-col overflow-visible bg-[var(--toss-gray-1)]/50">
+        <div className="shrink-0 mx-2 mt-2 rounded-[10px] border border-[var(--toss-border)] border-l-4 border-l-[var(--toss-blue)] bg-[var(--toss-card)] p-2.5 shadow-sm md:mx-4 md:mt-4 md:p-3">
+          <p className="mb-2 text-[13px] font-semibold text-[var(--foreground)]">권한 빠른 복사 (A → B)</p>
+          <div className="flex flex-col gap-2.5 lg:flex-row lg:items-end">
             <div className="min-w-[180px] flex-1">
               <label className="mb-1 block text-[11px] font-bold text-[var(--toss-gray-3)]">권한 가져올 직원</label>
               <select
                 data-testid="staff-permission-copy-source"
                 value={copySourceId}
                 onChange={(e) => setCopySourceId(e.target.value)}
-                className="w-full rounded-[12px] border border-[var(--toss-border)] bg-[var(--input-bg)] px-3 py-2 text-[12px] font-bold"
+                className="w-full rounded-[10px] border border-[var(--toss-border)] bg-[var(--input-bg)] px-2.5 py-2 text-[11px] font-bold"
               >
                 <option value="">직원 선택</option>
                 {groupedStaffSections.map((companySection) =>
@@ -398,7 +398,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                 data-testid="staff-permission-copy-target"
                 value={selectedStaff?.id || ''}
                 onChange={(e) => setSelectedStaff(staffs.find((staff) => staff.id === e.target.value) ?? null)}
-                className="w-full rounded-[12px] border border-[var(--toss-border)] bg-[var(--input-bg)] px-3 py-2 text-[12px] font-bold"
+                className="w-full rounded-[10px] border border-[var(--toss-border)] bg-[var(--input-bg)] px-2.5 py-2 text-[11px] font-bold"
               >
                 <option value="">직원 선택</option>
                 {groupedStaffSections.map((companySection) =>
@@ -417,7 +417,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                 )}
               </select>
             </div>
-            <label className="flex items-center gap-2 rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2 text-[10px] font-bold text-[var(--toss-gray-4)]">
+            <label className="flex items-center gap-2 rounded-[10px] border border-[var(--toss-border)] bg-white px-2.5 py-2 text-[10px] font-bold text-[var(--toss-gray-4)]">
               <input
                 data-testid="staff-permission-copy-role"
                 type="checkbox"
@@ -425,14 +425,14 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                 onChange={(e) => setCopyRoleToo(e.target.checked)}
                 className="rounded border-[var(--toss-border)]"
               />
-              역할도 함께 복사
+              역할까지 함께 복사
             </label>
             <button
               type="button"
               data-testid="staff-permission-copy-apply"
               onClick={copyPermissionsToStaff}
               disabled={copying || !copySourceId || !selectedStaff?.id || copySourceId === selectedStaff?.id}
-              className="rounded-[12px] bg-[var(--toss-blue)] px-4 py-2 text-[11px] font-bold text-white hover:bg-[var(--toss-blue)] disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-[10px] bg-[var(--toss-blue)] px-3 py-2 text-[10px] font-bold text-white hover:bg-[var(--toss-blue)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {copying ? '적용 중...' : '현재 직원에 복사'}
             </button>
@@ -440,24 +440,26 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
         </div>
 
         {selectedStaff ? (
-          <div className="flex-1 px-3 pb-16 pt-1 md:px-5 md:pb-20 md:pt-2" data-testid="staff-permission-detail">
-            <div className="max-w-5xl space-y-4">
-            <div className="border-b border-[var(--toss-border)] pb-3">
-              <h3 className="text-xl font-semibold text-[var(--foreground)] tracking-tight">
-                [{selectedStaff.name}] 직원·권한 설정
-              </h3>
-              <p className="mt-1 text-[11px] font-bold text-[var(--toss-blue)]">
-                사번 {selectedStaff.employee_no} | {selectedStaff.department} {selectedStaff.position}
-              </p>
-            </div>            <div className="grid gap-4 xl:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
-              <div className="space-y-4">
-                <div className="bg-[var(--toss-card)] p-4 rounded-[10px] shadow-sm border border-[var(--toss-border)]">
-                  <p className="mb-2 text-[13px] font-semibold text-[var(--foreground)]">역할(Role)</p>
+          <div className="px-2 pb-32 pt-1 md:px-4 md:pb-40 md:pt-1.5" data-testid="staff-permission-detail">
+            <div className="max-w-6xl space-y-3">
+              <div className="border-b border-[var(--toss-border)] pb-3">
+                <h3 className="text-lg font-semibold text-[var(--foreground)] tracking-tight">
+                  [{selectedStaff.name}] 직원 권한 설정
+                </h3>
+                <p className="mt-1 text-[11px] font-bold text-[var(--toss-blue)]">
+                  사번 {selectedStaff.employee_no} | {selectedStaff.department} {selectedStaff.position}
+                </p>
+              </div>
+
+              <div className="grid gap-3 xl:grid-cols-[minmax(0,300px)_minmax(0,1fr)]">
+              <div className="space-y-3">
+                <div className="bg-[var(--toss-card)] p-3 rounded-[10px] shadow-sm border border-[var(--toss-border)]">
+                  <p className="mb-2 text-[13px] font-semibold text-[var(--foreground)]">역할</p>
                   <select
                     data-testid={`staff-role-select`}
                     value={selectedStaff.role || 'staff'}
                     onChange={(e) => handleRoleChange(selectedStaff.id, e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-[12px] text-[12px] font-bold ${
+                    className={`w-full px-2.5 py-2 border rounded-[10px] text-[11px] font-bold ${
                       selectedStaff.role === 'admin' ? 'border-red-200 text-red-600 bg-red-50' : 'border-[var(--toss-border)]'
                     }`}
                   >
@@ -467,28 +469,28 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                   </select>
                 </div>
 
-                <div className="bg-[var(--toss-card)] p-4 rounded-[10px] shadow-sm border border-[var(--toss-border)]">
+                <div className="bg-[var(--toss-card)] p-3 rounded-[10px] shadow-sm border border-[var(--toss-border)]">
                   <p className="mb-2 text-[13px] font-semibold text-[var(--foreground)]">비밀번호 설정</p>
                   <div className="flex gap-2">
-                    <input
-                      type="password"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="새 비밀번호"
-                      className="flex-1 px-3 py-2 border border-[var(--toss-border)] rounded-[12px] text-[12px]"
-                    />
+                      <input
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="새 비밀번호"
+                        className="flex-1 px-2.5 py-2 border border-[var(--toss-border)] rounded-[10px] text-[11px]"
+                      />
                     <button
                       type="button"
                       onClick={setPassword}
                       disabled={passwordSaving || !newPassword.trim()}
-                      className="px-3.5 py-2 bg-[var(--foreground)] text-white rounded-[12px] text-[11px] font-bold hover:bg-[var(--foreground)] disabled:opacity-50"
+                      className="px-3 py-2 bg-[var(--foreground)] text-white rounded-[10px] text-[10px] font-bold hover:bg-[var(--foreground)] disabled:opacity-50"
                     >
                       {passwordSaving ? '변경 중...' : '변경'}
                     </button>
                   </div>
                 </div>
 
-                <div className="bg-red-50 p-4 rounded-[10px] shadow-sm border border-red-200">
+                <div className="bg-red-50 p-3 rounded-[10px] shadow-sm border border-red-200">
                   <p className="mb-2 text-[13px] font-semibold text-red-600">보안 및 세션 관리</p>
                   <button
                     type="button"
@@ -504,24 +506,24 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                         .from('staff_members')
                         .update({ force_logout_at: new Date().toISOString() })
                         .eq('id', selectedStaff.id);
-                      if (!error) alert('강제 로그아웃 명령을 전송했습니다.');
-                      else alert('처리 중 오류 발생');
+                      if (!error) alert('강제 로그아웃 명령이 전송되었습니다.');
+                      else alert('처리 중 오류가 발생했습니다.');
                     }}
-                    className="w-full py-2.5 bg-red-600 text-white rounded-[12px] text-[11px] font-bold hover:bg-red-700 transition-colors shadow-sm"
+                    className="w-full py-2 bg-red-600 text-white rounded-[10px] text-[10px] font-bold hover:bg-red-700 transition-colors shadow-sm"
                   >
                     기기 전체 강제 로그아웃 (Session Kill)
                   </button>
                 </div>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {FEATURE_PERMISSION_GROUPS.map((group) => {
                   const stats = permissionStats.find((item) => item.id === group.id);
                   const activeCount = stats?.active || 0;
                   const totalCount = stats?.total || group.items.length;
 
                   return (
-                    <section key={group.id} className="bg-[var(--toss-card)] p-4 rounded-[10px] shadow-sm border border-[var(--toss-border)] space-y-3">
+                    <section key={group.id} className="bg-[var(--toss-card)] p-3 rounded-[10px] shadow-sm border border-[var(--toss-border)] space-y-2.5">
                       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                         <div className="flex items-center gap-2">
                           <p className="text-[13px] font-semibold text-[var(--foreground)]">{group.label}</p>
@@ -547,13 +549,13 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 gap-2 xl:grid-cols-2">
+                      <div className="grid grid-cols-1 gap-1.5 xl:grid-cols-2">
                         {group.items.map((item) => {
                           const isActive = selectedPermissions?.[item.key] === true;
                           return (
                             <div
                               key={item.key}
-                              className={`flex items-center justify-between gap-3 rounded-[10px] border p-2.5 transition-colors ${getToneClasses(item.tone, isActive)}`}
+                              className={`flex items-center justify-between gap-2 rounded-[10px] border px-2.5 py-2 transition-colors ${getToneClasses(item.tone, isActive)}` }
                             >
                               <div className="min-w-0">
                                 <p className={`truncate text-[11px] font-bold ${isActive ? 'text-[var(--foreground)]' : 'text-slate-700'}`}>
@@ -565,10 +567,10 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                                 data-testid={`staff-permission-toggle-${item.key}`}
                                 aria-pressed={isActive}
                                 onClick={() => togglePermission(selectedStaff.id, item.key)}
-                                className={`relative h-5 w-10 shrink-0 rounded-full transition-all focus:outline-none focus:ring-3 ${getToggleClasses(item.tone, isActive)}`}
+                                className={`relative h-[18px] w-[36px] shrink-0 rounded-full transition-all focus:outline-none focus:ring-3 ${getToggleClasses(item.tone, isActive)}` }
                               >
                                 <div
-                                  className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all ${
+                                  className={`absolute top-0.5 h-[14px] w-[14px] rounded-full bg-white shadow-sm transition-all ${
                                     isActive ? 'left-5' : 'left-0.5'
                                   }`}
                                 />
@@ -587,10 +589,11 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
         ) : (
           <div className="flex-1 min-h-0 flex flex-col items-center justify-center px-6 text-center text-[var(--toss-gray-3)]">
             <span className="mb-4 text-5xl">🔐</span>
-            <p className="text-sm font-semibold">왼쪽에서 직원을 선택해 권한과 역할을 설정하세요.</p>
+            <p className="text-sm font-semibold">왼쪽에서 직원을 선택해 권한과 역할을 설정해주세요.</p>
           </div>
         )}
       </div>
     </div>
   );
 }
+

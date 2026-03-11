@@ -3,7 +3,8 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { persistSupabaseAccessToken } from '@/lib/supabase-bridge';
 
-export default function MyProfileCard({ user: initialUser, onOpenApproval }: any) {
+export default function MyProfileCard({ user: initialUser, onOpenApproval, setMainMenu }: any) {
+  const MASKED_TEXT = '••••••••';
   const [user, setUser] = useState<any>(initialUser || {});
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -93,37 +94,34 @@ export default function MyProfileCard({ user: initialUser, onOpenApproval }: any
     window.location.replace('/');
   };
 
-  const verifyPasswordAndRun = async (onSuccess: () => void) => {
+  const verifyPassword = async () => {
     try {
-      let currentUser = user;
-      if (!currentUser?.id && initialUser?.name) {
-        await recoverUserIdentity(initialUser.name);
-        try {
-          const stored = localStorage.getItem('erp_user');
-          if (stored) currentUser = JSON.parse(stored);
-        } catch {
-          // ignore
-        }
-      }
-      if (!currentUser?.id) {
-        alert('직원 계정으로 로그인한 상태에서만 사용할 수 있습니다.');
-        return;
-      }
       const input = window.prompt('본인 확인을 위해 현재 비밀번호를 입력해 주세요.');
-      if (!input) return;
-      const { data, error } = await supabase
-        .from('staff_members')
-        .select('id')
-        .eq('id', currentUser.id)
-        .eq('password', input)
-        .single();
-      if (error || !data) {
+      if (!input) return false;
+
+      const response = await fetch('/api/auth/verify-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: input, name: user?.name, employeeNo: user?.employee_no }),
+      });
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok || !payload?.verified) {
         alert('비밀번호가 일치하지 않습니다.');
-        return;
+        return false;
       }
-      onSuccess();
+
+      return true;
     } catch {
       alert('본인 확인 중 오류가 발생했습니다.');
+      return false;
+    }
+  };
+
+  const verifyPasswordAndRun = async (onSuccess: () => void) => {
+    const verified = await verifyPassword();
+    if (verified) {
+      onSuccess();
     }
   };
 
@@ -252,10 +250,10 @@ export default function MyProfileCard({ user: initialUser, onOpenApproval }: any
   if (!user) return <div className="p-10">로딩 중...</div>;
 
   return (
-    <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-[16px] p-5 sm:p-6 lg:p-8 flex flex-col h-full">
+    <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-[16px] p-4 sm:p-5 lg:p-6 flex flex-col">
 
       {/* 프로필 헤더 */}
-      <div className="flex flex-row items-center sm:items-start gap-4 sm:gap-6 pb-6 sm:pb-7 border-b border-[var(--toss-border)] shrink-0">
+      <div className="flex flex-row items-center sm:items-start gap-4 sm:gap-5 pb-4 sm:pb-5 border-b border-[var(--toss-border)] shrink-0">
         <div className="relative group shrink-0">
           <div className="w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-full bg-[var(--toss-gray-1)] flex items-center justify-center overflow-hidden border-2 sm:border-4 border-[var(--toss-card)] shadow-sm">
             {avatarUrl ? (
@@ -284,8 +282,7 @@ export default function MyProfileCard({ user: initialUser, onOpenApproval }: any
         </div>
 
         <div className="flex-1 w-full sm:w-auto text-left">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-2">
-            {/* 이름 · 직책 + 소속 */}
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div className="flex flex-col items-start gap-1">
               <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-[var(--foreground)] tracking-tight">
                 {user.name} {user.position}
@@ -295,18 +292,27 @@ export default function MyProfileCard({ user: initialUser, onOpenApproval }: any
               </p>
             </div>
 
-            {/* 보안 정보 · 내 정보 수정 버튼 */}
-            <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 mt-2 sm:mt-0">
+            <div className="flex flex-wrap items-center gap-2 lg:max-w-[56%] lg:justify-end">
+              <span className="rounded-full bg-[var(--toss-gray-1)] px-3 py-1.5 text-[11px] font-bold text-[var(--toss-gray-3)]">
+                인사관리
+              </span>
               <button
-                onClick={() => verifyPasswordAndRun(() => setShowSecret((v) => !v))}
-                className="text-[11px] sm:text-[11px] font-bold px-3 py-1.5 sm:px-4 sm:py-2 bg-[var(--toss-gray-1)] rounded-full text-[var(--toss-gray-3)] hover:text-[var(--toss-blue)] border border-transparent hover:border-[var(--toss-blue-light)]"
+                type="button"
+                onClick={() => setMainMenu?.('인사관리')}
+                className="rounded-full border border-[var(--toss-blue-light)] bg-white px-3 py-1.5 text-[11px] font-bold text-[var(--toss-blue)] transition-all hover:bg-[var(--toss-blue-light)]"
               >
-                {showSecret ? '민감 정보 숨기기 🔒' : '보안 정보 보기 👁️'}
+                인사관리로 이동
+              </button>
+              <button
+                onClick={() => { if (showSecret) setShowSecret(false); else verifyPasswordAndRun(() => setShowSecret(true)); }}
+                className="rounded-full border border-transparent bg-[var(--toss-gray-1)] px-3 py-1.5 text-[11px] font-bold text-[var(--toss-gray-3)] transition-all hover:border-[var(--toss-blue-light)] hover:text-[var(--toss-blue)]"
+              >
+                {showSecret ? '민감 정보 숨기기' : '보안 정보 보기'}
               </button>
               <button
                 type="button"
-                onClick={() => verifyPasswordAndRun(() => setIsEditing((v) => !v))}
-                className={`text-[11px] sm:text-[11px] font-bold px-3 py-1.5 sm:px-4 sm:py-2 rounded-full border transition-all ${isEditing
+                onClick={() => { if (isEditing) setIsEditing(false); else verifyPasswordAndRun(() => setIsEditing(true)); }}
+                className={`rounded-full border px-3 py-1.5 text-[11px] font-bold transition-all ${isEditing
                   ? 'bg-red-50 text-red-500 border-red-100 hover:bg-red-100'
                   : 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)] border-[var(--toss-blue-light)] hover:bg-[var(--toss-blue-light)]'
                   }`}
@@ -315,78 +321,49 @@ export default function MyProfileCard({ user: initialUser, onOpenApproval }: any
               </button>
             </div>
           </div>
-          {/* 디버깅용 메시지 (작게 표시, 문제 해결 후 삭제 가능) */}
           {/* <p className="text-[11px] text-[var(--toss-gray-3)] mt-2">시스템 상태: {debugMsg || '정상'}</p> */}
         </div>
       </div>
 
       {/* 상세 정보 + 나의 근태/연차 요약 */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar py-5 sm:py-6 min-h-0">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-10">
+      <div className="pt-4 sm:pt-5">
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-5 lg:gap-6">
           {/* 인사 관리 정보 */}
-          <div className="lg:col-span-2 space-y-5">
+          <div className="space-y-4">
             <h3 className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest border-l-4 border-[var(--toss-blue)] pl-3 mb-1">
               인사 관리 정보
             </h3>
-            <div className="grid grid-cols-1 min-[480px]:grid-cols-2 gap-x-6 gap-y-5">
+            <div className="grid grid-cols-1 min-[520px]:grid-cols-2 xl:grid-cols-3 gap-x-5 gap-y-4">
               <InfoItem label="사번" value={user.employee_no} />
               <InfoItem label="입사일" value={user.join_date} />
+              <InfoItem label="이메일" value={user.email} />
             </div>
             {isEditing ? (
-              <div className="grid grid-cols-1 min-[480px]:grid-cols-2 gap-x-6 gap-y-5 pt-1">
-                <EditableItem
-                  label="이메일"
-                  value={editForm.email}
-                  onChange={(v: string) => setEditForm((f) => ({ ...f, email: v }))}
-                  placeholder="이메일 주소를 입력하세요"
-                />
-                <EditableItem
-                  label="연락처"
-                  value={editForm.phone}
-                  onChange={(v: string) => setEditForm((f) => ({ ...f, phone: v }))}
-                  placeholder="'-' 없이 숫자만 입력"
-                />
-                <EditableItem
-                  label="내선번호"
-                  value={editForm.extension}
-                  onChange={(v: string) => setEditForm((f) => ({ ...f, extension: v }))}
-                  placeholder="내선번호 입력"
-                />
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 min-[480px]:grid-cols-2 gap-x-6 gap-y-5 pt-1">
-                <InfoItem label="이메일" value={user.email} />
-                <InfoItem label="연락처" value={user.phone} />
-                <InfoItem label="내선번호" value={user.extension || user.permissions?.extension} />
-              </div>
-            )}
-          </div>
-
-          {/* 나의 근태 · 연차 */}
-          <div className="space-y-4">
-            <h3 className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest border-l-4 border-emerald-500 pl-3 mb-1">
-              나의 근태 · 연차
-            </h3>
-            <LeaveAndCommuteSummary user={user} onOpenApproval={onOpenApproval} />
-          </div>
-
-          {/* 보안 및 급여 */}
-          <div className="lg:col-span-3 space-y-5 pt-2 border-t border-[var(--toss-border)] mt-2">
-            <h3 className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest border-l-4 border-[var(--toss-danger)] pl-3 mb-1">
-              보안 및 급여
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
-              {isEditing ? (
-                <>
+              <>
+                <div className="grid grid-cols-1 min-[520px]:grid-cols-2 xl:grid-cols-3 gap-x-5 gap-y-4">
+                  <EditableItem
+                    label="연락처"
+                    value={editForm.phone}
+                    onChange={(v: string) => setEditForm((f) => ({ ...f, phone: v }))}
+                    placeholder="'-' 없이 숫자만 입력"
+                  />
+                  <EditableItem
+                    label="내선번호"
+                    value={editForm.extension}
+                    onChange={(v: string) => setEditForm((f) => ({ ...f, extension: v }))}
+                    placeholder="내선번호 입력"
+                  />
                   <EditableItem
                     label="거주지"
                     value={editForm.address}
                     onChange={(v: string) => setEditForm((f) => ({ ...f, address: v }))}
                     placeholder="도로명 주소를 입력하세요"
                   />
-                  <div className="space-y-3">
-                    <span className="text-[12px] font-bold text-[var(--toss-gray-3)] block mb-2">계좌정보</span>
-                    <div className="grid grid-cols-2 gap-3">
+                </div>
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-x-6 gap-y-4 pt-1">
+                  <div className="xl:col-span-2 space-y-3">
+                    <span className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-wide block">계좌정보</span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <input
                         type="text"
                         value={editForm.bank_name}
@@ -406,54 +383,62 @@ export default function MyProfileCard({ user: initialUser, onOpenApproval }: any
                         className="w-full px-3 py-2.5 rounded-[16px] border border-[var(--toss-border)] text-[13px] font-semibold text-[var(--foreground)] bg-[var(--input-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)]"
                       />
                     </div>
-                    <p className="text-[11px] text-[var(--toss-gray-3)]">
-                      급여 이체용 계좌 정보를 정확히 입력해 주세요.
-                    </p>
                   </div>
-                </>
-              ) : (
-                <>
-                  <InfoItem label="거주지" value={user.address} />
+                </div>
+              </>
+            ) : (
+              <div className="grid grid-cols-1 min-[520px]:grid-cols-2 xl:grid-cols-3 gap-x-5 gap-y-4">
+                <InfoItem label="연락처" value={showSecret ? user.phone : MASKED_TEXT} isMasked={!showSecret} />
+                <InfoItem label="내선번호" value={user.extension || user.permissions?.extension} />
+                <InfoItem label="거주지" value={showSecret ? user.address : MASKED_TEXT} isMasked={!showSecret} />
+                <InfoItem
+                  label="기본급"
+                  value={
+                    showSecret
+                      ? `₩ ${(user.base_salary || 0).toLocaleString()}`
+                      : MASKED_TEXT
+                  }
+                  isMasked={!showSecret}
+                />
+                {showSecret && [
+                  { key: 'meal_allowance', label: '식대 (비과세)' },
+                  { key: 'vehicle_allowance', label: '자가운전 (비과세)' },
+                  { key: 'childcare_allowance', label: '보육수당 (비과세)' },
+                  { key: 'research_allowance', label: '연구활동비 (비과세)' },
+                  { key: 'other_taxfree', label: '기타 비과세' },
+                ].filter(({ key }) => Number(user[key as keyof typeof user] ?? 0) > 0).map(({ key, label }) => (
                   <InfoItem
-                    label="기본급"
-                    value={
-                      showSecret
-                        ? `₩ ${(user.base_salary || 0).toLocaleString()}`
-                        : '••••••••'
-                    }
-                    isMasked={!showSecret}
+                    key={key}
+                    label={label}
+                    value={`₩ ${(Number(user[key as keyof typeof user]) || 0).toLocaleString()}`}
                   />
-                  {showSecret && [
-                    { key: 'meal_allowance', label: '식대 (비과세)' },
-                    { key: 'vehicle_allowance', label: '자가운전 (비과세)' },
-                    { key: 'childcare_allowance', label: '보육수당 (비과세)' },
-                    { key: 'research_allowance', label: '연구활동비 (비과세)' },
-                    { key: 'other_taxfree', label: '기타 비과세' },
-                  ].filter(({ key }) => Number(user[key as keyof typeof user] ?? 0) > 0).map(({ key, label }) => (
-                    <InfoItem
-                      key={key}
-                      label={label}
-                      value={`₩ ${(Number(user[key as keyof typeof user]) || 0).toLocaleString()}`}
-                    />
-                  ))}
-                  <InfoItem
-                    label="계좌정보"
-                    value={
-                      showSecret
-                        ? `${user.bank_name || ''} ${user.bank_account || ''}`
-                        : '••••••••'
-                    }
-                    isMasked={!showSecret}
-                  />
-                </>
-              )}
-            </div>
+                ))}
+                <InfoItem
+                  label="계좌정보"
+                  value={
+                    showSecret
+                      ? `${user.bank_name || ''} ${user.bank_account || ''}`.trim()
+                      : MASKED_TEXT
+                  }
+                  isMasked={!showSecret}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* 나의 근태 · 연차 */}
+          <div className="space-y-3">
+            <h3 className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest border-l-4 border-emerald-500 pl-3 mb-1">
+              나의 근태 · 연차
+            </h3>
+            <LeaveAndCommuteSummary user={user} onOpenApproval={onOpenApproval} />
           </div>
         </div>
+
       </div>
 
       {/* 로그아웃 버튼 */}
-      <div className="pt-5 sm:pt-6 mt-4 border-t border-[var(--toss-border)] flex flex-col-reverse sm:flex-row gap-3 sm:items-center sm:justify-between shrink-0">
+      <div className="pt-4 sm:pt-5 mt-4 border-t border-[var(--toss-border)] flex flex-col-reverse sm:flex-row gap-3 sm:items-center sm:justify-between shrink-0">
         {isEditing && (
           <button
             type="button"
@@ -639,3 +624,6 @@ function LeaveAndCommuteSummary({ user, onOpenApproval }: any) {
     </div>
   );
 }
+
+
+

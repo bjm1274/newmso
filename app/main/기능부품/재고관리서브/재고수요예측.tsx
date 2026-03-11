@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { getItemName, getItemQuantity, getRecommendedOrderQuantity, requestInventoryReorder } from '@/app/main/inventory-utils';
 
 interface Props {
   user: any;
@@ -36,9 +37,9 @@ export default function InventoryDemandForecast({ user, inventory, selectedCo }:
         const { data } = await supabase
           .from('inventory_logs')
           .select('*')
-          .eq('type', 'out')
           .gte('created_at', since.toISOString());
-        setLogs(data || []);
+        const outboundLogs = (data || []).filter((log: any) => ['출고', 'out'].includes(String(log.change_type || log.type || '').trim()));
+        setLogs(outboundLogs);
       } catch {
         setLogs([]);
       } finally {
@@ -52,10 +53,10 @@ export default function InventoryDemandForecast({ user, inventory, selectedCo }:
     const itemLogs = logs.filter((l: any) => String(l.item_id || l.inventory_id) === String(item.id));
     const totalOut = itemLogs.reduce((s: number, l: any) => s + (l.quantity || l.amount || 0), 0);
     const avgDailyUsage = totalOut / 90;
-    const currentStock = item.quantity || item.stock || 0;
+    const currentStock = getItemQuantity(item);
     const daysLeft = avgDailyUsage > 0 ? Math.round(currentStock / avgDailyUsage) : 9999;
     const safetyStock = Math.round(avgDailyUsage * safetyDays);
-    const orderQty = Math.max(0, safetyStock * 2 - currentStock);
+    const orderQty = Math.max(getRecommendedOrderQuantity(item), safetyStock * 2 - currentStock, 0);
 
     const status: ItemForecast['status'] =
       daysLeft > 90 ? '초과재고' :
@@ -91,18 +92,16 @@ export default function InventoryDemandForecast({ user, inventory, selectedCo }:
     'text-green-600 bg-green-50 border-green-200';
 
   const handleAutoOrder = async (fc: ItemForecast) => {
-    if (!confirm(`${fc.item.item_name || fc.item.name} ${fc.orderQty}개 발주를 자동 신청하시겠습니까?`)) return;
+    if (!confirm(`${getItemName(fc.item)} ${fc.orderQty}개 발주를 자동 신청하시겠습니까?`)) return;
     setOrdering(String(fc.item.id));
     try {
-      await supabase.from('approvals').insert({
-        type: '자동발주신청',
-        title: `[자동발주] ${fc.item.item_name || fc.item.name} ${fc.orderQty}개`,
-        content: `현재 재고: ${fc.item.quantity || 0}개, 일평균 소비: ${fc.avgDailyUsage.toFixed(1)}개, 예상 소진: ${fc.daysLeft}일, 발주 권장량: ${fc.orderQty}개`,
-        sender_id: user?.id,
-        sender_name: user?.name || user?.email,
-        status: '대기',
-        company: fc.item.company,
+      const { error } = await requestInventoryReorder({
+        item: fc.item,
+        user,
+        quantity: fc.orderQty,
+        reason: `현재 재고: ${getItemQuantity(fc.item)}개, 일평균 소비: ${fc.avgDailyUsage.toFixed(1)}개, 예상 소진: ${fc.daysLeft}일, 발주 권장량: ${fc.orderQty}개`,
       });
+      if (error) throw error;
       alert('자동발주 신청이 완료되었습니다.');
     } catch {
       alert('신청에 실패했습니다.');
@@ -154,7 +153,7 @@ export default function InventoryDemandForecast({ user, inventory, selectedCo }:
               <div key={i} className={`p-4 rounded-[12px] border ${statusColor(fc.status)}`}>
                 <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
                   <div>
-                    <p className="text-sm font-bold text-[var(--foreground)]">{fc.item.item_name || fc.item.name}</p>
+                    <p className="text-sm font-bold text-[var(--foreground)]">{getItemName(fc.item)}</p>
                     <p className="text-[11px] text-[var(--toss-gray-4)]">{fc.item.category} · {fc.item.company}</p>
                   </div>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusColor(fc.status)}`}>{fc.status}</span>
@@ -162,7 +161,7 @@ export default function InventoryDemandForecast({ user, inventory, selectedCo }:
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 text-center">
                   <div className="bg-white/60 rounded-[8px] p-2">
                     <p className="text-[10px] text-[var(--toss-gray-3)]">현재 재고</p>
-                    <p className="text-sm font-bold">{fmt(fc.item.quantity || 0)}</p>
+                    <p className="text-sm font-bold">{fmt(getItemQuantity(fc.item))}</p>
                   </div>
                   <div className="bg-white/60 rounded-[8px] p-2">
                     <p className="text-[10px] text-[var(--toss-gray-3)]">일평균 소비</p>
@@ -203,3 +202,6 @@ export default function InventoryDemandForecast({ user, inventory, selectedCo }:
     </div>
   );
 }
+
+
+

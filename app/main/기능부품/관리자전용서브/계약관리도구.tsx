@@ -103,10 +103,10 @@ export default function ContractManager() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-180px)] overflow-hidden animate-in fade-in duration-500">
+    <div className="flex min-h-[calc(100dvh-180px)] flex-col overflow-x-hidden overflow-y-auto animate-in fade-in duration-500">
       {/* 상단 액션바: 회사 선택 및 저장 */}
-      <div className="flex items-center justify-between mb-6 shrink-0">
-        <div className="flex bg-[var(--toss-gray-1)] p-1 rounded-2xl border border-[var(--toss-border)] overflow-x-auto no-scrollbar max-w-[70%]">
+      <div className="mb-6 flex shrink-0 flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex max-w-full overflow-x-auto rounded-2xl border border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-1 no-scrollbar xl:max-w-[70%]">
           {companies.map(co => (
             <button
               key={co.id}
@@ -120,7 +120,7 @@ export default function ContractManager() {
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 xl:justify-end">
           <button
             onClick={() => {
               if (window.confirm('현재 본문 내용을 지우고 표준 근로계약서 양식으로 초기화할까요?')) {
@@ -142,9 +142,9 @@ export default function ContractManager() {
       </div>
 
       {/* 메인 Split View */}
-      <div className="flex-1 flex gap-8 overflow-hidden">
+      <div className="flex flex-1 flex-col gap-8 xl:flex-row xl:overflow-hidden">
         {/* Left: Editor Pane (45%) */}
-        <div className="w-[45%] flex flex-col gap-6 overflow-y-auto pr-2 custom-scrollbar">
+        <div className="custom-scrollbar flex w-full flex-col gap-6 overflow-visible xl:w-[45%] xl:overflow-y-auto xl:pr-2">
           {/* 본문 에디터 카드 */}
           <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[24px] p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
@@ -235,17 +235,12 @@ export default function ContractManager() {
           </div>
         </div>
 
-        {/* Right: Live Preview Pane (55%) */}
-        <div className="flex-1 flex flex-col bg-[var(--toss-gray-1)] rounded-[32px] border border-[var(--toss-border)] overflow-hidden">
-          <div className="px-6 py-4 border-b border-[var(--toss-border)] flex items-center justify-between bg-white/50 backdrop-blur-md">
-            <span className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-              Live Preview
-            </span>
+        <div className="flex min-h-[640px] flex-1 flex-col overflow-hidden rounded-[32px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] xl:min-h-0">
+          <div className="px-6 py-4 border-b border-[var(--toss-border)] flex items-center justify-end bg-white/50 backdrop-blur-md">
             <span className="text-[10px] font-semibold text-[var(--toss-gray-3)]">A4 규격 실시간 랜더링</span>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-12 flex justify-center custom-scrollbar">
+          <div className="custom-scrollbar flex flex-1 justify-center overflow-y-auto p-4 md:p-12">
             {/* 고해상도 미리보기 페이퍼 */}
             <div className="w-full max-w-[640px] bg-white shadow-2xl rounded-sm border border-gray-200 min-h-[900px] flex flex-col p-[50px] font-serif transition-transform duration-500 scale-[0.98] hover:scale-100 origin-top">
               {/* 미리보기 헤더: 자동 연동 정보 모사 */}

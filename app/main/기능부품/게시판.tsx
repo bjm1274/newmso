@@ -12,6 +12,10 @@ const BOARD_POST_OPTIONAL_COLUMNS = [
   'tags',
   'attachments',
   'likes_count',
+  'schedule_date',
+  'schedule_time',
+  'schedule_room',
+  'patient_name',
   'surgery_fasting',
   'surgery_inpatient',
   'surgery_guardian',
@@ -149,17 +153,17 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   ];
 
   const boardMetaMap: Record<string, { title: string; description: string }> = {
-    공지사항: { title: '공지사항', description: '병원 공지와 주요 안내를 관리합니다.' },
-    자유게시판: { title: '자유게시판', description: '직원들이 자유롭게 소통하는 공간입니다.' },
-    익명소리함: { title: '익명 소리함', description: '익명 의견과 제안을 안전하게 확인합니다.' },
-    경조사: { title: '경조사', description: '축하와 부고 소식을 함께 공유합니다.' },
-    수술일정: { title: '수술일정', description: '수술 일정 캘린더와 접수 현황을 관리합니다.' },
-    MRI일정: { title: 'MRI일정', description: 'MRI 검사 일정과 예약 현황을 관리합니다.' },
-    직원제안함: { title: '직원 제안함', description: '업무 개선 제안을 모아 검토합니다.' },
+    공지사항: { title: '공지사항', description: '' },
+    자유게시판: { title: '자유게시판', description: '' },
+    익명소리함: { title: '익명 소리함', description: '' },
+    경조사: { title: '경조사', description: '' },
+    수술일정: { title: '수술일정', description: '' },
+    MRI일정: { title: 'MRI일정', description: '' },
+    직원제안함: { title: '직원 제안함', description: '' },
   };
   const currentBoardMeta = boardMetaMap[activeBoard] || {
     title: activeBoard || '게시판',
-    description: '게시판 내용을 확인하고 관리합니다.',
+    description: '',
   };
   const canCreatePost =
     activeBoard === '공지사항' ||
@@ -646,10 +650,6 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
         content: isScheduleBoard ? normalizedScheduleChartNo || null : normalizedContent || null,
         company: user?.company || null,
         tags: tags,
-        schedule_date: scheduleDate || null,
-        schedule_time: resolvedScheduleTime || null,
-        schedule_room: normalizedScheduleRoom || null,
-        patient_name: normalizedSchedulePatient || null,
         author_name: activeBoard === '익명소리함' ? '익명' : (user?.name || '익명'),
         author_id: activeBoard === '익명소리함' ? null : user?.id,
         likes_count: 0,
@@ -661,6 +661,10 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
 
       // 수술/검사 일정의 경우 수술 관련 체크값을 함께 저장
       if (isScheduleBoard) {
+        postData.schedule_date = scheduleDate || null;
+        postData.schedule_time = resolvedScheduleTime || null;
+        postData.schedule_room = normalizedScheduleRoom || null;
+        postData.patient_name = normalizedSchedulePatient || null;
         postData.surgery_fasting = scheduleFasting;
         postData.surgery_inpatient = scheduleInpatient;
         postData.surgery_guardian = scheduleGuardian;
@@ -797,7 +801,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
 
   return (
     <div
-      className="flex flex-col h-full min-h-0 app-page overflow-hidden"
+      className="flex h-full min-h-0 flex-col overflow-x-hidden app-page"
       data-testid="board-view"
     >
       {/* 상세 메뉴(공지사항·자유게시판 등)는 메인 좌측 사이드바에서 게시판 호버/클릭 시 플라이아웃으로 선택 */}
@@ -1264,55 +1268,54 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
 
           {/* 수술일정·MRI일정용 달력 뷰 */}
           {(activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
-            <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] shadow-sm p-4 md:p-6 space-y-4">
-              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
+            <div className="min-w-0 space-y-4 rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4 shadow-sm md:p-6">
+              <div className="flex min-w-0 flex-col items-start justify-between gap-4 md:flex-row md:items-center">
+                <div className="flex min-w-0 items-center gap-4">
                   <div>
-                    <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
-                      {activeBoard === '수술일정' ? '수술 일정 캘린더' : 'MRI 일정 캘린더'}
-                    </p>
                     <h3 className="text-lg md:text-xl font-semibold text-[var(--foreground)] mt-1">
                       {calendarMonth.getFullYear()}년 {calendarMonth.getMonth() + 1}월
                     </h3>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 text-xs font-bold shrink-0 self-end md:self-auto w-full md:w-auto">
+                <div className="flex w-full min-w-0 flex-col gap-2 text-xs font-bold md:w-auto md:flex-row md:items-center">
                   <input
                     value={searchKeyword}
                     onChange={e => setSearchKeyword(e.target.value)}
                     placeholder="환자명 또는 차트번호 검색"
-                    className="flex-1 md:w-48 px-3 py-1.5 rounded-full border border-[var(--toss-border)] bg-[var(--toss-gray-1)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 font-semibold"
+                    className="w-full min-w-0 px-3 py-1.5 font-semibold rounded-full border border-[var(--toss-border)] bg-[var(--toss-gray-1)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 md:w-48"
                   />
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setCalendarMonth(
-                        new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1)
-                      )
-                    }
-                    className="shrink-0 px-3 py-1.5 rounded-full border border-[var(--toss-border)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-gray-1)] hidden min-[320px]:block"
-                  >
-                    이전달
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCalendarMonth(new Date())}
-                    className="shrink-0 px-3 py-1.5 rounded-full border border-[var(--toss-border)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-gray-1)]"
-                  >
-                    오늘
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setCalendarMonth(
-                        new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1)
-                      )
-                    }
-                    className="shrink-0 px-3 py-1.5 rounded-full border border-[var(--toss-border)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-gray-1)] hidden min-[320px]:block"
-                  >
-                    다음달
-                  </button>
+                  <div className="grid w-full grid-cols-3 gap-2 md:flex md:w-auto">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCalendarMonth(
+                          new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1)
+                        )
+                      }
+                      className="inline-flex items-center justify-center whitespace-nowrap rounded-full border border-[var(--toss-border)] px-3 py-1.5 text-[var(--toss-gray-4)] hover:bg-[var(--toss-gray-1)]"
+                    >
+                      이전달
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCalendarMonth(new Date())}
+                      className="inline-flex items-center justify-center whitespace-nowrap rounded-full border border-[var(--toss-border)] px-3 py-1.5 text-[var(--toss-gray-4)] hover:bg-[var(--toss-gray-1)]"
+                    >
+                      오늘
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCalendarMonth(
+                          new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1)
+                        )
+                      }
+                      className="inline-flex items-center justify-center whitespace-nowrap rounded-full border border-[var(--toss-border)] px-3 py-1.5 text-[var(--toss-gray-4)] hover:bg-[var(--toss-gray-1)]"
+                    >
+                      다음달
+                    </button>
+                  </div>
                 </div>
               </div>
 

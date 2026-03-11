@@ -149,7 +149,6 @@ export default function DailyClosurePage({ user }: { user: any }) {
                     <h2 className="text-xl font-bold text-[var(--foreground)] flex items-center gap-2">
                         <span>💰</span> 원무과 마감보고
                     </h2>
-                    <p className="text-[12px] text-[var(--toss-gray-3)] mt-1 font-medium">일일 수납 내역 정산 및 시재 관리</p>
                 </div>
                 <button
                     onClick={() => setView(view === 'list' ? 'form' : 'list')}

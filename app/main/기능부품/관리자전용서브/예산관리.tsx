@@ -170,7 +170,6 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-[var(--foreground)]">예산 관리</h2>
-          <p className="text-sm text-[var(--toss-gray-3)] mt-0.5">부서별 예산 설정 및 집행 현황을 관리합니다.</p>
         </div>
         {activeTab === '집행현황' && (
           <button

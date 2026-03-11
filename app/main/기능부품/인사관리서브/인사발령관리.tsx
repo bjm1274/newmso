@@ -69,7 +69,6 @@ export default function PersonnelAppointment({ staffs = [], selectedCo, user }: 
                 <div className="flex justify-between items-center">
                     <div>
                         <h2 className="text-xl font-bold text-[var(--foreground)] tracking-tight">📋 인사발령 관리 <span className="text-sm text-[var(--toss-blue)] ml-2">[{selectedCo}]</span></h2>
-                        <p className="text-[11px] text-[var(--toss-gray-3)] font-bold mt-1">승진 · 전보 · 직무변경 · 휴직/복직 발령 및 관보 생성</p>
                     </div>
                     <div className="flex items-center gap-2">
                         <button onClick={generateGazette} className="px-4 py-2.5 bg-gray-800 text-white text-[11px] font-bold rounded-xl shadow-md hover:opacity-90 transition-all">📃 관보 생성</button>

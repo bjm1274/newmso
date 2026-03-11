@@ -40,6 +40,8 @@ function matchesCreatedDateRange(createdAt: string | number | Date | null | unde
 
 function normalizeComposeFormType(value?: string) {
   if (!value || value === '인사명령') return '연차/휴가';
+  if (value === 'attendance_fix' || value === '출결정정' || value === '출결 정정') return '출결정정';
+  if (value === '휴가신청' || value === 'leave') return '연차/휴가';
   return value;
 }
 
@@ -66,7 +68,7 @@ function sanitizeCustomFormTypes(
     });
 }
 
-export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, selectedCompanyId, onRefresh, initialView, onViewChange }: any) {
+export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, selectedCompanyId, onRefresh, initialView, onViewChange, initialComposeRequest, onConsumeComposeRequest }: any) {
   const [viewMode, setViewMode] = useState(initialView && APPROVAL_VIEWS.includes(initialView) ? initialView : '기안함');
   const [approvals, setApprovals] = useState<any[]>([]);
   const [formType, setFormType] = useState('연차/휴가');
@@ -93,6 +95,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   // 작성하기 자동 저장용
   const [autoSaveMsg, setAutoSaveMsg] = useState<string | null>(null);
   const [draftBanner, setDraftBanner] = useState<boolean>(false);
+  const [attendanceCorrectionSeedDates, setAttendanceCorrectionSeedDates] = useState<string[]>([]);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoSaveMsgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fetchApprovalsRef = useRef<() => void>(() => {});
@@ -266,6 +269,37 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       if (saved && APPROVAL_VIEWS.includes(saved)) setViewMode(saved);
     } catch { /* ignore */ }
   }, [initialView]);
+
+  useEffect(() => {
+    if (!initialComposeRequest) return;
+
+    const nextView = typeof initialComposeRequest?.viewMode === 'string' && initialComposeRequest.viewMode.trim()
+      ? initialComposeRequest.viewMode
+      : '작성하기';
+    const nextFormType = normalizeComposeFormType(initialComposeRequest?.formType || initialComposeRequest?.type);
+
+    setViewMode(nextView);
+    setFormType(nextFormType);
+    try { window.localStorage.setItem(APPROVAL_VIEW_KEY, nextView); } catch { /* ignore */ }
+
+    if (nextFormType === '출결정정') {
+      const nextDates = Array.isArray(initialComposeRequest?.dates)
+        ? initialComposeRequest.dates
+        : [initialComposeRequest?.date || initialComposeRequest?.workDate];
+
+      setAttendanceCorrectionSeedDates(
+        Array.from(
+          new Set(
+            nextDates
+              .map((value: any) => String(value || '').slice(0, 10))
+              .filter(Boolean)
+          )
+        )
+      );
+    }
+
+    onConsumeComposeRequest?.();
+  }, [initialComposeRequest, onConsumeComposeRequest]);
 
   const fetchApprovals = useCallback(async () => {
     const scopedCompanyId = !isMso ? user?.company_id : selectedCompanyId;
@@ -802,7 +836,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
 
   return (
     <div
-      className="flex flex-col h-full min-h-0 app-page overflow-hidden"
+      className="flex h-full min-h-0 flex-col overflow-x-hidden app-page"
       data-testid="approval-view"
     >
       {/* 상세 메뉴(기안함·결재함·작성하기)는 메인 좌측 사이드바에서 전자결재 호버/클릭 시 플라이아웃으로 선택 */}
@@ -965,7 +999,12 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                 ) : formType === '양식신청' ? (
                   <FormRequest user={user} staffs={staffs} />
                 ) : formType === '출결정정' ? (
-                  <AttendanceCorrectionForm user={user} staffs={staffs} />
+                  <AttendanceCorrectionForm
+                    user={user}
+                    staffs={staffs}
+                    initialSelectedDates={attendanceCorrectionSeedDates}
+                    onConsumeInitialSelectedDates={() => setAttendanceCorrectionSeedDates([])}
+                  />
                 ) : formType === '연차계획서' ? (
                   <AnnualLeavePlanForm user={user} staffs={staffs} setExtraData={setExtraData} setFormTitle={setFormTitle} />
                 ) : (

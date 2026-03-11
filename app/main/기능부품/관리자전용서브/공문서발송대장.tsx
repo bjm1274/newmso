@@ -161,7 +161,6 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)]">공문서 발송 대장</h2>
-          <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">공문 발송 내역을 등록하고 수신 확인 여부를 관리합니다.</p>
         </div>
         <button
           onClick={openAdd}

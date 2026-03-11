@@ -131,7 +131,6 @@ export default function DocumentScanner({ user, staffs, selectedCo = '전체' }:
             <div className="flex justify-between items-end border-b border-[var(--toss-border)] pb-4">
                 <div>
                     <h2 className="text-xl md:text-2xl font-bold text-[var(--foreground)] tracking-tight">스마트 서류 제출</h2>
-                    <p className="text-[11px] md:text-xs text-[var(--toss-gray-3)] font-bold uppercase mt-1">HR Document Scanner</p>
                 </div>
                 {isAdmin && (
                     <div className="flex gap-2">

@@ -1,6 +1,7 @@
-﻿'use client';
+'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { getItemMinQuantity, getItemName, getItemQuantity, getItemUnitPrice, getRecommendedOrderQuantity } from '@/app/main/inventory-utils';
 
 export default function PurchaseOrderManagement({ user, inventory, suppliers, fetchInventory }: any) {
   const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
@@ -26,7 +27,7 @@ export default function PurchaseOrderManagement({ user, inventory, suppliers, fe
   };
 
   const checkLowStockItems = () => {
-    const items = inventory.filter((item: any) => item.quantity <= item.min_quantity);
+    const items = inventory.filter((item: any) => getItemQuantity(item) <= getItemMinQuantity(item));
     setLowStockItems(items);
   };
 
@@ -41,9 +42,9 @@ export default function PurchaseOrderManagement({ user, inventory, suppliers, fe
         if (!acc[supplierName]) acc[supplierName] = [];
         acc[supplierName].push({
           item_id: item.id,
-          name: item.item_name,
-          qty: item.min_quantity * 2 - item.quantity,
-          unit_price: item.unit_price || 0
+          name: getItemName(item),
+          qty: getRecommendedOrderQuantity(item),
+          unit_price: getItemUnitPrice(item)
         });
         return acc;
       }, {});
@@ -108,9 +109,9 @@ export default function PurchaseOrderManagement({ user, inventory, suppliers, fe
             {lowStockItems.map((item: any) => (
               <div key={item.id} className="p-6 bg-orange-50 border border-orange-100 rounded-[12px] flex justify-between items-center">
                 <div>
-                  <p className="text-sm font-semibold text-[var(--foreground)]">{item.item_name}</p>
+                  <p className="text-sm font-semibold text-[var(--foreground)]">{getItemName(item)}</p>
                   <p className="text-[11px] font-bold text-orange-600 mt-1">
-                    현재: {item.quantity}개 / 최소: {item.min_quantity}개
+                    현재: {getItemQuantity(item)}개 / 최소: {getItemMinQuantity(item)}개
                   </p>
                 </div>
                 <span className="px-3 py-1 bg-orange-600 text-white rounded-full text-[11px] font-semibold">재고부족</span>
@@ -168,3 +169,4 @@ export default function PurchaseOrderManagement({ user, inventory, suppliers, fe
     </div>
   );
 }
+

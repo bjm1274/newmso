@@ -128,10 +128,6 @@ export default function SurgeryExamTemplateManager() {
       <h2 className="text-xl font-semibold text-[var(--foreground)] tracking-tight mb-2">
         수술 · 검사명 템플릿 관리
       </h2>
-      <p className="text-[11px] text-[var(--toss-gray-3)] font-bold">
-        수술일정표 / MRI일정표 작성 시 드롭다운으로 선택할 수 있는 수술명·검사명
-        목록을 관리합니다.
-      </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* 수술 템플릿 */}

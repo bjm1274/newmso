@@ -52,6 +52,7 @@ function MainPageContent() {
   const [initialOpenChatRoomId, setInitialOpenChatRoomId] = useState<string | null>(null);
   const [initialOpenMessageId, setInitialOpenMessageId] = useState<string | null>(null);
   const [initialOpenPostId, setInitialOpenPostId] = useState<string | null>(null);
+  const [initialApprovalIntent, setInitialApprovalIntent] = useState<any>(null);
 
   const [data, setData] = useState<ERPData>({
     staffs: [],
@@ -97,6 +98,18 @@ function MainPageContent() {
     },
     [companies, isMsoUser]
   );
+
+  const handleOpenApproval = useCallback((intent?: any) => {
+    setMainMenu('전자결재');
+    if (!intent) return;
+
+    const nextView = typeof intent?.viewMode === 'string' && intent.viewMode.trim()
+      ? intent.viewMode
+      : '작성하기';
+
+    setSubView(nextView);
+    setInitialApprovalIntent(intent);
+  }, []);
 
   const resolveLegacyNavigation = useCallback(
     (menuId?: string | null, subViewId?: string | null, candidateUser?: any) => {
@@ -528,7 +541,7 @@ function MainPageContent() {
 
   return (
     <div
-      className="flex flex-col md:flex-row h-screen w-full bg-[var(--background)] overflow-hidden min-h-[100dvh]"
+      className="flex min-h-[100dvh] w-full flex-col overflow-x-hidden bg-[var(--background)] md:flex-row"
       data-testid="main-shell"
     >
       <Sidebar
@@ -546,7 +559,7 @@ function MainPageContent() {
       />
 
       {currentSubMenus.length > 0 && (
-        <aside className="flex flex-row md:flex-col w-full md:w-44 bg-[var(--toss-card)] border-b md:border-b-0 md:border-r border-[var(--toss-border)] p-2 md:py-4 md:px-3 space-x-1 md:space-x-0 md:space-y-1 shrink-0 overflow-x-auto md:overflow-x-visible no-scrollbar">
+        <aside className="flex w-full shrink-0 flex-row overflow-x-auto border-b border-[var(--toss-border)] bg-[var(--toss-card)] p-2 no-scrollbar md:sticky md:top-0 md:max-h-[100dvh] md:w-44 md:flex-col md:space-y-1 md:overflow-x-visible md:overflow-y-auto md:border-r md:border-b-0 md:px-3 md:py-4">
           {(() => {
             if (mainMenu === '관리자' || mainMenu === '재고관리') {
               const groups = Array.from(new Set(currentSubMenus.map(s => s.group))).filter(Boolean);
@@ -590,7 +603,7 @@ function MainPageContent() {
         </aside>
       )}
 
-      <div className="flex-1 flex flex-col overflow-hidden min-h-0 pb-[72px] md:pb-0 relative">
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-x-hidden">
         {/* 접속 시 한 번 알림·GPS 권한 요청 모달 */}
         <PermissionPromptModal />
         {/* 채팅·전자결재·연차촉진·출퇴근 실시간 알림 통합 배너 (웹·모바일 즉시 표시) */}
@@ -641,6 +654,9 @@ function MainPageContent() {
             setInitialOpenChatRoomId(null);
             setInitialOpenMessageId(null);
           }}
+          onOpenApproval={handleOpenApproval}
+          initialApprovalIntent={initialApprovalIntent}
+          onConsumeApprovalIntent={() => setInitialApprovalIntent(null)}
           setMainMenu={setMainMenu}
         />
       </div>

@@ -414,7 +414,6 @@ export default function DischargeReviewPage({ user }: { user: any }) {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-6 bg-white border-b border-[var(--toss-border)] gap-4">
                 <div>
                     <h2 className="text-xl font-bold text-[var(--foreground)] flex items-center gap-2"><span>🏥</span> 퇴원심사</h2>
-                    <p className="text-[12px] text-[var(--toss-gray-3)] mt-1 font-medium">차트 데이터 기반 퇴원 체크리스트 점검 및 AI 분석</p>
                 </div>
                 <div className="flex gap-2">
                     {(['reviews', 'new', 'template'] as Tab[]).map(t => (

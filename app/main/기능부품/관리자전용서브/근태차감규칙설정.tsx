@@ -51,7 +51,6 @@ export default function AttendanceDeductionRules({ selectedCo = '전체' }: any)
   return (
     <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] p-8 shadow-xl max-w-2xl">
       <h3 className="text-xl font-bold text-[var(--foreground)] mb-2">근태 차감 규칙 설정</h3>
-      <p className="text-[11px] text-[var(--toss-gray-4)] font-bold mb-6">급여 정산 시 지각·조퇴·결근이 자동 반영됩니다. 기본급(직원 등록 시 설정) 기준으로 계산됩니다.</p>
 
       <div className="space-y-6">
         <div>

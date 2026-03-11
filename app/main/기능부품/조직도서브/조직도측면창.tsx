@@ -17,23 +17,23 @@ type SubMenuItem = {
 
 export const SUB_MENUS: Record<string, SubMenuItem[]> = {
   재고관리: [
-    { id: '현황', label: '현황', group: '재고 대시보드', icon: '📊' },
-    { id: '이력', label: '이력', group: '재고 대시보드', icon: '🕘' },
-    { id: '유통기한', label: '유통기한 알림', group: '재고 대시보드', icon: '⏰' },
-    { id: '수요예측', label: '수요 예측', group: '재고 대시보드', icon: '🔮' },
-    { id: '등록', label: '등록', group: '입출고 운영', icon: '📝' },
-    { id: '스캔', label: '스캔', group: '입출고 운영', icon: '📷' },
-    { id: '발주', label: '발주', group: '입출고 운영', icon: '📦' },
-    { id: '재고실사', label: '재고 실사', group: '입출고 운영', icon: '🔎' },
-    { id: '이관', label: '재고 이관', group: '입출고 운영', icon: '🔄' },
-    { id: '명세서', label: '명세서', group: '문서 · 자산', icon: '🧾' },
-    { id: '납품확인서', label: '납품 확인서', group: '문서 · 자산', icon: '📋' },
-    { id: 'UDI', label: 'UDI', group: '문서 · 자산', icon: '🏷️' },
-    { id: '자산', label: '자산 QR', group: '문서 · 자산', icon: '🔖' },
-    { id: '거래처', label: '거래처', group: '기준 정보', icon: '🏭' },
-    { id: '카테고리', label: '카테고리', group: '기준 정보', icon: '🗂️' },
-    { id: 'AS반품', label: 'AS / 반품', group: '기준 정보', icon: '↩️' },
-    { id: '소모품통계', label: '소모품 통계', group: '기준 정보', icon: '📉' },
+    { id: '현황', label: '현황', group: '조회', icon: '📊' },
+    { id: '이력', label: '이력', group: '조회', icon: '🕘' },
+    { id: '유통기한', label: '유통기한', group: '조회', icon: '⏰' },
+    { id: '수요예측', label: '수요예측', group: '조회', icon: '🔮' },
+    { id: '등록', label: '등록', group: '입출고', icon: '📝' },
+    { id: '스캔', label: '스캔', group: '입출고', icon: '📷' },
+    { id: '발주', label: '발주', group: '발주문서', icon: '📦' },
+    { id: '재고실사', label: '재고실사', group: '입출고', icon: '🔎' },
+    { id: '이관', label: '이관', group: '입출고', icon: '🔄' },
+    { id: '명세서', label: '명세서', group: '발주문서', icon: '🧾' },
+    { id: '납품확인서', label: '납품확인서', group: '발주문서', icon: '📋' },
+    { id: 'UDI', label: 'UDI', group: '발주문서', icon: '🏷️' },
+    { id: '자산', label: '자산', group: '설정', icon: '🔖' },
+    { id: '거래처', label: '거래처', group: '설정', icon: '🏭' },
+    { id: '카테고리', label: '카테고리', group: '설정', icon: '🗂️' },
+    { id: 'AS반품', label: 'AS반품', group: '설정', icon: '↩️' },
+    { id: '소모품통계', label: '소모품통계', group: '설정', icon: '📉' },
   ],
   게시판: [
     { id: '공지사항', label: '공지사항', icon: '📢' },
@@ -217,7 +217,7 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
   return (
     <>
       <aside
-        className="relative hidden h-screen w-[72px] shrink-0 flex-col items-center border-r border-[var(--toss-border)] bg-[var(--toss-card)] py-4 shadow-sm md:flex"
+        className="sticky top-0 z-[240] hidden h-[100dvh] w-[72px] shrink-0 flex-col items-center border-r border-[var(--toss-border)] bg-[var(--toss-card)] py-4 shadow-sm md:flex"
         data-testid="desktop-sidebar"
       >
         <div className="mb-3 flex w-full shrink-0 flex-col items-center px-2">
@@ -285,3 +285,5 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
     </>
   );
 }
+
+

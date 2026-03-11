@@ -286,7 +286,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
   if (!user) return <div className="p-10 text-center font-bold">사용자 정보 로딩 중...</div>;
 
   return (
-    <div className="h-full min-h-0 flex flex-col app-page px-3 py-4 md:p-6 rounded-none md:rounded-[3rem] overflow-hidden relative">
+    <div className="relative h-full min-h-0 flex flex-col overflow-x-hidden app-page px-3 py-3 md:rounded-[3rem] md:px-5 md:py-4">
 
       {/* 전자 서명 전용 신규 모달 */}
       {pendingContract && (
@@ -299,7 +299,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
       )}
 
       {/* 상단 로고 및 헤더 */}
-      <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 shrink-0">
+      <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-3 shrink-0">
         <div className="text-left space-y-2 w-full">
           {/* 로고 + 인사말 바로 옆에 즐겨찾기 버튼 (모바일/PC 공통) */}
           <div className="flex flex-wrap items-center gap-2 mb-2">
@@ -387,8 +387,8 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
           />
           <TabButton
             isActive={activeTab === 'records'}
-            onClick={() => setActiveTab('records')}
-            label="급여·증명서" icon="📑"
+            onClick={() => { setActiveTab('records'); setRecordsView('certificates'); }}
+            label="급여·증명서" icon="📑" ariaLabel="증명서"
           />
           <TabButton
             isActive={activeTab === 'documents'}
@@ -404,33 +404,30 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
       </div>
 
       {/* 메인 콘텐츠 영역 */}
-      <div className="flex-1 min-h-0 overflow-hidden relative">
-        <div className="absolute inset-0 overflow-y-auto overflow-x-hidden transition-all duration-300">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden transition-all duration-300">
           {activeTab === 'profile' && (
-            <div data-testid="mypage-profile-tab">
-              <div className="p-4 md:p-6">
-                <RoleDashboard user={user} setMainMenu={setMainMenu} />
-              </div>
-              <MyProfileCard user={user} onOpenApproval={onOpenApproval} />
+            <div data-testid="mypage-profile-tab" className="space-y-4 pb-4">
+              <RoleDashboard user={user} setMainMenu={setMainMenu} />
+              <MyProfileCard user={user} onOpenApproval={onOpenApproval} setMainMenu={setMainMenu} />
             </div>
           )}
           {activeTab === 'commute' && (
-            <div data-testid="mypage-commute-tab">
+            <div data-testid="mypage-commute-tab" className="pb-4">
               <CommuteRecord
               user={user}
               onRequestCorrection={(log: any) =>
                 onOpenApproval?.({
                   type: '출결정정',
-                  workDate: log.work_date,
-                  todayLog: log,
+                  viewMode: '작성하기',
+                  dates: [log.date || log.work_date].filter(Boolean),
                 })
               }
               />
             </div>
           )}
-          {activeTab === 'todo' && <div data-testid="mypage-todo-tab"><MyTodoList user={user} /></div>}
+          {activeTab === 'todo' && <div data-testid="mypage-todo-tab" className="pb-4"><MyTodoList user={user} /></div>}
           {activeTab === 'records' && (
-            <div data-testid="mypage-records-tab">
+            <div data-testid="mypage-records-tab" className="pb-4">
               <PayrollAndCertificatesHub
                 user={user}
                 activeView={recordsView}
@@ -438,9 +435,8 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
               />
             </div>
           )}
-          {activeTab === 'documents' && <div data-testid="mypage-documents-tab"><MyDocuments user={user} /></div>}
-          {activeTab === 'notifications' && <div data-testid="mypage-notifications-tab"><NotificationInbox user={user} onRefresh={() => { }} /></div>}
-        </div>
+          {activeTab === 'documents' && <div data-testid="mypage-documents-tab" className="pb-4"><MyDocuments user={user} /></div>}
+          {activeTab === 'notifications' && <div data-testid="mypage-notifications-tab" className="pb-4"><NotificationInbox user={user} onRefresh={() => { }} /></div>}
       </div>
 
     </div>
@@ -555,10 +551,11 @@ function PayrollAndCertificatesHub({
   );
 }
 
-function TabButton({ isActive, onClick, label, icon }: any) {
+function TabButton({ isActive, onClick, label, icon, ariaLabel }: any) {
   return (
     <button
       onClick={onClick}
+      {...(ariaLabel ? { 'aria-label': ariaLabel } : {})}
       className={`flex flex-col md:flex-row items-center gap-1 md:gap-2 px-1.5 md:px-5 py-2 md:py-2.5 rounded-xl md:rounded-full text-[10px] md:text-sm font-bold transition-all duration-200 whitespace-nowrap
         ${isActive ? 'bg-[var(--toss-blue)] text-white shadow-md' : 'bg-transparent text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]'}
       `}
