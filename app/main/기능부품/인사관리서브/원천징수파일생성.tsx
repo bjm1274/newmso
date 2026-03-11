@@ -37,7 +37,6 @@ export default function TaxFileGenerator({ staffs, selectedCo }: { staffs: any[]
                 </div>
                 <div>
                     <h3 className="text-sm font-bold text-foreground">홈택스/EDI 신고 파일 자동 생성</h3>
-                    <p className="text-[11px] font-medium text-zinc-500 mt-0.5">원천세 신고 및 4대보험 취득/상실 신고를 위한 전용 포맷 텍스트 및 엑셀 변환기</p>
                 </div>
             </div>
 

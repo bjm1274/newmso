@@ -6,11 +6,13 @@ import EducationList from './교육내역/교육내역명단';
 import EducationStatus from './교육내역/교육이수현황';
 import LicenseTracking from './교육내역/자격면허대시보드';
 import {
+  buildFallbackLicenseRows,
   buildEducationCompletionMap,
   getApplicableEducationItems,
   getEducationCompletionKey,
   getEducationDueDate,
   getScopedActiveStaffs,
+  isLicenseQueryRecoverableError,
 } from './교육내역/education-utils';
 
 interface LicenseAlert {
@@ -48,14 +50,24 @@ export default function EducationMain({ staffs, selectedCo }: any) {
 
     const staffMap = new Map(activeStaffs.map((staff: any) => [String(staff.id), staff]));
     const today = new Date();
+    const fallbackLicenses = buildFallbackLicenseRows(activeStaffs);
 
     try {
-      const [{ data: completions }, { data: licenses }] = await Promise.all([
+      const [{ data: completions, error: completionsError }, { data: licenses, error: licensesError }] = await Promise.all([
         supabase.from('education_completions').select('staff_id, education_name, certificate_url'),
         supabase.from('staff_licenses').select('id, staff_id, license_name, expiry_date, issuing_body'),
       ]);
 
+      if (completionsError) {
+        throw completionsError;
+      }
+
       const nextCompletionMap = buildEducationCompletionMap(completions || []);
+      const licenseRows = licensesError ? fallbackLicenses : licenses || fallbackLicenses;
+
+      if (licensesError && !isLicenseQueryRecoverableError(licensesError)) {
+        console.error('자격면허 알림 로드 실패:', licensesError);
+      }
 
       const educationAlerts = activeStaffs
         .flatMap((staff: any) => {
@@ -80,7 +92,7 @@ export default function EducationMain({ staffs, selectedCo }: any) {
         })
         .sort((a: any, b: any) => a.daysLeft - b.daysLeft);
 
-      const nextLicenseAlerts = (licenses || [])
+      const nextLicenseAlerts = licenseRows
         .map((license: any) => {
           const matchedStaff = staffMap.get(String(license.staff_id));
           if (!matchedStaff || !license.expiry_date) return null;

@@ -150,9 +150,6 @@ export default function LatenessPatternAnalysis({ staffs, selectedCo }: Props) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)]">지각 / 조퇴 패턴 분석</h2>
-          <p className="mt-1 text-xs text-[var(--toss-gray-3)]">
-            기간별 지각, 조퇴 통계를 집계하고 주의 직원을 빠르게 찾습니다.
-          </p>
         </div>
         <div className="flex gap-2">
           {(Object.keys(PERIOD_MONTHS) as Array<keyof typeof PERIOD_MONTHS>).map((item) => (

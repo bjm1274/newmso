@@ -74,7 +74,6 @@ export default function TaxFreeLimitChecker({ staffs, selectedCo, user }: Props)
     <div className="p-4 md:p-6 space-y-5 max-w-5xl mx-auto">
       <div>
         <h2 className="text-lg font-bold text-[var(--foreground)]">비과세 한도 초과 경고</h2>
-        <p className="text-xs text-[var(--toss-gray-3)] mt-1">2024년 기준 비과세 한도를 초과한 항목을 직원별로 표시합니다.</p>
       </div>
 
       <div className="flex flex-wrap gap-3 items-center">

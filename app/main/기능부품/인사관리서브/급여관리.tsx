@@ -113,7 +113,7 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
       className="flex flex-col h-full animate-in fade-in duration-500 app-page"
       data-testid="payroll-view"
     >
-      <header className="sticky top-0 z-30 flex flex-col md:flex-row md:items-center justify-between p-6 md:p-8 bg-[var(--toss-card)] border-b border-[var(--toss-border)] gap-6 shadow-sm">
+      <header className="sticky top-0 z-30 flex flex-col justify-between gap-4 border-b border-[var(--toss-border)] bg-[var(--toss-card)] p-4 md:flex-row md:items-center md:p-5 shadow-sm">
         <div className="flex flex-wrap items-center gap-4 bg-[var(--toss-gray-1)] p-1.5 rounded-[22px] border border-[var(--toss-border)]">
           <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-[18px] shadow-sm ring-1 ring-black/5">
             <span className="text-sm">📅</span>
@@ -155,7 +155,7 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
         </div>
       </header>
 
-      <div className="flex-1 p-4 md:p-6 overflow-y-auto custom-scrollbar">
+      <div className="flex-1 overflow-y-auto custom-scrollbar p-3 md:p-4">
         {filtered.length > 0 ? (
           <>
             {activeTab === '대시보드' && <HRDashboardIntegrated staffs={filtered} selectedCo={selectedCo} checkedIds={checkedIds} yearMonth={yearMonth} />}
@@ -165,7 +165,7 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
             )}
 
             {activeTab === '급여대장' && (
-              <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 items-start">
+              <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-4">
                 <div className="xl:col-span-1 h-fit max-h-[800px] sticky top-4">
                   <PayrollTable
                     staffs={filtered}
@@ -183,7 +183,7 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
                     }}
                   />
                 </div>
-                <div className="xl:col-span-3 space-y-6">
+                <div className="xl:col-span-3 space-y-4">
                   {current && <SalaryDetail staff={current} record={currentRecord || null} />}
                   <aside className="grid grid-cols-1 gap-4">
                     {current && <SalaryChangeHistory staffId={String(current.id)} staffName={current.name} />}
@@ -193,17 +193,16 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
             )}
 
             {activeTab === '연말퇴직정산' && (
-              <div className="space-y-8">
+              <div className="space-y-5">
                 <div className="p-4 bg-[var(--toss-gray-1)] rounded-xl border border-[var(--toss-border)]">
                   <h2 className="text-lg font-bold text-[var(--foreground)] mb-2">연말/퇴직 통합 정산 센터</h2>
-                  <p className="text-sm text-[var(--toss-gray-3)]">복잡한 연말정산과 퇴직금(퇴직소득세) 정산을 한 곳에서 처리합니다.</p>
                 </div>
-                <div className="grid grid-cols-1 xl:grid-cols-5 gap-8 items-start">
+                <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-5">
                   <div className="xl:col-span-3 bg-[var(--toss-card)] p-6 rounded-[16px] border border-[var(--toss-border)] shadow-sm">
                     <h3 className="text-base font-bold text-[var(--toss-blue)] mb-4">연말정산 처리</h3>
                     <YearEndSettlement staffs={staffs} selectedCo={selectedCo} />
                   </div>
-                  <div className="xl:col-span-2 space-y-6">
+                  <div className="xl:col-span-2 space-y-4">
                     <div className="bg-[var(--toss-card)] p-6 rounded-[16px] border border-[var(--toss-border)] shadow-sm">
                       <h3 className="text-base font-bold text-red-500 mb-4">퇴직금 정산 처리</h3>
                       <SeveranceCalculator />
@@ -222,7 +221,6 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
               <div className="p-4 md:p-6">
                 <div className="mb-5">
                   <h2 className="text-base font-bold text-[var(--foreground)]">급여 실시간 시뮬레이터</h2>
-                  <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">기본급·수당을 입력하면 공제 항목과 실수령액을 즉시 계산합니다.</p>
                 </div>
                 <SalarySimulator />
               </div>

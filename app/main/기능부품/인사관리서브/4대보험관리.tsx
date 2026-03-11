@@ -126,7 +126,6 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: any) {
                         <h2 className="text-xl font-bold text-[var(--foreground)] tracking-tight">
                             🏛️ 4대보험 관리 <span className="text-sm text-[var(--toss-blue)] ml-2">[{selectedCo}]</span>
                         </h2>
-                        <p className="text-[11px] text-[var(--toss-gray-3)] font-bold mt-1">국민연금 · 건강보험 · 고용보험 · 산재보험 취득/변경/상실 신고</p>
                     </div>
                     <div className="flex items-center gap-2">
                         {pendingCount > 0 && (

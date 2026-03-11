@@ -89,7 +89,6 @@ export default function PurchaseOrderManagement({ user, inventory, suppliers, fe
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tight">스마트 발주 제어 시스템</h2>
-            <p className="text-[11px] text-orange-600 font-bold mt-1 uppercase tracking-widest">Smart Purchase Order Engine</p>
           </div>
           <button
             onClick={handleAutoGeneratePurchaseOrder}

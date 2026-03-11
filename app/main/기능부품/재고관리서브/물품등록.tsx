@@ -104,7 +104,6 @@ export default function ProductRegistration({ user, suppliers, fetchInventory, f
       <div className="bg-[var(--toss-card)] p-6 md:p-10 border border-[var(--toss-border)] shadow-xl rounded-[2.5rem]">
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-[var(--foreground)] tracking-tight">신규 물품 자산 등록</h2>
-          <p className="text-[11px] text-[var(--toss-blue)] font-bold mt-1 tracking-widest">재고·자산 정보를 입력해 주세요.</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">

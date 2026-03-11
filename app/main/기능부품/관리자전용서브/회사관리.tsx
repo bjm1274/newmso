@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { Company, CompanyType } from '@/lib/company';
@@ -144,7 +144,7 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300" data-testid="company-manager-view">
+    <div className="space-y-4 animate-in fade-in duration-300" data-testid="company-manager-view">
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)]">회사 관리</h2>
@@ -192,26 +192,26 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
       </div>
 
       {activeTab === 'company' && (
-        <div className="space-y-8">
+        <div className="space-y-5">
           <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[12px] shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-[var(--toss-border)]">
+            <div className="p-4 border-b border-[var(--toss-border)]">
               <h3 className="text-base font-bold text-[var(--foreground)]">회사(병원) 목록</h3>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-[var(--toss-gray-1)] border-b border-[var(--toss-border)]">
                   <tr>
-                    <th className="px-6 py-4 text-left font-bold text-[var(--toss-gray-4)]">회사명</th>
-                    <th className="px-6 py-4 text-left font-bold text-[var(--toss-gray-4)]">유형</th>
-                    <th className="px-6 py-4 text-left font-bold text-[var(--toss-gray-4)]">상태</th>
-                    <th className="px-6 py-4 text-right font-bold text-[var(--toss-gray-4)]">관리</th>
+                    <th className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">회사명</th>
+                    <th className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">유형</th>
+                    <th className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">상태</th>
+                    <th className="px-4 py-3 text-right font-bold text-[var(--toss-gray-4)]">관리</th>
                   </tr>
                 </thead>
                 <tbody>
                   {companies.map((c) => (
                     <tr key={c.id} className="border-b border-[var(--toss-border)] hover:bg-[var(--toss-gray-1)]/50">
-                      <td className="px-6 py-4 font-bold text-[var(--foreground)]">{c.name}</td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-3 font-bold text-[var(--foreground)]">{c.name}</td>
+                      <td className="px-4 py-3">
                         <span
                           className={`px-2 py-1 rounded-[12px] text-xs font-bold ${c.type === 'MSO' ? 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)]' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'
                             }`}
@@ -219,8 +219,8 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
                           {c.type === 'MSO' ? '경영지원(MSO)' : c.type === 'HOSPITAL' ? '병원' : '클리닉'}
                         </span>
                       </td>
-                      <td className="px-6 py-4">{c.is_active ? '활성' : '비활성'}</td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-4 py-3">{c.is_active ? '활성' : '비활성'}</td>
+                      <td className="px-4 py-3 text-right">
                         <button
                           data-testid={`company-manager-edit-${c.id}`}
                           onClick={() => handleEdit(c)}
@@ -236,7 +236,7 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
             </div>
           </div>
 
-          <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[12px] shadow-sm p-6">
+          <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[12px] shadow-sm p-4">
             <h3 className="text-base font-bold text-[var(--foreground)] mb-4">{editing ? '회사 수정' : '회사 추가'}</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -308,11 +308,11 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
                 />
               </div>
             </div>
-            <div className="flex gap-3 mt-6">
+            <div className="flex gap-2.5 mt-4">
               <button
                 data-testid="company-manager-save-button"
                 onClick={handleSave}
-                className="px-6 py-3 bg-[var(--toss-blue)] text-white rounded-[12px] font-bold text-sm hover:bg-[var(--toss-blue)]"
+                className="px-5 py-2.5 bg-[var(--toss-blue)] text-white rounded-[12px] font-bold text-sm hover:bg-[var(--toss-blue)]"
               >
                 {editing ? '저장' : '추가'}
               </button>
@@ -330,7 +330,7 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
                       memo: '',
                     });
                   }}
-                  className="px-6 py-3 bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] rounded-[12px] font-bold text-sm hover:bg-[var(--toss-border)]"
+                  className="px-5 py-2.5 bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] rounded-[12px] font-bold text-sm hover:bg-[var(--toss-border)]"
                 >
                   취소
                 </button>
@@ -352,3 +352,4 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
     </div>
   );
 }
+

@@ -2,7 +2,13 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { getScopedActiveStaffs, getStaffDepartment, getStaffPosition } from './education-utils';
+import {
+  buildFallbackLicenseRows,
+  getScopedActiveStaffs,
+  getStaffDepartment,
+  getStaffPosition,
+  isLicenseQueryRecoverableError,
+} from './education-utils';
 
 const COPY_URL_FIELDS = ['file_url', 'attachment_url', 'copy_url', 'document_url', 'document_file_url', 'license_file_url'];
 
@@ -38,22 +44,38 @@ function getLicenseStatus(expiryDate?: string | null) {
 export default function LicenseTracking({ staffs, selectedCo }: any) {
   const [searchTerm, setSearchTerm] = useState('');
   const [licenses, setLicenses] = useState<any[]>([]);
+  const [usingFallbackData, setUsingFallbackData] = useState(false);
   const activeStaffs = useMemo(() => getScopedActiveStaffs(staffs, selectedCo), [staffs, selectedCo]);
+  const fallbackLicenses = useMemo(() => buildFallbackLicenseRows(activeStaffs), [activeStaffs]);
   const staffMap = useMemo(() => new Map(activeStaffs.map((staff: any) => [String(staff.id), staff])), [activeStaffs]);
 
   useEffect(() => {
+    let isMounted = true;
+
     const loadLicenses = async () => {
       const { data, error } = await supabase.from('staff_licenses').select('*');
+      if (!isMounted) return;
+
       if (error) {
-        console.error('자격면허 대시보드 로드 실패:', error);
-        setLicenses([]);
+        if (!isLicenseQueryRecoverableError(error)) {
+          console.error('자격면허 대시보드 로드 실패:', error);
+        }
+        setLicenses(fallbackLicenses);
+        setUsingFallbackData(true);
         return;
       }
-      setLicenses(data || []);
+
+      const nextLicenses = data && data.length > 0 ? data : fallbackLicenses;
+      setLicenses(nextLicenses);
+      setUsingFallbackData(nextLicenses === fallbackLicenses && fallbackLicenses.length > 0);
     };
 
     void loadLicenses();
-  }, []);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [fallbackLicenses]);
 
   const realLicenses = useMemo(() => {
     return licenses
@@ -170,7 +192,6 @@ export default function LicenseTracking({ staffs, selectedCo }: any) {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h3 className="text-sm font-black text-slate-800">자격 및 면허 갱신 대상 트래커</h3>
-          <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">Certification & License Lifecycle</p>
         </div>
 
         <div className="flex gap-2 flex-wrap">

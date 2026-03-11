@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { canAccessHrSection, canAccessMainMenu } from '@/lib/access-control';
+import { supabase } from '@/lib/supabase';
 import 구성원관리 from './인사관리서브/구성원현황';
 import CertificateGenerator from './인사관리서브/증명서발급';
 import PayrollMain from './인사관리서브/급여관리';
@@ -281,18 +282,18 @@ function SectionTabBar({
 }) {
   return (
     <div
-      className="border-b border-[var(--toss-border)] bg-[var(--toss-card)] px-4 py-4 md:px-6"
+      className="border-b border-[var(--toss-border)] bg-[var(--toss-card)] px-3 py-3 md:px-4"
       data-testid={testIdPrefix ? `${testIdPrefix}-bar` : undefined}
     >
       {title || description ? (
-        <div className="mb-3">
+        <div className="mb-2">
           {title ? <h3 className="text-sm font-bold text-[var(--foreground)]">{title}</h3> : null}
           {description ? (
             <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{description}</p>
           ) : null}
         </div>
       ) : null}
-      <div className="no-scrollbar flex gap-2 overflow-x-auto">
+      <div className="no-scrollbar flex gap-1.5 overflow-x-auto">
         {tabs.map((tab, index) => (
           <button
             key={tab.id}
@@ -328,8 +329,10 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
   const [계약내부탭, 계약내부탭설정] = useState<ContractEmbeddedTabId>(getContractInitialTab(initialMenu));
   const [교대근무탭, 교대근무탭설정] = useState<ShiftSuiteTabId>(getShiftSuiteInitialTab(initialMenu));
   const [휴가내부탭, 휴가내부탭설정] = useState<LeaveSuiteTabId>(getLeaveSuiteInitialTab(initialMenu));
+  const [전체직원목록, 전체직원목록설정] = useState<any[]>([]);
 
   const hasAccess = canAccessMainMenu(user, '인사관리');
+  const isMsoViewer = user?.company === 'SY INC.' || user?.permissions?.mso === true;
   const visibleHrTabs = HR_TABS.filter((tab) => canAccessHrTab(user, tab));
   const visibleHrTabIds = visibleHrTabs.map((tab) => tab.id);
   const activeMenu = visibleHrTabs.some((tab) => tab.id === 현재메뉴) ? 현재메뉴 : (visibleHrTabs[0]?.id || '구성원');
@@ -343,14 +346,54 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
   const workspaceTabs = visibleHrTabs.filter((tab) => activeWorkspaceConfig.groups.includes(tab.group));
   const visibleAttendanceTabs = ATTENDANCE_ANALYSIS_TABS.filter((tab) => canAccessHrSection(user, tab.perm));
   const activeAttendanceTab = normalizeAttendanceTabForUser(user, 근태분석탭);
+  const 인사직원목록 = useMemo(
+    () => (isMsoViewer && 전체직원목록.length > 0 ? 전체직원목록 : staffs || []),
+    [isMsoViewer, staffs, 전체직원목록]
+  );
+  const 인사부서목록 = useMemo(
+    () =>
+      Array.from(new Set(인사직원목록.map((staff: any) => staff?.department).filter(Boolean))).map((name) => ({ name })),
+    [인사직원목록]
+  );
 
   const 사업체목록: string[] = [
     '전체',
-    ...Array.from(new Set<string>((staffs || []).map((staff: any) => staff?.company).filter(Boolean))),
+    ...Array.from(new Set<string>(인사직원목록.map((staff: any) => staff?.company).filter(Boolean))),
   ];
   if (!사업체목록.includes('SY INC.')) {
     사업체목록.push('SY INC.');
   }
+
+  useEffect(() => {
+    if (!isMsoViewer) {
+      전체직원목록설정([]);
+      return;
+    }
+
+    let isActive = true;
+
+    const fetchAllStaffsForHr = async () => {
+      const { data, error } = await supabase
+        .from('staff_members')
+        .select('*')
+        .order('employee_no', { ascending: true });
+
+      if (error) {
+        console.error('인사관리 전체 직원 목록 조회 실패:', error);
+        return;
+      }
+
+      if (isActive) {
+        전체직원목록설정(data || []);
+      }
+    };
+
+    fetchAllStaffsForHr();
+
+    return () => {
+      isActive = false;
+    };
+  }, [isMsoViewer, staffs, user?.id]);
 
   useEffect(() => {
     if (사업체목록.includes(선택사업체)) return;
@@ -464,8 +507,8 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
 
   return (
     <div className="app-page flex h-full min-h-0 flex-col overflow-x-hidden md:flex-row">
-      <aside className="flex h-auto w-full shrink-0 flex-col overflow-hidden border-b border-[var(--toss-border)] bg-[var(--toss-card)] md:h-full md:w-56 md:border-b-0 md:border-r">
-        <div className="shrink-0 border-b border-[var(--toss-border)] p-2 md:p-3">
+      <aside className="flex h-auto w-full shrink-0 flex-col overflow-hidden border-b border-[var(--toss-border)] bg-[var(--toss-card)] md:sticky md:top-0 md:self-start md:h-[100dvh] md:max-h-[100dvh] md:w-44 md:border-b-0 md:border-r">
+        <div className="shrink-0 border-b border-[var(--toss-border)] p-1.5 md:p-2.5">
           <p className="px-1 pb-2 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-4)]">업무 공간</p>
           <div className="no-scrollbar flex gap-1 overflow-x-auto md:flex-col md:overflow-visible">
             {availableWorkspaces.map((workspace) => (
@@ -481,13 +524,13 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
                 }`}
               >
                 <span className="shrink-0 text-[13px]">{workspace.icon}</span>
-                <span className="whitespace-nowrap break-keep">{workspace.label}</span>
+                <span className="truncate whitespace-nowrap break-keep">{workspace.label}</span>
               </button>
             ))}
           </div>
         </div>
 
-        <div className="no-scrollbar flex min-h-0 flex-row gap-1 overflow-x-auto p-2 md:flex-1 md:flex-col md:overflow-y-auto md:p-3">
+        <div className="no-scrollbar flex min-h-0 flex-row gap-1 overflow-x-auto p-1.5 md:flex-1 md:flex-col md:overflow-y-auto md:p-2.5">
           <div className="flex gap-1 md:hidden">
             {workspaceTabs.map(({ id, label, icon }) => (
               <button
@@ -512,7 +555,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
               if (groupTabs.length === 0) return null;
 
               return (
-                <div key={group} className={index > 0 ? 'mt-2 border-t border-[var(--toss-border)] pt-2' : ''}>
+                <div key={group} className={index > 0 ? 'mt-1.5 border-t border-[var(--toss-border)] pt-1.5' : ''}>
                   <p className="px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">
                     {HR_GROUP_LABELS[group]}
                   </p>
@@ -538,45 +581,52 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
           </div>
         </div>
 
-        <div className="grid shrink-0 grid-cols-2 gap-2 border-t border-[var(--toss-border)] p-2 md:grid-cols-1 md:gap-3 md:p-3">
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-bold text-[var(--toss-gray-4)] md:text-[11px]">사업체</label>
-            <select
-              data-testid="hr-company-select"
-              value={선택사업체}
-              onChange={(event) => 사업체설정(event.target.value)}
-              className="w-full rounded-[12px] border border-[var(--toss-border)] bg-emerald-50 px-2 py-2 text-[11px] font-bold text-[var(--foreground)] outline-none focus:ring-2 focus:ring-emerald-500/30 dark:bg-emerald-950/20 md:px-3 md:py-2.5"
-            >
-              {사업체목록.map((회사명) => (
-                <option key={회사명} value={회사명}>
-                  {회사명}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-bold text-[var(--toss-gray-4)] md:text-[11px]">직원 상태</label>
-            <select
-              data-testid="hr-status-select"
-              value={직원상태필터}
-              onChange={(event) => 직원상태필터설정(event.target.value as StaffStatus)}
-              className="w-full rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-blue-light)]/30 px-2 py-2 text-[11px] font-bold text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 md:px-3 md:py-2.5"
-            >
-              <option value="재직">재직자</option>
-              <option value="퇴사">퇴사자</option>
-            </select>
+        <div className="shrink-0 border-t border-[var(--toss-border)] bg-[var(--toss-card)] p-1.5 shadow-[0_-10px_24px_rgba(15,23,42,0.04)] md:sticky md:bottom-0 md:z-10 md:p-2.5">
+          <div className="grid grid-cols-1 gap-2">
+            <div className="flex items-center gap-2 rounded-[16px] border border-[var(--toss-border)] bg-white px-3 py-2 shadow-sm">
+              <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-black text-emerald-700">
+                사업체
+              </span>
+              <select
+                data-testid="hr-company-select"
+                value={선택사업체}
+                onChange={(event) => 사업체설정(event.target.value)}
+                className="w-full bg-transparent text-[12px] font-bold text-[var(--foreground)] outline-none"
+              >
+                {사업체목록.map((회사명) => (
+                  <option key={회사명} value={회사명}>
+                    {회사명}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-2 rounded-[16px] border border-[var(--toss-border)] bg-white px-3 py-2 shadow-sm">
+              <span className="shrink-0 rounded-full bg-[var(--toss-blue-light)] px-2 py-1 text-[10px] font-black text-[var(--toss-blue)]">
+                직원상태
+              </span>
+              <select
+                data-testid="hr-status-select"
+                value={직원상태필터}
+                onChange={(event) => 직원상태필터설정(event.target.value as StaffStatus)}
+                className="w-full bg-transparent text-[12px] font-bold text-[var(--foreground)] outline-none"
+              >
+                <option value="재직">재직자</option>
+                <option value="퇴사">퇴사자</option>
+              </select>
+            </div>
           </div>
         </div>
+
       </aside>
 
       <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <section className="custom-scrollbar flex-1 overflow-y-auto bg-[var(--page-bg)] p-4 md:p-0">
+        <section className="custom-scrollbar flex-1 overflow-y-auto bg-[var(--page-bg)] p-3 md:p-0">
           {activeMenu === '구성원' && (
             <div className="flex h-full flex-col">
               <div className="min-h-0 flex-1 overflow-y-auto">
                 <구성원관리
-                  직원목록={staffs}
-                  부서목록={depts}
+                  직원목록={인사직원목록}
+                  부서목록={인사부서목록}
                   선택사업체={선택사업체}
                   보기상태={직원상태필터}
                   on문서보기={인사서류보기}
@@ -589,18 +639,18 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
             </div>
           )}
 
-          {activeMenu === '인사발령' && <PersonnelAppointment staffs={staffs} selectedCo={선택사업체} user={user} />}
-          {activeMenu === '포상/징계' && <RewardDisciplineManagement staffs={staffs} selectedCo={선택사업체} user={user} />}
+          {activeMenu === '인사발령' && <PersonnelAppointment staffs={인사직원목록} selectedCo={선택사업체} user={user} />}
+          {activeMenu === '포상/징계' && <RewardDisciplineManagement staffs={인사직원목록} selectedCo={선택사업체} user={user} />}
 
           {activeMenu === '교육' && (
-            <div className="p-4 md:p-10">
-              <EducationMain staffs={staffs} selectedCo={선택사업체} />
+            <div className="p-3 md:p-6">
+              <EducationMain staffs={인사직원목록} selectedCo={선택사업체} />
             </div>
           )}
 
           {activeMenu === '오프보딩' && (
-            <div className="p-4 md:p-10">
-              <OffboardingView staffs={staffs} selectedCo={선택사업체} onRefresh={onRefresh} />
+            <div className="p-3 md:p-6">
+              <OffboardingView staffs={인사직원목록} selectedCo={선택사업체} onRefresh={onRefresh} />
             </div>
           )}
 
@@ -613,18 +663,18 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
                 onChange={(tabId) => 근태분석탭설정(tabId as AttendanceAnalysisTabId)}
               />
               <div className="min-h-0 flex-1 overflow-y-auto">
-                {activeAttendanceTab === '근태관리' && <AttendanceMain staffs={staffs} selectedCo={선택사업체} />}
+                {activeAttendanceTab === '근태관리' && <AttendanceMain staffs={인사직원목록} selectedCo={선택사업체} />}
                 {activeAttendanceTab === '연차소멸알림' && (
-                  <AnnualLeaveExpiryAlert staffs={staffs} selectedCo={선택사업체} user={user} />
+                  <AnnualLeaveExpiryAlert staffs={인사직원목록} selectedCo={선택사업체} user={user} />
                 )}
                 {activeAttendanceTab === '지각조퇴분석' && (
-                  <LatenessPatternAnalysis staffs={staffs} selectedCo={선택사업체} user={user} />
+                  <LatenessPatternAnalysis staffs={인사직원목록} selectedCo={선택사업체} user={user} />
                 )}
                 {activeAttendanceTab === '근무형태이력' && (
-                  <WorkTypeChangeHistory staffs={staffs} selectedCo={선택사업체} user={user} />
+                  <WorkTypeChangeHistory staffs={인사직원목록} selectedCo={선택사업체} user={user} />
                 )}
                 {activeAttendanceTab === '조기퇴근감지' && (
-                  <EarlyLeavingDetection staffs={staffs} selectedCo={선택사업체} user={user} />
+                  <EarlyLeavingDetection staffs={인사직원목록} selectedCo={선택사업체} user={user} />
                 )}
               </div>
             </div>
@@ -640,9 +690,9 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
                 testIdPrefix="shift-suite"
               />
               <div className="min-h-0 flex-1 overflow-y-auto">
-                {교대근무탭 === '캘린더' && <ShiftCalendar staffs={staffs} selectedCo={선택사업체} />}
+                {교대근무탭 === '캘린더' && <ShiftCalendar staffs={인사직원목록} selectedCo={선택사업체} />}
                 {교대근무탭 === '생성마법사' && (
-                  <AutoRosterPlanner user={user} staffs={staffs} selectedCo={선택사업체} />
+                  <AutoRosterPlanner user={user} staffs={인사직원목록} selectedCo={선택사업체} />
                 )}
               </div>
             </div>
@@ -650,7 +700,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
           {activeMenu === '연차/휴가' && (
             <div className="flex h-full flex-col overflow-hidden">
               <LeaveManagement
-                staffs={staffs}
+                staffs={인사직원목록}
                 selectedCo={선택사업체}
                 onRefresh={onRefresh}
                 user={user}
@@ -668,37 +718,37 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
                 onChange={(tabId) => 급여내부탭설정(tabId as PayrollEmbeddedTabId)}
               />
               <div className="min-h-0 flex-1 overflow-y-auto">
-                {급여내부탭 === '기본' && <PayrollMain staffs={staffs} selectedCo={선택사업체} onRefresh={onRefresh} />}
+                {급여내부탭 === '기본' && <PayrollMain staffs={인사직원목록} selectedCo={선택사업체} onRefresh={onRefresh} />}
                 {급여내부탭 === '원천징수파일' && (
-                  <div className="p-4 md:p-10">
-                    <TaxFileGenerator staffs={staffs} selectedCo={선택사업체} />
+                    <div className="p-3 md:p-6">
+                    <TaxFileGenerator staffs={인사직원목록} selectedCo={선택사업체} />
                   </div>
                 )}
                 {급여내부탭 === '4대보험' && (
-                  <div className="grid gap-6 p-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:p-10">
+                  <div className="grid gap-4 p-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:p-6">
                     <div className="rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4 shadow-sm">
-                      <InsuranceManagement staffs={staffs} selectedCo={선택사업체} />
+                      <InsuranceManagement staffs={인사직원목록} selectedCo={선택사업체} />
                     </div>
                     <div className="rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4 shadow-sm">
-                      <InsuranceEDI staffs={staffs} selectedCo={선택사업체} user={user} />
+                      <InsuranceEDI staffs={인사직원목록} selectedCo={선택사업체} user={user} />
                     </div>
                   </div>
                 )}
               </div>
             </div>
           )}
-          {activeMenu === '건강검진' && <HealthCheckupManagement staffs={staffs} selectedCo={선택사업체} />}
-          {activeMenu === '경조사' && <CongratulationsCondolences staffs={staffs} selectedCo={선택사업체} />}
-          {activeMenu === '면허/자격증' && <LicenseManager staffs={staffs} selectedCo={선택사업체} user={user} />}
+          {activeMenu === '건강검진' && <HealthCheckupManagement staffs={인사직원목록} selectedCo={선택사업체} />}
+          {activeMenu === '경조사' && <CongratulationsCondolences staffs={인사직원목록} selectedCo={선택사업체} />}
+          {activeMenu === '면허/자격증' && <LicenseManager staffs={인사직원목록} selectedCo={선택사업체} user={user} />}
           {activeMenu === '의료기기점검' && <MedicalDeviceInspection selectedCo={선택사업체} user={user} />}
 
           {activeMenu === '비품대여' && (
-            <div className="p-4 md:p-10">
-              <AssetLoanManager staffs={staffs} selectedCo={선택사업체} />
+            <div className="p-3 md:p-6">
+              <AssetLoanManager staffs={인사직원목록} selectedCo={선택사업체} />
             </div>
           )}
 
-          {activeMenu === '사고보고서' && <IncidentReport staffs={staffs} selectedCo={선택사업체} user={user} />}
+          {activeMenu === '사고보고서' && <IncidentReport staffs={인사직원목록} selectedCo={선택사업체} user={user} />}
 
           {activeMenu === '계약' && (
             <div className="flex h-full flex-col">
@@ -711,11 +761,11 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
               />
               <div className="min-h-0 flex-1 overflow-y-auto">
                 {계약내부탭 === '기본' && (
-                  <ContractMain staffs={staffs} selectedCo={선택사업체} onRefresh={onRefresh} />
+                  <ContractMain staffs={인사직원목록} selectedCo={선택사업체} onRefresh={onRefresh} />
                 )}
                 {계약내부탭 === '계약서생성기' && (
-                  <div className="p-4 md:p-8">
-                    <ContractAutoGenerator staffs={staffs} selectedCo={선택사업체} user={user} />
+                    <div className="p-3 md:p-6">
+                    <ContractAutoGenerator staffs={인사직원목록} selectedCo={선택사업체} user={user} />
                   </div>
                 )}
               </div>
@@ -723,23 +773,23 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
           )}
 
           {activeMenu === '문서보관함' && (
-            <문서보관함 user={user} selectedCo={선택사업체} linkedTarget={문서연결대상} />
-          )}
+              <문서보관함 user={user} selectedCo={선택사업체} linkedTarget={문서연결대상} />
+            )}
 
           {activeMenu === '증명서' && (
-            <div className="p-4 md:p-10">
-              <CertificateGenerator staffs={staffs} selectedCo={선택사업체} />
+            <div className="p-3 md:p-6">
+              <CertificateGenerator staffs={인사직원목록} selectedCo={선택사업체} />
             </div>
           )}
 
           {activeMenu === '서류제출' && (
-            <div className="p-4 md:p-10">
-              <DocumentScanner user={user} staffs={staffs} selectedCo={선택사업체} />
+            <div className="p-3 md:p-6">
+              <DocumentScanner user={user} staffs={인사직원목록} selectedCo={선택사업체} />
             </div>
           )}
 
           {activeMenu === '캘린더' && (
-            <div className="flex flex-col gap-8 p-4 md:flex-row md:p-10">
+            <div className="flex flex-col gap-4 p-3 md:flex-row md:p-6">
               <div className="flex-1">
                 <SharedCalendarView user={user} />
               </div>

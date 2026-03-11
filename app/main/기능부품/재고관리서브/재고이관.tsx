@@ -76,7 +76,6 @@ export default function InventoryTransfer({ user, inventory = [], fetchInventory
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div>
           <h2 className="text-base font-bold text-[var(--foreground)]">부서간 재고 이관</h2>
-          <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">법인·부서 간 재고를 이관하고 이력을 관리합니다.</p>
         </div>
         <button onClick={() => { setForm({ item_id: '', quantity: 1, from_company: '', from_dept: '', to_company: '', to_dept: '', reason: '' }); setShowModal(true); }}
           className="px-4 py-2 bg-[var(--toss-blue)] text-white rounded-[10px] text-sm font-bold shadow-sm hover:opacity-90">+ 이관 요청</button>

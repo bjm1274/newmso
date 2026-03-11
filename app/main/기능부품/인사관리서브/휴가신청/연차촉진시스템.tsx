@@ -132,7 +132,6 @@ export default function AnnualLeavePromotion({ staffs, selectedCo }: { staffs: S
         <div className="flex justify-between items-center mb-8">
           <div>
             <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tight">연차사용촉진 자동화 시스템</h2>
-            <p className="text-[11px] text-[var(--toss-blue)] font-bold mt-1 uppercase tracking-widest">Annual Leave Promotion Engine</p>
           </div>
           <div className="px-4 py-2 bg-blue-50 rounded-[16px]">
             <p className="text-[11px] font-semibold text-[var(--toss-blue)]">현재 촉진 시기: <span className="text-sm">1차 촉진 (7월)</span></p>

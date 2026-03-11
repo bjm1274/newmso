@@ -973,15 +973,10 @@ export default function AutoRosterPlanner({
       <div className="rounded-[24px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-6 shadow-sm">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.24em] text-[var(--toss-blue)]">Shift Wizard</p>
             <h3 className="mt-2 text-xl font-bold text-[var(--foreground)]">교대근무 생성 마법사</h3>
-            <p className="mt-2 text-[12px] text-[var(--toss-gray-3)]">
-              자동편성과 간호근무표를 하나로 합쳐 팀 단위로 생성하고, 생성 후에는 표에서 바로 임의 수정할 수 있습니다.
-            </p>
           </div>
           <div className="flex flex-wrap items-end gap-3">
-            <label className="flex flex-col gap-1">
-              <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">대상 월</span>
+            <label className="flex flex-col gap-0">
               <div className="rounded-[14px] border border-[var(--toss-border)] bg-[var(--input-bg)] px-3 py-2">
                 <SmartMonthPicker
                   value={selectedMonth}
@@ -1044,9 +1039,6 @@ export default function AutoRosterPlanner({
         <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h4 className="text-base font-bold text-[var(--foreground)]">현재 생성 규칙</h4>
-            <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">
-              마법사에서 선택한 팀, 패턴, 근무유형이 여기에 반영됩니다. 병동 3교대는 D / E / N / OFF 표기로 미리보기를 확인할 수 있습니다.
-            </p>
           </div>
           {loadingShifts && <span className="text-[12px] font-semibold text-[var(--toss-blue)]">근무유형 불러오는 중...</span>}
         </div>
@@ -1076,18 +1068,12 @@ export default function AutoRosterPlanner({
           </span>
         </div>
 
-        <div className="mt-4 rounded-[18px] border border-dashed border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-4 py-3 text-[12px] text-[var(--toss-gray-3)]">
-          표기 안내: <span className="font-bold text-[var(--foreground)]">D</span> 데이 / <span className="font-bold text-[var(--foreground)]">E</span> 이브닝 / <span className="font-bold text-[var(--foreground)]">N</span> 나이트 / <span className="font-bold text-[var(--foreground)]">OFF</span> 휴무
-        </div>
       </div>
 
       <div className="rounded-[24px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-6 shadow-sm">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h4 className="text-base font-bold text-[var(--foreground)]">대상 직원 세부 조정</h4>
-            <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">
-              마법사로 생성한 후 필요한 직원만 켜거나, 패턴과 나이트 횟수, 시작 오프셋을 직원별로 다시 맞출 수 있습니다.
-            </p>
           </div>
           {loadingShifts && <span className="text-[12px] font-semibold text-[var(--toss-blue)]">근무형태 불러오는 중...</span>}
         </div>
@@ -1369,8 +1355,7 @@ export default function AutoRosterPlanner({
                 <div className="space-y-6">
                   <div className="grid gap-4 lg:grid-cols-[180px_minmax(0,1fr)]">
                     <div className="space-y-4">
-                      <label className="flex flex-col gap-1">
-                        <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">대상 월</span>
+                      <label className="flex flex-col gap-0">
                         <div className="rounded-[14px] border border-[var(--toss-border)] bg-[var(--input-bg)] px-3 py-2">
                           <SmartMonthPicker
                             value={selectedMonth}

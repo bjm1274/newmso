@@ -73,7 +73,6 @@ export default function QRAssetManager({ user, inventory, fetchInventory }: any)
             <div className="flex justify-between items-end border-b border-[var(--toss-border)] pb-4">
                 <div>
                     <h2 className="text-xl md:text-2xl font-bold text-[var(--foreground)] tracking-tight">QR 스마트 자산 관리</h2>
-                    <p className="text-[11px] md:text-xs text-[var(--toss-gray-3)] font-bold uppercase mt-1">Asset Tracking & Check-out System</p>
                 </div>
                 <div className="flex gap-2">
                     <button onClick={() => setActiveTab('대시보드')} className={`px-4 py-2 text-xs font-bold rounded-xl transition-colors ${activeTab === '대시보드' ? 'bg-[var(--toss-blue)] text-white' : 'bg-slate-100 text-slate-500'}`}>사내 자산 보드</button>

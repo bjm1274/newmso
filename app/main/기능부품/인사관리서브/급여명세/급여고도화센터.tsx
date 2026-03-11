@@ -583,11 +583,7 @@ export default function PayrollAdvancedCenter({
   return (
     <div className="space-y-6">
       <div className="rounded-[24px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-6 shadow-sm">
-        <p className="text-[11px] font-black uppercase tracking-[0.24em] text-[var(--toss-blue)]">Payroll Ops</p>
         <h2 className="mt-2 text-xl font-bold text-[var(--foreground)]">급여 고도화 센터</h2>
-        <p className="mt-2 text-[12px] text-[var(--toss-gray-3)]">
-          기존 급여 기능과 겹치지 않게 상여/소급/공제/프리랜서/신고연동/다법인/급여캘린더/2단계 승인만 별도 관리합니다.
-        </p>
       </div>
 
       {loading ? (
@@ -707,7 +703,6 @@ export default function PayrollAdvancedCenter({
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-base font-bold text-[var(--foreground)]">홈택스/EDI 신고파일 고도화 · 회계 GL 전표 연동</h3>
-                  <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">현재 급여를 기준으로 신고 요약과 회계 전표를 동시에 생성합니다.</p>
                 </div>
                 <button onClick={() => downloadCsv(`payroll_gl_${yearMonth}.csv`, glRows)} className="rounded-[12px] bg-[var(--toss-blue)] px-4 py-2 text-sm font-bold text-white">GL CSV 다운로드</button>
               </div>

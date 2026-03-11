@@ -5,6 +5,11 @@ import { existsSync, readFileSync } from 'fs';
 import path from 'path';
 import { createSupabaseAccessToken } from '@/lib/server-supabase-bridge';
 import {
+  pickStoredPassword,
+  updateStaffPasswordWithFallback,
+  verifyStoredPassword,
+} from '@/lib/staff-password';
+import {
   clearSessionCookie,
   createSessionToken,
   getSessionCookieOptions,
@@ -86,24 +91,6 @@ function failureResponse(error?: string, status = 200) {
     { status }
   );
   return clearSessionCookie(response);
-}
-
-async function verifyStoredPassword(storedPassword: string, inputPassword: string) {
-  if (!storedPassword) {
-    return { ok: false, needsHashUpgrade: false };
-  }
-
-  if (storedPassword.startsWith('$2')) {
-    return {
-      ok: await bcrypt.compare(inputPassword, storedPassword),
-      needsHashUpgrade: false,
-    };
-  }
-
-  return {
-    ok: storedPassword === inputPassword,
-    needsHashUpgrade: storedPassword === inputPassword,
-  };
 }
 
 export async function POST(request: NextRequest) {
@@ -247,16 +234,12 @@ export async function POST(request: NextRequest) {
       return failureResponse('등록된 사번 또는 이름이 없습니다.');
     }
 
-    const storedPassword = String(userRow.password ?? userRow.passwd ?? '').trim();
+    const storedPassword = pickStoredPassword(userRow);
     const isFirstLogin = !storedPassword;
     let notice: string | undefined;
 
     if (isFirstLogin) {
-      const passwordHash = await bcrypt.hash(password, 10);
-      const { error: updateError } = await supabase
-        .from('staff_members')
-        .update({ password: passwordHash })
-        .eq('id', userRow.id);
+      const { error: updateError } = await updateStaffPasswordWithFallback(supabase, userRow.id, password);
 
       if (updateError) {
         return failureResponse('비밀번호 설정 중 오류가 발생했습니다.', 500);
@@ -270,11 +253,7 @@ export async function POST(request: NextRequest) {
       }
 
       if (verified.needsHashUpgrade) {
-        const passwordHash = await bcrypt.hash(password, 10);
-        await supabase
-          .from('staff_members')
-          .update({ password: passwordHash })
-          .eq('id', userRow.id);
+        await updateStaffPasswordWithFallback(supabase, userRow.id, password);
       }
     }
 

@@ -134,7 +134,6 @@ export default function UnpaidAllowanceAlert({ staffs, selectedCo, user }: Props
     <div className="p-4 md:p-6 space-y-5 max-w-4xl mx-auto">
       <div>
         <h2 className="text-lg font-bold text-[var(--foreground)]">장기 미지급 수당 알림</h2>
-        <p className="text-xs text-[var(--toss-gray-3)] mt-1">최근 3개월 근태 대비 미지급 수당을 감지합니다.</p>
       </div>
 
       {loading ? (

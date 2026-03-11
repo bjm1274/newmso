@@ -57,7 +57,6 @@ export default function MinWageChecker({ staffs = [], selectedCo, user }: { staf
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div>
           <h2 className="text-base font-bold text-[var(--foreground)]">최저임금 미달 자동 경고</h2>
-          <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">직원 급여가 최저임금 기준에 미달하는지 자동으로 감지합니다.</p>
         </div>
         <div className="flex items-center gap-2">
           <select value={checkYear} onChange={e => setCheckYear(Number(e.target.value))} className="px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm font-bold bg-[var(--toss-card)] outline-none">

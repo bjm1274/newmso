@@ -51,7 +51,6 @@ export default function WagePeakCalculator({ staffs = [], selectedCo, user }: { 
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div>
           <h2 className="text-base font-bold text-[var(--foreground)]">임금피크제 자동 계산</h2>
-          <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">나이별 임금 감액 비율을 자동으로 계산합니다.</p>
         </div>
         <button onClick={() => setShowSettings(v => !v)} className="px-3 py-1.5 bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] rounded-[10px] text-xs font-bold">
           {showSettings ? '설정 닫기' : '요율 설정'}
