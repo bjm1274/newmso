@@ -109,7 +109,6 @@ export default function SalaryAnomalyDetector({ staffs = [] }: { staffs: any[] }
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div>
           <h3 className="text-base font-bold text-[var(--foreground)]">급여 이상치 자동 감지</h3>
-          <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">전월 대비 급여 변동이 비정상적으로 큰 직원을 자동으로 감지합니다.</p>
         </div>
         <div className="flex gap-2 items-center shrink-0">
           <input

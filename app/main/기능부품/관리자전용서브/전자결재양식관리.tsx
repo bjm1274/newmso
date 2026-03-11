@@ -529,10 +529,6 @@ export default function ApprovalFormTypesManager() {
     <div className="max-w-5xl space-y-8">
       <div>
         <h2 className="text-xl font-semibold text-[var(--foreground)]">서식양식 관리</h2>
-        <p className="text-xs text-[var(--toss-gray-3)] mt-1">
-          전자결재에서 사용할 서식/양식을 관리하고, 각 서식의 디자인(제목, 색상, 하단 문구 등)을 설정합니다.
-          여기서 추가한 양식은 전자결재 작성하기 탭에 함께 표시됩니다.
-        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -567,9 +563,6 @@ export default function ApprovalFormTypesManager() {
       {/* 추가 */}
       <div className="bg-white p-6 rounded-[12px] border border-[var(--toss-border)] shadow-sm">
         <h3 className="text-sm font-semibold text-[var(--foreground)] mb-4">양식 추가</h3>
-        <p className="mb-4 text-[11px] leading-5 text-[var(--toss-gray-3)]">
-          기본 양식은 이미 제공되며, 여기서는 필요한 커스텀 양식만 추가하면 됩니다.
-        </p>
         <div className="flex flex-wrap gap-3 items-end">
           <div>
             <label className="block text-[11px] font-bold text-[var(--toss-gray-3)] mb-1">표시 이름</label>
@@ -657,9 +650,6 @@ export default function ApprovalFormTypesManager() {
         <div className="flex items-center justify-between gap-2">
           <div>
             <h3 className="text-sm font-semibold text-[var(--foreground)]">서식 디자인 설정</h3>
-            <p className="text-[11px] text-[var(--toss-gray-3)]">
-              좌측에서 서식을 선택한 뒤, 우측에서 제목/색상/하단 문구 등을 조정합니다. 급여명세서 서식도 여기에서 함께 관리됩니다.
-            </p>
           </div>
           {designLoading && (
             <span className="text-[11px] text-[var(--toss-gray-3)] font-bold">디자인 불러오는 중...</span>
@@ -728,9 +718,6 @@ export default function ApprovalFormTypesManager() {
                 </p>
                 <p className="text-sm font-semibold text-[var(--foreground)]">
                   {selectedName || '서식을 선택해 주세요'}
-                </p>
-                <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
-                  회사 로고 워터마크와 직인은 기본값으로 켜져 있으며, 아래에서 개별 조정할 수 있습니다.
                 </p>
               </div>
               <div className="flex items-center gap-1 bg-[var(--toss-gray-1)] border border-[var(--toss-border)] rounded-full px-1 py-1">
@@ -899,9 +886,6 @@ export default function ApprovalFormTypesManager() {
             {/* 미리보기 – 클릭으로 제목/부제/서명 위치 조정 */}
             <div className="mt-1 rounded-[28px] border border-dashed border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-4">
               <div className="flex items-center justify-between mb-1">
-                <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
-                  Preview
-                </p>
                 <p className="text-[11px] text-[var(--toss-gray-3)]">
                   미리보기 안을 클릭하면{' '}
                   <span className="font-bold">

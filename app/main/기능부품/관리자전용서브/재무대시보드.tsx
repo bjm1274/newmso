@@ -38,7 +38,6 @@ export default function FinancialDashboard() {
             <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-[var(--toss-border)] pb-4 space-y-4 md:space-y-0">
                 <div>
                     <h2 className="text-xl md:text-2xl font-bold text-[var(--foreground)] tracking-tight">C-Level 재무분석 보드</h2>
-                    <p className="text-[11px] md:text-xs text-[var(--toss-gray-3)] font-bold uppercase mt-1">Financial & Budget Dashboard</p>
                 </div>
                 <div className="flex gap-2">
                     {['Q1', 'Q2', 'Q3', 'Q4'].map(q => (

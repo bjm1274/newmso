@@ -299,14 +299,14 @@ function SectionTabBar({
             type="button"
             onClick={() => onChange(tab.id)}
             data-testid={testIdPrefix ? `${testIdPrefix}-${index}` : undefined}
-            className={`flex items-center gap-2 rounded-full px-4 py-2 text-[11px] font-bold transition-all ${
+            className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-[11px] font-bold transition-all ${
               activeTab === tab.id
                 ? 'bg-[var(--toss-blue)] text-white shadow-md'
                 : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-blue-light)] hover:text-[var(--foreground)]'
             }`}
           >
-            <span>{tab.icon}</span>
-            <span>{tab.label}</span>
+            <span className="shrink-0">{tab.icon}</span>
+            <span className="whitespace-nowrap break-keep">{tab.label}</span>
           </button>
         ))}
       </div>
@@ -463,7 +463,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
   }
 
   return (
-    <div className="app-page flex h-full min-h-0 flex-col overflow-hidden md:flex-row">
+    <div className="app-page flex h-full min-h-0 flex-col overflow-x-hidden md:flex-row">
       <aside className="flex h-auto w-full shrink-0 flex-col overflow-hidden border-b border-[var(--toss-border)] bg-[var(--toss-card)] md:h-full md:w-56 md:border-b-0 md:border-r">
         <div className="shrink-0 border-b border-[var(--toss-border)] p-2 md:p-3">
           <p className="px-1 pb-2 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-4)]">업무 공간</p>
@@ -474,14 +474,14 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
                 type="button"
                 onClick={() => handleWorkspaceChange(workspace.id)}
                 data-testid={`hr-workspace-${workspace.id}`}
-                className={`flex min-w-[110px] items-center justify-center gap-2 rounded-[12px] px-3 py-2 text-[11px] font-bold transition-all md:w-full md:justify-start ${
+                className={`flex min-w-max shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-[12px] px-3 py-2 text-[11px] font-bold transition-all md:w-full md:justify-start ${
                   activeWorkspace === workspace.id
                     ? 'bg-[var(--foreground)] text-white shadow-md'
                     : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-blue-light)] hover:text-[var(--foreground)]'
                 }`}
               >
-                <span className="text-[13px]">{workspace.icon}</span>
-                <span>{workspace.label}</span>
+                <span className="shrink-0 text-[13px]">{workspace.icon}</span>
+                <span className="whitespace-nowrap break-keep">{workspace.label}</span>
               </button>
             ))}
           </div>

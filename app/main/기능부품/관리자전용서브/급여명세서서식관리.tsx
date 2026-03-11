@@ -125,12 +125,6 @@ function PreviewCard({
                 </p>
                 <p className="mt-1 text-sm font-bold text-slate-800">CERT-2026-000001</p>
               </div>
-              <div
-                className="rounded-full px-3 py-1 text-[10px] font-black uppercase"
-                style={{ color: primaryColor, backgroundColor: alphaColor(primaryColor, 0.12) }}
-              >
-                Preview
-              </div>
             </div>
             <div className="mt-5 space-y-3 text-[12px] text-slate-600">
               {['성명', '소속', '직위', '재직기간', '제출용도'].map((label) => (
@@ -284,12 +278,6 @@ export default function PayrollSlipDesignManager() {
         <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
           <div>
             <h2 className="text-lg font-bold text-[var(--foreground)]">문서 양식 통합 관리</h2>
-            <p className="mt-1 text-sm text-[var(--toss-gray-3)]">
-              급여명세서와 증명서 발급 문서가 같은 브랜드 규칙을 사용하도록 맞춥니다.
-            </p>
-            <p className="mt-1 text-[11px] font-bold text-[var(--toss-blue)]">
-              저장 키: {DOCUMENT_DESIGN_SETTING_KEY}
-            </p>
           </div>
           {loading && (
             <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">불러오는 중...</span>
@@ -437,9 +425,6 @@ export default function PayrollSlipDesignManager() {
             <div className="rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)]/60 p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">
-                    Preview
-                  </p>
                   <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">
                     {selectedScopeLabel} · {selectedDocument.label}
                   </p>

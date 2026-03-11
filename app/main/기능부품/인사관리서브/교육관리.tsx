@@ -1,149 +1,261 @@
-import { useState, useEffect } from 'react';
+'use client';
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import EducationList from './교육내역/교육내역명단';
 import EducationStatus from './교육내역/교육이수현황';
 import LicenseTracking from './교육내역/자격면허대시보드';
+import {
+  buildEducationCompletionMap,
+  getApplicableEducationItems,
+  getEducationCompletionKey,
+  getEducationDueDate,
+  getScopedActiveStaffs,
+} from './교육내역/education-utils';
 
-const EDUCATION_DEADLINES: Record<string, { month: number; day: number }> = {
-  성희롱예방: { month: 6, day: 30 },
-  개인정보보호: { month: 6, day: 30 },
-  '직장 내 장애인 인식개선': { month: 6, day: 30 },
-  '직장 내 괴롭힘 방지': { month: 6, day: 30 },
-  '산업안전보건(일반)': { month: 9, day: 30 },
-  '감염관리 교육': { month: 3, day: 31 },
-  '환자안전·의료사고 예방': { month: 3, day: 31 },
-  '의료법·의료윤리 교육': { month: 3, day: 31 },
-  '마약류 취급자 교육(해당자)': { month: 5, day: 31 },
-  아동학대신고: { month: 3, day: 31 },
-  노인학대신고: { month: 3, day: 31 },
-};
+interface LicenseAlert {
+  id: string | number;
+  staffId: string | number;
+  name: string;
+  licenseName: string;
+  issuingBody?: string | null;
+  expiryDate: string;
+  daysLeft: number;
+  type: 'URGENT' | 'PENDING';
+}
 
 export default function EducationMain({ staffs, selectedCo }: any) {
   const [notifications, setNotifications] = useState<any[]>([]);
-  const [licenseNotifications, setLicenseNotifications] = useState<any[]>([]);
+  const [licenseNotifications, setLicenseNotifications] = useState<LicenseAlert[]>([]);
+  const [completionMap, setCompletionMap] = useState<Record<string, { is_completed: boolean; certificate_url?: string | null }>>({});
   const [showNoti, setShowNoti] = useState(false);
   const [activeTab, setActiveTab] = useState('의무교육');
+  const educationListRef = useRef<HTMLDivElement>(null);
+  const licenseDashboardRef = useRef<HTMLDivElement>(null);
+  const activeStaffs = useMemo(() => getScopedActiveStaffs(staffs, selectedCo), [staffs, selectedCo]);
 
-  // [기능 3] 법정 의무 교육 자동 알림 로직
-  useEffect(() => {
-    const loadAlerts = async () => {
-      const filtered = selectedCo === '전체' ? staffs : staffs.filter((s: any) => s.company === selectedCo);
-      const today = new Date();
+  const scrollToSection = (target: HTMLDivElement | null) => {
+    target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
-      try {
-        const [{ data: completions }, { data: licenses }] = await Promise.all([
-          supabase.from('education_completions').select('staff_id, education_name'),
-          supabase.from('staff_licenses').select('id, staff_id, license_name, expiry_date, issuing_body'),
-        ]);
+  const loadAlerts = useCallback(async () => {
+    if (activeStaffs.length === 0) {
+      setNotifications([]);
+      setLicenseNotifications([]);
+      setCompletionMap({});
+      return;
+    }
 
-        const completionSet = new Set(
-          (completions || []).map((item: any) => `${item.staff_id}_${item.education_name}`)
-        );
+    const staffMap = new Map(activeStaffs.map((staff: any) => [String(staff.id), staff]));
+    const today = new Date();
 
-        const educationAlerts = filtered.flatMap((staff: any) => {
-          return Object.entries(EDUCATION_DEADLINES).flatMap(([education, deadline]) => {
-            if (completionSet.has(`${staff.id}_${education}`)) return [];
+    try {
+      const [{ data: completions }, { data: licenses }] = await Promise.all([
+        supabase.from('education_completions').select('staff_id, education_name, certificate_url'),
+        supabase.from('staff_licenses').select('id, staff_id, license_name, expiry_date, issuing_body'),
+      ]);
 
-            const dueDate = new Date(today.getFullYear(), deadline.month - 1, deadline.day);
+      const nextCompletionMap = buildEducationCompletionMap(completions || []);
+
+      const educationAlerts = activeStaffs
+        .flatMap((staff: any) => {
+          return getApplicableEducationItems(staff.company).flatMap((item) => {
+            if (nextCompletionMap[getEducationCompletionKey(staff.id, item.name)]) return [];
+
+            const dueDate = getEducationDueDate(item.name, today.getFullYear());
+            if (!dueDate) return [];
+
             const daysLeft = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
             if (daysLeft > 45) return [];
 
             return [{
               id: staff.id,
               name: staff.name,
-              education,
+              education: item.name,
               dueDate: dueDate.toISOString().slice(0, 10),
               daysLeft,
               type: daysLeft <= 14 ? 'URGENT' : 'PENDING',
             }];
           });
-        }).sort((a: any, b: any) => a.daysLeft - b.daysLeft);
+        })
+        .sort((a: any, b: any) => a.daysLeft - b.daysLeft);
 
-        const licenseAlerts = (licenses || [])
-          .map((license: any) => {
-            const matchedStaff = filtered.find((staff: any) => String(staff.id) === String(license.staff_id));
-            if (!matchedStaff || !license.expiry_date) return null;
-            const daysLeft = Math.ceil((new Date(license.expiry_date).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-            if (daysLeft > 90) return null;
+      const nextLicenseAlerts = (licenses || [])
+        .map((license: any) => {
+          const matchedStaff = staffMap.get(String(license.staff_id));
+          if (!matchedStaff || !license.expiry_date) return null;
 
-            return {
-              id: license.id,
-              staffId: license.staff_id,
-              name: matchedStaff.name,
-              licenseName: license.license_name,
-              issuingBody: license.issuing_body,
-              expiryDate: license.expiry_date,
-              daysLeft,
-              type: daysLeft <= 30 ? 'URGENT' : 'PENDING',
-            };
-          })
-          .filter(Boolean)
-          .sort((a: any, b: any) => a.daysLeft - b.daysLeft);
+          const daysLeft = Math.ceil((new Date(license.expiry_date).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+          if (daysLeft > 90) return null;
 
-        setNotifications(educationAlerts);
-        setLicenseNotifications(licenseAlerts);
-      } catch (error) {
-        console.error('교육/면허 알림 로드 실패:', error);
-        setNotifications([]);
-        setLicenseNotifications([]);
-      }
-    };
+          return {
+            id: license.id,
+            staffId: license.staff_id,
+            name: matchedStaff.name,
+            licenseName: license.license_name,
+            issuingBody: license.issuing_body,
+            expiryDate: license.expiry_date,
+            daysLeft,
+            type: daysLeft <= 30 ? 'URGENT' : 'PENDING',
+          };
+        })
+        .filter(Boolean)
+        .sort((a: any, b: any) => a.daysLeft - b.daysLeft) as LicenseAlert[];
 
-    loadAlerts();
-  }, [staffs, selectedCo]);
+      setCompletionMap(nextCompletionMap);
+      setNotifications(educationAlerts);
+      setLicenseNotifications(nextLicenseAlerts);
+    } catch (error) {
+      console.error('교육/면허 알림 로드 실패:', error);
+      setCompletionMap({});
+      setNotifications([]);
+      setLicenseNotifications([]);
+    }
+  }, [activeStaffs]);
+
+  useEffect(() => {
+    void loadAlerts();
+  }, [loadAlerts]);
+
+  useEffect(() => {
+    setShowNoti(false);
+  }, [activeTab]);
 
   const activeAlerts = activeTab === '의무교육' ? notifications : licenseNotifications;
   const urgentEducationCount = notifications.filter((item) => item.type === 'URGENT').length;
   const urgentLicenseCount = licenseNotifications.filter((item) => item.type === 'URGENT').length;
+  const educationSummary = useMemo(() => {
+    const pendingCounts = new Map<string, number>();
+    const urgentCounts = new Map<string, number>();
+    let totalRequiredCount = 0;
+    let completedCount = 0;
+    let pendingAssignmentCount = 0;
+    let pendingStaffCount = 0;
+
+    activeStaffs.forEach((staff: any) => {
+      const applicableItems = getApplicableEducationItems(staff.company);
+      let staffPendingCount = 0;
+
+      totalRequiredCount += applicableItems.length;
+
+      applicableItems.forEach((item) => {
+        const completed = !!completionMap[getEducationCompletionKey(staff.id, item.name)];
+        if (completed) {
+          completedCount += 1;
+          return;
+        }
+
+        pendingAssignmentCount += 1;
+        staffPendingCount += 1;
+        pendingCounts.set(item.name, (pendingCounts.get(item.name) || 0) + 1);
+      });
+
+      if (staffPendingCount > 0) {
+        pendingStaffCount += 1;
+      }
+    });
+
+    notifications
+      .filter((item) => item.type === 'URGENT')
+      .forEach((item) => urgentCounts.set(item.education, (urgentCounts.get(item.education) || 0) + 1));
+
+    const focusSource = urgentCounts.size > 0 ? urgentCounts : pendingCounts;
+    const focusItems = [...focusSource.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ko'))
+      .slice(0, 4)
+      .map(([name, count]) => ({ name, count }));
+
+    return {
+      totalStaffCount: activeStaffs.length,
+      totalRequiredCount,
+      completedCount,
+      pendingAssignmentCount,
+      pendingStaffCount,
+      urgentStaffCount: new Set(
+        notifications.filter((item) => item.type === 'URGENT').map((item) => String(item.id))
+      ).size,
+      completionRate: totalRequiredCount > 0 ? Math.round((completedCount / totalRequiredCount) * 100) : 0,
+      focusItems,
+    };
+  }, [activeStaffs, completionMap, notifications]);
+
+  const bannerText = activeTab === '의무교육'
+    ? urgentEducationCount > 0
+      ? `법정 의무 교육 이수 기한이 14일 이내인 직원이 ${urgentEducationCount}명 있습니다.`
+      : `45일 이내 교육 마감 대상이 ${notifications.length}건 있습니다.`
+    : urgentLicenseCount > 0
+      ? `자격·면허 만료가 30일 이내인 직원이 ${urgentLicenseCount}명 있습니다.`
+      : `90일 이내 갱신 대상이 ${licenseNotifications.length}건 있습니다.`;
+
+  const handleAlertPanel = () => {
+    if (activeAlerts.length === 0) {
+      alert('현재 확인할 알림 대상이 없습니다.');
+      return;
+    }
+    setShowNoti((prev) => !prev);
+  };
+
+  const handlePrimaryAction = () => {
+    if (activeTab === '의무교육') {
+      scrollToSection(educationListRef.current);
+      return;
+    }
+    scrollToSection(licenseDashboardRef.current);
+  };
 
   return (
     <div className="flex flex-col h-full animate-in fade-in duration-500 bg-[var(--tab-bg)]/20 relative">
-      {/* 상단 알림 배너 (기한 임박 직원 존재 시) */}
       {activeAlerts.length > 0 && (
         <div className="bg-red-600 text-white px-8 py-2 flex justify-between items-center animate-pulse">
-          <p className="text-[11px] font-semibold">
-            {activeTab === '의무교육'
-              ? `⚠️ 법정 의무 교육 이수 기한이 14일 이내인 직원이 ${urgentEducationCount}명 있습니다. 즉시 독려가 필요합니다.`
-              : `⚠️ 자격·면허 만료가 30일 이내인 직원이 ${urgentLicenseCount}명 있습니다. 갱신 안내가 필요합니다.`}
-          </p>
-          <button onClick={() => setShowNoti(!showNoti)} className="text-[11px] font-semibold underline">상세보기</button>
+          <p className="text-[11px] font-semibold">{bannerText}</p>
+          <button onClick={handleAlertPanel} className="text-[11px] font-semibold underline">
+            {showNoti ? '패널 닫기' : '상세보기'}
+          </button>
         </div>
       )}
 
-      {/* 상단 액션 헤더 */}
       <header className="px-8 pt-8 pb-4 border-b border-[var(--toss-border)] bg-[var(--toss-card)] flex flex-col gap-6 shrink-0">
         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-xl font-semibold text-[var(--foreground)] tracking-tight">
               Compliance & 자격 관리 <span className="text-sm text-[var(--toss-blue)] ml-2">[{selectedCo}]</span>
             </h2>
-            <p className="text-[11px] text-[var(--toss-gray-3)] font-bold mt-1 uppercase tracking-widest">Mandatory Training & License Dashboard</p>
           </div>
-          <div className="flex gap-2">
-            <button className="px-6 py-3 bg-[var(--toss-card)] border border-[var(--toss-border)] text-[var(--toss-gray-4)] text-[11px] font-semibold shadow-sm hover:bg-[var(--toss-gray-1)] transition-all">
-              자동 알림 시스템 설정
+          <div className="flex gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={handleAlertPanel}
+              className="px-6 py-3 bg-[var(--toss-card)] border border-[var(--toss-border)] text-[11px] font-semibold shadow-sm hover:bg-[var(--toss-gray-1)] transition-all"
+            >
+              {showNoti ? '알림 패널 닫기' : '알림 대상 보기'}
             </button>
-            <button className="px-6 py-3 bg-[var(--toss-blue)] text-white text-[11px] font-semibold shadow-xl hover:scale-105 transition-all">
-              + 신규 등록
+            <button
+              type="button"
+              onClick={handlePrimaryAction}
+              className="px-6 py-3 bg-[var(--toss-blue)] text-white text-[11px] font-semibold shadow-xl hover:scale-105 transition-all"
+            >
+              {activeTab === '의무교육' ? '전체 명단으로 이동' : '자격면허 목록으로 이동'}
             </button>
           </div>
         </div>
 
-        {/* 탭 컨트롤 */}
         <div className="flex gap-1 border-b border-[var(--toss-border)] -mb-4">
-          {['의무교육', '자격면허'].map((t) => (
+          {['의무교육', '자격면허'].map((tab) => (
             <button
-              key={t}
-              onClick={() => setActiveTab(t)}
-              className={`px-6 py-3 text-[12px] font-black border-b-2 transition-all ${activeTab === t ? 'border-[var(--toss-blue)] text-[var(--toss-blue)]' : 'border-transparent text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'}`}
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-6 py-3 text-[12px] font-black border-b-2 transition-all ${
+                activeTab === tab
+                  ? 'border-[var(--toss-blue)] text-[var(--toss-blue)]'
+                  : 'border-transparent text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'
+              }`}
             >
-              {t === '의무교육' ? '📚 법정 의무교육' : '📜 자격 및 면허 대시보드'}
+              {tab === '의무교육' ? '법정 의무교육' : '자격 및 면허 대시보드'}
             </button>
           ))}
         </div>
       </header>
 
-      {/* 알림 팝업 레이어 */}
       {showNoti && (
         <div className="absolute top-32 right-8 w-80 bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-2xl z-50 p-6 rounded-none animate-in slide-in-from-top-4">
           <div className="flex justify-between items-center mb-4 border-b pb-2">
@@ -153,29 +265,39 @@ export default function EducationMain({ staffs, selectedCo }: any) {
             <button onClick={() => setShowNoti(false)} className="text-[var(--toss-gray-3)] text-lg">×</button>
           </div>
           <div className="space-y-3 max-h-60 overflow-y-auto custom-scrollbar">
-            {activeAlerts.map((n, i) => (
-              <div key={i} className={`p-3 border-l-4 ${n.type === 'URGENT' ? 'border-red-500 bg-red-50' : 'border-orange-400 bg-orange-50'}`}>
+            {activeAlerts.map((item: any, index) => (
+              <div key={index} className={`p-3 border-l-4 ${item.type === 'URGENT' ? 'border-red-500 bg-red-50' : 'border-orange-400 bg-orange-50'}`}>
                 <p className="text-[11px] font-semibold text-[var(--foreground)]">
-                  {activeTab === '의무교육' ? `${n.name} (${n.education})` : `${n.name} (${n.licenseName})`}
+                  {activeTab === '의무교육' ? `${item.name} (${item.education})` : `${item.name} (${item.licenseName})`}
                 </p>
                 <p className="text-[11px] font-bold text-[var(--toss-gray-3)] mt-1">
-                  {activeTab === '의무교육' ? `마감까지 ${n.daysLeft}일 남음` : `만료까지 ${n.daysLeft}일 남음`}
+                  {activeTab === '의무교육'
+                    ? item.daysLeft < 0
+                      ? `마감 후 ${Math.abs(item.daysLeft)}일 경과`
+                      : `마감까지 ${item.daysLeft}일 남음`
+                    : item.daysLeft < 0
+                      ? `만료 후 ${Math.abs(item.daysLeft)}일 경과`
+                      : `만료까지 ${item.daysLeft}일 남음`}
                 </p>
                 <button
                   type="button"
                   onClick={async () => {
-                    if (!confirm(`${n.name}님에게 알림 발송을 하시겠습니까?`)) return;
+                    if (!confirm(`${item.name}님에게 알림 발송을 하시겠습니까?`)) return;
                     const { error } = await supabase.from('notifications').insert({
-                      user_id: activeTab === '의무교육' ? n.id : n.staffId,
+                      user_id: activeTab === '의무교육' ? item.id : item.staffId,
                       type: activeTab === '의무교육' ? 'education' : 'license_expiry',
-                      title: activeTab === '의무교육' ? '🚨 법정의무교육 이수 독촉' : '📜 자격·면허 갱신 안내',
+                      title: activeTab === '의무교육' ? '법정의무교육 이수 독촉' : '자격·면허 갱신 안내',
                       body: activeTab === '의무교육'
-                        ? `${n.education} 의무교육 이수 기한이 ${n.daysLeft}일 남았습니다. 신속히 교육을 수료하시고 이수증을 등록해 주세요.`
-                        : `${n.licenseName}의 만료일이 ${n.expiryDate}입니다. ${n.issuingBody || '발급기관'} 기준으로 갱신 일정을 확인해 주세요.`,
-                      read_at: null
+                        ? item.daysLeft < 0
+                          ? `${item.education} 의무교육 이수 기한이 이미 지났습니다. 신속히 교육을 수료하시고 이수증을 등록해 주세요.`
+                          : `${item.education} 의무교육 이수 기한이 ${item.daysLeft}일 남았습니다. 신속히 교육을 수료하시고 이수증을 등록해 주세요.`
+                        : item.daysLeft < 0
+                          ? `${item.licenseName}의 만료일(${item.expiryDate})이 이미 지났습니다. ${item.issuingBody || '발급기관'} 기준으로 즉시 갱신 일정을 확인해 주세요.`
+                          : `${item.licenseName}의 만료일이 ${item.expiryDate}입니다. ${item.issuingBody || '발급기관'} 기준으로 갱신 일정을 확인해 주세요.`,
+                      read_at: null,
                     });
                     if (!error) {
-                      alert(`${n.name}님에게 독촉 알림이 성공적으로 전송되었습니다.`);
+                      alert(`${item.name}님에게 독촉 알림이 성공적으로 전송되었습니다.`);
                     } else {
                       alert('알림 전송 중 오류가 발생했습니다.');
                       console.error(error);
@@ -183,7 +305,7 @@ export default function EducationMain({ staffs, selectedCo }: any) {
                   }}
                   className="mt-2 text-[11px] font-semibold text-[var(--toss-blue)] uppercase tracking-tight hover:opacity-70"
                 >
-                  알림톡 발송 →
+                  알림톡 발송
                 </button>
               </div>
             ))}
@@ -191,13 +313,22 @@ export default function EducationMain({ staffs, selectedCo }: any) {
         </div>
       )}
 
-      {/* 본문 스크롤 영역 */}
       <div className="flex-1 p-8 overflow-y-auto space-y-8 custom-scrollbar">
         {activeTab === '의무교육' ? (
           <>
-            <EducationStatus selectedCo={selectedCo} urgentCount={notifications.length} staffs={staffs} />
-            <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] p-8 shadow-sm rounded-2xl">
-              <EducationList selectedCo={selectedCo} staffs={staffs} notifications={notifications} />
+            <EducationStatus
+              selectedCo={selectedCo}
+              summary={educationSummary}
+              onOpenRoster={() => scrollToSection(educationListRef.current)}
+            />
+            <div ref={educationListRef} className="bg-[var(--toss-card)] border border-[var(--toss-border)] p-8 shadow-sm rounded-2xl">
+              <EducationList
+                selectedCo={selectedCo}
+                staffs={activeStaffs}
+                notifications={notifications}
+                completions={completionMap}
+                onStatusChanged={loadAlerts}
+              />
             </div>
           </>
         ) : (
@@ -216,7 +347,9 @@ export default function EducationMain({ staffs, selectedCo }: any) {
                 <p className="mt-2 text-sm font-semibold text-[var(--foreground)]">갱신 요청 발송 / 사본 확보 / 부서장 확인</p>
               </div>
             </div>
-            <LicenseTracking staffs={staffs} selectedCo={selectedCo} />
+            <div ref={licenseDashboardRef}>
+              <LicenseTracking staffs={staffs} selectedCo={selectedCo} />
+            </div>
           </>
         )}
       </div>

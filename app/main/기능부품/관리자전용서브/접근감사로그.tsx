@@ -127,7 +127,6 @@ export default function AccessAuditLog({ user }: Props) {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)]">접근 권한 감사 로그</h2>
-          <p className="text-xs text-[var(--toss-gray-3)] mt-1">시스템 접근 이력 및 수상한 접근 감지</p>
         </div>
         <button onClick={handleCsvDownload} className="px-4 py-2 bg-[var(--toss-blue)] text-white text-xs font-bold rounded-[8px] hover:opacity-90">CSV 내보내기</button>
       </div>

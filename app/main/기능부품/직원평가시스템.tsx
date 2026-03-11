@@ -126,7 +126,6 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
             <aside className="w-full lg:w-80 flex flex-col bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[24px] shadow-sm overflow-hidden">
                 <div className="p-5 border-b border-[var(--toss-border)] bg-[var(--toss-gray-1)]/30">
                     <h3 className="text-sm font-bold text-[var(--foreground)]">평가 대상 직원</h3>
-                    <p className="text-[10px] text-[var(--toss-gray-3)] mt-1">기록할 직원을 선택하세요</p>
                 </div>
                 <div className="flex-1 overflow-y-auto no-scrollbar p-2 space-y-1">
                     {staffs.map((s) => (

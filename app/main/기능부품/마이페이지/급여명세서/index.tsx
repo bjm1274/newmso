@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import SalaryDetail from '../../인사관리서브/급여명세/급여상세';
@@ -14,29 +14,37 @@ export default function SalarySlipContainer({ user }: any) {
   const handlePasswordVerify = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user?.id) {
-      setVerifyError('직원 계정으로 로그인한 상태에서만 이용할 수 있습니다.');
+      setVerifyError('직원 계정으로 로그인한 뒤 이용해 주세요.');
       return;
     }
+
     const pwd = passwordInput.trim();
     if (!pwd) {
       setVerifyError('비밀번호를 입력해 주세요.');
       return;
     }
+
     setVerifying(true);
     setVerifyError('');
     try {
-      const { data, error } = await supabase
-        .from('staff_members')
-        .select('id')
-        .eq('id', user.id)
-        .eq('password', pwd)
-        .single();
-      if (error || !data) {
+      const response = await fetch('/api/auth/verify-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          password: pwd,
+          name: user?.name,
+          employeeNo: user?.employee_no,
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok || !payload?.verified) {
         setVerifyError('비밀번호가 일치하지 않습니다.');
         setPasswordInput('');
         setVerifying(false);
         return;
       }
+
       setUnlocked(true);
       setPasswordInput('');
     } catch {

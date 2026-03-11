@@ -47,7 +47,7 @@ export default function OrgChart({ user, staffs, depts, selectedCo, setSelectedC
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-white">
+    <div className="flex flex-1 flex-col overflow-x-hidden bg-white">
       {/* 헤더 */}
       <div className="p-6 border-b border-[var(--toss-border)]">
         <h2 className="text-2xl font-semibold text-[var(--foreground)] mb-4">🏢 조직도</h2>

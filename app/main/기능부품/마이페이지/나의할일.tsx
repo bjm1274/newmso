@@ -2,6 +2,10 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
+function isUuidLike(value: string | null | undefined) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
+}
+
 export default function MyTodoList({ user: initialUser }: any) {
   const [user, setUser] = useState<any>(initialUser || {});
   const [tasks, setTasks] = useState<any[]>([]);
@@ -21,7 +25,7 @@ export default function MyTodoList({ user: initialUser }: any) {
   // 1. 유저 ID 확인 및 자동 복구 로직 (user 변경 시에만 실행, selectedDate 변경 시 불필요한 재조회 방지)
   useEffect(() => {
     const checkAndRecoverUser = async () => {
-      if (initialUser?.id) {
+      if (initialUser?.id && isUuidLike(initialUser.id)) {
         setUser(initialUser);
         fetchTasks(initialUser.id);
         setRecoverAttempted(true);

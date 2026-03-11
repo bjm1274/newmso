@@ -107,9 +107,6 @@ export default function NotificationAutomation({ user }: any) {
     <div className="bg-[var(--toss-card)] p-8 border border-[var(--toss-border)] rounded-[12px] shadow-xl max-w-xl space-y-6">
       <div>
         <h3 className="text-xl font-semibold text-[var(--foreground)] mb-2">알림 자동화</h3>
-        <p className="text-xs text-[var(--toss-gray-3)] font-bold">
-          급여 정산 알림 + 연차 촉진(1차/2차)을 자동으로 발송하고, 발송 이력을 별도 테이블에 기록합니다.
-        </p>
       </div>
       <div className="space-y-4">
         <label className="flex items-center gap-3">

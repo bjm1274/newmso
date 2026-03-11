@@ -160,7 +160,7 @@ function InnerTabBar({
     >
       <div className="mb-3">
         <h3 className="text-sm font-bold text-[var(--foreground)]">{title}</h3>
-        <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{description}</p>
+        {description ? <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{description}</p> : null}
       </div>
       <div className="no-scrollbar flex gap-2 overflow-x-auto">
         {tabs.map((tab, index) => (
@@ -169,14 +169,14 @@ function InnerTabBar({
             type="button"
             onClick={() => onChange(tab.id)}
             data-testid={testIdPrefix ? `${testIdPrefix}-${index}` : undefined}
-            className={`flex items-center gap-2 rounded-full px-4 py-2 text-[11px] font-bold transition-all ${
+            className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-[11px] font-bold transition-all ${
               activeTab === tab.id
                 ? 'bg-[var(--toss-blue)] text-white shadow-md'
                 : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-blue-light)] hover:text-[var(--foreground)]'
             }`}
           >
-            <span>{tab.icon}</span>
-            <span>{tab.label}</span>
+            <span className="shrink-0">{tab.icon}</span>
+            <span className="whitespace-nowrap break-keep">{tab.label}</span>
           </button>
         ))}
       </div>
@@ -234,12 +234,12 @@ export default function AdminView({ user, staffs = [], onRefresh, initialTab }: 
       className="relative flex min-h-0 flex-1 flex-col bg-[var(--page-bg)] animate-in fade-in duration-500"
       data-testid="admin-view"
     >
-      <main className="custom-scrollbar flex-1 min-h-0 min-w-0 overflow-y-auto bg-[var(--toss-gray-1)]/30 p-4 md:p-10">
+      <main className="custom-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto bg-[var(--toss-gray-1)]/30 p-4 pb-24 md:p-10">
         {activeTab === '경영분석' && (
           <>
             <InnerTabBar
               title="경영분석"
-              description="경영, 재무, 예산, 통합보고서, 법인 손익을 하나의 분석 공간으로 묶었습니다."
+              description=""
               tabs={ANALYSIS_TABS}
               activeTab={analysisTab}
               onChange={(tabId) => setAnalysisTab(tabId as AnalysisTabId)}
@@ -257,7 +257,7 @@ export default function AdminView({ user, staffs = [], onRefresh, initialTab }: 
           <>
             <InnerTabBar
               title="감사센터"
-              description="접근 감사와 일반 감사 로그를 한곳에서 조회합니다."
+              description=""
               tabs={AUDIT_TABS}
               activeTab={auditTab}
               onChange={(tabId) => setAuditTab(tabId as AuditTabId)}

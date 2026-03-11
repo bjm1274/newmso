@@ -118,7 +118,6 @@ export default function FormBuilder({ user }: any) {
                     {/* Left: Tools Pane */}
                     <div className="w-full md:w-64 bg-white border border-slate-200 rounded-3xl p-6 shadow-sm shrink-0 flex flex-col">
                         <h3 className="text-sm font-black text-slate-800 mb-4">필드 추가</h3>
-                        <p className="text-[11px] font-bold text-slate-400 mb-4">원하는 필드를 클릭하여 우측 캔버스에 추가하세요.</p>
                         <div className="space-y-2 flex-1 overflow-y-auto">
                             {availableTypes.map(t => (
                                 <button

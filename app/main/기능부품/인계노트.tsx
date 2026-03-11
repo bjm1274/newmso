@@ -206,7 +206,6 @@ export default function HandoverNotes({ user }: { user: any }) {
                     <h2 className="text-xl font-bold text-[var(--foreground)] flex items-center gap-2">
                         <span>📝</span> 병동 인계노트
                     </h2>
-                    <p className="text-[12px] text-[var(--toss-gray-3)] mt-1 font-medium">3교대 근무자를 위한 일별 핵심 전달사항</p>
                 </div>
                 <div className="flex items-center gap-3 w-full md:w-auto">
                     <div className="relative flex-1 md:w-64">

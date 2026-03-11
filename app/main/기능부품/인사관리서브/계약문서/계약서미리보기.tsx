@@ -370,7 +370,6 @@ export default function ContractPreview({ staff, contract }: Props) {
     <div className="bg-[var(--toss-gray-1)] md:p-8 flex flex-col h-[900px] overflow-y-auto rounded-[32px] border border-[var(--toss-border)] relative custom-scrollbar print:bg-white print:p-0 print:border-none print:h-auto print:overflow-visible">
       <div className="flex items-center justify-between px-6 py-4 mb-4 bg-white/50 backdrop-blur-md border-b border-[var(--toss-border)] sticky top-0 z-20 print:hidden">
         <div>
-          <span className="text-[10px] font-bold text-[var(--toss-blue)] uppercase tracking-widest">Document Preview</span>
           <h1 className="text-sm font-bold text-[var(--foreground)] mt-0.5">{staff.name} 근로계약서</h1>
         </div>
         <div className="flex items-center gap-3">

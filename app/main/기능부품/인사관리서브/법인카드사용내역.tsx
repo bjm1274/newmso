@@ -184,7 +184,6 @@ export default function CorporateCardTransactions({ staffs = [] }: any) {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
           <h3 className="text-xl font-semibold text-[var(--foreground)] tracking-tight">법인카드 관리</h3>
-          <p className="text-[11px] text-[var(--toss-blue)] font-bold uppercase tracking-widest">회사별 카드 등록 · 사용내역 실시간 반영</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <div className="flex gap-0.5 p-1 app-tab-bar">

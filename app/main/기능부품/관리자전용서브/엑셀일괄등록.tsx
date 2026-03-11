@@ -119,9 +119,9 @@ export default function ExcelBulkUpload({ onRefresh }: any) {
     <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[12px] p-8 shadow-sm max-w-2xl">
       <h3 className="text-xl font-bold text-[var(--foreground)] mb-2">엑셀 일괄 등록</h3>
       <p className="text-xs text-[var(--toss-gray-3)] font-bold mb-6">
-        {mode === 'staff' && '엑셀: 사번, 이름, 회사, 부서, 직급, 기본급, 입사일'}
-        {mode === 'inventory' && '엑셀: 품목명, 수량, 단가, 회사, 분류'}
-        {isEcount && '이카운트에서 내보낸 재고/품목 엑셀을 그대로 업로드하면 품목명·수량·단가·분류 등이 재고 리스트에 반영됩니다.'}
+        {mode === 'staff' && ''}
+        {mode === 'inventory' && ''}
+        {isEcount && ''}
       </p>
       <div className="flex flex-wrap gap-2 mb-4">
         <button onClick={() => setMode('staff')} className={`px-4 py-2 rounded-[12px] text-xs font-bold ${mode === 'staff' ? 'bg-[var(--toss-blue)] text-white' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'}`}>직원</button>
@@ -130,9 +130,7 @@ export default function ExcelBulkUpload({ onRefresh }: any) {
       </div>
       {isEcount && (
         <div className="mb-4 p-3 bg-teal-50 border border-teal-100 rounded-[12px] text-[11px] text-teal-800">
-          <p className="font-bold mb-1">이카운트 형식 컬럼 예시 (한글/영문 모두 인식)</p>
-          <p>품목코드, 품목명(품목), 규격, 단위, 수량(재고/재고수량), 단가(원가), 품목그룹(분류), 회사, 최소재고(안전재고)</p>
-          <div className="mt-2 flex items-center gap-2">
+          <div className="flex items-center gap-2">
             <label className="font-bold text-[var(--toss-gray-4)]">엑셀에 회사가 없을 때 기본 회사:</label>
             <input type="text" value={defaultCompany} onChange={e => setDefaultCompany(e.target.value)} className="border border-[var(--toss-border)] rounded-[12px] px-2 py-1 w-40 text-sm" placeholder="박철홍정형외과" />
           </div>

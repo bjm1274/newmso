@@ -148,7 +148,6 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)]">회사 관리</h2>
-          <p className="text-xs text-[var(--toss-gray-3)] mt-1">MSO가 관리하는 회사·팀·법인카드·계약 설정을 한 곳에서 관리합니다.</p>
         </div>
         <div className="flex gap-0.5 p-1 app-tab-bar flex-wrap">
           <button
@@ -197,9 +196,6 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
           <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[12px] shadow-sm overflow-hidden">
             <div className="p-6 border-b border-[var(--toss-border)]">
               <h3 className="text-base font-bold text-[var(--foreground)]">회사(병원) 목록</h3>
-              <p className="text-xs text-[var(--toss-gray-3)] mt-1">
-                MSO가 관리하는 회사·병원을 등록·수정합니다. 인사·연차·급여는 각 회사별로 분리됩니다.
-              </p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">

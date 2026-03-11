@@ -134,7 +134,6 @@ export default function CompanyPnL({ staffs, selectedCo, user }: Props) {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)]">법인별 손익 현황</h2>
-          <p className="text-xs text-[var(--toss-gray-3)] mt-1">인건비 중심 법인별 비용 현황 대시보드</p>
         </div>
         <input
           type="month"

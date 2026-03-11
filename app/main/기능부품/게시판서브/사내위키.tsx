@@ -13,9 +13,9 @@ export default function WikiDashboard() {
     };
 
     return (
-        <div className="flex h-[calc(100vh-140px)] animate-in fade-in duration-500 bg-white border border-slate-200/60 rounded-3xl overflow-hidden shadow-sm m-4 md:m-8">
+        <div className="m-4 flex min-h-[calc(100dvh-140px)] flex-col animate-in overflow-hidden rounded-3xl border border-slate-200/60 bg-white shadow-sm fade-in duration-500 md:m-8 md:flex-row">
             {/* Sidebar Tree (노션 스타일) */}
-            <div className="w-64 md:w-80 border-r border-slate-100 bg-slate-50/50 flex flex-col shrink-0">
+            <div className="flex w-full shrink-0 flex-col border-b border-slate-100 bg-slate-50/50 md:w-80 md:border-r md:border-b-0">
                 <div className="p-6 border-b border-slate-100">
                     <h3 className="text-sm font-black text-slate-800 mb-4 tracking-tight">📖 SY Knowledge Base</h3>
                     <input
@@ -59,20 +59,20 @@ export default function WikiDashboard() {
             </div>
 
             {/* Editor / Reader Area */}
-            <div className="flex-1 overflow-y-auto bg-white relative">
-                <header className="absolute top-0 w-full h-14 bg-white/80 backdrop-blur-sm border-b border-slate-100/50 flex items-center justify-between px-8 z-10 sticky">
+            <div className="relative flex-1 overflow-y-auto bg-white">
+                <header className="sticky top-0 z-10 flex min-h-14 w-full flex-col gap-3 border-b border-slate-100/50 bg-white/80 px-4 py-4 backdrop-blur-sm md:h-14 md:flex-row md:items-center md:justify-between md:px-8 md:py-0">
                     <div className="flex items-center gap-2 text-[11px] font-bold text-slate-400 tracking-widest uppercase">
                         <span>Knowledge Base</span>
                         <span>/</span>
                         <span className="text-primary">{selectedDoc?.name || '문서 선택'}</span>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                         <button className="px-4 py-2 text-[10px] font-black tracking-widest bg-slate-100 text-slate-500 rounded-lg hover:bg-slate-200 transition-colors">공유하기</button>
                         <button className="px-4 py-2 text-[10px] font-black tracking-widest bg-primary text-white rounded-lg shadow-sm hover:scale-105 transition-transform">문서 편집기능 (Editor)</button>
                     </div>
                 </header>
 
-                <div className="p-10 md:p-16 max-w-4xl mx-auto space-y-8 pb-32">
+                <div className="mx-auto max-w-4xl space-y-8 p-6 pb-32 md:p-16">
                     {selectedDoc ? (
                         <>
                             <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight mb-8">

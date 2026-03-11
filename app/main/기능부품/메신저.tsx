@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import SmartDatePicker from './공통/SmartDatePicker';
@@ -9,6 +9,8 @@ const CAN_WRITE_NOTICE_POSITIONS = ['대표', '부장', '팀장', '실장', '병
 const CHAT_ROOM_KEY = 'erp_chat_last_room';
 const CHAT_FOCUS_KEY = 'erp_chat_focus_keyword';
 const CHAT_ROOM_PREFS_KEY = 'erp_chat_room_prefs';
+const CHAT_PINNED_KEY = 'erp_chat_pinned_messages';
+const CHAT_BOOKMARK_KEY = 'erp_chat_bookmarks';
 const MESSAGE_READ_WRITES_ENABLED = true;
 
 function sortChatRoomsWithNoticeFirst(rooms: any[]): any[] {
@@ -64,6 +66,60 @@ type DeliveryState = {
 
 function getRoomPrefsStorageKey(userId: string | null | undefined): string {
   return `${CHAT_ROOM_PREFS_KEY}:${userId || 'guest'}`;
+}
+
+function isUuidLike(value: string | null | undefined): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
+}
+
+function getPinnedStorageKey(roomId: string | null | undefined): string {
+  return `${CHAT_PINNED_KEY}:${roomId || 'none'}`;
+}
+
+function getBookmarkStorageKey(userId: string | null | undefined): string {
+  return `${CHAT_BOOKMARK_KEY}:${userId || 'guest'}`;
+}
+
+function readStoredStringArray(storageKey: string): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.map((value) => String(value)) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredStringArray(storageKey: string, values: string[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(Array.from(new Set(values.map((value) => String(value))))));
+  } catch {
+    // ignore
+  }
+}
+
+function readStoredPinnedIds(roomId: string | null | undefined): string[] {
+  return readStoredStringArray(getPinnedStorageKey(roomId)).slice(0, 1);
+}
+
+function writeStoredPinnedIds(roomId: string | null | undefined, messageIds: string[]) {
+  writeStoredStringArray(getPinnedStorageKey(roomId), messageIds.slice(0, 1));
+}
+
+function readStoredBookmarks(userId: string | null | undefined): string[] {
+  return readStoredStringArray(getBookmarkStorageKey(userId));
+}
+
+function writeStoredBookmarks(userId: string | null | undefined, messageIds: string[]) {
+  writeStoredStringArray(getBookmarkStorageKey(userId), messageIds);
+}
+
+function getKoreanTodayString() {
+  const now = new Date();
+  const koreaNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  return koreaNow.toISOString().split('T')[0];
 }
 
 function getRoomDisplayName(room: any, staffs: any[], currentUserId: string | null | undefined): string {
@@ -200,6 +256,28 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   const permissions = user?.permissions || {};
   const isMso = user?.company === 'SY INC.' || permissions.mso === true || user?.role === 'admin';
   const canWriteNotice = isMso || Boolean(user?.position && CAN_WRITE_NOTICE_POSITIONS.includes(user.position));
+  const currentStaffProfile = useMemo(() => {
+    if (!Array.isArray(staffs) || staffs.length === 0) return null;
+    const sessionUserId = String(user?.id || '').trim();
+    if (sessionUserId) {
+      const exactMatch = staffs.find((staff: any) => String(staff.id) === sessionUserId);
+      if (exactMatch) return exactMatch;
+    }
+    const sessionUserName = String(user?.name || '').trim();
+    if (sessionUserName) {
+      return staffs.find((staff: any) => String(staff.name || '').trim() === sessionUserName) || null;
+    }
+    return null;
+  }, [staffs, user?.id, user?.name]);
+  const effectiveTodoUserId = useMemo(() => {
+    if (isUuidLike(user?.id)) {
+      return String(user.id);
+    }
+    if (currentStaffProfile?.id) {
+      return String(currentStaffProfile.id);
+    }
+    return String(user?.id || '').trim();
+  }, [currentStaffProfile?.id, user?.id]);
 
   const setRoom = (roomId: string | null) => {
     setSelectedRoomId(roomId);
@@ -523,27 +601,40 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     setChatRooms(list);
 
     if (msgs?.length) {
-      const ids = msgs.map((m: any) => m.id);
+      const ids = msgs.map((m: any) => String(m.id));
       const { data: reads } = await supabase.from('message_reads').select('message_id').in('message_id', ids);
       const counts: Record<string, number> = {};
       reads?.forEach((r: any) => { counts[r.message_id] = (counts[r.message_id] || 0) + 1; });
       setReadCounts(counts);
-      if (user?.id) {
-        const { data: bookmarks } = await supabase
-          .from('message_bookmarks')
-          .select('message_id')
-          .eq('user_id', user.id)
-          .in('message_id', ids);
-        setBookmarkedIds(new Set((bookmarks || []).map((bookmark: any) => bookmark.message_id)));
+      if (effectiveTodoUserId) {
+        try {
+          const { data: bookmarks, error: bookmarkError } = await supabase
+            .from('message_bookmarks')
+            .select('message_id')
+            .eq('user_id', effectiveTodoUserId)
+            .in('message_id', ids);
+          if (bookmarkError) throw bookmarkError;
+          const nextBookmarkIds = (bookmarks || []).map((bookmark: any) => String(bookmark.message_id));
+          setBookmarkedIds(new Set(nextBookmarkIds));
+          writeStoredBookmarks(effectiveTodoUserId, nextBookmarkIds);
+        } catch {
+          setBookmarkedIds(new Set(readStoredBookmarks(effectiveTodoUserId).filter((bookmarkId) => ids.includes(bookmarkId))));
+        }
       }
     } else {
       setReadCounts({});
-      setBookmarkedIds(new Set());
+      setBookmarkedIds(new Set(readStoredBookmarks(effectiveTodoUserId)));
     }
 
     try {
-      const { data: pinned } = await supabase.from('pinned_messages').select('message_id').eq('room_id', selectedRoomId);
-      if (pinned) setPinnedIds(pinned.map((p: any) => p.message_id));
+      const { data: pinned, error: pinnedError } = await supabase
+        .from('pinned_messages')
+        .select('message_id')
+        .eq('room_id', selectedRoomId);
+      if (pinnedError) throw pinnedError;
+      const nextPinnedIds = (pinned || []).map((item: any) => String(item.message_id)).slice(-1);
+      setPinnedIds(nextPinnedIds);
+      writeStoredPinnedIds(selectedRoomId, nextPinnedIds);
 
       const { data: reacts } = await supabase.from('message_reactions').select('message_id, emoji');
       const reactMap: Record<string, Record<string, number>> = {};
@@ -562,7 +653,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         vMap[v.poll_id][v.option_index] = (vMap[v.poll_id][v.option_index] || 0) + 1;
       });
       setPollVotes(vMap);
-    } catch (_) {}
+    } catch (_) {
+      setPinnedIds(readStoredPinnedIds(selectedRoomId));
+    }
 
     await updateUnreadForRooms(list);
 
@@ -604,7 +697,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         }
       }
     }
-  }, [selectedRoomId, user?.id, updateUnreadForRooms, persistMessageReads, broadcastChatSync, staffs]);
+  }, [selectedRoomId, user?.id, effectiveTodoUserId, updateUnreadForRooms, persistMessageReads, broadcastChatSync, staffs]);
 
   const roomNotifyRef = useRef(true);
   useEffect(() => { roomNotifyRef.current = roomNotifyOn; }, [roomNotifyOn]);
@@ -928,8 +1021,13 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   }, [selectedRoomId, scrollToBottom]);
 
   const pinnedMessages = useMemo(
-    () => messages.filter((m) => pinnedIds.includes(m.id)),
+    () => messages.filter((m) => pinnedIds.includes(String(m.id))),
     [messages, pinnedIds]
+  );
+
+  const currentNoticeMessage = useMemo(
+    () => pinnedMessages[pinnedMessages.length - 1] || null,
+    [pinnedMessages]
   );
 
 
@@ -1338,12 +1436,17 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   const handleAction = async (type: 'task') => {
     if (!activeActionMsg) return;
     if (type === 'task') {
+      if (!effectiveTodoUserId) {
+        alert('연결된 직원 계정을 찾지 못했습니다.');
+        setActiveActionMsg(null);
+        return;
+      }
       const content = (activeActionMsg.content || '').trim() || '첨부 파일 확인';
       const { error } = await supabase.from('todos').insert([{
-        user_id: user.id,
+        user_id: effectiveTodoUserId,
         content: `[채팅] ${content}`,
         is_complete: false,
-        task_date: new Date().toISOString().slice(0, 10),
+        task_date: getKoreanTodayString(),
       }]);
       if (!error) {
         alert('할 일 등록 완료');
@@ -1466,51 +1569,70 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   };
 
   const togglePin = async (messageId: string) => {
-    const isPinned = pinnedIds.includes(messageId);
+    const normalizedMessageId = String(messageId);
+    const isPinned = pinnedIds.includes(normalizedMessageId);
     try {
       if (isPinned) {
-        await supabase.from('pinned_messages').delete().eq('room_id', selectedRoomId).eq('message_id', messageId);
+        const { error } = await supabase
+          .from('pinned_messages')
+          .delete()
+          .eq('room_id', selectedRoomId)
+          .eq('message_id', normalizedMessageId);
+        if (error) throw error;
+        setPinnedIds([]);
+        writeStoredPinnedIds(selectedRoomId, []);
       } else {
-        await supabase.from('pinned_messages').insert([{ room_id: selectedRoomId, message_id: messageId, pinned_by: user.id }]);
+        const { error: clearError } = await supabase.from('pinned_messages').delete().eq('room_id', selectedRoomId);
+        if (clearError) throw clearError;
+        const { error: insertError } = await supabase
+          .from('pinned_messages')
+          .insert([{ room_id: selectedRoomId, message_id: normalizedMessageId, pinned_by: user.id }]);
+        if (insertError) throw insertError;
+        setPinnedIds([normalizedMessageId]);
+        writeStoredPinnedIds(selectedRoomId, [normalizedMessageId]);
       }
-      setPinnedIds((p) => (isPinned ? p.filter((id) => id !== messageId) : [...p, messageId]));
       fetchData();
     } catch (_) {
-      setPinnedIds((p) => (isPinned ? p.filter((id) => id !== messageId) : [...p, messageId]));
+      const nextPinnedIds = isPinned ? [] : [normalizedMessageId];
+      setPinnedIds(nextPinnedIds);
+      writeStoredPinnedIds(selectedRoomId, nextPinnedIds);
     }
   };
 
   const toggleBookmark = async (messageId: string) => {
-    const isBookmarked = bookmarkedIds.has(messageId);
+    const normalizedMessageId = String(messageId);
+    const isBookmarked = bookmarkedIds.has(normalizedMessageId);
+    const nextBookmarkIds = isBookmarked
+      ? Array.from(bookmarkedIds).filter((id) => id !== normalizedMessageId)
+      : [...Array.from(bookmarkedIds), normalizedMessageId];
     try {
+      if (!effectiveTodoUserId) {
+        throw new Error('missing-user');
+      }
       if (isBookmarked) {
-        await supabase
+        const { error } = await supabase
           .from('message_bookmarks')
           .delete()
-          .eq('user_id', user.id)
-          .eq('message_id', messageId);
-        setBookmarkedIds((prev) => {
-          const next = new Set(prev);
-          next.delete(messageId);
-          return next;
-        });
+          .eq('user_id', effectiveTodoUserId)
+          .eq('message_id', normalizedMessageId);
+        if (error) throw error;
       } else {
-        await supabase.from('message_bookmarks').upsert(
-          [
-            {
-              user_id: user.id,
-              message_id: messageId,
-              room_id: selectedRoomId,
-            },
-          ],
-          { onConflict: 'user_id,message_id' }
-        );
-        setBookmarkedIds((prev) => new Set(prev).add(messageId));
+        const { error } = await supabase.from('message_bookmarks').insert([
+          {
+            user_id: effectiveTodoUserId,
+            message_id: normalizedMessageId,
+            room_id: selectedRoomId,
+          },
+        ]);
+        if (error) throw error;
       }
+      setBookmarkedIds(new Set(nextBookmarkIds));
+      writeStoredBookmarks(effectiveTodoUserId, nextBookmarkIds);
       await fetchData();
     } catch (error) {
       console.error('toggleBookmark error', error);
-      alert('북마크 처리 중 오류가 발생했습니다.');
+      setBookmarkedIds(new Set(nextBookmarkIds));
+      writeStoredBookmarks(effectiveTodoUserId, nextBookmarkIds);
     }
   };
 
@@ -1895,7 +2017,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         </div>
       </aside>
 
-      <main className={`${!selectedRoomId ? 'hidden md:flex' : 'flex'} flex-1 min-h-0 flex-col bg-[var(--toss-gray-1)] relative pb-16 md:pb-0`}>
+      <main className={`${!selectedRoomId ? 'hidden md:flex' : 'flex'} flex-1 min-h-0 flex-col bg-[var(--toss-gray-1)] relative`}>
         {selectedRoomId && selectedRoom && (
           <header className="px-6 py-3.5 flex items-center justify-between border-b border-zinc-200/50 dark:border-zinc-800/50 glass glass-border shrink-0 z-40">
             <div className="flex items-center gap-3 min-w-0">
@@ -2030,7 +2152,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       ? '전송 실패'
                       : totalRecipients > 0 && unreadRecipients > 0
                         ? `${unreadRecipients}`
-                        : null;
+                        : '전송됨';
                 const canOpenReadStatus = Boolean(
                   isMine &&
                   deliveryState === 'sent' &&
@@ -2251,7 +2373,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         )}
 
         <div
-          className={`absolute left-0 right-0 bottom-0 md:relative p-2 md:p-3 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] bg-[var(--toss-card)] shrink-0 transition-all z-10 ${isDragging ? 'border-t-2 border-[var(--toss-blue)] border-dashed bg-blue-50 dark:bg-blue-900/20' : 'border-t border-[var(--toss-border)]'}`}
+          className={`absolute left-0 right-0 bottom-0 md:relative p-2 md:p-3 bg-[var(--toss-card)] shrink-0 transition-all z-10 ${isDragging ? 'border-t-2 border-[var(--toss-blue)] border-dashed bg-blue-50 dark:bg-blue-900/20' : 'border-t border-[var(--toss-border)]'}`}
           onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
           onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }}
           onDrop={async (e) => {
@@ -2273,7 +2395,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             </div>
           )}
 
-          <div className={`flex items-end gap-3 p-3 rounded-[16px] border transition-all ${selectedRoomId === NOTICE_ROOM_ID && !canWriteNotice
+          <div className={`flex items-center md:items-end gap-3 p-3 rounded-[16px] border transition-all ${selectedRoomId === NOTICE_ROOM_ID && !canWriteNotice
             ? 'bg-[var(--toss-gray-1)] border-[var(--toss-border)] opacity-80 pointer-events-none'
             : 'bg-[var(--toss-gray-1)] border-[var(--toss-border)] focus-within:bg-[var(--toss-card)] focus-within:ring-4 focus-within:ring-[var(--toss-blue)]'
             }`}>
@@ -2291,7 +2413,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 ref={composerRef}
                 data-testid="chat-message-input"
                 rows={1}
-                className="w-full bg-transparent p-1 px-2 outline-none text-[15px] md:text-sm font-bold min-w-0 resize-none max-h-28 leading-5"
+                className="block min-h-[24px] w-full min-w-0 resize-none bg-transparent px-2 py-1.5 text-[15px] font-bold leading-5 outline-none md:text-sm"
                 placeholder={selectedRoomId === NOTICE_ROOM_ID && !canWriteNotice ? "부서장 이상만 공지 작성 가능" : "메시지를 입력하세요... (@이름 멘션 가능)"}
                 value={inputMsg}
                 onChange={e => {
@@ -2369,7 +2491,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   <div className="p-4 bg-orange-50 dark:bg-orange-950/20 rounded-2xl border border-orange-100 dark:border-orange-900/30">
                     <p className="text-xs font-bold text-orange-800 dark:text-orange-300 mb-1">공지</p>
                     <p className="text-xs text-orange-900/70 dark:text-orange-200/50 leading-relaxed whitespace-pre-wrap">
-                      {selectedRoom?.notice_message?.content || '등록된 공지가 없습니다.'}
+                      {currentNoticeMessage?.content || '등록된 공지가 없습니다.'}
                     </p>
                   </div>
                 </div>
@@ -2475,11 +2597,11 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   </button>
                   <button onClick={() => { if (!activeActionMsg) return; void togglePin(activeActionMsg.id); setActiveActionMsg(null); }} className="w-full flex items-center gap-4 p-4 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[12px] transition-colors">
                     <span className="text-xl">📢</span>
-                    <span className="text-sm font-bold">{pinnedIds.includes(activeActionMsg.id) ? '공지 해제' : '공지 등록'}</span>
+                    <span className="text-sm font-bold">{pinnedIds.includes(String(activeActionMsg.id)) ? '공지 해제' : '공지 등록'}</span>
                   </button>
                   <button onClick={() => { if (!activeActionMsg) return; void toggleBookmark(activeActionMsg.id); setActiveActionMsg(null); }} className="w-full flex items-center gap-4 p-4 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[12px] transition-colors">
                     <span className="text-xl">🔖</span>
-                    <span className="text-sm font-bold">{bookmarkedIds.has(activeActionMsg.id) ? '북마크 해제' : '북마크 등록'}</span>
+                    <span className="text-sm font-bold">{bookmarkedIds.has(String(activeActionMsg.id)) ? '북마크 해제' : '북마크 등록'}</span>
                   </button>
                   <button onClick={async () => { await navigator.clipboard?.writeText(activeActionMsg.content || ''); alert('복사했습니다.'); setActiveActionMsg(null); }} className="w-full flex items-center gap-4 p-4 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[12px] transition-colors">
                     <span className="text-xl">📋</span>
@@ -2531,26 +2653,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       <button onClick={() => { void deleteMessageFromActions(activeActionMsg); }} className="w-full p-3 text-left hover:bg-red-50 rounded-[12px] text-xs font-semibold text-red-600 transition-colors">메시지 삭제</button>
                     </>
                   )}
-                  <button
-                    onClick={async () => {
-                      if (!activeActionMsg) return;
-                      try {
-                        const { error } = await supabase
-                          .from('chat_rooms')
-                          .update({ notice_message_id: activeActionMsg.id })
-                          .eq('id', selectedRoomId);
-                        if (error) throw error;
-                        alert('공지로 등록했습니다.');
-                        fetchData();
-                      } catch (err) {
-                        alert('공지 등록 중 오류가 발생했습니다.');
-                      }
-                      setActiveActionMsg(null);
-                    }}
-                    className="w-full p-3 text-left hover:bg-orange-50 rounded-[12px] text-xs font-semibold text-orange-600 transition-colors"
-                  >
-                    공지로 등록
-                  </button>
+                  <button onClick={() => { void togglePin(activeActionMsg.id); setActiveActionMsg(null); }} className={`w-full p-3 text-left rounded-[12px] text-xs font-semibold transition-colors ${pinnedIds.includes(String(activeActionMsg.id)) ? 'hover:bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]' : 'hover:bg-orange-50 text-orange-500'}`}>{pinnedIds.includes(String(activeActionMsg.id)) ? '공지 해제' : '공지로 등록'}</button>
                   <button onClick={() => { handleAction('task'); setActiveActionMsg(null) }} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">할 일로 등록</button>
                   <button
                     onClick={() => { openReadStatusPanel(activeActionMsg); }}
@@ -2567,41 +2670,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   <button onClick={() => { openThreadPanel(activeActionMsg); }} className="w-full p-3 text-left hover:bg-[var(--toss-blue-light)] rounded-[12px] text-xs font-semibold text-[var(--toss-blue)] transition-colors">이 메시지 스레드 보기</button>
                   <button onClick={async () => { try { const base = `[채팅] ${activeActionMsg.staff?.name || '이름 없음'} (${new Date(activeActionMsg.created_at).toLocaleString('ko-KR')})\n${activeActionMsg.content || ''}${activeActionMsg.file_url ? `\n파일: ${activeActionMsg.file_url}` : ''}`; await navigator.clipboard?.writeText(`[전자결재 메모]\n${base}`); alert('전자결재용으로 복사했습니다.'); } catch { alert('복사 실패'); } setActiveActionMsg(null); }} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">전자결재용 내용 복사</button>
                   <button onClick={async () => { try { const base = `[채팅] ${activeActionMsg.staff?.name || '이름 없음'} (${new Date(activeActionMsg.created_at).toLocaleString('ko-KR')})\n${activeActionMsg.content || ''}${activeActionMsg.file_url ? `\n파일: ${activeActionMsg.file_url}` : ''}`; await navigator.clipboard?.writeText(`[게시판 메모]\n${base}`); alert('게시판용으로 복사했습니다.'); } catch { alert('복사 실패'); } setActiveActionMsg(null); }} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">게시판용 내용 복사</button>
-                  <button
-                    onClick={async () => {
-                      try {
-                        const isBookmarked = bookmarkedIds.has(activeActionMsg.id);
-                        if (isBookmarked) {
-                          await supabase
-                            .from('message_bookmarks')
-                            .delete()
-                            .eq('user_id', user.id)
-                            .eq('message_id', activeActionMsg.id);
-                          setBookmarkedIds(prev => {
-                            const next = new Set(prev);
-                            next.delete(activeActionMsg.id);
-                            return next;
-                          });
-                        } else {
-                          await supabase.from('message_bookmarks').insert([
-                            {
-                              user_id: user.id,
-                              message_id: activeActionMsg.id,
-                              room_id: selectedRoomId,
-                            },
-                          ]);
-                          setBookmarkedIds(prev => new Set(prev).add(activeActionMsg.id));
-                        }
-                      } catch {
-                        alert('북마크 처리 중 오류가 발생했습니다.');
-                      }
-                      setActiveActionMsg(null);
-                    }}
-                    className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors"
-                  >
-                    {bookmarkedIds.has(activeActionMsg.id) ? '북마크 해제' : '중요 메시지 북마크'}
-                  </button>
-                  <button onClick={() => { togglePin(activeActionMsg.id); setActiveActionMsg(null) }} className={`w-full p-3 text-left rounded-[12px] text-xs font-semibold transition-colors ${pinnedIds.includes(activeActionMsg.id) ? 'hover:bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]' : 'hover:bg-orange-50 text-orange-500'}`}>{pinnedIds.includes(activeActionMsg.id) ? '공지 해제' : '공지로 등록'}</button>
+                  <button onClick={() => { void toggleBookmark(activeActionMsg.id); setActiveActionMsg(null); }} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">{bookmarkedIds.has(String(activeActionMsg.id)) ? '북마크 해제' : '중요 메시지 북마크'}</button>
                 </div>
               </div>
             </div>
@@ -3112,7 +3181,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       {room.name || '채팅방'}
                     </span>
                     <span className="text-[11px] text-[var(--toss-gray-3)]">
-                      {roomUnreadCounts[room.id] ? `안읽음 ${roomUnreadCounts[room.id]}건` : ''}
+                      {roomUnreadCounts[room.id] ? String(roomUnreadCounts[room.id]) : ''}
                     </span>
                   </button>
                 ))}
@@ -3394,6 +3463,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     </div>
   );
 }
+
+
 
 
 

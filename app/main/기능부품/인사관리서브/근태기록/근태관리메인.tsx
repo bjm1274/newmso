@@ -290,7 +290,7 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
         )}
 
         {viewMode === 'schedule' && (
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl overflow-hidden shadow-sm flex flex-col h-[calc(100vh-200px)]">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl overflow-hidden shadow-sm flex flex-col min-h-[calc(100dvh-200px)]">
             <div className="p-5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-col gap-5 shrink-0">
               <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
                 <div>
