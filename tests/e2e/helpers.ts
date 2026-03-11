@@ -71,6 +71,7 @@ export type MockFixtures = {
   companies?: any[];
   inventoryItems?: any[];
   inventoryLogs?: any[];
+  inventoryTransfers?: any[];
   workShifts?: any[];
   orgTeams?: any[];
   approvalFormTypes?: any[];
@@ -253,6 +254,7 @@ function buildFixtures(overrides: MockFixtures = {}) {
       ],
     inventoryItems: overrides.inventoryItems ?? [],
     inventoryLogs: overrides.inventoryLogs ?? [],
+    inventoryTransfers: overrides.inventoryTransfers ?? [],
     workShifts: overrides.workShifts ?? [],
     orgTeams: overrides.orgTeams ?? [],
     approvalFormTypes: overrides.approvalFormTypes ?? [],
@@ -451,6 +453,7 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
   let companies = [...fixtures.companies];
   let inventoryItems = [...fixtures.inventoryItems];
   let inventoryLogs = [...fixtures.inventoryLogs];
+  let inventoryTransfers = [...fixtures.inventoryTransfers];
   let workShifts = [...fixtures.workShifts];
   let orgTeams = [...fixtures.orgTeams];
   let generatedContracts = [...fixtures.generatedContracts];
@@ -900,6 +903,26 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
       }
 
       return json(route, inventoryLogs);
+    }
+
+    if (path.includes('/inventory_transfers')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(inventoryTransfers, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const inserted = payloads.map((payload: any, index: number) => ({
+          id: payload.id || `inventory-transfer-${inventoryTransfers.length + index + 1}`,
+          created_at: payload.created_at || new Date().toISOString(),
+          ...payload,
+        }));
+        inventoryTransfers = [...inserted, ...inventoryTransfers];
+        return json(route, wantsObject ? inserted[0] : inserted);
+      }
+
+      return json(route, inventoryTransfers);
     }
 
     if (path.includes('/inventory')) {

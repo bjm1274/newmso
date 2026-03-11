@@ -100,10 +100,6 @@ function writeStoredStringArray(storageKey: string, values: string[]) {
   }
 }
 
-function readStoredPinnedIds(roomId: string | null | undefined): string[] {
-  return readStoredStringArray(getPinnedStorageKey(roomId)).slice(0, 1);
-}
-
 function writeStoredPinnedIds(roomId: string | null | undefined, messageIds: string[]) {
   writeStoredStringArray(getPinnedStorageKey(roomId), messageIds.slice(0, 1));
 }
@@ -252,23 +248,121 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   const [unreadModalMsg, setUnreadModalMsg] = useState<any | null>(null);
   const [unreadUsers, setUnreadUsers] = useState<any[]>([]);
   const [unreadLoading, setUnreadLoading] = useState(false);
+  const [chatDirectoryStaffs, setChatDirectoryStaffs] = useState<any[]>([]);
+  const [persistedPinnedMessages, setPersistedPinnedMessages] = useState<any[]>([]);
 
   const permissions = user?.permissions || {};
   const isMso = user?.company === 'SY INC.' || permissions.mso === true || user?.role === 'admin';
   const canWriteNotice = isMso || Boolean(user?.position && CAN_WRITE_NOTICE_POSITIONS.includes(user.position));
+  const allKnownStaffs = useMemo(() => {
+    const merged = new Map<string, any>();
+    [...chatDirectoryStaffs, ...(Array.isArray(staffs) ? staffs : [])].forEach((staff: any) => {
+      if (!staff?.id) return;
+      const staffId = String(staff.id);
+      const previous = merged.get(staffId) || {};
+      merged.set(staffId, { ...previous, ...staff });
+    });
+    return Array.from(merged.values());
+  }, [chatDirectoryStaffs, staffs]);
+  const findKnownStaffById = useCallback(
+    (staffId: string | null | undefined) =>
+      allKnownStaffs.find((staff: any) => String(staff.id) === String(staffId)) || null,
+    [allKnownStaffs]
+  );
+  const resolveStaffProfile = useCallback(
+    (staffId: string | null | undefined, fallbackName?: string | null) => {
+      const knownStaff = findKnownStaffById(staffId);
+      if (knownStaff) {
+        return {
+          ...knownStaff,
+          photo_url: knownStaff.avatar_url || knownStaff.photo_url || null,
+        };
+      }
+      if (String(staffId) === String(user?.id) && user?.name) {
+        return {
+          id: user.id,
+          name: user.name,
+          company: user.company || '',
+          department: user.department || '',
+          position: user.position || '',
+          photo_url: user.avatar_url || null,
+        };
+      }
+      const safeName = String(fallbackName || '').trim();
+      if (!safeName) return null;
+      return {
+        id: staffId,
+        name: safeName,
+        company: '',
+        department: '',
+        position: '',
+        photo_url: null,
+      };
+    },
+    [findKnownStaffById, user?.avatar_url, user?.company, user?.department, user?.id, user?.name, user?.position]
+  );
+  const resolveRoomMemberProfile = useCallback(
+    (room: any, memberId: string) => {
+      const knownStaff = resolveStaffProfile(memberId);
+      if (knownStaff) return knownStaff;
+      if (room?.type === 'direct' && String(memberId) !== String(user?.id)) {
+        return {
+          id: memberId,
+          name: room?.name || '이름 없음',
+          company: '',
+          department: '',
+          position: '',
+          photo_url: null,
+        };
+      }
+      return {
+        id: memberId,
+        name: '이름 없음',
+        company: '',
+        department: '',
+        position: '',
+        photo_url: null,
+      };
+    },
+    [resolveStaffProfile, user?.id]
+  );
   const currentStaffProfile = useMemo(() => {
-    if (!Array.isArray(staffs) || staffs.length === 0) return null;
+    if (!Array.isArray(allKnownStaffs) || allKnownStaffs.length === 0) return null;
     const sessionUserId = String(user?.id || '').trim();
     if (sessionUserId) {
-      const exactMatch = staffs.find((staff: any) => String(staff.id) === sessionUserId);
+      const exactMatch = allKnownStaffs.find((staff: any) => String(staff.id) === sessionUserId);
       if (exactMatch) return exactMatch;
     }
     const sessionUserName = String(user?.name || '').trim();
     if (sessionUserName) {
-      return staffs.find((staff: any) => String(staff.name || '').trim() === sessionUserName) || null;
+      return allKnownStaffs.find((staff: any) => String(staff.name || '').trim() === sessionUserName) || null;
     }
     return null;
-  }, [staffs, user?.id, user?.name]);
+  }, [allKnownStaffs, user?.id, user?.name]);
+
+  useEffect(() => {
+    let active = true;
+    const loadChatDirectory = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('staff_members')
+          .select('id, name, company, department, position, presence_status, last_seen_at, status');
+        if (error) throw error;
+        if (active) {
+          setChatDirectoryStaffs(Array.isArray(data) ? data : []);
+        }
+      } catch (error) {
+        console.error('채팅 직원 디렉터리 로드 실패:', error);
+        if (active) {
+          setChatDirectoryStaffs([]);
+        }
+      }
+    };
+    void loadChatDirectory();
+    return () => {
+      active = false;
+    };
+  }, []);
   const effectiveTodoUserId = useMemo(() => {
     if (isUuidLike(user?.id)) {
       return String(user.id);
@@ -578,10 +672,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     const { data: msgs } = await query;
     if (msgs) {
       const enrichedMessages = msgs.map((msg: any) => {
-        const matchedStaff = staffs.find((staff: any) => String(staff.id) === String(msg.sender_id));
+        const matchedStaff = resolveStaffProfile(msg.sender_id);
         return {
           ...msg,
-          staff: msg.staff || (matchedStaff ? { name: matchedStaff.name, photo_url: matchedStaff.photo_url || null } : null),
+          staff: msg.staff || matchedStaff,
         };
       });
       setMessages((prev) => {
@@ -635,7 +729,44 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       const nextPinnedIds = (pinned || []).map((item: any) => String(item.message_id)).slice(-1);
       setPinnedIds(nextPinnedIds);
       writeStoredPinnedIds(selectedRoomId, nextPinnedIds);
+      if (nextPinnedIds.length > 0) {
+        const pinnedLookup = new Map<string, any>();
+        (msgs || []).forEach((msg: any) => {
+          const messageId = String(msg.id);
+          if (!nextPinnedIds.includes(messageId)) return;
+          pinnedLookup.set(messageId, {
+            ...msg,
+            staff: msg.staff || resolveStaffProfile(msg.sender_id),
+          });
+        });
+        const missingPinnedIds = nextPinnedIds.filter((messageId) => !pinnedLookup.has(messageId));
+        if (missingPinnedIds.length > 0) {
+          const { data: pinnedRows, error: pinnedRowsError } = await supabase
+            .from('messages')
+            .select('*')
+            .in('id', missingPinnedIds);
+          if (pinnedRowsError) throw pinnedRowsError;
+          (pinnedRows || []).forEach((msg: any) => {
+            pinnedLookup.set(String(msg.id), {
+              ...msg,
+              staff: resolveStaffProfile(msg.sender_id),
+            });
+          });
+        }
+        setPersistedPinnedMessages(
+          nextPinnedIds
+            .map((messageId) => pinnedLookup.get(messageId))
+            .filter(Boolean)
+        );
+      } else {
+        setPersistedPinnedMessages([]);
+      }
+    } catch (error) {
+      console.error('공지 메시지 불러오기 실패:', error);
+      setPersistedPinnedMessages([]);
+    }
 
+    try {
       const { data: reacts } = await supabase.from('message_reactions').select('message_id, emoji');
       const reactMap: Record<string, Record<string, number>> = {};
       reacts?.forEach((r: any) => {
@@ -645,7 +776,11 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       setReactions(reactMap);
 
       const { data: dbPolls } = await supabase.from('polls').select('*').eq('room_id', selectedRoomId);
-      if (dbPolls?.length) setPolls(dbPolls);
+      if (dbPolls?.length) {
+        setPolls(dbPolls);
+      } else {
+        setPolls([]);
+      }
       const { data: votes } = await supabase.from('poll_votes').select('poll_id, option_index');
       const vMap: any = {};
       votes?.forEach((v: any) => {
@@ -653,8 +788,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         vMap[v.poll_id][v.option_index] = (vMap[v.poll_id][v.option_index] || 0) + 1;
       });
       setPollVotes(vMap);
-    } catch (_) {
-      setPinnedIds(readStoredPinnedIds(selectedRoomId));
+    } catch (error) {
+      console.error('반응/투표 데이터 불러오기 실패:', error);
     }
 
     await updateUnreadForRooms(list);
@@ -697,7 +832,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         }
       }
     }
-  }, [selectedRoomId, user?.id, effectiveTodoUserId, updateUnreadForRooms, persistMessageReads, broadcastChatSync, staffs]);
+  }, [selectedRoomId, user?.id, effectiveTodoUserId, updateUnreadForRooms, persistMessageReads, broadcastChatSync, resolveStaffProfile]);
 
   const roomNotifyRef = useRef(true);
   useEffect(() => { roomNotifyRef.current = roomNotifyOn; }, [roomNotifyOn]);
@@ -846,10 +981,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         if (!row?.id) return;
         setMessages((prev) => {
           if (prev.some((m: any) => m.id === row.id)) return prev;
-          const sender = Array.isArray(staffs) ? staffs.find((s: any) => String(s.id) === String(row.sender_id)) : null;
           const newMsg = {
             ...row,
-            staff: sender ? { name: sender.name, photo_url: sender.avatar_url || sender.photo_url || null } : { name: '이름 없음', photo_url: null },
+            staff: resolveStaffProfile(row.sender_id, row.sender_name) || { name: '이름 없음', photo_url: null },
           };
           return [...prev, newMsg];
         });
@@ -879,7 +1013,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       .on('postgres_changes', { event: '*', schema: 'public', table: 'poll_votes' }, () => fetchData())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [selectedRoomId, fetchData, user?.id, staffs]);
+  }, [selectedRoomId, fetchData, user?.id, resolveStaffProfile]);
 
   useEffect(() => {
     if (!selectedRoomId) {
@@ -1025,20 +1159,24 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     [messages, pinnedIds]
   );
 
+  const noticeMessages = useMemo(
+    () => (persistedPinnedMessages.length > 0 ? persistedPinnedMessages : pinnedMessages),
+    [persistedPinnedMessages, pinnedMessages]
+  );
+
   const currentNoticeMessage = useMemo(
-    () => pinnedMessages[pinnedMessages.length - 1] || null,
-    [pinnedMessages]
+    () => noticeMessages[noticeMessages.length - 1] || null,
+    [noticeMessages]
   );
 
 
   const roomMembers = useMemo(() => {
     if (!selectedRoomId) return [];
-    if (selectedRoomId === NOTICE_ROOM_ID) return staffs;
+    if (selectedRoomId === NOTICE_ROOM_ID) return allKnownStaffs;
     const room = chatRooms.find((r: any) => r.id === selectedRoomId);
     if (!room || !Array.isArray(room.members) || !room.members.length) return [];
-    const memberIds = room.members.map((id: any) => String(id));
-    return staffs.filter((s: any) => memberIds.includes(String(s.id)));
-  }, [chatRooms, selectedRoomId, staffs]);
+    return room.members.map((id: any) => resolveRoomMemberProfile(room, String(id)));
+  }, [allKnownStaffs, chatRooms, resolveRoomMemberProfile, selectedRoomId]);
 
   const selectedRoom = useMemo(
     () => chatRooms.find((r: any) => r.id === selectedRoomId) || null,
@@ -1046,8 +1184,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   );
 
   const selectedRoomLabel = useMemo(
-    () => getRoomDisplayName(selectedRoom, staffs, user?.id),
-    [selectedRoom, staffs, user?.id]
+    () => getRoomDisplayName(selectedRoom, allKnownStaffs, user?.id),
+    [selectedRoom, allKnownStaffs, user?.id]
   );
 
   const addableMembers = useMemo(() => {
@@ -1085,14 +1223,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   const sidebarRooms = useMemo(() => {
     const keyword = omniSearch.trim().toLowerCase();
     const filtered = visibleRooms.filter((room: any) => {
-      const label = getRoomDisplayName(room, staffs, user?.id).toLowerCase();
+      const label = getRoomDisplayName(room, allKnownStaffs, user?.id).toLowerCase();
       const isHidden = roomPrefs[room.id]?.hidden === true;
       if (isHidden && !showHiddenRooms) return false;
       if (!keyword) return true;
       return label.includes(keyword);
     });
     return sortRoomsForSidebar(filtered, roomPrefs);
-  }, [visibleRooms, omniSearch, roomPrefs, showHiddenRooms, staffs, user?.id]);
+  }, [visibleRooms, omniSearch, roomPrefs, showHiddenRooms, allKnownStaffs, user?.id]);
 
   const typingNoticeText = useMemo(() => {
     const names = Object.values(typingUsers).filter(Boolean);
@@ -1139,12 +1277,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         const readUserIds = new Set((reads || []).map((r: any) => String(r.user_id)));
 
         const roomMemberIds = selectedRoom.id === NOTICE_ROOM_ID
-          ? staffs.map((s: any) => String(s.id))
+          ? allKnownStaffs.map((s: any) => String(s.id))
           : Array.isArray(selectedRoom.members)
             ? selectedRoom.members.map((id: string) => String(id))
             : [];
 
-        const allRoomStaffs = staffs.filter((s: any) => roomMemberIds.includes(String(s.id)));
+        const allRoomStaffs = allKnownStaffs.filter((s: any) => roomMemberIds.includes(String(s.id)));
 
         const readers: any[] = [];
         const nonReaders: any[] = [];
@@ -1168,7 +1306,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         setUnreadLoading(false);
       }
     },
-    [selectedRoom, staffs]
+    [selectedRoom, allKnownStaffs]
   );
 
   const handleLeaveRoom = async () => {
@@ -1591,11 +1729,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         setPinnedIds([normalizedMessageId]);
         writeStoredPinnedIds(selectedRoomId, [normalizedMessageId]);
       }
-      fetchData();
-    } catch (_) {
-      const nextPinnedIds = isPinned ? [] : [normalizedMessageId];
-      setPinnedIds(nextPinnedIds);
-      writeStoredPinnedIds(selectedRoomId, nextPinnedIds);
+      await fetchData();
+    } catch (error) {
+      console.error('공지 등록 상태 변경 실패:', error);
+      alert(isPinned ? '공지 해제에 실패했습니다.' : '공지 등록에 실패했습니다.');
     }
   };
 
@@ -1876,12 +2013,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   const unread = roomUnreadCounts[room.id] || 0;
                   const isSelected = selectedRoomId === room.id;
                   const isNoticeChannel = room.id === NOTICE_ROOM_ID;
-                  const label = getRoomDisplayName(room, staffs, user?.id);
+                  const label = getRoomDisplayName(room, allKnownStaffs, user?.id);
                   const preview = getRoomPreviewText(room);
                   const members = normalizeMemberIds(room.members);
                   const peer =
                     room.type === 'direct'
-                      ? staffs.find(
+                      ? allKnownStaffs.find(
                           (staff: any) =>
                             members.includes(String(staff.id)) &&
                             String(staff.id) !== String(user?.id)
@@ -2065,10 +2202,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           </header>
         )}
 
-        {selectedRoomId && pinnedMessages.length > 0 && (
+        {selectedRoomId && noticeMessages.length > 0 && (
           <div className="shrink-0 border-b border-orange-100 bg-orange-50/80 px-4 py-3 md:px-6">
             <div className="flex flex-wrap gap-2">
-              {pinnedMessages.map((pinnedMessage) => (
+              {noticeMessages.map((pinnedMessage) => (
                 <button
                   key={`pin-${pinnedMessage.id}`}
                   type="button"
@@ -2547,7 +2684,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   </div>
                   <div className="space-y-3">
                     {selectedRoom?.members?.map((memberId: string) => {
-                      const s = staffs.find((st: any) => st.id === memberId);
+                      const s = resolveRoomMemberProfile(selectedRoom, String(memberId));
                       const isOwner = selectedRoom?.created_by === user.id;
                       return (
                         <div key={memberId} className="flex items-center justify-between group">
@@ -3012,7 +3149,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
               ) : (
                 threadMessages.map((m: any) => {
                   const isRoot = m.id === threadRoot.id;
-                  const staff = m.staff || staffs.find((s: any) => s.id === m.sender_id);
+                  const staff = m.staff || resolveStaffProfile(m.sender_id);
                   const createdAt = new Date(m.created_at);
                   return (
                     <div
@@ -3305,7 +3442,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       .eq('id', selectedRoom.id);
 
                     const invitedNames = addMemberSelectingIds
-                      .map((id) => staffs.find((s: any) => s.id === id)?.name || '이름 없음')
+                      .map((id) => resolveStaffProfile(id)?.name || '이름 없음')
                       .join(', ');
                     const inviterName = user?.name || '이름 없음';
                     const systemContent = `[초대] ${inviterName}님이 ${invitedNames}님을 초대했습니다.`;
@@ -3426,7 +3563,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 {globalSearchResults.map((msg: any) => {
                   let roomName = msg.chat_rooms?.name || '채팅방';
                   if (msg.chat_rooms?.type === 'direct' && Array.isArray(msg.chat_rooms?.members)) {
-                    const otherStaff = staffs.find((s: any) => msg.chat_rooms.members.includes(String(s.id)) && String(s.id) !== String(user?.id));
+                    const otherStaff = allKnownStaffs.find((s: any) => msg.chat_rooms.members.includes(String(s.id)) && String(s.id) !== String(user?.id));
                     if (otherStaff) roomName = otherStaff.name;
                   }
                   return (
@@ -3463,12 +3600,5 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     </div>
   );
 }
-
-
-
-
-
-
-
 
 
