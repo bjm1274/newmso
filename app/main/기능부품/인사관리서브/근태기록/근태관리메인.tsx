@@ -144,7 +144,6 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                 <h2 className="text-xl font-bold text-foreground">
                   전문 근태 통합 관리 <span className="ml-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[10px] font-bold border border-blue-100">{selectedCo}</span>
                 </h2>
-                <p className="text-[11px] font-medium text-zinc-400 mt-1">임직원 출퇴근 현황, 스케줄 지정, 통계를 한곳에서 관리합니다.</p>
               </div>
             </div>
 
@@ -297,9 +296,6 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                   <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
                     <span className="text-xl">✨</span> 스마트 근무 편성
                   </h3>
-                  <p className="text-[11px] text-zinc-500 font-medium mt-1">
-                    근무 툴을 선택하고 표의 빈칸을 클릭/드래그하여 스마트하게 듀티를 채워보세요. 게시판-경조사 탭의 금일 근무 현황과 실시간 연동됩니다.
-                  </p>
                 </div>
                 <button
                   type="button"

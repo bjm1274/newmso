@@ -5,7 +5,7 @@ import AttendanceForms from './전자결재서브/근태신청양식';
 import SuppliesForm from './전자결재서브/비품구매양식';
 import AdminForms from './전자결재서브/관리행정양식';
 import FormRequest from './전자결재서브/양식신청';
-import AttendanceCorrectionForm from './전자결재서브/출결정정양식';
+import AttendanceCorrectionForm from '@/app/main/기능부품/전자결재서브/출결정정양식';
 import ExpenseReportForm from './전자결재서브/지출결의서양식';
 
 export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, selectedCompanyId, onRefresh }: any) {

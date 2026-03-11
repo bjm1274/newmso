@@ -15,13 +15,15 @@ export default function GlobalSearch({
   onSelect,
   staffs = [],
   posts = [],
-  variant = 'input'
+  variant = 'input',
+  compact = false,
 }: {
   user: any;
   onSelect: (type: string, id: string, item?: any) => void;
   staffs?: any[];
   posts?: any[];
   variant?: 'input' | 'icon';
+  compact?: boolean;
 }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -199,10 +201,14 @@ export default function GlobalSearch({
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          className="min-h-[44px] min-w-[44px] flex items-center justify-center p-2 rounded-[12px] text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)] hover:text-[var(--foreground)] transition-colors touch-manipulation"
+          className={`flex items-center justify-center text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)] hover:text-[var(--foreground)] transition-colors touch-manipulation ${
+            compact
+              ? 'min-h-[30px] min-w-[30px] rounded-full p-1'
+              : 'min-h-[44px] min-w-[44px] rounded-[12px] p-2'
+          }`}
           aria-label="검색"
         >
-          <span className="text-xl">🔍</span>
+          <span className={compact ? 'text-lg' : 'text-xl'}>🔍</span>
         </button>
         {open && dropdown}
       </div>

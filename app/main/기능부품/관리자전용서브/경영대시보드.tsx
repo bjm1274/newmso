@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -47,8 +47,8 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: any) 
   const leaveUsageTrend: number[] = []; // Virtual data removed
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-700" data-testid="admin-analysis-business">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-slate-200/60 pb-6">
+    <div className="space-y-6 animate-in fade-in duration-700" data-testid="admin-analysis-business">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-3 border-b border-slate-200/60 pb-4">
         <div>
           <h2 className="text-2xl font-black text-slate-800 tracking-tight">HR 데이터 시각화 & 경영 분석 보드 📊</h2>
         </div>
@@ -58,27 +58,27 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: any) 
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-        <div className="bg-white p-6 border border-slate-200/60 shadow-sm rounded-3xl relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-6 text-3xl opacity-10 group-hover:scale-110 transition-transform">💰</div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+        <div className="bg-white p-4 border border-slate-200/60 shadow-sm rounded-3xl relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-4 text-3xl opacity-10 group-hover:scale-110 transition-transform">💰</div>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">월 예상 인건비</p>
           <p className="text-2xl font-black text-slate-800 mt-2">₩{(metrics.totalLaborCost || 0).toLocaleString()}</p>
           <p className="text-[10px] font-bold text-success mt-2">▲ 전월 대비 1.2% 증가</p>
         </div>
-        <div className="bg-white p-6 border border-slate-200/60 shadow-sm rounded-3xl relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-6 text-3xl opacity-10 group-hover:scale-110 transition-transform">⚠️</div>
+        <div className="bg-white p-4 border border-slate-200/60 shadow-sm rounded-3xl relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-4 text-3xl opacity-10 group-hover:scale-110 transition-transform">⚠️</div>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">번아웃 의심 인원 (연차 미사용)</p>
           <p className="text-2xl font-black text-danger mt-2">{metrics.burnoutCandidates ?? 0}명</p>
           <p className="text-[10px] font-bold text-danger mt-2">지적 및 독려 필요</p>
         </div>
-        <div className="bg-white p-6 border border-slate-200/60 shadow-sm rounded-3xl relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-6 text-3xl opacity-10 group-hover:scale-110 transition-transform">📉</div>
+        <div className="bg-white p-4 border border-slate-200/60 shadow-sm rounded-3xl relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-4 text-3xl opacity-10 group-hover:scale-110 transition-transform">📉</div>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">AI 예측 이직률 / 퇴사율</p>
           <p className="text-2xl font-black text-orange-500 mt-2">{metrics.turnoverPrediction ?? '-'}%</p>
           <p className="text-[10px] font-bold text-slate-400 mt-2">동종 업계 평균(4.5%) 대비 양호</p>
         </div>
-        <div className="bg-white p-6 border border-slate-200/60 shadow-sm rounded-3xl relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-6 text-3xl opacity-10 group-hover:scale-110 transition-transform">🏝️</div>
+        <div className="bg-white p-4 border border-slate-200/60 shadow-sm rounded-3xl relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-4 text-3xl opacity-10 group-hover:scale-110 transition-transform">🏝️</div>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">조직 연차 사용률</p>
           <p className="text-2xl font-black text-primary mt-2">{metrics.leaveUsageRate ?? '-'}%</p>
           <div className="w-full h-1.5 bg-slate-100 rounded-full mt-3 overflow-hidden">
@@ -87,9 +87,9 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: any) 
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-        <div className="bg-white border border-slate-200/60 p-6 md:p-8 rounded-3xl shadow-sm">
-          <div className="flex justify-between items-end mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-5">
+        <div className="bg-white border border-slate-200/60 p-4 md:p-5 rounded-3xl shadow-sm">
+          <div className="flex justify-between items-end mb-5">
             <div>
               <h3 className="text-sm font-black text-slate-800">월별 퇴사율 추이 (Turnover Rate)</h3>
               <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">최근 12개월 분석 데이터</p>
@@ -123,8 +123,8 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: any) 
 
         </div>
 
-        <div className="bg-white border border-slate-200/60 p-6 md:p-8 rounded-3xl shadow-sm">
-          <div className="flex justify-between items-end mb-8">
+        <div className="bg-white border border-slate-200/60 p-4 md:p-5 rounded-3xl shadow-sm">
+          <div className="flex justify-between items-end mb-5">
             <div>
               <h3 className="text-sm font-black text-slate-800">연차/휴가 누적 사용률 (Leave Usage)</h3>
               <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">전사 평균 소진 현황</p>
@@ -160,7 +160,7 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: any) 
         </div>
       </div>
 
-      <div className="bg-slate-800 border border-slate-700 p-8 rounded-3xl shadow-xl flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
+      <div className="bg-slate-800 border border-slate-700 p-5 rounded-3xl shadow-xl flex flex-col md:flex-row items-center justify-between gap-4 relative overflow-hidden">
         <div className="absolute right-0 top-0 opacity-10 transform translate-x-1/4 -translate-y-1/4">
           <svg width="300" height="300" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" /></svg>
         </div>
@@ -177,3 +177,4 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: any) 
     </div>
   );
 }
+

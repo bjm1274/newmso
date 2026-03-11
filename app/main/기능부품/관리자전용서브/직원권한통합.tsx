@@ -62,6 +62,9 @@ function sortStaffRows(a: any, b: any) {
   return compareKoreanLabels(String(a?.name || ''), String(b?.name || ''));
 }
 
+const STAFF_LIST_SELECT =
+  'id, employee_no, name, company, department, position, role, permissions';
+
 export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () => void }) {
   const [staffs, setStaffs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,7 +77,12 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
 
   const fetchStaffs = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase.from('staff_members').select('*').order('employee_no');
+    const { data, error } = await supabase.from('staff_members').select(STAFF_LIST_SELECT).order('employee_no');
+    if (error) {
+      console.error('직원 권한 목록 조회 실패:', error);
+      setLoading(false);
+      return;
+    }
     if (data) {
       const sortedData = [...data].sort(sortStaffRows);
       setStaffs(sortedData);
@@ -112,22 +120,31 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
     const actor = readClientAuditActor();
     const beforeStaff = staffs.find((staff) => staff.id === selectedStaff.id) || selectedStaff;
     setPasswordSaving(true);
-    const { error } = await updateStaffRecord(selectedStaff.id, { password: newPassword.trim() });
+    const response = await fetch('/api/admin/staff-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        staffId: selectedStaff.id,
+        password: newPassword,
+      }),
+    });
+    const payload = await response.json().catch(() => null);
     setPasswordSaving(false);
 
-    if (error) {
+    if (!response.ok || !payload?.ok) {
       alert('비밀번호 변경 중 오류가 발생했습니다.');
       return;
     }
 
     setNewPassword('');
+    await fetchStaffs();
     await logAudit(
       '비밀번호재설정',
       'staff_permission',
       String(selectedStaff.id),
       {
         staff_name: beforeStaff?.name || selectedStaff.name,
-        ...buildAuditDiff({ password: beforeStaff?.password || '' }, { password: '[PROTECTED]' }, ['password']),
+        ...buildAuditDiff({ password: '[EXISTING]' }, { password: '[UPDATED]' }, ['password']),
       },
       actor.userId,
       actor.userName

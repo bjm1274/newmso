@@ -40,7 +40,6 @@ export default function IntegratedHRSettings({ companyName }: { companyName: str
                     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <div className="flex flex-col gap-2 mb-6">
                             <h2 className="text-2xl font-bold text-[var(--foreground)] tracking-tight">세법 및 비과세 기준</h2>
-                            <p className="text-sm font-medium text-[var(--toss-gray-4)]">최신 한국 세법에 따른 4대보험 요율 및 비과세 한도 룰을 관리합니다.</p>
                         </div>
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
                             <div className="bg-[var(--toss-card)] p-6 rounded-[20px] shadow-sm border border-[var(--toss-border)]">
@@ -61,7 +60,6 @@ export default function IntegratedHRSettings({ companyName }: { companyName: str
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <div className="flex flex-col gap-2 mb-6">
                             <h2 className="text-2xl font-bold text-[var(--foreground)] tracking-tight">스케줄 및 근무제형</h2>
-                            <p className="text-sm font-medium text-[var(--toss-gray-4)]">병원, 교대근무자 등 다양한 근무형태(Day/Eve/Night/Off)를 설정합니다.</p>
                         </div>
                         <div className="bg-[var(--toss-card)] p-6 rounded-[20px] shadow-sm border border-[var(--toss-border)]">
                             <ShiftPatternManager selectedCo={companyName} />
@@ -72,7 +70,6 @@ export default function IntegratedHRSettings({ companyName }: { companyName: str
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-2xl">
                         <div className="flex flex-col gap-2 mb-6">
                             <h2 className="text-2xl font-bold text-[var(--foreground)] tracking-tight">급여 마감 및 잠금</h2>
-                            <p className="text-sm font-medium text-[var(--toss-gray-4)]">특정 월의 급여 정산이 끝나면 잠금 처리하여 수정 및 덮어쓰기를 원천 차단합니다.</p>
                         </div>
                         <div className="bg-[var(--toss-card)] p-6 rounded-[20px] shadow-sm border border-[var(--toss-border)] border-l-4 border-l-amber-500">
                             <PayrollLockPanel yearMonth={new Date().toISOString().slice(0, 7)} companyName={companyName} />
@@ -98,7 +95,6 @@ function HRPolicies({ companyName }: { companyName: string }) {
         <div className="max-w-4xl space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="flex flex-col gap-2 mb-6">
                 <h2 className="text-2xl font-bold text-[var(--foreground)] tracking-tight">인사 정책 설정 (Rules)</h2>
-                <p className="text-sm font-medium text-[var(--toss-gray-4)]">자동화된 시스템이 백그라운드에서 어떤 룰을 기준으로 계산할지 켜고 끕니다.</p>
             </div>
 
             <div className="space-y-6">

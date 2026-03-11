@@ -152,7 +152,6 @@ export default function UnpaidAbsenceDeduction({ staffs, selectedCo, user }: Pro
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)]">무급 결근 자동 차감</h2>
-          <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">결근 일수 입력 시 일급 기준으로 차감 금액을 자동 산출합니다.</p>
         </div>
         <div className="flex items-center gap-3">
           <input

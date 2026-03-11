@@ -30,6 +30,18 @@ export interface EducationSummary {
   focusItems: Array<{ name: string; count: number }>;
 }
 
+export interface LicenseLikeRow {
+  id: string | number;
+  staff_id: string | number;
+  license_name: string;
+  license_number?: string | null;
+  issued_date?: string | null;
+  expiry_date?: string | null;
+  issuing_body?: string | null;
+  memo?: string | null;
+  source?: 'staff_licenses' | 'staff_members';
+}
+
 const MEDICAL_COMPANY_PATTERN = /병원|의원|정형외과|내과|소아과|치과|한의원|요양|재활|산부인과|피부과|성형외과|외과|안과/i;
 
 export const EDUCATION_ITEMS: EducationItem[] = [
@@ -109,4 +121,71 @@ export function getStaffDepartment(staff: any) {
 
 export function getStaffPosition(staff: any) {
   return staff?.position || staff?.job_title || staff?.직함 || '';
+}
+
+function normalizeOptionalText(value: unknown) {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  return normalized || null;
+}
+
+function normalizeOptionalDate(value: unknown) {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  if (!normalized) return null;
+  return normalized.slice(0, 10);
+}
+
+export function buildFallbackLicenseRows(staffs: any[] = []): LicenseLikeRow[] {
+  return staffs.flatMap((staff) => {
+    const permissions = staff?.permissions || {};
+    const licenseName = normalizeOptionalText(staff?.license);
+    const licenseNumber = normalizeOptionalText(permissions.license_no);
+    const issuedDate = normalizeOptionalDate(permissions.license_date);
+    const expiryDate =
+      normalizeOptionalDate(permissions.license_expiry_date) ||
+      normalizeOptionalDate(permissions.license_expiry) ||
+      normalizeOptionalDate(staff?.license_expiry_date);
+    const issuingBody =
+      normalizeOptionalText(permissions.license_issuer) ||
+      normalizeOptionalText(permissions.license_org) ||
+      normalizeOptionalText(staff?.license_issuer);
+    const memo = normalizeOptionalText(permissions.license_note);
+
+    if (!licenseName && !licenseNumber && !issuedDate && !expiryDate && !issuingBody && !memo) {
+      return [];
+    }
+
+    return [
+      {
+        id: `staff-${String(staff?.id ?? '')}-license`,
+        staff_id: String(staff?.id ?? ''),
+        license_name: licenseName || '면허/자격',
+        license_number: licenseNumber,
+        issued_date: issuedDate,
+        expiry_date: expiryDate,
+        issuing_body: issuingBody,
+        memo,
+        source: 'staff_members',
+      },
+    ];
+  });
+}
+
+export function isLicenseQueryRecoverableError(error: any) {
+  if (!error) return false;
+
+  const code = String(error?.code || '').toUpperCase();
+  const message = `${String(error?.message || '')} ${String(error?.details || '')} ${String(error?.hint || '')}`.toLowerCase();
+
+  return (
+    code === 'PGRST205' ||
+    code === '42P01' ||
+    code === '42501' ||
+    message.includes('staff_licenses') ||
+    message.includes('schema cache') ||
+    message.includes('permission denied') ||
+    message.includes('relation') ||
+    message.includes('does not exist')
+  );
 }

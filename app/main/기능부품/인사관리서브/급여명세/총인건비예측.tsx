@@ -85,7 +85,6 @@ export default function TotalLaborCostForecast({ staffs, selectedCo, user }: Pro
     <div className="p-4 md:p-6 space-y-6 max-w-4xl mx-auto">
       <div>
         <h2 className="text-lg font-bold text-[var(--foreground)]">연간 총인건비 예측</h2>
-        <p className="text-xs text-[var(--toss-gray-3)] mt-1">최근 12개월 실적 기반 향후 3개월 예측 (단순 이동평균)</p>
       </div>
 
       {/* 요약 카드 */}

@@ -2,15 +2,37 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { persistSupabaseAccessToken } from '@/lib/supabase-bridge';
+import { isMissingColumnError } from '@/lib/supabase-compat';
 
-export default function MyProfileCard({ user: initialUser, onOpenApproval, setMainMenu }: any) {
+const getProfilePhotoUrl = (source: any) => source?.avatar_url || source?.photo_url || null;
+
+const normalizeProfileUser = (source: any) => {
+  if (!source) return source;
+  const photoUrl = getProfilePhotoUrl(source);
+  return {
+    ...source,
+    avatar_url: photoUrl,
+    photo_url: photoUrl,
+  };
+};
+
+export default function MyProfileCard({
+  user: initialUser,
+  onOpenApproval,
+  hideHeader = false,
+  hideActionBar = false,
+  showSecret: controlledShowSecret,
+  setShowSecret: setControlledShowSecret,
+  isEditing: controlledIsEditing,
+  setIsEditing: setControlledIsEditing,
+}: any) {
   const MASKED_TEXT = '••••••••';
-  const [user, setUser] = useState<any>(initialUser || {});
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [user, setUser] = useState<any>(normalizeProfileUser(initialUser || {}));
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(getProfilePhotoUrl(initialUser));
   const [uploading, setUploading] = useState(false);
-  const [showSecret, setShowSecret] = useState(false);
+  const [internalShowSecret, setInternalShowSecret] = useState(false);
   const [debugMsg, setDebugMsg] = useState(''); // 디버깅용 메시지
-  const [isEditing, setIsEditing] = useState(false);
+  const [internalIsEditing, setInternalIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({
     email: initialUser?.email || '',
     phone: initialUser?.phone || '',
@@ -20,6 +42,36 @@ export default function MyProfileCard({ user: initialUser, onOpenApproval, setMa
     bank_account: initialUser?.bank_account || '',
   });
   // 다크모드 토글은 사용하지 않도록 제거 (항상 라이트 모드)
+
+  const showSecret = typeof controlledShowSecret === 'boolean' ? controlledShowSecret : internalShowSecret;
+  const isEditing = typeof controlledIsEditing === 'boolean' ? controlledIsEditing : internalIsEditing;
+  const applyShowSecret = (nextValue: boolean) => {
+    if (typeof setControlledShowSecret === 'function') {
+      setControlledShowSecret(nextValue);
+      return;
+    }
+    setInternalShowSecret(nextValue);
+  };
+  const applyIsEditing = (nextValue: boolean) => {
+    if (typeof setControlledIsEditing === 'function') {
+      setControlledIsEditing(nextValue);
+      return;
+    }
+    setInternalIsEditing(nextValue);
+  };
+
+  const broadcastProfileUpdate = (nextUser: any) => {
+    if (typeof window === 'undefined') return;
+    const normalizedUser = normalizeProfileUser(nextUser);
+    window.dispatchEvent(
+      new CustomEvent('erp-profile-updated', {
+        detail: {
+          user: normalizedUser,
+          avatarUrl: getProfilePhotoUrl(normalizedUser),
+        },
+      })
+    );
+  };
 
   // [핵심] 페이지 로드 시 ID가 없으면 '이름'으로 ID를 찾아내는 복구 로직
   useEffect(() => {
@@ -59,12 +111,14 @@ export default function MyProfileCard({ user: initialUser, onOpenApproval, setMa
       }
 
       // 2. 찾아낸 진짜 정보로 상태 업데이트
-      setUser(data);
-      setAvatarUrl(data.avatar_url);
+      const normalizedUser = normalizeProfileUser(data);
+      setUser(normalizedUser);
+      setAvatarUrl(getProfilePhotoUrl(normalizedUser));
 
       // 3. 브라우저 저장소 동기화 (다른 탭·할일 등에서 동일 사용자 인식)
-      localStorage.setItem('user_session', JSON.stringify(data));
-      localStorage.setItem('erp_user', JSON.stringify(data));
+      localStorage.setItem('user_session', JSON.stringify(normalizedUser));
+      localStorage.setItem('erp_user', JSON.stringify(normalizedUser));
+      broadcastProfileUpdate(normalizedUser);
       // setDebugMsg(`ID 복구 완료: ${data.id}`);
 
     } catch (err) {
@@ -102,11 +156,16 @@ export default function MyProfileCard({ user: initialUser, onOpenApproval, setMa
       const response = await fetch('/api/auth/verify-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: input, name: user?.name, employeeNo: user?.employee_no }),
+        body: JSON.stringify({
+          password: input,
+          userId: user?.id || initialUser?.id,
+          name: user?.name || initialUser?.name,
+          employeeNo: user?.employee_no || initialUser?.employee_no,
+        }),
       });
       const payload = await response.json().catch(() => null);
 
-      if (!response.ok || !payload?.verified) {
+      if (!response.ok) {
         alert('비밀번호가 일치하지 않습니다.');
         return false;
       }
@@ -165,21 +224,36 @@ export default function MyProfileCard({ user: initialUser, onOpenApproval, setMa
       const newUrl = `${data.publicUrl}?t=${new Date().getTime()}`;
 
       // 3. DB 업데이트 (복구된/저장소 사용자 ID)
-      const { error: updateError } = await supabase
+      const avatarUpdate = await supabase
         .from('staff_members')
         .update({ avatar_url: newUrl })
         .eq('id', currentUser.id);
 
-      if (updateError) throw updateError;
+      if (avatarUpdate.error) {
+        if (!isMissingColumnError(avatarUpdate.error, 'avatar_url')) throw avatarUpdate.error;
+
+        const photoUpdate = await supabase
+          .from('staff_members')
+          .update({ photo_url: newUrl })
+          .eq('id', currentUser.id);
+
+        if (photoUpdate.error) {
+          if (isMissingColumnError(photoUpdate.error, 'photo_url')) {
+            throw new Error('staff_members 테이블에 avatar_url 또는 photo_url 컬럼이 없습니다.');
+          }
+          throw photoUpdate.error;
+        }
+      }
 
       // 4. 화면 반영
       setAvatarUrl(newUrl);
 
       // 5. 세션 강제 동기화 (새로고침 방어)
-      const updatedUser = { ...currentUser, avatar_url: newUrl };
+      const updatedUser = normalizeProfileUser({ ...currentUser, avatar_url: newUrl, photo_url: newUrl });
       setUser(updatedUser);
       localStorage.setItem('user_session', JSON.stringify(updatedUser));
       localStorage.setItem('erp_user', JSON.stringify(updatedUser));
+      broadcastProfileUpdate(updatedUser);
 
       alert('사진이 정상적으로 등록되었습니다!');
 
@@ -239,7 +313,7 @@ export default function MyProfileCard({ user: initialUser, onOpenApproval, setMa
         return;
       }
 
-      setIsEditing(false);
+      applyIsEditing(false);
       alert('인사팀으로 내 정보 변경 요청(결재 대기)이 전송되었습니다. 관리자 승인 후 반영됩니다.');
     } catch (err) {
       console.error(err);
@@ -249,98 +323,113 @@ export default function MyProfileCard({ user: initialUser, onOpenApproval, setMa
 
   if (!user) return <div className="p-10">로딩 중...</div>;
 
+  const actionButtons = (
+    <>
+      <button
+        type="button"
+        onClick={() => { if (showSecret) applyShowSecret(false); else verifyPasswordAndRun(() => applyShowSecret(true)); }}
+        className="rounded-full border border-transparent bg-[var(--toss-gray-1)] px-3 py-1.5 text-[11px] font-bold text-[var(--toss-gray-3)] transition-all hover:border-[var(--toss-blue-light)] hover:text-[var(--toss-blue)]"
+      >
+        {showSecret ? '민감 정보 숨기기' : '보안 정보 보기'}
+      </button>
+      <button
+        type="button"
+        onClick={() => { if (isEditing) applyIsEditing(false); else verifyPasswordAndRun(() => applyIsEditing(true)); }}
+        className={`rounded-full border px-3 py-1.5 text-[11px] font-bold transition-all ${isEditing
+          ? 'bg-red-50 text-red-500 border-red-100 hover:bg-red-100'
+          : 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)] border-[var(--toss-blue-light)] hover:bg-[var(--toss-blue-light)]'
+          }`}
+      >
+        {isEditing ? '수정 취소' : '내 정보 수정'}
+      </button>
+    </>
+  );
+
   return (
-    <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-[16px] p-4 sm:p-5 lg:p-6 flex flex-col">
+    <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-[16px] p-3 sm:p-4 lg:p-5 flex flex-col">
 
       {/* 프로필 헤더 */}
-      <div className="flex flex-row items-center sm:items-start gap-4 sm:gap-5 pb-4 sm:pb-5 border-b border-[var(--toss-border)] shrink-0">
-        <div className="relative group shrink-0">
-          <div className="w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-full bg-[var(--toss-gray-1)] flex items-center justify-center overflow-hidden border-2 sm:border-4 border-[var(--toss-card)] shadow-sm">
-            {avatarUrl ? (
-              <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
+      {!hideHeader ? (
+        <div className="flex flex-row items-center sm:items-start gap-3 sm:gap-4 pb-3 sm:pb-4 border-b border-[var(--toss-border)] shrink-0">
+          <div className="relative group shrink-0">
+            <div className="w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-full bg-[var(--toss-gray-1)] flex items-center justify-center overflow-hidden border-2 sm:border-4 border-[var(--toss-card)] shadow-sm">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-5xl font-bold text-[var(--toss-gray-3)]">👤</span>
+              )}
+            </div>
+            {user?.id ? (
+              <>
+                <label className="absolute bottom-1 right-1 w-10 h-10 bg-[var(--toss-blue)] text-white rounded-full flex items-center justify-center cursor-pointer hover:opacity-90 transition-all shadow-sm z-10" htmlFor="profiles-upload">
+                  {uploading ? '⏳' : '📷'}
+                </label>
+                <input
+                  style={{ display: 'none' }}
+                  type="file"
+                  id="profiles-upload"
+                  accept="image/*"
+                  onChange={uploadAvatar}
+                  disabled={uploading}
+                />
+              </>
             ) : (
-              <span className="text-5xl font-bold text-[var(--toss-gray-3)]">👤</span>
+              <span className="absolute bottom-1 right-1 text-[11px] font-bold text-[var(--toss-gray-3)] max-w-[100px] text-right">직원 계정 로그인 시 사진 등록 가능</span>
             )}
           </div>
-          {user?.id ? (
-            <>
-              <label className="absolute bottom-1 right-1 w-10 h-10 bg-[var(--toss-blue)] text-white rounded-full flex items-center justify-center cursor-pointer hover:opacity-90 transition-all shadow-sm z-10" htmlFor="profiles-upload">
-                {uploading ? '⏳' : '📷'}
-              </label>
-              <input
-                style={{ display: 'none' }}
-                type="file"
-                id="profiles-upload"
-                accept="image/*"
-                onChange={uploadAvatar}
-                disabled={uploading}
-              />
-            </>
-          ) : (
-            <span className="absolute bottom-1 right-1 text-[11px] font-bold text-[var(--toss-gray-3)] max-w-[100px] text-right">직원 계정 로그인 시 사진 등록 가능</span>
-          )}
-        </div>
 
-        <div className="flex-1 w-full sm:w-auto text-left">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div className="flex flex-col items-start gap-1">
-              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-[var(--foreground)] tracking-tight">
-                {user.name} {user.position}
-              </h2>
-              <p className="text-sm sm:text-base lg:text-lg font-bold text-[var(--toss-blue)] underline decoration-[var(--toss-blue-light)] underline-offset-4">
-                {user.department} 소속
-              </p>
-            </div>
+          <div className="flex-1 w-full sm:w-auto text-left">
+            <div className="flex flex-col gap-2.5 lg:flex-row lg:items-start lg:justify-between">
+              <div className="flex flex-col items-start gap-1">
+                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-[var(--foreground)] tracking-tight">
+                  {user.name} {user.position}
+                </h2>
+                <p className="text-sm sm:text-base lg:text-lg font-bold text-[var(--toss-blue)] underline decoration-[var(--toss-blue-light)] underline-offset-4">
+                  {user.department} 소속
+                </p>
+              </div>
 
-            <div className="flex flex-wrap items-center gap-2 lg:max-w-[56%] lg:justify-end">
-              <span className="rounded-full bg-[var(--toss-gray-1)] px-3 py-1.5 text-[11px] font-bold text-[var(--toss-gray-3)]">
-                인사관리
-              </span>
-              <button
-                type="button"
-                onClick={() => setMainMenu?.('인사관리')}
-                className="rounded-full border border-[var(--toss-blue-light)] bg-white px-3 py-1.5 text-[11px] font-bold text-[var(--toss-blue)] transition-all hover:bg-[var(--toss-blue-light)]"
-              >
-                인사관리로 이동
-              </button>
-              <button
-                onClick={() => { if (showSecret) setShowSecret(false); else verifyPasswordAndRun(() => setShowSecret(true)); }}
-                className="rounded-full border border-transparent bg-[var(--toss-gray-1)] px-3 py-1.5 text-[11px] font-bold text-[var(--toss-gray-3)] transition-all hover:border-[var(--toss-blue-light)] hover:text-[var(--toss-blue)]"
-              >
-                {showSecret ? '민감 정보 숨기기' : '보안 정보 보기'}
-              </button>
-              <button
-                type="button"
-                onClick={() => { if (isEditing) setIsEditing(false); else verifyPasswordAndRun(() => setIsEditing(true)); }}
-                className={`rounded-full border px-3 py-1.5 text-[11px] font-bold transition-all ${isEditing
-                  ? 'bg-red-50 text-red-500 border-red-100 hover:bg-red-100'
-                  : 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)] border-[var(--toss-blue-light)] hover:bg-[var(--toss-blue-light)]'
-                  }`}
-              >
-                {isEditing ? '수정 취소' : '내 정보 수정'}
-              </button>
+              <div className="flex flex-wrap items-center gap-1.5 lg:max-w-[56%] lg:justify-end">
+                {actionButtons}
+              </div>
             </div>
+            {/* <p className="text-[11px] text-[var(--toss-gray-3)] mt-2">시스템 상태: {debugMsg || '정상'}</p> */}
           </div>
-          {/* <p className="text-[11px] text-[var(--toss-gray-3)] mt-2">시스템 상태: {debugMsg || '정상'}</p> */}
         </div>
-      </div>
+      ) : (
+        <>
+          <input
+            style={{ display: 'none' }}
+            type="file"
+            id="profiles-upload"
+            accept="image/*"
+            onChange={uploadAvatar}
+            disabled={uploading}
+          />
+          {!hideActionBar ? (
+            <div className="mb-3 flex flex-wrap items-center justify-end gap-2 border-b border-[var(--toss-border)] pb-3">
+              {actionButtons}
+            </div>
+          ) : null}
+        </>
+      )}
 
       {/* 상세 정보 + 나의 근태/연차 요약 */}
-      <div className="pt-4 sm:pt-5">
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-5 lg:gap-6">
+        <div className={hideHeader ? '' : 'pt-3 sm:pt-4'}>
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-4 lg:gap-5">
           {/* 인사 관리 정보 */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             <h3 className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest border-l-4 border-[var(--toss-blue)] pl-3 mb-1">
               인사 관리 정보
             </h3>
-            <div className="grid grid-cols-1 min-[520px]:grid-cols-2 xl:grid-cols-3 gap-x-5 gap-y-4">
+            <div className="grid grid-cols-1 min-[520px]:grid-cols-2 xl:grid-cols-3 gap-x-4 gap-y-3">
               <InfoItem label="사번" value={user.employee_no} />
               <InfoItem label="입사일" value={user.join_date} />
               <InfoItem label="이메일" value={user.email} />
             </div>
             {isEditing ? (
               <>
-                <div className="grid grid-cols-1 min-[520px]:grid-cols-2 xl:grid-cols-3 gap-x-5 gap-y-4">
+                <div className="grid grid-cols-1 min-[520px]:grid-cols-2 xl:grid-cols-3 gap-x-4 gap-y-3">
                   <EditableItem
                     label="연락처"
                     value={editForm.phone}
@@ -360,10 +449,10 @@ export default function MyProfileCard({ user: initialUser, onOpenApproval, setMa
                     placeholder="도로명 주소를 입력하세요"
                   />
                 </div>
-                <div className="grid grid-cols-1 xl:grid-cols-3 gap-x-6 gap-y-4 pt-1">
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-x-4 gap-y-3 pt-1">
                   <div className="xl:col-span-2 space-y-3">
                     <span className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-wide block">계좌정보</span>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       <input
                         type="text"
                         value={editForm.bank_name}
@@ -387,7 +476,7 @@ export default function MyProfileCard({ user: initialUser, onOpenApproval, setMa
                 </div>
               </>
             ) : (
-              <div className="grid grid-cols-1 min-[520px]:grid-cols-2 xl:grid-cols-3 gap-x-5 gap-y-4">
+              <div className="grid grid-cols-1 min-[520px]:grid-cols-2 xl:grid-cols-3 gap-x-4 gap-y-3">
                 <InfoItem label="연락처" value={showSecret ? user.phone : MASKED_TEXT} isMasked={!showSecret} />
                 <InfoItem label="내선번호" value={user.extension || user.permissions?.extension} />
                 <InfoItem label="거주지" value={showSecret ? user.address : MASKED_TEXT} isMasked={!showSecret} />
@@ -427,7 +516,7 @@ export default function MyProfileCard({ user: initialUser, onOpenApproval, setMa
           </div>
 
           {/* 나의 근태 · 연차 */}
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             <h3 className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest border-l-4 border-emerald-500 pl-3 mb-1">
               나의 근태 · 연차
             </h3>
@@ -438,7 +527,7 @@ export default function MyProfileCard({ user: initialUser, onOpenApproval, setMa
       </div>
 
       {/* 로그아웃 버튼 */}
-      <div className="pt-4 sm:pt-5 mt-4 border-t border-[var(--toss-border)] flex flex-col-reverse sm:flex-row gap-3 sm:items-center sm:justify-between shrink-0">
+      <div className="mt-3 flex shrink-0 flex-col-reverse gap-2.5 border-t border-[var(--toss-border)] pt-3 sm:flex-row sm:items-center sm:justify-between">
         {isEditing && (
           <button
             type="button"
@@ -463,7 +552,7 @@ export default function MyProfileCard({ user: initialUser, onOpenApproval, setMa
 
 function InfoItem({ label, value, isMasked }: any) {
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1">
       <span className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-wide">{label}</span>
       <span className={`text-[15px] font-bold leading-snug ${isMasked ? 'text-[var(--toss-gray-3)] tracking-widest' : 'text-[var(--foreground)]'}`}>
         {value || '-'}
@@ -474,7 +563,7 @@ function InfoItem({ label, value, isMasked }: any) {
 
 function EditableItem({ label, value, onChange, placeholder }: any) {
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1">
       <span className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-wide">{label}</span>
       <input
         type="text"
@@ -560,14 +649,14 @@ function LeaveAndCommuteSummary({ user, onOpenApproval }: any) {
 
   if (!summary) {
     return (
-      <div className="bg-[var(--toss-gray-1)] border border-[var(--toss-border)] rounded-[16px] p-4 sm:p-5 text-[12px] text-[var(--toss-gray-3)] font-semibold">
+      <div className="bg-[var(--toss-gray-1)] border border-[var(--toss-border)] rounded-[16px] p-3.5 sm:p-4 text-[12px] text-[var(--toss-gray-3)] font-semibold">
         근태·연차 정보를 불러오는 중입니다...
       </div>
     );
   }
 
   return (
-    <div className="bg-[var(--toss-gray-1)] border border-[var(--toss-border)] rounded-[16px] p-4 sm:p-5 space-y-4 text-[12px]">
+    <div className="bg-[var(--toss-gray-1)] border border-[var(--toss-border)] rounded-[16px] p-3.5 sm:p-4 space-y-3 text-[12px]">
       <div className="flex justify-between items-end">
         <div>
           <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1.5">
@@ -588,7 +677,7 @@ function LeaveAndCommuteSummary({ user, onOpenApproval }: any) {
         </button>
       </div>
 
-      <div className="border-t border-[var(--toss-border)] pt-4 space-y-2">
+      <div className="border-t border-[var(--toss-border)] pt-3 space-y-1.5">
         <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">
           최근 지각
         </p>
@@ -605,7 +694,7 @@ function LeaveAndCommuteSummary({ user, onOpenApproval }: any) {
         )}
       </div>
 
-      <div className="border-t border-[var(--toss-border)] pt-4 space-y-2">
+      <div className="border-t border-[var(--toss-border)] pt-3 space-y-1.5">
         <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">
           최근 추가근무
         </p>
@@ -624,6 +713,3 @@ function LeaveAndCommuteSummary({ user, onOpenApproval }: any) {
     </div>
   );
 }
-
-
-

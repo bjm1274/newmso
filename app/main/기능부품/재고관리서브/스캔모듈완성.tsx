@@ -174,13 +174,6 @@ export default function ScanModule({ user, inventory, fetchInventory }: ScanModu
           <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tight">
             의료기기 QR·바코드 스캔 입고
           </h2>
-          <p className="text-[11px] text-[var(--toss-blue)] font-bold mt-1 uppercase tracking-widest">
-            Handheld Scanner / 카메라 스캐너 입력 전용
-          </p>
-          <p className="text-[11px] text-[var(--toss-gray-3)] mt-2">
-            의료기기 QR코드·바코드를 스캐너로 찍으면 아래 입력창에 자동으로 코드가 들어오고,
-            엔터(↵)를 누르면 해당 품목의 입고 수량이 1개씩 증가합니다.
-          </p>
         </div>
 
         {/* 스캐너 입력 영역 */}

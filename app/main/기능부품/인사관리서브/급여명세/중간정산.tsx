@@ -117,7 +117,6 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
     <div className="bg-[var(--toss-card)] p-6 md:p-8 rounded-[12px] border border-[var(--toss-border)] shadow-sm animate-in fade-in duration-300" data-testid="interim-settlement-view">
       <div className="mb-6 pb-4 border-b border-[var(--toss-border)]">
         <h2 className="text-lg font-bold text-[var(--foreground)]">중간정산</h2>
-        <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">퇴직·중도 퇴사자 급여 일할 계산</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">

@@ -129,7 +129,6 @@ export default function WorkTypeChangeHistory({ staffs, selectedCo, user }: Prop
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)]">근무 형태 변경 이력</h2>
-          <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">정규직·파트타임·계약직·파견 등 근무 형태 변경 기록을 관리합니다.</p>
         </div>
         <button
           onClick={() => { setShowForm(true); setMessage(null); }}

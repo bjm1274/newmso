@@ -122,7 +122,6 @@ export default function InvoiceAutoExtraction({ onRefresh, user }: any) {
         <div className="bg-[var(--toss-card)] p-6 md:p-8 border border-[var(--toss-border)] shadow-xl rounded-[2.5rem] animate-in fade-in duration-500">
             <div className="mb-6">
                 <h3 className="text-xl font-bold text-[var(--foreground)] tracking-tight">📄 명세서 추출 자동 입고</h3>
-                <p className="text-[11px] text-[var(--toss-gray-3)] font-bold mt-1">영수증, 거래명세서, 인보이스 이미지 또는 PDF를 업로드하면 AI가 품목을 자동 추출합니다.</p>
             </div>
 
             <div className="flex flex-col md:flex-row gap-6">

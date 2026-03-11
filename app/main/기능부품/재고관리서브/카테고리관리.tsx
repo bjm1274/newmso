@@ -128,7 +128,6 @@ export default function CategoryManager({ user }: { user: any }) {
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div>
           <h2 className="text-base font-bold text-[var(--foreground)]">재고 카테고리 트리 관리</h2>
-          <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">계층형 카테고리 구조로 재고를 분류합니다.</p>
         </div>
         <div className="flex gap-2">
           <button onClick={importFromInventory} className="px-3 py-1.5 bg-purple-500 text-white rounded-[10px] text-xs font-bold">재고에서 가져오기</button>

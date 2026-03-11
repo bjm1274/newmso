@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useState, useEffect } from 'react';
 
 // 기능 컴포넌트 불러오기
@@ -71,6 +71,9 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
   const [favorites, setFavorites] = useState<FavoriteId[]>([]);
   const [showFavPicker, setShowFavPicker] = useState(false);
   const [pendingFav, setPendingFav] = useState<FavoriteId | ''>('');
+  const [profileSummary, setProfileSummary] = useState(() => buildProfileSummary(user));
+  const [showSecret, setShowSecret] = useState(false);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
 
   const [pendingContract, setPendingContract] = useState<any>(null);
   const [showSignaturePad, setShowSignaturePad] = useState(false);
@@ -194,6 +197,42 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
     }
   }, [activeTab, recordsView]);
 
+  useEffect(() => {
+    setProfileSummary(buildProfileSummary(user));
+  }, [user]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const syncFromStorage = () => {
+      try {
+        const raw = window.localStorage.getItem('erp_user');
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (!user?.name || parsed?.name === user.name) {
+          setProfileSummary(buildProfileSummary(parsed));
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    const handleProfileUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent<{ user?: any }>;
+      if (customEvent.detail?.user) {
+        setProfileSummary(buildProfileSummary(customEvent.detail.user));
+        return;
+      }
+      syncFromStorage();
+    };
+
+    syncFromStorage();
+    window.addEventListener('erp-profile-updated', handleProfileUpdate as EventListener);
+    return () => {
+      window.removeEventListener('erp-profile-updated', handleProfileUpdate as EventListener);
+    };
+  }, [user?.name]);
+
   // 즐겨찾기 목록 복구
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -283,10 +322,68 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
     setShowFavPicker(false);
   };
 
+  const verifyProfilePassword = async () => {
+    try {
+      const input = window.prompt('본인 확인을 위해 현재 비밀번호를 입력해 주세요.');
+      if (!input) return false;
+
+      const response = await fetch('/api/auth/verify-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          password: input,
+          userId: profileSummary.id || user?.id,
+          name: profileSummary.name || user?.name,
+          employeeNo: profileSummary.employeeNo || user?.employee_no,
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        alert(payload?.error ? `본인 확인 중 오류가 발생했습니다.\n${payload.error}` : '본인 확인 중 오류가 발생했습니다.');
+        return false;
+      }
+
+      if (!payload?.verified) {
+        alert('비밀번호가 일치하지 않습니다.');
+        return false;
+      }
+
+      return true;
+    } catch {
+      alert('본인 확인 중 오류가 발생했습니다.');
+      return false;
+    }
+  };
+
+  const handleToggleSecret = async () => {
+    if (showSecret) {
+      setShowSecret(false);
+      return;
+    }
+
+    const verified = await verifyProfilePassword();
+    if (verified) {
+      setShowSecret(true);
+    }
+  };
+
+  const handleToggleEdit = async () => {
+    if (isEditingProfile) {
+      setIsEditingProfile(false);
+      return;
+    }
+
+    const verified = await verifyProfilePassword();
+    if (verified) {
+      setIsEditingProfile(true);
+    }
+  };
+
   if (!user) return <div className="p-10 text-center font-bold">사용자 정보 로딩 중...</div>;
 
   return (
-    <div className="relative h-full min-h-0 flex flex-col overflow-x-hidden app-page px-3 py-3 md:rounded-[3rem] md:px-5 md:py-4">
+    <div className="relative h-full min-h-0 flex flex-col overflow-x-hidden app-page px-2.5 py-2.5 md:rounded-[3rem] md:px-4 md:py-3">
 
       {/* 전자 서명 전용 신규 모달 */}
       {pendingContract && (
@@ -299,25 +396,65 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
       )}
 
       {/* 상단 로고 및 헤더 */}
-      <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-3 shrink-0">
-        <div className="text-left space-y-2 w-full">
-          {/* 로고 + 인사말 바로 옆에 즐겨찾기 버튼 (모바일/PC 공통) */}
-          <div className="flex flex-wrap items-center gap-2 mb-2">
-            <AppLogo size={40} />
-            <h1 className="page-header-title text-2xl font-semibold tracking-tight">
-              반갑습니다, {user.name}님 👋
-            </h1>
+      <div className="mb-3 flex flex-col gap-2.5 shrink-0">
+        <div className="flex flex-col gap-2.5 xl:flex-row xl:items-center xl:justify-between">
+          <div className="min-w-0 flex-1 text-left">
+            <div className="mb-1 flex flex-wrap items-center gap-2">
+              <AppLogo size={40} />
+              <h1 className="page-header-title text-2xl font-semibold tracking-tight">
+                반갑습니다, {user.name}님 👋
+              </h1>
+            </div>
+          </div>
+
+          <div className="flex w-full justify-around rounded-2xl border border-[var(--toss-border)] bg-[var(--toss-card)] p-0.5 shadow-sm xl:w-auto xl:justify-start">
+            <TabButton
+              isActive={activeTab === 'profile'}
+              onClick={() => setActiveTab('profile')}
+              label="내 정보" icon="👤"
+            />
+            <TabButton
+              isActive={activeTab === 'commute'}
+              onClick={() => setActiveTab('commute')}
+              label="출퇴근" icon="⏰"
+            />
+            <TabButton
+              isActive={activeTab === 'todo'}
+              onClick={() => setActiveTab('todo')}
+              label="할일" icon="✅"
+            />
+            <TabButton
+              isActive={activeTab === 'records' && recordsView === 'certificates'}
+              onClick={() => { setActiveTab('records'); setRecordsView('certificates'); }}
+              label="증명서" icon="📑" ariaLabel="증명서"
+            />
+            <TabButton
+              isActive={activeTab === 'records' && recordsView === 'salary'}
+              onClick={() => { setActiveTab('records'); setRecordsView('salary'); }}
+              label="급여" icon="💰" ariaLabel="급여"
+            />
+            <TabButton
+              isActive={activeTab === 'documents'}
+              onClick={() => setActiveTab('documents')}
+              label="서류제출" icon="📤"
+            />
+            <TabButton
+              isActive={activeTab === 'notifications'}
+              onClick={() => setActiveTab('notifications')}
+              label="알림" icon="🔔"
+            />
+          </div>
+        </div>
+
+        <div className="mt-0.5 flex flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => setShowFavPicker((v) => !v)}
-              className="ml-1 px-3 py-1.5 rounded-full text-[11px] font-semibold border border-dashed border-[var(--toss-border)] text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)] whitespace-nowrap"
+              className="rounded-full border border-dashed border-[var(--toss-border)] px-3 py-1.5 text-[11px] font-semibold whitespace-nowrap text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]"
             >
               + 즐겨찾기 추가
             </button>
-          </div>
-
-          {/* 자주 쓰는 기능 즐겨찾기 바로가기 */}
-          <div className="flex flex-col gap-2 mt-1">
             <div className="flex gap-2 overflow-x-auto md:flex-wrap md:overflow-visible no-scrollbar">
               {favorites.map((id) => {
                 const opt = FAVORITE_OPTIONS.find(o => o.id === id);
@@ -342,77 +479,63 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
                 );
               })}
             </div>
-            {showFavPicker && (
-              <div className="flex items-center gap-2">
-                <select
-                  value={pendingFav}
-                  onChange={(e) => setPendingFav(e.target.value as FavoriteId | '')}
-                  className="px-3 py-1.5 rounded-full text-[11px] font-semibold border border-[var(--toss-border)] bg-[var(--toss-card)]"
-                >
-                  <option value="">항목 선택</option>
-                  {FAVORITE_OPTIONS.filter(o => !favorites.includes(o.id)).map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={handleAddFavorite}
-                  className="px-3 py-1.5 rounded-full text-[11px] font-semibold bg-[var(--foreground)] text-white hover:opacity-90"
-                >
-                  추가
-                </button>
-              </div>
-            )}
           </div>
-        </div>
-
-        {/* 통합 탭 네비게이션 (가로 스크롤 레이아웃) */}
-        <div className="flex justify-around md:justify-start bg-[var(--toss-card)] p-1 rounded-2xl shadow-sm border border-[var(--toss-border)] w-full md:w-fit">
-          <TabButton
-            isActive={activeTab === 'profile'}
-            onClick={() => setActiveTab('profile')}
-            label="내 정보" icon="👤"
-          />
-          <TabButton
-            isActive={activeTab === 'commute'}
-            onClick={() => setActiveTab('commute')}
-            label="출퇴근" icon="⏰"
-          />
-          <TabButton
-            isActive={activeTab === 'todo'}
-            onClick={() => setActiveTab('todo')}
-            label="할일" icon="✅"
-          />
-          <TabButton
-            isActive={activeTab === 'records'}
-            onClick={() => { setActiveTab('records'); setRecordsView('certificates'); }}
-            label="급여·증명서" icon="📑" ariaLabel="증명서"
-          />
-          <TabButton
-            isActive={activeTab === 'documents'}
-            onClick={() => setActiveTab('documents')}
-            label="서류제출" icon="📤"
-          />
-          <TabButton
-            isActive={activeTab === 'notifications'}
-            onClick={() => setActiveTab('notifications')}
-            label="알림" icon="🔔"
-          />
+          {showFavPicker && (
+            <div className="flex items-center gap-2">
+              <select
+                value={pendingFav}
+                onChange={(e) => setPendingFav(e.target.value as FavoriteId | '')}
+                className="px-3 py-1.5 rounded-full text-[11px] font-semibold border border-[var(--toss-border)] bg-[var(--toss-card)]"
+              >
+                <option value="">항목 선택</option>
+                {FAVORITE_OPTIONS.filter(o => !favorites.includes(o.id)).map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={handleAddFavorite}
+                className="px-3 py-1.5 rounded-full text-[11px] font-semibold bg-[var(--foreground)] text-white hover:opacity-90"
+              >
+                추가
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
       {/* 메인 콘텐츠 영역 */}
       <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden transition-all duration-300">
           {activeTab === 'profile' && (
-            <div data-testid="mypage-profile-tab" className="space-y-4 pb-4">
-              <RoleDashboard user={user} setMainMenu={setMainMenu} />
-              <MyProfileCard user={user} onOpenApproval={onOpenApproval} setMainMenu={setMainMenu} />
+            <div data-testid="mypage-profile-tab" className="space-y-3 pb-3">
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-start">
+                <ProfileHeaderSummary
+                  user={profileSummary}
+                  showSecret={showSecret}
+                  isEditing={isEditingProfile}
+                  onToggleSecret={handleToggleSecret}
+                  onToggleEdit={handleToggleEdit}
+                />
+                <div className="min-w-0 flex-1">
+                  <RoleDashboard user={user} setMainMenu={setMainMenu} />
+                </div>
+              </div>
+              <MyProfileCard
+                user={user}
+                onOpenApproval={onOpenApproval}
+                hideHeader
+                hideActionBar
+                showSecret={showSecret}
+                setShowSecret={setShowSecret}
+                isEditing={isEditingProfile}
+                setIsEditing={setIsEditingProfile}
+              />
             </div>
           )}
           {activeTab === 'commute' && (
-            <div data-testid="mypage-commute-tab" className="pb-4">
+            <div data-testid="mypage-commute-tab" className="pb-3">
               <CommuteRecord
               user={user}
               onRequestCorrection={(log: any) =>
@@ -425,9 +548,9 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
               />
             </div>
           )}
-          {activeTab === 'todo' && <div data-testid="mypage-todo-tab" className="pb-4"><MyTodoList user={user} /></div>}
+          {activeTab === 'todo' && <div data-testid="mypage-todo-tab" className="pb-3"><MyTodoList user={user} /></div>}
           {activeTab === 'records' && (
-            <div data-testid="mypage-records-tab" className="pb-4">
+            <div data-testid="mypage-records-tab" className="pb-3">
               <PayrollAndCertificatesHub
                 user={user}
                 activeView={recordsView}
@@ -435,11 +558,89 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
               />
             </div>
           )}
-          {activeTab === 'documents' && <div data-testid="mypage-documents-tab" className="pb-4"><MyDocuments user={user} /></div>}
-          {activeTab === 'notifications' && <div data-testid="mypage-notifications-tab" className="pb-4"><NotificationInbox user={user} onRefresh={() => { }} /></div>}
+          {activeTab === 'documents' && <div data-testid="mypage-documents-tab" className="pb-3"><MyDocuments user={user} /></div>}
+          {activeTab === 'notifications' && <div data-testid="mypage-notifications-tab" className="pb-3"><NotificationInbox user={user} onRefresh={() => { }} /></div>}
       </div>
 
     </div>
+  );
+}
+
+function buildProfileSummary(source: any) {
+  return {
+    id: source?.id || null,
+    name: source?.name || '',
+    position: source?.position || '',
+    department: source?.department || '',
+    avatarUrl: source?.avatar_url || source?.photo_url || null,
+    employeeNo: source?.employee_no || '',
+  };
+}
+
+function ProfileHeaderSummary({
+  user,
+  showSecret,
+  isEditing,
+  onToggleSecret,
+  onToggleEdit,
+}: {
+  user: { id?: string | null; name: string; position: string; department: string; avatarUrl?: string | null; employeeNo?: string | null };
+  showSecret: boolean;
+  isEditing: boolean;
+  onToggleSecret: () => void;
+  onToggleEdit: () => void;
+}) {
+  return (
+    <section className="h-[128px] w-full rounded-[22px] border border-[var(--toss-border)] bg-[var(--toss-card)] px-4 py-3 shadow-sm xl:max-w-[340px]">
+      <div className="flex h-full items-center justify-between gap-3">
+        <div className="relative shrink-0">
+          <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-[var(--toss-border)] bg-[var(--toss-gray-1)] shadow-sm">
+            {user.avatarUrl ? (
+              <img src={user.avatarUrl} alt="프로필 사진" className="h-full w-full object-cover" />
+            ) : (
+              <span className="text-3xl text-[var(--toss-gray-3)]">👤</span>
+            )}
+          </div>
+          {user.id ? (
+            <label
+              htmlFor="profiles-upload"
+              className="absolute -bottom-1 -right-1 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-[var(--toss-blue)] text-[13px] text-white shadow-sm transition-all hover:opacity-90"
+              title="프로필 사진 등록"
+            >
+              📷
+            </label>
+          ) : null}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[28px] font-bold tracking-tight leading-tight text-[var(--foreground)] break-keep">
+            {user.name} {user.position}
+          </p>
+          <p className="mt-2 truncate text-sm font-bold text-[var(--toss-blue)]">
+            {user.department || '소속 정보 없음'}
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-col gap-1.5">
+          <button
+            type="button"
+            onClick={onToggleSecret}
+            className="rounded-full border border-transparent bg-[var(--toss-gray-1)] px-3 py-1.5 text-[10px] font-bold text-[var(--toss-gray-3)] transition-all hover:border-[var(--toss-blue-light)] hover:text-[var(--toss-blue)]"
+          >
+            {showSecret ? '민감 정보 숨기기' : '보안 정보 보기'}
+          </button>
+          <button
+            type="button"
+            onClick={onToggleEdit}
+            className={`rounded-full border px-3 py-1.5 text-[10px] font-bold transition-all ${
+              isEditing
+                ? 'bg-red-50 text-red-500 border-red-100 hover:bg-red-100'
+                : 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)] border-[var(--toss-blue-light)] hover:bg-[var(--toss-blue-light)]'
+            }`}
+          >
+            {isEditing ? '수정 취소' : '내 정보 수정'}
+          </button>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -488,16 +689,16 @@ function PayrollAndCertificatesHub({
   }, [user?.id]);
 
   return (
-    <div className="space-y-5 p-4 md:p-6">
-      <section className="rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-5 shadow-sm">
-        <div className="flex flex-col gap-4">
+    <div className="space-y-4 p-3 md:p-4">
+      <section className="rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4 shadow-sm">
+        <div className="flex flex-col gap-3">
           <div>
             <h2 className="text-xl font-bold tracking-tight text-[var(--foreground)]">급여·증명서</h2>
-            <p className="mt-1 text-sm text-[var(--toss-gray-3)]">급여명세서와 발급된 증명서를 한 화면에서 구분해서 확인합니다.</p>
           </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <button
               type="button"
+              aria-label="월별 정산 카드"
               onClick={() => onChangeView('salary')}
               className={`rounded-[20px] border px-5 py-4 text-left transition-all ${
                 activeView === 'salary'
@@ -508,7 +709,6 @@ function PayrollAndCertificatesHub({
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">급여명세서</p>
-                  <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">월별 급여 정산 내역 확인</p>
                 </div>
                 <span className="rounded-full bg-white px-3 py-1 text-sm font-black text-[var(--toss-blue)] shadow-sm">
                   {summary.salaryCount}건
@@ -517,6 +717,7 @@ function PayrollAndCertificatesHub({
             </button>
             <button
               type="button"
+              aria-label="발급 문서 카드"
               onClick={() => onChangeView('certificates')}
               className={`rounded-[20px] border px-5 py-4 text-left transition-all ${
                 activeView === 'certificates'
@@ -590,3 +791,4 @@ function QuickFavoriteButton({ label, icon, onClick, active, onRemove }: any) {
     </button>
   );
 }
+

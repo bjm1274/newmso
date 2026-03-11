@@ -1,3 +1,5 @@
+﻿'use client';
+
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import {
@@ -5,11 +7,49 @@ import {
   fetchDocumentDesignStore,
   resolveDocumentDesign,
 } from '@/lib/document-designs';
+import AppLogo from '@/app/components/AppLogo';
 
-function InfoItem({ label, value, highlight = false }: { label: string; value?: string; highlight?: boolean }) {
+function toNumber(value: unknown) {
+  const parsed = Number(value || 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatCurrency(value: number) {
+  return `${Math.floor(toNumber(value)).toLocaleString()}??;
+}
+
+function formatDateLabel(value?: string | null) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString('ko-KR');
+}
+
+function parseDeductionDetail(value: unknown) {
+  if (!value) return {};
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return {};
+    }
+  }
+  if (typeof value === 'object') return value as Record<string, any>;
+  return {};
+}
+
+function InfoItem({
+  label,
+  value,
+  highlight = false,
+}: {
+  label: string;
+  value?: string;
+  highlight?: boolean;
+}) {
   return (
-    <div>
-      <p className="mb-1 text-[10px] font-black uppercase tracking-[0.16em] text-[var(--toss-gray-3)]">
+    <div className="space-y-1.5">
+      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--toss-gray-3)]">
         {label}
       </p>
       <p className={`text-sm font-bold ${highlight ? 'text-[var(--toss-blue)]' : 'text-[var(--foreground)]'}`}>
@@ -41,34 +81,27 @@ function SalaryRow({
           <span className="text-[13px] font-bold text-[var(--toss-gray-4)]">{label}</span>
           {isTaxFree && (
             <span
-              className="rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wide"
+              className="rounded-full px-2 py-0.5 text-[9px] font-black tracking-wide"
               style={{ backgroundColor: alphaColor(highlightColor, 0.12), color: highlightColor }}
             >
-              Non-Taxable
-            </span>
+              鍮꾧낵??            </span>
           )}
         </div>
         <span className={`text-sm font-extrabold tracking-tight ${isDeduction ? 'text-red-600' : 'text-[var(--foreground)]'}`}>
-          {isDeduction ? '-' : ''} {Math.floor(Number(value) || 0).toLocaleString()}원
+          {isDeduction ? '-' : ''}
+          {formatCurrency(value)}
         </span>
       </div>
-      {note && (
+      {note ? (
         <p className="mt-1 text-[10px] font-medium leading-relaxed text-[var(--toss-gray-3)]">
           {note}
         </p>
-      )}
+      ) : null}
     </div>
   );
 }
 
-function formatDateLabel(value?: string | null) {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString('ko-KR');
-}
-
-export default function SalaryDetail({ record, staff }: any) {
+export default function SalaryDetail({ record, staff, displayYearMonth }: any) {
   const [companySeal, setCompanySeal] = useState<string | null>(null);
   const [design, setDesign] = useState(() => resolveDocumentDesign(null, 'payroll_slip'));
 
@@ -94,55 +127,59 @@ export default function SalaryDetail({ record, staff }: any) {
     };
 
     loadResources().catch((error) => {
-      console.error('급여명세서 리소스 로딩 실패:', error);
+      console.error('湲됱뿬紐낆꽭??由ъ냼??濡쒕뵫 ?ㅽ뙣:', error);
     });
   }, [staff?.company]);
 
   const data = useMemo(() => {
-    return record || {
-      base_salary: staff?.base_salary || 0,
-      meal_allowance: staff?.meal_allowance || 0,
-      night_duty_allowance: staff?.night_duty_allowance || 0,
-      vehicle_allowance: staff?.vehicle_allowance || 0,
-      childcare_allowance: staff?.childcare_allowance || 0,
-      research_allowance: staff?.research_allowance || 0,
-      other_taxfree: staff?.other_taxfree || 0,
-      extra_allowance: 0,
-      overtime_pay: 0,
-      bonus: 0,
-      year_month: new Date().toISOString().slice(0, 7),
-    };
+    return (
+      record || {
+        base_salary: staff?.base_salary || 0,
+        meal_allowance: staff?.meal_allowance || 0,
+        night_duty_allowance: staff?.night_duty_allowance || 0,
+        vehicle_allowance: staff?.vehicle_allowance || 0,
+        childcare_allowance: staff?.childcare_allowance || 0,
+        research_allowance: staff?.research_allowance || 0,
+        other_taxfree: staff?.other_taxfree || 0,
+        extra_allowance: 0,
+        overtime_pay: 0,
+        bonus: 0,
+        year_month: new Date().toISOString().slice(0, 7),
+      }
+    );
   }, [record, staff]);
 
   const calc = useMemo(() => {
     if (record) {
-      const detail = record.deduction_detail || {};
+      const detail = parseDeductionDetail(record.deduction_detail);
+      const taxable = toNumber(record.total_taxable);
+
       return {
-        totalPayment: Number(record.total_taxable || 0) + Number(record.total_taxfree || 0),
-        totalDeduction: Number(record.total_deduction || 0),
-        pension: detail.national_pension ?? record.national_pension ?? Math.floor(Number(record.total_taxable || 0) * 0.045),
-        health: detail.health_insurance ?? record.health_insurance ?? Math.floor(Number(record.total_taxable || 0) * 0.03545),
-        longTerm: detail.long_term_care ?? record.long_term_care ?? 0,
-        employment: detail.employment_insurance ?? record.employment_insurance ?? Math.floor(Number(record.total_taxable || 0) * 0.009),
-        incomeTax: detail.income_tax ?? record.income_tax ?? Math.floor(Number(record.total_taxable || 0) * 0.03),
-        localTax: detail.local_tax ?? record.local_tax ?? 0,
-        customDeduction: detail.custom_deduction ?? 0,
-        net: Number(record.net_pay || 0),
+        totalPayment: taxable + toNumber(record.total_taxfree),
+        totalDeduction: toNumber(record.total_deduction),
+        pension: toNumber(detail.national_pension ?? record.national_pension ?? Math.floor(taxable * 0.045)),
+        health: toNumber(detail.health_insurance ?? record.health_insurance ?? Math.floor(taxable * 0.03545)),
+        longTerm: toNumber(detail.long_term_care ?? record.long_term_care),
+        employment: toNumber(detail.employment_insurance ?? record.employment_insurance ?? Math.floor(taxable * 0.009)),
+        incomeTax: toNumber(detail.income_tax ?? record.income_tax ?? Math.floor(taxable * 0.03)),
+        localTax: toNumber(detail.local_tax ?? record.local_tax),
+        customDeduction: toNumber(detail.custom_deduction),
+        net: toNumber(record.net_pay),
       };
     }
 
     const taxable =
-      Number(data.base_salary || 0) +
-      Number(data.extra_allowance || 0) +
-      Number(data.overtime_pay || 0) +
-      Number(data.bonus || 0);
+      toNumber(data.base_salary) +
+      toNumber(data.extra_allowance) +
+      toNumber(data.overtime_pay) +
+      toNumber(data.bonus);
     const taxfree =
-      Number(data.meal_allowance || 0) +
-      Number(data.night_duty_allowance || 0) +
-      Number(data.vehicle_allowance || 0) +
-      Number(data.childcare_allowance || 0) +
-      Number(data.research_allowance || 0) +
-      Number(data.other_taxfree || 0);
+      toNumber(data.meal_allowance) +
+      toNumber(data.night_duty_allowance) +
+      toNumber(data.vehicle_allowance) +
+      toNumber(data.childcare_allowance) +
+      toNumber(data.research_allowance) +
+      toNumber(data.other_taxfree);
 
     const pension = Math.floor(taxable * 0.045);
     const health = Math.floor(taxable * 0.03545);
@@ -170,16 +207,16 @@ export default function SalaryDetail({ record, staff }: any) {
   const companyLabel = design.companyLabel || companyName;
   const primaryColor = design.primaryColor;
   const borderColor = design.borderColor;
-  const headerBackground = `linear-gradient(135deg, ${primaryColor}, ${alphaColor(primaryColor, 0.9)})`;
-  const highlightSurface = alphaColor(primaryColor, 0.08);
   const sectionBorder = alphaColor(primaryColor, 0.18);
+  const highlightSurface = alphaColor(primaryColor, 0.08);
+  const headerSurface = `linear-gradient(180deg, ${alphaColor(primaryColor, 0.12)}, rgba(255,255,255,1))`;
 
-  const yearMonth = String(data.year_month || new Date().toISOString().slice(0, 7));
+  const yearMonth = String(displayYearMonth || data.year_month || new Date().toISOString().slice(0, 7));
   const [year, month] = yearMonth.split('-');
-  const monthLabel = `${year}년 ${Number(month || '1')}월`;
-  const advancePayAmount = Number(record?.advance_pay || 0);
+  const monthLabel = `${year}??${Number(month || '1')}??湲됱뿬紐낆꽭??;
+  const advancePayAmount = toNumber(record?.advance_pay);
   const isAdvancePay = advancePayAmount > 0;
-  const hourlyRate = Math.floor(Number(data.base_salary || 0) / 209);
+  const hourlyRate = Math.floor(toNumber(data.base_salary) / 209);
 
   return (
     <div className="mx-auto mb-10 w-full max-w-7xl overflow-hidden rounded-[24px] border bg-white shadow-xl print:mb-0 print:max-w-none print:shadow-md">
@@ -189,24 +226,13 @@ export default function SalaryDetail({ record, staff }: any) {
         }
       `}</style>
 
-      <div className="relative overflow-hidden px-8 py-10 text-white print:py-7" style={{ background: headerBackground }}>
-        <div className="absolute -right-12 -top-16 h-52 w-52 rounded-full bg-white/10 blur-3xl" />
-        <div className="relative z-10 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-sm font-black uppercase tracking-[0.24em] opacity-80">{companyLabel}</p>
-            <h2 className="mt-3 text-3xl font-extrabold tracking-tight">{design.title}</h2>
-            <p className="mt-1 text-sm font-medium opacity-90">{design.subtitle}</p>
-            <p className="mt-4 text-[13px] font-semibold opacity-90">{monthLabel}</p>
-          </div>
-          <div className="rounded-[20px] bg-black/10 px-5 py-4 backdrop-blur-sm">
-            <p className="text-xs font-black uppercase tracking-[0.2em] opacity-70">
-              {isAdvancePay ? 'Advance Pay' : 'Net Pay'}
-            </p>
-            <p className="mt-2 text-4xl font-black tracking-tight">
-              {(isAdvancePay ? advancePayAmount : calc.net).toLocaleString()}원
-            </p>
-          </div>
-        </div>
+      <div
+        className="border-b px-8 py-10 text-center print:py-7"
+        style={{ background: headerSurface, borderColor }}
+      >
+        <h2 className="text-3xl font-extrabold tracking-tight text-[var(--foreground)]">
+          {monthLabel}
+        </h2>
       </div>
 
       <div className="space-y-8 p-8 print:space-y-5 print:px-8 print:py-5">
@@ -214,12 +240,41 @@ export default function SalaryDetail({ record, staff }: any) {
           className="grid grid-cols-2 gap-6 rounded-[20px] p-6 md:grid-cols-3 lg:grid-cols-6 print:grid-cols-6 print:gap-4 print:p-5"
           style={{ backgroundColor: highlightSurface, border: `1px solid ${borderColor}` }}
         >
-          <InfoItem label="성명" value={staff?.name} />
-          <InfoItem label="사번" value={staff?.employee_no || staff?.id} />
-          <InfoItem label="입사일" value={formatDateLabel(staff?.join_date || staff?.joined_at)} />
-          <InfoItem label="부서" value={staff?.department} />
-          <InfoItem label="직위" value={staff?.position} />
-          <InfoItem label="시급 환산" value={`${hourlyRate.toLocaleString()}원`} highlight />
+          <InfoItem label="?깅챸" value={staff?.name} />
+          <InfoItem label="?щ쾲" value={staff?.employee_no || staff?.id} />
+          <InfoItem label="?낆궗?? value={formatDateLabel(staff?.join_date || staff?.joined_at)} />
+          <InfoItem label="遺?? value={staff?.department} />
+          <InfoItem label="吏곸쐞" value={staff?.position} />
+          <InfoItem label="?쒓툒 ?섏궛" value={formatCurrency(hourlyRate)} highlight />
+        </div>
+
+        <div
+          className="relative overflow-hidden rounded-[24px] border px-6 py-7 text-center print:py-4"
+          style={{
+            borderColor,
+            background: 'radial-gradient(circle at top, ' + alphaColor(primaryColor, 0.16) + ', rgba(255,255,255,0.96) 58%)',
+          }}
+        >
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{ background: 'radial-gradient(circle at center, ' + alphaColor(primaryColor, 0.12) + ', transparent 72%)' }}
+          />
+          <div className="relative flex flex-col items-center gap-3 print:gap-2">
+            <div
+              className="flex h-20 w-20 items-center justify-center rounded-[24px] border bg-white/90 shadow-[0_18px_40px_rgba(15,23,42,0.08)] print:h-14 print:w-14"
+              style={{ borderColor: alphaColor(primaryColor, 0.18) }}
+            >
+              <AppLogo size={52} className="rounded-[16px]" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-lg font-black tracking-tight text-[var(--foreground)] print:text-base">
+                {companyLabel}
+              </p>
+              <p className="text-xs font-medium text-[var(--toss-gray-3)] print:text-[10px]">
+                이번 달 급여 지급과 공제 내역을 한눈에 확인할 수 있도록 정리했습니다.
+              </p>
+            </div>
+          </div>
         </div>
 
         {isAdvancePay ? (
@@ -228,61 +283,58 @@ export default function SalaryDetail({ record, staff }: any) {
             style={{ border: `1px solid ${alphaColor('#d97706', 0.28)}` }}
           >
             <p className="text-sm font-bold text-amber-800">
-              이 문서는 가불 지급 내역입니다. 기본급과 공제 항목은 제외하고 지급 금액만 표시합니다.
+              ??臾몄꽌??媛遺?吏湲??댁뿭?낅땲?? 吏湲?湲덉븸留??쒖떆?⑸땲??
             </p>
-            <div className="mt-4 flex items-center justify-between">
-              <span className="text-sm font-semibold text-slate-700">가불 지급액</span>
-              <span className="text-2xl font-black text-amber-700">{advancePayAmount.toLocaleString()}원</span>
+            <div className="mt-4 flex items-center justify-between gap-4">
+              <span className="text-sm font-semibold text-slate-700">媛遺?吏湲됱븸</span>
+              <span className="text-2xl font-black text-amber-700">{formatCurrency(advancePayAmount)}</span>
             </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 print:grid-cols-2 print:gap-6">
             <div className="space-y-4">
               <div className="flex items-end justify-between px-1">
-                <h4 className="text-sm font-black text-[var(--foreground)]">지급내역</h4>
+                <h4 className="text-sm font-black text-[var(--foreground)]">吏湲됰궡??/h4>
                 <span className="text-xs font-black" style={{ color: primaryColor }}>
-                  지급합계 {calc.totalPayment.toLocaleString()}원
+                  吏湲됲빀怨?{formatCurrency(calc.totalPayment)}
                 </span>
               </div>
               <div className="overflow-hidden rounded-[18px] bg-white" style={{ border: `2px solid ${sectionBorder}` }}>
                 <div className="space-y-3 p-5 print:space-y-2 print:px-5 print:py-4">
-                  <SalaryRow label="기본급" value={Number(data.base_salary || 0)} note="월 기본 급여" highlightColor={primaryColor} />
-                  {Number(data.overtime_pay || 0) > 0 && (
+                  <SalaryRow label="湲곕낯湲? value={toNumber(data.base_salary)} note="??湲곕낯 湲됱뿬" highlightColor={primaryColor} />
+                  {toNumber(data.overtime_pay) > 0 ? (
                     <SalaryRow
-                      label="연장근로수당"
-                      value={Number(data.overtime_pay || 0)}
-                      note={`시급 ${hourlyRate.toLocaleString()}원 기준 연장근로 반영`}
+                      label="?곗옣洹쇰줈?섎떦"
+                      value={toNumber(data.overtime_pay)}
+                      note={`?쒓툒 ${formatCurrency(hourlyRate)} 湲곗? ?곗옣洹쇰줈 諛섏쁺`}
                       highlightColor={primaryColor}
                     />
-                  )}
-                  {Number(data.bonus || 0) > 0 && (
-                    <SalaryRow label="상여" value={Number(data.bonus || 0)} note="성과 또는 별도 상여" highlightColor={primaryColor} />
-                  )}
-                  {Number(data.extra_allowance || 0) > 0 && (
-                    <SalaryRow label="기타 수당" value={Number(data.extra_allowance || 0)} note="직책 / 자격 / 기타 수당" highlightColor={primaryColor} />
-                  )}
+                  ) : null}
+                  {toNumber(data.bonus) > 0 ? (
+                    <SalaryRow label="?곸뿬" value={toNumber(data.bonus)} note="?깃낵 ?먮뒗 蹂꾨룄 ?곸뿬" highlightColor={primaryColor} />
+                  ) : null}
+                  {toNumber(data.extra_allowance) > 0 ? (
+                    <SalaryRow label="湲고? ?섎떦" value={toNumber(data.extra_allowance)} note="吏곸콉 ?먮뒗 湲고? ?섎떦" highlightColor={primaryColor} />
+                  ) : null}
 
                   <div className="mt-3 border-t pt-3" style={{ borderColor }}>
-                    <p className="text-[11px] font-black uppercase tracking-[0.18em]" style={{ color: primaryColor }}>
-                      Tax-Free Benefits
-                    </p>
-                    <div className="mt-2 space-y-3 print:space-y-2">
-                      <SalaryRow label="식대" value={Number(data.meal_allowance || 0)} note="월 비과세 식대" isTaxFree highlightColor={primaryColor} />
-                      {Number(data.night_duty_allowance || 0) > 0 && (
-                        <SalaryRow label="야간 수당" value={Number(data.night_duty_allowance || 0)} note="야간 근무 반영" isTaxFree highlightColor={primaryColor} />
-                      )}
-                      {Number(data.vehicle_allowance || 0) > 0 && (
-                        <SalaryRow label="차량 유지비" value={Number(data.vehicle_allowance || 0)} note="업무용 차량 지원" isTaxFree highlightColor={primaryColor} />
-                      )}
-                      {Number(data.childcare_allowance || 0) > 0 && (
-                        <SalaryRow label="보육 수당" value={Number(data.childcare_allowance || 0)} note="보육 지원 수당" isTaxFree highlightColor={primaryColor} />
-                      )}
-                      {Number(data.research_allowance || 0) > 0 && (
-                        <SalaryRow label="연구 활동비" value={Number(data.research_allowance || 0)} note="연구 활동 지원" isTaxFree highlightColor={primaryColor} />
-                      )}
-                      {Number(data.other_taxfree || 0) > 0 && (
-                        <SalaryRow label="기타 비과세" value={Number(data.other_taxfree || 0)} note="기타 비과세 수당" isTaxFree highlightColor={primaryColor} />
-                      )}
+                    <div className="space-y-3 print:space-y-2">
+                      <SalaryRow label="?앸?" value={toNumber(data.meal_allowance)} note="??鍮꾧낵???앸?" isTaxFree highlightColor={primaryColor} />
+                      {toNumber(data.night_duty_allowance) > 0 ? (
+                        <SalaryRow label="?쇨컙 ?섎떦" value={toNumber(data.night_duty_allowance)} note="?쇨컙 洹쇰Т 諛섏쁺" isTaxFree highlightColor={primaryColor} />
+                      ) : null}
+                      {toNumber(data.vehicle_allowance) > 0 ? (
+                        <SalaryRow label="李⑤웾 ?좎?鍮? value={toNumber(data.vehicle_allowance)} note="?낅Т??李⑤웾 吏?? isTaxFree highlightColor={primaryColor} />
+                      ) : null}
+                      {toNumber(data.childcare_allowance) > 0 ? (
+                        <SalaryRow label="蹂댁쑁 ?섎떦" value={toNumber(data.childcare_allowance)} note="蹂댁쑁 吏???섎떦" isTaxFree highlightColor={primaryColor} />
+                      ) : null}
+                      {toNumber(data.research_allowance) > 0 ? (
+                        <SalaryRow label="?곌뎄 ?쒕룞鍮? value={toNumber(data.research_allowance)} note="?곌뎄 ?쒕룞 吏?? isTaxFree highlightColor={primaryColor} />
+                      ) : null}
+                      {toNumber(data.other_taxfree) > 0 ? (
+                        <SalaryRow label="湲고? 鍮꾧낵?? value={toNumber(data.other_taxfree)} note="湲고? 鍮꾧낵???섎떦" isTaxFree highlightColor={primaryColor} />
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -291,78 +343,65 @@ export default function SalaryDetail({ record, staff }: any) {
 
             <div className="space-y-4">
               <div className="flex items-end justify-between px-1">
-                <h4 className="text-sm font-black text-[var(--foreground)]">공제내역</h4>
+                <h4 className="text-sm font-black text-[var(--foreground)]">怨듭젣?댁뿭</h4>
                 <span className="text-xs font-black text-red-600">
-                  공제합계 {calc.totalDeduction.toLocaleString()}원
+                  怨듭젣?⑷퀎 {formatCurrency(calc.totalDeduction)}
                 </span>
               </div>
               <div className="overflow-hidden rounded-[18px] bg-white" style={{ border: `2px solid ${alphaColor('#991b1b', 0.22)}` }}>
                 <div className="space-y-3 p-5 print:space-y-2 print:px-5 print:py-4">
-                  <SalaryRow label="국민연금" value={calc.pension} isDeduction highlightColor={primaryColor} />
-                  <SalaryRow label="건강보험" value={calc.health} isDeduction highlightColor={primaryColor} />
-                  <SalaryRow label="장기요양보험" value={calc.longTerm} isDeduction highlightColor={primaryColor} />
-                  <SalaryRow label="고용보험" value={calc.employment} isDeduction highlightColor={primaryColor} />
-                  <SalaryRow label="소득세" value={calc.incomeTax} isDeduction highlightColor={primaryColor} />
-                  <SalaryRow label="지방소득세" value={calc.localTax} isDeduction highlightColor={primaryColor} />
-                  {Number(calc.customDeduction || 0) > 0 && (
-                    <SalaryRow label="기타 공제" value={calc.customDeduction} isDeduction highlightColor={primaryColor} />
-                  )}
+                  <SalaryRow label="援???곌툑" value={calc.pension} isDeduction highlightColor={primaryColor} />
+                  <SalaryRow label="嫄닿컯蹂댄뿕" value={calc.health} isDeduction highlightColor={primaryColor} />
+                  <SalaryRow label="?κ린?붿뼇蹂댄뿕" value={calc.longTerm} isDeduction highlightColor={primaryColor} />
+                  <SalaryRow label="怨좎슜蹂댄뿕" value={calc.employment} isDeduction highlightColor={primaryColor} />
+                  <SalaryRow label="?뚮뱷?? value={calc.incomeTax} isDeduction highlightColor={primaryColor} />
+                  <SalaryRow label="吏諛⑹냼?앹꽭" value={calc.localTax} isDeduction highlightColor={primaryColor} />
+                  {toNumber(calc.customDeduction) > 0 ? (
+                    <SalaryRow label="湲고? 怨듭젣" value={calc.customDeduction} isDeduction highlightColor={primaryColor} />
+                  ) : null}
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        <div
-          className="rounded-[20px] px-6 py-5 text-white"
-          style={{ background: `linear-gradient(135deg, ${alphaColor(primaryColor, 0.95)}, ${alphaColor(primaryColor, 0.76)})` }}
-        >
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.2em] opacity-75">Payment Summary</p>
-              <p className="mt-1 text-sm font-semibold opacity-90">
-                본 지급 내역은 회사 기준 급여 마감 결과를 반영합니다.
-              </p>
-            </div>
-            <p className="text-3xl font-black tracking-tight">{calc.net.toLocaleString()}원</p>
-          </div>
-        </div>
-
         <div className="flex flex-col gap-5 border-t pt-6 md:flex-row md:items-end md:justify-between" style={{ borderColor }}>
           <div className="space-y-1">
-            {design.footerText && (
+            {design.footerText ? (
               <p className="text-[11px] font-medium leading-relaxed text-[var(--toss-gray-3)]">
                 {design.footerText}
               </p>
-            )}
+            ) : null}
             <p className="text-[10px] text-[var(--toss-gray-3)]">
-              발급 시각: {new Date().toLocaleString('ko-KR')}
+              諛쒓툒 ?쒓컖: {new Date().toLocaleString('ko-KR')}
             </p>
           </div>
 
-          {design.showSignArea && (
-            <div className="flex items-center gap-6">
-              <div className="text-right">
+          {design.showSignArea ? (
+            <div className="flex items-center gap-4">
+              <div className="relative flex items-center justify-end pr-5">
                 <p className="text-3xl font-black tracking-tight text-[var(--foreground)]">{companyLabel}</p>
-                <p className="mt-1 text-[11px] font-semibold text-[var(--toss-gray-3)]">직인 / 담당자 승인</p>
+                <div className="pointer-events-none absolute -right-1 top-1/2 -translate-y-1/2">
+                  {companySeal ? (
+                    <img
+                      src={companySeal}
+                      alt="?뚯궗 吏곸씤"
+                      className="h-14 w-14 rotate-12 object-contain opacity-85 mix-blend-multiply"
+                    />
+                  ) : (
+                    <div className="flex h-14 w-14 items-center justify-center rounded-full border-4 border-double border-red-600 text-xs font-black text-red-600 opacity-80">
+                      吏곸씤
+                    </div>
+                  )}
+                </div>
               </div>
-              {companySeal ? (
-                <div className="flex h-16 w-16 items-center justify-center">
-                  <img
-                    src={companySeal}
-                    alt="회사 직인"
-                    className="h-14 w-14 rotate-12 object-contain opacity-90 mix-blend-multiply"
-                  />
-                </div>
-              ) : (
-                <div className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-double border-red-600 text-xs font-black text-red-600 opacity-80">
-                  직인
-                </div>
-              )}
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </div>
   );
 }
+
+
+

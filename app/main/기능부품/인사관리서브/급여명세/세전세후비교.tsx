@@ -89,7 +89,6 @@ export default function GrossNetComparison({ staffs, selectedCo, user }: Props) 
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)]">세전/세후 비교 분석</h2>
-          <p className="text-xs text-[var(--toss-gray-3)] mt-1">직원별 총지급액, 공제액, 실수령액을 비교합니다.</p>
         </div>
         <div className="flex gap-2 items-center">
           <input

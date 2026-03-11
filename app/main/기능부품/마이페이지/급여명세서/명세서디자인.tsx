@@ -90,7 +90,7 @@ export default function SalarySlipUI({ user, currentDate, salaryData, totalPayme
       {/* 4. 실 수령액 */}
       <div className="mb-10 p-6 bg-[var(--foreground)] text-white rounded-[16px] flex justify-between items-center shadow-lg border-l-[12px] border-[var(--toss-blue)]">
         <div>
-          <p className="text-xs font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">Total Net Pay</p>
+          <p className="text-xs font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">총 지급액</p>
           <p className="text-sm font-semibold text-[var(--toss-gray-1)]">차인 지급액 (실 수령액)</p>
         </div>
         <p className="text-4xl font-semibold tracking-tight">

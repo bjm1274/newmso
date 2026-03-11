@@ -63,7 +63,6 @@ export default function OrdinaryWageCalculator({ staffs, selectedCo, user }: Pro
     <div className="p-4 md:p-6 space-y-6 max-w-4xl mx-auto">
       <div>
         <h2 className="text-lg font-bold text-[var(--foreground)]">통상임금 자동 계산기</h2>
-        <p className="text-xs text-[var(--toss-gray-3)] mt-1">정기성·일률성·고정성 있는 수당을 입력하여 통상임금 및 법정수당을 자동 계산합니다.</p>
       </div>
 
       {/* 직원 선택 */}

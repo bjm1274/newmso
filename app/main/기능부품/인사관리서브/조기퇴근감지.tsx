@@ -141,7 +141,6 @@ export default function EarlyLeavingDetection({ staffs, selectedCo, user }: Prop
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)]">조기 퇴근 감지</h2>
-          <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">정상 퇴근 시각 기준 조기 퇴근을 감지하고 미신청 건을 강조 표시합니다.</p>
         </div>
         <input
           type="month"

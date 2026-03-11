@@ -110,9 +110,7 @@ export default function TaxInsuranceRatesPanel({ companyName }: { companyName?: 
                 <button onClick={() => openEdit(r)} className="text-xs font-medium text-[var(--toss-blue)] hover:opacity-80 shrink-0">수정</button>
               </div>
             ))}
-            {list.length === 0 && !editing && (
-              <p className="text-xs text-[var(--toss-gray-3)]">등록된 연도가 없습니다. &quot;연도 추가&quot;로 입력하세요.</p>
-            )}
+            {list.length === 0 && !editing && null}
           </div>
 
           <div className="border-t border-[var(--toss-border)] pt-4 space-y-3">

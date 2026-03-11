@@ -133,12 +133,12 @@ export default function MyDocuments({ user }: any) {
                         <div key={doc.id} className={`border p-3.5 rounded-2xl shadow-sm transition-all relative group h-full flex flex-col justify-between ${existingDoc ? 'border-emerald-100 bg-emerald-50/20' : 'border-slate-100 bg-white hover:border-blue-400'}`}>
                             <div>
                                 <div className="flex justify-between items-start">
-                                    <h4 className="text-[11px] font-black text-slate-800 leading-tight pr-4">{doc.label}</h4>
+                                    <h4 className="pr-4 text-[11px] font-black leading-tight text-[var(--foreground)]">{doc.label}</h4>
                                     {existingDoc && (
                                         <span className="text-emerald-500 text-[10px] font-black">✓</span>
                                     )}
                                 </div>
-                                <span className={`inline-block mt-1 px-1.5 py-0.5 text-[8px] font-black rounded ${existingDoc ? 'bg-emerald-100/50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+                                <span className={`inline-block mt-1 rounded px-1.5 py-0.5 text-[8px] font-black ${existingDoc ? 'bg-emerald-100/50 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-5)]'}`}>
                                     {existingDoc ? '제출 완료' : '미제출'}
                                 </span>
                             </div>
@@ -146,14 +146,14 @@ export default function MyDocuments({ user }: any) {
                             <div className="mt-3 flex gap-1.5">
                                 {existingDoc ? (
                                     <>
-                                        <button onClick={() => window.open(existingDoc.file_url, '_blank')} className="flex-1 py-1.5 bg-slate-50 text-slate-500 text-[10px] font-black rounded-lg hover:bg-slate-100 transition-colors">보기</button>
-                                        <button onClick={() => setScanningDoc(doc)} className="px-2 py-1.5 bg-white border border-slate-200 text-slate-400 text-[10px] rounded-lg hover:text-blue-500" title="재촬영">📷</button>
+                                        <button onClick={() => window.open(existingDoc.file_url, '_blank')} className="flex-1 rounded-lg bg-[var(--toss-gray-1)] py-1.5 text-[10px] font-black text-[var(--foreground)] transition-colors hover:bg-[var(--toss-gray-2)]">보기</button>
+                                        <button onClick={() => setScanningDoc(doc)} className="rounded-lg border border-[var(--toss-border)] bg-[var(--toss-card)] px-2 py-1.5 text-[10px] text-[var(--toss-gray-5)] transition-colors hover:text-[var(--toss-blue)]" title="재촬영">📷</button>
                                     </>
                                 ) : (
                                     <div className="flex w-full gap-1">
                                         <button
                                             onClick={() => setScanningDoc(doc)}
-                                            className="flex-1 py-2 bg-blue-50 text-blue-600 text-[9px] font-black rounded-xl hover:bg-blue-100 transition-colors flex items-center justify-center gap-1"
+                                            className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-blue-50 py-2 text-[9px] font-black text-blue-700 transition-colors hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:bg-blue-900/50"
                                         >
                                             📷 촬영
                                         </button>
@@ -162,7 +162,7 @@ export default function MyDocuments({ user }: any) {
                                                 setUploadingDocId(doc.id);
                                                 fileInputRef.current?.click();
                                             }}
-                                            className="flex-1 py-2 bg-slate-50 text-slate-500 text-[9px] font-black rounded-xl hover:bg-slate-100 transition-colors flex items-center justify-center gap-1"
+                                            className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-[var(--toss-gray-1)] py-2 text-[9px] font-black text-[var(--foreground)] transition-colors hover:bg-[var(--toss-gray-2)]"
                                         >
                                             📁 파일
                                         </button>

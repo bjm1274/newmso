@@ -121,9 +121,6 @@ export default function AnnualLeaveExpiryAlert({ staffs, selectedCo }: Props) {
     <div className="mx-auto max-w-4xl space-y-5 p-4 md:p-6" data-testid="attendance-analysis-leave-expiry">
       <div>
         <h2 className="text-lg font-bold text-[var(--foreground)]">연차 소멸 예정 알림</h2>
-        <p className="mt-1 text-xs text-[var(--toss-gray-3)]">
-          소멸이 임박한 연차를 확인하고 직원에게 바로 알림을 보냅니다.
-        </p>
       </div>
 
       <div className="flex flex-wrap gap-2">

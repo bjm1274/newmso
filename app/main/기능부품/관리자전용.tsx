@@ -155,14 +155,14 @@ function InnerTabBar({
 }) {
   return (
     <div
-      className="mb-6 rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4 shadow-sm"
+      className="mb-4 rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-3 shadow-sm"
       data-testid={testIdPrefix ? `${testIdPrefix}-bar` : undefined}
     >
-      <div className="mb-3">
+      <div className="mb-2">
         <h3 className="text-sm font-bold text-[var(--foreground)]">{title}</h3>
         {description ? <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{description}</p> : null}
       </div>
-      <div className="no-scrollbar flex gap-2 overflow-x-auto">
+      <div className="no-scrollbar flex gap-1.5 overflow-x-auto">
         {tabs.map((tab, index) => (
           <button
             key={tab.id}
@@ -234,7 +234,7 @@ export default function AdminView({ user, staffs = [], onRefresh, initialTab }: 
       className="relative flex min-h-0 flex-1 flex-col bg-[var(--page-bg)] animate-in fade-in duration-500"
       data-testid="admin-view"
     >
-      <main className="custom-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto bg-[var(--toss-gray-1)]/30 p-4 pb-24 md:p-10">
+      <main className="custom-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto bg-[var(--toss-gray-1)]/30 p-3 pb-20 md:p-6">
         {activeTab === '경영분석' && (
           <>
             <InnerTabBar

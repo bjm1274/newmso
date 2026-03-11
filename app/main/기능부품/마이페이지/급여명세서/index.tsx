@@ -32,13 +32,21 @@ export default function SalarySlipContainer({ user }: any) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           password: pwd,
+          userId: user?.id,
           name: user?.name,
           employeeNo: user?.employee_no,
         }),
       });
       const payload = await response.json().catch(() => null);
 
-      if (!response.ok || !payload?.verified) {
+      if (!response.ok) {
+        setVerifyError(payload?.error || '본인 확인 중 오류가 발생했습니다.');
+        setPasswordInput('');
+        setVerifying(false);
+        return;
+      }
+
+      if (!payload?.verified) {
         setVerifyError('비밀번호가 일치하지 않습니다.');
         setPasswordInput('');
         setVerifying(false);
@@ -59,16 +67,17 @@ export default function SalarySlipContainer({ user }: any) {
     setCurrentDate(newDate);
   };
 
+  const selectedYearMonth = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+
   useEffect(() => {
     if (!user?.id) return;
 
     const fetchSalaryRecord = async () => {
-      const yearMonth = currentDate.toISOString().slice(0, 7);
       const { data, error } = await supabase
         .from('payroll_records')
         .select('*')
         .eq('staff_id', user.id)
-        .eq('year_month', yearMonth)
+        .eq('year_month', selectedYearMonth)
         .maybeSingle();
 
       if (error) {
@@ -80,7 +89,7 @@ export default function SalarySlipContainer({ user }: any) {
     };
 
     fetchSalaryRecord();
-  }, [currentDate, user?.id]);
+  }, [selectedYearMonth, user?.id]);
 
   const handlePrint = () => { window.print(); };
 
@@ -159,7 +168,7 @@ export default function SalarySlipContainer({ user }: any) {
               <button type="button" onClick={() => changeMonth(-1)} className="w-10 h-10 rounded-full bg-[var(--toss-card)] border border-[var(--toss-border)] hover:bg-[var(--toss-gray-2)] flex items-center justify-center shadow-sm">◀</button>
               <button type="button" onClick={() => changeMonth(1)} className="w-10 h-10 rounded-full bg-[var(--toss-card)] border border-[var(--toss-border)] hover:bg-[var(--toss-gray-2)] flex items-center justify-center shadow-sm">▶</button>
             </div>
-            <h3 className="text-lg sm:text-xl font-semibold text-[var(--foreground)]">{currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월 내역</h3>
+            <h3 className="text-lg sm:text-xl font-semibold text-[var(--foreground)]">{currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월</h3>
           </div>
           <button type="button" onClick={handlePrint} className="px-6 py-3 sm:px-8 sm:py-4 bg-[var(--foreground)] text-white text-sm font-semibold rounded-[16px] hover:opacity-95 transition-all flex items-center gap-2 shadow-lg">
             🖨️ A4 한 장에 맞춰 인쇄
@@ -171,6 +180,7 @@ export default function SalarySlipContainer({ user }: any) {
             <SalaryDetail
               staff={user}
               record={salaryData}
+              displayYearMonth={selectedYearMonth}
             />
           </div>
         </div>
