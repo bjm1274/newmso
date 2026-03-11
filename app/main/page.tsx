@@ -5,7 +5,15 @@ import { supabase } from '@/lib/supabase';
 import { withMissingColumnFallback } from '@/lib/supabase-compat';
 import { persistSupabaseAccessToken } from '@/lib/supabase-bridge';
 import { setSelectedCompanyId as persistSelectedCompanyId, getSelectedCompanyId } from '@/lib/useCompany';
-import { hasUserPayloadChanged } from '@/lib/access-control';
+import { normalizeProfileUser } from '@/lib/profile-photo';
+import {
+  canAccessApprovalSection,
+  canAccessBoard,
+  canAccessInventorySection,
+  canAccessMainMenu,
+  hasUserPayloadChanged,
+  normalizeMainMenuForUser,
+} from '@/lib/access-control';
 import { isNamedSystemMasterAccount } from '@/lib/system-master';
 
 import Sidebar, { SUB_MENUS } from './기능부품/조직도서브/조직도측면창';
@@ -21,6 +29,44 @@ type ERPData = {
   surgeries: any[];
   mris: any[];
 };
+
+const ADMIN_SUBMENU_PERMISSION_KEYS: Record<string, string> = {
+  경영분석: 'admin_경영분석',
+  감사센터: 'admin_감사센터',
+  시스템마스터센터: 'admin_시스템마스터센터',
+  엑셀등록: 'admin_엑셀등록',
+  알림자동화: 'admin_알림자동화',
+  회사관리: 'admin_회사관리',
+  직원권한: 'admin_직원권한',
+  수술검사템플릿: 'admin_수술검사템플릿',
+  팝업관리: 'admin_팝업관리',
+  데이터백업: 'admin_데이터백업',
+  데이터초기화: 'admin_데이터초기화',
+  문서양식: 'admin_문서양식',
+  급여이상치: 'admin_급여이상치',
+  공문서대장: 'admin_공문서대장',
+};
+
+function canAccessAdminSubMenu(user: any, subMenuId: string) {
+  const permissions = user?.permissions || {};
+  if (
+    user?.company === 'SY INC.' ||
+    user?.role === 'admin' ||
+    permissions.mso === true ||
+    permissions.admin === true
+  ) {
+    return true;
+  }
+
+  if (!canAccessMainMenu(user, '관리자')) {
+    return false;
+  }
+
+  const permissionKey = ADMIN_SUBMENU_PERMISSION_KEYS[subMenuId];
+  if (!permissionKey) return false;
+
+  return permissions[permissionKey] === true;
+}
 
 function MainPageFallback() {
   return (
@@ -125,6 +171,10 @@ function MainPageContent() {
           : { menuId: '인사관리', subViewId: '구성원' };
       }
 
+      if (menuId === '관리자' && subViewId === '조직도') {
+        return { menuId: '관리자', subViewId: '회사관리' };
+      }
+
       return { menuId, subViewId };
     },
     [],
@@ -153,6 +203,19 @@ function MainPageContent() {
 
     const bootstrap = async () => {
       try {
+        const navigationQuery =
+          typeof window !== 'undefined'
+            ? (() => {
+                const params = new URLSearchParams(window.location.search);
+                return {
+                  openChatRoom: params.get('open_chat_room')?.trim() || null,
+                  openMessage: params.get('open_msg')?.trim() || null,
+                  openMenu: params.get('open_menu')?.trim() || null,
+                  openPost: params.get('open_post')?.trim() || null,
+                };
+              })()
+            : null;
+
         const response = await fetch('/api/auth/session', {
           method: 'GET',
           cache: 'no-store',
@@ -165,7 +228,7 @@ function MainPageContent() {
         }
 
         const payload = await response.json();
-        const sessionUser = payload?.user;
+        const sessionUser = normalizeProfileUser(payload?.user);
         if (!sessionUser) {
           await clearClientSession();
           router.replace('/');
@@ -184,13 +247,38 @@ function MainPageContent() {
           // ignore
         }
 
+        const savedCo = localStorage.getItem('erp_last_co');
         const savedMenu = localStorage.getItem('erp_last_menu');
         const savedSubView = localStorage.getItem('erp_last_subview');
-        const savedCo = localStorage.getItem('erp_last_co');
-        const normalizedNavigation = resolveLegacyNavigation(savedMenu, savedSubView, sessionUser);
+        const shouldRestoreMenu = !(
+          navigationQuery?.openChatRoom ||
+          navigationQuery?.openMessage ||
+          navigationQuery?.openMenu ||
+          navigationQuery?.openPost
+        );
+        const shouldRestoreSubView = !(
+          navigationQuery?.openChatRoom ||
+          navigationQuery?.openMessage ||
+          navigationQuery?.openPost
+        );
 
-        if (normalizedNavigation.menuId && !ignore) setMainMenu(normalizedNavigation.menuId);
-        if (normalizedNavigation.subViewId && !ignore) setSubView(normalizedNavigation.subViewId);
+        if (shouldRestoreMenu) {
+          const normalizedNavigation = resolveLegacyNavigation(savedMenu, savedSubView, sessionUser);
+          const restoredMenu = normalizeMainMenuForUser(sessionUser, normalizedNavigation.menuId);
+
+          if (!ignore) {
+            setMainMenu(restoredMenu);
+            if (
+              shouldRestoreSubView &&
+              normalizedNavigation.subViewId &&
+              restoredMenu === normalizedNavigation.menuId
+            ) {
+              setSubView(normalizedNavigation.subViewId);
+            }
+          }
+        } else if (!ignore && shouldRestoreSubView && savedSubView) {
+          setSubView(savedSubView);
+        }
 
         if (sessionUser.company !== 'SY INC.' && !sessionUser.permissions?.mso) {
           if (!ignore) setSelectedCo(sessionUser.company);
@@ -241,12 +329,18 @@ function MainPageContent() {
   useEffect(() => {
     if (!user) return;
     const normalizedNavigation = resolveLegacyNavigation(mainMenu, subView, user);
+    const normalizedMenu = normalizeMainMenuForUser(user, normalizedNavigation.menuId || mainMenu);
 
-    if (normalizedNavigation.menuId && normalizedNavigation.menuId !== mainMenu) {
-      setMainMenu(normalizedNavigation.menuId);
+    if (normalizedMenu !== mainMenu) {
+      setMainMenu(normalizedMenu);
+      return;
     }
 
-    if (normalizedNavigation.subViewId && normalizedNavigation.subViewId !== subView) {
+    if (
+      normalizedNavigation.subViewId &&
+      normalizedNavigation.menuId === normalizedMenu &&
+      normalizedNavigation.subViewId !== subView
+    ) {
       setSubView(normalizedNavigation.subViewId);
     }
   }, [mainMenu, resolveLegacyNavigation, subView, user]);
@@ -443,6 +537,10 @@ function MainPageContent() {
         }
       );
 
+      const normalizedStaffData = Array.isArray(staffData)
+        ? staffData.map((staff: any) => normalizeProfileUser(staff))
+        : [];
+
       const { data: postData } = await withMissingColumnFallback(
         async () => {
           let postQuery = supabase.from('board_posts').select('*').order('created_at', { ascending: false });
@@ -463,26 +561,27 @@ function MainPageContent() {
       );
 
       // 현재 사용자의 변경된 정보(팀/부서 등)가 있으면 세션 동기화
-      if (staffData && u?.id) {
-        const updatedSelf = staffData.find((s: any) => s.id === u.id);
+      if (normalizedStaffData.length > 0 && u?.id) {
+        const updatedSelf = normalizedStaffData.find((s: any) => s.id === u.id);
         if (updatedSelf) {
           const safeSelf = { ...updatedSelf };
           delete safeSelf.password;
           delete safeSelf.passwd;
-          if (hasUserPayloadChanged(u, safeSelf)) {
-            setUser(safeSelf);
-            localStorage.setItem('erp_user', JSON.stringify(safeSelf));
-            localStorage.setItem('user_session', JSON.stringify(safeSelf));
+          const normalizedSelf = normalizeProfileUser(safeSelf);
+          if (hasUserPayloadChanged(u, normalizedSelf)) {
+            setUser(normalizedSelf);
+            localStorage.setItem('erp_user', JSON.stringify(normalizedSelf));
+            localStorage.setItem('user_session', JSON.stringify(normalizedSelf));
           }
         }
       }
 
-      const uniqueDepts = Array.from(new Set((staffData || []).map((s: any) => s.department)))
+      const uniqueDepts = Array.from(new Set(normalizedStaffData.map((s: any) => String(s.department || '').trim())))
         .filter(Boolean)
-        .map(d => ({ name: d }));
+        .map((name) => ({ id: name, name }));
 
       setData({
-        staffs: staffData || [],
+        staffs: normalizedStaffData,
         depts: uniqueDepts || [],
         posts: postData || [],
         tasks: [],
@@ -499,7 +598,26 @@ function MainPageContent() {
   // 현재 메인 메뉴에 해당하는 서브메뉴 목록
   const isSystemMaster = isNamedSystemMasterAccount(user);
   const currentSubMenus = (mainMenu === '인사관리' ? [] : (SUB_MENUS[mainMenu] || []))
-    .filter((subMenu) => subMenu.id !== '시스템마스터센터' || isSystemMaster);
+    .filter((subMenu) => {
+      if (mainMenu === '게시판') {
+        return canAccessBoard(user, subMenu.id, 'read');
+      }
+
+      if (mainMenu === '전자결재') {
+        return canAccessApprovalSection(user, subMenu.id);
+      }
+
+      if (mainMenu === '재고관리') {
+        return canAccessInventorySection(user, subMenu.id);
+      }
+
+      if (mainMenu === '관리자') {
+        if (subMenu.id === '시스템마스터센터' && !isSystemMaster) return false;
+        return canAccessAdminSubMenu(user, subMenu.id);
+      }
+
+      return true;
+    });
   const subgroupLabels: Record<string, string> = {
     '재고 대시보드': '📊 재고 대시보드',
     '입출고 운영': '📦 입출고 운영',
@@ -520,10 +638,23 @@ function MainPageContent() {
   // 메인 메뉴가 바뀌었는데 현재 subView가 해당 메뉴의 서브메뉴에 없다면, 첫 번째 서브메뉴로 보정
   useEffect(() => {
     if (!currentSubMenus.length) return;
+    const normalizedNavigation = resolveLegacyNavigation(mainMenu, subView, user);
+    const preferredSubView =
+      normalizedNavigation.menuId === mainMenu
+        ? normalizedNavigation.subViewId
+        : subView;
+
+    if (preferredSubView && currentSubMenus.some((s) => s.id === preferredSubView)) {
+      if (preferredSubView !== subView) {
+        setSubView(preferredSubView);
+      }
+      return;
+    }
+
     if (!currentSubMenus.some((s) => s.id === subView)) {
       setSubView(currentSubMenus[0].id);
     }
-  }, [mainMenu]);
+  }, [currentSubMenus, mainMenu, resolveLegacyNavigation, subView, user]);
 
   // user 없으면 로그인 페이지로 리다이렉트 (초기 로드 시)
   if (!user) {

@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { canAccessApprovalSection } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
 import { isMissingColumnError, withMissingColumnFallback } from '@/lib/supabase-compat';
 import AttendanceForms from './전자결재서브/근태신청양식';
@@ -16,7 +17,7 @@ const LOCAL_APPROVAL_FORM_TYPES_KEY = 'erp_approval_form_types_custom';
 const APPROVAL_OPTIONAL_INSERT_COLUMNS = ['company_id', 'approver_line', 'doc_number'];
 const ALL_DOCUMENT_FILTER = '전체 문서';
 
-const APPROVAL_VIEWS = ['기안함', '결재함', '작성하기'];
+const APPROVAL_VIEWS = ['기안함', '결재함', '작성하기'] as const;
 const SYSTEM_FORM_TYPE_SLUGS = new Set(['leave', 'overtime', 'purchase', 'attendance_fix', 'generic', 'personnel_order']);
 
 function toLocalDateKey(value: string | number | Date | null | undefined) {
@@ -69,7 +70,13 @@ function sanitizeCustomFormTypes(
 }
 
 export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, selectedCompanyId, onRefresh, initialView, onViewChange, initialComposeRequest, onConsumeComposeRequest }: any) {
-  const [viewMode, setViewMode] = useState(initialView && APPROVAL_VIEWS.includes(initialView) ? initialView : '기안함');
+  const defaultApprovalView =
+    APPROVAL_VIEWS.find((view) => canAccessApprovalSection(user, view)) || '기안함';
+  const [viewMode, setViewMode] = useState(
+    initialView && APPROVAL_VIEWS.includes(initialView as (typeof APPROVAL_VIEWS)[number]) && canAccessApprovalSection(user, initialView)
+      ? initialView
+      : defaultApprovalView
+  );
   const [approvals, setApprovals] = useState<any[]>([]);
   const [formType, setFormType] = useState('연차/휴가');
   const [formTitle, setFormTitle] = useState('');
@@ -100,6 +107,23 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const autoSaveMsgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fetchApprovalsRef = useRef<() => void>(() => {});
   const isMso = user?.company === 'SY INC.' || user?.permissions?.mso === true;
+  const visibleApprovalViews = useMemo(
+    () => APPROVAL_VIEWS.filter((view) => canAccessApprovalSection(user, view)),
+    [user]
+  );
+  const resolveAccessibleView = useCallback(
+    (requestedView?: string | null) => {
+      if (
+        requestedView &&
+        APPROVAL_VIEWS.includes(requestedView as (typeof APPROVAL_VIEWS)[number]) &&
+        visibleApprovalViews.includes(requestedView as (typeof APPROVAL_VIEWS)[number])
+      ) {
+        return requestedView;
+      }
+      return visibleApprovalViews[0] || null;
+    },
+    [visibleApprovalViews]
+  );
 
   const BUILTIN_FORM_TYPES = useMemo(
     () => ['연차/휴가', '연차계획서', '연장근무', '물품신청', '수리요청서', '업무기안', '업무협조', '양식신청', '출결정정'],
@@ -203,6 +227,14 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       { name: '?묒떇?좎껌', slug: 'generic' }
     ];
 
+    const normalizedFallbackTypes = [
+      { name: '연차/휴가', slug: 'leave' },
+      { name: '연장근무', slug: 'overtime' },
+      { name: '비품구매', slug: 'purchase' },
+      { name: '출결정정', slug: 'attendance_fix' },
+      { name: '양식신청', slug: 'generic' }
+    ];
+
     if (typeof window !== 'undefined') {
       try {
         const stored = window.localStorage.getItem(LOCAL_APPROVAL_FORM_TYPES_KEY);
@@ -213,9 +245,9 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
               .map((row: any) => ({ name: row.name, slug: row.slug }))
               .filter((row: any) => row.name && row.slug)
           : [];
-        setCustomFormTypes(activeCustomTypes.length ? activeCustomTypes : fallbackTypes);
+        setCustomFormTypes(activeCustomTypes.length ? activeCustomTypes : normalizedFallbackTypes);
       } catch {
-        setCustomFormTypes(fallbackTypes);
+        setCustomFormTypes(normalizedFallbackTypes);
       }
       return;
     }
@@ -258,25 +290,41 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
 
   // initialView 또는 로컬스토리지에서 탭 복구
   useEffect(() => {
-    if (initialView && APPROVAL_VIEWS.includes(initialView)) {
-      setViewMode(initialView);
-      try { window.localStorage.setItem(APPROVAL_VIEW_KEY, initialView); } catch { /* ignore */ }
+    const nextView = resolveAccessibleView(initialView);
+    if (nextView) {
+      setViewMode(nextView);
+      try { window.localStorage.setItem(APPROVAL_VIEW_KEY, nextView); } catch { /* ignore */ }
       return;
     }
     if (typeof window === 'undefined') return;
     try {
       const saved = window.localStorage.getItem(APPROVAL_VIEW_KEY);
-      if (saved && APPROVAL_VIEWS.includes(saved)) setViewMode(saved);
+      const restored = resolveAccessibleView(saved);
+      if (restored) setViewMode(restored);
     } catch { /* ignore */ }
-  }, [initialView]);
+  }, [initialView, resolveAccessibleView]);
+
+  useEffect(() => {
+    const normalizedView = resolveAccessibleView(viewMode);
+    if (!normalizedView || normalizedView === viewMode) return;
+    setViewMode(normalizedView);
+    if (typeof onViewChange === 'function') onViewChange(normalizedView);
+  }, [onViewChange, resolveAccessibleView, viewMode]);
 
   useEffect(() => {
     if (!initialComposeRequest) return;
 
-    const nextView = typeof initialComposeRequest?.viewMode === 'string' && initialComposeRequest.viewMode.trim()
-      ? initialComposeRequest.viewMode
-      : '작성하기';
+    const requestedView =
+      typeof initialComposeRequest?.viewMode === 'string' && initialComposeRequest.viewMode.trim()
+        ? initialComposeRequest.viewMode
+        : '작성하기';
+    const nextView = resolveAccessibleView(requestedView);
     const nextFormType = normalizeComposeFormType(initialComposeRequest?.formType || initialComposeRequest?.type);
+
+    if (!nextView) {
+      onConsumeComposeRequest?.();
+      return;
+    }
 
     setViewMode(nextView);
     setFormType(nextFormType);
@@ -299,7 +347,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     }
 
     onConsumeComposeRequest?.();
-  }, [initialComposeRequest, onConsumeComposeRequest]);
+  }, [initialComposeRequest, onConsumeComposeRequest, resolveAccessibleView]);
 
   const fetchApprovals = useCallback(async () => {
     const scopedCompanyId = !isMso ? user?.company_id : selectedCompanyId;
@@ -738,8 +786,11 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     }
     clearDraftFromStorage();
     alert("상신 완료!");
-    setViewMode('기안함');
-    if (typeof onViewChange === 'function') onViewChange('기안함');
+    const nextView = resolveAccessibleView('기안함');
+    if (nextView) {
+      setViewMode(nextView);
+      if (typeof onViewChange === 'function') onViewChange(nextView);
+    }
     fetchApprovals();
     if (onRefresh) onRefresh();
   };
@@ -819,6 +870,21 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       setApprovalDocumentFilter(ALL_DOCUMENT_FILTER);
     }
   }, [approvalDocumentFilter, documentTypeOptions]);
+
+  if (visibleApprovalViews.length === 0) {
+    return (
+      <div
+        className="flex h-full flex-col items-center justify-center bg-[var(--toss-gray-1)] p-6 text-center"
+        data-testid="approval-view"
+      >
+        <div className="mb-4 text-6xl">🔒</div>
+        <h2 className="text-xl font-bold text-[var(--foreground)]">전자결재 접근 권한이 없습니다.</h2>
+        <p className="mt-2 text-sm font-semibold text-[var(--toss-gray-3)]">
+          메인 메뉴 권한과 전자결재 세부 권한을 확인해 주세요.
+        </p>
+      </div>
+    );
+  }
 
   const toggleSelectAll = () => {
     if (allBulkSelected) {
@@ -1258,7 +1324,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       )}
 
       {/* 모바일 전용 기안 작성 FAB (작성하기 아닐 때만 노출) */}
-      {viewMode !== '작성하기' && (
+      {viewMode !== '작성하기' && canAccessApprovalSection(user, '작성하기') && (
         <button
           onClick={() => {
             setViewMode('작성하기');

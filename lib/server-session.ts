@@ -1,3 +1,5 @@
+import { normalizeProfileUser } from './profile-photo';
+
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
@@ -14,9 +16,12 @@ export type SessionUser = Record<string, unknown> & {
   company_id?: string | null;
   position?: string | null;
   photo_url?: string | null;
+  avatar_url?: string | null;
+  profile_photo_path?: string | null;
+  profile_photo_updated_at?: string | null;
   email?: string | null;
   phone?: string | null;
-  permissions: Record<string, boolean>;
+  permissions: Record<string, any>;
 };
 
 export type SessionPayload = {
@@ -121,23 +126,28 @@ export function normalizeSessionUser(input: any): SessionUser {
   const rest = { ...(input || {}) };
   delete rest.password;
   delete rest.passwd;
+  const normalizedProfile = normalizeProfileUser(rest) as Record<string, any>;
   return {
-    ...rest,
-    id: rest?.id ?? null,
-    employee_no: rest?.employee_no ?? null,
-    name: rest?.name ?? '',
-    role: rest?.role ?? null,
-    department: rest?.department ?? null,
-    company: rest?.company ?? null,
-    company_id: rest?.company_id ?? null,
-    position: rest?.position ?? null,
-    photo_url: rest?.photo_url ?? null,
-    avatar_url: rest?.avatar_url ?? null,
-    email: rest?.email ?? null,
-    phone: rest?.phone ?? null,
+    ...normalizedProfile,
+    id: normalizedProfile?.id ?? null,
+    employee_no: normalizedProfile?.employee_no ?? null,
+    name: normalizedProfile?.name ?? '',
+    role: normalizedProfile?.role ?? null,
+    department: normalizedProfile?.department ?? null,
+    company: normalizedProfile?.company ?? null,
+    company_id: normalizedProfile?.company_id ?? null,
+    position: normalizedProfile?.position ?? null,
+    photo_url: normalizedProfile?.photo_url ?? null,
+    avatar_url: normalizedProfile?.avatar_url ?? null,
+    profile_photo_path: normalizedProfile?.profile_photo_path ?? null,
+    profile_photo_updated_at: normalizedProfile?.profile_photo_updated_at ?? null,
+    email: normalizedProfile?.email ?? null,
+    phone: normalizedProfile?.phone ?? null,
     permissions:
-      rest?.permissions && typeof rest.permissions === 'object' && !Array.isArray(rest.permissions)
-        ? rest.permissions
+      normalizedProfile?.permissions &&
+      typeof normalizedProfile.permissions === 'object' &&
+      !Array.isArray(normalizedProfile.permissions)
+        ? normalizedProfile.permissions
         : {},
   };
 }

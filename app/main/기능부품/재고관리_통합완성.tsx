@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { canAccessInventorySection } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnFallback } from '@/lib/supabase-compat';
 import UDIManagement from './재고관리서브/UDI관리';
@@ -91,7 +92,11 @@ export default function IntegratedInventoryManagement({
   onViewChange,
 }: any) {
   const initialResolvedView = resolveInventoryView(initialView);
-  const [activeView, setActiveView] = useState(initialResolvedView.view);
+  const defaultInventoryView =
+    INVENTORY_VIEWS.find((view) => canAccessInventorySection(user, view)) || '현황';
+  const [activeView, setActiveView] = useState(
+    canAccessInventorySection(user, initialResolvedView.view) ? initialResolvedView.view : defaultInventoryView
+  );
   const [viewCompany, setViewCompany] = useState<string>('전체'); // 현황 탭용 회사 선택
   const [selectedDept, setSelectedDept] = useState('전체');
   const [inventory, setInventory] = useState<any[]>([]);
@@ -108,6 +113,11 @@ export default function IntegratedInventoryManagement({
 
   const { lowStockItems, expiryImminentItems } = useInventoryAlertSystem(inventory, user);
   const isMsoUser = user?.company === 'SY INC.' || user?.permissions?.mso === true;
+  const availableInventoryViews = useMemo(
+    () => INVENTORY_VIEWS.filter((view) => canAccessInventorySection(user, view)),
+    [user]
+  );
+  const fallbackInventoryView = availableInventoryViews[0] || null;
 
   const fetchLogs = useCallback(async () => {
     try {
@@ -343,13 +353,23 @@ export default function IntegratedInventoryManagement({
         : window.localStorage.getItem(INV_VIEW_KEY);
 
     if (!requestedView || !(VALID_VIEWS as readonly string[]).includes(requestedView)) return;
+    if (!canAccessInventorySection(user, requestedView) && !fallbackInventoryView) return;
 
-    const resolved = resolveInventoryView(requestedView);
-    applyResolvedView(requestedView);
+    const nextView = canAccessInventorySection(user, requestedView) ? requestedView : fallbackInventoryView;
+    if (!nextView) return;
+
+    const resolved = resolveInventoryView(nextView);
+    applyResolvedView(nextView);
     try {
       window.localStorage.setItem(INV_VIEW_KEY, resolved.view);
     } catch { /* ignore */ }
-  }, [applyResolvedView, initialView]);
+  }, [applyResolvedView, fallbackInventoryView, initialView, user]);
+
+  useEffect(() => {
+    if (!fallbackInventoryView) return;
+    if (canAccessInventorySection(user, activeView)) return;
+    applyResolvedView(fallbackInventoryView);
+  }, [activeView, applyResolvedView, fallbackInventoryView, user]);
 
   useEffect(() => {
     if (activeView === '이력' || activeView === '현황') {
@@ -394,6 +414,7 @@ export default function IntegratedInventoryManagement({
   const openInventoryView = useCallback(
     (view: string, nextRegistrationMode?: 'form' | 'excel' | 'auto_extract') => {
       if (!(VALID_VIEWS as readonly string[]).includes(view)) return;
+      if (!canAccessInventorySection(user, view)) return;
       const resolved = resolveInventoryView(view);
       applyResolvedView(view);
       if (resolved.view === '등록' && nextRegistrationMode) {
@@ -402,7 +423,7 @@ export default function IntegratedInventoryManagement({
         setRegistrationMode('form');
       }
     },
-    [applyResolvedView],
+    [applyResolvedView, user],
   );
 
   const handleStockUpdate = async (item: any, type: 'in' | 'out', amount: number, targetCompany: string, targetDept: string) => {
@@ -444,6 +465,21 @@ export default function IntegratedInventoryManagement({
       console.error('입출고 처리 실패:', err);
     }
   };
+
+  if (!fallbackInventoryView) {
+    return (
+      <div
+        className="flex h-full flex-col items-center justify-center bg-[var(--toss-gray-1)] p-6 text-center"
+        data-testid="inventory-view"
+      >
+        <div className="mb-4 text-6xl">🔒</div>
+        <h2 className="text-xl font-bold text-[var(--foreground)]">재고관리 접근 권한이 없습니다.</h2>
+        <p className="mt-2 text-sm font-semibold text-[var(--toss-gray-3)]">
+          메인 메뉴 권한과 재고관리 세부 권한을 확인해 주세요.
+        </p>
+      </div>
+    );
+  }
 
   const handleAutoApprovalRequest = async (item: any) => {
     const quantity = getItemQuantity(item);
@@ -987,4 +1023,3 @@ export default function IntegratedInventoryManagement({
     </div>
   );
 }
-

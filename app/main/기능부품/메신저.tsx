@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
+import { useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import SmartDatePicker from './공통/SmartDatePicker';
 
@@ -35,6 +35,13 @@ function isVideoUrl(url: string): boolean {
 
 function normalizeMemberIds(members: any): string[] {
   return Array.isArray(members) ? members.map((id: any) => String(id)) : [];
+}
+
+function getDirectRoomMembersKey(room: any): string | null {
+  if (room?.type !== 'direct') return null;
+  const members = normalizeMemberIds(room?.members);
+  if (members.length !== 2) return null;
+  return [...members].sort().join('::');
 }
 
 type RoomPreference = {
@@ -154,6 +161,7 @@ function sortRoomsForSidebar(rooms: any[], prefs: Record<string, RoomPreference>
 export default function ChatView({ user, onRefresh, staffs = [], initialOpenChatRoomId, initialOpenMessageId, onConsumeOpenChatRoomId }: any) {
   const [messages, setMessages] = useState<any[]>([]);
   const pendingScrollMsgIdRef = useRef<string | null>(null);
+  const pendingBottomAlignRoomIdRef = useRef<string | null>(null);
   const [omniSearch, setOmniSearch] = useState('');
   const [chatSearch, setChatSearch] = useState('');
   const [inputMsg, setInputMsg] = useState('');
@@ -372,8 +380,81 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     }
     return String(user?.id || '').trim();
   }, [currentStaffProfile?.id, user?.id]);
+  const effectiveChatUserId = useMemo(() => {
+    const currentStaffId = String(currentStaffProfile?.id || '').trim();
+    if (currentStaffId) {
+      return currentStaffId;
+    }
+    return String(user?.id || '').trim();
+  }, [currentStaffProfile?.id, user?.id]);
+
+  const repairDirectRooms = useCallback(async (rooms: any[]) => {
+    const sourceRooms = Array.isArray(rooms) ? rooms : [];
+    const orphanRooms = sourceRooms.filter((room: any) =>
+      room?.type === 'direct' && (!Array.isArray(room.members) || room.members.length === 0)
+    );
+    if (orphanRooms.length === 0) {
+      return sourceRooms;
+    }
+
+    try {
+      const orphanRoomIds = orphanRooms
+        .map((room: any) => String(room?.id || '').trim())
+        .filter(Boolean);
+      if (orphanRoomIds.length === 0) {
+        return sourceRooms;
+      }
+
+      const { data: roomMessages, error } = await supabase
+        .from('messages')
+        .select('room_id, sender_id, created_at')
+        .in('room_id', orphanRoomIds)
+        .not('sender_id', 'is', null)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+
+      const senderIdsByRoom = new Map<string, Set<string>>();
+      (roomMessages || []).forEach((message: any) => {
+        const roomId = String(message?.room_id || '').trim();
+        const senderId = String(message?.sender_id || '').trim();
+        if (!roomId || !senderId || senderId === 'null' || senderId === 'undefined') return;
+        const senders = senderIdsByRoom.get(roomId) || new Set<string>();
+        senders.add(senderId);
+        senderIdsByRoom.set(roomId, senders);
+      });
+
+      const repairedRooms = [...sourceRooms];
+      for (const room of orphanRooms) {
+        const roomId = String(room?.id || '').trim();
+        const inferredMembers = Array.from(senderIdsByRoom.get(roomId) || []);
+        if (inferredMembers.length !== 2) continue;
+
+        const { error: updateError } = await supabase
+          .from('chat_rooms')
+          .update({ members: inferredMembers })
+          .eq('id', roomId);
+        if (updateError) throw updateError;
+
+        const roomIndex = repairedRooms.findIndex((candidate: any) => String(candidate?.id) === roomId);
+        if (roomIndex >= 0) {
+          repairedRooms[roomIndex] = {
+            ...repairedRooms[roomIndex],
+            members: inferredMembers,
+          };
+        }
+      }
+
+      return repairedRooms;
+    } catch (error) {
+      console.error('repairDirectRooms failed', error);
+      return sourceRooms;
+    }
+  }, []);
 
   const setRoom = (roomId: string | null) => {
+    pendingBottomAlignRoomIdRef.current = roomId;
+    isNearBottomRef.current = true;
+    setShowScrollToLatest(false);
     setSelectedRoomId(roomId);
     if (typeof window === 'undefined') return;
     try {
@@ -409,10 +490,21 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
     const listEl = messageListRef.current;
     if (listEl) {
-      listEl.scrollTo({ top: listEl.scrollHeight, behavior });
+      if (behavior === 'auto') {
+        listEl.scrollTop = listEl.scrollHeight;
+      } else {
+        listEl.scrollTo({ top: listEl.scrollHeight, behavior });
+      }
     } else {
       scrollRef.current?.scrollIntoView({ behavior, block: 'end' });
     }
+    requestAnimationFrame(() => {
+      composerRef.current?.scrollIntoView({
+        behavior,
+        block: 'end',
+        inline: 'nearest',
+      });
+    });
     isNearBottomRef.current = true;
     setShowScrollToLatest(false);
   }, []);
@@ -580,7 +672,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         const myRooms = rooms.filter((r: any) => {
           if (r.id === NOTICE_ROOM_ID) return true;
           if (Array.isArray(r.members)) {
-            return r.members.some((id: any) => String(id) === String(user.id));
+            return r.members.some((id: any) => String(id) === effectiveChatUserId);
           }
           return false;
         });
@@ -604,7 +696,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             .from('messages')
             .select('id', { count: 'exact', head: true })
             .eq('room_id', roomId)
-            .neq('sender_id', user.id)
+            .neq('sender_id', effectiveChatUserId)
             .eq('is_deleted', false);
           if (last) query = query.gt('created_at', last);
           const { count } = await query;
@@ -615,8 +707,16 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         console.error('채팅방별 안읽은 메시지 계산 실패:', e);
       }
     },
-    [user?.id]
+    [effectiveChatUserId, user?.id]
   );
+
+  const syncChatRoomsState = useCallback(async (rooms: any[]) => {
+    const repairedRooms = await repairDirectRooms(rooms);
+    const list = sortChatRoomsWithNoticeFirst(repairedRooms || []);
+    setChatRooms(list);
+    await updateUnreadForRooms(list);
+    return list;
+  }, [repairDirectRooms, updateUnreadForRooms]);
 
   useEffect(() => {
     chatRoomsRef.current = chatRooms;
@@ -631,11 +731,20 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     try {
       const saved = window.localStorage.getItem(CHAT_ROOM_KEY);
       if (saved && saved !== 'null' && saved !== 'undefined') {
+        pendingBottomAlignRoomIdRef.current = saved;
+        isNearBottomRef.current = true;
+        setShowScrollToLatest(false);
         setSelectedRoomId(saved);
       } else {
+        pendingBottomAlignRoomIdRef.current = NOTICE_ROOM_ID;
+        isNearBottomRef.current = true;
+        setShowScrollToLatest(false);
         setSelectedRoomId(NOTICE_ROOM_ID);
       }
     } catch {
+      pendingBottomAlignRoomIdRef.current = NOTICE_ROOM_ID;
+      isNearBottomRef.current = true;
+      setShowScrollToLatest(false);
       setSelectedRoomId(NOTICE_ROOM_ID);
     }
   }, []);
@@ -664,10 +773,36 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
   const fetchData = useCallback(async () => {
     if (!selectedRoomId) return;
+    const { data: roomRows } = await supabase.from('chat_rooms').select('*');
+    const repairedRooms = await repairDirectRooms(roomRows || []);
+    const selectedRoomRecord =
+      repairedRooms.find((room: any) => String(room.id) === String(selectedRoomId)) || null;
+    const selectedRoomKey = getDirectRoomMembersKey(selectedRoomRecord);
+    const canonicalDirectRoom = selectedRoomKey
+      ? repairedRooms
+          .filter((room: any) => getDirectRoomMembersKey(room) === selectedRoomKey)
+          .sort((a: any, b: any) =>
+            new Date(b.last_message_at || b.created_at || 0).getTime() -
+            new Date(a.last_message_at || a.created_at || 0).getTime()
+          )[0]
+      : null;
+    if (canonicalDirectRoom?.id && String(canonicalDirectRoom.id) !== String(selectedRoomId)) {
+      setRoom(String(canonicalDirectRoom.id));
+    }
+    const roomIdsToLoad = Array.from(
+      new Set(
+        selectedRoomKey
+          ? repairedRooms
+              .filter((room: any) => getDirectRoomMembersKey(room) === selectedRoomKey)
+              .map((room: any) => String(room.id))
+          : [String(selectedRoomId)]
+      )
+    );
+
     const query = supabase
       .from('messages')
       .select('*')
-      .eq('room_id', selectedRoomId)
+      .in('room_id', roomIdsToLoad)
       .order('created_at', { ascending: true });
     const { data: msgs } = await query;
     if (msgs) {
@@ -690,9 +825,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       });
     }
 
-    const { data: rooms } = await supabase.from('chat_rooms').select('*');
-    const list = sortChatRoomsWithNoticeFirst(rooms || []);
-    setChatRooms(list);
+    const list = await syncChatRoomsState(repairedRooms);
 
     if (msgs?.length) {
       const ids = msgs.map((m: any) => String(m.id));
@@ -792,11 +925,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       console.error('반응/투표 데이터 불러오기 실패:', error);
     }
 
-    await updateUnreadForRooms(list);
-
     if (selectedRoomId && msgs?.length) {
       const unreadMsgIds = msgs
-        .filter((m: any) => m.sender_id !== user?.id)
+        .filter((m: any) => String(m.sender_id) !== effectiveChatUserId)
         .filter((m: any) => {
           return true;
         })
@@ -832,7 +963,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         }
       }
     }
-  }, [selectedRoomId, user?.id, effectiveTodoUserId, updateUnreadForRooms, persistMessageReads, broadcastChatSync, resolveStaffProfile]);
+  }, [selectedRoomId, user?.id, effectiveChatUserId, effectiveTodoUserId, repairDirectRooms, syncChatRoomsState, persistMessageReads, broadcastChatSync, resolveStaffProfile]);
 
   const roomNotifyRef = useRef(true);
   useEffect(() => { roomNotifyRef.current = roomNotifyOn; }, [roomNotifyOn]);
@@ -859,27 +990,23 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           .eq('id', NOTICE_ROOM_ID);
       }
       const { data: rooms } = await supabase.from('chat_rooms').select('*');
-      const list = sortChatRoomsWithNoticeFirst(rooms || []);
-      setChatRooms(list);
-      await updateUnreadForRooms(list);
+      await syncChatRoomsState(rooms || []);
     };
     loadRooms();
     // selectedRoomId는 의도적으로 제외 — 채팅방 목록은 마운트 시 1회만 로드
-  }, [updateUnreadForRooms]);
+  }, [syncChatRoomsState]);
 
   useEffect(() => {
     const channel = supabase.channel('chat-rooms-list')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_rooms' }, () => {
-        supabase.from('chat_rooms').select('*').then(({ data: rooms }) => {
+        supabase.from('chat_rooms').select('*').then(async ({ data: rooms }) => {
           if (!rooms) return;
-          const list = sortChatRoomsWithNoticeFirst(rooms);
-          setChatRooms(list);
-          updateUnreadForRooms(list);
+          await syncChatRoomsState(rooms);
         });
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [updateUnreadForRooms]);
+  }, [syncChatRoomsState]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -958,7 +1085,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         { event: 'INSERT', schema: 'public', table: 'messages' },
         async (payload: any) => {
           const msg: any = payload.new;
-          if (!msg || msg.sender_id === user.id) return;
+          if (!msg || String(msg.sender_id) === effectiveChatUserId) return;
           if (chatRoomsRef.current.length) {
             await updateUnreadForRooms(chatRoomsRef.current);
           }
@@ -1154,6 +1281,49 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     requestAnimationFrame(() => scrollToBottom('auto'));
   }, [selectedRoomId, scrollToBottom]);
 
+  useLayoutEffect(() => {
+    if (!selectedRoomId) {
+      pendingBottomAlignRoomIdRef.current = null;
+      return;
+    }
+    if (pendingBottomAlignRoomIdRef.current !== selectedRoomId) return;
+
+    let cancelled = false;
+    let firstFrame = 0;
+    let secondFrame = 0;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const alignToLatest = () => {
+      firstFrame = requestAnimationFrame(() => {
+        secondFrame = requestAnimationFrame(() => {
+          if (cancelled || pendingBottomAlignRoomIdRef.current !== selectedRoomId) return;
+          scrollToBottom('auto');
+          const listEl = messageListRef.current;
+          if (!listEl) {
+            pendingBottomAlignRoomIdRef.current = null;
+            return;
+          }
+          const distanceFromBottom = listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight;
+          if (distanceFromBottom < 24) {
+            pendingBottomAlignRoomIdRef.current = null;
+          }
+        });
+      });
+    };
+
+    alignToLatest();
+    retryTimer = setTimeout(alignToLatest, 120);
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(firstFrame);
+      cancelAnimationFrame(secondFrame);
+      if (retryTimer) {
+        clearTimeout(retryTimer);
+      }
+    };
+  }, [selectedRoomId, messages.length, polls.length, pinnedIds.length, persistedPinnedMessages.length, scrollToBottom]);
+
   const pinnedMessages = useMemo(
     () => messages.filter((m) => pinnedIds.includes(String(m.id))),
     [messages, pinnedIds]
@@ -1184,8 +1354,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   );
 
   const selectedRoomLabel = useMemo(
-    () => getRoomDisplayName(selectedRoom, allKnownStaffs, user?.id),
-    [selectedRoom, allKnownStaffs, user?.id]
+    () => getRoomDisplayName(selectedRoom, allKnownStaffs, effectiveChatUserId),
+    [selectedRoom, allKnownStaffs, effectiveChatUserId]
   );
 
   const addableMembers = useMemo(() => {
@@ -1209,28 +1379,44 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   }, [selectedRoom, staffs, addMemberSearch]);
 
   const visibleRooms = useMemo(
-    () =>
-      chatRooms.filter((room: any) => {
+    () => {
+      const dedupedRooms = new Map<string, any>();
+      chatRooms.forEach((room: any) => {
         if (room.id === NOTICE_ROOM_ID) return true;
         if (Array.isArray(room.members)) {
-          return room.members.some((id: any) => String(id) === String(user?.id));
+          const isMember = room.members.some((id: any) => String(id) === effectiveChatUserId);
+          if (!isMember) return;
+          const roomKey = getDirectRoomMembersKey(room) || `room:${room.id}`;
+          const previousRoom = dedupedRooms.get(roomKey);
+          const previousTime = new Date(previousRoom?.last_message_at || previousRoom?.created_at || 0).getTime();
+          const currentTime = new Date(room?.last_message_at || room?.created_at || 0).getTime();
+          if (!previousRoom || currentTime >= previousTime) {
+            dedupedRooms.set(roomKey, room);
+          }
         }
-        return false;
-      }),
-    [chatRooms, user?.id]
+      });
+      if (!dedupedRooms.has(`room:${NOTICE_ROOM_ID}`)) {
+        const noticeRoom = chatRooms.find((room: any) => room.id === NOTICE_ROOM_ID);
+        if (noticeRoom) {
+          dedupedRooms.set(`room:${NOTICE_ROOM_ID}`, noticeRoom);
+        }
+      }
+      return Array.from(dedupedRooms.values());
+    },
+    [chatRooms, effectiveChatUserId]
   );
 
   const sidebarRooms = useMemo(() => {
     const keyword = omniSearch.trim().toLowerCase();
     const filtered = visibleRooms.filter((room: any) => {
-      const label = getRoomDisplayName(room, allKnownStaffs, user?.id).toLowerCase();
+      const label = getRoomDisplayName(room, allKnownStaffs, effectiveChatUserId).toLowerCase();
       const isHidden = roomPrefs[room.id]?.hidden === true;
       if (isHidden && !showHiddenRooms) return false;
       if (!keyword) return true;
       return label.includes(keyword);
     });
     return sortRoomsForSidebar(filtered, roomPrefs);
-  }, [visibleRooms, omniSearch, roomPrefs, showHiddenRooms, allKnownStaffs, user?.id]);
+  }, [visibleRooms, omniSearch, roomPrefs, showHiddenRooms, allKnownStaffs, effectiveChatUserId]);
 
   const typingNoticeText = useMemo(() => {
     const names = Object.values(typingUsers).filter(Boolean);
@@ -1241,8 +1427,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
   const selectedPeer = useMemo(() => {
     if (!selectedRoom || selectedRoom.type !== 'direct') return null;
-    return roomMembers.find((member: any) => String(member.id) !== String(user?.id)) || null;
-  }, [selectedRoom, roomMembers, user?.id]);
+    return roomMembers.find((member: any) => String(member.id) !== effectiveChatUserId) || null;
+  }, [selectedRoom, roomMembers, effectiveChatUserId]);
 
   const selectedPeerPresence = selectedPeer ? presenceMap[String(selectedPeer.id)] : null;
 
@@ -1627,6 +1813,68 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     return grouped;
   }, [staffs]);
 
+  const openDirectChat = useCallback(async (staff: any) => {
+    const otherId = String(staff?.id || '').trim();
+    if (!effectiveChatUserId || !otherId) {
+      alert('채팅 상대를 찾지 못했습니다.');
+      return;
+    }
+
+    try {
+      const { data: rooms, error } = await supabase
+        .from('chat_rooms')
+        .select('*')
+        .eq('type', 'direct');
+      if (error) throw error;
+
+      const repairedRooms = await repairDirectRooms(rooms || []);
+      const targetMembers = new Set([effectiveChatUserId, otherId]);
+      const foundRoom = repairedRooms
+        .filter((room: any) => {
+          const members = Array.isArray(room?.members)
+            ? room.members.map((memberId: any) => String(memberId))
+            : [];
+          return members.length === targetMembers.size && [...targetMembers].every((memberId) => members.includes(memberId));
+        })
+        .sort((a: any, b: any) =>
+          new Date(b.last_message_at || b.created_at || 0).getTime() -
+          new Date(a.last_message_at || a.created_at || 0).getTime()
+        )[0];
+
+      if (foundRoom) {
+        setChatRooms((prev) =>
+          sortChatRoomsWithNoticeFirst([
+            ...prev.filter((room: any) => String(room.id) !== String(foundRoom.id)),
+            foundRoom,
+          ])
+        );
+        setRoom(foundRoom.id);
+      } else {
+        const { data: room, error: insertError } = await supabase
+          .from('chat_rooms')
+          .insert([{ name: `${staff.name}`, type: 'direct', members: [effectiveChatUserId, otherId] }])
+          .select('*')
+          .single();
+        if (insertError) throw insertError;
+        if (room) {
+          setChatRooms((prev) =>
+            sortChatRoomsWithNoticeFirst([
+              ...prev.filter((candidate: any) => String(candidate.id) !== String(room.id)),
+              room,
+            ])
+          );
+          setRoom(room.id);
+          await fetchData();
+        }
+      }
+
+      setViewMode('chat');
+    } catch (error) {
+      console.error('openDirectChat failed', error);
+      alert('채팅방을 여는 중 오류가 발생했습니다.');
+    }
+  }, [effectiveChatUserId, fetchData, repairDirectRooms]);
+
   const mediaMessages = useMemo(() => {
     return messages.filter((m: any) => m.file_url);
   }, [messages]);
@@ -1774,7 +2022,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   };
 
   const markMessageRead = async (msg: any) => {
-    if (msg.sender_id === user.id) return;
+    if (String(msg.sender_id) === effectiveChatUserId) return;
     try {
         await persistMessageReads([msg.id]);
         broadcastChatSync('message-read', msg.room_id);
@@ -1793,14 +2041,33 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       }
       const { data, error } = await supabase
         .from('messages')
-        .select('*, staff:staff_members!left(name, photo_url), chat_rooms!inner(name, type, members)')
+        .select('*')
         .in('room_id', roomIds)
         .ilike('content', `%${globalSearchQuery}%`)
         .order('created_at', { ascending: false })
         .limit(50);
 
       if (error) throw error;
-      setGlobalSearchResults(data || []);
+      const messageRows = Array.isArray(data) ? data : [];
+      const relatedRoomIds = Array.from(new Set(messageRows.map((message: any) => String(message.room_id)).filter(Boolean)));
+      const { data: roomRows, error: roomError } = await supabase
+        .from('chat_rooms')
+        .select('id, name, type, members')
+        .in('id', relatedRoomIds);
+      if (roomError) throw roomError;
+
+      const roomMap = new Map<string, any>();
+      (roomRows || []).forEach((room: any) => {
+        roomMap.set(String(room.id), room);
+      });
+
+      const enrichedRows = messageRows.map((message: any) => ({
+        ...message,
+        staff: resolveStaffProfile(message.sender_id, message.sender_name),
+        chat_rooms: roomMap.get(String(message.room_id)) || null,
+      }));
+
+      setGlobalSearchResults(enrichedRows);
     } catch (err) {
       console.error(err);
     } finally {
@@ -1954,7 +2221,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   }, [deleteMessage]);
 
   return (
-    <div data-testid="chat-view" className="flex flex-1 min-h-0 overflow-hidden relative font-sans h-full bg-[var(--background)] md:bg-[var(--toss-card)]">
+    <div data-testid="chat-view" className="flex flex-1 min-h-0 overflow-hidden relative font-sans h-full bg-[var(--background)] md:h-[100dvh] md:max-h-[100dvh] md:bg-[var(--toss-card)]">
       <aside className={`${selectedRoomId ? 'hidden md:flex' : 'flex'} w-full md:w-80 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 flex-col shrink-0 z-50 transition-all`}>
         <div className="p-4 md:p-6 space-y-4 flex flex-col min-h-0">
           <div className="flex gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl glass">
@@ -2013,7 +2280,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   const unread = roomUnreadCounts[room.id] || 0;
                   const isSelected = selectedRoomId === room.id;
                   const isNoticeChannel = room.id === NOTICE_ROOM_ID;
-                  const label = getRoomDisplayName(room, allKnownStaffs, user?.id);
+                  const label = getRoomDisplayName(room, allKnownStaffs, effectiveChatUserId);
                   const preview = getRoomPreviewText(room);
                   const members = normalizeMemberIds(room.members);
                   const peer =
@@ -2021,7 +2288,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       ? allKnownStaffs.find(
                           (staff: any) =>
                             members.includes(String(staff.id)) &&
-                            String(staff.id) !== String(user?.id)
+                            String(staff.id) !== effectiveChatUserId
                         )
                       : null;
                   const isPeerOnline = peer ? Boolean(presenceMap[String(peer.id)]) : false;
@@ -2122,20 +2389,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                 </div>
                               </div>
                               <button
-                                onClick={async () => {
-                                  const otherId = s.id;
-                                  const { data: rooms } = await supabase.from('chat_rooms').select('id, members').eq('type', 'direct');
-                                  const found = (rooms || []).find((r: any) => {
-                                    const m = new Set((r.members || []).map((x: any) => String(x)));
-                                    const p = new Set([String(user.id), String(otherId)]);
-                                    return m.size === p.size && [...p].every((id) => m.has(id));
-                                  });
-                                  if (found) setRoom(found.id);
-                                  else {
-                                    const { data: room } = await supabase.from('chat_rooms').insert([{ name: `${s.name}`, type: 'direct', members: [user.id, otherId] }]).select('id').single();
-                                    if (room) { setRoom(room.id); fetchData(); }
-                                  }
-                                  setViewMode('chat');
+                                onClick={() => {
+                                  void openDirectChat(s);
                                 }}
                                 className="px-3 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-all border border-blue-100 dark:border-blue-800/50"
                               >
@@ -2154,7 +2409,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         </div>
       </aside>
 
-      <main className={`${!selectedRoomId ? 'hidden md:flex' : 'flex'} flex-1 min-h-0 flex-col bg-[var(--toss-gray-1)] relative`}>
+      <main className={`${!selectedRoomId ? 'hidden md:flex' : 'flex'} flex-1 min-h-0 flex-col overflow-hidden bg-[var(--toss-gray-1)] relative`}>
         {selectedRoomId && selectedRoom && (
           <header className="px-6 py-3.5 flex items-center justify-between border-b border-zinc-200/50 dark:border-zinc-800/50 glass glass-border shrink-0 z-40">
             <div className="flex items-center gap-3 min-w-0">
@@ -2242,7 +2497,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
               let lastDateLabel = '';
               const totalRecipients = Math.max(
                 0,
-                roomMembers.filter((member: any) => String(member.id) !== String(user?.id)).length
+                roomMembers.filter((member: any) => String(member.id) !== effectiveChatUserId).length
               );
               return combinedTimeline.map((item) => {
                 if (item.type === 'poll') {
@@ -2274,7 +2529,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 }
 
                 const msg = item;
-                const isMine = msg.sender_id === user.id;
+                const isMine = String(msg.sender_id) === effectiveChatUserId;
                 const msgReacts = reactions[msg.id] || {};
                 const hasReacts = Object.keys(msgReacts).some(e => (msgReacts[e] || 0) > 0);
 
@@ -3563,7 +3818,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 {globalSearchResults.map((msg: any) => {
                   let roomName = msg.chat_rooms?.name || '채팅방';
                   if (msg.chat_rooms?.type === 'direct' && Array.isArray(msg.chat_rooms?.members)) {
-                    const otherStaff = allKnownStaffs.find((s: any) => msg.chat_rooms.members.includes(String(s.id)) && String(s.id) !== String(user?.id));
+                    const otherStaff = allKnownStaffs.find((s: any) => msg.chat_rooms.members.includes(String(s.id)) && String(s.id) !== effectiveChatUserId);
                     if (otherStaff) roomName = otherStaff.name;
                   }
                   return (
@@ -3600,5 +3855,3 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     </div>
   );
 }
-
-

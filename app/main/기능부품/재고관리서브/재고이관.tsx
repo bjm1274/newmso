@@ -1,91 +1,423 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { withMissingColumnFallback } from '@/lib/supabase-compat';
+import {
+  getItemName,
+  getItemQuantity,
+  validateInventoryQuantity,
+  validateInventoryTransfer,
+} from '@/app/main/inventory-utils';
 
-export default function InventoryTransfer({ user, inventory = [], fetchInventory }: { user: any; inventory: any[]; fetchInventory: () => void }) {
+const EMPTY_TRANSFER_FORM = {
+  item_id: '',
+  quantity: 1,
+  to_company: '',
+  to_dept: '',
+  reason: '',
+};
+
+function normalizeInventoryText(value: unknown) {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function findDestinationInventoryItem(
+  inventory: any[],
+  selectedItem: any,
+  toCompany: string,
+  toDept: string,
+) {
+  if (!selectedItem || !toCompany.trim()) {
+    return null;
+  }
+
+  return (
+    inventory.find((candidate) => {
+      if (String(candidate.id) === String(selectedItem.id)) {
+        return false;
+      }
+
+      return (
+        normalizeInventoryText(getItemName(candidate)) === normalizeInventoryText(getItemName(selectedItem)) &&
+        normalizeInventoryText(candidate.category) === normalizeInventoryText(selectedItem.category) &&
+        normalizeInventoryText(candidate.spec) === normalizeInventoryText(selectedItem.spec) &&
+        normalizeInventoryText(candidate.lot_number) === normalizeInventoryText(selectedItem.lot_number) &&
+        normalizeInventoryText(candidate.company) === normalizeInventoryText(toCompany) &&
+        normalizeInventoryText(candidate.department) === normalizeInventoryText(toDept)
+      );
+    }) || null
+  );
+}
+
+export default function InventoryTransfer({
+  user,
+  inventory = [],
+  fetchInventory,
+}: {
+  user: any;
+  inventory: any[];
+  fetchInventory: () => void | Promise<void>;
+}) {
   const [transfers, setTransfers] = useState<any[]>([]);
-  const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ item_id: '', quantity: 1, from_company: '', from_dept: '', to_company: '', to_dept: '', reason: '' });
+  const [form, setForm] = useState(EMPTY_TRANSFER_FORM);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'request' | 'history'>('request');
+  const [destinationItem, setDestinationItem] = useState<any | null>(null);
+  const [companyOptions, setCompanyOptions] = useState<string[]>(() =>
+    Array.from(
+      new Set(
+        inventory
+          .map((item) => String(item.company || '').trim())
+          .filter(Boolean),
+      ),
+    ).sort(),
+  );
 
-  const companies = Array.from(new Set(inventory.map(i => i.company).filter(Boolean))).sort();
-  const depts = Array.from(new Set(inventory.map(i => i.department).filter(Boolean))).sort();
-
-  const selectedItem = inventory.find(i => String(i.id) === String(form.item_id));
-  const maxQty = selectedItem?.quantity ?? selectedItem?.stock ?? 0;
-
-  const fetchTransfers = useCallback(async () => {
-    const { data } = await supabase.from('inventory_transfers').select('*').order('created_at', { ascending: false }).limit(100);
-    setTransfers(data || []);
+  const resetForm = useCallback(() => {
+    setForm(EMPTY_TRANSFER_FORM);
   }, []);
 
-  useEffect(() => { fetchTransfers(); }, [fetchTransfers]);
+  const fetchTransfers = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('inventory_transfers')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (error) {
+        throw error;
+      }
+      setTransfers(data || []);
+    } catch {
+      setTransfers([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchTransfers();
+  }, [fetchTransfers]);
+
+  useEffect(() => {
+    const inventoryCompanies = Array.from(
+      new Set(
+        inventory
+          .map((item) => String(item.company || '').trim())
+          .filter(Boolean),
+      ),
+    ).sort();
+    let cancelled = false;
+
+    const loadCompanies = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('companies')
+          .select('name')
+          .eq('is_active', true);
+
+        if (cancelled) {
+          return;
+        }
+
+        const remoteCompanies =
+          !error && Array.isArray(data)
+            ? data
+                .map((company: any) => String(company?.name || '').trim())
+                .filter(Boolean)
+            : [];
+
+        setCompanyOptions(Array.from(new Set([...inventoryCompanies, ...remoteCompanies])).sort());
+      } catch {
+        if (!cancelled) {
+          setCompanyOptions(inventoryCompanies);
+        }
+      }
+    };
+
+    loadCompanies();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [inventory]);
+
+  const selectedItem = useMemo(
+    () => inventory.find((item) => String(item.id) === String(form.item_id)) || null,
+    [form.item_id, inventory],
+  );
+  const sourceCompany = String(selectedItem?.company || '').trim();
+  const sourceDept = String(selectedItem?.department || '').trim();
+  const maxQty = selectedItem ? getItemQuantity(selectedItem) : 0;
+  const quantityValidation = validateInventoryQuantity(form.quantity, {
+    label: '이관 수량',
+    min: 1,
+    max: maxQty,
+  });
+  const validationMessage = validateInventoryTransfer({
+    item: selectedItem,
+    quantity: form.quantity,
+    toCompany: form.to_company,
+    fromCompany: sourceCompany,
+    toDept: form.to_dept,
+    fromDept: sourceDept,
+  });
+  const destinationPrevQty = destinationItem ? getItemQuantity(destinationItem) : 0;
+  const requestedQuantity = quantityValidation.quantity ?? 0;
+  const sourceNextQty = selectedItem ? Math.max(maxQty - requestedQuantity, 0) : 0;
+  const destinationNextQty = destinationPrevQty + requestedQuantity;
+  const destinationDepartments = useMemo(() => {
+    if (!form.to_company.trim()) {
+      return [];
+    }
+
+    return Array.from(
+      new Set(
+        inventory
+          .filter(
+            (item) =>
+              normalizeInventoryText(item.company) === normalizeInventoryText(form.to_company),
+          )
+          .map((item) => String(item.department || '').trim())
+          .filter(Boolean),
+      ),
+    ).sort();
+  }, [form.to_company, inventory]);
+  const shouldShowValidation = Boolean(
+    form.item_id || form.to_company || form.to_dept || form.reason || form.quantity !== 1,
+  );
+
+  useEffect(() => {
+    const localDestinationItem = findDestinationInventoryItem(
+      inventory,
+      selectedItem,
+      form.to_company,
+      form.to_dept,
+    );
+
+    if (!selectedItem || !form.to_company.trim()) {
+      setDestinationItem(null);
+      return;
+    }
+
+    if (localDestinationItem) {
+      setDestinationItem(localDestinationItem);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadDestinationItem = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('inventory')
+          .select('*')
+          .eq('company', form.to_company)
+          .eq('item_name', getItemName(selectedItem));
+
+        if (error) {
+          throw error;
+        }
+
+        if (cancelled) {
+          return;
+        }
+
+        setDestinationItem(
+          findDestinationInventoryItem(data || [], selectedItem, form.to_company, form.to_dept),
+        );
+      } catch {
+        if (!cancelled) {
+          setDestinationItem(null);
+        }
+      }
+    };
+
+    loadDestinationItem();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [form.to_company, form.to_dept, inventory, selectedItem]);
 
   const handleTransfer = async () => {
-    if (!form.item_id) return alert('물품을 선택하세요.');
-    if (!form.to_company) return alert('이관 대상 법인을 선택하세요.');
-    if (form.quantity <= 0) return alert('이관 수량을 입력하세요.');
-    if (form.quantity > maxQty) return alert(`재고 부족: 현재 재고 ${maxQty}개`);
-    if (form.from_company === form.to_company && form.from_dept === form.to_dept) return alert('출발지와 목적지가 동일합니다.');
+    if (validationMessage || !selectedItem || quantityValidation.quantity === null) {
+      alert(validationMessage || '이관 정보를 다시 확인하세요.');
+      return;
+    }
+
+    const destinationCompanyId =
+      inventory.find(
+        (item) =>
+          normalizeInventoryText(item.company) === normalizeInventoryText(form.to_company) &&
+          item.company_id,
+      )?.company_id ??
+      (normalizeInventoryText(sourceCompany) === normalizeInventoryText(form.to_company)
+        ? selectedItem.company_id ?? null
+        : null);
+    const transferQuantity = quantityValidation.quantity;
+    const sourceNotes = `→ ${form.to_company}${form.to_dept ? ` ${form.to_dept}` : ''} (사유: ${form.reason || '없음'})`;
+    const destinationNotes = `${sourceCompany}${sourceDept ? ` ${sourceDept}` : ''} → ${form.to_company}${form.to_dept ? ` ${form.to_dept}` : ''} (사유: ${form.reason || '없음'})`;
 
     setSaving(true);
     try {
-      // 재고 차감
-      const newQty = maxQty - form.quantity;
-      await supabase.from('inventory').update({ quantity: newQty, stock: newQty }).eq('id', form.item_id);
+      const { error: sourceUpdateError } = await supabase
+        .from('inventory')
+        .update({ quantity: sourceNextQty, stock: sourceNextQty })
+        .eq('id', form.item_id);
+      if (sourceUpdateError) {
+        throw sourceUpdateError;
+      }
 
-      // 이관 이력 기록
-      await supabase.from('inventory_transfers').insert([{
-        item_id: form.item_id,
-        item_name: selectedItem?.item_name || selectedItem?.name,
-        quantity: form.quantity,
-        from_company: form.from_company || selectedItem?.company,
-        from_department: form.from_dept || selectedItem?.department,
-        to_company: form.to_company,
-        to_department: form.to_dept,
-        reason: form.reason,
-        transferred_by: user?.name,
-        transferred_by_id: user?.id,
-        status: '완료',
-      }]);
+      let destinationInventoryId = destinationItem?.id ?? null;
 
-      // 입고 로그
-      await supabase.from('inventory_logs').insert([{
-        item_id: form.item_id,
-        inventory_id: form.item_id,
-        type: '이관',
-        change_type: '이관출고',
-        quantity: form.quantity,
-        prev_quantity: maxQty,
-        next_quantity: newQty,
-        actor_name: user?.name,
-        company: form.from_company || selectedItem?.company,
-        notes: `→ ${form.to_company} ${form.to_dept || ''} (사유: ${form.reason || '없음'})`,
-      }]);
+      if (destinationItem) {
+        const { error: destinationUpdateError } = await supabase
+          .from('inventory')
+          .update({ quantity: destinationNextQty, stock: destinationNextQty })
+          .eq('id', destinationItem.id);
+        if (destinationUpdateError) {
+          throw destinationUpdateError;
+        }
+      } else {
+        const baseDestinationPayload: Record<string, any> = {
+          item_name: getItemName(selectedItem),
+          category: selectedItem?.category || null,
+          quantity: transferQuantity,
+          stock: transferQuantity,
+          min_quantity: selectedItem?.min_quantity ?? selectedItem?.min_stock ?? 0,
+          unit_price: selectedItem?.unit_price ?? selectedItem?.price ?? 0,
+          expiry_date: selectedItem?.expiry_date || null,
+          lot_number: selectedItem?.lot_number || null,
+          is_udi: Boolean(selectedItem?.is_udi),
+          company: form.to_company,
+          department: form.to_dept || '',
+          location: selectedItem?.location || null,
+        };
 
-      setShowModal(false);
-      fetchInventory();
-      fetchTransfers();
+        if (selectedItem?.spec) baseDestinationPayload.spec = selectedItem.spec;
+        if (selectedItem?.insurance_code) baseDestinationPayload.insurance_code = selectedItem.insurance_code;
+        if (selectedItem?.udi_code) baseDestinationPayload.udi_code = selectedItem.udi_code;
+        if (selectedItem?.supplier_name) baseDestinationPayload.supplier_name = selectedItem.supplier_name;
+        if (selectedItem?.supplier) baseDestinationPayload.supplier = selectedItem.supplier;
+
+        const primaryPayload = destinationCompanyId
+          ? { ...baseDestinationPayload, company_id: destinationCompanyId }
+          : baseDestinationPayload;
+        const fallbackPayload = { ...baseDestinationPayload };
+
+        const { data: insertedDestination, error: destinationInsertError } =
+          await withMissingColumnFallback<Record<string, any>>(
+            () =>
+              supabase
+                .from('inventory')
+                .insert([primaryPayload])
+                .select('*')
+                .single(),
+            () =>
+              supabase
+                .from('inventory')
+                .insert([fallbackPayload])
+                .select('*')
+                .single(),
+          );
+        if (destinationInsertError) {
+          throw destinationInsertError;
+        }
+
+        destinationInventoryId = insertedDestination?.id ?? null;
+      }
+
+      const { error: transferError } = await supabase.from('inventory_transfers').insert([
+        {
+          item_id: form.item_id,
+          item_name: getItemName(selectedItem),
+          quantity: transferQuantity,
+          from_company: sourceCompany,
+          from_department: sourceDept,
+          to_company: form.to_company,
+          to_department: form.to_dept,
+          reason: form.reason,
+          transferred_by: user?.name,
+          transferred_by_id: user?.id,
+          status: '완료',
+        },
+      ]);
+      if (transferError) {
+        throw transferError;
+      }
+
+      const logRows = [
+        {
+          item_id: form.item_id,
+          inventory_id: form.item_id,
+          type: '이관',
+          change_type: '이관출고',
+          quantity: transferQuantity,
+          prev_quantity: maxQty,
+          next_quantity: sourceNextQty,
+          actor_name: user?.name,
+          company: sourceCompany,
+          notes: sourceNotes,
+        },
+      ];
+
+      if (destinationInventoryId) {
+        logRows.push({
+          item_id: destinationInventoryId,
+          inventory_id: destinationInventoryId,
+          type: '이관',
+          change_type: '이관입고',
+          quantity: transferQuantity,
+          prev_quantity: destinationPrevQty,
+          next_quantity: destinationNextQty,
+          actor_name: user?.name,
+          company: form.to_company,
+          notes: destinationNotes,
+        });
+      }
+
+      const { error: logError } = await supabase.from('inventory_logs').insert(logRows);
+      if (logError) {
+        throw logError;
+      }
+
+      resetForm();
+      setActiveTab('history');
+      await Promise.all([Promise.resolve(fetchInventory()), fetchTransfers()]);
       alert('이관이 완료되었습니다.');
-    } catch { alert('이관 처리 실패'); } finally { setSaving(false); }
+    } catch {
+      alert('이관 처리 실패');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
-    <div className="p-4 md:p-8 space-y-5">
+    <div className="p-4 md:p-8 space-y-5" data-testid="inventory-transfer-view">
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div>
           <h2 className="text-base font-bold text-[var(--foreground)]">부서간 재고 이관</h2>
+          <p className="text-xs text-[var(--toss-gray-3)] mt-1">출발 위치 재고를 차감하고 목적지 재고를 자동으로 합산합니다.</p>
         </div>
-        <button onClick={() => { setForm({ item_id: '', quantity: 1, from_company: '', from_dept: '', to_company: '', to_dept: '', reason: '' }); setShowModal(true); }}
-          className="px-4 py-2 bg-[var(--toss-blue)] text-white rounded-[10px] text-sm font-bold shadow-sm hover:opacity-90">+ 이관 요청</button>
+        <button
+          data-testid="inventory-transfer-reset-button"
+          onClick={() => {
+            resetForm();
+            setActiveTab('request');
+          }}
+          className="px-4 py-2 bg-[var(--toss-blue)] text-white rounded-[10px] text-sm font-bold shadow-sm hover:opacity-90"
+        >
+          + 새 이관 요청
+        </button>
       </div>
 
       <div className="flex gap-1 bg-[var(--toss-gray-1)] rounded-[12px] p-1 w-fit">
-        {[{ key: 'request', label: '이관 신청' }, { key: 'history', label: '이관 이력' }].map(t => (
-          <button key={t.key} onClick={() => setActiveTab(t.key as any)}
-            className={`px-4 py-1.5 rounded-[10px] text-xs font-bold transition-all ${activeTab === t.key ? 'bg-[var(--toss-card)] text-[var(--foreground)] shadow-sm' : 'text-[var(--toss-gray-3)]'}`}>
-            {t.label}
+        {[{ key: 'request', label: '이관 신청' }, { key: 'history', label: '이관 이력' }].map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key as 'request' | 'history')}
+            className={`px-4 py-1.5 rounded-[10px] text-xs font-bold transition-all ${activeTab === tab.key ? 'bg-[var(--toss-card)] text-[var(--foreground)] shadow-sm' : 'text-[var(--toss-gray-3)]'}`}
+          >
+            {tab.label}
           </button>
         ))}
       </div>
@@ -93,67 +425,160 @@ export default function InventoryTransfer({ user, inventory = [], fetchInventory
       {activeTab === 'request' && (
         <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] p-5 shadow-sm space-y-4">
           <p className="text-sm font-bold text-[var(--foreground)]">이관 신청서 작성</p>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">이관 물품 *</label>
-              <select value={form.item_id} onChange={e => setForm(f => ({ ...f, item_id: e.target.value }))} className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm bg-[var(--toss-card)] outline-none">
+              <select
+                data-testid="inventory-transfer-item-select"
+                value={form.item_id}
+                onChange={(event) => setForm((prev) => ({ ...prev, item_id: event.target.value }))}
+                className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm bg-[var(--toss-card)] outline-none"
+              >
                 <option value="">물품 선택</option>
-                {inventory.map(i => <option key={i.id} value={i.id}>{i.item_name || i.name} (재고: {i.quantity ?? i.stock ?? 0}개)</option>)}
+                {inventory.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {getItemName(item)} ({getItemQuantity(item)}개 · {item.company || '회사 미지정'})
+                  </option>
+                ))}
               </select>
             </div>
+
             <div>
               <label className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">이관 수량 *</label>
-              <input type="number" value={form.quantity} min={1} max={maxQty} onChange={e => setForm(f => ({ ...f, quantity: Number(e.target.value) }))}
-                className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm bg-[var(--toss-card)] outline-none" />
-              {selectedItem && <p className="text-[10px] text-[var(--toss-gray-3)] mt-0.5">현재 재고: {maxQty}개</p>}
+              <input
+                data-testid="inventory-transfer-quantity-input"
+                type="number"
+                value={form.quantity}
+                min={1}
+                step={1}
+                max={maxQty || undefined}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    quantity: event.target.value === '' ? 0 : Number(event.target.value),
+                  }))
+                }
+                className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm bg-[var(--toss-card)] outline-none"
+              />
+              {selectedItem && (
+                <p className="text-[10px] text-[var(--toss-gray-3)] mt-0.5">현재 재고: {maxQty}개</p>
+              )}
             </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">출발 법인</label>
-              <select value={form.from_company} onChange={e => setForm(f => ({ ...f, from_company: e.target.value }))} className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm bg-[var(--toss-card)] outline-none">
-                <option value="">현재 위치</option>
-                {companies.map(c => <option key={c}>{c}</option>)}
-              </select>
+
+            <div className="md:col-span-2 rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)]/60 p-3">
+              <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] mb-2">출발 위치</p>
+              <p data-testid="inventory-transfer-source-location" className="text-sm font-bold text-[var(--foreground)]">
+                {selectedItem ? `${sourceCompany || '회사 미지정'} ${sourceDept || '부서 미지정'}` : '물품을 선택하면 현재 위치가 표시됩니다.'}
+              </p>
             </div>
+
             <div>
               <label className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">이관 대상 법인 *</label>
-              <select value={form.to_company} onChange={e => setForm(f => ({ ...f, to_company: e.target.value }))} className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm bg-[var(--toss-card)] outline-none">
+              <select
+                data-testid="inventory-transfer-to-company-select"
+                value={form.to_company}
+                onChange={(event) => setForm((prev) => ({ ...prev, to_company: event.target.value }))}
+                className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm bg-[var(--toss-card)] outline-none"
+              >
                 <option value="">선택</option>
-                {companies.map(c => <option key={c}>{c}</option>)}
+                {companyOptions.map((company) => (
+                  <option key={company} value={company}>
+                    {company}
+                  </option>
+                ))}
               </select>
             </div>
+
             <div>
               <label className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">이관 대상 부서</label>
-              <input value={form.to_dept} onChange={e => setForm(f => ({ ...f, to_dept: e.target.value }))} placeholder="예: 원무팀"
-                className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm bg-[var(--toss-card)] outline-none" />
+              <input
+                data-testid="inventory-transfer-to-dept-input"
+                value={form.to_dept}
+                list="inventory-transfer-departments"
+                onChange={(event) => setForm((prev) => ({ ...prev, to_dept: event.target.value }))}
+                placeholder="예: 원무팀"
+                className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm bg-[var(--toss-card)] outline-none"
+              />
+              <datalist id="inventory-transfer-departments">
+                {destinationDepartments.map((department) => (
+                  <option key={department} value={department} />
+                ))}
+              </datalist>
             </div>
-            <div>
+
+            <div className="md:col-span-2">
               <label className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">이관 사유</label>
-              <input value={form.reason} onChange={e => setForm(f => ({ ...f, reason: e.target.value }))} placeholder="예: 부서 재배치"
-                className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm bg-[var(--toss-card)] outline-none" />
+              <input
+                data-testid="inventory-transfer-reason-input"
+                value={form.reason}
+                onChange={(event) => setForm((prev) => ({ ...prev, reason: event.target.value }))}
+                placeholder="예: 부서 재배치"
+                className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm bg-[var(--toss-card)] outline-none"
+              />
             </div>
           </div>
-          <button onClick={handleTransfer} disabled={saving} className="px-6 py-2.5 bg-[var(--toss-blue)] text-white rounded-[12px] text-sm font-bold disabled:opacity-50 hover:opacity-90">
+
+          {selectedItem && (
+            <div
+              data-testid="inventory-transfer-preview"
+              className="rounded-[14px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)]/70 p-4"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">출발지 예상 재고</p>
+                  <p className="text-sm font-bold text-[var(--foreground)]">
+                    {maxQty}개 → {sourceNextQty}개
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">목적지 예상 재고</p>
+                  <p className="text-sm font-bold text-[var(--foreground)]">
+                    {destinationPrevQty}개 → {destinationNextQty}개
+                  </p>
+                </div>
+              </div>
+              <p className="mt-3 text-[11px] text-[var(--toss-gray-3)]">
+                {destinationItem
+                  ? '목적지에 같은 품목이 있어 기존 재고에 합산됩니다.'
+                  : '목적지에 같은 품목이 없어 새 재고 카드가 생성됩니다.'}
+              </p>
+            </div>
+          )}
+
+          {shouldShowValidation && validationMessage && (
+            <p data-testid="inventory-transfer-error" className="text-xs font-semibold text-red-500">
+              {validationMessage}
+            </p>
+          )}
+
+          <button
+            data-testid="inventory-transfer-submit"
+            onClick={handleTransfer}
+            disabled={saving}
+            className="px-6 py-2.5 bg-[var(--toss-blue)] text-white rounded-[12px] text-sm font-bold disabled:opacity-50 hover:opacity-90"
+          >
             {saving ? '처리 중...' : '이관 실행'}
           </button>
         </div>
       )}
 
       {activeTab === 'history' && (
-        <div className="space-y-2">
+        <div data-testid="inventory-transfer-history" className="space-y-2">
           {transfers.length === 0 ? (
             <div className="text-center py-16 text-[var(--toss-gray-3)] font-bold text-sm">이관 이력이 없습니다.</div>
-          ) : transfers.map(t => (
-            <div key={t.id} className="flex items-center justify-between p-3 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[12px]">
+          ) : transfers.map((transfer) => (
+            <div key={transfer.id} className="flex items-center justify-between p-3 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[12px]">
               <div>
-                <p className="text-sm font-bold text-[var(--foreground)]">{t.item_name}</p>
+                <p className="text-sm font-bold text-[var(--foreground)]">{transfer.item_name}</p>
                 <p className="text-[10px] text-[var(--toss-gray-3)]">
-                  {t.from_company} {t.from_department} → {t.to_company} {t.to_department} · {t.quantity}개 · {t.transferred_by}
+                  {transfer.from_company} {transfer.from_department} → {transfer.to_company} {transfer.to_department} · {transfer.quantity}개 · {transfer.transferred_by}
                 </p>
-                {t.reason && <p className="text-[10px] text-[var(--toss-gray-3)]">사유: {t.reason}</p>}
+                {transfer.reason && <p className="text-[10px] text-[var(--toss-gray-3)]">사유: {transfer.reason}</p>}
               </div>
               <div className="text-right">
-                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-green-100 text-green-700">{t.status || '완료'}</span>
-                <p className="text-[9px] text-[var(--toss-gray-3)] mt-0.5">{t.created_at?.slice(0, 10)}</p>
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-green-100 text-green-700">{transfer.status || '완료'}</span>
+                <p className="text-[9px] text-[var(--toss-gray-3)] mt-0.5">{transfer.created_at?.slice(0, 10)}</p>
               </div>
             </div>
           ))}

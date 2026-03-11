@@ -852,6 +852,150 @@ test("inventory stock-out flow updates stock through the modal", async ({
   await expect(page.getByTestId("inventory-stock-modal")).toHaveCount(0);
 });
 
+test("inventory transfer updates both source and destination stock", async ({
+  page,
+}) => {
+  const inventoryPatchBodies: Array<Record<string, unknown>> = [];
+  const inventoryLogBodies: Array<Record<string, unknown>> = [];
+  const inventoryTransferBodies: Array<Record<string, unknown>> = [];
+
+  page.on("request", (request) => {
+    if (
+      request.method() === "PATCH" &&
+      request.url().includes("/inventory?")
+    ) {
+      inventoryPatchBodies.push(JSON.parse(request.postData() || "{}"));
+    }
+
+    if (
+      request.method() === "POST" &&
+      request.url().includes("/inventory_logs")
+    ) {
+      const body = JSON.parse(request.postData() || "[]");
+      inventoryLogBodies.push(...(Array.isArray(body) ? body : [body]));
+    }
+
+    if (
+      request.method() === "POST" &&
+      request.url().includes("/inventory_transfers")
+    ) {
+      const body = JSON.parse(request.postData() || "[]");
+      inventoryTransferBodies.push(...(Array.isArray(body) ? body : [body]));
+    }
+  });
+
+  await mockSupabase(page, {
+    companies: [
+      {
+        id: fakeUser.company_id,
+        name: fakeUser.company,
+        type: "HOSPITAL",
+        is_active: true,
+      },
+      { id: "company-transfer-2", name: "수연의원", type: "HOSPITAL", is_active: true },
+    ],
+    inventoryItems: [
+      {
+        id: "inventory-transfer-source-1",
+        item_name: "E2E 이동품목",
+        category: "소모품",
+        quantity: 10,
+        stock: 10,
+        min_quantity: 2,
+        lot_number: "LOT-100",
+        company: fakeUser.company,
+        company_id: fakeUser.company_id,
+        department: fakeUser.department,
+        created_at: "2026-03-08T09:00:00.000Z",
+      },
+      {
+        id: "inventory-transfer-destination-1",
+        item_name: "E2E 이동품목",
+        category: "소모품",
+        quantity: 3,
+        stock: 3,
+        min_quantity: 2,
+        lot_number: "LOT-100",
+        company: "수연의원",
+        company_id: "company-transfer-2",
+        department: "원무팀",
+        created_at: "2026-03-08T09:00:00.000Z",
+      },
+    ],
+    inventoryLogs: [],
+    inventoryTransfers: [],
+  });
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: "재고관리",
+      erp_inventory_view: "이관",
+    },
+  });
+
+  await page.goto(
+    `/main?${new URLSearchParams({ open_menu: "재고관리" }).toString()}`,
+  );
+
+  await page.getByRole("button", { name: "이관" }).click();
+  await expect(page.getByTestId("inventory-transfer-view")).toBeVisible();
+  await page
+    .getByTestId("inventory-transfer-item-select")
+    .selectOption("inventory-transfer-source-1");
+  await page.getByTestId("inventory-transfer-quantity-input").fill("4");
+  await page
+    .getByTestId("inventory-transfer-to-company-select")
+    .selectOption("수연의원");
+  await page.getByTestId("inventory-transfer-to-dept-input").fill("원무팀");
+
+  await expect(page.getByTestId("inventory-transfer-preview")).toContainText(
+    "10개 → 6개",
+  );
+  await expect(page.getByTestId("inventory-transfer-preview")).toContainText(
+    "3개 → 7개",
+  );
+
+  await page.getByTestId("inventory-transfer-submit").click();
+
+  await expect.poll(() => inventoryPatchBodies.length).toBe(2);
+  await expect.poll(() => inventoryTransferBodies.length).toBe(1);
+  await expect.poll(() => inventoryLogBodies.length).toBe(2);
+
+  expect(inventoryPatchBodies).toEqual(
+    expect.arrayContaining([
+      { quantity: 6, stock: 6 },
+      { quantity: 7, stock: 7 },
+    ]),
+  );
+  expect(inventoryTransferBodies[0]).toMatchObject({
+    item_id: "inventory-transfer-source-1",
+    quantity: 4,
+    from_company: fakeUser.company,
+    from_department: fakeUser.department,
+    to_company: "수연의원",
+    to_department: "원무팀",
+    status: "완료",
+  });
+  expect(inventoryLogBodies).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        change_type: "이관출고",
+        prev_quantity: 10,
+        next_quantity: 6,
+        company: fakeUser.company,
+      }),
+      expect.objectContaining({
+        change_type: "이관입고",
+        prev_quantity: 3,
+        next_quantity: 7,
+        company: "수연의원",
+      }),
+    ]),
+  );
+
+  await expect(page.getByTestId("inventory-transfer-history")).toBeVisible();
+  await expect(page.getByText("E2E 이동품목")).toBeVisible();
+});
+
 test("inventory registration creates a new inventory item through the form tab", async ({
   page,
 }) => {
@@ -1049,9 +1193,10 @@ test("staff permission manager can copy permissions and role to another staff me
     name: "권한원본",
     role: "manager",
     permissions: {
-      hr: true,
-      inventory: true,
-      approval: true,
+      menu_재고관리: true,
+      menu_전자결재: true,
+      inventory_현황: true,
+      approval_기안함: true,
       admin: false,
       mso: false,
     },
@@ -1063,9 +1208,10 @@ test("staff permission manager can copy permissions and role to another staff me
     name: "권한복사본",
     role: "staff",
     permissions: {
-      hr: false,
-      inventory: false,
-      approval: false,
+      menu_재고관리: false,
+      menu_전자결재: false,
+      inventory_현황: false,
+      approval_기안함: false,
       admin: false,
       mso: false,
     },
@@ -1104,10 +1250,10 @@ test("staff permission manager can copy permissions and role to another staff me
   await page.getByTestId(`staff-permission-row-${targetStaff.id}`).click();
   await expect(page.getByTestId("staff-role-select")).toHaveValue("manager");
   await expect(
-    page.getByTestId("staff-permission-toggle-inventory"),
+    page.getByTestId("staff-permission-toggle-inventory_현황"),
   ).toHaveAttribute("aria-pressed", "true");
   await expect(
-    page.getByTestId("staff-permission-toggle-approval"),
+    page.getByTestId("staff-permission-toggle-approval_기안함"),
   ).toHaveAttribute("aria-pressed", "true");
 });
 
@@ -1458,9 +1604,8 @@ test("staff permission manager saves a permission toggle for the selected staff 
     employee_no: "EMP-777",
     name: "권한대상",
     permissions: {
-      hr: false,
-      inventory: false,
-      approval: false,
+      menu_전자결재: false,
+      approval_작성하기: false,
       admin: false,
       mso: false,
     },
@@ -1483,7 +1628,7 @@ test("staff permission manager saves a permission toggle for the selected staff 
   await expect(page.getByTestId("staff-permission-view")).toBeVisible();
   await page.getByTestId(`staff-permission-row-${targetStaff.id}`).click();
 
-  const approvalToggle = page.getByTestId("staff-permission-toggle-approval");
+  const approvalToggle = page.getByTestId("staff-permission-toggle-approval_작성하기");
   await expect(approvalToggle).toHaveAttribute("aria-pressed", "false");
 
   const saveRequest = page.waitForRequest(

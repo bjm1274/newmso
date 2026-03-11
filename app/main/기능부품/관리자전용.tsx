@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { canAccessMainMenu } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
 
 import StaffPermissionManager from './관리자전용서브/직원권한통합';
@@ -69,6 +70,43 @@ const DIRECT_ADMIN_TABS: AdminOuterTabId[] = [
   '공문서대장',
   '시스템마스터센터',
 ];
+
+const ADMIN_SECTION_PERMISSION_KEYS: Record<AdminOuterTabId, string> = {
+  경영분석: 'admin_경영분석',
+  감사센터: 'admin_감사센터',
+  시스템마스터센터: 'admin_시스템마스터센터',
+  엑셀등록: 'admin_엑셀등록',
+  알림자동화: 'admin_알림자동화',
+  회사관리: 'admin_회사관리',
+  직원권한: 'admin_직원권한',
+  수술검사템플릿: 'admin_수술검사템플릿',
+  팝업관리: 'admin_팝업관리',
+  데이터백업: 'admin_데이터백업',
+  데이터초기화: 'admin_데이터초기화',
+  문서양식: 'admin_문서양식',
+  급여이상치: 'admin_급여이상치',
+  공문서대장: 'admin_공문서대장',
+};
+
+function canAccessAdminTab(user: any, tabId: AdminOuterTabId) {
+  const permissions = user?.permissions || {};
+  if (
+    user?.company === 'SY INC.' ||
+    user?.role === 'admin' ||
+    permissions.mso === true ||
+    permissions.admin === true
+  ) {
+    return true;
+  }
+
+  if (!canAccessMainMenu(user, '관리자')) {
+    return false;
+  }
+
+  const permissionKey = ADMIN_SECTION_PERMISSION_KEYS[tabId];
+  if (!permissionKey) return false;
+  return permissions[permissionKey] === true;
+}
 
 function normalizeAdminEntry(tabId?: string | null): {
   activeTab: AdminOuterTabId;
@@ -191,21 +229,55 @@ export default function AdminView({ user, staffs = [], onRefresh, initialTab }: 
   const [auditTab, setAuditTab] = useState<AuditTabId>(initialState.auditTab);
   const [inventory, setInventory] = useState<any[]>([]);
 
-  const isMso = user?.company === 'SY INC.' || user?.permissions?.mso === true;
   const isSystemMaster = isNamedSystemMasterAccount(user);
+  const hasAdminMenuAccess = canAccessMainMenu(user, '관리자');
+  const visibleAdminTabs = useMemo(() => {
+    const tabs: AdminOuterTabId[] = [];
+
+    if (canAccessAdminTab(user, '경영분석')) tabs.push('경영분석');
+    if (canAccessAdminTab(user, '감사센터')) tabs.push('감사센터');
+    if (canAccessAdminTab(user, '엑셀등록')) tabs.push('엑셀등록');
+    if (canAccessAdminTab(user, '알림자동화')) tabs.push('알림자동화');
+    if (canAccessAdminTab(user, '회사관리')) tabs.push('회사관리');
+    if (canAccessAdminTab(user, '직원권한')) tabs.push('직원권한');
+    if (canAccessAdminTab(user, '수술검사템플릿')) tabs.push('수술검사템플릿');
+    if (canAccessAdminTab(user, '팝업관리')) tabs.push('팝업관리');
+    if (canAccessAdminTab(user, '데이터백업')) tabs.push('데이터백업');
+    if (canAccessAdminTab(user, '데이터초기화')) tabs.push('데이터초기화');
+    if (canAccessAdminTab(user, '문서양식')) tabs.push('문서양식');
+    if (canAccessAdminTab(user, '급여이상치')) tabs.push('급여이상치');
+    if (canAccessAdminTab(user, '공문서대장')) tabs.push('공문서대장');
+    if (isSystemMaster && canAccessAdminTab(user, '시스템마스터센터')) {
+      tabs.push('시스템마스터센터');
+    }
+
+    return tabs;
+  }, [isSystemMaster, user]);
+  const fallbackAdminTab = visibleAdminTabs[0] || null;
 
   useEffect(() => {
     const nextState = normalizeAdminEntry(initialTab);
-    const nextActiveTab = nextState.activeTab === '시스템마스터센터' && !isSystemMaster
-      ? '감사센터'
-      : nextState.activeTab;
+    const requestedTab =
+      nextState.activeTab === '시스템마스터센터' && !isSystemMaster
+        ? '감사센터'
+        : nextState.activeTab;
+    const nextActiveTab = visibleAdminTabs.includes(requestedTab)
+      ? requestedTab
+      : (fallbackAdminTab ?? requestedTab);
     setActiveTab(nextActiveTab);
     setAnalysisTab(nextState.analysisTab);
     setAuditTab(nextState.auditTab);
-  }, [initialTab, isSystemMaster]);
+  }, [fallbackAdminTab, initialTab, isSystemMaster, visibleAdminTabs]);
 
   useEffect(() => {
-    if (!isMso) return;
+    if (activeTab && visibleAdminTabs.includes(activeTab)) return;
+    if (fallbackAdminTab) {
+      setActiveTab(fallbackAdminTab);
+    }
+  }, [activeTab, fallbackAdminTab, visibleAdminTabs]);
+
+  useEffect(() => {
+    if (!visibleAdminTabs.includes('경영분석')) return;
 
     const fetchInventory = async () => {
       const { data } = await supabase.from('inventory').select('*');
@@ -215,15 +287,15 @@ export default function AdminView({ user, staffs = [], onRefresh, initialTab }: 
     fetchInventory().catch((error) => {
       console.error('관리자 재고 조회 실패:', error);
     });
-  }, [isMso]);
+  }, [visibleAdminTabs]);
 
-  if (!isMso) {
+  if (!hasAdminMenuAccess || visibleAdminTabs.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center bg-[var(--toss-gray-1)] p-6 text-center">
         <div className="mb-4 text-6xl">🔒</div>
         <h2 className="text-xl font-bold text-[var(--foreground)]">관리자 메뉴 접근 권한이 없습니다.</h2>
         <p className="mt-2 text-sm font-semibold text-[var(--toss-gray-3)]">
-          이 메뉴는 MSO 권한이 있는 계정만 사용할 수 있습니다.
+          메인 메뉴 권한과 관리자 세부 권한을 확인해 주세요.
         </p>
       </div>
     );

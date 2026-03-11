@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { canAccessBoard } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnFallback } from '@/lib/supabase-compat';
 import SmartDatePicker from './공통/SmartDatePicker';
@@ -71,7 +72,15 @@ async function runBoardPostMutation<T>(
 }
 
 export default function BoardView({ user, subView, setSubView, selectedCo, selectedCompanyId, initialBoard, initialPostId, onConsumePostId, surgeries, mris, onRefresh, setMainMenu }: any) {
-  const [activeBoard, setActiveBoard] = useState(initialBoard && BOARD_IDS.includes(initialBoard) ? initialBoard : (subView && BOARD_IDS.includes(subView) ? subView : '공지사항'));
+  const defaultBoard =
+    BOARD_IDS.find((boardId) => canAccessBoard(user, boardId, 'read')) || '공지사항';
+  const [activeBoard, setActiveBoard] = useState(
+    initialBoard && BOARD_IDS.includes(initialBoard) && canAccessBoard(user, initialBoard, 'read')
+      ? initialBoard
+      : subView && BOARD_IDS.includes(subView) && canAccessBoard(user, subView, 'read')
+        ? subView
+        : defaultBoard
+  );
   const [posts, setPosts] = useState<any[]>([]);
   const [showNewPost, setShowNewPost] = useState(false);
   const [title, setTitle] = useState('');
@@ -151,6 +160,10 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     { id: 'MRI일정', label: '🔬 MRI일정표', icon: '🔬' },
     { id: '직원제안함', label: '💡 직원 제안함', icon: '💡' }
   ];
+  const visibleBoards = useMemo(
+    () => boards.filter((board) => canAccessBoard(user, board.id, 'read')),
+    [user]
+  );
 
   const boardMetaMap: Record<string, { title: string; description: string }> = {
     공지사항: { title: '공지사항', description: '' },
@@ -165,12 +178,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     title: activeBoard || '게시판',
     description: '',
   };
-  const canCreatePost =
-    activeBoard === '공지사항' ||
-    activeBoard === '자유게시판' ||
-    activeBoard === '경조사' ||
-    activeBoard === '수술일정' ||
-    activeBoard === 'MRI일정';
+  const canCreatePost = canAccessBoard(user, activeBoard, 'write');
 
   // 오전/오후 + 시/분 드롭다운 값을 HH:MM 문자열로 변환
   const updateScheduleTime = (period: string, hour: string, minute: string) => {
@@ -184,6 +192,11 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   }, [activeBoard, scheduleHour, scheduleMinute, schedulePeriod]);
 
   const fetchPosts = async () => {
+    if (!canAccessBoard(user, activeBoard, 'read')) {
+      setPosts([]);
+      return;
+    }
+
     const isMso = user?.company === 'SY INC.' || user?.permissions?.mso === true;
     const scopedCompanyId = isMso ? selectedCompanyId : user?.company_id;
     const scopedCompanyName =
@@ -227,9 +240,23 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
 
   // 메인 사이드바 플라이아웃에서 선택한 게시판 반영
   useEffect(() => {
-    const board = initialBoard || subView;
-    if (board && BOARD_IDS.includes(board)) setActiveBoard(board);
-  }, [initialBoard, subView]);
+    const requestedBoard = [initialBoard, subView].find(
+      (boardId): boardId is string =>
+        Boolean(boardId) && BOARD_IDS.includes(boardId) && canAccessBoard(user, boardId, 'read')
+    );
+
+    if (requestedBoard && requestedBoard !== activeBoard) {
+      setActiveBoard(requestedBoard);
+      return;
+    }
+
+    if (!canAccessBoard(user, activeBoard, 'read')) {
+      const fallbackBoard = visibleBoards[0]?.id;
+      if (fallbackBoard) {
+        setActiveBoard(fallbackBoard);
+      }
+    }
+  }, [activeBoard, initialBoard, subView, user, visibleBoards]);
 
   // 수술·MRI 템플릿 불러오기
   useEffect(() => {
@@ -490,6 +517,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
 
   const canEditPost = (post: any) => {
     if (!user) return false;
+    if (!canAccessBoard(user, post?.board_type || activeBoard, 'write')) return false;
     // 일반 직원도 자신이 올린 수술/MRI일정에 대해 '요청'을 할 수 있도록 조건 완화 (작성자 본인 포함)
     return (post.author_id && String(post.author_id) === String(user.id)) || isDepartmentHead;
   };
@@ -626,6 +654,11 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   };
 
   const handleNewPost = async () => {
+    if (!canCreatePost) {
+      alert('이 게시판에 글을 작성할 권한이 없습니다.');
+      return;
+    }
+
     const isScheduleBoard = activeBoard === '수술일정' || activeBoard === 'MRI일정';
     const normalizedTitle = title.trim();
     const normalizedContent = content.trim();
@@ -798,6 +831,18 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       setLoading(false);
     }
   };
+
+  if (visibleBoards.length === 0) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center bg-[var(--toss-gray-1)] p-6 text-center">
+        <div className="mb-4 text-6xl">🔒</div>
+        <h2 className="text-xl font-bold text-[var(--foreground)]">게시판 접근 권한이 없습니다.</h2>
+        <p className="mt-2 text-sm font-semibold text-[var(--toss-gray-3)]">
+          메인 메뉴 권한과 게시판 읽기 권한을 확인해 주세요.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div
