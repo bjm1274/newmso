@@ -19,7 +19,7 @@ import ConsumableStats from './재고관리서브/소모품통계';
 import DeliveryConfirmation from './재고관리서브/납품확인서';
 import InventoryDemandForecast from './재고관리서브/재고수요예측';
 import SupplierDocumentWorkspace from './재고관리서브/SupplierDocumentWorkspace';
-import { requestInventoryReorder } from '@/app/main/inventory-utils';
+import { getItemMinQuantity, getItemQuantity, requestInventoryReorder } from '@/app/main/inventory-utils';
 
 const INV_VIEW_KEY = 'erp_inventory_view';
 
@@ -72,14 +72,6 @@ const INVENTORY_VIEW_META: Record<string, { title: string; description: string }
   재고실사: { title: '재고 실사', description: '' },
   이관: { title: '재고 이관', description: '' },
 };
-
-function getItemQuantity(item: any) {
-  return Number(item?.quantity ?? item?.stock ?? 0);
-}
-
-function getItemMinQuantity(item: any) {
-  return Number(item?.min_quantity ?? item?.min_stock ?? 0);
-}
 
 function isExpirySoon(item: any, threshold: number) {
   return Boolean(item?.expiry_date) && new Date(item.expiry_date).getTime() < threshold;
@@ -995,5 +987,4 @@ export default function IntegratedInventoryManagement({
     </div>
   );
 }
-
 

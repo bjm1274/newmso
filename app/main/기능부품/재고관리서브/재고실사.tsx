@@ -1,6 +1,7 @@
 'use client';
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { getItemName, getItemQuantity, validateInventoryQuantity } from '@/app/main/inventory-utils';
 
 type CountItem = {
   id: string;
@@ -21,10 +22,10 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
   const startSession = () => {
     const list: CountItem[] = inventory.map(item => ({
       id: item.id,
-      item_name: item.item_name || item.name || '-',
+      item_name: getItemName(item),
       category: item.category || '-',
       company: item.company || '-',
-      expected: item.quantity ?? item.stock ?? 0,
+      expected: getItemQuantity(item),
       actual: '',
     }));
     setItems(list);
@@ -41,31 +42,63 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
   );
 
   const enteredCount = items.filter(it => it.actual !== '').length;
-  const discrepancies = items.filter(it => it.actual !== '' && Number(it.actual) !== it.expected);
+  const invalidEntries = items.filter((item) => {
+    if (item.actual === '') return false;
+    return Boolean(
+      validateInventoryQuantity(item.actual, {
+        label: '실물 수량',
+        allowEmpty: true,
+      }).error,
+    );
+  });
+  const discrepancies = items.filter((item) => {
+    const { quantity } = validateInventoryQuantity(item.actual, {
+      label: '실물 수량',
+      allowEmpty: true,
+    });
+    return quantity !== null && quantity !== item.expected;
+  });
 
   const handleComplete = async () => {
+    if (invalidEntries.length > 0) {
+      const preview = invalidEntries.slice(0, 5).map((item) => `- ${item.item_name}`).join('\n');
+      const suffix = invalidEntries.length > 5 ? `\n외 ${invalidEntries.length - 5}개 품목` : '';
+      alert(`실물 수량을 다시 확인하세요.\n${preview}${suffix}`);
+      return;
+    }
+
     const unenteredCount = items.filter(it => it.actual === '').length;
     if (unenteredCount > 0) {
       if (!confirm(`아직 ${unenteredCount}개 품목의 실사 수량이 입력되지 않았습니다.\n미입력 품목은 제외하고 완료하시겠습니까?`)) return;
     }
     setSaving(true);
     try {
-      const entered = items.filter(it => it.actual !== '');
-      const discrepancyList = entered.filter(it => Number(it.actual) !== it.expected);
+      const entered = items.flatMap((item) => {
+        const { quantity } = validateInventoryQuantity(item.actual, {
+          label: '실물 수량',
+          allowEmpty: true,
+        });
+
+        return quantity === null ? [] : [{
+          ...item,
+          actualQuantity: quantity,
+        }];
+      });
+      const discrepancyList = entered.filter(item => item.actualQuantity !== item.expected);
 
       // 차이 있는 품목만 DB 업데이트
-      for (const it of discrepancyList) {
-        await supabase.from('inventory').update({ quantity: Number(it.actual), stock: Number(it.actual) }).eq('id', it.id);
+      for (const item of discrepancyList) {
+        await supabase.from('inventory').update({ quantity: item.actualQuantity, stock: item.actualQuantity }).eq('id', item.id);
         await supabase.from('inventory_logs').insert([{
-          item_id: it.id,
-          inventory_id: it.id,
+          item_id: item.id,
+          inventory_id: item.id,
           type: '실사조정',
           change_type: '실사조정',
-          quantity: Math.abs(Number(it.actual) - it.expected),
-          prev_quantity: it.expected,
-          next_quantity: Number(it.actual),
+          quantity: Math.abs(item.actualQuantity - item.expected),
+          prev_quantity: item.expected,
+          next_quantity: item.actualQuantity,
           actor_name: user?.name,
-          company: it.company,
+          company: item.company,
         }]);
       }
 
@@ -76,24 +109,24 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
           conducted_name: user?.name,
           total_items: entered.length,
           discrepancy_count: discrepancyList.length,
-          report: entered.map(it => ({
-            id: it.id,
-            item_name: it.item_name,
-            category: it.category,
-            expected: it.expected,
-            actual: Number(it.actual),
-            diff: Number(it.actual) - it.expected,
+          report: entered.map(item => ({
+            id: item.id,
+            item_name: item.item_name,
+            category: item.category,
+            expected: item.expected,
+            actual: item.actualQuantity,
+            diff: item.actualQuantity - item.expected,
           })),
           created_at: new Date().toISOString(),
         }]);
       } catch { /* 테이블 없으면 무시 */ }
 
-      setReport(discrepancyList.map(it => ({
-        item_name: it.item_name,
-        category: it.category,
-        expected: it.expected,
-        actual: Number(it.actual),
-        diff: Number(it.actual) - it.expected,
+      setReport(discrepancyList.map(item => ({
+        item_name: item.item_name,
+        category: item.category,
+        expected: item.expected,
+        actual: item.actualQuantity,
+        diff: item.actualQuantity - item.expected,
       })));
       fetchInventory();
       setSessionStarted(false);
@@ -196,6 +229,9 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
         {discrepancies.length > 0 && (
           <p className="text-xs text-orange-500 font-bold mt-2">⚠️ 차이 발견: {discrepancies.length}개 품목</p>
         )}
+        {invalidEntries.length > 0 && (
+          <p className="text-xs text-red-500 font-bold mt-1">입력 오류: {invalidEntries.length}개 품목</p>
+        )}
       </div>
 
       <div className="flex gap-3">
@@ -233,11 +269,15 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
             </thead>
             <tbody className="divide-y divide-[var(--toss-border)]">
               {filtered.map(it => {
-                const actualNum = it.actual !== '' ? Number(it.actual) : null;
+                const { quantity: actualNum, error: actualError } = validateInventoryQuantity(it.actual, {
+                  label: '실물 수량',
+                  allowEmpty: true,
+                });
                 const diff = actualNum !== null ? actualNum - it.expected : null;
+                const hasError = Boolean(actualError);
                 const hasDiff = diff !== null && diff !== 0;
                 return (
-                  <tr key={it.id} className={`transition-colors ${hasDiff ? 'bg-orange-50/50' : ''}`}>
+                  <tr key={it.id} className={`transition-colors ${hasError ? 'bg-red-50/60' : hasDiff ? 'bg-orange-50/50' : ''}`}>
                     <td className="px-4 py-3">
                       <p className="text-[10px] font-bold text-[var(--toss-blue)]">{it.company}</p>
                       <p className="text-[9px] text-[var(--toss-gray-3)]">{it.category}</p>
@@ -248,13 +288,17 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
                       <input
                         type="number"
                         min={0}
+                        step={1}
                         value={it.actual}
                         onChange={e => setActual(it.id, e.target.value)}
                         placeholder="실물 수량"
-                        className={`w-24 px-3 py-1.5 border rounded-[8px] text-sm font-bold text-center outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20 ${hasDiff ? 'border-orange-400 bg-orange-50' : 'border-[var(--toss-border)] bg-[var(--toss-card)]'}`}
+                        className={`w-24 px-3 py-1.5 border rounded-[8px] text-sm font-bold text-center outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20 ${hasError ? 'border-red-400 bg-red-50' : hasDiff ? 'border-orange-400 bg-orange-50' : 'border-[var(--toss-border)] bg-[var(--toss-card)]'}`}
                       />
+                      {actualError && (
+                        <p className="mt-1 text-[10px] font-semibold text-red-500">{actualError}</p>
+                      )}
                     </td>
-                    <td className={`px-4 py-3 text-center text-sm font-bold ${diff === null ? 'text-[var(--toss-gray-3)]' : diff > 0 ? 'text-emerald-600' : diff < 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+                    <td className={`px-4 py-3 text-center text-sm font-bold ${hasError || diff === null ? 'text-[var(--toss-gray-3)]' : diff > 0 ? 'text-emerald-600' : diff < 0 ? 'text-red-500' : 'text-emerald-600'}`}>
                       {diff === null ? '-' : diff === 0 ? '✓' : `${diff > 0 ? '+' : ''}${diff}`}
                     </td>
                   </tr>
