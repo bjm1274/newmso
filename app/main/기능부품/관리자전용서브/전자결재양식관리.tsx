@@ -222,9 +222,37 @@ function mergeWithDefaultDesigns(stored: Record<string, any> | null | undefined)
 
 /** 관리자: 전자결재 서식/양식 + 디자인 통합 관리 */
 const LOCAL_APPROVAL_FORM_TYPES_KEY = 'erp_approval_form_types_custom';
+const LOCAL_FORM_TEMPLATE_DESIGNS_KEY = 'erp_form_template_designs';
+
+function isMissingTableError(error: any, tableName = 'system_settings') {
+  if (!error) return false;
+  const code = String(error?.code || '');
+  const message = String(error?.message || error?.details || '').toLowerCase();
+  return code === 'PGRST205' || message.includes(tableName.toLowerCase());
+}
+
+function readLocalDesigns() {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(LOCAL_FORM_TEMPLATE_DESIGNS_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalDesigns(designs: Record<string, TemplateDesign>) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(LOCAL_FORM_TEMPLATE_DESIGNS_KEY, JSON.stringify(designs));
+  } catch {
+    // ignore
+  }
+}
 
 async function persistDesigns(designs: Record<string, TemplateDesign>) {
-  return supabase
+  writeLocalDesigns(designs);
+  const result = await supabase
     .from('system_settings')
     .upsert(
       {
@@ -234,6 +262,10 @@ async function persistDesigns(designs: Record<string, TemplateDesign>) {
       },
       { onConflict: 'key' }
     );
+  if (isMissingTableError(result.error, 'system_settings')) {
+    return { data: designs, error: null } as unknown as typeof result;
+  }
+  return result;
 }
 
 function resolveCurrentDesign(
@@ -313,15 +345,19 @@ export default function ApprovalFormTypesManager() {
   useEffect(() => {
     const loadDesigns = async () => {
       try {
+        const localDesigns = readLocalDesigns();
         const { data, error } = await supabase
           .from('system_settings')
           .select('value')
           .eq('key', 'form_template_designs')
           .maybeSingle();
 
-        let parsed = {};
+        let parsed = localDesigns || {};
         if (!error && data?.value) {
           parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+          writeLocalDesigns(parsed);
+        } else if (error && !isMissingTableError(error, 'system_settings')) {
+          throw error;
         }
 
         const { designs: mergedDesigns, changed } = mergeWithDefaultDesigns(parsed);

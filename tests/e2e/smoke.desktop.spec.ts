@@ -51,6 +51,55 @@ async function loginWithSession(
     },
   ]);
 }
+
+/* const lockedDownMsoUser = {
+  ...fakeUser,
+  id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  employee_no: "E2E-LOCKED",
+  name: "Locked Down MSO",
+  company: "SY INC.",
+  company_id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+  role: "admin",
+  permissions: {
+    ...fakeUser.permissions,
+    approval: false,
+    hr: false,
+    inventory: false,
+    admin: false,
+    mso: false,
+    menu_異붽?湲곕뒫: false,
+    menu_寃뚯떆?? false,
+    menu_?꾩옄寃곗옱: false,
+    menu_?몄궗愿由? false,
+    menu_?ш퀬愿由? false,
+    menu_愿由ъ옄: false,
+  },
+}; */
+
+const lockedDownMsoUser = {
+  ...fakeUser,
+  id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  employee_no: "E2E-LOCKED",
+  name: "Locked Down MSO",
+  company: "SY INC.",
+  company_id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+  role: "admin",
+  permissions: {
+    ...fakeUser.permissions,
+    approval: false,
+    hr: false,
+    inventory: false,
+    admin: false,
+    mso: false,
+    ["menu_\uCD94\uAC00\uAE30\uB2A5"]: false,
+    ["menu_\uAC8C\uC2DC\uD310"]: false,
+    ["menu_\uC804\uC790\uACB0\uC7AC"]: false,
+    ["menu_\uC778\uC0AC\uAD00\uB9AC"]: false,
+    ["menu_\uC7AC\uACE0\uAD00\uB9AC"]: false,
+    ["menu_\uAD00\uB9AC\uC790"]: false,
+  },
+};
+
 test("root route shows the login form", async ({ page }) => {
   await mockSupabase(page);
   await page.goto("/");
@@ -127,6 +176,35 @@ test("desktop main shell loads with a seeded session", async ({ page }) => {
   await expect(page.getByTestId("main-shell")).toBeVisible();
   await expect(page.getByTestId("desktop-sidebar")).toBeVisible();
   await expect(page.getByTestId("sidebar-menu-home")).toBeVisible();
+});
+
+test("main shell hides permission-gated menus for a locked-down SY INC. account", async ({
+  page,
+}) => {
+  await mockSupabase(page, {
+    staffMembers: [lockedDownMsoUser],
+    companies: [
+      {
+        id: lockedDownMsoUser.company_id,
+        name: lockedDownMsoUser.company,
+        type: "mso",
+        is_active: true,
+      },
+    ],
+  });
+  await seedSession(page, { user: lockedDownMsoUser });
+
+  await page.goto("/main");
+
+  await expect(page.getByTestId("main-shell")).toBeVisible();
+  await expect(page.getByTestId("sidebar-menu-home")).toBeVisible();
+  await expect(page.getByTestId("sidebar-menu-chat")).toBeVisible();
+  await expect(page.getByTestId("sidebar-menu-extra")).toHaveCount(0);
+  await expect(page.getByTestId("sidebar-menu-board")).toHaveCount(0);
+  await expect(page.getByTestId("sidebar-menu-approval")).toHaveCount(0);
+  await expect(page.getByTestId("sidebar-menu-hr")).toHaveCount(0);
+  await expect(page.getByTestId("sidebar-menu-inventory")).toHaveCount(0);
+  await expect(page.getByTestId("sidebar-menu-admin")).toHaveCount(0);
 });
 
 test("mypage tabs switch across profile, commute, todo, certificates, salary, documents, and notifications", async ({

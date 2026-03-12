@@ -269,8 +269,8 @@ export default function MyProfileCard({
       if (permissionsUpdate.error && !persistedToLegacyColumn) {
         throw permissionsUpdate.error;
       }
-      if (legacyUploadError && !persistedToLegacyColumn) {
-        throw legacyUploadError;
+      if (legacyUploadError && !permissionsUpdate.error) {
+        console.warn('Legacy profile photo columns are unavailable; persisted metadata in permissions instead.', legacyUploadError);
       }
 
       setAvatarUrl(newUrl);

@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { getProfilePhotoUrl, normalizeProfileUser } from '@/lib/profile-photo';
 import SmartDatePicker from './공통/SmartDatePicker';
 
 const NOTICE_ROOM_ID = '00000000-0000-0000-0000-000000000000';
@@ -268,7 +269,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       if (!staff?.id) return;
       const staffId = String(staff.id);
       const previous = merged.get(staffId) || {};
-      merged.set(staffId, { ...previous, ...staff });
+      merged.set(staffId, normalizeProfileUser({ ...previous, ...staff }));
     });
     return Array.from(merged.values());
   }, [chatDirectoryStaffs, staffs]);
@@ -283,7 +284,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       if (knownStaff) {
         return {
           ...knownStaff,
-          photo_url: knownStaff.avatar_url || knownStaff.photo_url || null,
+          photo_url: getProfilePhotoUrl(knownStaff),
         };
       }
       if (String(staffId) === String(user?.id) && user?.name) {
@@ -293,7 +294,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
           company: user.company || '',
           department: user.department || '',
           position: user.position || '',
-          photo_url: user.avatar_url || null,
+          photo_url: getProfilePhotoUrl(user),
         };
       }
       const safeName = String(fallbackName || '').trim();
@@ -354,10 +355,10 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       try {
         const { data, error } = await supabase
           .from('staff_members')
-          .select('id, name, company, department, position, presence_status, last_seen_at, status');
+          .select('id, name, company, department, position, presence_status, last_seen_at, status, permissions');
         if (error) throw error;
         if (active) {
-          setChatDirectoryStaffs(Array.isArray(data) ? data : []);
+          setChatDirectoryStaffs(Array.isArray(data) ? data.map((staff: any) => normalizeProfileUser(staff)) : []);
         }
       } catch (error) {
         console.error('채팅 직원 디렉터리 로드 실패:', error);
@@ -1611,7 +1612,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       reply_to_id: resolvedReplyToId,
       created_at: new Date().toISOString(),
       is_deleted: false,
-      staff: { name: user.name, photo_url: user.avatar_url || null },
+      staff: { name: user.name, photo_url: getProfilePhotoUrl(user) },
     };
 
     if (retryMessageId) {
@@ -1657,7 +1658,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     if (!error && inserted) {
       const optimisticMsg = {
         ...inserted,
-        staff: { name: user.name, photo_url: user.avatar_url || null },
+        staff: { name: user.name, photo_url: getProfilePhotoUrl(user) },
       };
       setMessages((prev) =>
         prev.map((message: any) =>

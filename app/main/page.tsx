@@ -49,12 +49,12 @@ const ADMIN_SUBMENU_PERMISSION_KEYS: Record<string, string> = {
 
 function canAccessAdminSubMenu(user: any, subMenuId: string) {
   const permissions = user?.permissions || {};
-  if (
-    user?.company === 'SY INC.' ||
-    user?.role === 'admin' ||
+  const hasAdminOverride =
     permissions.mso === true ||
-    permissions.admin === true
-  ) {
+    permissions.admin === true ||
+    isNamedSystemMasterAccount(user);
+
+  if (hasAdminOverride) {
     return true;
   }
 
