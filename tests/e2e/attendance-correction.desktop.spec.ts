@@ -102,6 +102,9 @@ test('attendance correction approval updates legacy-schema rows and attendance r
   await page.getByRole('button', { name: '결재 대기' }).click();
   await expect(page.getByText('레거시 승인 테스트')).toBeVisible();
   await page.getByRole('button', { name: '승인' }).first().click();
+  await expect(
+    page.getByText('결재 대기 중인 출결 정정 문서가 없습니다.')
+  ).toBeVisible();
 
   const snapshot = await page.evaluate(async ({ correctionId, date, staffId }) => {
     const headers = { Accept: 'application/json' };
