@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { isMissingColumnError } from '@/lib/supabase-compat';
 
 type ProblemReason = '미체크' | '지각' | '결근' | '미출근';
 
@@ -23,6 +24,37 @@ const STATUS_VIEW = '현황';
 const APPROVAL_VIEW = '결재';
 const DEFAULT_CORRECTION_TYPE = '정상반영';
 
+const DEFAULT_CORRECTION_STATUS = '대기';
+
+function isAttendanceCorrectionsLegacySchemaError(error: any) {
+  return [
+    'attendance_date',
+    'requested_at',
+    'approval_status',
+    'approved_by',
+    'approved_at',
+  ].some((column) => isMissingColumnError(error, column));
+}
+
+async function withAttendanceCorrectionsFallback<T>(
+  primary: () => PromiseLike<{ data: T | null; error: any }>,
+  fallback: () => PromiseLike<{ data: T | null; error: any }>,
+) {
+  const result = await primary();
+  if (isAttendanceCorrectionsLegacySchemaError(result.error)) {
+    return fallback();
+  }
+  return result;
+}
+
+function getCorrectionDate(correction: any) {
+  return String(correction?.attendance_date || correction?.original_date || '').slice(0, 10);
+}
+
+function getCorrectionStatus(correction: any) {
+  return correction?.approval_status || correction?.status || DEFAULT_CORRECTION_STATUS;
+}
+
 export default function AttendanceCorrectionForm({
   user,
   initialSelectedDates = [],
@@ -41,10 +73,18 @@ export default function AttendanceCorrectionForm({
   const canApprove = user?.department === '행정팀' || user?.role === 'admin';
 
   const fetchCorrections = useCallback(async () => {
-    const { data } = await supabase
-      .from('attendance_corrections')
-      .select('*')
-      .order('requested_at', { ascending: false });
+    const { data } = await withAttendanceCorrectionsFallback<any[]>(
+      () =>
+        supabase
+          .from('attendance_corrections')
+          .select('*')
+          .order('requested_at', { ascending: false }),
+      () =>
+        supabase
+          .from('attendance_corrections')
+          .select('*')
+          .order('created_at', { ascending: false }),
+    );
 
     if (data) {
       setCorrections(data as any[]);
@@ -77,14 +117,22 @@ export default function AttendanceCorrectionForm({
         .gte('work_date', startStr)
         .lte('work_date', endStr);
 
-      const { data: myCorrections } = await supabase
-        .from('attendance_corrections')
-        .select('attendance_date, original_date')
-        .eq('staff_id', user.id);
+      const { data: myCorrections } = await withAttendanceCorrectionsFallback<any[]>(
+        () =>
+          supabase
+            .from('attendance_corrections')
+            .select('attendance_date, original_date')
+            .eq('staff_id', user.id),
+        () =>
+          supabase
+            .from('attendance_corrections')
+            .select('original_date')
+            .eq('staff_id', user.id),
+      );
 
       const alreadyRequested = new Set(
         (myCorrections || [])
-          .map((item: any) => (item.attendance_date || item.original_date)?.toString().slice(0, 10))
+          .map((item: any) => getCorrectionDate(item))
           .filter(Boolean)
       );
 
@@ -183,7 +231,15 @@ export default function AttendanceCorrectionForm({
         status: '대기',
       }));
 
-      const { error } = await supabase.from('attendance_corrections').insert(rows);
+      const { error } = await withAttendanceCorrectionsFallback<null>(
+        () => supabase.from('attendance_corrections').insert(rows),
+        () => {
+          const legacyRows = rows.map(
+            ({ attendance_date, requested_at, approval_status, ...rest }) => rest
+          );
+          return supabase.from('attendance_corrections').insert(legacyRows);
+        }
+      );
       if (error) throw error;
 
       alert('출결 정정 신청이 완료되었습니다.');
@@ -234,16 +290,27 @@ export default function AttendanceCorrectionForm({
   };
 
   const handleApprove = async (correction: any, newStatus: string) => {
-    const dateStr = (correction.attendance_date || correction.original_date)?.toString().slice(0, 10);
-    const { error } = await supabase
-      .from('attendance_corrections')
-      .update({
-        approval_status: newStatus,
-        status: newStatus,
-        approved_by: user.id,
-        approved_at: new Date().toISOString(),
-      })
-      .eq('id', correction.id);
+    const dateStr = getCorrectionDate(correction);
+    const approvedAt = new Date().toISOString();
+    const { error } = await withAttendanceCorrectionsFallback<null>(
+      () =>
+        supabase
+          .from('attendance_corrections')
+          .update({
+            approval_status: newStatus,
+            status: newStatus,
+            approved_by: user.id,
+            approved_at: approvedAt,
+          })
+          .eq('id', correction.id),
+      () =>
+        supabase
+          .from('attendance_corrections')
+          .update({
+            status: newStatus,
+          })
+          .eq('id', correction.id)
+    );
 
     if (error) {
       alert('처리 중 오류가 발생했습니다.');
@@ -265,11 +332,14 @@ export default function AttendanceCorrectionForm({
 
   const myCorrections = corrections.filter((item) => item.staff_id === user.id);
   const pendingCorrections = corrections.filter(
-    (item) => (item.approval_status || item.status) === '대기'
+    (item) => getCorrectionStatus(item) === DEFAULT_CORRECTION_STATUS
   );
 
   return (
-    <div className="custom-scrollbar flex h-full flex-col overflow-y-auto bg-[var(--tab-bg)]/30 p-4 md:p-8">
+    <div
+      className="custom-scrollbar flex h-full flex-col overflow-y-auto bg-[var(--tab-bg)]/30 p-4 md:p-8"
+      data-testid="attendance-correction-view"
+    >
       <div className="space-y-6 md:space-y-8">
         <header>
           <h2 className="text-xl font-semibold tracking-tight text-[var(--foreground)] md:text-2xl">
@@ -322,6 +392,7 @@ export default function AttendanceCorrectionForm({
           <div className="space-y-6">
             <button
               type="button"
+              data-testid="attendance-correction-toggle"
               onClick={() => setShowNewCorrection((prev) => !prev)}
               className="rounded-[16px] bg-black px-5 py-3 text-xs font-semibold text-white shadow-lg transition-all hover:scale-[0.98]"
             >
@@ -354,6 +425,7 @@ export default function AttendanceCorrectionForm({
                           <button
                             key={item.date}
                             type="button"
+                            data-testid={`attendance-correction-date-${item.date}`}
                             onClick={() => toggleSelectedDate(item.date)}
                             className={`rounded-[16px] border-2 p-3 text-left text-xs font-bold transition-all ${
                               selectedDates.includes(item.date)
@@ -404,6 +476,7 @@ export default function AttendanceCorrectionForm({
                       사유
                     </label>
                     <textarea
+                      data-testid="attendance-correction-reason-input"
                       value={reason}
                       onChange={(event) => setReason(event.target.value)}
                       placeholder="지각 또는 미기록 사유를 자세히 입력해주세요."
@@ -414,6 +487,7 @@ export default function AttendanceCorrectionForm({
 
                 <button
                   type="button"
+                  data-testid="attendance-correction-submit"
                   onClick={handleSubmitCorrection}
                   disabled={loading}
                   className="w-full rounded-[16px] bg-[var(--toss-blue)] py-4 text-sm font-semibold text-white shadow-lg transition-all hover:scale-[0.98] disabled:opacity-50"
@@ -434,26 +508,26 @@ export default function AttendanceCorrectionForm({
             ) : (
               myCorrections.map((correction, index) => (
                 <div
-                  key={correction.id || `${correction.attendance_date}-${index}`}
+                  key={correction.id || `${getCorrectionDate(correction)}-${index}`}
                   className="rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-6 shadow-sm"
                 >
                   <div className="mb-4 flex items-start justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-[var(--foreground)]">
-                        {correction.attendance_date || correction.original_date}
+                        {getCorrectionDate(correction)}
                       </p>
                       <p className="mt-1 text-xs font-bold text-[var(--toss-gray-3)]">{correction.reason}</p>
                     </div>
                     <span
                       className={`rounded-[12px] px-3 py-1 text-[11px] font-semibold ${
-                        (correction.approval_status || correction.status) === '승인'
+                        getCorrectionStatus(correction) === '승인'
                           ? 'bg-green-100 text-green-600'
-                          : (correction.approval_status || correction.status) === '거절'
+                          : getCorrectionStatus(correction) === '거절'
                             ? 'bg-red-100 text-red-600'
                             : 'bg-orange-100 text-orange-500'
                       }`}
                     >
-                      {correction.approval_status ?? correction.status}
+                      {getCorrectionStatus(correction)}
                     </span>
                   </div>
                   <div className="border-t border-[var(--toss-border)] pt-4">
@@ -476,13 +550,13 @@ export default function AttendanceCorrectionForm({
             ) : (
               pendingCorrections.map((correction, index) => (
                 <div
-                  key={correction.id || `${correction.attendance_date}-${index}`}
+                  key={correction.id || `${getCorrectionDate(correction)}-${index}`}
                   className="rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-6 shadow-sm"
                 >
                   <div className="mb-4 flex items-start justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-[var(--foreground)]">
-                        {correction.attendance_date || correction.original_date}
+                        {getCorrectionDate(correction)}
                       </p>
                       <p className="mt-1 text-xs font-bold text-[var(--toss-gray-3)]">{correction.reason}</p>
                     </div>
