@@ -90,12 +90,12 @@ const ADMIN_SECTION_PERMISSION_KEYS: Record<AdminOuterTabId, string> = {
 
 function canAccessAdminTab(user: any, tabId: AdminOuterTabId) {
   const permissions = user?.permissions || {};
-  if (
-    user?.company === 'SY INC.' ||
-    user?.role === 'admin' ||
+  const hasAdminOverride =
     permissions.mso === true ||
-    permissions.admin === true
-  ) {
+    permissions.admin === true ||
+    isNamedSystemMasterAccount(user);
+
+  if (hasAdminOverride) {
     return true;
   }
 

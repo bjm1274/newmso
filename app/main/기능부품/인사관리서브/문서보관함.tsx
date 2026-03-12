@@ -2,6 +2,39 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
+const DOCUMENT_PDF_BUCKET_CANDIDATES = ['document-pdfs', 'board-attachments'];
+
+function isMissingBucketError(error: any, bucketName: string) {
+  if (!error) return false;
+  const message = String(error?.message || error?.details || '').toLowerCase();
+  return (
+    message.includes('bucket') &&
+    (message.includes('not found') || message.includes(bucketName.toLowerCase()))
+  );
+}
+
+async function uploadDocumentPdf(filePath: string, blob: Blob) {
+  let lastError: any = null;
+
+  for (const bucket of DOCUMENT_PDF_BUCKET_CANDIDATES) {
+    const { error } = await supabase.storage
+      .from(bucket)
+      .upload(filePath, blob, { contentType: 'application/pdf', upsert: true });
+
+    if (!error) {
+      const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
+      return data.publicUrl as string;
+    }
+
+    lastError = error;
+    if (!isMissingBucketError(error, bucket)) {
+      throw error;
+    }
+  }
+
+  throw lastError || new Error('No available storage bucket for document PDFs.');
+}
+
 const CATEGORIES = [
   { id: '규정', label: '규정' },
   { id: '양식', label: '양식' },
@@ -87,6 +120,8 @@ export default function DocumentRepository({
               : 'all';
           const safeTitle = title.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || 'document';
           const filePath = `${safeCompany}/${safeTitle}_${Date.now()}.pdf`;
+          const uploadedUrl = await uploadDocumentPdf(filePath, blob);
+          if (uploadedUrl) return uploadedUrl;
 
           const { error: upErr } = await supabase.storage
             .from('document-pdfs')
@@ -204,6 +239,19 @@ export default function DocumentRepository({
           : selectedCo).replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || 'company';
       const safeTitle = title.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || 'document';
       const filePath = `${safeCompany}/${safeTitle}_${Date.now()}.pdf`;
+      const uploadedUrl = await uploadDocumentPdf(filePath, blob);
+      if (uploadedUrl) {
+        const url = uploadedUrl;
+
+        await supabase
+          .from('document_repository')
+          .update({ file_url: url, updated_at: new Date().toISOString() })
+          .eq('id', selected.id);
+
+        setSelected({ ...selected, file_url: url });
+        window.open(url, '_blank');
+        return;
+      }
 
       const { error: upErr } = await supabase.storage
         .from('document-pdfs')

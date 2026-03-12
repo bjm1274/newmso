@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 
 export const DOCUMENT_DESIGN_SETTING_KEY = 'document_designs_v2';
+const LOCAL_SYSTEM_SETTING_PREFIX = 'erp_local_system_setting_';
 
 export type DocumentDesignType = 'payroll_slip' | 'certificate';
 
@@ -49,6 +50,35 @@ const EMPTY_STORE: DocumentDesignStore = {
   defaults: {},
   companies: {},
 };
+
+function isMissingTableError(error: any, tableName = 'system_settings') {
+  if (!error) return false;
+  const code = String(error?.code || '');
+  const message = String(error?.message || error?.details || '').toLowerCase();
+  return code === 'PGRST205' || message.includes(tableName.toLowerCase());
+}
+
+function readLocalSystemSetting(key: string) {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(`${LOCAL_SYSTEM_SETTING_PREFIX}${key}`);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalSystemSetting(key: string, value: unknown) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(
+      `${LOCAL_SYSTEM_SETTING_PREFIX}${key}`,
+      JSON.stringify(value),
+    );
+  } catch {
+    // ignore
+  }
+}
 
 function isRecord(value: unknown): value is Record<string, any> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -105,6 +135,7 @@ export function normalizeDocumentDesignStore(value: unknown): DocumentDesignStor
 }
 
 async function readSetting(key: string) {
+  const localValue = readLocalSystemSetting(key);
   const { data, error } = await supabase
     .from('system_settings')
     .select('value')
@@ -112,20 +143,31 @@ async function readSetting(key: string) {
     .maybeSingle();
 
   if (error) {
+    if (isMissingTableError(error, 'system_settings')) {
+      return localValue;
+    }
     throw error;
   }
 
-  if (!data?.value) return null;
+  if (!data?.value) return localValue;
 
+  let parsedValue = null;
   if (typeof data.value === 'string') {
     try {
-      return JSON.parse(data.value);
+      parsedValue = JSON.parse(data.value);
     } catch {
-      return null;
+      parsedValue = null;
     }
+  } else {
+    parsedValue = data.value;
   }
 
-  return data.value;
+  if (parsedValue != null) {
+    writeLocalSystemSetting(key, parsedValue);
+    return parsedValue;
+  }
+
+  return localValue;
 }
 
 function isEmptyPatch(patch?: DesignPatch) {
@@ -177,9 +219,15 @@ export async function saveDocumentDesignStore(store: DocumentDesignStore) {
     updated_at: new Date().toISOString(),
   };
 
-  return supabase
+  writeLocalSystemSetting(DOCUMENT_DESIGN_SETTING_KEY, store);
+
+  const result = await supabase
     .from('system_settings')
     .upsert(payload, { onConflict: 'key' });
+  if (isMissingTableError(result.error, 'system_settings')) {
+    return { data: payload, error: null } as unknown as typeof result;
+  }
+  return result;
 }
 
 export function resolveDocumentDesign(

@@ -1,3 +1,5 @@
+import { isNamedSystemMasterAccount } from '@/lib/system-master';
+
 type UserLike = {
   role?: string | null;
   company?: string | null;
@@ -259,8 +261,17 @@ export function isAdminUser(user: UserLike | null | undefined): boolean {
   return user?.role === 'admin' || hasPermission(user, 'admin');
 }
 
+function hasGlobalAccessOverride(user: UserLike | null | undefined): boolean {
+  const permissions = getPermissions(user);
+  return (
+    permissions.mso === true ||
+    permissions.admin === true ||
+    isNamedSystemMasterAccount(user as Record<string, any> | null | undefined)
+  );
+}
+
 export function isPrivilegedUser(user: UserLike | null | undefined): boolean {
-  return isMsoUser(user) || isAdminUser(user);
+  return hasGlobalAccessOverride(user);
 }
 
 export function canAccessMainMenu(user: UserLike | null | undefined, menuId: string): boolean {

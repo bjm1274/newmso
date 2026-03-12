@@ -18,6 +18,61 @@ interface Seal {
 
 const SEAL_TYPES = ['법인인감', '대표인', '부서인'];
 
+const LOCAL_SEALS_KEY = 'erp_company_seals_local';
+const SEAL_BUCKET_CANDIDATES = ['seals', 'company-seals'];
+
+function isMissingTableError(error: any, tableName = 'company_seals') {
+  if (!error) return false;
+  const code = String(error?.code || '');
+  const message = String(error?.message || error?.details || '').toLowerCase();
+  return code === 'PGRST205' || message.includes(tableName.toLowerCase());
+}
+
+function isMissingBucketError(error: any, bucketName: string) {
+  if (!error) return false;
+  const message = String(error?.message || error?.details || '').toLowerCase();
+  return (
+    message.includes('bucket') &&
+    (message.includes('not found') || message.includes(bucketName.toLowerCase()))
+  );
+}
+
+function readLocalSeals(): Seal[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(LOCAL_SEALS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeLocalSeals(next: Seal[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(LOCAL_SEALS_KEY, JSON.stringify(next));
+  } catch {
+    // ignore
+  }
+}
+
+async function uploadSealImage(imageFile: File, fallbackPreview: string | null) {
+  const fileName = `seals/${Date.now()}_${imageFile.name}`;
+
+  for (const bucket of SEAL_BUCKET_CANDIDATES) {
+    const { error } = await supabase.storage.from(bucket).upload(fileName, imageFile, { upsert: true });
+    if (!error) {
+      const { data } = supabase.storage.from(bucket).getPublicUrl(fileName);
+      return data?.publicUrl || fallbackPreview || '';
+    }
+    if (!isMissingBucketError(error, bucket)) {
+      throw error;
+    }
+  }
+
+  return fallbackPreview || '';
+}
+
 export default function SealManager({ user, selectedCo }: Props) {
   const [seals, setSeals] = useState<Seal[]>([]);
   const [loading, setLoading] = useState(false);
@@ -33,10 +88,22 @@ export default function SealManager({ user, selectedCo }: Props) {
   const fetchSeals = async () => {
     setLoading(true);
     try {
-      const { data } = await supabase.from('company_seals').select('*').order('created_at', { ascending: false });
-      setSeals(data || []);
+      const { data, error } = await supabase
+        .from('company_seals')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) {
+        if (!isMissingTableError(error, 'company_seals')) {
+          throw error;
+        }
+        setSeals(readLocalSeals());
+        return;
+      }
+      const next = data || [];
+      setSeals(next);
+      writeLocalSeals(next);
     } catch {
-      setSeals([]);
+      setSeals(readLocalSeals());
     } finally {
       setLoading(false);
     }
@@ -60,26 +127,33 @@ export default function SealManager({ user, selectedCo }: Props) {
     try {
       let imageUrl = imagePreview || '';
       if (imageFile) {
-        const fileName = `seals/${Date.now()}_${imageFile.name}`;
-        const { data: uploadData } = await supabase.storage.from('seals').upload(fileName, imageFile, { upsert: true });
-        if (uploadData) {
-          const { data: urlData } = supabase.storage.from('seals').getPublicUrl(fileName);
-          imageUrl = urlData?.publicUrl || imagePreview || '';
-        }
+        imageUrl = await uploadSealImage(imageFile, imagePreview);
       }
-      await supabase.from('company_seals').insert({
+      const nextSeal: Seal = {
+        id: globalThis.crypto?.randomUUID?.() || `local-seal-${Date.now()}`,
         company: company.trim(),
         type: sealType,
         image_url: imageUrl,
         is_active: true,
-      });
+        created_at: new Date().toISOString(),
+      };
+      const { error } = await supabase.from('company_seals').insert(nextSeal);
+      if (error) {
+        if (!isMissingTableError(error, 'company_seals')) {
+          throw error;
+        }
+        const next = [nextSeal, ...readLocalSeals()];
+        setSeals(next);
+        writeLocalSeals(next);
+      } else {
+        await fetchSeals();
+      }
       alert('직인이 등록되었습니다.');
       setShowForm(false);
       setCompany(selectedCo === '전체' ? '' : selectedCo);
       setSealType('법인인감');
       setImagePreview(null);
       setImageFile(null);
-      fetchSeals();
     } catch {
       alert('저장에 실패했습니다.');
     } finally {
@@ -89,8 +163,20 @@ export default function SealManager({ user, selectedCo }: Props) {
 
   const handleToggleActive = async (seal: Seal) => {
     try {
-      await supabase.from('company_seals').update({ is_active: !seal.is_active }).eq('id', seal.id);
-      setSeals(prev => prev.map(s => s.id === seal.id ? { ...s, is_active: !s.is_active } : s));
+      const nextActive = !seal.is_active;
+      const { error } = await supabase.from('company_seals').update({ is_active: nextActive }).eq('id', seal.id);
+      if (error) {
+        if (!isMissingTableError(error, 'company_seals')) {
+          throw error;
+        }
+        const next = readLocalSeals().map((item) => item.id === seal.id ? { ...item, is_active: nextActive } : item);
+        setSeals(next);
+        writeLocalSeals(next);
+        return;
+      }
+      const next = seals.map((item) => item.id === seal.id ? { ...item, is_active: nextActive } : item);
+      setSeals(next);
+      writeLocalSeals(next);
     } catch {
       alert('변경에 실패했습니다.');
     }
@@ -99,8 +185,19 @@ export default function SealManager({ user, selectedCo }: Props) {
   const handleDelete = async (id: string) => {
     if (!confirm('이 직인을 삭제하시겠습니까?')) return;
     try {
-      await supabase.from('company_seals').delete().eq('id', id);
-      setSeals(prev => prev.filter(s => s.id !== id));
+      const { error } = await supabase.from('company_seals').delete().eq('id', id);
+      if (error) {
+        if (!isMissingTableError(error, 'company_seals')) {
+          throw error;
+        }
+        const nextLocal = readLocalSeals().filter((item) => item.id !== id);
+        setSeals(nextLocal);
+        writeLocalSeals(nextLocal);
+        return;
+      }
+      const next = seals.filter((item) => item.id !== id);
+      setSeals(next);
+      writeLocalSeals(next);
     } catch {
       alert('삭제에 실패했습니다.');
     }
