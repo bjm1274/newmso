@@ -113,6 +113,8 @@ export type MockFixtures = {
   insuranceRecords?: any[];
   attendance?: any[];
   attendances?: any[];
+  attendanceCorrections?: any[];
+  legacyAttendanceCorrectionsSchema?: boolean;
   leaveRequests?: any[];
   attendanceDeductionRules?: any[];
   taxInsuranceRates?: any[];
@@ -129,6 +131,19 @@ function json(route: Route, payload: unknown, status = 200) {
     contentType: 'application/json',
     body: JSON.stringify(payload),
   });
+}
+
+function missingColumn(route: Route, columnName: string) {
+  return json(
+    route,
+    {
+      code: 'PGRST204',
+      details: null,
+      hint: null,
+      message: `Could not find the '${columnName}' column of 'attendance_corrections' in the schema cache`,
+    },
+    400
+  );
 }
 
 function normalizeComparableValue(value: any) {
@@ -295,6 +310,8 @@ function buildFixtures(overrides: MockFixtures = {}) {
     insuranceRecords: overrides.insuranceRecords ?? [],
     attendance: overrides.attendance ?? [],
     attendances: overrides.attendances ?? [],
+    attendanceCorrections: overrides.attendanceCorrections ?? [],
+    legacyAttendanceCorrectionsSchema: overrides.legacyAttendanceCorrectionsSchema ?? false,
     leaveRequests: overrides.leaveRequests ?? [],
     attendanceDeductionRules:
       overrides.attendanceDeductionRules ??
@@ -493,9 +510,11 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
   let insuranceRecords = [...fixtures.insuranceRecords];
   let attendance = [...(fixtures.attendance ?? [])];
   let attendances = [...fixtures.attendances];
+  let attendanceCorrections = [...fixtures.attendanceCorrections];
   let leaveRequests = [...(fixtures.leaveRequests ?? [])];
   const attendanceDeductionRules = [...fixtures.attendanceDeductionRules];
   const taxInsuranceRates = [...fixtures.taxInsuranceRates];
+  const legacyAttendanceCorrectionsSchema = fixtures.legacyAttendanceCorrectionsSchema;
   let messageInsertFailures = fixtures.messageInsertFailures;
   let payrollRecords = [...fixtures.payrollRecords];
 
@@ -746,6 +765,71 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
         return json(route, wantsObject ? updated[0] ?? null : updated);
       }
       return json(route, approvals);
+    }
+
+    if (path.includes('/attendance_corrections')) {
+      if (legacyAttendanceCorrectionsSchema) {
+        const select = url.searchParams.get('select') || '';
+        const order = url.searchParams.get('order') || '';
+
+        if (select.includes('attendance_date')) {
+          return missingColumn(route, 'attendance_date');
+        }
+
+        if (order.startsWith('requested_at')) {
+          return missingColumn(route, 'requested_at');
+        }
+      }
+
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(attendanceCorrections, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+
+        if (legacyAttendanceCorrectionsSchema) {
+          const missingColumnName = ['attendance_date', 'requested_at', 'approval_status'].find((column) =>
+            payloads.some((payload: any) => Object.prototype.hasOwnProperty.call(payload, column))
+          );
+
+          if (missingColumnName) {
+            return missingColumn(route, missingColumnName);
+          }
+        }
+
+        const inserted = payloads.map((payload: any, index: number) => ({
+          id: payload.id || `attendance-correction-${attendanceCorrections.length + index + 1}`,
+          created_at: payload.created_at || new Date().toISOString(),
+          status: payload.status ?? '대기',
+          ...payload,
+        }));
+        attendanceCorrections = [...inserted, ...attendanceCorrections];
+        return json(route, wantsObject ? inserted[0] : inserted);
+      }
+
+      if (method === 'PATCH') {
+        const body = request.postDataJSON();
+
+        if (legacyAttendanceCorrectionsSchema) {
+          const missingColumnName = ['approval_status', 'approved_by', 'approved_at'].find((column) =>
+            Object.prototype.hasOwnProperty.call(body, column)
+          );
+
+          if (missingColumnName) {
+            return missingColumn(route, missingColumnName);
+          }
+        }
+
+        attendanceCorrections = attendanceCorrections.map((row: any) =>
+          matchFilters(row, url) ? { ...row, ...body } : row
+        );
+        const updated = applyQueryFilters(attendanceCorrections, url);
+        return json(route, wantsObject ? updated[0] ?? null : updated);
+      }
+
+      return json(route, attendanceCorrections);
     }
 
     if (path.includes('/work_shifts')) {
