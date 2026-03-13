@@ -3,14 +3,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import {
-  DOCUMENT_DESIGN_SETTING_KEY,
   DEFAULT_DOCUMENT_DESIGNS,
-  DocumentDesignType,
+  DocumentDesign,
   DocumentDesignStore,
+  DocumentDesignType,
   alphaColor,
   fetchDocumentDesignStore,
+  getDocumentDesignScopePatch,
   resetDocumentDesignScope,
   resolveDocumentDesign,
+  resolveDocumentDesignReference,
   saveDocumentDesignStore,
   updateDocumentDesignStore,
 } from '@/lib/document-designs';
@@ -21,12 +23,54 @@ const DOCUMENT_TYPE_OPTIONS: { id: DocumentDesignType; label: string; helper: st
   {
     id: 'payroll_slip',
     label: '급여명세서',
-    helper: '마이페이지, 인사관리, PDF 출력에 같은 서식을 적용합니다.',
+    helper: '마이페이지와 인사관리 PDF 출력에 공통으로 적용되는 기본 문서입니다.',
   },
   {
     id: 'certificate',
     label: '증명서 발급',
-    helper: '재직증명서, 경력증명서 등 발급 문서에 같은 서식을 적용합니다.',
+    helper: '재직증명서, 경력증명서 등 발급 문서의 공통 기본 디자인입니다.',
+  },
+];
+
+const TEXT_FIELD_CONFIGS: Array<{
+  field: Exclude<keyof DocumentDesign, 'showSignArea'>;
+  label: string;
+  helper: string;
+  placeholder?: string;
+  multiline?: boolean;
+}> = [
+  {
+    field: 'title',
+    label: '문서 제목',
+    helper: '문서 상단에 가장 크게 표시되는 제목입니다.',
+  },
+  {
+    field: 'subtitle',
+    label: '부제목',
+    helper: '문서 설명이나 보조 문구로 사용됩니다.',
+  },
+  {
+    field: 'companyLabel',
+    label: '회사 표기',
+    helper: '헤더와 서명 영역에 표시할 회사명입니다.',
+  },
+  {
+    field: 'primaryColor',
+    label: '주 색상',
+    helper: '헤더와 강조 영역에 사용되는 색상입니다.',
+    placeholder: '#1d4ed8',
+  },
+  {
+    field: 'borderColor',
+    label: '테두리 색상',
+    helper: '카드와 표 경계선 색상입니다.',
+    placeholder: '#dbe4f0',
+  },
+  {
+    field: 'footerText',
+    label: '하단 문구',
+    helper: '문서 하단 주석이나 안내 문구입니다. 비워 두면 숨길 수 있습니다.',
+    multiline: true,
   },
 ];
 
@@ -34,6 +78,10 @@ type CompanyOption = {
   id: string;
   name: string;
 };
+
+function hasOwnPatchField(patch: Partial<DocumentDesign>, field: keyof DocumentDesign) {
+  return Object.prototype.hasOwnProperty.call(patch, field);
+}
 
 function PreviewCard({
   title,
@@ -44,33 +92,53 @@ function PreviewCard({
   borderColor,
   showSignArea,
   type,
-}: {
-  title: string;
-  subtitle: string;
-  footerText: string;
-  companyLabel: string;
-  primaryColor: string;
-  borderColor: string;
-  showSignArea: boolean;
-  type: DocumentDesignType;
-}) {
+}: DocumentDesign & { type: DocumentDesignType }) {
   const surface = alphaColor(primaryColor, 0.08);
   const softLine = alphaColor(primaryColor, 0.18);
+  const certificateIdentityRows = [
+    ['성명', '홍길동'],
+    ['사번', 'KM-240101'],
+    ['부서', '인사팀'],
+    ['직위', '대리'],
+  ];
+  const certificateRows = [
+    ['입사일자', '2023년 3월 1일'],
+    ['재직기간', '2023.03.01 ~ 현재'],
+    ['사용용도', '제출용'],
+    ['발급일자', '2026년 3월 12일'],
+    ['발급번호', 'CERT-202603-000001'],
+  ];
 
   return (
     <div
-      className="rounded-[20px] bg-white p-6 shadow-sm"
-      style={{ border: `1px solid ${borderColor}` }}
+      className="relative overflow-hidden rounded-[20px] bg-white p-6 shadow-sm"
+      style={{
+        border: `1px solid ${borderColor}`,
+        background: `linear-gradient(180deg, #ffffff 0%, ${alphaColor(primaryColor, 0.03)} 100%)`,
+      }}
     >
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full blur-2xl" style={{ backgroundColor: alphaColor(primaryColor, 0.12) }} />
+        <img src="/logo.png" alt="" className="absolute left-1/2 top-1/2 h-28 w-28 -translate-x-1/2 -translate-y-1/2 object-contain opacity-[0.05] mix-blend-multiply" />
+      </div>
       <div
-        className="rounded-[16px] p-5 text-white"
+        className="relative rounded-[16px] p-5 text-white"
         style={{ background: `linear-gradient(135deg, ${primaryColor}, ${alphaColor(primaryColor, 0.8)})` }}
       >
-        <p className="text-[11px] font-black uppercase tracking-[0.24em] opacity-80">
+        <div className="mb-3 inline-flex rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-black tracking-[0.18em] opacity-90">
+          기본 문서
+        </div>
+        <p className="text-[11px] font-black tracking-[0.18em] opacity-80">
           {companyLabel}
         </p>
         <h3 className="mt-2 text-2xl font-bold tracking-tight">{title}</h3>
-        <p className="mt-1 text-[12px] font-medium opacity-85">{subtitle}</p>
+        {subtitle && <p className="mt-1 text-[12px] font-medium opacity-85">{subtitle}</p>}
+        {type === 'certificate' && (
+          <div
+            className="mt-4 h-[4px] rounded-full"
+            style={{ background: 'linear-gradient(90deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.55) 100%)' }}
+          />
+        )}
       </div>
 
       <div className="mt-5 rounded-[16px] p-5" style={{ backgroundColor: surface }}>
@@ -84,12 +152,12 @@ function PreviewCard({
                   style={{ border: `1px solid ${softLine}` }}
                 >
                   <p className="text-[10px] font-black uppercase text-slate-400">{label}</p>
-                  <p className="mt-1 font-semibold text-slate-800">예시</p>
+                  <p className="mt-1 font-semibold text-slate-800">예시 데이터</p>
                 </div>
               ))}
             </div>
             <div className="grid grid-cols-2 gap-4">
-              {['지급내역', '공제내역'].map((section) => (
+              {['지급 내역', '공제 내역'].map((section) => (
                 <div
                   key={section}
                   className="rounded-[14px] bg-white p-4"
@@ -114,27 +182,80 @@ function PreviewCard({
             </div>
           </div>
         ) : (
-          <div
-            className="rounded-[16px] bg-white p-5"
-            style={{ border: `1px solid ${borderColor}` }}
-          >
-            <div className="flex items-center justify-between">
+          <div className="space-y-4">
+            <div
+              className="flex items-center justify-between rounded-[16px] border bg-white px-4 py-3 shadow-sm"
+              style={{ borderColor: alphaColor(primaryColor, 0.15), backgroundColor: alphaColor(primaryColor, 0.05) }}
+            >
               <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-                  Document No.
+                <p className="text-[10px] font-black tracking-[0.18em] text-slate-400">
+                  발급번호
                 </p>
-                <p className="mt-1 text-sm font-bold text-slate-800">CERT-2026-000001</p>
+                <p className="mt-1 text-sm font-bold text-slate-800">CERT-202603-000001</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] font-black tracking-[0.18em] text-slate-400">
+                  발급일자
+                </p>
+                <p className="mt-1 text-sm font-semibold text-slate-800">2026년 3월 12일</p>
               </div>
             </div>
-            <div className="mt-5 space-y-3 text-[12px] text-slate-600">
-              {['성명', '소속', '직위', '재직기간', '제출용도'].map((label) => (
+
+            <div className="grid gap-4 md:grid-cols-[110px_1fr]">
+              <div
+                className="rounded-[18px] bg-white p-3 shadow-sm"
+                style={{ border: `1px solid ${borderColor}` }}
+              >
+                <div className="aspect-[3/4] overflow-hidden rounded-[14px]" style={{ backgroundColor: surface }}>
+                  <div className="flex h-full w-full items-center justify-center text-3xl font-black text-slate-300">
+                    사
+                  </div>
+                </div>
+                <p className="mt-2 text-center text-[11px] font-semibold text-slate-400">사진</p>
+              </div>
+
+              <div
+                className="rounded-[18px] bg-white p-4 shadow-sm"
+                style={{ border: `1px solid ${borderColor}` }}
+              >
+                {certificateIdentityRows.map(([label, value], index) => (
+                  <div
+                    key={label}
+                    className={`grid grid-cols-[64px_16px_1fr] items-start gap-2 ${index < certificateIdentityRows.length - 1 ? 'border-b pb-2.5' : ''} ${index > 0 ? 'pt-2.5' : ''}`}
+                    style={{ borderColor }}
+                  >
+                    <span className="text-[12px] font-black text-slate-700">{label}</span>
+                    <span className="text-[12px] font-black text-slate-700">:</span>
+                    <span className="text-[12px] font-semibold text-slate-800">{value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div
+              className="rounded-[16px] border p-4 text-center"
+              style={{
+                borderColor: alphaColor(primaryColor, 0.18),
+                background: `linear-gradient(135deg, ${alphaColor(primaryColor, 0.12)}, rgba(255,255,255,0.88))`,
+              }}
+            >
+              <p className="text-[13px] font-black text-slate-800">상기인은 다음과 같이 당사에 재직 중임을 증명합니다.</p>
+              {footerText && <p className="mt-2 text-[11px] leading-relaxed text-slate-500">{footerText}</p>}
+            </div>
+
+            <div
+              className="rounded-[18px] bg-white p-4 shadow-sm"
+              style={{ border: `1px solid ${borderColor}` }}
+            >
+              {certificateRows.map(([label, value], index) => (
                 <div
                   key={label}
-                  className="flex items-center justify-between border-b pb-2"
+                  className={`grid grid-cols-[76px_16px_1fr] items-start gap-2 ${index < certificateRows.length - 1 ? 'border-b pb-2.5' : ''} ${index > 0 ? 'pt-2.5' : ''}`}
                   style={{ borderColor }}
                 >
-                  <span className="font-black uppercase text-slate-400">{label}</span>
-                  <span className="font-semibold text-slate-800">예시 데이터</span>
+                  <span className="text-[12px] font-black text-slate-700">{label}</span>
+                  <span className="text-[12px] font-black text-slate-700">:</span>
+                  <span className="text-[12px] font-semibold text-slate-800">{value}</span>
                 </div>
               ))}
             </div>
@@ -142,20 +263,120 @@ function PreviewCard({
         )}
       </div>
 
-      {footerText && (
+      {type !== 'certificate' && footerText && (
         <p className="mt-4 text-[11px] font-medium text-slate-500">
           {footerText}
         </p>
       )}
 
       {showSignArea && (
-        <div
-          className="mt-5 flex justify-end border-t pt-4 text-[11px] font-semibold text-slate-500"
-          style={{ borderColor }}
-        >
-          {companyLabel} 직인 / 담당자 서명
-        </div>
+        type === 'certificate' ? (
+          <div className="mt-5 flex justify-center border-t pt-4" style={{ borderColor }}>
+            <div
+              className="flex items-end gap-4 rounded-[18px] border bg-white/90 px-5 py-3 shadow-sm"
+              style={{ borderColor: alphaColor(primaryColor, 0.18) }}
+            >
+              <div className="text-center">
+                <p className="text-2xl font-black tracking-tight text-slate-800">{companyLabel}</p>
+                <p className="mt-1 text-[11px] font-semibold text-slate-500">대표자 / 직인</p>
+              </div>
+              <div
+                className="flex h-16 w-16 items-center justify-center rounded-full border-[3px] bg-white text-center text-[10px] font-black shadow-sm"
+                style={{ borderColor: alphaColor(primaryColor, 0.7), color: primaryColor }}
+              >
+                직인
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div
+            className="mt-5 flex justify-end border-t pt-4 text-[11px] font-semibold text-slate-500"
+            style={{ borderColor }}
+          >
+            {companyLabel} 직인 / 담당자 서명
+          </div>
+        )
       )}
+    </div>
+  );
+}
+
+function DesignFieldRow({
+  label,
+  helper,
+  baseValue,
+  currentValue,
+  placeholder,
+  multiline = false,
+  modified,
+  onChange,
+  onReset,
+}: {
+  label: string;
+  helper: string;
+  baseValue: string;
+  currentValue: string;
+  placeholder?: string;
+  multiline?: boolean;
+  modified: boolean;
+  onChange: (value: string) => void;
+  onReset: () => void;
+}) {
+  const inputClassName =
+    'w-full rounded-[14px] border border-[var(--toss-border)] px-3 py-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20';
+
+  return (
+    <div className="rounded-[16px] border border-[var(--toss-border)] bg-white p-4 shadow-sm">
+      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+        <div>
+          <p className="text-sm font-bold text-[var(--foreground)]">{label}</p>
+          <p className="mt-1 text-[11px] leading-5 text-[var(--toss-gray-3)]">{helper}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span
+            className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
+              modified
+                ? 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)]'
+                : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'
+            }`}
+          >
+            {modified ? '수정됨' : '기본값 사용'}
+          </span>
+          {modified && (
+            <button
+              type="button"
+              onClick={onReset}
+              className="rounded-[10px] border border-[var(--toss-border)] bg-white px-3 py-1.5 text-[11px] font-bold text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]"
+            >
+              기준으로 되돌리기
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-4">
+        {multiline ? (
+          <textarea
+            value={currentValue}
+            onChange={(event) => onChange(event.target.value)}
+            rows={3}
+            placeholder={placeholder}
+            className={inputClassName}
+          />
+        ) : (
+          <input
+            value={currentValue}
+            onChange={(event) => onChange(event.target.value)}
+            placeholder={placeholder}
+            className={inputClassName}
+          />
+        )}
+      </div>
+
+      <div className="mt-3 rounded-[12px] bg-[var(--toss-gray-1)]/80 px-3 py-2 text-[11px] text-[var(--toss-gray-3)]">
+        <span className="font-bold text-[var(--foreground)]">기준값</span>
+        <span className="ml-2 whitespace-pre-wrap break-all">{baseValue || '(비어 있음)'}</span>
+      </div>
     </div>
   );
 }
@@ -196,78 +417,104 @@ export default function PayrollSlipDesignManager() {
         setStore(designStore);
         setCompanies(Array.from(companyMap.values()).sort((a, b) => a.name.localeCompare(b.name)));
       } catch (error) {
-        console.error('문서 양식 설정 조회 실패:', error);
+        console.error('문서 서식 설정 조회 실패:', error);
+        setStore({
+          version: 2,
+          defaults: {},
+          companies: {},
+        });
       } finally {
         setLoading(false);
       }
     };
 
-    load();
+    void load();
   }, []);
 
-  const resolvedDesign = useMemo(() => {
-    if (!store) {
-      return DEFAULT_DOCUMENT_DESIGNS[selectedType];
-    }
+  const workingStore = store || {
+    version: 2,
+    defaults: {},
+    companies: {},
+  } satisfies DocumentDesignStore;
 
-    return resolveDocumentDesign(
-      store,
-      selectedType,
-      selectedCompany === COMPANY_ALL ? undefined : selectedCompany,
-    );
-  }, [selectedCompany, selectedType, store]);
-
+  const selectedCompanyName = selectedCompany === COMPANY_ALL ? undefined : selectedCompany;
   const selectedDocument = DOCUMENT_TYPE_OPTIONS.find((item) => item.id === selectedType)!;
-  const selectedScopeLabel =
-    selectedCompany === COMPANY_ALL ? '전체 기본값' : selectedCompany;
+  const selectedScopeLabel = selectedCompanyName || '전체 기본 디자인';
 
-  const updateField = (field: keyof typeof resolvedDesign, value: string | boolean) => {
-    if (!store) return;
+  const referenceDesign = useMemo(
+    () => resolveDocumentDesignReference(workingStore, selectedType, selectedCompanyName),
+    [selectedCompanyName, selectedType, workingStore],
+  );
 
-    const patch = {
+  const resolvedDesign = useMemo(
+    () => resolveDocumentDesign(workingStore, selectedType, selectedCompanyName),
+    [selectedCompanyName, selectedType, workingStore],
+  );
+
+  const scopePatch = useMemo(
+    () => getDocumentDesignScopePatch(workingStore, selectedType, selectedCompanyName),
+    [selectedCompanyName, selectedType, workingStore],
+  );
+
+  const modifiedFieldKeys = useMemo(
+    () =>
+      (Object.keys(scopePatch) as (keyof DocumentDesign)[]).filter((field) =>
+        hasOwnPatchField(scopePatch, field),
+      ),
+    [scopePatch],
+  );
+
+  const updateField = (field: keyof DocumentDesign, value: string | boolean) => {
+    const nextDesign: DocumentDesign = {
       ...resolvedDesign,
       [field]: value,
     };
 
     setStore(
       updateDocumentDesignStore(
-        store,
+        workingStore,
         selectedType,
-        patch,
-        selectedCompany === COMPANY_ALL ? undefined : selectedCompany,
+        nextDesign,
+        selectedCompanyName,
       ),
     );
   };
 
+  const resetField = (field: keyof DocumentDesign) => {
+    updateField(field, referenceDesign[field]);
+  };
+
   const handleSave = async () => {
-    if (!store) return;
     setSaving(true);
 
     try {
-      const { error } = await saveDocumentDesignStore(store);
+      const { error } = await saveDocumentDesignStore(workingStore);
       if (error) {
         throw error;
       }
-      alert('문서 양식 설정을 저장했습니다.');
+      alert('문서 디자인 설정을 저장했습니다.');
     } catch (error) {
       console.error(error);
-      alert('문서 양식 저장 중 오류가 발생했습니다.');
+      alert('문서 디자인 저장 중 오류가 발생했습니다.');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleReset = () => {
-    if (!store) return;
-    if (!confirm(`${selectedScopeLabel}의 ${selectedDocument.label} 서식을 기본값으로 되돌릴까요?`)) {
+  const handleResetScope = () => {
+    if (
+      !confirm(
+        `${selectedScopeLabel}의 ${selectedDocument.label} 수정값을 모두 지우고 기준 디자인으로 되돌릴까요?`,
+      )
+    ) {
       return;
     }
 
     setStore(
       resetDocumentDesignScope(
-        store,
+        workingStore,
         selectedType,
-        selectedCompany === COMPANY_ALL ? undefined : selectedCompany,
+        selectedCompanyName,
       ),
     );
   };
@@ -277,20 +524,23 @@ export default function PayrollSlipDesignManager() {
       <div className="rounded-[20px] border border-[var(--toss-border)] bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
           <div>
-            <h2 className="text-lg font-bold text-[var(--foreground)]">문서 양식 통합 관리</h2>
+            <h2 className="text-lg font-bold text-[var(--foreground)]">문서 서식 통합 관리</h2>
+            <p className="mt-1 text-sm text-[var(--toss-gray-3)]">
+              급여명세서와 증명서는 기본 디자인을 기준으로 보고, 필요한 부분만 수정해서 덧씌우는 방식으로 관리합니다.
+            </p>
           </div>
           {loading && (
             <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">불러오는 중...</span>
           )}
         </div>
 
-        <div className="mt-6 grid gap-4 lg:grid-cols-[320px_1fr]">
+        <div className="mt-6 grid gap-4 xl:grid-cols-[320px_1fr]">
           <div className="space-y-4">
             <div className="rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)]/70 p-4">
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">
                 적용 범위
               </p>
-              <div className="mt-3 space-y-2">
+              <div className="mt-3 space-y-3">
                 <label className="block">
                   <span className="mb-1 block text-[11px] font-semibold text-[var(--toss-gray-3)]">
                     문서 종류
@@ -317,7 +567,7 @@ export default function PayrollSlipDesignManager() {
                     onChange={(event) => setSelectedCompany(event.target.value)}
                     className="w-full rounded-[14px] border border-[var(--toss-border)] bg-white px-3 py-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20"
                   >
-                    <option value={COMPANY_ALL}>전체 기본값</option>
+                    <option value={COMPANY_ALL}>전체 기본 디자인</option>
                     {companies.map((company) => (
                       <option key={company.id} value={company.name}>
                         {company.name}
@@ -326,6 +576,7 @@ export default function PayrollSlipDesignManager() {
                   </select>
                 </label>
               </div>
+
               <div className="mt-4 rounded-[14px] bg-white px-4 py-3 text-[12px] text-[var(--toss-gray-3)] shadow-sm">
                 <p className="font-semibold text-[var(--foreground)]">{selectedDocument.label}</p>
                 <p className="mt-1 leading-relaxed">{selectedDocument.helper}</p>
@@ -334,130 +585,158 @@ export default function PayrollSlipDesignManager() {
 
             <div className="rounded-[16px] border border-[var(--toss-border)] bg-white p-4 shadow-sm">
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">
-                서식 값
+                현재 수정 상태
               </p>
-              <div className="mt-3 space-y-3">
-                <label className="block">
-                  <span className="mb-1 block text-[11px] font-semibold text-[var(--toss-gray-3)]">제목</span>
-                  <input
-                    value={resolvedDesign.title}
-                    onChange={(event) => updateField('title', event.target.value)}
-                    className="w-full rounded-[14px] border border-[var(--toss-border)] px-3 py-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="mb-1 block text-[11px] font-semibold text-[var(--toss-gray-3)]">부제</span>
-                  <input
-                    value={resolvedDesign.subtitle}
-                    onChange={(event) => updateField('subtitle', event.target.value)}
-                    className="w-full rounded-[14px] border border-[var(--toss-border)] px-3 py-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="mb-1 block text-[11px] font-semibold text-[var(--toss-gray-3)]">회사 표기</span>
-                  <input
-                    value={resolvedDesign.companyLabel}
-                    onChange={(event) => updateField('companyLabel', event.target.value)}
-                    className="w-full rounded-[14px] border border-[var(--toss-border)] px-3 py-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20"
-                  />
-                </label>
-
-                <div className="grid grid-cols-[1fr_88px] gap-3">
-                  <label className="block">
-                    <span className="mb-1 block text-[11px] font-semibold text-[var(--toss-gray-3)]">주 색상</span>
-                    <input
-                      value={resolvedDesign.primaryColor}
-                      onChange={(event) => updateField('primaryColor', event.target.value)}
-                      className="w-full rounded-[14px] border border-[var(--toss-border)] px-3 py-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20"
-                      placeholder="#1d4ed8"
-                    />
-                  </label>
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">미리보기</span>
-                    <div
-                      className="h-[42px] rounded-[14px] border border-[var(--toss-border)]"
-                      style={{ backgroundColor: resolvedDesign.primaryColor }}
-                    />
-                  </div>
-                </div>
-
-                <label className="block">
-                  <span className="mb-1 block text-[11px] font-semibold text-[var(--toss-gray-3)]">테두리 색상</span>
-                  <input
-                    value={resolvedDesign.borderColor}
-                    onChange={(event) => updateField('borderColor', event.target.value)}
-                    className="w-full rounded-[14px] border border-[var(--toss-border)] px-3 py-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20"
-                    placeholder="#dbe4f0"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="mb-1 block text-[11px] font-semibold text-[var(--toss-gray-3)]">하단 문구</span>
-                  <textarea
-                    value={resolvedDesign.footerText}
-                    onChange={(event) => updateField('footerText', event.target.value)}
-                    rows={3}
-                    className="w-full rounded-[14px] border border-[var(--toss-border)] px-3 py-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20"
-                  />
-                </label>
-
-                <label className="flex items-center justify-between rounded-[14px] border border-[var(--toss-border)] px-4 py-3">
-                  <div>
-                    <p className="text-sm font-semibold text-[var(--foreground)]">서명 / 직인 영역 표시</p>
-                    <p className="text-[11px] text-[var(--toss-gray-3)]">
-                      급여명세서와 증명서 하단 서명 영역 노출 여부
-                    </p>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={resolvedDesign.showSignArea}
-                    onChange={(event) => updateField('showSignArea', event.target.checked)}
-                    className="h-4 w-4 rounded border-[var(--toss-border)]"
-                  />
-                </label>
+              <div className="mt-3 rounded-[14px] bg-[var(--toss-gray-1)]/70 p-4">
+                <p className="text-sm font-semibold text-[var(--foreground)]">{selectedScopeLabel}</p>
+                <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
+                  {selectedCompanyName
+                    ? '회사 전용 수정값은 전체 기본 디자인 위에 덧씌워집니다.'
+                    : '전체 기본 디자인은 모든 회사 문서의 기준이 됩니다.'}
+                </p>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {modifiedFieldKeys.length === 0 ? (
+                  <span className="rounded-full bg-[var(--toss-gray-1)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-4)]">
+                    별도 수정 없음
+                  </span>
+                ) : (
+                  modifiedFieldKeys.map((field) => (
+                    <span
+                      key={field}
+                      className="rounded-full bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--toss-blue)]"
+                    >
+                      {TEXT_FIELD_CONFIGS.find((item) => item.field === field)?.label ||
+                        '서명 영역'}
+                    </span>
+                  ))
+                )}
               </div>
             </div>
           </div>
 
           <div className="space-y-4">
-            <div className="rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)]/60 p-4">
-              <div className="flex items-center justify-between">
-                <div>
+            <div className="grid gap-4 xl:grid-cols-2">
+              <div className="rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)]/60 p-4">
+                <div className="mb-4">
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">
+                    기준 디자인
+                  </p>
                   <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">
-                    {selectedScopeLabel} · {selectedDocument.label}
+                    {selectedCompanyName ? '전체 기본 디자인을 기준으로 비교' : '시스템 기본값'}
+                  </p>
+                </div>
+                <PreviewCard type={selectedType} {...referenceDesign} />
+              </div>
+
+              <div className="rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)]/60 p-4">
+                <div className="mb-4">
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">
+                    현재 적용 결과
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">
+                    {selectedScopeLabel}에 실제 반영되는 미리보기
+                  </p>
+                </div>
+                <PreviewCard type={selectedType} {...resolvedDesign} />
+              </div>
+            </div>
+
+            <div className="rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)]/60 p-4">
+              <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">
+                    기준 디자인에서 수정
+                  </p>
+                  <p className="mt-1 text-sm text-[var(--toss-gray-3)]">
+                    입력값은 현재 적용 결과를 보여주지만, 저장은 기준 디자인과 다른 값만 따로 보관합니다.
                   </p>
                 </div>
                 <button
                   type="button"
-                  onClick={handleReset}
+                  onClick={handleResetScope}
                   className="rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--toss-gray-1)]"
                 >
-                  현재 범위 초기화
+                  이 범위 수정값 전체 초기화
                 </button>
               </div>
-              <div className="mt-4">
-                <PreviewCard
-                  type={selectedType}
-                  title={resolvedDesign.title}
-                  subtitle={resolvedDesign.subtitle}
-                  companyLabel={resolvedDesign.companyLabel}
-                  primaryColor={resolvedDesign.primaryColor}
-                  borderColor={resolvedDesign.borderColor}
-                  footerText={resolvedDesign.footerText}
-                  showSignArea={resolvedDesign.showSignArea}
-                />
+
+              <div className="mt-4 space-y-4">
+                {TEXT_FIELD_CONFIGS.map((config) => {
+                  const modified = hasOwnPatchField(scopePatch, config.field);
+                  return (
+                    <DesignFieldRow
+                      key={config.field}
+                      label={config.label}
+                      helper={config.helper}
+                      baseValue={String(referenceDesign[config.field] ?? '')}
+                      currentValue={String(resolvedDesign[config.field] ?? '')}
+                      placeholder={config.placeholder}
+                      multiline={config.multiline}
+                      modified={modified}
+                      onChange={(value) => updateField(config.field, value)}
+                      onReset={() => resetField(config.field)}
+                    />
+                  );
+                })}
+
+                <div className="rounded-[16px] border border-[var(--toss-border)] bg-white p-4 shadow-sm">
+                  <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <p className="text-sm font-bold text-[var(--foreground)]">서명 / 직인 영역 표시</p>
+                      <p className="mt-1 text-[11px] leading-5 text-[var(--toss-gray-3)]">
+                        급여명세서와 증명서 하단의 서명 및 직인 영역 노출 여부를 설정합니다.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                          hasOwnPatchField(scopePatch, 'showSignArea')
+                            ? 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)]'
+                            : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'
+                        }`}
+                      >
+                        {hasOwnPatchField(scopePatch, 'showSignArea') ? '수정됨' : '기본값 사용'}
+                      </span>
+                      {hasOwnPatchField(scopePatch, 'showSignArea') && (
+                        <button
+                          type="button"
+                          onClick={() => resetField('showSignArea')}
+                          className="rounded-[10px] border border-[var(--toss-border)] bg-white px-3 py-1.5 text-[11px] font-bold text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]"
+                        >
+                          기준으로 되돌리기
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <label className="mt-4 flex items-center justify-between rounded-[14px] border border-[var(--toss-border)] px-4 py-3">
+                    <span className="text-sm font-semibold text-[var(--foreground)]">
+                      하단 서명 / 직인 영역 표시
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={resolvedDesign.showSignArea}
+                      onChange={(event) => updateField('showSignArea', event.target.checked)}
+                      className="h-4 w-4 rounded border-[var(--toss-border)]"
+                    />
+                  </label>
+
+                  <div className="mt-3 rounded-[12px] bg-[var(--toss-gray-1)]/80 px-3 py-2 text-[11px] text-[var(--toss-gray-3)]">
+                    <span className="font-bold text-[var(--foreground)]">기준값</span>
+                    <span className="ml-2">{referenceDesign.showSignArea ? '표시' : '숨김'}</span>
+                  </div>
+                </div>
               </div>
             </div>
 
             <div className="flex justify-end gap-3">
               <button
                 type="button"
-                onClick={handleReset}
+                onClick={handleResetScope}
                 className="rounded-[14px] border border-[var(--toss-border)] bg-white px-5 py-3 text-sm font-semibold text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]"
               >
-                기본값으로 되돌리기
+                이 범위 수정값 지우기
               </button>
               <button
                 type="button"
@@ -465,7 +744,7 @@ export default function PayrollSlipDesignManager() {
                 disabled={saving || loading}
                 className="rounded-[14px] bg-[var(--toss-blue)] px-5 py-3 text-sm font-semibold text-white hover:opacity-95 disabled:opacity-60"
               >
-                  {saving ? '저장 중...' : '문서 양식 저장'}
+                {saving ? '저장 중...' : '문서 디자인 저장'}
               </button>
             </div>
           </div>

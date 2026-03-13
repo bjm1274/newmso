@@ -115,6 +115,7 @@ export type MockFixtures = {
   attendances?: any[];
   attendanceCorrections?: any[];
   legacyAttendanceCorrectionsSchema?: boolean;
+  legacyInventoryDepartmentSchema?: boolean;
   leaveRequests?: any[];
   attendanceDeductionRules?: any[];
   taxInsuranceRates?: any[];
@@ -133,14 +134,14 @@ function json(route: Route, payload: unknown, status = 200) {
   });
 }
 
-function missingColumn(route: Route, columnName: string) {
+function missingColumn(route: Route, columnName: string, tableName = 'attendance_corrections') {
   return json(
     route,
     {
       code: 'PGRST204',
       details: null,
       hint: null,
-      message: `Could not find the '${columnName}' column of 'attendance_corrections' in the schema cache`,
+      message: `Could not find the '${columnName}' column of '${tableName}' in the schema cache`,
     },
     400
   );
@@ -312,6 +313,7 @@ function buildFixtures(overrides: MockFixtures = {}) {
     attendances: overrides.attendances ?? [],
     attendanceCorrections: overrides.attendanceCorrections ?? [],
     legacyAttendanceCorrectionsSchema: overrides.legacyAttendanceCorrectionsSchema ?? false,
+    legacyInventoryDepartmentSchema: overrides.legacyInventoryDepartmentSchema ?? false,
     leaveRequests: overrides.leaveRequests ?? [],
     attendanceDeductionRules:
       overrides.attendanceDeductionRules ??
@@ -515,6 +517,7 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
   const attendanceDeductionRules = [...fixtures.attendanceDeductionRules];
   const taxInsuranceRates = [...fixtures.taxInsuranceRates];
   const legacyAttendanceCorrectionsSchema = fixtures.legacyAttendanceCorrectionsSchema;
+  const legacyInventoryDepartmentSchema = fixtures.legacyInventoryDepartmentSchema;
   let messageInsertFailures = fixtures.messageInsertFailures;
   let payrollRecords = [...fixtures.payrollRecords];
 
@@ -1044,12 +1047,24 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
 
     if (path.includes('/inventory')) {
       if (method === 'GET') {
+        if (legacyInventoryDepartmentSchema && url.searchParams.has('department')) {
+          return missingColumn(route, 'department', 'inventory');
+        }
+
         return json(route, firstOrList(applyQueryFilters(inventoryItems, url), wantsObject));
       }
 
       if (method === 'POST') {
         const body = request.postDataJSON();
         const payloads = Array.isArray(body) ? body : [body];
+
+        if (
+          legacyInventoryDepartmentSchema &&
+          payloads.some((payload: any) => Object.prototype.hasOwnProperty.call(payload, 'department'))
+        ) {
+          return missingColumn(route, 'department', 'inventory');
+        }
+
         const inserted = payloads.map((payload: any, index: number) => ({
           id: payload.id || `inventory-item-${inventoryItems.length + index + 1}`,
           created_at: payload.created_at || new Date().toISOString(),

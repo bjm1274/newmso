@@ -18,6 +18,27 @@ type Shift = {
   monthly_night_days?: number | null;
   additional_work_hours?: number | null;
   extra_contract_allowance?: number | null;
+  work_day_mode?: WorkDayMode;
+};
+
+type WorkDayMode = 'weekdays' | 'all_days';
+type ShiftFormState = {
+  name: string;
+  start_time: string;
+  end_time: string;
+  description: string;
+  company_name: string;
+  selectedCompanies: string[];
+  break_start_time: string;
+  break_end_time: string;
+  shift_type: string;
+  weekly_work_days: number;
+  is_weekend_work: boolean;
+  is_shift: boolean;
+  monthly_night_days: number;
+  additional_work_hours: number;
+  extra_contract_allowance: number;
+  work_day_mode: WorkDayMode;
 };
 
 const DEFAULT_COMPANY_OPTIONS = ['박철홍정형외과', '수연의원', 'SY INC.'];
@@ -27,12 +48,14 @@ type ShiftContractMeta = {
   monthly_night_days: number;
   additional_work_hours: number;
   extra_contract_allowance: number;
+  work_day_mode: WorkDayMode;
 };
 
 type ShiftContractMetaInput = {
   monthly_night_days?: number | null;
   additional_work_hours?: number | null;
   extra_contract_allowance?: number | null;
+  work_day_mode?: WorkDayMode | null;
 };
 
 function normalizeShiftContractMeta(meta?: ShiftContractMetaInput | null): ShiftContractMeta {
@@ -40,21 +63,27 @@ function normalizeShiftContractMeta(meta?: ShiftContractMetaInput | null): Shift
     monthly_night_days: Math.max(0, Math.floor(Number(meta?.monthly_night_days) || 0)),
     additional_work_hours: Math.max(0, Math.round((Number(meta?.additional_work_hours) || 0) * 10) / 10),
     extra_contract_allowance: Math.max(0, Math.floor(Number(meta?.extra_contract_allowance) || 0)),
+    work_day_mode: meta?.work_day_mode === 'all_days' ? 'all_days' : 'weekdays',
   };
 }
 
 function hasShiftContractMeta(meta?: ShiftContractMetaInput | null) {
   const normalized = normalizeShiftContractMeta(meta);
-  return Object.values(normalized).some((value) => value > 0);
+  return (
+    normalized.monthly_night_days > 0 ||
+    normalized.additional_work_hours > 0 ||
+    normalized.extra_contract_allowance > 0 ||
+    normalized.work_day_mode === 'all_days'
+  );
 }
 
-function parseShiftDescription(rawDescription?: string | null) {
+function parseShiftDescription(rawDescription?: string | null, fallbackWorkDayMode: WorkDayMode = 'weekdays') {
   const description = String(rawDescription || '');
   const markerIndex = description.lastIndexOf(SHIFT_META_MARKER);
   if (markerIndex === -1) {
     return {
       description: description.trim(),
-      meta: normalizeShiftContractMeta(),
+      meta: normalizeShiftContractMeta({ work_day_mode: fallbackWorkDayMode }),
     };
   }
 
@@ -62,14 +91,18 @@ function parseShiftDescription(rawDescription?: string | null) {
   const metaText = description.slice(markerIndex + SHIFT_META_MARKER.length).trim();
 
   try {
+    const parsedMeta = JSON.parse(metaText);
     return {
       description: baseDescription,
-      meta: normalizeShiftContractMeta(JSON.parse(metaText)),
+      meta: normalizeShiftContractMeta({
+        ...parsedMeta,
+        work_day_mode: parsedMeta?.work_day_mode ?? fallbackWorkDayMode,
+      }),
     };
   } catch {
     return {
       description: description.trim(),
-      meta: normalizeShiftContractMeta(),
+      meta: normalizeShiftContractMeta({ work_day_mode: fallbackWorkDayMode }),
     };
   }
 }
@@ -151,10 +184,71 @@ function needsExtendedContractSettings(shift: {
   );
 }
 
-function createEmptyShiftState(selectedCo?: string) {
-  const fixedCompany = selectedCo && selectedCo !== '전체' ? selectedCo : '';
+function isThreeShiftPattern(shiftType?: string | null) {
+  return String(shiftType || '').includes('3교대');
+}
+
+function resolveWorkDayMode(shift: {
+  shift_type?: string | null;
+  weekly_work_days?: number | null;
+  is_weekend_work?: boolean | null;
+}): WorkDayMode {
+  if (isThreeShiftPattern(shift.shift_type)) {
+    return 'all_days';
+  }
+
+  return shift.is_weekend_work || Number(shift.weekly_work_days) >= 7 ? 'all_days' : 'weekdays';
+}
+
+function getStoredWorkDayMode(shift: {
+  shift_type?: string | null;
+  weekly_work_days?: number | null;
+  is_weekend_work?: boolean | null;
+  description?: string | null;
+}) {
+  const columnMode = resolveWorkDayMode(shift);
+  const parsedDescription = parseShiftDescription(shift.description, columnMode);
+  const workDayMode = parsedDescription.meta.work_day_mode || columnMode;
 
   return {
+    parsedDescription,
+    workDayMode,
+    weeklyWorkDays: shift.weekly_work_days ?? (workDayMode === 'all_days' ? 7 : 5),
+    isWeekendWork: shift.is_weekend_work ?? (workDayMode === 'all_days'),
+  };
+}
+
+function applyWorkDayMode<T extends {
+  shift_type?: string | null;
+  weekly_work_days?: number | null;
+  is_weekend_work?: boolean | null;
+  work_day_mode?: WorkDayMode;
+}>(
+  shift: T,
+  requestedMode: WorkDayMode
+): Omit<T, 'work_day_mode' | 'weekly_work_days' | 'is_weekend_work'> & {
+  work_day_mode: WorkDayMode;
+  weekly_work_days: number;
+  is_weekend_work: boolean;
+} {
+  const nextMode = isThreeShiftPattern(shift.shift_type) ? 'all_days' : requestedMode;
+
+  return {
+    ...shift,
+    work_day_mode: nextMode,
+    weekly_work_days: nextMode === 'all_days' ? 7 : 5,
+    is_weekend_work: nextMode === 'all_days',
+  };
+}
+
+function formatWorkDayMode(mode: WorkDayMode) {
+  return mode === 'all_days' ? '월~일' : '월~금';
+}
+
+function createEmptyShiftState(selectedCo?: string): ShiftFormState {
+  const fixedCompany = selectedCo && selectedCo !== '전체' ? selectedCo : '';
+
+  return applyWorkDayMode({
     name: '',
     start_time: '09:00',
     end_time: '18:00',
@@ -170,7 +264,8 @@ function createEmptyShiftState(selectedCo?: string) {
     monthly_night_days: 0,
     additional_work_hours: 0,
     extra_contract_allowance: 0,
-  };
+    work_day_mode: 'weekdays' as WorkDayMode,
+  }, 'weekdays');
 }
 
 export default function ShiftManagement({ selectedCo }: any) {
@@ -179,7 +274,7 @@ export default function ShiftManagement({ selectedCo }: any) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
   const [companyOptions, setCompanyOptions] = useState<string[]>(DEFAULT_COMPANY_OPTIONS);
-  const [newShift, setNewShift] = useState(() => createEmptyShiftState(selectedCo));
+  const [newShift, setNewShift] = useState<ShiftFormState>(() => createEmptyShiftState(selectedCo));
 
   const fetchShifts = async () => {
     setLoading(true);
@@ -192,23 +287,29 @@ export default function ShiftManagement({ selectedCo }: any) {
 
       if (error) throw error;
       let list = (data || []).map((s: any) => {
-        const parsedDescription = parseShiftDescription(s.description);
+        const storedWorkDayMode = getStoredWorkDayMode({
+          shift_type: s.shift_type,
+          weekly_work_days: s.weekly_work_days,
+          is_weekend_work: s.is_weekend_work,
+          description: s.description,
+        });
         return {
           id: s.id,
           name: s.name,
           start_time: s.start_time?.slice(0, 5) || '09:00',
           end_time: s.end_time?.slice(0, 5) || '18:00',
-          description: parsedDescription.description,
+          description: storedWorkDayMode.parsedDescription.description,
           company_name: s.company_name,
           break_start_time: s.break_start_time?.slice(0, 5) || null,
           break_end_time: s.break_end_time?.slice(0, 5) || null,
           shift_type: s.shift_type || null,
-          weekly_work_days: s.weekly_work_days ?? null,
-          is_weekend_work: s.is_weekend_work ?? null,
+          weekly_work_days: storedWorkDayMode.weeklyWorkDays,
+          is_weekend_work: storedWorkDayMode.isWeekendWork,
           is_shift: s.is_shift ?? false,
-          monthly_night_days: parsedDescription.meta.monthly_night_days,
-          additional_work_hours: parsedDescription.meta.additional_work_hours,
-          extra_contract_allowance: parsedDescription.meta.extra_contract_allowance,
+          monthly_night_days: storedWorkDayMode.parsedDescription.meta.monthly_night_days,
+          additional_work_hours: storedWorkDayMode.parsedDescription.meta.additional_work_hours,
+          extra_contract_allowance: storedWorkDayMode.parsedDescription.meta.extra_contract_allowance,
+          work_day_mode: storedWorkDayMode.workDayMode,
         };
       });
       if (selectedCo && selectedCo !== '전체') {
@@ -264,7 +365,7 @@ export default function ShiftManagement({ selectedCo }: any) {
     if (!name) return;
     if (allPatterns.includes(name)) return alert('이미 존재하는 패턴입니다.');
     setCustomPatterns([...customPatterns, name]);
-    setNewShift({ ...newShift, shift_type: name });
+    setNewShift((prev) => applyWorkDayMode({ ...prev, shift_type: name }, prev.work_day_mode || 'weekdays'));
     setNewPatternName('');
     setShowPatternInput(false);
   };
@@ -293,6 +394,7 @@ export default function ShiftManagement({ selectedCo }: any) {
         monthly_night_days: newShift.monthly_night_days,
         additional_work_hours: newShift.additional_work_hours,
         extra_contract_allowance: newShift.extra_contract_allowance,
+        work_day_mode: newShift.work_day_mode,
       }) || null,
       company_name: selectedCompanyName,
       break_start_time: newShift.break_start_time || null,
@@ -312,6 +414,7 @@ export default function ShiftManagement({ selectedCo }: any) {
         monthly_night_days: newShift.monthly_night_days,
         additional_work_hours: newShift.additional_work_hours,
         extra_contract_allowance: newShift.extra_contract_allowance,
+        work_day_mode: newShift.work_day_mode,
       }) || null,
       company_name: selectedCompanyName,
     };
@@ -411,7 +514,7 @@ export default function ShiftManagement({ selectedCo }: any) {
                 <button
                   onClick={() => {
                     setEditingShiftId(shift.id);
-                    setNewShift({
+                    setNewShift(applyWorkDayMode({
                       name: shift.name,
                       start_time: shift.start_time,
                       end_time: shift.end_time,
@@ -427,7 +530,8 @@ export default function ShiftManagement({ selectedCo }: any) {
                       monthly_night_days: shift.monthly_night_days ?? 0,
                       additional_work_hours: shift.additional_work_hours ?? 0,
                       extra_contract_allowance: shift.extra_contract_allowance ?? 0,
-                    });
+                      work_day_mode: shift.work_day_mode || resolveWorkDayMode(shift),
+                    }, shift.work_day_mode || resolveWorkDayMode(shift)));
                     setShowAddModal(true);
                   }}
                   className="px-2 py-1 rounded-full bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] hover:opacity-90"
@@ -464,7 +568,7 @@ export default function ShiftManagement({ selectedCo }: any) {
                 {shift.shift_type && <span className="px-1.5 py-0.5 rounded-full bg-slate-700 border border-slate-800 shadow-sm">{shift.shift_type}</span>}
                 {shift.weekly_work_days && (
                   <span className="px-1.5 py-0.5 rounded-full bg-slate-700 border border-slate-800 shadow-sm">
-                    {shift.weekly_work_days}일
+                    {formatWorkDayMode(shift.work_day_mode || resolveWorkDayMode(shift))}
                   </span>
                 )}
                 <span className="px-1.5 py-0.5 rounded-full bg-slate-700 border border-slate-800 shadow-sm">
@@ -610,7 +714,11 @@ export default function ShiftManagement({ selectedCo }: any) {
                   <label className="caption uppercase block mb-1">근무 패턴</label>
                   <select
                     value={newShift.shift_type}
-                    onChange={e => setNewShift({ ...newShift, shift_type: e.target.value })}
+                    onChange={e =>
+                      setNewShift((prev) =>
+                        applyWorkDayMode({ ...prev, shift_type: e.target.value }, prev.work_day_mode || 'weekdays')
+                      )
+                    }
                     className="w-full p-3 bg-[var(--input-bg)] border border-[var(--toss-border)] font-semibold text-xs radius-toss"
                   >
                     <option value="">선택</option>
@@ -629,25 +737,38 @@ export default function ShiftManagement({ selectedCo }: any) {
                   )}
                 </div>
                 <div>
-                  <label className="caption uppercase block mb-1">주 근무일수 / 주말</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min={1}
-                      max={7}
-                      value={newShift.weekly_work_days}
-                      onChange={e => setNewShift({ ...newShift, weekly_work_days: Number(e.target.value) || 0 })}
-                      className="w-16 p-2 bg-[var(--input-bg)] border border-[var(--toss-border)] font-semibold text-xs text-center radius-toss"
-                    />
-                    <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">일 / 주</span>
-                    <label className="ml-2 text-[11px] font-bold text-[var(--toss-gray-4)] flex items-center gap-1">
-                      <input
-                        type="checkbox"
-                        checked={newShift.is_weekend_work}
-                        onChange={e => setNewShift({ ...newShift, is_weekend_work: e.target.checked })}
-                      />
-                      주말 포함
-                    </label>
+                  <label className="caption uppercase block mb-1">근무 요일 기준</label>
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { value: 'weekdays' as WorkDayMode, label: '주말 제외', desc: '월~금 근무 / 토·일 OFF' },
+                        { value: 'all_days' as WorkDayMode, label: '월~일 전체', desc: '토·일 포함 근무' },
+                      ].map((option) => {
+                        const selected = (newShift.work_day_mode || 'weekdays') === option.value;
+                        const locked = isThreeShiftPattern(newShift.shift_type) && option.value !== 'all_days';
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => setNewShift((prev) => applyWorkDayMode(prev, option.value))}
+                            disabled={locked}
+                            className={`rounded-xl border px-3 py-3 text-left transition-all ${selected ? 'border-[var(--toss-blue)] bg-[var(--toss-blue-light)]/70 ring-1 ring-[var(--toss-blue)]/20' : 'border-[var(--toss-border)] bg-white'} ${locked ? 'cursor-not-allowed opacity-40' : 'hover:border-[var(--toss-blue)]/50'}`}
+                            data-testid={`shift-workday-mode-${option.value}`}
+                          >
+                            <p className="text-[11px] font-bold text-[var(--foreground)]">{option.label}</p>
+                            <p className="mt-1 text-[10px] text-[var(--toss-gray-3)]">{option.desc}</p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[10px] font-semibold text-[var(--toss-gray-3)]">
+                      현재 설정: {formatWorkDayMode(newShift.work_day_mode || 'weekdays')} · 주 {newShift.weekly_work_days}일
+                    </p>
+                    {isThreeShiftPattern(newShift.shift_type) && (
+                      <p className="text-[10px] font-semibold text-[var(--toss-blue)]">
+                        3교대 유형은 자동으로 월~일 전체 근무 기준으로 고정됩니다.
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>

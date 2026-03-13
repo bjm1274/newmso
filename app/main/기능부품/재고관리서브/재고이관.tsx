@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { withMissingColumnFallback } from '@/lib/supabase-compat';
+import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import {
   getItemName,
   getItemQuantity,
@@ -299,25 +299,26 @@ export default function InventoryTransfer({
         if (selectedItem?.supplier_name) baseDestinationPayload.supplier_name = selectedItem.supplier_name;
         if (selectedItem?.supplier) baseDestinationPayload.supplier = selectedItem.supplier;
 
-        const primaryPayload = destinationCompanyId
-          ? { ...baseDestinationPayload, company_id: destinationCompanyId }
-          : baseDestinationPayload;
-        const fallbackPayload = { ...baseDestinationPayload };
-
         const { data: insertedDestination, error: destinationInsertError } =
-          await withMissingColumnFallback<Record<string, any>>(
-            () =>
-              supabase
+          await withMissingColumnsFallback<Record<string, any>>(
+            (omittedColumns) => {
+              const destinationPayload: Record<string, any> = { ...baseDestinationPayload };
+
+              if (destinationCompanyId && !omittedColumns.has('company_id')) {
+                destinationPayload.company_id = destinationCompanyId;
+              }
+
+              if (omittedColumns.has('department')) {
+                delete destinationPayload.department;
+              }
+
+              return supabase
                 .from('inventory')
-                .insert([primaryPayload])
+                .insert([destinationPayload])
                 .select('*')
-                .single(),
-            () =>
-              supabase
-                .from('inventory')
-                .insert([fallbackPayload])
-                .select('*')
-                .single(),
+                .single();
+            },
+            ['company_id', 'department'],
           );
         if (destinationInsertError) {
           throw destinationInsertError;

@@ -20,7 +20,18 @@ import ConsumableStats from './재고관리서브/소모품통계';
 import DeliveryConfirmation from './재고관리서브/납품확인서';
 import InventoryDemandForecast from './재고관리서브/재고수요예측';
 import SupplierDocumentWorkspace from './재고관리서브/SupplierDocumentWorkspace';
-import { getItemMinQuantity, getItemQuantity, requestInventoryReorder } from '@/app/main/inventory-utils';
+import {
+  buildSupplyRequestWorkflowItems,
+  fetchSupportInventoryRows,
+  findSupplySourceInventoryItem,
+  getItemMinQuantity,
+  getItemQuantity,
+  INVENTORY_SUPPORT_COMPANY,
+  INVENTORY_SUPPORT_DEPARTMENT,
+  processInventoryIssue,
+  requestInventoryReorder,
+  summarizeSupplyRequestWorkflow,
+} from '@/app/main/inventory-utils';
 
 const INV_VIEW_KEY = 'erp_inventory_view';
 
@@ -30,6 +41,10 @@ const VALID_VIEWS = [...INVENTORY_VIEWS, ...LEGACY_VIEWS];
 const EXPIRY_SOON_MS = 30 * 24 * 60 * 60 * 1000;
 type InventoryStatusFilter = '전체' | '재고부족' | '유통기한임박' | '정상';
 type SupplierWorkspaceTab = 'suppliers' | 'documents';
+type LinkedSupplyOrderTarget = {
+  approvalId: string;
+  requestIndex: number;
+};
 
 function resolveInventoryView(view?: string | null): {
   view: string;
@@ -90,6 +105,8 @@ export default function IntegratedInventoryManagement({
   onRefresh,
   initialView,
   onViewChange,
+  initialWorkflowApprovalId,
+  onConsumeInitialWorkflowApprovalId,
 }: any) {
   const initialResolvedView = resolveInventoryView(initialView);
   const defaultInventoryView =
@@ -110,9 +127,18 @@ export default function IntegratedInventoryManagement({
   const [registrationMode, setRegistrationMode] = useState<'form' | 'excel' | 'auto_extract'>('form');
   const [supplierWorkspaceTab, setSupplierWorkspaceTab] = useState<SupplierWorkspaceTab>(initialResolvedView.supplierTab ?? 'suppliers');
   const [showExpiryCenter, setShowExpiryCenter] = useState(Boolean(initialResolvedView.showExpiryCenter));
+  const [pendingSupplyApprovals, setPendingSupplyApprovals] = useState<any[]>([]);
+  const [completedSupplyApprovals, setCompletedSupplyApprovals] = useState<any[]>([]);
+  const [workflowActionKey, setWorkflowActionKey] = useState<string | null>(null);
+  const [highlightedSupplyApprovalId, setHighlightedSupplyApprovalId] = useState<string | null>(null);
+  const [highlightedSupplyOrderTarget, setHighlightedSupplyOrderTarget] = useState<LinkedSupplyOrderTarget | null>(null);
 
   const { lowStockItems, expiryImminentItems } = useInventoryAlertSystem(inventory, user);
   const isMsoUser = user?.company === 'SY INC.' || user?.permissions?.mso === true;
+  const isInventoryOpsUser =
+    (String(user?.company || '').trim() === INVENTORY_SUPPORT_COMPANY &&
+      String(user?.department || '').trim() === INVENTORY_SUPPORT_DEPARTMENT) ||
+    user?.permissions?.mso === true;
   const availableInventoryViews = useMemo(
     () => INVENTORY_VIEWS.filter((view) => canAccessInventorySection(user, view)),
     [user]
@@ -336,6 +362,85 @@ export default function IntegratedInventoryManagement({
     }
   }, []);
 
+  const fetchPendingSupplyApprovals = useCallback(async () => {
+    if (!isInventoryOpsUser) {
+      setPendingSupplyApprovals([]);
+      setCompletedSupplyApprovals([]);
+      return;
+    }
+
+    try {
+      const [{ data: approvalsData, error: approvalsError }, { data: supportInventoryRows, error: inventoryError }] =
+        await Promise.all([
+          supabase
+            .from('approvals')
+            .select('*')
+            .eq('type', '물품신청')
+            .eq('status', '승인')
+            .order('created_at', { ascending: false }),
+          fetchSupportInventoryRows(),
+        ]);
+
+      if (approvalsError) throw approvalsError;
+      if (inventoryError) throw inventoryError;
+
+      const nextPendingApprovals: any[] = [];
+      const nextCompletedApprovals: any[] = [];
+
+      (approvalsData || []).forEach((approval: any) => {
+        const workflowItems = buildSupplyRequestWorkflowItems(
+          approval?.meta_data?.items,
+          supportInventoryRows || [],
+          approval?.meta_data?.inventory_workflow?.items,
+        );
+        if (workflowItems.length === 0) {
+          return;
+        }
+
+        const summary = summarizeSupplyRequestWorkflow(workflowItems);
+        const nextApproval = {
+          ...approval,
+          live_inventory_workflow: {
+            items: workflowItems,
+            summary,
+          },
+        };
+
+        const allHandled = workflowItems.every(
+          (workflowItem) => workflowItem.status === 'issued' || workflowItem.status === 'ordered',
+        );
+
+        if (allHandled) {
+          nextCompletedApprovals.push(nextApproval);
+          return;
+        }
+
+        nextPendingApprovals.push(nextApproval);
+      });
+
+      nextCompletedApprovals.sort((left: any, right: any) => {
+        const leftLatestProcessedAt = Math.max(
+          ...((left?.live_inventory_workflow?.items || []).map((item: any) =>
+            item?.processed_at ? new Date(item.processed_at).getTime() : 0,
+          )),
+        );
+        const rightLatestProcessedAt = Math.max(
+          ...((right?.live_inventory_workflow?.items || []).map((item: any) =>
+            item?.processed_at ? new Date(item.processed_at).getTime() : 0,
+          )),
+        );
+        return rightLatestProcessedAt - leftLatestProcessedAt;
+      });
+
+      setPendingSupplyApprovals(nextPendingApprovals);
+      setCompletedSupplyApprovals(nextCompletedApprovals);
+    } catch (error) {
+      console.error('승인된 물품신청 처리 목록 로드 실패:', error);
+      setPendingSupplyApprovals([]);
+      setCompletedSupplyApprovals([]);
+    }
+  }, [isInventoryOpsUser]);
+
   const applyResolvedView = useCallback((view?: string | null) => {
     const resolved = resolveInventoryView(view);
     setActiveView(resolved.view);
@@ -401,6 +506,70 @@ export default function IntegratedInventoryManagement({
   }, [activeView, selectedCo, fetchInventory]);
 
   useEffect(() => {
+    if (activeView !== '현황') return;
+    void fetchPendingSupplyApprovals();
+  }, [activeView, fetchPendingSupplyApprovals, inventory]);
+
+  useEffect(() => {
+    if (!initialWorkflowApprovalId) return;
+    if (activeView !== '현황') {
+      applyResolvedView('현황');
+    }
+  }, [activeView, applyResolvedView, initialWorkflowApprovalId]);
+
+  useEffect(() => {
+    if (!initialWorkflowApprovalId || activeView !== '현황') return;
+
+    const matchedApproval = [...pendingSupplyApprovals, ...completedSupplyApprovals].find(
+      (approval: any) => String(approval?.id) === String(initialWorkflowApprovalId),
+    );
+
+    if (!matchedApproval) return;
+
+    setHighlightedSupplyApprovalId(String(initialWorkflowApprovalId));
+    const selector = `[data-supply-approval-id="${String(initialWorkflowApprovalId)}"]`;
+    const scrollTimer = window.setTimeout(() => {
+      const target = document.querySelector(selector);
+      if (target instanceof HTMLElement) {
+        target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }, 120);
+    const clearTimer = window.setTimeout(() => {
+      setHighlightedSupplyApprovalId((current) =>
+        current === String(initialWorkflowApprovalId) ? null : current,
+      );
+    }, 2600);
+
+    onConsumeInitialWorkflowApprovalId?.();
+
+    return () => {
+      window.clearTimeout(scrollTimer);
+      window.clearTimeout(clearTimer);
+    };
+  }, [
+    activeView,
+    completedSupplyApprovals,
+    initialWorkflowApprovalId,
+    onConsumeInitialWorkflowApprovalId,
+    pendingSupplyApprovals,
+  ]);
+
+  useEffect(() => {
+    if (!isInventoryOpsUser || activeView !== '현황') return;
+
+    const channel = supabase
+      .channel(`inventory-supply-approvals-${user?.id || 'guest'}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'approvals' }, () => {
+        void fetchPendingSupplyApprovals();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activeView, fetchPendingSupplyApprovals, isInventoryOpsUser, user?.id]);
+
+  useEffect(() => {
     setSelectedDept('전체');
   }, [viewCompany]);
 
@@ -424,6 +593,17 @@ export default function IntegratedInventoryManagement({
       }
     },
     [applyResolvedView, user],
+  );
+
+  const openLinkedSupplyOrder = useCallback(
+    (approvalId: string, requestIndex: number) => {
+      setHighlightedSupplyOrderTarget({
+        approvalId: String(approvalId),
+        requestIndex: Number(requestIndex),
+      });
+      openInventoryView('발주');
+    },
+    [openInventoryView],
   );
 
   const handleStockUpdate = async (item: any, type: 'in' | 'out', amount: number, targetCompany: string, targetDept: string) => {
@@ -465,6 +645,265 @@ export default function IntegratedInventoryManagement({
       console.error('입출고 처리 실패:', err);
     }
   };
+
+  const updateSupplyApprovalWorkflow = useCallback(async (approval: any, nextItems: any[]) => {
+    const summary = summarizeSupplyRequestWorkflow(nextItems);
+    const workflowStatus = nextItems.every(
+      (item) => item.status === 'issued' || item.status === 'ordered',
+    )
+      ? 'completed'
+      : 'processing';
+
+    const nextWorkflow = {
+      ...(approval?.meta_data?.inventory_workflow || {}),
+      status: workflowStatus,
+      source_company: INVENTORY_SUPPORT_COMPANY,
+      source_department: INVENTORY_SUPPORT_DEPARTMENT,
+      updated_at: new Date().toISOString(),
+      items: nextItems,
+      summary,
+    };
+    const nextMetaData = {
+      ...(approval?.meta_data || {}),
+      inventory_workflow: nextWorkflow,
+    };
+
+    const { error } = await supabase
+      .from('approvals')
+      .update({ meta_data: nextMetaData })
+      .eq('id', approval.id);
+
+    if (error) {
+      throw error;
+    }
+
+    return nextWorkflow;
+  }, []);
+
+  const handleSupplyIssue = useCallback(async (approval: any, workflowItem: any) => {
+    const actionKey = `${approval.id}:${workflowItem.request_index}:issue`;
+    setWorkflowActionKey(actionKey);
+
+    try {
+      const { data: supportInventoryRows, error: inventoryError } = await fetchSupportInventoryRows();
+
+      if (inventoryError) throw inventoryError;
+
+      const liveItems = buildSupplyRequestWorkflowItems(
+        approval?.meta_data?.items,
+        supportInventoryRows || [],
+        approval?.meta_data?.inventory_workflow?.items,
+      );
+      const currentItem = liveItems.find(
+        (item) => Number(item.request_index) === Number(workflowItem.request_index),
+      );
+
+      if (!currentItem) {
+        throw new Error('처리할 물품신청 항목을 찾지 못했습니다.');
+      }
+      if (currentItem.status === 'issued') {
+        return;
+      }
+      if (currentItem.recommended_action !== 'issue') {
+        throw new Error('현재 재고가 부족하여 바로 불출할 수 없습니다.');
+      }
+
+      const sourceItem =
+        (supportInventoryRows || []).find(
+          (row: any) => String(row.id) === String(currentItem.source_inventory_id),
+        ) || findSupplySourceInventoryItem(supportInventoryRows || [], currentItem.name);
+
+      if (!sourceItem) {
+        throw new Error('경영지원팀 원본 재고를 찾지 못했습니다.');
+      }
+
+      await processInventoryIssue({
+        sourceItem,
+        inventoryRows: supportInventoryRows || [],
+        quantity: currentItem.qty,
+        toCompany: approval?.sender_company || INVENTORY_SUPPORT_COMPANY,
+        toDept: currentItem.dept || '',
+        reason: `전자결재 승인 물품신청 (${approval.title})`,
+        user,
+        destinationCompanyId: approval?.company_id ?? null,
+      });
+
+      const nextItems = liveItems.map((item) =>
+        Number(item.request_index) === Number(currentItem.request_index)
+          ? {
+              ...item,
+              status: 'issued',
+              processed_at: new Date().toISOString(),
+              processed_by_id: user?.id || null,
+              processed_by_name: user?.name || null,
+              note: '경영지원팀 재고에서 불출 처리 완료',
+            }
+          : item,
+      );
+
+      await updateSupplyApprovalWorkflow(approval, nextItems);
+
+      if (approval?.sender_id) {
+        await supabase.from('notifications').insert([
+          {
+            user_id: approval.sender_id,
+            type: 'inventory',
+            title: `[불출 완료] ${currentItem.name}`,
+            body: `${currentItem.name} ${currentItem.qty}개가 ${currentItem.dept || '수령부서'}로 불출 처리되었습니다.`,
+            metadata: {
+              approval_id: approval.id,
+              request_index: currentItem.request_index,
+            },
+          },
+        ]);
+      }
+
+      await Promise.all([
+        Promise.resolve(refreshCurrentInventory()),
+        fetchLogs(),
+        fetchPendingSupplyApprovals(),
+      ]);
+      onRefresh?.();
+      alert('불출 처리가 완료되었습니다.');
+    } catch (error: any) {
+      console.error('물품신청 불출 처리 실패:', error);
+      alert(error?.message || '불출 처리 중 오류가 발생했습니다.');
+    } finally {
+      setWorkflowActionKey(null);
+    }
+  }, [fetchLogs, fetchPendingSupplyApprovals, onRefresh, refreshCurrentInventory, updateSupplyApprovalWorkflow, user]);
+
+  const handleSupplyOrder = useCallback(async (approval: any, workflowItem: any) => {
+    const actionKey = `${approval.id}:${workflowItem.request_index}:order`;
+    setWorkflowActionKey(actionKey);
+
+    try {
+      const { data: supportInventoryRows, error: inventoryError } = await fetchSupportInventoryRows();
+
+      if (inventoryError) throw inventoryError;
+
+      const liveItems = buildSupplyRequestWorkflowItems(
+        approval?.meta_data?.items,
+        supportInventoryRows || [],
+        approval?.meta_data?.inventory_workflow?.items,
+      );
+      const currentItem = liveItems.find(
+        (item) => Number(item.request_index) === Number(workflowItem.request_index),
+      );
+
+      if (!currentItem) {
+        throw new Error('처리할 물품신청 항목을 찾지 못했습니다.');
+      }
+      if (currentItem.status === 'ordered') {
+        return;
+      }
+
+      const sourceItem =
+        (supportInventoryRows || []).find(
+          (row: any) => String(row.id) === String(currentItem.source_inventory_id),
+        ) || findSupplySourceInventoryItem(supportInventoryRows || [], currentItem.name);
+
+      let orderRequested = false;
+      let note = '기준 재고가 없어 수동 발주가 필요합니다.';
+
+      if (sourceItem) {
+        const reorderQuantity = Math.max(currentItem.shortage_qty || currentItem.qty, 1);
+        const { error } = await requestInventoryReorder({
+          item: sourceItem,
+          user,
+          quantity: reorderQuantity,
+          reason: `[승인 연동 발주] ${approval.title}\n${currentItem.name} ${reorderQuantity}개 보충 필요 / 수령부서: ${currentItem.dept || '-'}`,
+          metaData: {
+            source_supply_approval_id: approval.id,
+            source_supply_request_index: currentItem.request_index,
+            source_supply_title: approval.title,
+            source_requester_name: approval?.sender_name || null,
+            source_requester_company: approval?.sender_company || null,
+            source_requester_department: currentItem.dept || null,
+            source_requested_quantity: currentItem.qty,
+            source_shortage_quantity: reorderQuantity,
+          },
+        });
+        if (error) throw error;
+
+        orderRequested = true;
+        note = `자동 발주 기안을 생성했습니다. 보충 수량 ${reorderQuantity}개`;
+      }
+
+      const nextItems = liveItems.map((item) =>
+        Number(item.request_index) === Number(currentItem.request_index)
+          ? {
+              ...item,
+              status: 'ordered',
+              processed_at: new Date().toISOString(),
+              processed_by_id: user?.id || null,
+              processed_by_name: user?.name || null,
+              order_approval_requested: orderRequested,
+              note,
+            }
+          : item,
+      );
+
+      await updateSupplyApprovalWorkflow(approval, nextItems);
+
+      if (approval?.sender_id) {
+        await supabase.from('notifications').insert([
+          {
+            user_id: approval.sender_id,
+            type: 'inventory',
+            title: `[발주 진행] ${currentItem.name}`,
+            body: `${currentItem.name} ${currentItem.qty}개는 재고가 부족해 발주 절차로 전환되었습니다.`,
+            metadata: {
+              approval_id: approval.id,
+              request_index: currentItem.request_index,
+            },
+          },
+        ]);
+      }
+
+      await fetchPendingSupplyApprovals();
+      alert(orderRequested ? '발주 요청을 등록했습니다.' : '자동 발주 기준 재고가 없어 발주 필요 상태로만 표시했습니다.');
+    } catch (error: any) {
+      console.error('물품신청 발주 처리 실패:', error);
+      alert(error?.message || '발주 처리 중 오류가 발생했습니다.');
+    } finally {
+      setWorkflowActionKey(null);
+    }
+  }, [fetchPendingSupplyApprovals, updateSupplyApprovalWorkflow, user]);
+
+  const pendingSupplyApprovalSummary = useMemo(() => (
+    pendingSupplyApprovals.reduce(
+      (summary, approval: any) => {
+        const workflowSummary = approval?.live_inventory_workflow?.summary;
+        summary.approval_count += 1;
+        summary.issue_ready_count += Number(workflowSummary?.issue_ready_count || 0);
+        summary.order_required_count += Number(workflowSummary?.order_required_count || 0);
+        return summary;
+      },
+      {
+        approval_count: 0,
+        issue_ready_count: 0,
+        order_required_count: 0,
+      },
+    )
+  ), [pendingSupplyApprovals]);
+
+  const completedSupplyApprovalSummary = useMemo(() => (
+    completedSupplyApprovals.reduce(
+      (summary, approval: any) => {
+        const workflowSummary = approval?.live_inventory_workflow?.summary;
+        summary.approval_count += 1;
+        summary.issued_count += Number(workflowSummary?.issued_count || 0);
+        summary.ordered_count += Number(workflowSummary?.ordered_count || 0);
+        return summary;
+      },
+      {
+        approval_count: 0,
+        issued_count: 0,
+        ordered_count: 0,
+      },
+    )
+  ), [completedSupplyApprovals]);
 
   if (!fallbackInventoryView) {
     return (
@@ -621,6 +1060,279 @@ export default function IntegratedInventoryManagement({
                     )}
                   </div>
                 </div>
+                {isInventoryOpsUser && pendingSupplyApprovals.length > 0 && (
+                  <section
+                    className="rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-5 shadow-sm"
+                    data-testid="inventory-supply-approval-panel"
+                  >
+                    <div className="flex flex-col gap-3 border-b border-[var(--toss-border)] pb-4 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">Approved Supply Requests</p>
+                        <h3 className="mt-1 text-lg font-black text-[var(--foreground)]">승인된 물품신청 처리</h3>
+                        <p className="mt-1 text-xs text-[var(--toss-gray-3)]">경영지원팀 재고 기준으로 불출 가능 여부를 확인하고, 부족하면 발주로 넘겨주세요.</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <span className="rounded-full bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--toss-blue)]">
+                          문서 {pendingSupplyApprovalSummary.approval_count}건
+                        </span>
+                        <span className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-600">
+                          불출 가능 {pendingSupplyApprovalSummary.issue_ready_count}건
+                        </span>
+                        <span className="rounded-full bg-orange-50 px-3 py-1 text-[11px] font-bold text-orange-600">
+                          발주 필요 {pendingSupplyApprovalSummary.order_required_count}건
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 space-y-3">
+                      {pendingSupplyApprovals.map((approval: any) => {
+                        const workflowItems = approval?.live_inventory_workflow?.items || [];
+                        const workflowSummary = approval?.live_inventory_workflow?.summary || {
+                          issue_ready_count: 0,
+                          order_required_count: 0,
+                        };
+
+                        return (
+                          <article
+                            key={approval.id}
+                            className={`rounded-[18px] border bg-[var(--page-bg)] p-4 transition-all ${
+                              highlightedSupplyApprovalId === String(approval.id)
+                                ? 'border-[var(--toss-blue)] ring-2 ring-[var(--toss-blue)]/20 shadow-lg'
+                                : 'border-[var(--toss-border)]'
+                            }`}
+                            data-testid={`inventory-supply-approval-${approval.id}`}
+                            data-supply-approval-id={String(approval.id)}
+                            data-highlighted={highlightedSupplyApprovalId === String(approval.id) ? 'true' : 'false'}
+                          >
+                            <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                              <div>
+                                <h4 className="text-sm font-bold text-[var(--foreground)]">{approval.title}</h4>
+                                <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
+                                  신청자 {approval.sender_name || '-'} / 회사 {approval.sender_company || '-'} / 문서번호 {approval.doc_number || approval.meta_data?.doc_number || '-'}
+                                </p>
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-600">
+                                  불출 가능 {workflowSummary.issue_ready_count}건
+                                </span>
+                                <span className="rounded-full bg-orange-50 px-2.5 py-1 text-[10px] font-bold text-orange-600">
+                                  발주 필요 {workflowSummary.order_required_count}건
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="mt-3 space-y-2">
+                              {workflowItems.map((workflowItem: any) => {
+                                const actionKeyPrefix = `${approval.id}:${workflowItem.request_index}`;
+                                const isBusy =
+                                  workflowActionKey === `${actionKeyPrefix}:issue` ||
+                                  workflowActionKey === `${actionKeyPrefix}:order`;
+                                const isIssued = workflowItem.status === 'issued';
+                                const isOrdered = workflowItem.status === 'ordered';
+                                const canIssue = workflowItem.recommended_action === 'issue' && !isIssued && !isOrdered;
+                                const canOrder = workflowItem.recommended_action === 'order' && !isOrdered && !isIssued;
+
+                                return (
+                                  <div
+                                    key={`${approval.id}-${workflowItem.request_index}`}
+                                    className="grid gap-3 rounded-[14px] border border-[var(--toss-border)] bg-white px-4 py-3 lg:grid-cols-[minmax(0,1.7fr)_88px_88px_120px_auto]"
+                                    data-testid={`inventory-supply-approval-item-${approval.id}-${workflowItem.request_index}`}
+                                  >
+                                    <div className="min-w-0">
+                                      <p className="truncate text-sm font-bold text-[var(--foreground)]">{workflowItem.name}</p>
+                                      <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
+                                        용도 {workflowItem.purpose || '-'} / 수령부서 {workflowItem.dept || '-'}
+                                      </p>
+                                      {workflowItem.note && (
+                                        <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">{workflowItem.note}</p>
+                                      )}
+                                    </div>
+                                    <div className="rounded-[12px] bg-[var(--toss-gray-1)] px-3 py-2 text-center">
+                                      <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">요청</p>
+                                      <p className="mt-1 text-sm font-bold text-[var(--foreground)]">{workflowItem.qty}</p>
+                                    </div>
+                                    <div className="rounded-[12px] bg-[var(--toss-gray-1)] px-3 py-2 text-center">
+                                      <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">재고</p>
+                                      <p className={`mt-1 text-sm font-bold ${workflowItem.shortage_qty > 0 ? 'text-orange-600' : 'text-emerald-600'}`}>
+                                        {workflowItem.available_qty}
+                                      </p>
+                                    </div>
+                                    <div className="flex items-center">
+                                      <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${
+                                        isIssued
+                                          ? 'bg-emerald-50 text-emerald-600'
+                                          : isOrdered
+                                            ? 'bg-orange-50 text-orange-600'
+                                            : workflowItem.recommended_action === 'issue'
+                                              ? 'bg-blue-50 text-[var(--toss-blue)]'
+                                              : 'bg-red-50 text-red-600'
+                                      }`}>
+                                        {isIssued
+                                          ? '불출 완료'
+                                          : isOrdered
+                                            ? '발주 처리'
+                                            : workflowItem.recommended_action === 'issue'
+                                              ? '불출 확인'
+                                              : '재고 부족'}
+                                      </span>
+                                    </div>
+                                    <div className="flex flex-wrap items-center justify-end gap-2">
+                                      {canIssue && (
+                                        <button
+                                          type="button"
+                                          onClick={() => void handleSupplyIssue(approval, workflowItem)}
+                                          disabled={isBusy}
+                                          className="rounded-[10px] bg-[var(--toss-blue)] px-3 py-2 text-[11px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                          data-testid={`inventory-supply-issue-${approval.id}-${workflowItem.request_index}`}
+                                        >
+                                          {isBusy ? '처리 중...' : '불출 처리'}
+                                        </button>
+                                      )}
+                                      {canOrder && (
+                                        <button
+                                          type="button"
+                                          onClick={() => void handleSupplyOrder(approval, workflowItem)}
+                                          disabled={isBusy}
+                                          className="rounded-[10px] bg-orange-600 px-3 py-2 text-[11px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                          data-testid={`inventory-supply-order-${approval.id}-${workflowItem.request_index}`}
+                                        >
+                                          {isBusy ? '처리 중...' : '발주 처리'}
+                                        </button>
+                                      )}
+                                      {(isIssued || isOrdered) && (
+                                        <span className="text-[10px] font-bold text-[var(--toss-gray-3)]">
+                                          {workflowItem.processed_by_name || '처리 완료'}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  </section>
+                )}
+                {isInventoryOpsUser && completedSupplyApprovals.length > 0 && (
+                  <section
+                    className="rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-5 shadow-sm"
+                    data-testid="inventory-supply-history-panel"
+                  >
+                    <div className="flex flex-col gap-3 border-b border-[var(--toss-border)] pb-4 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">Processed Supply History</p>
+                        <h3 className="mt-1 text-lg font-black text-[var(--foreground)]">처리 완료 히스토리</h3>
+                        <p className="mt-1 text-xs text-[var(--toss-gray-3)]">
+                          최근 처리된 물품신청 결과를 확인하고, 발주 건은 바로 발주관리 탭으로 이어서 확인할 수 있습니다.
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <span className="rounded-full bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--toss-blue)]">
+                          문서 {completedSupplyApprovalSummary.approval_count}건
+                        </span>
+                        <span className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-600">
+                          불출 완료 {completedSupplyApprovalSummary.issued_count}건
+                        </span>
+                        <span className="rounded-full bg-orange-50 px-3 py-1 text-[11px] font-bold text-orange-600">
+                          발주 전환 {completedSupplyApprovalSummary.ordered_count}건
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 space-y-3">
+                      {completedSupplyApprovals.slice(0, 8).map((approval: any) => {
+                        const workflowItems = approval?.live_inventory_workflow?.items || [];
+                        const latestProcessedAt =
+                          workflowItems.reduce((latest: string | null, item: any) => {
+                            if (!item?.processed_at) return latest;
+                            if (!latest) return item.processed_at;
+                            return new Date(item.processed_at).getTime() > new Date(latest).getTime()
+                              ? item.processed_at
+                              : latest;
+                          }, null) || approval.created_at;
+
+                        return (
+                          <article
+                            key={`history-${approval.id}`}
+                            className={`rounded-[18px] border bg-[var(--page-bg)] p-4 transition-all ${
+                              highlightedSupplyApprovalId === String(approval.id)
+                                ? 'border-[var(--toss-blue)] ring-2 ring-[var(--toss-blue)]/20 shadow-lg'
+                                : 'border-[var(--toss-border)]'
+                            }`}
+                            data-testid={`inventory-supply-history-${approval.id}`}
+                            data-supply-approval-id={String(approval.id)}
+                            data-highlighted={highlightedSupplyApprovalId === String(approval.id) ? 'true' : 'false'}
+                          >
+                            <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                              <div>
+                                <h4 className="text-sm font-bold text-[var(--foreground)]">{approval.title}</h4>
+                                <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
+                                  신청자 {approval.sender_name || '-'} / 회사 {approval.sender_company || '-'}
+                                </p>
+                              </div>
+                              <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                                최근 처리 {new Date(latestProcessedAt).toLocaleString('ko-KR')}
+                              </p>
+                            </div>
+
+                            <div className="mt-3 space-y-2">
+                              {workflowItems.map((workflowItem: any) => {
+                                const isOrdered = workflowItem.status === 'ordered';
+                                const isIssued = workflowItem.status === 'issued';
+
+                                return (
+                                  <div
+                                    key={`history-item-${approval.id}-${workflowItem.request_index}`}
+                                    className="grid gap-3 rounded-[14px] border border-[var(--toss-border)] bg-white px-4 py-3 lg:grid-cols-[minmax(0,1.6fr)_88px_130px_auto]"
+                                    data-testid={`inventory-supply-history-item-${approval.id}-${workflowItem.request_index}`}
+                                  >
+                                    <div className="min-w-0">
+                                      <p className="truncate text-sm font-bold text-[var(--foreground)]">{workflowItem.name}</p>
+                                      <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
+                                        용도 {workflowItem.purpose || '-'} / 수령부서 {workflowItem.dept || '-'}
+                                      </p>
+                                      {workflowItem.note && (
+                                        <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">{workflowItem.note}</p>
+                                      )}
+                                    </div>
+                                    <div className="rounded-[12px] bg-[var(--toss-gray-1)] px-3 py-2 text-center">
+                                      <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">처리수량</p>
+                                      <p className="mt-1 text-sm font-bold text-[var(--foreground)]">{workflowItem.qty}</p>
+                                    </div>
+                                    <div className="flex items-center">
+                                      <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${
+                                        isIssued ? 'bg-emerald-50 text-emerald-600' : 'bg-orange-50 text-orange-600'
+                                      }`}>
+                                        {isIssued ? '불출 완료' : '발주 처리'}
+                                      </span>
+                                    </div>
+                                    <div className="flex flex-wrap items-center justify-end gap-2">
+                                      <span className="text-[10px] font-bold text-[var(--toss-gray-3)]">
+                                        {workflowItem.processed_by_name || '처리 완료'}
+                                      </span>
+                                      {isOrdered && (
+                                        <button
+                                          type="button"
+                                          onClick={() => openLinkedSupplyOrder(approval.id, workflowItem.request_index)}
+                                          className="rounded-[10px] bg-[var(--foreground)] px-3 py-2 text-[11px] font-bold text-white"
+                                          data-testid={`inventory-supply-history-open-order-${approval.id}-${workflowItem.request_index}`}
+                                        >
+                                          발주 보기
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  </section>
+                )}
                 <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
                   <div className="bg-[var(--toss-card)] p-4 rounded-[14px] border border-[var(--toss-border)] shadow-sm text-center">
                     <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">조회 품목</p>
@@ -905,7 +1617,16 @@ export default function IntegratedInventoryManagement({
             </section>
           )}
           {activeView === 'UDI' && <UDIManagement user={user} inventory={inventory} fetchInventory={fetchInventory} />}
-          {activeView === '발주' && <PurchaseOrderManagement user={user} inventory={inventory} suppliers={suppliers} fetchInventory={fetchInventory} />}
+          {activeView === '발주' && (
+            <PurchaseOrderManagement
+              user={user}
+              inventory={inventory}
+              suppliers={suppliers}
+              fetchInventory={fetchInventory}
+              highlightedSource={highlightedSupplyOrderTarget}
+              onConsumeHighlightedSource={() => setHighlightedSupplyOrderTarget(null)}
+            />
+          )}
           {activeView === '스캔' && (
             <ScanModule
               user={user}

@@ -7,6 +7,7 @@ import { persistSupabaseAccessToken } from '@/lib/supabase-bridge';
 import { setSelectedCompanyId as persistSelectedCompanyId, getSelectedCompanyId } from '@/lib/useCompany';
 import { normalizeProfileUser } from '@/lib/profile-photo';
 import {
+  canAccessAdminSection,
   canAccessApprovalSection,
   canAccessBoard,
   canAccessInventorySection,
@@ -30,42 +31,12 @@ type ERPData = {
   mris: any[];
 };
 
-const ADMIN_SUBMENU_PERMISSION_KEYS: Record<string, string> = {
-  경영분석: 'admin_경영분석',
-  감사센터: 'admin_감사센터',
-  시스템마스터센터: 'admin_시스템마스터센터',
-  엑셀등록: 'admin_엑셀등록',
-  알림자동화: 'admin_알림자동화',
-  회사관리: 'admin_회사관리',
-  직원권한: 'admin_직원권한',
-  수술검사템플릿: 'admin_수술검사템플릿',
-  팝업관리: 'admin_팝업관리',
-  데이터백업: 'admin_데이터백업',
-  데이터초기화: 'admin_데이터초기화',
-  문서양식: 'admin_문서양식',
-  급여이상치: 'admin_급여이상치',
-  공문서대장: 'admin_공문서대장',
-};
-
 function canAccessAdminSubMenu(user: any, subMenuId: string) {
-  const permissions = user?.permissions || {};
-  const hasAdminOverride =
-    permissions.mso === true ||
-    permissions.admin === true ||
-    isNamedSystemMasterAccount(user);
-
-  if (hasAdminOverride) {
-    return true;
-  }
-
   if (!canAccessMainMenu(user, '관리자')) {
     return false;
   }
 
-  const permissionKey = ADMIN_SUBMENU_PERMISSION_KEYS[subMenuId];
-  if (!permissionKey) return false;
-
-  return permissions[permissionKey] === true;
+  return canAccessAdminSection(user, subMenuId);
 }
 
 function MainPageFallback() {
@@ -99,6 +70,7 @@ function MainPageContent() {
   const [initialOpenMessageId, setInitialOpenMessageId] = useState<string | null>(null);
   const [initialOpenPostId, setInitialOpenPostId] = useState<string | null>(null);
   const [initialApprovalIntent, setInitialApprovalIntent] = useState<any>(null);
+  const [initialInventoryWorkflowApprovalId, setInitialInventoryWorkflowApprovalId] = useState<string | null>(null);
 
   const [data, setData] = useState<ERPData>({
     staffs: [],
@@ -197,6 +169,24 @@ function MainPageContent() {
     }
   }, []);
 
+  const persistClientUser = useCallback((nextUser: any) => {
+    if (!nextUser) return;
+
+    const safeUser = { ...nextUser };
+    delete safeUser.password;
+    delete safeUser.passwd;
+
+    const normalizedUser = normalizeProfileUser(safeUser);
+    setUser(normalizedUser);
+
+    try {
+      localStorage.setItem('erp_user', JSON.stringify(normalizedUser));
+      localStorage.setItem('user_session', JSON.stringify(normalizedUser));
+    } catch {
+      // ignore
+    }
+  }, []);
+
   // 1. 초기 로드 시 사용자 정보 및 이전 상태 복구
   useEffect(() => {
     let ignore = false;
@@ -236,7 +226,7 @@ function MainPageContent() {
         }
 
         if (!ignore) {
-          setUser(sessionUser);
+          persistClientUser(sessionUser);
         }
 
         try {
@@ -324,7 +314,7 @@ function MainPageContent() {
     return () => {
       ignore = true;
     };
-  }, [clearClientSession, resolveLegacyNavigation, router]); // 마운트 시 1회만 실행
+  }, [clearClientSession, persistClientUser, resolveLegacyNavigation, router]); // 마운트 시 1회만 실행
 
   useEffect(() => {
     if (!user) return;
@@ -350,6 +340,15 @@ function MainPageContent() {
     if (!user?.id) return;
     const channel = supabase.channel(`force-logout-${user.id}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'staff_members', filter: `id=eq.${user.id}` }, (payload) => {
+        const safeNextUser = { ...(payload.new || {}) };
+        delete safeNextUser.password;
+        delete safeNextUser.passwd;
+
+        const normalizedNextUser = normalizeProfileUser(safeNextUser);
+        if (hasUserPayloadChanged(user, normalizedNextUser)) {
+          persistClientUser(normalizedNextUser);
+        }
+
         const forceLogoutAt = payload.new.force_logout_at;
         if (forceLogoutAt && new Date(forceLogoutAt).getTime() > new Date(loginAt).getTime()) {
           alert('관리자에 의해 강제 로그아웃 되었습니다. 다시 로그인해 주세요.');
@@ -359,7 +358,7 @@ function MainPageContent() {
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [clearClientSession, user?.id, loginAt]);
+  }, [clearClientSession, persistClientUser, user, user?.id, loginAt]);
 
   // 1-1. 강제 로그아웃(세션 만료) 체크 — 마운트 시 1회만 실행
   useEffect(() => {
@@ -405,8 +404,19 @@ function MainPageContent() {
   useEffect(() => {
     const targetMenu = searchParams.get('open_menu')?.trim();
     const openPost = searchParams.get('open_post')?.trim();
-    if (targetMenu || openPost) {
+    const openInventoryView = searchParams.get('open_inventory_view')?.trim();
+    const openInventoryApproval = searchParams.get('open_inventory_approval')?.trim();
+    if (targetMenu || openPost || openInventoryView || openInventoryApproval) {
       if (targetMenu) setMainMenu(targetMenu);
+      if (targetMenu === '재고관리' || openInventoryView || openInventoryApproval) {
+        setMainMenu('재고관리');
+        if (openInventoryView) {
+          setSubView(openInventoryView);
+        }
+        if (openInventoryApproval) {
+          setInitialInventoryWorkflowApprovalId(openInventoryApproval);
+        }
+      }
       const openBoard = searchParams.get('open_board')?.trim();
       if (openBoard) {
         setInitialBoardView(openBoard);
@@ -569,9 +579,7 @@ function MainPageContent() {
           delete safeSelf.passwd;
           const normalizedSelf = normalizeProfileUser(safeSelf);
           if (hasUserPayloadChanged(u, normalizedSelf)) {
-            setUser(normalizedSelf);
-            localStorage.setItem('erp_user', JSON.stringify(normalizedSelf));
-            localStorage.setItem('user_session', JSON.stringify(normalizedSelf));
+            persistClientUser(normalizedSelf);
           }
         }
       }
@@ -750,6 +758,11 @@ function MainPageContent() {
           onOpenChatRoom={(roomId) => { setMainMenu('채팅'); setInitialOpenChatRoomId(roomId); }}
           onOpenMessage={(roomId, messageId) => { setMainMenu('채팅'); setInitialOpenChatRoomId(roomId); setInitialOpenMessageId(messageId); }}
           onOpenApproval={() => setMainMenu('전자결재')}
+          onOpenInventory={(intent) => {
+            setMainMenu('재고관리');
+            setSubView(intent?.view || '현황');
+            setInitialInventoryWorkflowApprovalId(intent?.approvalId || null);
+          }}
           onOpenBoard={(boardId) => { setMainMenu('게시판'); if (boardId) setInitialBoardView(boardId); }}
           onOpenPost={(boardId, postId) => { setMainMenu('게시판'); if (boardId) setInitialBoardView(boardId); setInitialOpenPostId(postId); }}
         />
@@ -788,6 +801,8 @@ function MainPageContent() {
           onOpenApproval={handleOpenApproval}
           initialApprovalIntent={initialApprovalIntent}
           onConsumeApprovalIntent={() => setInitialApprovalIntent(null)}
+          initialInventoryWorkflowApprovalId={initialInventoryWorkflowApprovalId}
+          onConsumeInitialInventoryWorkflowApprovalId={() => setInitialInventoryWorkflowApprovalId(null)}
           setMainMenu={setMainMenu}
         />
       </div>

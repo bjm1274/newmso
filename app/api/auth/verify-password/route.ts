@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { verifyPrivilegedSessionPassword } from '@/lib/admin-credentials';
 import { readSessionFromRequest } from '@/lib/server-session';
 import {
   pickStoredPassword,
@@ -37,6 +38,11 @@ export async function POST(request: Request) {
     const requestEmployeeNo = String(body?.employeeNo ?? '').trim();
     if (!password) {
       return NextResponse.json({ verified: false, error: 'Password is required' }, { status: 400 });
+    }
+
+    const privilegedVerification = await verifyPrivilegedSessionPassword(session?.user, password);
+    if (privilegedVerification.ok) {
+      return NextResponse.json({ verified: true });
     }
 
     const supabase = createAdminSupabase();

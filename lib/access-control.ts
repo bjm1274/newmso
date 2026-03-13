@@ -196,6 +196,17 @@ function getPermissions(user?: UserLike | null) {
   return user.permissions;
 }
 
+function getExplicitPermissionState(
+  user: UserLike | null | undefined,
+  permissionKey: string
+): boolean | null {
+  const permissions = getPermissions(user);
+  if (!Object.prototype.hasOwnProperty.call(permissions, permissionKey)) {
+    return null;
+  }
+  return permissions[permissionKey] === true;
+}
+
 function expandPermissionKeys(permissionKey: string) {
   const visited = new Set<string>();
   const queue = [permissionKey];
@@ -249,8 +260,15 @@ function normalizeValue(value: any): any {
 }
 
 export function hasPermission(user: UserLike | null | undefined, permissionKey: string): boolean {
+  const explicitPermission = getExplicitPermissionState(user, permissionKey);
+  if (explicitPermission !== null) {
+    return explicitPermission;
+  }
+
   const permissions = getPermissions(user);
-  return expandPermissionKeys(permissionKey).some((key) => permissions[key] === true);
+  return expandPermissionKeys(permissionKey)
+    .filter((key) => key !== permissionKey)
+    .some((key) => permissions[key] === true);
 }
 
 export function isMsoUser(user: UserLike | null | undefined): boolean {
@@ -261,17 +279,8 @@ export function isAdminUser(user: UserLike | null | undefined): boolean {
   return user?.role === 'admin' || hasPermission(user, 'admin');
 }
 
-function hasGlobalAccessOverride(user: UserLike | null | undefined): boolean {
-  const permissions = getPermissions(user);
-  return (
-    permissions.mso === true ||
-    permissions.admin === true ||
-    isNamedSystemMasterAccount(user as Record<string, any> | null | undefined)
-  );
-}
-
 export function isPrivilegedUser(user: UserLike | null | undefined): boolean {
-  return hasGlobalAccessOverride(user);
+  return isNamedSystemMasterAccount(user as Record<string, any> | null | undefined);
 }
 
 export function canAccessMainMenu(user: UserLike | null | undefined, menuId: string): boolean {

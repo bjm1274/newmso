@@ -3,6 +3,13 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { canAccessApprovalSection } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
 import { isMissingColumnError, withMissingColumnFallback } from '@/lib/supabase-compat';
+import {
+  buildSupplyRequestWorkflowItems,
+  fetchSupportInventoryRows,
+  INVENTORY_SUPPORT_COMPANY,
+  INVENTORY_SUPPORT_DEPARTMENT,
+  summarizeSupplyRequestWorkflow,
+} from '@/app/main/inventory-utils';
 import AttendanceForms from './전자결재서브/근태신청양식';
 import SuppliesForm from './전자결재서브/비품구매양식';
 import AdminForms from './전자결재서브/관리행정양식';
@@ -14,11 +21,61 @@ import AnnualLeavePlanForm from './전자결재서브/연차사용계획서양�
 const APPROVAL_VIEW_KEY = 'erp_approval_view';
 const DRAFT_STORAGE_KEY = 'erp_draft_approval';
 const LOCAL_APPROVAL_FORM_TYPES_KEY = 'erp_approval_form_types_custom';
+const LOCAL_FORM_TEMPLATE_DESIGNS_KEY = 'erp_form_template_designs';
 const APPROVAL_OPTIONAL_INSERT_COLUMNS = ['company_id', 'approver_line', 'doc_number'];
 const ALL_DOCUMENT_FILTER = '전체 문서';
 
 const APPROVAL_VIEWS = ['기안함', '결재함', '작성하기'] as const;
-const SYSTEM_FORM_TYPE_SLUGS = new Set(['leave', 'overtime', 'purchase', 'attendance_fix', 'generic', 'personnel_order']);
+const BUILTIN_FORM_TYPE_DEFINITIONS = [
+  { slug: 'leave', name: '연차/휴가' },
+  { slug: 'annual_plan', name: '연차계획서' },
+  { slug: 'overtime', name: '연장근무' },
+  { slug: 'purchase', name: '물품신청' },
+  { slug: 'repair_request', name: '수리요청서' },
+  { slug: 'draft_business', name: '업무기안' },
+  { slug: 'cooperation', name: '업무협조' },
+  { slug: 'generic', name: '양식신청' },
+  { slug: 'attendance_fix', name: '출결정정' },
+] as const;
+const SYSTEM_FORM_TYPE_SLUGS = new Set([...BUILTIN_FORM_TYPE_DEFINITIONS.map((item) => item.slug), 'personnel_order']);
+const DEFAULT_APPROVAL_TEMPLATE_DESIGN = {
+  title: '결재 문서',
+  subtitle: '전자결재 승인 문서',
+  companyLabel: 'SY INC.',
+  primaryColor: '#155eef',
+  borderColor: '#d7e3ff',
+  footerText: '전자결재 승인 문서입니다.',
+  showSignArea: true,
+  showBackgroundLogo: true,
+  backgroundLogoUrl: '/sy-logo.png',
+  backgroundLogoOpacity: 0.06,
+  showSeal: true,
+  sealLabel: 'SY INC. 직인',
+};
+
+function alphaColor(hexColor: string | undefined, alpha: number) {
+  if (!hexColor) return `rgba(21, 94, 239, ${alpha})`;
+  const cleaned = hexColor.replace('#', '');
+  const expanded = cleaned.length === 3
+    ? cleaned.split('').map((char) => `${char}${char}`).join('')
+    : cleaned;
+
+  if (expanded.length !== 6) return `rgba(21, 94, 239, ${alpha})`;
+
+  const r = parseInt(expanded.slice(0, 2), 16);
+  const g = parseInt(expanded.slice(2, 4), 16);
+  const b = parseInt(expanded.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function escapeHtml(value: unknown) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 function toLocalDateKey(value: string | number | Date | null | undefined) {
   if (!value) return '';
@@ -85,6 +142,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const [ccLine, setCcLine] = useState<any[]>([]);
   const [extraData, setExtraData] = useState<any>({});
   const [customFormTypes, setCustomFormTypes] = useState<{ name: string; slug: string }[]>([]);
+  const [formTemplateDesigns, setFormTemplateDesigns] = useState<Record<string, any>>({});
   const [lastDraftByType, setLastDraftByType] = useState<Record<string, any>>({});
   const [suppliesLoadKey, setSuppliesLoadKey] = useState(0);
   const [selectedApprovalId, setSelectedApprovalId] = useState<string | null>(null);
@@ -133,6 +191,118 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     () => [...BUILTIN_FORM_TYPES, ...customFormTypes.map((item) => item.slug)],
     [customFormTypes]
   );
+  const resolveApprovalTemplateMeta = useCallback((item: any) => {
+    const rawSlug = String(item?.meta_data?.form_slug || '').trim();
+    const rawType = String(item?.type || '').trim();
+    const rawName = String(item?.meta_data?.form_name || '').trim();
+
+    const builtinBySlug = BUILTIN_FORM_TYPE_DEFINITIONS.find((template) => template.slug === rawSlug || template.slug === rawType);
+    if (builtinBySlug) return builtinBySlug;
+
+    const builtinByName = BUILTIN_FORM_TYPE_DEFINITIONS.find((template) => template.name === rawName || template.name === rawType);
+    if (builtinByName) return builtinByName;
+
+    const customBySlug = customFormTypes.find((template) => template.slug === rawSlug || template.slug === rawType);
+    if (customBySlug) return customBySlug;
+
+    const customByName = customFormTypes.find((template) => template.name === rawName || template.name === rawType);
+    if (customByName) return customByName;
+
+    return {
+      slug: rawSlug || rawType || 'generic',
+      name: rawName || rawType || '양식신청',
+    };
+  }, [customFormTypes]);
+
+  const resolveApprovalTemplateDesign = useCallback((item: any) => {
+    const template = resolveApprovalTemplateMeta(item);
+    const storedDesign = template.slug ? formTemplateDesigns?.[template.slug] || {} : {};
+    const companyLabel = storedDesign.companyLabel || item?.sender_company || user?.company || DEFAULT_APPROVAL_TEMPLATE_DESIGN.companyLabel;
+
+    return {
+      ...DEFAULT_APPROVAL_TEMPLATE_DESIGN,
+      ...storedDesign,
+      title: storedDesign.title || template.name || DEFAULT_APPROVAL_TEMPLATE_DESIGN.title,
+      subtitle: storedDesign.subtitle || `${template.name || '결재'} 승인 문서`,
+      companyLabel,
+      sealLabel: storedDesign.sealLabel || `${companyLabel} 직인`,
+      templateName: template.name || item?.type || '결재 문서',
+      templateSlug: template.slug || item?.meta_data?.form_slug || item?.type || 'generic',
+    };
+  }, [formTemplateDesigns, resolveApprovalTemplateMeta, user?.company]);
+
+  const openApprovalPrintView = useCallback((item: any) => {
+    const design = resolveApprovalTemplateDesign(item);
+    const templateMeta = resolveApprovalTemplateMeta(item);
+    const win = window.open('', '_blank');
+    if (!win) return;
+
+    const approvalBoxes = Array.isArray(item?.approver_line)
+      ? item.approver_line.map((_: string, index: number) => (
+          `<div class="sig-box">${index + 1}단계<br><br><br>(인)</div>`
+        )).join('')
+      : '';
+
+    win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${escapeHtml(templateMeta.name || '결재문서')}</title>
+  <style>
+    body{font-family:'Malgun Gothic',sans-serif;background:#f5f7fb;margin:0;padding:24px;color:#111827}
+    .sheet{max-width:860px;margin:0 auto;background:#fff;border:1px solid ${escapeHtml(design.borderColor || '#d7e3ff')};border-radius:28px;overflow:hidden;box-shadow:0 24px 60px rgba(15,23,42,.12)}
+    .hero{position:relative;padding:36px 40px 28px;background:linear-gradient(135deg, ${escapeHtml(alphaColor(design.primaryColor, 0.18))} 0%, rgba(255,255,255,0) 68%)}
+    .kicker{display:inline-flex;align-items:center;gap:8px;padding:7px 12px;border-radius:999px;background:rgba(255,255,255,.92);font-size:10px;font-weight:800;letter-spacing:.24em;text-transform:uppercase;color:#64748b}
+    .dot{width:8px;height:8px;border-radius:999px;background:${escapeHtml(design.primaryColor || '#155eef')}}
+    h1{margin:20px 0 8px;font-size:28px;line-height:1.1;color:${escapeHtml(design.primaryColor || '#155eef')}}
+    .subtitle{font-size:13px;line-height:1.7;color:#475569}
+    .meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:0 40px 28px}
+    .meta div{border:1px solid ${escapeHtml(alphaColor(design.borderColor || '#d7e3ff', 0.9))};border-radius:16px;padding:12px 14px;font-size:12px;background:#fff}
+    .meta strong{display:block;margin-bottom:4px;color:#64748b}
+    .body{padding:0 40px 24px}
+    .doc-title{font-size:20px;font-weight:800;color:#111827;margin:0 0 12px}
+    .content{border:1px solid ${escapeHtml(alphaColor(design.borderColor || '#d7e3ff', 0.9))};border-radius:20px;padding:18px 20px;min-height:220px;font-size:13px;line-height:1.75;white-space:pre-wrap}
+    .approval-line{display:flex;flex-wrap:wrap;gap:12px;padding:0 40px 28px}
+    .sig-box{border:1px dashed ${escapeHtml(alphaColor(design.primaryColor || '#155eef', 0.45))};border-radius:18px;padding:12px 16px;min-width:110px;text-align:center;font-size:11px;color:#475569;background:#fff}
+    .footer{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;padding:20px 40px 32px;border-top:1px solid ${escapeHtml(alphaColor(design.borderColor || '#d7e3ff', 0.9))};font-size:12px;color:#64748b}
+    .footer strong{display:block;margin-bottom:6px;letter-spacing:.18em;text-transform:uppercase;color:${escapeHtml(design.primaryColor || '#155eef')}}
+    .seal{width:92px;height:92px;border-radius:999px;border:3px solid ${escapeHtml(alphaColor(design.primaryColor || '#155eef', 0.75))};display:flex;align-items:center;justify-content:center;text-align:center;font-weight:800;font-size:10px;color:${escapeHtml(design.primaryColor || '#155eef')}}
+    @media print { body{background:#fff;padding:0}.sheet{box-shadow:none;border-radius:0;max-width:none;border:none} }
+  </style>
+</head>
+<body>
+  <div class="sheet">
+    <div class="hero">
+      <div class="kicker"><span class="dot"></span> Basic Approval Form</div>
+      <h1>${escapeHtml(design.title || templateMeta.name || '결재 문서')}</h1>
+      <div class="subtitle">${escapeHtml(design.subtitle || '')}</div>
+    </div>
+    <div class="meta">
+      <div><strong>회사</strong>${escapeHtml(design.companyLabel || item?.sender_company || '')}</div>
+      <div><strong>문서번호</strong>${escapeHtml(item?.doc_number || item?.meta_data?.doc_number || '-')}</div>
+      <div><strong>기안일</strong>${escapeHtml(new Date(item.created_at).toLocaleDateString('ko-KR'))}</div>
+      <div><strong>문서종류</strong>${escapeHtml(templateMeta.name || item?.type || '-')}</div>
+      <div><strong>기안자</strong>${escapeHtml(item?.sender_name || '-')}</div>
+      <div><strong>상태</strong>${escapeHtml(item?.status || '-')}</div>
+    </div>
+    <div class="body">
+      <div class="doc-title">${escapeHtml(item?.title || '(제목 없음)')}</div>
+      <div class="content">${escapeHtml(item?.content || '-').replace(/\n/g, '<br>')}</div>
+    </div>
+    ${design.showSignArea === false ? '' : `<div class="approval-line">${approvalBoxes}</div>`}
+    <div class="footer">
+      <div>
+        <strong>Smart Approval Document</strong>
+        <div>${escapeHtml(design.footerText || DEFAULT_APPROVAL_TEMPLATE_DESIGN.footerText)}</div>
+      </div>
+      ${design.showSeal === false ? '' : `<div class="seal">${escapeHtml(design.sealLabel || `${design.companyLabel || 'SY INC.'} 직인`)}</div>`}
+    </div>
+  </div>
+  <script>window.onload=()=>window.print()</script>
+</body>
+</html>`);
+    win.document.close();
+  }, [resolveApprovalTemplateDesign, resolveApprovalTemplateMeta]);
 
   // 결재자 후보: 부서장 이상(팀장·부장·병원장 등)을 목록 상단에, 그 다음 나머지 직원 (staffs는 이미 메인에서 회사별로 불러옴)
   const APPROVER_POSITIONS = ['팀장', '간호과장', '실장', '부장', '이사', '병원장'];
@@ -181,6 +351,95 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       const { [missingColumn]: _removed, ...legacyRow } = candidateRow;
       candidateRow = legacyRow;
     }
+  }, []);
+  const prepareSupplyApprovalInventoryWorkflow = useCallback(async (item: any) => {
+    const requestedItems = Array.isArray(item?.meta_data?.items) ? item.meta_data.items : [];
+    if (!item?.id || requestedItems.length === 0) {
+      return null;
+    }
+
+    const { data: sourceInventoryRows, error: sourceInventoryError } = await fetchSupportInventoryRows();
+
+    if (sourceInventoryError) {
+      throw sourceInventoryError;
+    }
+
+    const workflowItems = buildSupplyRequestWorkflowItems(
+      requestedItems,
+      sourceInventoryRows || [],
+      item?.meta_data?.inventory_workflow?.items,
+    );
+    const summary = summarizeSupplyRequestWorkflow(workflowItems);
+    const now = new Date().toISOString();
+    const workflow = {
+      status: 'pending',
+      source_company: INVENTORY_SUPPORT_COMPANY,
+      source_department: INVENTORY_SUPPORT_DEPARTMENT,
+      created_at: item?.meta_data?.inventory_workflow?.created_at || now,
+      updated_at: now,
+      items: workflowItems,
+      summary,
+    };
+    const nextMetaData = {
+      ...(item?.meta_data || {}),
+      inventory_workflow: workflow,
+    };
+
+    const { error: metaError } = await supabase
+      .from('approvals')
+      .update({ meta_data: nextMetaData })
+      .eq('id', item.id);
+
+    if (metaError) {
+      throw metaError;
+    }
+
+    try {
+      const { data: inventoryManagers } = await supabase
+        .from('staff_members')
+        .select('id, name')
+        .eq('company', INVENTORY_SUPPORT_COMPANY)
+        .eq('department', INVENTORY_SUPPORT_DEPARTMENT);
+
+      const managerNotifications = (inventoryManagers || [])
+        .map((staff: any) => ({
+          user_id: staff.id,
+          type: 'inventory',
+          title: `[물품신청 승인] ${item.title}`,
+          body: `${item.sender_name || '신청자'} 요청이 승인되었습니다. 출고 가능 ${summary.issue_ready_count}건, 발주 필요 ${summary.order_required_count}건을 확인해주세요.`,
+          metadata: {
+            approval_id: item.id,
+            workflow_type: 'supply_request_fulfillment',
+            source_company: INVENTORY_SUPPORT_COMPANY,
+            source_department: INVENTORY_SUPPORT_DEPARTMENT,
+            summary,
+          },
+        }))
+        .filter((notification) => notification.user_id);
+
+      const senderNotification = item?.sender_id
+        ? [{
+            user_id: item.sender_id,
+            type: 'approval',
+            title: '물품신청이 승인되었습니다',
+            body: '경영지원팀이 실시간 재고를 확인한 뒤 불출 또는 발주를 진행합니다.',
+            metadata: {
+              approval_id: item.id,
+              workflow_type: 'supply_request_fulfillment',
+              summary,
+            },
+          }]
+        : [];
+
+      const notificationRows = [...managerNotifications, ...senderNotification];
+      if (notificationRows.length > 0) {
+        await supabase.from('notifications').insert(notificationRows);
+      }
+    } catch (notificationError) {
+      console.error('물품신청 재고 처리 알림 생성 실패:', notificationError);
+    }
+
+    return { workflow, summary };
   }, []);
   const canUserApproveItem = useCallback((item: any) => {
     if (item?.status !== '대기' || !user?.id) return false;
@@ -276,6 +535,53 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       return changed ? next : prev;
     });
   }, [BUILTIN_FORM_TYPES]);
+
+  useEffect(() => {
+    const loadFormTemplateDesigns = async () => {
+      if (typeof window !== 'undefined') {
+        try {
+          const localRaw = window.localStorage.getItem(LOCAL_FORM_TEMPLATE_DESIGNS_KEY);
+          if (localRaw) {
+            const parsed = JSON.parse(localRaw);
+            if (parsed && typeof parsed === 'object') {
+              setFormTemplateDesigns(parsed);
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('system_settings')
+          .select('value')
+          .eq('key', 'form_template_designs')
+          .maybeSingle();
+
+        if (error) {
+          if (!isMissingColumnError(error, 'value')) {
+            console.warn('form_template_designs load failed:', error);
+          }
+          return;
+        }
+
+        if (!data?.value) return;
+
+        const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+        if (parsed && typeof parsed === 'object') {
+          setFormTemplateDesigns(parsed);
+          if (typeof window !== 'undefined') {
+            window.localStorage.setItem(LOCAL_FORM_TEMPLATE_DESIGNS_KEY, JSON.stringify(parsed));
+          }
+        }
+      } catch (error) {
+        console.warn('form_template_designs load failed:', error);
+      }
+    };
+
+    void loadFormTemplateDesigns();
+  }, []);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && user?.id) {
@@ -599,15 +905,15 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
 
     if (!appError) {
       if (isFinalApproval) {
+        let supplyApprovalSummary: ReturnType<typeof summarizeSupplyRequestWorkflow> | null = null;
         if (item.type === '물품신청' && item.meta_data.items) {
-          await supabase.from('notifications').insert([{
-            user_id: '00000000-0000-4000-a000-000000000001',
-            type: '물품이동요청',
-            title: '📦 물품 부서이동 승인 알림',
-            body: `[${item.title}] 결재가 최종 승인되었습니다. 물품 이동을 완료해주세요.`,
-            metadata: { approval_id: item.id, items: item.meta_data.items }
-          }]);
-          alert("최종 승인되었습니다. 행정팀에서 물품 이동을 완료하면 재고가 반영됩니다.");
+          try {
+            const workflowResult = await prepareSupplyApprovalInventoryWorkflow(item);
+            supplyApprovalSummary = workflowResult?.summary ?? null;
+          } catch (workflowError) {
+            console.error('물품신청 승인 후 재고 처리 준비 실패:', workflowError);
+            alert('최종 승인되었지만 경영지원팀 알림 또는 재고 처리 큐 생성에는 실패했습니다. 재고 화면에서 다시 확인해주세요.');
+          }
         }
 
         if (item.type === '인사명령' && item.meta_data.orderTargetId) {
@@ -696,7 +1002,11 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
           } catch (_) { }
         }
 
-        alert("최종 승인 처리가 완료되었습니다.");
+        if (supplyApprovalSummary) {
+          alert(`최종 승인되었습니다. 경영지원팀에 처리 알림을 보냈습니다.\n출고 가능 ${supplyApprovalSummary.issue_ready_count}건, 발주 필요 ${supplyApprovalSummary.order_required_count}건`);
+        } else {
+          alert("최종 승인 처리가 완료되었습니다.");
+        }
       } else {
         alert("승인되어 다음 결재자에게 진행되었습니다.");
       }
@@ -754,6 +1064,10 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     const docPrefix = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
     const { count } = await supabase.from('approvals').select('id', { count: 'exact', head: true });
     const docNumber = `${docPrefix}-${String((count || 0) + 1).padStart(4, '0')}`;
+    const selectedCustomForm = customFormTypes.find((item) => item.slug === formType);
+    const builtInForm = BUILTIN_FORM_TYPE_DEFINITIONS.find((item) => item.slug === formType || item.name === formType);
+    const resolvedFormSlug = selectedCustomForm?.slug || builtInForm?.slug || formType;
+    const resolvedFormName = selectedCustomForm?.name || builtInForm?.name || formType;
 
     const row: any = {
       sender_id: user.id,
@@ -766,6 +1080,8 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       content: formContent || '',
       meta_data: {
         ...extraData,
+        form_slug: resolvedFormSlug,
+        form_name: resolvedFormName,
         cc_departments,
         cc_users: ccLine.map(c => ({ id: c.id, name: c.name })),
         approver_line: approverLine.map((a: any) => a.id),
@@ -1244,6 +1560,8 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                   const currentStep = steps.find((s: { step: number; name: string; isCurrent: boolean }) => s.isCurrent) || null;
                   const isBulkTarget = viewMode === '결재함' && canUserApproveItem(item);
                   const isChecked = selectedApprovalIds.includes(item.id);
+                  const templateMeta = resolveApprovalTemplateMeta(item);
+                  const templateDesign = resolveApprovalTemplateDesign(item);
                   return (
                     <div
                       key={item.id}
@@ -1267,12 +1585,20 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                             />
                           </div>
                         )}
-                        <div className="w-7 h-7 bg-[var(--toss-gray-1)] shrink-0 rounded-[7px] flex items-center justify-center text-[11px] shadow-inner group-hover:bg-[var(--toss-blue-light)] transition-colors">
+                        <div
+                          className="w-7 h-7 shrink-0 rounded-[7px] flex items-center justify-center text-[11px] shadow-inner transition-colors"
+                          style={{ backgroundColor: alphaColor(templateDesign.primaryColor, 0.12), color: templateDesign.primaryColor || '#155eef' }}
+                        >
                           {item.type === '물품신청' ? '📦' : item.type === '양식신청' ? '📄' : item.type === '인사명령' ? '🎖️' : item.type === '수리요청서' ? '🔧' : '📋'}
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap gap-0.5 mb-0 items-center">
-                            <span className="px-1.5 py-[2px] bg-[var(--toss-gray-1)] rounded-md text-[10px] font-semibold text-[var(--toss-gray-3)]">{item.type}</span>
+                            <span
+                              className="px-1.5 py-[2px] rounded-md text-[10px] font-semibold"
+                              style={{ backgroundColor: alphaColor(templateDesign.primaryColor, 0.1), color: templateDesign.primaryColor || '#155eef' }}
+                            >
+                              {templateMeta.name || item.type}
+                            </span>
                             <span className={`px-1.5 py-[2px] rounded-md text-[10px] font-semibold ${item.status === '승인' ? 'bg-green-100 text-green-600' : item.status === '반려' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-500'}`}>{item.status}</span>
                             <span className="px-1.5 py-[2px] bg-[var(--toss-blue-light)] rounded-md text-[10px] font-semibold text-[var(--toss-blue)]">{item.sender_company}</span>
                           </div>
@@ -1293,8 +1619,9 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
 
                       <div className="flex flex-wrap gap-1 shrink-0 pt-0" onClick={(e) => e.stopPropagation()}>
                         <button type="button" onClick={() => {
-                          const win = window.open('', '_blank');
-                          if (!win) return;
+                          openApprovalPrintView(item);
+                          return;
+                          const win = window.open('', '_blank')!;
                           win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>결재문서</title><style>body{font-family:'Malgun Gothic',sans-serif;padding:30px;max-width:800px;margin:0 auto}h1{font-size:20px;text-align:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:20px}.meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;font-size:12px}.meta div{border:1px solid #ccc;padding:8px;border-radius:4px}.content{border:1px solid #ccc;padding:15px;min-height:200px;font-size:13px;line-height:1.6;border-radius:4px}.approval-line{margin-top:20px;display:flex;gap:10px}.sig-box{border:1px solid #ccc;padding:10px;min-width:80px;text-align:center;font-size:11px}@media print{button{display:none}}</style></head><body><h1>결 재 문 서</h1><div class="meta"><div><strong>문서번호:</strong> ${item.doc_number || '-'}</div><div><strong>기안일:</strong> ${new Date(item.created_at).toLocaleDateString('ko-KR')}</div><div><strong>기안자:</strong> ${item.sender_name}</div><div><strong>소속:</strong> ${item.sender_company}</div><div><strong>문서종류:</strong> ${item.type}</div><div><strong>상태:</strong> ${item.status}</div></div><h3 style="font-size:16px;margin-bottom:10px">${item.title}</h3><div class="content">${(item.content || '').replace(/\n/g, '<br>')}</div><div class="approval-line">${(item.approver_line || []).map((id: string, i: number) => `<div class="sig-box">${i + 1}단계<br><br><br>(인)</div>`).join('')}</div><script>window.onload=()=>window.print()</script></body></html>`);
                           win.document.close();
                         }} className="px-2 py-1 bg-gray-50 text-gray-600 border border-gray-200 rounded-[6px] text-[10px] font-semibold hover:bg-gray-100">PDF</button>
@@ -1341,6 +1668,8 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       {selectedApprovalId && (() => {
         const item = approvals.find((a: any) => a.id === selectedApprovalId);
         if (!item) return null;
+        const templateMeta = resolveApprovalTemplateMeta(item);
+        const templateDesign = resolveApprovalTemplateDesign(item);
         return (
           <div
             className="fixed inset-0 z-[110] flex items-end md:items-center justify-center p-0 md:p-4 bg-black/50"
@@ -1350,8 +1679,22 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
               className="bg-[var(--toss-card)] rounded-t-[16px] md:rounded-[12px] shadow-xl max-w-lg w-full max-h-[90dvh] overflow-hidden flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="p-4 md:p-6 border-b border-[var(--toss-border)] flex items-center justify-between">
-                <span className="px-2 py-0.5 bg-[var(--toss-gray-1)] rounded-md text-[11px] font-semibold text-[var(--toss-gray-3)]">{item.type}</span>
+              <div
+                className="p-4 md:p-6 border-b flex items-center justify-between"
+                style={{
+                  borderColor: alphaColor(templateDesign.borderColor, 0.9),
+                  background: `linear-gradient(135deg, ${alphaColor(templateDesign.primaryColor, 0.12)} 0%, rgba(255,255,255,0) 70%)`,
+                }}
+              >
+                <div className="min-w-0">
+                  <span
+                    className="inline-flex px-2 py-0.5 rounded-md text-[11px] font-semibold"
+                    style={{ backgroundColor: alphaColor(templateDesign.primaryColor, 0.1), color: templateDesign.primaryColor || '#155eef' }}
+                  >
+                    {templateMeta.name || item.type}
+                  </span>
+                  <p className="mt-2 text-[11px] text-[var(--toss-gray-3)]">{templateDesign.subtitle || '전자결재 승인 문서'}</p>
+                </div>
                 <button type="button" onClick={() => setSelectedApprovalId(null)} className="p-2 rounded-[12px] text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]">✕</button>
               </div>
               <div className="p-4 md:p-6 overflow-y-auto flex-1">

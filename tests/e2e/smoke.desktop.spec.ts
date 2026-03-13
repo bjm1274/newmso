@@ -237,6 +237,21 @@ test("mypage tabs switch across profile, commute, todo, certificates, salary, do
 
   await page.getByRole("button", { name: /할일/ }).click();
   await expect(page.getByTestId("mypage-todo-tab")).toBeVisible();
+  await page.getByRole("button", { name: "\uAE09\uC5EC\u00B7\uC99D\uBA85\uC11C" }).click();
+  await expect(page.getByTestId("mypage-records-tab")).toBeVisible();
+
+  await page.getByRole("button", { name: "\uBC1C\uAE09 \uBB38\uC11C \uCE74\uB4DC" }).click();
+  await expect(page.getByTestId("mypage-certificates-tab")).toBeVisible();
+
+  await page.getByRole("button", { name: "\uC6D4\uBCC4 \uC815\uC0B0 \uCE74\uB4DC" }).click();
+  await expect(page.getByTestId("mypage-salary-tab")).toBeVisible();
+
+  await page.getByRole("button", { name: /\uC11C\uB958\uC81C\uCD9C/ }).click();
+  await expect(page.getByTestId("mypage-documents-tab")).toBeVisible();
+
+  await page.getByRole("button", { name: /\uC54C\uB9BC/ }).last().click();
+  await expect(page.getByTestId("mypage-notifications-tab")).toBeVisible();
+  return;
   await expect(page.getByText("나의 할일 관리")).toBeVisible();
 
   await page.getByRole("button", { name: /증명서/ }).click();

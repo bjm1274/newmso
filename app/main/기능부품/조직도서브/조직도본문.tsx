@@ -36,6 +36,8 @@ export default function MainContent({
   onOpenApproval,
   initialApprovalIntent,
   onConsumeApprovalIntent,
+  initialInventoryWorkflowApprovalId,
+  onConsumeInitialInventoryWorkflowApprovalId,
   setMainMenu,
 }: any) {
   const [annualLeaveNotice, setAnnualLeaveNotice] = useState<{ remaining: number; total: number } | null>(null);
@@ -155,6 +157,8 @@ export default function MainContent({
             selectedCompanyId={selectedCompanyId}
             initialView={subView}
             onViewChange={setSubView}
+            initialWorkflowApprovalId={initialInventoryWorkflowApprovalId}
+            onConsumeInitialWorkflowApprovalId={onConsumeInitialInventoryWorkflowApprovalId}
           />
         </div>
       )}

@@ -24,23 +24,34 @@ export type DocumentDesignStore = {
   companies: Record<string, ScopedDesigns>;
 };
 
+const DOCUMENT_DESIGN_TYPES: DocumentDesignType[] = ['payroll_slip', 'certificate'];
+const DOCUMENT_DESIGN_FIELDS: (keyof DocumentDesign)[] = [
+  'title',
+  'subtitle',
+  'companyLabel',
+  'primaryColor',
+  'borderColor',
+  'footerText',
+  'showSignArea',
+];
+
 export const DEFAULT_DOCUMENT_DESIGNS: Record<DocumentDesignType, DocumentDesign> = {
   payroll_slip: {
     title: '급여명세서',
     subtitle: '월별 급여 지급 내역',
     companyLabel: 'SY INC.',
-    primaryColor: '#1d4ed8',
-    borderColor: '#dbe4f0',
-    footerText: '본 문서는 전자 발급 문서이며 회사 보관본과 동일한 효력을 가집니다.',
+    primaryColor: '#163b70',
+    borderColor: '#d8e1ee',
+    footerText: '본 문서는 전자 발급된 급여 확인 문서이며 회사 보관본과 동일한 효력을 가집니다.',
     showSignArea: true,
   },
   certificate: {
-    title: '재직증명서',
-    subtitle: '증명서 발급 문서',
+    title: '공식 증명서',
+    subtitle: '',
     companyLabel: 'SY INC.',
-    primaryColor: '#0f766e',
-    borderColor: '#d7e6e3',
-    footerText: '본 문서는 전자 발급 문서이며 제출용 원본으로 사용할 수 있습니다.',
+    primaryColor: '#0f4c5c',
+    borderColor: '#d5e3e5',
+    footerText: '',
     showSignArea: true,
   },
 };
@@ -84,35 +95,59 @@ function isRecord(value: unknown): value is Record<string, any> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
-function normalizeBoolean(value: unknown, fallback: boolean) {
-  return typeof value === 'boolean' ? value : fallback;
-}
-
-function normalizeString(value: unknown, fallback: string) {
-  return typeof value === 'string' && value.trim() ? value.trim() : fallback;
+function normalizePatchString(value: unknown) {
+  return typeof value === 'string' ? value.trim() : '';
 }
 
 function normalizeDesignPatch(value: unknown): DesignPatch {
   if (!isRecord(value)) return {};
 
-  return {
-    title: normalizeString(value.title, ''),
-    subtitle: normalizeString(value.subtitle, ''),
-    companyLabel: normalizeString(value.companyLabel, ''),
-    primaryColor: normalizeString(value.primaryColor, ''),
-    borderColor: normalizeString(value.borderColor, ''),
-    footerText: normalizeString(value.footerText, ''),
-    showSignArea: normalizeBoolean(value.showSignArea, true),
-  };
+  const patch: DesignPatch = {};
+
+  if (Object.prototype.hasOwnProperty.call(value, 'title')) {
+    patch.title = normalizePatchString(value.title);
+  }
+  if (Object.prototype.hasOwnProperty.call(value, 'subtitle')) {
+    patch.subtitle = normalizePatchString(value.subtitle);
+  }
+  if (Object.prototype.hasOwnProperty.call(value, 'companyLabel')) {
+    patch.companyLabel = normalizePatchString(value.companyLabel);
+  }
+  if (Object.prototype.hasOwnProperty.call(value, 'primaryColor')) {
+    patch.primaryColor = normalizePatchString(value.primaryColor);
+  }
+  if (Object.prototype.hasOwnProperty.call(value, 'borderColor')) {
+    patch.borderColor = normalizePatchString(value.borderColor);
+  }
+  if (Object.prototype.hasOwnProperty.call(value, 'footerText')) {
+    patch.footerText = normalizePatchString(value.footerText);
+  }
+  if (Object.prototype.hasOwnProperty.call(value, 'showSignArea') && typeof value.showSignArea === 'boolean') {
+    patch.showSignArea = value.showSignArea;
+  }
+
+  return patch;
 }
 
 function normalizeScopedDesigns(value: unknown): ScopedDesigns {
   if (!isRecord(value)) return {};
 
   const scoped: ScopedDesigns = {};
-  if (value.payroll_slip) scoped.payroll_slip = normalizeDesignPatch(value.payroll_slip);
-  if (value.certificate) scoped.certificate = normalizeDesignPatch(value.certificate);
+  if (Object.prototype.hasOwnProperty.call(value, 'payroll_slip')) {
+    scoped.payroll_slip = normalizeDesignPatch(value.payroll_slip);
+  }
+  if (Object.prototype.hasOwnProperty.call(value, 'certificate')) {
+    scoped.certificate = normalizeDesignPatch(value.certificate);
+  }
   return scoped;
+}
+
+function hasPatchValue(patch?: DesignPatch) {
+  return !!patch && Object.keys(patch).length > 0;
+}
+
+function buildCompanyLabel(base: DocumentDesign, defaults: DesignPatch, companyName?: string | null) {
+  return defaults.companyLabel || companyName || base.companyLabel;
 }
 
 export function normalizeDocumentDesignStore(value: unknown): DocumentDesignStore {
@@ -170,13 +205,8 @@ async function readSetting(key: string) {
   return localValue;
 }
 
-function isEmptyPatch(patch?: DesignPatch) {
-  if (!patch) return true;
-  return Object.values(patch).every((value) => value === '' || value === undefined);
-}
-
 async function applyLegacyPayrollFallback(store: DocumentDesignStore) {
-  if (!isEmptyPatch(store.defaults.payroll_slip)) return store;
+  if (hasPatchValue(store.defaults.payroll_slip)) return store;
 
   const formTemplateDesigns = await readSetting('form_template_designs').catch(() => null);
   if (isRecord(formTemplateDesigns) && isRecord(formTemplateDesigns.payroll_slip)) {
@@ -193,41 +223,29 @@ async function applyLegacyPayrollFallback(store: DocumentDesignStore) {
 }
 
 function applyCertificateFallback(store: DocumentDesignStore) {
-  if (!isEmptyPatch(store.defaults.certificate)) return store;
-
-  const payrollBase = store.defaults.payroll_slip || {};
-  store.defaults.certificate = {
-    primaryColor: payrollBase.primaryColor,
-    borderColor: payrollBase.borderColor,
-    companyLabel: payrollBase.companyLabel,
-  };
   return store;
 }
 
-export async function fetchDocumentDesignStore() {
-  const raw = await readSetting(DOCUMENT_DESIGN_SETTING_KEY).catch(() => null);
-  const store = normalizeDocumentDesignStore(raw);
-  await applyLegacyPayrollFallback(store);
-  applyCertificateFallback(store);
-  return store;
-}
+export function resolveDocumentDesignReference(
+  store: DocumentDesignStore | null | undefined,
+  type: DocumentDesignType,
+  companyName?: string | null,
+) {
+  const base = DEFAULT_DOCUMENT_DESIGNS[type];
 
-export async function saveDocumentDesignStore(store: DocumentDesignStore) {
-  const payload = {
-    key: DOCUMENT_DESIGN_SETTING_KEY,
-    value: JSON.stringify(store),
-    updated_at: new Date().toISOString(),
-  };
-
-  writeLocalSystemSetting(DOCUMENT_DESIGN_SETTING_KEY, store);
-
-  const result = await supabase
-    .from('system_settings')
-    .upsert(payload, { onConflict: 'key' });
-  if (isMissingTableError(result.error, 'system_settings')) {
-    return { data: payload, error: null } as unknown as typeof result;
+  if (!companyName) {
+    return {
+      ...base,
+      companyLabel: base.companyLabel,
+    };
   }
-  return result;
+
+  const defaults = store?.defaults?.[type] || {};
+  return {
+    ...base,
+    ...defaults,
+    companyLabel: buildCompanyLabel(base, defaults, companyName),
+  };
 }
 
 export function resolveDocumentDesign(
@@ -245,16 +263,111 @@ export function resolveDocumentDesign(
     ...companyScoped,
     companyLabel:
       companyScoped.companyLabel ||
-      defaults.companyLabel ||
-      companyName ||
-      base.companyLabel,
+      buildCompanyLabel(base, defaults, companyName),
   };
+}
+
+export function getDocumentDesignScopePatch(
+  store: DocumentDesignStore | null | undefined,
+  type: DocumentDesignType,
+  companyName?: string | null,
+) {
+  return companyName ? store?.companies?.[companyName]?.[type] || {} : store?.defaults?.[type] || {};
+}
+
+export function buildDocumentDesignPatch(reference: DocumentDesign, nextDesign: DocumentDesign): DesignPatch {
+  const patch: DesignPatch = {};
+
+  DOCUMENT_DESIGN_FIELDS.forEach((field) => {
+    const referenceValue = reference[field];
+    const nextValue = nextDesign[field];
+    if (nextValue !== referenceValue) {
+      patch[field] = nextValue as never;
+    }
+  });
+
+  return patch;
+}
+
+export function compactDocumentDesignStore(store: DocumentDesignStore | null | undefined) {
+  const normalized = normalizeDocumentDesignStore(store);
+  const defaults: ScopedDesigns = {};
+  const companies: Record<string, ScopedDesigns> = {};
+
+  DOCUMENT_DESIGN_TYPES.forEach((type) => {
+    const patch = normalized.defaults[type];
+    if (!patch) return;
+    const reference = resolveDocumentDesignReference(normalized, type);
+    const applied = { ...reference, ...patch };
+    const compactPatch = buildDocumentDesignPatch(reference, applied);
+    if (hasPatchValue(compactPatch)) {
+      defaults[type] = compactPatch;
+    }
+  });
+
+  Object.entries(normalized.companies).forEach(([companyName, scopedDesigns]) => {
+    const nextScoped: ScopedDesigns = {};
+
+    DOCUMENT_DESIGN_TYPES.forEach((type) => {
+      const patch = scopedDesigns?.[type];
+      if (!patch) return;
+
+      const reference = resolveDocumentDesignReference(
+        { version: 2, defaults, companies },
+        type,
+        companyName,
+      );
+      const applied = { ...reference, ...patch };
+      const compactPatch = buildDocumentDesignPatch(reference, applied);
+
+      if (hasPatchValue(compactPatch)) {
+        nextScoped[type] = compactPatch;
+      }
+    });
+
+    if (Object.keys(nextScoped).length > 0) {
+      companies[companyName] = nextScoped;
+    }
+  });
+
+  return {
+    version: 2,
+    defaults,
+    companies,
+  } satisfies DocumentDesignStore;
+}
+
+export async function fetchDocumentDesignStore() {
+  const raw = await readSetting(DOCUMENT_DESIGN_SETTING_KEY).catch(() => null);
+  const store = normalizeDocumentDesignStore(raw);
+  await applyLegacyPayrollFallback(store);
+  applyCertificateFallback(store);
+  return compactDocumentDesignStore(store);
+}
+
+export async function saveDocumentDesignStore(store: DocumentDesignStore) {
+  const compacted = compactDocumentDesignStore(store);
+  const payload = {
+    key: DOCUMENT_DESIGN_SETTING_KEY,
+    value: JSON.stringify(compacted),
+    updated_at: new Date().toISOString(),
+  };
+
+  writeLocalSystemSetting(DOCUMENT_DESIGN_SETTING_KEY, compacted);
+
+  const result = await supabase
+    .from('system_settings')
+    .upsert(payload, { onConflict: 'key' });
+  if (isMissingTableError(result.error, 'system_settings')) {
+    return { data: payload, error: null } as unknown as typeof result;
+  }
+  return result;
 }
 
 export function updateDocumentDesignStore(
   store: DocumentDesignStore,
   type: DocumentDesignType,
-  design: DesignPatch,
+  design: DocumentDesign,
   companyName?: string | null,
 ) {
   const next: DocumentDesignStore = {
@@ -267,23 +380,37 @@ export function updateDocumentDesignStore(
     },
   };
 
+  const reference = resolveDocumentDesignReference(store, type, companyName);
+  const patch = buildDocumentDesignPatch(reference, design);
+
   if (!companyName) {
-    next.defaults[type] = {
-      ...(store.defaults[type] || {}),
-      ...design,
-    };
-    return next;
+    if (hasPatchValue(patch)) {
+      next.defaults[type] = patch;
+    } else {
+      const { [type]: _removed, ...rest } = next.defaults;
+      next.defaults = rest;
+    }
+    return compactDocumentDesignStore(next);
   }
 
-  next.companies[companyName] = {
+  const currentScoped = {
     ...(store.companies[companyName] || {}),
-    [type]: {
-      ...(store.companies[companyName]?.[type] || {}),
-      ...design,
-    },
   };
 
-  return next;
+  if (hasPatchValue(patch)) {
+    currentScoped[type] = patch;
+    next.companies[companyName] = currentScoped;
+  } else {
+    const { [type]: _removed, ...restScoped } = currentScoped;
+    if (Object.keys(restScoped).length > 0) {
+      next.companies[companyName] = restScoped;
+    } else {
+      const { [companyName]: _removedCompany, ...restCompanies } = next.companies;
+      next.companies = restCompanies;
+    }
+  }
+
+  return compactDocumentDesignStore(next);
 }
 
 export function resetDocumentDesignScope(
@@ -302,15 +429,22 @@ export function resetDocumentDesignScope(
   };
 
   if (!companyName) {
-    const { [type]: _, ...rest } = next.defaults;
+    const { [type]: _removed, ...rest } = next.defaults;
     next.defaults = rest;
-    return next;
+    return compactDocumentDesignStore(next);
   }
 
   const scoped = { ...(next.companies[companyName] || {}) };
-  const { [type]: _, ...rest } = scoped;
-  next.companies[companyName] = rest;
-  return next;
+  const { [type]: _removed, ...rest } = scoped;
+
+  if (Object.keys(rest).length > 0) {
+    next.companies[companyName] = rest;
+  } else {
+    const { [companyName]: _removedCompany, ...restCompanies } = next.companies;
+    next.companies = restCompanies;
+  }
+
+  return compactDocumentDesignStore(next);
 }
 
 export function alphaColor(hexColor: string | undefined | null, alpha: number) {

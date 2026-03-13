@@ -15,6 +15,7 @@ const employeeUser = {
   position: '간호사',
   role: 'staff',
   permissions: {
+    ...fakeUser.permissions,
     approval: true,
     mso: false,
     admin: false,
@@ -31,6 +32,7 @@ const managerUser = {
   position: '팀장',
   role: 'manager',
   permissions: {
+    ...fakeUser.permissions,
     approval: true,
     mso: false,
     admin: false,
@@ -50,6 +52,7 @@ const adminUser = {
   position: '시스템관리자',
   role: 'admin',
   permissions: {
+    ...fakeUser.permissions,
     approval: true,
     mso: true,
     admin: true,

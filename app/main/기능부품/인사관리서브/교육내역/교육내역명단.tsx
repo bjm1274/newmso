@@ -9,6 +9,9 @@ import {
   getScopedActiveStaffs,
   getStaffDepartment,
   getStaffPosition,
+  removeEducationCompletionWithFallback,
+  serializeEducationQueryError,
+  upsertEducationCompletionWithFallback,
 } from './education-utils';
 
 interface EducationListProps {
@@ -89,31 +92,31 @@ export default function EducationList({
       }
 
       if (!selectedAction.isCompleted) {
-        const { error: dbError } = await supabase.from('education_completions').upsert([{
+        const { error: dbError } = await upsertEducationCompletionWithFallback(supabase, {
           staff_id: selectedAction.staffId,
           education_name: selectedAction.eduName,
           certificate_url: url || null,
-        }]);
+        });
 
         if (dbError) {
-          console.warn('certificate_url column might be missing', dbError);
-          await supabase.from('education_completions').upsert([{
-            staff_id: selectedAction.staffId,
-            education_name: selectedAction.eduName,
-          }]);
+          throw dbError;
         }
       } else {
-        await supabase
-          .from('education_completions')
-          .delete()
-          .eq('staff_id', selectedAction.staffId)
-          .eq('education_name', selectedAction.eduName);
+        const { error: deleteError } = await removeEducationCompletionWithFallback(
+          supabase,
+          selectedAction.staffId,
+          selectedAction.eduName,
+        );
+
+        if (deleteError) {
+          throw deleteError;
+        }
       }
 
       await onStatusChanged?.();
       setSelectedAction(null);
     } catch (error) {
-      console.error(error);
+      console.error('교육 이수 상태 업데이트 실패:', serializeEducationQueryError(error));
       alert('상태 업데이트 중 오류가 발생했습니다.');
     } finally {
       setUploading(false);

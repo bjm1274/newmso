@@ -30,3 +30,27 @@ export async function withMissingColumnFallback<T>(
   }
   return result;
 }
+
+export async function withMissingColumnsFallback<T>(
+  execute: (omittedColumns: ReadonlySet<string>) => PromiseLike<SupabaseResult<T>>,
+  columnNames: string[],
+): Promise<SupabaseResult<T>> {
+  const omittedColumns = new Set<string>();
+  let result = await execute(omittedColumns);
+
+  while (result.error) {
+    const missingColumn = columnNames.find(
+      (columnName) =>
+        !omittedColumns.has(columnName) && isMissingColumnError(result.error, columnName),
+    );
+
+    if (!missingColumn) {
+      return result;
+    }
+
+    omittedColumns.add(missingColumn);
+    result = await execute(omittedColumns);
+  }
+
+  return result;
+}

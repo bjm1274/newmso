@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { canAccessMainMenu } from '@/lib/access-control';
+import { canAccessAdminSection, canAccessMainMenu } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
 
 import StaffPermissionManager from './관리자전용서브/직원권한통합';
@@ -71,41 +71,12 @@ const DIRECT_ADMIN_TABS: AdminOuterTabId[] = [
   '시스템마스터센터',
 ];
 
-const ADMIN_SECTION_PERMISSION_KEYS: Record<AdminOuterTabId, string> = {
-  경영분석: 'admin_경영분석',
-  감사센터: 'admin_감사센터',
-  시스템마스터센터: 'admin_시스템마스터센터',
-  엑셀등록: 'admin_엑셀등록',
-  알림자동화: 'admin_알림자동화',
-  회사관리: 'admin_회사관리',
-  직원권한: 'admin_직원권한',
-  수술검사템플릿: 'admin_수술검사템플릿',
-  팝업관리: 'admin_팝업관리',
-  데이터백업: 'admin_데이터백업',
-  데이터초기화: 'admin_데이터초기화',
-  문서양식: 'admin_문서양식',
-  급여이상치: 'admin_급여이상치',
-  공문서대장: 'admin_공문서대장',
-};
-
 function canAccessAdminTab(user: any, tabId: AdminOuterTabId) {
-  const permissions = user?.permissions || {};
-  const hasAdminOverride =
-    permissions.mso === true ||
-    permissions.admin === true ||
-    isNamedSystemMasterAccount(user);
-
-  if (hasAdminOverride) {
-    return true;
-  }
-
   if (!canAccessMainMenu(user, '관리자')) {
     return false;
   }
 
-  const permissionKey = ADMIN_SECTION_PERMISSION_KEYS[tabId];
-  if (!permissionKey) return false;
-  return permissions[permissionKey] === true;
+  return canAccessAdminSection(user, tabId);
 }
 
 function normalizeAdminEntry(tabId?: string | null): {

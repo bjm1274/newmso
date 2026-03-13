@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { buildAuditDiff, logAudit, readClientAuditActor } from '@/lib/audit';
 import StaffHistoryTimeline from './인사이력타임라인';
@@ -25,6 +25,35 @@ function createEmptyStaffForm(selectedCompany?: string) {
   };
 }
 
+const TAXABLE_SALARY_FIELDS = [
+  { key: 'base_salary', label: '기본급 (월)' },
+  { key: 'position_allowance', label: '직책수당' },
+  { key: 'overtime_allowance', label: '연장근로수당' },
+  { key: 'night_work_allowance', label: '야간근로수당' },
+  { key: 'holiday_work_allowance', label: '휴일근로수당' },
+  { key: 'annual_leave_pay', label: '연차휴가수당' },
+] as const;
+
+const TAXFREE_SALARY_FIELDS = [
+  { key: 'meal_allowance', label: '식대' },
+  { key: 'vehicle_allowance', label: '자가운전' },
+  { key: 'childcare_allowance', label: '보육수당' },
+  { key: 'research_allowance', label: '연구비' },
+  { key: 'other_taxfree', label: '기타 비과세' },
+] as const;
+
+const MONTHLY_STANDARD_HOURS = 209;
+
+function formatWon(amount: number) {
+  return `${Math.round(amount || 0).toLocaleString('ko-KR')}원`;
+}
+
+function getMonthlyWorkingHours(weeklyHours: number) {
+  const normalizedWeeklyHours = Number(weeklyHours) || 40;
+  if (normalizedWeeklyHours <= 0) return MONTHLY_STANDARD_HOURS;
+  return Math.max(1, Math.round(MONTHLY_STANDARD_HOURS * (normalizedWeeklyHours / 40) * 10) / 10);
+}
+
 // ESLint가 React 컴포넌트로 인식하도록 함수 이름을
 // 영문 대문자로 시작하는 형태로 지정합니다.
 // default export이므로 외부 import 이름(구성원관리 등)은 그대로 사용 가능합니다.
@@ -36,6 +65,31 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   const [activeTab, setActiveTab] = useState('기본'); // '기본', '소속', '급여'
   const [신규직원, 신규직원설정] = useState(() => createEmptyStaffForm(선택사업체));
   const previousModalOpenRef = useRef(false);
+  const taxableSalaryTotal = useMemo(
+    () =>
+      TAXABLE_SALARY_FIELDS.reduce(
+        (sum, { key }) => sum + Number(신규직원[key as keyof typeof 신규직원] || 0),
+        0,
+      ),
+    [신규직원],
+  );
+  const taxfreeSalaryTotal = useMemo(
+    () =>
+      TAXFREE_SALARY_FIELDS.reduce(
+        (sum, { key }) => sum + Number(신규직원[key as keyof typeof 신규직원] || 0),
+        0,
+      ),
+    [신규직원],
+  );
+  const totalSalaryAmount = taxableSalaryTotal + taxfreeSalaryTotal;
+  const monthlyWorkingHours = useMemo(
+    () => getMonthlyWorkingHours(신규직원.working_hours_per_week),
+    [신규직원.working_hours_per_week],
+  );
+  const hourlySalaryAmount = useMemo(
+    () => Math.round(totalSalaryAmount / monthlyWorkingHours),
+    [monthlyWorkingHours, totalSalaryAmount],
+  );
 
   // ESS (직원 셀프 서비스) 승인 대기함 관련
   const [essRequests, setEssRequests] = useState<any[]>([]);
@@ -493,7 +547,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       </header>
 
       <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
-        <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+        {false && (
+          <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
           {[
             { label: 보기상태 === '퇴사' ? '퇴사자 수' : '재직자 수', value: 필터목록.length, tone: 'bg-[var(--toss-card)] border-[var(--toss-border)] text-[var(--foreground)]' },
             { label: '면허/자격 등록', value: 면허등록인원수, tone: 'bg-amber-50 border-amber-200 text-amber-900' },
@@ -505,7 +560,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
               <p className="mt-2 text-2xl font-bold">{card.value}</p>
             </div>
           ))}
-        </div>
+          </div>
+        )}
 
         {선택된직원ID && (
           <div className="mb-6 space-y-6">
@@ -943,19 +999,29 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                   <div className="flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
                     {/* (과세) 월 급여 및 고정 수당 */}
                     <div className="space-y-4">
-                      <h4 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
-                        <span className="w-1.5 h-4 bg-[var(--toss-blue)] rounded-full" />
-                        월 급여 및 고정 수당 (과세)
-                      </h4>
+                      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                        <h4 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
+                          <span className="w-1.5 h-4 bg-[var(--toss-blue)] rounded-full" />
+                          월 급여 및 고정 수당 (과세)
+                        </h4>
+                        <div className="grid grid-cols-2 gap-3 rounded-[18px] bg-[var(--toss-blue-light)] px-4 py-3 md:min-w-[320px]">
+                          <div>
+                            <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">총 급여</p>
+                            <p data-testid="new-staff-total-salary" className="mt-1 text-base font-black text-[var(--foreground)]">{formatWon(totalSalaryAmount)}</p>
+                          </div>
+                          <div className="border-l border-[var(--toss-border)] pl-3">
+                            <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">시급</p>
+                            <p data-testid="new-staff-hourly-wage" className="mt-1 text-base font-black text-[var(--toss-blue)]">{formatWon(hourlySalaryAmount)}</p>
+                          </div>
+                          <div className="col-span-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">
+                            <span>과세 {formatWon(taxableSalaryTotal)}</span>
+                            <span>비과세 {formatWon(taxfreeSalaryTotal)}</span>
+                            <span>월 소정근로시간 {monthlyWorkingHours.toLocaleString('ko-KR')}시간 기준</span>
+                          </div>
+                        </div>
+                      </div>
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-4 bg-[var(--toss-gray-1)] p-6 rounded-[24px]">
-                        {[
-                          { key: 'base_salary', label: '기본급 (월)' },
-                          { key: 'position_allowance', label: '직책수당' },
-                          { key: 'overtime_allowance', label: '연장근로수당' },
-                          { key: 'night_work_allowance', label: '야간근로수당' },
-                          { key: 'holiday_work_allowance', label: '휴일근로수당' },
-                          { key: 'annual_leave_pay', label: '연차휴가수당' },
-                        ].map(({ key, label }) => {
+                        {TAXABLE_SALARY_FIELDS.map(({ key, label }) => {
                           const val = Number(신규직원[key as keyof typeof 신규직원] ?? 0);
                           return (
                             <div key={key} className="space-y-1.5">
@@ -963,6 +1029,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                               <input
                                 type="text"
                                 inputMode="numeric"
+                                data-testid={`new-staff-salary-${key}`}
                                 value={val ? val.toLocaleString() : ''}
                                 onChange={e => {
                                   const n = parseInt(e.target.value.replace(/,/g, ''), 10) || 0;
@@ -984,13 +1051,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                         비과세 수당 항목
                       </h4>
                       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 bg-[var(--toss-gray-1)] p-6 rounded-[24px]">
-                        {[
-                          { key: 'meal_allowance', label: '식대' },
-                          { key: 'vehicle_allowance', label: '자가운전' },
-                          { key: 'childcare_allowance', label: '보육수당' },
-                          { key: 'research_allowance', label: '연구비' },
-                          { key: 'other_taxfree', label: '기타 비과세' },
-                        ].map(({ key, label }) => {
+                        {TAXFREE_SALARY_FIELDS.map(({ key, label }) => {
                           const val = Number(신규직원[key as keyof typeof 신규직원] ?? 0);
                           return (
                             <div key={key} className="space-y-1">
@@ -998,6 +1059,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                               <input
                                 type="text"
                                 inputMode="numeric"
+                                data-testid={`new-staff-taxfree-${key}`}
                                 value={val ? val.toLocaleString() : ''}
                                 onChange={e => {
                                   const n = parseInt(e.target.value.replace(/,/g, ''), 10) || 0;

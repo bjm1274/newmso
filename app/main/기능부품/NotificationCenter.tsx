@@ -33,6 +33,19 @@ function timeAgo(dateStr: string) {
   });
 }
 
+function buildInventoryNotificationHref(metadata: Record<string, any>) {
+  const params = new URLSearchParams({
+    open_menu: '재고관리',
+  });
+
+  if (metadata?.approval_id) {
+    params.set('open_inventory_view', '현황');
+    params.set('open_inventory_approval', String(metadata.approval_id));
+  }
+
+  return `/main?${params.toString()}`;
+}
+
 export default function NotificationCenter({ user }: { user: any }) {
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -150,7 +163,7 @@ export default function NotificationCenter({ user }: { user: any }) {
     }
 
     if (notification.type === 'inventory') {
-      router.push('/main?open_menu=재고관리');
+      router.push(buildInventoryNotificationHref(meta));
       return;
     }
 
