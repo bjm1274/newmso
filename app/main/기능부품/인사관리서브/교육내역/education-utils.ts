@@ -1,3 +1,5 @@
+import { isMissingColumnError } from '@/lib/supabase-compat';
+
 export type EducationCategory = 'hospital' | 'company' | 'common';
 
 export interface EducationItem {
@@ -7,6 +9,12 @@ export interface EducationItem {
 
 export interface EducationCompletionEntry {
   is_completed: boolean;
+  certificate_url?: string | null;
+}
+
+export interface EducationCompletionLikeRow {
+  staff_id: string | number;
+  education_name: string;
   certificate_url?: string | null;
 }
 
@@ -107,6 +115,212 @@ export function buildEducationCompletionMap(rows: any[] = []) {
   });
 
   return next;
+}
+
+function hasMeaningfulDate(value: unknown) {
+  if (typeof value !== 'string') return false;
+  const normalized = value.trim();
+  if (!normalized) return false;
+  return !Number.isNaN(new Date(normalized).getTime());
+}
+
+function isEducationRecordCompleted(row: any) {
+  if (hasMeaningfulDate(row?.completed_at)) return true;
+
+  const normalizedStatus = String(row?.status ?? '')
+    .trim()
+    .toLowerCase();
+
+  if (!normalizedStatus) return false;
+
+  return (
+    normalizedStatus.includes('완료') ||
+    normalizedStatus.includes('수료') ||
+    normalizedStatus.includes('이수') ||
+    normalizedStatus.includes('complete') ||
+    normalizedStatus.includes('completed') ||
+    normalizedStatus.includes('done')
+  );
+}
+
+export function isEducationCompletionQueryRecoverableError(error: any) {
+  if (!error) return false;
+
+  const code = String(error?.code || '').toUpperCase();
+  const message = `${String(error?.message || '')} ${String(error?.details || '')} ${String(error?.hint || '')}`.toLowerCase();
+
+  return (
+    code === 'PGRST205' ||
+    code === '42P01' ||
+    code === '42501' ||
+    message.includes('education_completions') ||
+    message.includes('schema cache') ||
+    message.includes('permission denied') ||
+    message.includes('relation') ||
+    message.includes('does not exist')
+  );
+}
+
+export function serializeEducationQueryError(error: any) {
+  if (!error || typeof error !== 'object') return error;
+  return {
+    code: error?.code ?? null,
+    message: error?.message ?? null,
+    details: error?.details ?? null,
+    hint: error?.hint ?? null,
+  };
+}
+
+export async function selectEducationCompletionRowsWithFallback(supabase: any) {
+  let completionQuery = await supabase
+    .from('education_completions')
+    .select('staff_id, education_name, certificate_url');
+
+  if (isMissingColumnError(completionQuery.error, 'certificate_url')) {
+    completionQuery = await supabase
+      .from('education_completions')
+      .select('staff_id, education_name');
+  }
+
+  if (!completionQuery.error) {
+    return {
+      rows: (completionQuery.data || []).map((row: any) => ({
+        staff_id: row.staff_id,
+        education_name: row.education_name,
+        certificate_url: row.certificate_url ?? null,
+      })) as EducationCompletionLikeRow[],
+      error: null,
+      source: 'education_completions' as const,
+    };
+  }
+
+  if (!isEducationCompletionQueryRecoverableError(completionQuery.error)) {
+    return {
+      rows: [] as EducationCompletionLikeRow[],
+      error: completionQuery.error,
+      source: null,
+    };
+  }
+
+  const fallbackQuery = await supabase
+    .from('education_records')
+    .select('staff_id, education_name, status, completed_at');
+
+  if (fallbackQuery.error) {
+    return {
+      rows: [] as EducationCompletionLikeRow[],
+      error: fallbackQuery.error,
+      source: 'education_records' as const,
+    };
+  }
+
+  return {
+    rows: (fallbackQuery.data || [])
+      .filter((row: any) => isEducationRecordCompleted(row))
+      .map((row: any) => ({
+        staff_id: row.staff_id,
+        education_name: row.education_name,
+        certificate_url: null,
+      })) as EducationCompletionLikeRow[],
+    error: null,
+    source: 'education_records' as const,
+  };
+}
+
+export async function upsertEducationCompletionWithFallback(
+  supabase: any,
+  payload: EducationCompletionLikeRow,
+) {
+  let upsertResult = await supabase
+    .from('education_completions')
+    .upsert([
+      {
+        staff_id: payload.staff_id,
+        education_name: payload.education_name,
+        certificate_url: payload.certificate_url ?? null,
+      },
+    ]);
+
+  if (isMissingColumnError(upsertResult.error, 'certificate_url')) {
+    upsertResult = await supabase
+      .from('education_completions')
+      .upsert([
+        {
+          staff_id: payload.staff_id,
+          education_name: payload.education_name,
+        },
+      ]);
+  }
+
+  if (!upsertResult.error) {
+    return { error: null, source: 'education_completions' as const };
+  }
+
+  if (!isEducationCompletionQueryRecoverableError(upsertResult.error)) {
+    return { error: upsertResult.error, source: null };
+  }
+
+  const existingRecordQuery = await supabase
+    .from('education_records')
+    .select('id')
+    .eq('staff_id', payload.staff_id)
+    .eq('education_name', payload.education_name)
+    .limit(1)
+    .maybeSingle();
+
+  if (existingRecordQuery.error && !isEducationCompletionQueryRecoverableError(existingRecordQuery.error)) {
+    return { error: existingRecordQuery.error, source: 'education_records' as const };
+  }
+
+  const completedPayload = {
+    staff_id: payload.staff_id,
+    education_name: payload.education_name,
+    status: '완료',
+    completed_at: new Date().toISOString().slice(0, 10),
+  };
+
+  if (existingRecordQuery.data?.id) {
+    const updateResult = await supabase
+      .from('education_records')
+      .update(completedPayload)
+      .eq('id', existingRecordQuery.data.id);
+
+    return { error: updateResult.error, source: 'education_records' as const };
+  }
+
+  const insertResult = await supabase
+    .from('education_records')
+    .insert([completedPayload]);
+
+  return { error: insertResult.error, source: 'education_records' as const };
+}
+
+export async function removeEducationCompletionWithFallback(
+  supabase: any,
+  staffId: string,
+  educationName: string,
+) {
+  const deleteResult = await supabase
+    .from('education_completions')
+    .delete()
+    .eq('staff_id', staffId)
+    .eq('education_name', educationName);
+
+  if (!deleteResult.error) {
+    return { error: null, source: 'education_completions' as const };
+  }
+
+  if (!isEducationCompletionQueryRecoverableError(deleteResult.error)) {
+    return { error: deleteResult.error, source: null };
+  }
+
+  const fallbackDelete = await supabase
+    .from('education_records')
+    .delete()
+    .eq('staff_id', staffId)
+    .eq('education_name', educationName);
+
+  return { error: fallbackDelete.error, source: 'education_records' as const };
 }
 
 export function getEducationDueDate(educationName: string, year = new Date().getFullYear()) {

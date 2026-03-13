@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import bcrypt from 'bcryptjs';
-import { existsSync, readFileSync } from 'fs';
-import path from 'path';
+import { getAdminCredentialConfig, getRuntimeEnv, verifyPrivilegedLogin } from '@/lib/admin-credentials';
 import { createSupabaseAccessToken } from '@/lib/server-supabase-bridge';
 import {
   pickStoredPassword,
@@ -16,48 +14,6 @@ import {
   normalizeSessionUser,
   SESSION_COOKIE_NAME,
 } from '@/lib/server-session';
-
-function readEnvFileValue(key: string) {
-  const envFiles = ['.env.local', '.env'];
-
-  for (const envFile of envFiles) {
-    const envPath = path.join(process.cwd(), envFile);
-    if (!existsSync(envPath)) continue;
-
-    const content = readFileSync(envPath, 'utf8');
-    const lines = content.split(/\r?\n/);
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#')) continue;
-
-      const normalized = trimmed.startsWith('export ') ? trimmed.slice(7).trim() : trimmed;
-      const separatorIndex = normalized.indexOf('=');
-      if (separatorIndex === -1) continue;
-
-      const name = normalized.slice(0, separatorIndex).trim();
-      if (name !== key) continue;
-
-      const rawValue = normalized.slice(separatorIndex + 1).trim();
-      if (!rawValue) return '';
-
-      if (
-        (rawValue.startsWith('"') && rawValue.endsWith('"')) ||
-        (rawValue.startsWith("'") && rawValue.endsWith("'"))
-      ) {
-        return rawValue.slice(1, -1);
-      }
-
-      return rawValue;
-    }
-  }
-
-  return '';
-}
-
-function getRuntimeEnv(key: string) {
-  return process.env[key] || readEnvFileValue(key);
-}
 
 function getAdminClient() {
   const supabaseUrl = getRuntimeEnv('NEXT_PUBLIC_SUPABASE_URL');
@@ -109,23 +65,15 @@ export async function POST(request: NextRequest) {
     return failureResponse('아이디와 비밀번호를 모두 입력해주세요.', 400);
   }
 
-  const adminName = getRuntimeEnv('ADMIN_NAME');
-  const adminPasswordHash = getRuntimeEnv('ADMIN_PASSWORD_HASH');
-  const masterId = getRuntimeEnv('MASTER_ID');
-  const masterPasswordHash = getRuntimeEnv('MASTER_PASSWORD_HASH');
+  const { adminName, adminPasswordHash, masterId, masterPasswordHash } = getAdminCredentialConfig();
 
   if (!adminName || !adminPasswordHash || !masterId || !masterPasswordHash) {
     return failureResponse('마스터 로그인 환경변수를 읽지 못했습니다. 서버를 재시작한 뒤 다시 시도해주세요.', 500);
   }
 
-  let adminMatch = false;
-  try {
-    adminMatch = await bcrypt.compare(password, adminPasswordHash);
-  } catch {
-    adminMatch = false;
-  }
+  const privilegedLogin = await verifyPrivilegedLogin(loginId, password);
 
-  if (loginId === adminName && adminMatch) {
+  if (privilegedLogin.ok && privilegedLogin.kind === 'admin') {
     const supabase = getAdminClient();
     const { data: msoRow } = await supabase
       .from('staff_members')
@@ -167,14 +115,7 @@ export async function POST(request: NextRequest) {
     return successResponse(user);
   }
 
-  let masterMatch = false;
-  try {
-    masterMatch = await bcrypt.compare(password, masterPasswordHash);
-  } catch {
-    masterMatch = false;
-  }
-
-  if (loginId === masterId && masterMatch) {
+  if (privilegedLogin.ok && privilegedLogin.kind === 'master') {
     return successResponse({
       id: null,
       employee_no: '0',

@@ -33,6 +33,7 @@ const adminUser = {
   position: '시스템관리자',
   role: 'admin',
   permissions: {
+    ...fakeUser.permissions,
     hr: true,
     inventory: true,
     approval: true,

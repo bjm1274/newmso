@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import SmartDatePicker from '../공통/SmartDatePicker';
 
 export default function InvoiceAutoExtraction({ onRefresh, user }: any) {
@@ -103,7 +104,20 @@ export default function InvoiceAutoExtraction({ onRefresh, user }: any) {
                 department: user?.department || '',
             }));
 
-            const { error } = await supabase.from('inventory').insert(payloads);
+            const { error } = await withMissingColumnsFallback(
+                (omittedColumns) =>
+                    supabase.from('inventory').insert(
+                        payloads.map((payload: Record<string, any>) => {
+                            if (!omittedColumns.has('department')) {
+                                return payload;
+                            }
+
+                            const { department, ...legacyPayload } = payload;
+                            return legacyPayload;
+                        }),
+                    ),
+                ['department'],
+            );
             if (error) throw error;
 
             successCount = payloads.length;

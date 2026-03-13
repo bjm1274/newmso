@@ -72,7 +72,7 @@ type AttendanceAnalysisTabId =
 
 type PayrollEmbeddedTabId = '기본' | '원천징수파일' | '4대보험';
 type ContractEmbeddedTabId = '기본' | '계약서생성기';
-type ShiftSuiteTabId = '캘린더' | '생성마법사';
+type ShiftSuiteTabId = '캘린더' | '생성마법사' | '근무규칙생성' | '교대방식패턴';
 type LeaveSuiteTabId = '연차/휴가 신청내역' | '공휴일 달력';
 
 type HrTabDef = {
@@ -148,6 +148,8 @@ const CONTRACT_UTILITY_TABS = [
 const SHIFT_SUITE_TABS = [
   { id: '캘린더', label: '교대 캘린더', icon: '🔄' },
   { id: '생성마법사', label: '생성 마법사', icon: '🧩' },
+  { id: '근무규칙생성', label: '근무규칙생성', icon: '📐' },
+  { id: '교대방식패턴', label: '교대방식 패턴', icon: '🧬' },
 ] as const;
 
 const LEAVE_SUITE_MENU_MAP: Record<string, LeaveSuiteTabId> = {
@@ -188,6 +190,8 @@ const SHIFT_SUITE_MENU_MAP: Record<string, ShiftSuiteTabId> = {
   교대근무: '생성마법사',
   근무표자동편성: '생성마법사',
   간호근무표: '생성마법사',
+  근무규칙생성: '근무규칙생성',
+  교대방식패턴: '교대방식패턴',
 };
 
 const ATTENDANCE_ANALYSIS_MENU_MAP: Record<string, AttendanceAnalysisTabId> = {
@@ -693,6 +697,22 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
                 {교대근무탭 === '캘린더' && <ShiftCalendar staffs={인사직원목록} selectedCo={선택사업체} />}
                 {교대근무탭 === '생성마법사' && (
                   <AutoRosterPlanner user={user} staffs={인사직원목록} selectedCo={선택사업체} />
+                )}
+                {교대근무탭 === '근무규칙생성' && (
+                  <AutoRosterPlanner
+                    user={user}
+                    staffs={인사직원목록}
+                    selectedCo={선택사업체}
+                    panelMode="rules"
+                  />
+                )}
+                {교대근무탭 === '교대방식패턴' && (
+                  <AutoRosterPlanner
+                    user={user}
+                    staffs={인사직원목록}
+                    selectedCo={선택사업체}
+                    panelMode="patterns"
+                  />
                 )}
               </div>
             </div>

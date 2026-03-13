@@ -425,14 +425,9 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
               label="할일" icon="✅"
             />
             <TabButton
-              isActive={activeTab === 'records' && recordsView === 'certificates'}
-              onClick={() => { setActiveTab('records'); setRecordsView('certificates'); }}
-              label="증명서" icon="📑" ariaLabel="증명서"
-            />
-            <TabButton
-              isActive={activeTab === 'records' && recordsView === 'salary'}
-              onClick={() => { setActiveTab('records'); setRecordsView('salary'); }}
-              label="급여" icon="💰" ariaLabel="급여"
+              isActive={activeTab === 'records'}
+              onClick={() => { setActiveTab('records'); }}
+              label="급여·증명서" icon="📑" ariaLabel="급여·증명서"
             />
             <TabButton
               isActive={activeTab === 'documents'}

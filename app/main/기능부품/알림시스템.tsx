@@ -211,6 +211,7 @@ function ToastCard({ notif, onClose, onAction }: { notif: ToastItem; onClose: (i
   const cfg = getTypeCfg(notif.type);
   const isChat = notif.type === 'message' || notif.type === 'mention';
   const isApproval = notif.type === 'approval';
+  const isInventory = notif.type === 'inventory';
   const initials = notif.senderName ? getInitials(notif.senderName) : null;
   return (
     <div
@@ -233,11 +234,15 @@ function ToastCard({ notif, onClose, onAction }: { notif: ToastItem; onClose: (i
           <span className="text-[10px] text-gray-400 dark:text-gray-500 whitespace-nowrap shrink-0">{timeAgo(notif.createdAt)}</span>
         </div>
         {notif.body && <p className="text-[11.5px] text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2 leading-snug">{notif.body}</p>}
-        {(isChat || isApproval) && (
+        {(isChat || isApproval || isInventory) && (
           <button type="button" onClick={e => { e.stopPropagation(); onAction(notif); }}
             className={`mt-1.5 text-[10.5px] font-bold px-2 py-0.5 rounded-full border transition-all bg-transparent
-              ${isChat ? 'text-blue-600 border-blue-300 hover:bg-blue-50' : 'text-violet-600 border-violet-300 hover:bg-violet-50'}`}>
-            {isChat ? '💬 채팅 열기' : '📋 결재하기'}
+              ${isChat
+                ? 'text-blue-600 border-blue-300 hover:bg-blue-50'
+                : isApproval
+                  ? 'text-violet-600 border-violet-300 hover:bg-violet-50'
+                  : 'text-orange-600 border-orange-300 hover:bg-orange-50'}`}>
+            {isChat ? '💬 채팅 열기' : isApproval ? '📋 결재하기' : '📦 재고 확인'}
           </button>
         )}
       </div>
@@ -254,12 +259,13 @@ function ToastCard({ notif, onClose, onAction }: { notif: ToastItem; onClose: (i
 
 // ─── 메인 컴포넌트 ───
 export default function NotificationSystem({
-  user, onOpenChatRoom, onOpenMessage, onOpenApproval, onOpenBoard, onOpenPost,
+  user, onOpenChatRoom, onOpenMessage, onOpenApproval, onOpenInventory, onOpenBoard, onOpenPost,
 }: {
   user: any;
   onOpenChatRoom?: (roomId: string) => void;
   onOpenMessage?: (roomId: string, messageId: string) => void;
   onOpenApproval?: () => void;
+  onOpenInventory?: (intent?: { view?: string | null; approvalId?: string | null }) => void;
   onOpenBoard?: (boardId?: string) => void;
   onOpenPost?: (boardId: string, postId: string) => void;
 }) {
@@ -351,6 +357,12 @@ export default function NotificationSystem({
         if (notif.data.id && onOpenMessage) onOpenMessage(notif.data.room_id, notif.data.id);
         else if (onOpenChatRoom) onOpenChatRoom(notif.data.room_id);
       } else if (t === 'approval' && onOpenApproval) onOpenApproval();
+      else if (t === 'inventory' && onOpenInventory) {
+        onOpenInventory({
+          view: notif.data?.approval_id ? '현황' : null,
+          approvalId: notif.data?.approval_id || null,
+        });
+      }
       else if (t === 'board') {
         if (notif.data?.post_id && onOpenPost) onOpenPost(notif.data.board_type || '공지사항', notif.data.post_id);
         else if (onOpenBoard) onOpenBoard(notif.data?.board_type);
@@ -358,7 +370,7 @@ export default function NotificationSystem({
         onOpenPost(notif.data.board_type || '공지사항', notif.data.post_id);
       }
     };
-  }, [removeToast, onOpenMessage, onOpenChatRoom, onOpenApproval, onOpenPost, onOpenBoard]);
+  }, [removeToast, onOpenMessage, onOpenChatRoom, onOpenApproval, onOpenInventory, onOpenPost, onOpenBoard]);
 
   // ─── Supabase Realtime 구독 ───
   useEffect(() => {

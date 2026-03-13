@@ -12,6 +12,8 @@ import {
   getEducationCompletionKey,
   getEducationDueDate,
   getScopedActiveStaffs,
+  selectEducationCompletionRowsWithFallback,
+  serializeEducationQueryError,
   isLicenseQueryRecoverableError,
 } from './교육내역/education-utils';
 
@@ -53,8 +55,8 @@ export default function EducationMain({ staffs, selectedCo }: any) {
     const fallbackLicenses = buildFallbackLicenseRows(activeStaffs);
 
     try {
-      const [{ data: completions, error: completionsError }, { data: licenses, error: licensesError }] = await Promise.all([
-        supabase.from('education_completions').select('staff_id, education_name, certificate_url'),
+      const [{ rows: completions, error: completionsError }, { data: licenses, error: licensesError }] = await Promise.all([
+        selectEducationCompletionRowsWithFallback(supabase),
         supabase.from('staff_licenses').select('id, staff_id, license_name, expiry_date, issuing_body'),
       ]);
 
@@ -118,7 +120,7 @@ export default function EducationMain({ staffs, selectedCo }: any) {
       setNotifications(educationAlerts);
       setLicenseNotifications(nextLicenseAlerts);
     } catch (error) {
-      console.error('교육/면허 알림 로드 실패:', error);
+      console.error('교육/면허 알림 로드 실패:', serializeEducationQueryError(error));
       setCompletionMap({});
       setNotifications([]);
       setLicenseNotifications([]);

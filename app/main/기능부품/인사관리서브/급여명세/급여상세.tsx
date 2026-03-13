@@ -173,6 +173,7 @@ export default function SalaryDetail({ record, staff }: any) {
   const headerBackground = `linear-gradient(135deg, ${primaryColor}, ${alphaColor(primaryColor, 0.9)})`;
   const highlightSurface = alphaColor(primaryColor, 0.08);
   const sectionBorder = alphaColor(primaryColor, 0.18);
+  const watermarkSrc = companySeal || '/logo.png';
 
   const yearMonth = String(data.year_month || new Date().toISOString().slice(0, 7));
   const [year, month] = yearMonth.split('-');
@@ -182,15 +183,37 @@ export default function SalaryDetail({ record, staff }: any) {
   const hourlyRate = Math.floor(Number(data.base_salary || 0) / 209);
 
   return (
-    <div className="mx-auto mb-10 w-full max-w-7xl overflow-hidden rounded-[24px] border bg-white shadow-xl print:mb-0 print:max-w-none print:shadow-md">
+    <div
+      className="relative mx-auto mb-10 w-full max-w-7xl overflow-hidden rounded-[24px] border bg-white shadow-xl print:mb-0 print:max-w-none print:shadow-md"
+      style={{ background: `linear-gradient(180deg, #ffffff 0%, ${alphaColor(primaryColor, 0.028)} 100%)` }}
+    >
       <style>{`
         @media print {
           .print\\:hidden { display: none !important; }
         }
       `}</style>
 
+      <div className="pointer-events-none absolute inset-0">
+        <div
+          className="absolute -right-16 top-24 h-56 w-56 rounded-full blur-3xl"
+          style={{ backgroundColor: alphaColor(primaryColor, 0.08) }}
+        />
+        <div
+          className="absolute -left-12 bottom-28 h-44 w-44 rounded-full blur-3xl"
+          style={{ backgroundColor: alphaColor(primaryColor, 0.05) }}
+        />
+        <img
+          src={watermarkSrc}
+          alt=""
+          className="absolute left-1/2 top-[52%] h-64 w-64 -translate-x-1/2 -translate-y-1/2 object-contain opacity-[0.045] mix-blend-multiply"
+        />
+      </div>
+
       <div className="relative overflow-hidden px-8 py-10 text-white print:py-7" style={{ background: headerBackground }}>
         <div className="absolute -right-12 -top-16 h-52 w-52 rounded-full bg-white/10 blur-3xl" />
+        <div className="absolute left-10 top-8 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.24em] backdrop-blur-sm">
+          Premium Payroll
+        </div>
         <div className="relative z-10 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-sm font-black uppercase tracking-[0.24em] opacity-80">{companyLabel}</p>
@@ -209,7 +232,7 @@ export default function SalaryDetail({ record, staff }: any) {
         </div>
       </div>
 
-      <div className="space-y-8 p-8 print:space-y-5 print:px-8 print:py-5">
+      <div className="relative z-10 space-y-8 p-8 print:space-y-5 print:px-8 print:py-5">
         <div
           className="grid grid-cols-2 gap-6 rounded-[20px] p-6 md:grid-cols-3 lg:grid-cols-6 print:grid-cols-6 print:gap-4 print:p-5"
           style={{ backgroundColor: highlightSurface, border: `1px solid ${borderColor}` }}
@@ -341,17 +364,27 @@ export default function SalaryDetail({ record, staff }: any) {
           </div>
 
           {design.showSignArea && (
-            <div className="flex items-center gap-6">
+            <div
+              className="flex items-center gap-6 rounded-[20px] border bg-white/90 px-5 py-4 shadow-sm"
+              style={{ borderColor: alphaColor(primaryColor, 0.16) }}
+            >
               <div className="text-right">
+                <p className="text-[10px] font-black uppercase tracking-[0.22em]" style={{ color: primaryColor }}>
+                  Verified By
+                </p>
                 <p className="text-3xl font-black tracking-tight text-[var(--foreground)]">{companyLabel}</p>
                 <p className="mt-1 text-[11px] font-semibold text-[var(--toss-gray-3)]">직인 / 담당자 승인</p>
               </div>
               {companySeal ? (
-                <div className="flex h-16 w-16 items-center justify-center">
+                <div className="relative flex h-16 w-16 items-center justify-center">
+                  <div
+                    className="absolute inset-1 rounded-full blur-lg"
+                    style={{ backgroundColor: alphaColor(primaryColor, 0.12) }}
+                  />
                   <img
                     src={companySeal}
                     alt="회사 직인"
-                    className="h-14 w-14 rotate-12 object-contain opacity-90 mix-blend-multiply"
+                    className="relative h-14 w-14 rotate-12 object-contain opacity-90 mix-blend-multiply"
                   />
                 </div>
               ) : (

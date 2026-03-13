@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import SmartDatePicker from '../공통/SmartDatePicker';
 
 export default function ProductRegistration({ user, suppliers, fetchInventory, fetchSuppliers }: any) {
@@ -56,7 +57,8 @@ export default function ProductRegistration({ user, suppliers, fetchInventory, f
     setLoading(true);
     try {
       // 선택적 필드 처리: 빈 문자열은 null로 변환하여 저장
-      const submissionData = {
+      const buildSubmissionData = (omittedColumns: ReadonlySet<string>) => {
+        const submissionData: Record<string, any> = {
         ...productForm,
         unit_price: productForm.unit_price || 0,
         expiry_date: productForm.expiry_date || null,
@@ -65,9 +67,19 @@ export default function ProductRegistration({ user, suppliers, fetchInventory, f
         spec: productForm.spec || null,
         // 재고 테이블에서 stock 컬럼을 함께 사용하므로 초기 재고 = quantity 로 맞춤
         stock: productForm.quantity || 0,
+        };
+
+        if (omittedColumns.has('department')) {
+          delete submissionData.department;
+        }
+
+        return submissionData;
       };
 
-      const { error } = await supabase.from('inventory').insert([submissionData]);
+      const { error } = await withMissingColumnsFallback(
+        (omittedColumns) => supabase.from('inventory').insert([buildSubmissionData(omittedColumns)]),
+        ['department'],
+      );
       if (error) throw error;
       alert(`${productForm.item_name} 등록이 완료되었습니다.`);
       fetchInventory();

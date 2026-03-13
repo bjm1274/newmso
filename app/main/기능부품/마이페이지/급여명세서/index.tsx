@@ -18,7 +18,7 @@ export default function SalarySlipContainer({ user }: any) {
       return;
     }
 
-    const pwd = passwordInput.trim();
+    const pwd = passwordInput;
     if (!pwd) {
       setVerifyError('비밀번호를 입력해 주세요.');
       return;
@@ -105,6 +105,7 @@ export default function SalarySlipContainer({ user }: any) {
             value={passwordInput}
             onChange={(e) => { setPasswordInput(e.target.value); setVerifyError(''); }}
             placeholder="비밀번호"
+            data-testid="salary-password-input"
             className="w-full px-4 py-3.5 rounded-[16px] border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] placeholder:text-[var(--toss-gray-3)] focus:outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)]"
             autoComplete="current-password"
             disabled={verifying}
@@ -113,6 +114,7 @@ export default function SalarySlipContainer({ user }: any) {
           <button
             type="submit"
             disabled={verifying}
+            data-testid="salary-password-submit"
             className="w-full py-3.5 bg-[var(--toss-blue)] text-white font-semibold rounded-[16px] hover:opacity-95 disabled:opacity-50 transition-all"
           >
             {verifying ? '확인 중...' : '확인'}

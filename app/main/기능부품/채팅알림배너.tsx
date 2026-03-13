@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, type KeyboardEvent } from 'react';
 
 type ChatDetail  = { title: string; body: string; room_id?: string };
 type AlertDetail = { title: string; body: string; type: string; data?: any };
@@ -90,6 +90,12 @@ export default function ChatAlertBanner({
     dismiss();
   };
 
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    handleClick();
+  };
+
   const cfg = current.kind === 'chat'
     ? TYPE_CFG['message']
     : TYPE_CFG[(current as any).type] || { bg: 'bg-[var(--toss-blue)]', icon: '🔔', label: '확인' };
@@ -97,9 +103,11 @@ export default function ChatAlertBanner({
   const pendingCount = queueRef.current.length;
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={handleClick}
+      onKeyDown={handleKeyDown}
       className={`fixed top-0 left-0 right-0 z-[100] flex items-center gap-3 px-4 py-3 ${cfg.bg}/90 text-white shadow-xl animate-in slide-in-from-top duration-200 safe-area-inset-top select-none`}
     >
       {/* 아이콘 */}
@@ -131,6 +139,6 @@ export default function ChatAlertBanner({
       <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-black/10 overflow-hidden">
         <div key={progressKey} className="h-full bg-white/50 animate-progress-6s" style={{ transformOrigin: 'left center' }} />
       </div>
-    </button>
+    </div>
   );
 }
