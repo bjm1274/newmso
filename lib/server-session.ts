@@ -21,6 +21,8 @@ export type SessionUser = Record<string, unknown> & {
   profile_photo_updated_at?: string | null;
   email?: string | null;
   phone?: string | null;
+  auth_user_id?: string | null;
+  is_system_master?: boolean;
   permissions: Record<string, any>;
 };
 
@@ -122,6 +124,26 @@ async function verifySignature(value: string, signature: string) {
   );
 }
 
+const SESSION_PERMISSION_KEYS = new Set([
+  'admin',
+  'mso',
+  'system_master',
+  'hr',
+  'inventory',
+  'approval',
+  'hr_교대근무',
+]);
+
+function compactSessionPermissions(permissions: Record<string, any>) {
+  return Object.entries(permissions || {}).reduce<Record<string, true>>((acc, [key, value]) => {
+    if (value !== true) return acc;
+    if (SESSION_PERMISSION_KEYS.has(key) || key.startsWith('menu_')) {
+      acc[key] = true;
+    }
+    return acc;
+  }, {});
+}
+
 export function normalizeSessionUser(input: any): SessionUser {
   const rest = { ...(input || {}) };
   delete rest.password;
@@ -143,6 +165,8 @@ export function normalizeSessionUser(input: any): SessionUser {
     profile_photo_updated_at: normalizedProfile?.profile_photo_updated_at ?? null,
     email: normalizedProfile?.email ?? null,
     phone: normalizedProfile?.phone ?? null,
+    auth_user_id: normalizedProfile?.auth_user_id ?? null,
+    is_system_master: normalizedProfile?.is_system_master === true,
     permissions:
       normalizedProfile?.permissions &&
       typeof normalizedProfile.permissions === 'object' &&
@@ -152,13 +176,36 @@ export function normalizeSessionUser(input: any): SessionUser {
   };
 }
 
+function createSessionUserSnapshot(input: any): SessionUser {
+  const normalizedUser = normalizeSessionUser(input);
+  return {
+    id: normalizedUser.id ?? null,
+    employee_no: normalizedUser.employee_no ?? null,
+    name: normalizedUser.name ?? '',
+    role: normalizedUser.role ?? null,
+    department: normalizedUser.department ?? null,
+    company: normalizedUser.company ?? null,
+    company_id: normalizedUser.company_id ?? null,
+    position: normalizedUser.position ?? null,
+    photo_url: normalizedUser.photo_url ?? null,
+    avatar_url: normalizedUser.avatar_url ?? null,
+    profile_photo_path: normalizedUser.profile_photo_path ?? null,
+    profile_photo_updated_at: normalizedUser.profile_photo_updated_at ?? null,
+    email: normalizedUser.email ?? null,
+    phone: normalizedUser.phone ?? null,
+    auth_user_id: String(normalizedUser.auth_user_id ?? '').trim() || null,
+    is_system_master: normalizedUser.is_system_master === true,
+    permissions: compactSessionPermissions(normalizedUser.permissions || {}),
+  };
+}
+
 export async function createSessionToken(user: any, maxAgeSeconds = SESSION_MAX_AGE_SECONDS) {
   const now = Math.floor(Date.now() / 1000);
   const payload: SessionPayload = {
     ver: 1,
     iat: now,
     exp: now + maxAgeSeconds,
-    user: normalizeSessionUser(user),
+    user: createSessionUserSnapshot(user),
   };
 
   const body = stringToBase64Url(JSON.stringify(payload));

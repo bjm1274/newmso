@@ -137,6 +137,219 @@ function alphaColor(hexColor: string | undefined, alpha: number) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+type PreviewRow = {
+  label: string;
+  value: string;
+};
+
+type TemplatePreviewSpec = {
+  badge: string;
+  intro: string;
+  summary: string;
+  metaRows: PreviewRow[];
+  detailRows: PreviewRow[];
+  footerNote: string;
+};
+
+function buildTemplatePreviewSpec(templateSlug: string | null, templateName: string, templateSummary: string): TemplatePreviewSpec {
+  const fallbackSummary = templateSummary || '선택한 양식의 기본 문서 구성을 이 화면에서 바로 미리보기로 확인합니다.';
+
+  const genericSpec: TemplatePreviewSpec = {
+    badge: '기본 양식',
+    intro: '문서 기본 미리보기',
+    summary: fallbackSummary,
+    metaRows: [
+      { label: '신청자', value: '홍길동 / 경영지원팀' },
+      { label: '작성일', value: '2026.03.13' },
+      { label: '문서번호', value: 'DOC-2026-0313' },
+      { label: '결재선', value: '팀장 > 부서장 > 관리자' },
+    ],
+    detailRows: [
+      { label: '문서 제목', value: templateName || '기본 문서 양식' },
+      { label: '핵심 내용', value: '선택한 양식의 주요 항목과 승인 포인트를 한 장에 정리합니다.' },
+      { label: '공유 범위', value: '관련 부서와 결재자에게 즉시 공유됩니다.' },
+      { label: '첨부 안내', value: '필요한 첨부 문서는 결재 전 단계에서 추가합니다.' },
+    ],
+    footerNote: '전자결재 기본서식',
+  };
+
+  switch (templateSlug) {
+    case 'leave':
+      return {
+        badge: '휴가 신청',
+        intro: '연차 · 휴가 기본양식',
+        summary: '휴가 일정과 인수인계, 승인 흐름을 한 장으로 확인하는 문서형 기본양식입니다.',
+        metaRows: [
+          { label: '신청자', value: '홍길동 / 외래팀' },
+          { label: '신청일', value: '2026.03.13' },
+          { label: '휴가 구분', value: '연차' },
+          { label: '승인 단계', value: '팀장 > 인사팀' },
+        ],
+        detailRows: [
+          { label: '사용 기간', value: '2026.03.18 - 2026.03.19' },
+          { label: '인수인계', value: '외래 접수 및 예약 문의는 김민지에게 전달합니다.' },
+          { label: '비상 연락', value: '010-0000-0000' },
+          { label: '확인 사항', value: '승인 즉시 관련 부서와 일정이 공유됩니다.' },
+        ],
+        footerNote: '휴가 승인 문서',
+      };
+    case 'annual_plan':
+      return {
+        badge: '연차 계획',
+        intro: '연간 사용 계획 미리보기',
+        summary: '연차 사용 계획을 미리 공유하고 월별 운영 공백을 조정하는 문서형 기본양식입니다.',
+        metaRows: [
+          { label: '대상자', value: '홍길동 / 총무팀' },
+          { label: '계획 연도', value: '2026년' },
+          { label: '작성일', value: '2026.01.05' },
+          { label: '검토 라인', value: '팀장 > 인사팀' },
+        ],
+        detailRows: [
+          { label: '상반기 계획', value: '3월 2일, 5월 1일, 6월 5일' },
+          { label: '하반기 계획', value: '8월 3일, 10월 2일, 12월 24일' },
+          { label: '대체 인력', value: '성수기 일정은 팀 내 선조정 후 사용합니다.' },
+          { label: '운영 메모', value: '부서 운영상 변동 시 재기안 후 수정합니다.' },
+        ],
+        footerNote: '연차 계획 공유',
+      };
+    case 'overtime':
+      return {
+        badge: '연장 근무',
+        intro: '근무시간 보상 신청',
+        summary: '근무시간, 보상 기준, 승인 사유를 정리해 제출하는 문서형 기본양식입니다.',
+        metaRows: [
+          { label: '신청자', value: '홍길동 / 수술팀' },
+          { label: '근무일', value: '2026.03.12' },
+          { label: '연장 시간', value: '3시간' },
+          { label: '보상 방식', value: '수당 지급' },
+        ],
+        detailRows: [
+          { label: '업무 내용', value: '수술 지연으로 인한 회복실 마감 지원' },
+          { label: '시작 · 종료', value: '18:00 - 21:00' },
+          { label: '승인 포인트', value: '부서장 승인 후 급여 반영 대상으로 이관합니다.' },
+          { label: '확인 메모', value: '연장근무 사유와 실제 근무시간을 함께 보관합니다.' },
+        ],
+        footerNote: '근무시간 보상 문서',
+      };
+    case 'purchase':
+      return {
+        badge: '물품 신청',
+        intro: '구매 요청 기본양식',
+        summary: '품목, 수량, 용도와 조달 우선순위를 정리하는 문서형 기본양식입니다.',
+        metaRows: [
+          { label: '요청 부서', value: '병동팀 1병동' },
+          { label: '작성자', value: '홍길동' },
+          { label: '요청일', value: '2026.03.13' },
+          { label: '긴급 여부', value: '일반' },
+        ],
+        detailRows: [
+          { label: '품목', value: '멸균 거즈 / 20BOX' },
+          { label: '사용 목적', value: '주간 시술 및 응급 재고 보충' },
+          { label: '예상 소진', value: '2주 내 사용 예정' },
+          { label: '조달 메모', value: '기존 계약 공급처 단가 기준으로 확인합니다.' },
+        ],
+        footerNote: '구매 요청 문서',
+      };
+    case 'repair_request':
+      return {
+        badge: '수리 요청',
+        intro: '시설 · 장비 이슈 접수',
+        summary: '고장 증상과 요청 우선순위를 빠르게 공유하는 문서형 기본양식입니다.',
+        metaRows: [
+          { label: '접수 부서', value: '검사팀' },
+          { label: '접수자', value: '홍길동' },
+          { label: '발생일', value: '2026.03.13' },
+          { label: '위치', value: 'MRI실' },
+        ],
+        detailRows: [
+          { label: '대상 장비', value: '영상 출력 모니터 2번' },
+          { label: '증상', value: '전원은 들어오나 화면 출력이 불안정합니다.' },
+          { label: '긴급도', value: '당일 확인 필요' },
+          { label: '처리 메모', value: '점검 후 수리 또는 교체 여부를 회신합니다.' },
+        ],
+        footerNote: '시설 이슈 접수',
+      };
+    case 'draft_business':
+      return {
+        badge: '업무 기안',
+        intro: '업무 보고 · 결재 초안',
+        summary: '업무 배경, 실행 계획, 결재 포인트를 문서형으로 정리하는 기본양식입니다.',
+        metaRows: [
+          { label: '기안 부서', value: '경영지원팀' },
+          { label: '기안자', value: '홍길동' },
+          { label: '기안일', value: '2026.03.13' },
+          { label: '관련 부서', value: '총무팀, 재무팀' },
+        ],
+        detailRows: [
+          { label: '배경', value: '분기 운영비 절감을 위한 계약 구조 조정' },
+          { label: '주요 내용', value: '현 공급 계약 재정비 및 비용 비교 검토' },
+          { label: '요청 사항', value: '예산 승인 및 일정 확정' },
+          { label: '첨부 예정', value: '비교 견적서, 운영 현황표' },
+        ],
+        footerNote: '업무 기안 문서',
+      };
+    case 'cooperation':
+      return {
+        badge: '업무 협조',
+        intro: '부서 간 협조 요청',
+        summary: '필요 지원 내용과 일정, 책임 범위를 정리해 전달하는 문서형 기본양식입니다.',
+        metaRows: [
+          { label: '요청 부서', value: '원무팀' },
+          { label: '협조 부서', value: '관리팀' },
+          { label: '요청일', value: '2026.03.13' },
+          { label: '희망 일정', value: '2026.03.18' },
+        ],
+        detailRows: [
+          { label: '협조 내용', value: '신규 접수 창구 이전에 따른 동선 안내 설치' },
+          { label: '필요 인원', value: '관리 2명' },
+          { label: '우선순위', value: '개원 전 완료 필요' },
+          { label: '공유 메모', value: '완료 후 원무팀과 현장 확인 예정' },
+        ],
+        footerNote: '부서 협조 문서',
+      };
+    case 'attendance_fix':
+      return {
+        badge: '출결 정정',
+        intro: '출퇴근 기록 정정',
+        summary: '누락 또는 오기재된 출결 정보를 사유와 함께 정정 신청하는 문서형 기본양식입니다.',
+        metaRows: [
+          { label: '신청자', value: '홍길동 / 검사팀' },
+          { label: '대상일', value: '2026.03.12' },
+          { label: '정정 구분', value: '출근시간 수정' },
+          { label: '신청일', value: '2026.03.13' },
+        ],
+        detailRows: [
+          { label: '기존 기록', value: '출근 누락' },
+          { label: '정정 요청', value: '08:27 출근으로 수정' },
+          { label: '사유', value: '단말기 오류로 체크인이 반영되지 않았습니다.' },
+          { label: '확인 자료', value: 'CCTV 확인, 부서장 확인 후 승인' },
+        ],
+        footerNote: '출결 정정 문서',
+      };
+    case 'payroll_slip':
+      return {
+        badge: '급여 문서',
+        intro: '월별 지급 내역 미리보기',
+        summary: '월 급여, 수당, 공제, 실지급 정보를 보기 쉽게 정리한 문서형 기본양식입니다.',
+        metaRows: [
+          { label: '대상자', value: '홍길동 / 관리팀' },
+          { label: '지급 월', value: '2026년 3월' },
+          { label: '지급일', value: '2026.03.25' },
+          { label: '문서번호', value: 'PAY-2026-0325' },
+        ],
+        detailRows: [
+          { label: '기본급', value: '3,200,000원' },
+          { label: '수당 합계', value: '420,000원' },
+          { label: '공제 합계', value: '318,000원' },
+          { label: '실지급액', value: '3,302,000원' },
+        ],
+        footerNote: '급여 명세 문서',
+      };
+    default:
+      return genericSpec;
+  }
+}
+
 function createDefaultDesignMap() {
   return builtinTemplates.reduce<Record<string, TemplateDesign>>((acc, template) => {
     const preset = BUILTIN_TEMPLATE_DEFAULTS[template.slug] || {};
@@ -244,7 +457,6 @@ export default function ApprovalFormTypesManager() {
   const [list, setList] = useState<FormTypeRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [designLoading, setDesignLoading] = useState(true);
-  const [savingDesign, setSavingDesign] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editSlug, setEditSlug] = useState('');
@@ -254,8 +466,7 @@ export default function ApprovalFormTypesManager() {
   const [selectedSlug, setSelectedSlug] = useState<string | null>(builtinTemplates[0]?.slug || null);
   const [selectedName, setSelectedName] = useState(builtinTemplates[0]?.name || '연차/휴가');
   const [designs, setDesigns] = useState<Record<string, TemplateDesign>>({});
-  const [activeHandle, setActiveHandle] = useState<'title' | 'subtitle' | 'sign'>('title');
-  const previewRef = useRef<HTMLDivElement | null>(null);
+  const designEditorRef = useRef<HTMLElement | null>(null);
   const selectedBaseTemplate = useMemo(
     () => builtinTemplates.find((template) => template.slug === addBaseSlug) ?? builtinTemplates[0],
     [addBaseSlug]
@@ -281,9 +492,40 @@ export default function ApprovalFormTypesManager() {
     [customTemplates]
   );
 
-  const currentDesign = useMemo(
-    () => resolveCurrentDesign(selectedSlug, selectedName, designs),
-    [designs, selectedName, selectedSlug]
+  const selectedTemplate = useMemo(
+    () => combinedTemplates.find((template) => template.slug === selectedSlug) ?? null,
+    [combinedTemplates, selectedSlug]
+  );
+
+  const previewTemplateSlug = useMemo(() => {
+    if (!selectedSlug) return 'generic';
+    if (builtinTemplates.some((template) => template.slug === selectedSlug)) {
+      return selectedSlug;
+    }
+
+    const customTemplate = list.find((row) => (row.slug || row.id) === selectedSlug);
+    return customTemplate?.base_slug || 'generic';
+  }, [list, selectedSlug]);
+
+  const previewSpec = useMemo(
+    () => buildTemplatePreviewSpec(
+      previewTemplateSlug,
+      selectedName,
+      (builtinTemplates.find((template) => template.slug === previewTemplateSlug) ?? selectedTemplate)?.summary || ''
+    ),
+    [previewTemplateSlug, selectedName, selectedTemplate]
+  );
+
+  const previewDesign = useMemo(() => {
+    const previewTemplateName =
+      builtinTemplates.find((template) => template.slug === previewTemplateSlug)?.name || selectedName;
+
+    return resolveCurrentDesign(previewTemplateSlug, previewTemplateName, {});
+  }, [previewTemplateSlug, selectedName]);
+
+  const previewSourceName = useMemo(
+    () => builtinTemplates.find((template) => template.slug === previewTemplateSlug)?.name || selectedName,
+    [previewTemplateSlug, selectedName]
   );
 
   const syncListState = (next: FormTypeRow[]) => {
@@ -375,23 +617,8 @@ export default function ApprovalFormTypesManager() {
   const handleSelectTemplate = (slug: string, name: string) => {
     setSelectedSlug(slug);
     setSelectedName(name);
-  };
-
-  const updateCurrentDesign = (field: keyof TemplateDesign, value: string | boolean | number) => {
-    if (!selectedSlug) return;
-
-    setDesigns((prev) => {
-      const current = resolveCurrentDesign(selectedSlug, selectedName, prev);
-      const nextEntry: TemplateDesign = { ...current, [field]: value };
-
-      if (field === 'companyLabel' && typeof value === 'string') {
-        const nextCompany = value.trim() || 'SY INC.';
-        if (!current.sealLabel || current.sealLabel === `${current.companyLabel || 'SY INC.'} 직인`) {
-          nextEntry.sealLabel = `${nextCompany} 직인`;
-        }
-      }
-
-      return { ...prev, [selectedSlug]: nextEntry };
+    requestAnimationFrame(() => {
+      designEditorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   };
 
@@ -515,23 +742,6 @@ export default function ApprovalFormTypesManager() {
     }
   };
 
-  const handleSaveDesign = async () => {
-    if (!selectedSlug) return;
-
-    setSavingDesign(true);
-    try {
-      const { error } = await persistDesigns(designs);
-      if (error) {
-        alert('디자인 저장에 실패했습니다: ' + error.message);
-        return;
-      }
-
-      alert('선택한 디자인이 저장되었습니다.');
-    } finally {
-      setSavingDesign(false);
-    }
-  };
-
   return (
     <div className="max-w-6xl space-y-8">
       <div className="space-y-2">
@@ -541,7 +751,7 @@ export default function ApprovalFormTypesManager() {
         </p>
       </div>
 
-      <section className="rounded-[24px] border border-[var(--toss-border)] bg-white p-6 shadow-sm">
+      <section ref={designEditorRef} className="rounded-[24px] border border-[var(--toss-border)] bg-white p-6 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-base font-semibold text-[var(--foreground)]">기본양식</h3>
@@ -742,170 +952,133 @@ export default function ApprovalFormTypesManager() {
         )}
       </section>
 
-      <section className="rounded-[24px] border border-[var(--toss-border)] bg-white p-6 shadow-sm">
+      <section ref={designEditorRef} className="rounded-[24px] border border-[var(--toss-border)] bg-white p-6 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="text-base font-semibold text-[var(--foreground)]">양식 디자인 수정</h3>
+            <h3 className="text-base font-semibold text-[var(--foreground)]">기본양식 미리보기</h3>
             <p className="mt-1 text-sm text-[var(--toss-gray-3)]">
-              기본양식이나 추가 양식을 선택한 뒤 제목과 색상, 문구를 바로 수정할 수 있습니다.
+              문서 양식을 누르면 해당 양식의 기본 문서 이미지만 바로 확인합니다.
             </p>
           </div>
-          {designLoading && <span className="text-xs font-semibold text-[var(--toss-gray-3)]">디자인 불러오는 중...</span>}
+          {designLoading && <span className="text-xs font-semibold text-[var(--toss-gray-3)]">기본값 불러오는 중...</span>}
         </div>
 
-        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <div className="space-y-2">
-            <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">수정할 양식 선택</p>
-            <div className="max-h-[520px] overflow-y-auto rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)]/60 custom-scrollbar">
-              <ul className="divide-y divide-[var(--toss-border)]">
-                {combinedTemplates.map((template) => {
-                  const isBuiltin = builtinTemplates.some((item) => item.slug === template.slug);
-                  const active = selectedSlug === template.slug;
-
-                  return (
-                    <li key={template.slug}>
-                      <button
-                        type="button"
-                        onClick={() => handleSelectTemplate(template.slug, template.name)}
-                        className={`w-full px-4 py-3 text-left transition-all ${active ? 'bg-white shadow-sm ring-1 ring-blue-100' : 'hover:bg-white/80'}`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className={`truncate text-[13px] font-bold ${active ? 'text-[var(--toss-blue)]' : 'text-[var(--foreground)]'}`}>{template.name}</p>
-                            <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-[var(--toss-gray-3)]">{template.summary}</p>
-                          </div>
-                          <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${isBuiltin ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>
-                            {isBuiltin ? '기본양식' : '추가 양식'}
-                          </span>
-                        </div>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
+        <div className="mt-6 rounded-[28px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--toss-gray-3)]">Selected Template</p>
+              <p className="mt-1 text-lg font-bold text-[var(--foreground)]">{selectedName}</p>
+              <p className="mt-1 text-sm text-[var(--toss-gray-3)]">{previewSpec.summary}</p>
+            </div>
+            <div className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-[var(--toss-gray-4)]">
+              기본 프리셋: {previewSourceName}
             </div>
           </div>
 
-          <div className="space-y-4 lg:col-span-2">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">선택한 양식</p>
-                <p className="text-sm font-semibold text-[var(--foreground)]">{selectedName}</p>
-              </div>
-              <div className="flex items-center gap-1 rounded-full border border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-1 py-1">
-                {(['title', 'subtitle', 'sign'] as const).map((key) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setActiveHandle(key)}
-                    className={`rounded-full px-3 py-1 text-[11px] font-semibold ${activeHandle === key ? 'bg-[var(--toss-blue)] text-white' : 'text-[var(--toss-gray-3)] hover:bg-white'}`}
-                  >
-                    {key === 'title' && '제목'}
-                    {key === 'subtitle' && '부제'}
-                    {key === 'sign' && '서명'}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <label className="flex flex-col gap-1">
-                <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">제목</span>
-                <input type="text" value={currentDesign.title || ''} onChange={(e) => updateCurrentDesign('title', e.target.value)} className="rounded-[16px] border border-[var(--toss-border)] px-3 py-2 text-sm font-semibold" />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">부제</span>
-                <input type="text" value={currentDesign.subtitle || ''} onChange={(e) => updateCurrentDesign('subtitle', e.target.value)} className="rounded-[16px] border border-[var(--toss-border)] px-3 py-2 text-sm font-semibold" />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">회사명 라벨</span>
-                <input type="text" value={currentDesign.companyLabel || ''} onChange={(e) => updateCurrentDesign('companyLabel', e.target.value)} className="rounded-[16px] border border-[var(--toss-border)] px-3 py-2 text-sm font-semibold" />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">직인 문구</span>
-                <input type="text" value={currentDesign.sealLabel || ''} onChange={(e) => updateCurrentDesign('sealLabel', e.target.value)} className="rounded-[16px] border border-[var(--toss-border)] px-3 py-2 text-sm font-semibold" />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">대표 색상</span>
-                <input type="text" value={currentDesign.primaryColor || ''} onChange={(e) => updateCurrentDesign('primaryColor', e.target.value)} className="rounded-[16px] border border-[var(--toss-border)] px-3 py-2 text-sm font-semibold" />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">하단 문구</span>
-                <input type="text" value={currentDesign.footerText || ''} onChange={(e) => updateCurrentDesign('footerText', e.target.value)} className="rounded-[16px] border border-[var(--toss-border)] px-3 py-2 text-sm font-semibold" />
-              </label>
-            </div>
-
-            <div className="rounded-[24px] border border-dashed border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-4">
-              <p className="mb-3 text-[11px] text-[var(--toss-gray-3)]">미리보기를 클릭하면 선택한 요소 위치가 바뀝니다.</p>
+          <div className="mt-5 flex min-h-[640px] items-center justify-center rounded-[24px] border border-[var(--toss-border)] bg-[#e9edf0] px-6 py-10">
+            <div
+              className="relative h-[568px] w-[402px] overflow-hidden rounded-[8px] border bg-[#fffdfa] shadow-[0_30px_90px_rgba(15,23,42,0.16)]"
+              style={{ borderColor: previewDesign.borderColor || '#d7e3ff' }}
+            >
               <div
-                ref={previewRef}
-                className="relative h-[320px] cursor-pointer overflow-hidden rounded-[24px] border bg-white"
-                style={{ borderColor: currentDesign.borderColor || '#d7e3ff' }}
-                onClick={(event) => {
-                  if (!previewRef.current || !selectedSlug) return;
-                  const rect = previewRef.current.getBoundingClientRect();
-                  const x = Number((((event.clientX - rect.left) / rect.width) * 100).toFixed(1));
-                  const y = Number((((event.clientY - rect.top) / rect.height) * 100).toFixed(1));
-                  const safeX = Math.max(0, Math.min(100, x));
-                  const safeY = Math.max(0, Math.min(100, y));
-
-                  if (activeHandle === 'title') {
-                    updateCurrentDesign('titleXPercent', safeX);
-                    updateCurrentDesign('titleYPercent', safeY);
-                  } else if (activeHandle === 'subtitle') {
-                    updateCurrentDesign('subtitleXPercent', safeX);
-                    updateCurrentDesign('subtitleYPercent', safeY);
-                  } else {
-                    updateCurrentDesign('signXPercent', safeX);
-                    updateCurrentDesign('signYPercent', safeY);
-                  }
+                className="absolute inset-0 opacity-70"
+                style={{
+                  backgroundImage:
+                    'linear-gradient(rgba(15,23,42,0.018) 1px, transparent 1px), linear-gradient(90deg, rgba(15,23,42,0.018) 1px, transparent 1px)',
+                  backgroundSize: '28px 28px',
                 }}
-              >
-                <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, #ffffff 0%, ${alphaColor(currentDesign.primaryColor, 0.03)} 100%)` }} />
-                <div className="absolute inset-x-0 top-0 h-24" style={{ background: `linear-gradient(135deg, ${alphaColor(currentDesign.primaryColor, 0.18)} 0%, rgba(255,255,255,0) 75%)` }} />
-                <div className="absolute -right-10 -top-10 h-36 w-36 rounded-full blur-3xl" style={{ backgroundColor: alphaColor(currentDesign.primaryColor, 0.12) }} />
-                <div className="absolute -left-8 bottom-10 h-24 w-24 rounded-full blur-2xl" style={{ backgroundColor: alphaColor(currentDesign.primaryColor, 0.08) }} />
-                {currentDesign.showBackgroundLogo !== false && currentDesign.backgroundLogoUrl && (
-                  <img
-                    src={currentDesign.backgroundLogoUrl}
-                    alt=""
-                    className="absolute left-1/2 top-1/2 h-40 w-40 -translate-x-1/2 -translate-y-1/2 object-contain mix-blend-multiply"
-                    style={{ opacity: currentDesign.backgroundLogoOpacity ?? 0.06 }}
-                  />
-                )}
-                <div className="absolute left-6 top-6 rounded-full border border-white/70 bg-white/90 px-3 py-1 text-[10px] font-black tracking-[0.18em] text-[var(--toss-gray-4)] shadow-sm">
-                  기본 양식
-                </div>
-                <div className="absolute text-xl font-black" style={{ top: `${currentDesign.titleYPercent ?? 16}%`, left: `${currentDesign.titleXPercent ?? 10}%`, color: currentDesign.primaryColor || '#155eef' }}>
-                  {currentDesign.title || '양식 제목'}
-                </div>
-                <div className="absolute max-w-[70%]" style={{ top: `${currentDesign.subtitleYPercent ?? 30}%`, left: `${currentDesign.subtitleXPercent ?? 10}%` }}>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--toss-gray-3)]">{currentDesign.companyLabel || 'SY INC.'}</div>
-                  <div className="mt-1 text-[13px] leading-6 text-[var(--toss-gray-4)]">{currentDesign.subtitle || '부제 또는 설명'}</div>
-                </div>
-                <div className="absolute inset-x-6 bottom-8 flex items-end justify-between gap-6 border-t pt-4 text-[11px] text-[var(--toss-gray-3)]" style={{ borderColor: alphaColor(currentDesign.borderColor, 0.9) }}>
-                  <div className="max-w-[60%]">
-                    <p className="font-semibold tracking-[0.18em]" style={{ color: currentDesign.primaryColor || '#155eef' }}>전자결재 문서</p>
-                    <p className="mt-2">{currentDesign.footerText || '기본 하단 문구가 여기에 표시됩니다.'}</p>
+              />
+              {previewDesign.showBackgroundLogo !== false && previewDesign.backgroundLogoUrl && (
+                <img
+                  src={previewDesign.backgroundLogoUrl}
+                  alt=""
+                  className="absolute left-1/2 top-1/2 h-44 w-44 -translate-x-1/2 -translate-y-1/2 object-contain mix-blend-multiply"
+                  style={{ opacity: previewDesign.backgroundLogoOpacity ?? 0.025 }}
+                />
+              )}
+
+              <div className="relative z-10 px-10 py-8">
+                <div className="flex items-end gap-4 border-b pb-5" style={{ borderColor: previewDesign.borderColor || '#d7e3ff' }}>
+                  <div className="flex h-[72px] w-[72px] items-center justify-center rounded-[14px] border bg-white shadow-sm" style={{ borderColor: previewDesign.borderColor || '#d7e3ff' }}>
+                    <img src="/logo.png" alt="" className="h-12 w-12 object-contain" />
                   </div>
-                  {currentDesign.showSeal !== false && (
-                    <div className="relative flex h-20 w-20 items-center justify-center rounded-full border-[3px] bg-white/95 text-center text-[10px] font-black shadow-sm" style={{ borderColor: alphaColor(currentDesign.primaryColor, 0.7), color: currentDesign.primaryColor || '#155eef' }}>
-                      {currentDesign.sealLabel || `${currentDesign.companyLabel || 'SY INC.'} 직인`}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] font-bold tracking-[0.18em] text-slate-400">{previewSpec.badge}</p>
+                    <h4 className="mt-1 text-[34px] font-black tracking-[-0.04em]" style={{ color: previewDesign.primaryColor || '#163b70' }}>
+                      {previewDesign.title || previewSourceName}
+                    </h4>
+                  </div>
+                </div>
+
+                <div
+                  className="mt-3 h-[4px] rounded-full"
+                  style={{ background: `linear-gradient(90deg, ${alphaColor(previewDesign.primaryColor, 0.95)} 0%, ${alphaColor(previewDesign.primaryColor, 0.4)} 100%)` }}
+                />
+
+                <div className="mt-7 grid grid-cols-[102px_1fr] gap-5">
+                  <div className="rounded-[14px] border bg-white p-2.5" style={{ borderColor: previewDesign.borderColor || '#d7e3ff' }}>
+                    <div className="flex aspect-[3/4] items-center justify-center rounded-[10px] bg-[var(--toss-gray-1)] text-4xl font-black text-[var(--toss-gray-3)]">
+                      홍
+                    </div>
+                    <p className="mt-2 text-center text-[11px] font-semibold text-[var(--toss-gray-3)]">사진</p>
+                  </div>
+
+                  <div className="rounded-[14px] border bg-white px-4 py-3" style={{ borderColor: previewDesign.borderColor || '#d7e3ff' }}>
+                    {previewSpec.metaRows.map((row, index) => (
+                      <div
+                        key={row.label}
+                        className={`grid grid-cols-[74px_10px_1fr] gap-2 ${index < previewSpec.metaRows.length - 1 ? 'border-b pb-2.5' : ''} ${index > 0 ? 'pt-2.5' : ''}`}
+                        style={{ borderColor: previewDesign.borderColor || '#d7e3ff' }}
+                      >
+                        <span className="text-[12px] font-black text-[var(--foreground)]">{row.label}</span>
+                        <span className="text-[12px] font-black text-[var(--foreground)]">:</span>
+                        <span className="text-[12px] font-semibold text-[var(--foreground)]">{row.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-7 text-center">
+                  <p className="text-[13px] font-semibold leading-relaxed text-[var(--foreground)]">
+                    {previewDesign.subtitle || previewSpec.summary}
+                  </p>
+                </div>
+
+                <div className="mt-6 overflow-hidden rounded-[14px] border bg-white" style={{ borderColor: previewDesign.borderColor || '#d7e3ff' }}>
+                  {previewSpec.detailRows.map((row, index) => (
+                    <div
+                      key={row.label}
+                      className={`grid grid-cols-[96px_10px_1fr] gap-3 px-4 py-3 ${index < previewSpec.detailRows.length - 1 ? 'border-b' : ''}`}
+                      style={{ borderColor: previewDesign.borderColor || '#d7e3ff' }}
+                    >
+                      <span className="text-[12px] font-black text-[var(--foreground)]">{row.label}</span>
+                      <span className="text-[12px] font-black text-[var(--foreground)]">:</span>
+                      <span className="text-[12px] font-semibold text-[var(--foreground)]">{row.value}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-9 flex items-end justify-center gap-5 border-t pt-5" style={{ borderColor: previewDesign.borderColor || '#d7e3ff' }}>
+                  <div className="text-center">
+                    <p className="text-[28px] font-black tracking-tight text-[var(--foreground)]">{previewDesign.companyLabel || 'SY INC.'}</p>
+                    <p className="mt-1 text-[11px] font-semibold text-[var(--toss-gray-3)]">{previewSpec.footerNote}</p>
+                  </div>
+                  {previewDesign.showSeal !== false && (
+                    <div className="relative flex h-20 w-20 items-center justify-center">
+                      <div
+                        className="absolute inset-2 rounded-full blur-xl"
+                        style={{ backgroundColor: alphaColor(previewDesign.primaryColor, 0.12) }}
+                      />
+                      <div
+                        className="relative flex h-20 w-20 items-center justify-center rounded-full border-4 border-double text-[11px] font-black leading-4 opacity-75"
+                        style={{ borderColor: alphaColor(previewDesign.primaryColor, 0.75), color: previewDesign.primaryColor || '#163b70' }}
+                      >
+                        직인
+                      </div>
                     </div>
                   )}
                 </div>
-                {currentDesign.showSignArea !== false && (
-                  <div className="absolute rounded-[18px] border border-dashed bg-white/90 px-4 py-3 text-[11px] text-[var(--toss-gray-4)] shadow-sm" style={{ top: `${currentDesign.signYPercent ?? 78}%`, left: `${currentDesign.signXPercent ?? 74}%` }}>
-                    서명: ____________________
-                  </div>
-                )}
               </div>
-            </div>
-
-            <div className="flex justify-end">
-              <button type="button" onClick={handleSaveDesign} disabled={savingDesign} className="rounded-[16px] bg-[var(--toss-blue)] px-5 py-2.5 text-[12px] font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
-                {savingDesign ? '디자인 저장 중...' : '선택한 디자인 저장'}
-              </button>
             </div>
           </div>
         </div>

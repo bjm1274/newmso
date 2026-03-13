@@ -67,87 +67,6 @@ export async function POST(request: NextRequest) {
 
   const { adminName, adminPasswordHash, masterId, masterPasswordHash } = getAdminCredentialConfig();
 
-  const privilegedLogin = await verifyPrivilegedLogin(loginId, password);
-
-  if (privilegedLogin.ok && privilegedLogin.kind === 'admin') {
-    const supabase = getAdminClient();
-    const adminDisplayName = adminName || 'MSO 관리자';
-    let msoRow: any = null;
-
-    if (adminName) {
-      const { data } = await supabase
-        .from('staff_members')
-        .select('*')
-        .eq('name', adminName)
-        .maybeSingle();
-      msoRow = data ?? null;
-    }
-
-    if (!msoRow && /^\d+$/.test(loginId)) {
-      const { data } = await supabase
-        .from('staff_members')
-        .select('*')
-        .eq('employee_no', loginId)
-        .maybeSingle();
-      msoRow = data ?? null;
-    }
-
-    const user = msoRow
-      ? {
-          ...msoRow,
-          role: 'admin',
-          permissions: {
-            inventory: true,
-            hr: true,
-            approval: true,
-            admin: true,
-            mso: true,
-            hr_교대근무: true,
-          },
-        }
-      : {
-          id: null,
-          employee_no: '1',
-          name: adminDisplayName,
-          role: 'admin',
-          department: '경영지원팀',
-          company: 'SY INC.',
-          company_id: null,
-          permissions: {
-            inventory: true,
-            hr: true,
-            approval: true,
-            admin: true,
-            mso: true,
-            hr_교대근무: true,
-          },
-        };
-
-    return successResponse(user);
-  }
-
-  if (privilegedLogin.ok && privilegedLogin.kind === 'master') {
-    return successResponse({
-      id: null,
-      employee_no: '0',
-      name: '시스템관리자',
-      role: 'admin',
-      is_system_master: true,
-      department: '경영지원팀',
-      company: 'SY INC.',
-      company_id: null,
-      permissions: {
-        inventory: true,
-        hr: true,
-        approval: true,
-        admin: true,
-        mso: true,
-        system_master: true,
-        hr_교대근무: true,
-      },
-    });
-  }
-
   try {
     const supabase = getAdminClient();
     let userRow: any = null;
@@ -183,6 +102,86 @@ export async function POST(request: NextRequest) {
     }
 
     if (!userRow) {
+      const privilegedLogin = await verifyPrivilegedLogin(loginId, password);
+
+      if (privilegedLogin.ok && privilegedLogin.kind === 'admin') {
+        const adminDisplayName = adminName || 'MSO 관리자';
+        let msoRow: any = null;
+
+        if (adminName) {
+          const { data } = await supabase
+            .from('staff_members')
+            .select('*')
+            .eq('name', adminName)
+            .maybeSingle();
+          msoRow = data ?? null;
+        }
+
+        if (!msoRow && /^\d+$/.test(loginId)) {
+          const { data } = await supabase
+            .from('staff_members')
+            .select('*')
+            .eq('employee_no', loginId)
+            .maybeSingle();
+          msoRow = data ?? null;
+        }
+
+        const user = msoRow
+          ? {
+              ...msoRow,
+              role: 'admin',
+              permissions: {
+                inventory: true,
+                hr: true,
+                approval: true,
+                admin: true,
+                mso: true,
+                hr_교대근무: true,
+              },
+            }
+          : {
+              id: null,
+              employee_no: '1',
+              name: adminDisplayName,
+              role: 'admin',
+              department: '경영지원팀',
+              company: 'SY INC.',
+              company_id: null,
+              permissions: {
+                inventory: true,
+                hr: true,
+                approval: true,
+                admin: true,
+                mso: true,
+                hr_교대근무: true,
+              },
+            };
+
+        return successResponse(user);
+      }
+
+      if (privilegedLogin.ok && privilegedLogin.kind === 'master') {
+        return successResponse({
+          id: null,
+          employee_no: '0',
+          name: '시스템관리자',
+          role: 'admin',
+          is_system_master: true,
+          department: '경영지원팀',
+          company: 'SY INC.',
+          company_id: null,
+          permissions: {
+            inventory: true,
+            hr: true,
+            approval: true,
+            admin: true,
+            mso: true,
+            system_master: true,
+            hr_교대근무: true,
+          },
+        });
+      }
+
       return failureResponse('등록된 사번 또는 이름이 없습니다.');
     }
 
@@ -201,6 +200,53 @@ export async function POST(request: NextRequest) {
     } else {
       const verified = await verifyStoredPassword(storedPassword, password);
       if (!verified.ok) {
+        const privilegedLogin = await verifyPrivilegedLogin(loginId, password);
+
+        if (privilegedLogin.ok && privilegedLogin.kind === 'admin') {
+          const adminDisplayName = adminName || 'MSO 관리자';
+          const user = {
+            ...userRow,
+            name: adminName || userRow?.name || adminDisplayName,
+            role: 'admin',
+            company: userRow?.company || 'SY INC.',
+            company_id: userRow?.company_id ?? null,
+            department: userRow?.department || '경영지원팀',
+            permissions: {
+              ...(userRow?.permissions || {}),
+              inventory: true,
+              hr: true,
+              approval: true,
+              admin: true,
+              mso: true,
+              hr_교대근무: true,
+            },
+          };
+
+          return successResponse(user);
+        }
+
+        if (privilegedLogin.ok && privilegedLogin.kind === 'master') {
+          return successResponse({
+            id: null,
+            employee_no: '0',
+            name: '시스템관리자',
+            role: 'admin',
+            is_system_master: true,
+            department: '경영지원팀',
+            company: 'SY INC.',
+            company_id: null,
+            permissions: {
+              inventory: true,
+              hr: true,
+              approval: true,
+              admin: true,
+              mso: true,
+              system_master: true,
+              hr_교대근무: true,
+            },
+          });
+        }
+
         return failureResponse('비밀번호가 일치하지 않습니다.');
       }
 

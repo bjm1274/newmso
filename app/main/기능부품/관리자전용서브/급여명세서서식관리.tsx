@@ -109,6 +109,127 @@ function PreviewCard({
     ['발급번호', 'CERT-202603-000001'],
   ];
 
+  const paperTitle = title || '재직증명서';
+  const paperIdentityRows = [
+    ['성명', '홍길동'],
+    ['사번', 'KM-240101'],
+    ['부서', '인사팀'],
+    ['직위', '대리'],
+  ];
+  const paperDetailRows = [
+    ['입사일자', '2023년 3월 1일'],
+    ['재직기간', '2023.03.01 ~ 현재'],
+    ['사용용도', '제출용'],
+    ['발급일자', '2026년 3월 12일'],
+    ['발급번호', 'CERT-202603-000001'],
+  ];
+
+  if (type === 'certificate') {
+    return (
+      <div
+        className="relative overflow-hidden rounded-[20px] bg-white p-6 shadow-sm"
+        style={{
+          border: `1px solid ${borderColor}`,
+          background: `linear-gradient(180deg, #fbfbfa 0%, #ffffff 20%, ${alphaColor(primaryColor, 0.025)} 100%)`,
+        }}
+      >
+        <div className="pointer-events-none absolute inset-0">
+          <div
+            className="absolute inset-0 opacity-60"
+            style={{
+              backgroundImage:
+                'linear-gradient(rgba(15,23,42,0.018) 1px, transparent 1px), linear-gradient(90deg, rgba(15,23,42,0.018) 1px, transparent 1px)',
+              backgroundSize: '24px 24px',
+            }}
+          />
+          <img
+            src="/logo.png"
+            alt=""
+            className="absolute left-1/2 top-1/2 h-28 w-28 -translate-x-1/2 -translate-y-1/2 object-contain opacity-[0.03] mix-blend-multiply"
+          />
+        </div>
+
+        <div className="relative z-10">
+          <div className="flex items-end gap-4 border-b pb-5" style={{ borderColor }}>
+            <div className="flex h-[72px] w-[72px] items-center justify-center rounded-[16px] border bg-white shadow-sm" style={{ borderColor }}>
+              <img src="/logo.png" alt="" className="h-12 w-12 object-contain" />
+            </div>
+            <div className="min-w-0 flex-1">
+              {subtitle ? <p className="text-[10px] font-semibold tracking-[0.18em] text-slate-400">{subtitle}</p> : null}
+              <h3 className="mt-1 text-[32px] font-black tracking-tight text-slate-900">{paperTitle}</h3>
+            </div>
+          </div>
+
+          <div
+            className="mt-2 h-[4px] rounded-full"
+            style={{ background: `linear-gradient(90deg, ${alphaColor(primaryColor, 0.9)} 0%, ${alphaColor(primaryColor, 0.45)} 100%)` }}
+          />
+
+          <div className="mt-5 grid gap-4 md:grid-cols-[110px_1fr]">
+            <div className="rounded-[16px] border bg-white p-3" style={{ borderColor }}>
+              <div className="aspect-[3/4] overflow-hidden rounded-[12px]" style={{ backgroundColor: surface }}>
+                <div className="flex h-full w-full items-center justify-center text-3xl font-black text-slate-300">홍</div>
+              </div>
+              <p className="mt-2 text-center text-[11px] font-semibold text-slate-400">사진</p>
+            </div>
+
+            <div className="rounded-[16px] border bg-white px-4 py-3" style={{ borderColor }}>
+              {paperIdentityRows.map(([label, value], index) => (
+                <div
+                  key={label}
+                  className={`grid grid-cols-[64px_16px_1fr] items-start gap-2 ${index < paperIdentityRows.length - 1 ? 'border-b pb-2.5' : ''} ${index > 0 ? 'pt-2.5' : ''}`}
+                  style={{ borderColor }}
+                >
+                  <span className="text-[12px] font-black text-slate-700">{label}</span>
+                  <span className="text-[12px] font-black text-slate-700">:</span>
+                  <span className="text-[12px] font-semibold text-slate-800">{value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-5 text-center">
+            <p className="text-[13px] font-semibold leading-relaxed text-slate-700">
+              상기인은 위와 같이 당사에 재직 중임을 증명합니다.
+            </p>
+            {footerText ? <p className="mt-2 text-[11px] leading-relaxed text-slate-500">{footerText}</p> : null}
+          </div>
+
+          <div className="mt-5 overflow-hidden rounded-[16px] border bg-white" style={{ borderColor }}>
+            {paperDetailRows.map(([label, value], index) => (
+              <div
+                key={label}
+                className={`grid grid-cols-[88px_18px_1fr] items-start gap-2 px-4 py-2.5 ${index < paperDetailRows.length - 1 ? 'border-b' : ''}`}
+                style={{ borderColor }}
+              >
+                <span className="text-[12px] font-black text-slate-700">{label}</span>
+                <span className="text-[12px] font-black text-slate-700">:</span>
+                <span className="text-[12px] font-semibold text-slate-800">{value}</span>
+              </div>
+            ))}
+          </div>
+
+          {showSignArea ? (
+            <div className="mt-6 flex justify-center border-t pt-5" style={{ borderColor }}>
+              <div className="flex items-end gap-4">
+                <div className="text-center">
+                  <p className="text-2xl font-black tracking-tight text-slate-900">{companyLabel}</p>
+                  <p className="mt-1 text-[11px] font-semibold text-slate-500">대표자 / 직인</p>
+                </div>
+                <div
+                  className="flex h-16 w-16 items-center justify-center rounded-full border-[3px] bg-white text-center text-[10px] font-black shadow-sm"
+                  style={{ borderColor: alphaColor(primaryColor, 0.7), color: primaryColor }}
+                >
+                  직인
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className="relative overflow-hidden rounded-[20px] bg-white p-6 shadow-sm"
@@ -133,7 +254,7 @@ function PreviewCard({
         </p>
         <h3 className="mt-2 text-2xl font-bold tracking-tight">{title}</h3>
         {subtitle && <p className="mt-1 text-[12px] font-medium opacity-85">{subtitle}</p>}
-        {type === 'certificate' && (
+        {false && (
           <div
             className="mt-4 h-[4px] rounded-full"
             style={{ background: 'linear-gradient(90deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.55) 100%)' }}
@@ -142,7 +263,7 @@ function PreviewCard({
       </div>
 
       <div className="mt-5 rounded-[16px] p-5" style={{ backgroundColor: surface }}>
-        {type === 'payroll_slip' ? (
+        {true ? (
           <div className="space-y-3 text-[12px]">
             <div className="grid grid-cols-3 gap-3">
               {['성명', '부서', '직위'].map((label) => (
@@ -263,14 +384,14 @@ function PreviewCard({
         )}
       </div>
 
-      {type !== 'certificate' && footerText && (
+      {footerText && (
         <p className="mt-4 text-[11px] font-medium text-slate-500">
           {footerText}
         </p>
       )}
 
       {showSignArea && (
-        type === 'certificate' ? (
+        false ? (
           <div className="mt-5 flex justify-center border-t pt-4" style={{ borderColor }}>
             <div
               className="flex items-end gap-4 rounded-[18px] border bg-white/90 px-5 py-3 shadow-sm"
