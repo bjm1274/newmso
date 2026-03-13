@@ -480,5 +480,556 @@ test('saved ward pattern mixes day-fixed, night-fixed, and rotating staff in one
     page.locator(`button[title^="${nightFixedMate.name} 2026-03-01 병동N"]`)
   ).toBeVisible();
   const rotatingRow = page.locator('tr').filter({ hasText: rotatingMate.name });
-  await expect(rotatingRow).toContainText('N 4');
+  const rotatingNightCount = await rotatingRow.locator('button[title]').evaluateAll((buttons) =>
+    buttons.filter((button) => (button.textContent || '').trim() === 'N').length
+  );
+  expect(rotatingNightCount).toBeGreaterThanOrEqual(3);
+
+  const rotatingDayEveningSequence = await rotatingRow.locator('button[title]').evaluateAll((buttons) =>
+    buttons
+      .map((button) => (button.textContent || '').trim())
+      .filter((code) => code === 'D' || code === 'E')
+      .slice(0, 8)
+  );
+
+  expect(
+    rotatingDayEveningSequence.some((code, index, list) => index > 0 && code === list[index - 1])
+  ).toBeTruthy();
+});
+
+test('ward auto generation detects dedicated staff without a saved pattern profile', async ({
+  page,
+}) => {
+  const plannerUser = {
+    ...fakeUser,
+    id: 'ward-planner-auto-1',
+    employee_no: 'WARD-AUTO-001',
+    name: '\uBCD1\uB3D9 \uCC45\uC784\uC790',
+    company: 'AlphaClinic',
+    company_id: 'clinic-1',
+    department: '\uBCD1\uB3D9\uD300',
+    position: '\uC218\uAC04\uD638\uC0AC',
+    role: 'manager',
+    shift_id: 'shift-ward-day',
+    shift_type: '3\uAD50\uB300',
+  };
+  const dayFixedMate = {
+    ...fakeUser,
+    id: 'ward-auto-day-1',
+    employee_no: 'WARD-AUTO-D-001',
+    name: '\uB370\uC774 \uC804\uB2F4 \uAC04\uD638\uC0AC',
+    company: 'AlphaClinic',
+    company_id: 'clinic-1',
+    department: '\uBCD1\uB3D9\uD300',
+    position: '\uAC04\uD638\uC0AC',
+    role: 'staff',
+    shift_id: 'shift-ward-day',
+    shift_type: '\uB370\uC774\uC804\uB2F4',
+  };
+  const nightFixedMate = {
+    ...fakeUser,
+    id: 'ward-auto-night-1',
+    employee_no: 'WARD-AUTO-N-001',
+    name: '\uB098\uC774\uD2B8 \uC804\uB2F4 \uAC04\uD638\uC0AC',
+    company: 'AlphaClinic',
+    company_id: 'clinic-1',
+    department: '\uBCD1\uB3D9\uD300',
+    position: '\uAC04\uD638\uC0AC',
+    role: 'staff',
+    shift_id: 'shift-ward-night',
+    shift_type: '\uB098\uC774\uD2B8\uC804\uB2F4',
+  };
+  const rotatingMate = {
+    ...fakeUser,
+    id: 'ward-auto-rotate-1',
+    employee_no: 'WARD-AUTO-R-001',
+    name: '\uC21C\uD658 \uAC04\uD638\uC0AC',
+    company: 'AlphaClinic',
+    company_id: 'clinic-1',
+    department: '\uBCD1\uB3D9\uD300',
+    position: '\uAC04\uD638\uC0AC',
+    role: 'staff',
+    shift_id: 'shift-ward-evening',
+    shift_type: '3\uAD50\uB300',
+  };
+
+  await mockSupabase(page, {
+    staffMembers: [plannerUser, dayFixedMate, nightFixedMate, rotatingMate],
+    companies: [{ id: 'clinic-1', name: 'AlphaClinic', type: 'hospital', is_active: true }],
+    workShifts: [
+      {
+        id: 'shift-ward-day',
+        name: '\uBCD1\uB3D9D',
+        start_time: '07:00:00',
+        end_time: '15:00:00',
+        shift_type: '3\uAD50\uB300',
+        company_name: 'AlphaClinic',
+        weekly_work_days: 7,
+        is_weekend_work: true,
+        is_active: true,
+      },
+      {
+        id: 'shift-ward-evening',
+        name: '\uBCD1\uB3D9E',
+        start_time: '15:00:00',
+        end_time: '23:00:00',
+        shift_type: '3\uAD50\uB300',
+        company_name: 'AlphaClinic',
+        weekly_work_days: 7,
+        is_weekend_work: true,
+        is_active: true,
+      },
+      {
+        id: 'shift-ward-night',
+        name: '\uBCD1\uB3D9N',
+        start_time: '23:00:00',
+        end_time: '07:00:00',
+        shift_type: '3\uAD50\uB300',
+        company_name: 'AlphaClinic',
+        weekly_work_days: 7,
+        is_weekend_work: true,
+        is_active: true,
+      },
+    ],
+  });
+  await seedSession(page, {
+    user: plannerUser,
+    localStorage: {
+      erp_last_menu: '\uC778\uC0AC\uAD00\uB9AC',
+      erp_last_subview: '\uAD50\uB300\uADFC\uBB34',
+      erp_hr_tab: '\uAD50\uB300\uADFC\uBB34',
+      erp_hr_workspace: '\uADFC\uD0DC \uBC0F \uAE09\uC5EC',
+    },
+  });
+
+  await openShiftPlanner(page);
+  await expect(page.getByTestId('roster-pattern-group-preview')).toContainText('\uB370\uC774\uC804\uB2F4 1\uBA85');
+  await expect(page.getByTestId('roster-pattern-group-preview')).toContainText('\uB098\uC774\uD2B8\uC804\uB2F4 1\uBA85');
+  await expect(page.getByTestId('roster-pattern-group-preview')).toContainText('\uC21C\uD658\uADFC\uBB34 2\uBA85');
+
+  await page.getByTestId('roster-auto-generate').click();
+
+  await expect(page.getByTestId('roster-generation-summary')).toContainText('\uBCD1\uB3D9\uD300');
+  await expect(
+    page.locator(`button[title^="${dayFixedMate.name} 2026-03-03 \uBCD1\uB3D9D"]`)
+  ).toBeVisible();
+  await expect(
+    page.locator(`button[title^="${nightFixedMate.name} 2026-03-01 \uBCD1\uB3D9N"]`)
+  ).toBeVisible();
+});
+
+test('ward generation rule limits consecutive work days and spreads weekend load', async ({
+  page,
+}) => {
+  const plannerUser = {
+    ...fakeUser,
+    id: 'ward-rule-planner-1',
+    employee_no: 'WARD-RULE-001',
+    name: '\uBCD1\uB3D9 \uCC45\uC784\uAC04\uD638\uC0AC',
+    company: 'AlphaClinic',
+    company_id: 'clinic-1',
+    department: '\uBCD1\uB3D9\uD300',
+    position: '\uC218\uAC04\uD638\uC0AC',
+    role: 'manager',
+    shift_id: 'shift-ward-day',
+    shift_type: '3\uAD50\uB300',
+  };
+  const staffMembers = [
+    plannerUser,
+    {
+      ...fakeUser,
+      id: 'ward-rule-2',
+      employee_no: 'WARD-RULE-002',
+      name: '\uAC04\uD638\uC0AC2',
+      company: 'AlphaClinic',
+      company_id: 'clinic-1',
+      department: '\uBCD1\uB3D9\uD300',
+      position: '\uAC04\uD638\uC0AC',
+      role: 'staff',
+      shift_id: 'shift-ward-evening',
+      shift_type: '3\uAD50\uB300',
+    },
+    {
+      ...fakeUser,
+      id: 'ward-rule-3',
+      employee_no: 'WARD-RULE-003',
+      name: '\uAC04\uD638\uC0AC3',
+      company: 'AlphaClinic',
+      company_id: 'clinic-1',
+      department: '\uBCD1\uB3D9\uD300',
+      position: '\uAC04\uD638\uC0AC',
+      role: 'staff',
+      shift_id: 'shift-ward-night',
+      shift_type: '3\uAD50\uB300',
+    },
+    {
+      ...fakeUser,
+      id: 'ward-rule-4',
+      employee_no: 'WARD-RULE-004',
+      name: '\uAC04\uD638\uC0AC4',
+      company: 'AlphaClinic',
+      company_id: 'clinic-1',
+      department: '\uBCD1\uB3D9\uD300',
+      position: '\uAC04\uD638\uC0AC',
+      role: 'staff',
+      shift_id: 'shift-ward-day',
+      shift_type: '3\uAD50\uB300',
+    },
+    {
+      ...fakeUser,
+      id: 'ward-rule-5',
+      employee_no: 'WARD-RULE-005',
+      name: '\uAC04\uD638\uC0AC5',
+      company: 'AlphaClinic',
+      company_id: 'clinic-1',
+      department: '\uBCD1\uB3D9\uD300',
+      position: '\uAC04\uD638\uC0AC',
+      role: 'staff',
+      shift_id: 'shift-ward-evening',
+      shift_type: '3\uAD50\uB300',
+    },
+  ];
+
+  await mockSupabase(page, {
+    staffMembers,
+    companies: [{ id: 'clinic-1', name: 'AlphaClinic', type: 'hospital', is_active: true }],
+    workShifts: [
+      {
+        id: 'shift-ward-day',
+        name: '\uBCD1\uB3D9D',
+        start_time: '07:00:00',
+        end_time: '15:00:00',
+        shift_type: '3\uAD50\uB300',
+        company_name: 'AlphaClinic',
+        weekly_work_days: 7,
+        is_weekend_work: true,
+        is_active: true,
+      },
+      {
+        id: 'shift-ward-evening',
+        name: '\uBCD1\uB3D9E',
+        start_time: '15:00:00',
+        end_time: '23:00:00',
+        shift_type: '3\uAD50\uB300',
+        company_name: 'AlphaClinic',
+        weekly_work_days: 7,
+        is_weekend_work: true,
+        is_active: true,
+      },
+      {
+        id: 'shift-ward-night',
+        name: '\uBCD1\uB3D9N',
+        start_time: '23:00:00',
+        end_time: '07:00:00',
+        shift_type: '3\uAD50\uB300',
+        company_name: 'AlphaClinic',
+        weekly_work_days: 7,
+        is_weekend_work: true,
+        is_active: true,
+      },
+    ],
+  });
+  await seedSession(page, {
+    user: plannerUser,
+    localStorage: {
+      erp_last_menu: '\uC778\uC0AC\uAD00\uB9AC',
+      erp_last_subview: '\uAD50\uB300\uADFC\uBB34',
+      erp_hr_tab: '\uAD50\uB300\uADFC\uBB34',
+      erp_hr_workspace: '\uADFC\uD0DC \uBC0F \uAE09\uC5EC',
+    },
+  });
+
+  await openShiftPatternManager(page);
+  await page.getByTestId('shift-suite-2').click();
+  await expect(page.getByTestId('roster-rule-manager')).toBeVisible();
+
+  await page.getByTestId('generation-rule-name-input').fill('\uBCD1\uB3D9 \uC778\uB825\uC548\uC804\uADDC\uCE59');
+  await page.getByTestId('generation-rule-team-keywords-input').fill('\uBCD1\uB3D9\uD300');
+  await page.getByTestId('generation-rule-max-consecutive-work-days').fill('3');
+  await page.getByTestId('generation-rule-save').click();
+
+  await page.getByTestId('shift-suite-1').click();
+  await page.getByTestId('roster-generation-rule-select').selectOption({
+    label: '\uBCD1\uB3D9 \uC778\uB825\uC548\uC804\uADDC\uCE59',
+  });
+  await page.getByTestId('roster-auto-generate').click();
+
+  const weekendDates = new Set([
+    '2026-03-01',
+    '2026-03-07',
+    '2026-03-08',
+    '2026-03-14',
+    '2026-03-15',
+    '2026-03-21',
+    '2026-03-22',
+    '2026-03-28',
+    '2026-03-29',
+  ]);
+
+  const weekendLoads: number[] = [];
+  for (const staff of staffMembers) {
+    const row = page.locator('tr').filter({ hasText: staff.name });
+    const codes = await row.locator('button[title]').evaluateAll((buttons) =>
+      buttons.map((button) => (button.textContent || '').trim())
+    );
+    let streak = 0;
+    let maxStreak = 0;
+    codes.forEach((code) => {
+      if (code === 'OFF') {
+        streak = 0;
+      } else {
+        streak += 1;
+        maxStreak = Math.max(maxStreak, streak);
+      }
+    });
+    expect(maxStreak).toBeLessThanOrEqual(3);
+
+    const titles = await row.locator('button[title]').evaluateAll((buttons) =>
+      buttons.map((button) => button.getAttribute('title') || '')
+    );
+    weekendLoads.push(
+      titles.filter((title, index) => {
+        const date = title.split(' ')[1] || '';
+        return weekendDates.has(date) && codes[index] !== 'OFF';
+      }).length
+    );
+  }
+
+  expect(Math.max(...weekendLoads) - Math.min(...weekendLoads)).toBeLessThanOrEqual(2);
+});
+
+test('ward auto generation keeps approved leave dates off in the roster', async ({ page }) => {
+  const plannerUser = {
+    ...fakeUser,
+    id: 'ward-leave-planner-1',
+    employee_no: 'WARD-LEAVE-001',
+    name: '\uBCD1\uB3D9 \uCC45\uC784\uAC04\uD638\uC0AC',
+    company: 'AlphaClinic',
+    company_id: 'clinic-1',
+    department: '\uBCD1\uB3D9\uD300',
+    position: '\uC218\uAC04\uD638\uC0AC',
+    role: 'manager',
+    shift_id: 'shift-ward-day',
+    shift_type: '3\uAD50\uB300',
+  };
+  const leaveStaff = {
+    ...fakeUser,
+    id: 'ward-leave-2',
+    employee_no: 'WARD-LEAVE-002',
+    name: '\uD734\uAC00 \uAC04\uD638\uC0AC',
+    company: 'AlphaClinic',
+    company_id: 'clinic-1',
+    department: '\uBCD1\uB3D9\uD300',
+    position: '\uAC04\uD638\uC0AC',
+    role: 'staff',
+    shift_id: 'shift-ward-evening',
+    shift_type: '3\uAD50\uB300',
+  };
+  const supportStaff = {
+    ...fakeUser,
+    id: 'ward-leave-3',
+    employee_no: 'WARD-LEAVE-003',
+    name: '\uBCF4\uC870 \uAC04\uD638\uC0AC',
+    company: 'AlphaClinic',
+    company_id: 'clinic-1',
+    department: '\uBCD1\uB3D9\uD300',
+    position: '\uAC04\uD638\uC0AC',
+    role: 'staff',
+    shift_id: 'shift-ward-night',
+    shift_type: '3\uAD50\uB300',
+  };
+
+  await mockSupabase(page, {
+    staffMembers: [plannerUser, leaveStaff, supportStaff],
+    companies: [{ id: 'clinic-1', name: 'AlphaClinic', type: 'hospital', is_active: true }],
+    workShifts: [
+      {
+        id: 'shift-ward-day',
+        name: '\uBCD1\uB3D9D',
+        start_time: '07:00:00',
+        end_time: '15:00:00',
+        shift_type: '3\uAD50\uB300',
+        company_name: 'AlphaClinic',
+        weekly_work_days: 7,
+        is_weekend_work: true,
+        is_active: true,
+      },
+      {
+        id: 'shift-ward-evening',
+        name: '\uBCD1\uB3D9E',
+        start_time: '15:00:00',
+        end_time: '23:00:00',
+        shift_type: '3\uAD50\uB300',
+        company_name: 'AlphaClinic',
+        weekly_work_days: 7,
+        is_weekend_work: true,
+        is_active: true,
+      },
+      {
+        id: 'shift-ward-night',
+        name: '\uBCD1\uB3D9N',
+        start_time: '23:00:00',
+        end_time: '07:00:00',
+        shift_type: '3\uAD50\uB300',
+        company_name: 'AlphaClinic',
+        weekly_work_days: 7,
+        is_weekend_work: true,
+        is_active: true,
+      },
+    ],
+    leaveRequests: [
+      {
+        id: 'leave-ward-1',
+        staff_id: leaveStaff.id,
+        leave_type: '\uC5F0\uCC28',
+        start_date: '2026-03-10',
+        end_date: '2026-03-12',
+        status: '\uC2B9\uC778',
+      },
+    ],
+  });
+  await seedSession(page, {
+    user: plannerUser,
+    localStorage: {
+      erp_last_menu: '\uC778\uC0AC\uAD00\uB9AC',
+      erp_last_subview: '\uAD50\uB300\uADFC\uBB34',
+      erp_hr_tab: '\uAD50\uB300\uADFC\uBB34',
+      erp_hr_workspace: '\uADFC\uD0DC \uBC0F \uAE09\uC5EC',
+    },
+  });
+
+  await openShiftPlanner(page);
+  await page.getByTestId('roster-auto-generate').click();
+
+  await expect(page.getByTestId('roster-leave-coverage-summary')).toContainText(
+    '\uC2B9\uC778 \uD734\uAC00 1\uAC74 \u00B7 3\uC77C \uBC18\uC601'
+  );
+  await expect(
+    page.locator(`button[title^="${leaveStaff.name} 2026-03-10 "]`)
+  ).toHaveText('OFF');
+  await expect(
+    page.locator(`button[title^="${leaveStaff.name} 2026-03-11 "]`)
+  ).toHaveText('OFF');
+  await expect(
+    page.locator(`button[title^="${leaveStaff.name} 2026-03-12 "]`)
+  ).toHaveText('OFF');
+});
+
+test('ward auto generation applies personal preferred off dates before building the roster', async ({
+  page,
+}) => {
+  const plannerUser = {
+    ...fakeUser,
+    id: 'ward-preferred-off-planner-1',
+    employee_no: 'WARD-PREF-001',
+    name: '\uBCD1\uB3D9 \uCC45\uC784\uAC04\uD638\uC0AC',
+    company: 'AlphaClinic',
+    company_id: 'clinic-1',
+    department: '\uBCD1\uB3D9\uD300',
+    position: '\uC218\uAC04\uD638\uC0AC',
+    role: 'manager',
+    shift_id: 'shift-ward-day',
+    shift_type: '3\uAD50\uB300',
+  };
+  const preferredOffStaff = {
+    ...fakeUser,
+    id: 'ward-preferred-off-2',
+    employee_no: 'WARD-PREF-002',
+    name: '\uD76C\uB9DDOFF \uAC04\uD638\uC0AC',
+    company: 'AlphaClinic',
+    company_id: 'clinic-1',
+    department: '\uBCD1\uB3D9\uD300',
+    position: '\uAC04\uD638\uC0AC',
+    role: 'staff',
+    shift_id: 'shift-ward-evening',
+    shift_type: '3\uAD50\uB300',
+  };
+  const supportStaff = {
+    ...fakeUser,
+    id: 'ward-preferred-off-3',
+    employee_no: 'WARD-PREF-003',
+    name: '\uBCF4\uC870 \uAC04\uD638\uC0AC',
+    company: 'AlphaClinic',
+    company_id: 'clinic-1',
+    department: '\uBCD1\uB3D9\uD300',
+    position: '\uAC04\uD638\uC0AC',
+    role: 'staff',
+    shift_id: 'shift-ward-night',
+    shift_type: '3\uAD50\uB300',
+  };
+
+  await mockSupabase(page, {
+    staffMembers: [plannerUser, preferredOffStaff, supportStaff],
+    companies: [{ id: 'clinic-1', name: 'AlphaClinic', type: 'hospital', is_active: true }],
+    workShifts: [
+      {
+        id: 'shift-ward-day',
+        name: '\uBCD1\uB3D9D',
+        start_time: '07:00:00',
+        end_time: '15:00:00',
+        shift_type: '3\uAD50\uB300',
+        company_name: 'AlphaClinic',
+        weekly_work_days: 7,
+        is_weekend_work: true,
+        is_active: true,
+      },
+      {
+        id: 'shift-ward-evening',
+        name: '\uBCD1\uB3D9E',
+        start_time: '15:00:00',
+        end_time: '23:00:00',
+        shift_type: '3\uAD50\uB300',
+        company_name: 'AlphaClinic',
+        weekly_work_days: 7,
+        is_weekend_work: true,
+        is_active: true,
+      },
+      {
+        id: 'shift-ward-night',
+        name: '\uBCD1\uB3D9N',
+        start_time: '23:00:00',
+        end_time: '07:00:00',
+        shift_type: '3\uAD50\uB300',
+        company_name: 'AlphaClinic',
+        weekly_work_days: 7,
+        is_weekend_work: true,
+        is_active: true,
+      },
+    ],
+  });
+  await seedSession(page, {
+    user: plannerUser,
+    localStorage: {
+      erp_last_menu: '\uC778\uC0AC\uAD00\uB9AC',
+      erp_last_subview: '\uAD50\uB300\uADFC\uBB34',
+      erp_hr_tab: '\uAD50\uB300\uADFC\uBB34',
+      erp_hr_workspace: '\uADFC\uD0DC \uBC0F \uAE09\uC5EC',
+    },
+  });
+
+  await openShiftPlanner(page);
+  await page.getByTestId('preferred-off-staff-select').selectOption(preferredOffStaff.id);
+  await page.getByTestId('preferred-off-date-select').selectOption('2026-03-18');
+  await page.getByTestId('preferred-off-add').click();
+  await page.getByTestId('preferred-off-date-select').selectOption('2026-03-19');
+  await page.getByTestId('preferred-off-add').click();
+
+  await expect(
+    page.getByTestId(`preferred-off-chip-${preferredOffStaff.id}-2026-03-18`)
+  ).toBeVisible();
+  await expect(
+    page.getByTestId(`preferred-off-chip-${preferredOffStaff.id}-2026-03-19`)
+  ).toBeVisible();
+
+  await page.getByTestId('roster-auto-generate').click();
+
+  await expect(page.getByTestId('roster-preferred-off-summary')).toContainText(
+    '\uD76C\uB9DD OFF 2\uAC74 \uBC18\uC601'
+  );
+  await expect(
+    page.locator(`button[title^="${preferredOffStaff.name} 2026-03-18 "]`)
+  ).toHaveText('OFF');
+  await expect(
+    page.locator(`button[title^="${preferredOffStaff.name} 2026-03-19 "]`)
+  ).toHaveText('OFF');
 });

@@ -142,6 +142,37 @@ type PreviewRow = {
   value: string;
 };
 
+function readRuntimeCompanyLabel(user?: any) {
+  if (user?.company) return String(user.company);
+
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = window.localStorage.getItem('erp_user');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.company) return String(parsed.company);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return DEFAULT_DESIGN.companyLabel || 'SY INC.';
+}
+
+function resolveCompanyLabelValue(value: string | undefined, fallback: string) {
+  const trimmed = String(value || '').trim();
+  if (!trimmed || trimmed === DEFAULT_DESIGN.companyLabel) return fallback;
+  return trimmed;
+}
+
+function resolveSealLabelValue(value: string | undefined, companyLabel: string) {
+  const trimmed = String(value || '').trim();
+  const defaultSealLabel = `${DEFAULT_DESIGN.companyLabel} 직인`;
+  if (!trimmed || trimmed === defaultSealLabel) return `${companyLabel} 직인`;
+  return trimmed;
+}
+
 type TemplatePreviewSpec = {
   badge: string;
   intro: string;
@@ -150,6 +181,133 @@ type TemplatePreviewSpec = {
   detailRows: PreviewRow[];
   footerNote: string;
 };
+
+function buildPreviewIdentityRows(templateSlug: string | null): PreviewRow[] {
+  const departmentBySlug: Record<string, string> = {
+    leave: '외래팀',
+    annual_plan: '총무팀',
+    overtime: '수술팀',
+    purchase: '1병동',
+    repair_request: '검사팀',
+    draft_business: '경영지원팀',
+    cooperation: '원무팀',
+    attendance_fix: '검사팀',
+    payroll_slip: '인사팀',
+    generic: '경영지원팀',
+  };
+
+  return [
+    { label: '성명', value: '홍길동' },
+    { label: '사번', value: 'KM-240101' },
+    { label: '부서', value: departmentBySlug[templateSlug || 'generic'] || '경영지원팀' },
+    { label: '직위', value: '대리' },
+  ];
+}
+
+function buildPreviewStatement(templateSlug: string | null, templateName: string) {
+  switch (templateSlug) {
+    case 'leave':
+      return '아래와 같이 휴가를 신청하오니 허가하여 주시기 바랍니다.';
+    case 'annual_plan':
+      return '아래와 같이 연간 휴가 계획을 제출하오니 검토하여 주시기 바랍니다.';
+    case 'overtime':
+      return '아래와 같이 연장근무를 신청하오니 승인하여 주시기 바랍니다.';
+    case 'purchase':
+      return '아래와 같이 물품 구매를 신청하오니 검토하여 주시기 바랍니다.';
+    case 'repair_request':
+      return '아래와 같이 시설 보수를 요청하오니 확인하여 주시기 바랍니다.';
+    case 'draft_business':
+      return '아래와 같이 업무 기안을 상신하오니 결재하여 주시기 바랍니다.';
+    case 'cooperation':
+      return '아래와 같이 부서 협조를 요청하오니 검토하여 주시기 바랍니다.';
+    case 'attendance_fix':
+      return '아래와 같이 근태 정정을 신청하오니 확인하여 주시기 바랍니다.';
+    default:
+      return `${templateName} 관련 내용을 아래와 같이 제출합니다.`;
+  }
+}
+
+function buildPreviewDetailRows(templateSlug: string | null): PreviewRow[] {
+  switch (templateSlug) {
+    case 'leave':
+      return [
+        { label: '휴가일시', value: '2026.03.18 09:00 ~ 2026.03.19 18:00' },
+        { label: '휴가구분', value: '연차' },
+        { label: '사유', value: '가족 일정으로 인한 개인 휴가 사용' },
+      ];
+    case 'annual_plan':
+      return [
+        { label: '계획기간', value: '2026년 3월 / 6월 / 10월' },
+        { label: '예상일수', value: '총 8일' },
+        { label: '비고', value: '부서 운영 일정 고려 후 최종 확정 예정' },
+      ];
+    case 'overtime':
+      return [
+        { label: '근무일시', value: '2026.03.12 18:00 ~ 21:00' },
+        { label: '근무구분', value: '연장근무' },
+        { label: '사유', value: '수술 일정 지연에 따른 마감 대응' },
+      ];
+    case 'purchase':
+      return [
+        { label: '품목', value: '멸균 거즈 / 20BOX' },
+        { label: '수량', value: '20BOX' },
+        { label: '사유', value: '병동 재고 보충 및 응급 사용 대비' },
+      ];
+    case 'repair_request':
+      return [
+        { label: '수리대상', value: 'MRI실 모니터 2번' },
+        { label: '장애내용', value: '영상 출력 불안정 및 화면 깜빡임' },
+        { label: '사유', value: '진료 중 장비 확인이 어려워 업무 지연 발생' },
+      ];
+    case 'draft_business':
+      return [
+        { label: '기안안건', value: '소모품 공급 계약 조건 조정' },
+        { label: '시행시기', value: '2026년 4월 1일 예정' },
+        { label: '사유', value: '운영비 절감 및 납기 안정성 확보 필요' },
+      ];
+    case 'cooperation':
+      return [
+        { label: '협조일시', value: '2026.03.18 08:30' },
+        { label: '협조내용', value: '신규 접수 동선 안내 및 창구 인력 지원' },
+        { label: '사유', value: '외래 내원 증가에 따른 현장 혼선 방지' },
+      ];
+    case 'attendance_fix':
+      return [
+        { label: '정정일시', value: '2026.03.12 08:21 출근' },
+        { label: '정정구분', value: '출근 시간 정정' },
+        { label: '사유', value: '모바일 출근 등록 누락' },
+      ];
+    default:
+      return [
+        { label: '문서항목', value: '기본 문서 항목 1' },
+        { label: '상세내용', value: '조직 내 공유가 필요한 내용을 정리합니다.' },
+        { label: '비고', value: '관련 부서 확인 후 최종 처리합니다.' },
+      ];
+  }
+}
+
+function buildPreviewDateLabel(templateSlug: string | null) {
+  if (templateSlug === 'annual_plan') return '작성일자';
+  return '신청일자';
+}
+
+function buildPreviewDocumentNumber(templateSlug: string | null) {
+  const prefixBySlug: Record<string, string> = {
+    leave: 'LV',
+    annual_plan: 'AL',
+    overtime: 'OT',
+    purchase: 'PR',
+    repair_request: 'RP',
+    draft_business: 'DG',
+    cooperation: 'CO',
+    attendance_fix: 'AT',
+    payroll_slip: 'PS',
+    generic: 'DOC',
+  };
+
+  const prefix = prefixBySlug[templateSlug || 'generic'] || 'DOC';
+  return `${prefix}-202603-000128`;
+}
 
 function buildTemplatePreviewSpec(templateSlug: string | null, templateName: string, templateSummary: string): TemplatePreviewSpec {
   const fallbackSummary = templateSummary || '선택한 양식의 기본 문서 구성을 이 화면에서 바로 미리보기로 확인합니다.';
@@ -350,10 +508,13 @@ function buildTemplatePreviewSpec(templateSlug: string | null, templateName: str
   }
 }
 
-function createDefaultDesignMap() {
+function createDefaultDesignMap(companyLabelOverride?: string) {
   return builtinTemplates.reduce<Record<string, TemplateDesign>>((acc, template) => {
     const preset = BUILTIN_TEMPLATE_DEFAULTS[template.slug] || {};
-    const companyLabel = preset.companyLabel || DEFAULT_DESIGN.companyLabel || 'SY INC.';
+    const companyLabel = resolveCompanyLabelValue(
+      preset.companyLabel,
+      companyLabelOverride || DEFAULT_DESIGN.companyLabel || 'SY INC.',
+    );
 
     acc[template.slug] = {
       ...DEFAULT_DESIGN,
@@ -363,15 +524,15 @@ function createDefaultDesignMap() {
       companyLabel,
       backgroundLogoUrl: DEFAULT_LOGO_URL,
       backgroundLogoOpacity: preset.backgroundLogoOpacity ?? DEFAULT_DESIGN.backgroundLogoOpacity,
-      sealLabel: preset.sealLabel || `${companyLabel} 직인`,
+      sealLabel: resolveSealLabelValue(preset.sealLabel, companyLabel),
     };
 
     return acc;
   }, {});
 }
 
-function mergeWithDefaultDesigns(stored: Record<string, any> | null | undefined) {
-  const defaults = createDefaultDesignMap();
+function mergeWithDefaultDesigns(stored: Record<string, any> | null | undefined, companyLabelOverride?: string) {
+  const defaults = createDefaultDesignMap(companyLabelOverride);
   const nextDesigns: Record<string, TemplateDesign> = { ...defaults };
 
   Object.entries(stored || {}).forEach(([slug, value]) => {
@@ -381,7 +542,10 @@ function mergeWithDefaultDesigns(stored: Record<string, any> | null | undefined)
       ...patch,
     } as TemplateDesign;
 
-    const companyLabel = merged.companyLabel || defaults[slug]?.companyLabel || DEFAULT_DESIGN.companyLabel || 'SY INC.';
+    const companyLabel = resolveCompanyLabelValue(
+      merged.companyLabel,
+      defaults[slug]?.companyLabel || companyLabelOverride || DEFAULT_DESIGN.companyLabel || 'SY INC.',
+    );
 
     nextDesigns[slug] = {
       ...merged,
@@ -391,7 +555,7 @@ function mergeWithDefaultDesigns(stored: Record<string, any> | null | undefined)
         merged.backgroundLogoOpacity
         ?? defaults[slug]?.backgroundLogoOpacity
         ?? DEFAULT_DESIGN.backgroundLogoOpacity,
-      sealLabel: merged.sealLabel || defaults[slug]?.sealLabel || `${companyLabel} 직인`,
+      sealLabel: resolveSealLabelValue(merged.sealLabel || defaults[slug]?.sealLabel, companyLabel),
       showBackgroundLogo: merged.showBackgroundLogo ?? true,
       showSeal: merged.showSeal ?? true,
       showSignArea: merged.showSignArea ?? true,
@@ -404,9 +568,10 @@ function mergeWithDefaultDesigns(stored: Record<string, any> | null | undefined)
 function resolveCurrentDesign(
   selectedSlug: string | null,
   selectedName: string,
-  designs: Record<string, TemplateDesign>
+  designs: Record<string, TemplateDesign>,
+  companyLabelOverride?: string,
 ) {
-  const defaults = createDefaultDesignMap();
+  const defaults = createDefaultDesignMap(companyLabelOverride);
   const preset = selectedSlug ? defaults[selectedSlug] : undefined;
   const saved = selectedSlug ? designs[selectedSlug] : undefined;
   const merged = {
@@ -414,7 +579,10 @@ function resolveCurrentDesign(
     ...(preset || {}),
     ...(saved || {}),
   };
-  const companyLabel = merged.companyLabel || DEFAULT_DESIGN.companyLabel || 'SY INC.';
+  const companyLabel = resolveCompanyLabelValue(
+    merged.companyLabel,
+    preset?.companyLabel || companyLabelOverride || DEFAULT_DESIGN.companyLabel || 'SY INC.',
+  );
 
   return {
     ...merged,
@@ -426,7 +594,7 @@ function resolveCurrentDesign(
       merged.backgroundLogoOpacity
       ?? preset?.backgroundLogoOpacity
       ?? DEFAULT_DESIGN.backgroundLogoOpacity,
-    sealLabel: merged.sealLabel || preset?.sealLabel || `${companyLabel} 직인`,
+    sealLabel: resolveSealLabelValue(merged.sealLabel || preset?.sealLabel, companyLabel),
     showBackgroundLogo: merged.showBackgroundLogo ?? true,
     showSeal: merged.showSeal ?? true,
     showSignArea: merged.showSignArea ?? true,
@@ -453,7 +621,7 @@ async function persistDesigns(designs: Record<string, TemplateDesign>) {
   return result;
 }
 
-export default function ApprovalFormTypesManager() {
+export default function ApprovalFormTypesManager({ user }: { user?: any }) {
   const [list, setList] = useState<FormTypeRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [designLoading, setDesignLoading] = useState(true);
@@ -467,6 +635,7 @@ export default function ApprovalFormTypesManager() {
   const [selectedName, setSelectedName] = useState(builtinTemplates[0]?.name || '연차/휴가');
   const [designs, setDesigns] = useState<Record<string, TemplateDesign>>({});
   const designEditorRef = useRef<HTMLElement | null>(null);
+  const currentCompanyLabel = useMemo(() => readRuntimeCompanyLabel(user), [user]);
   const selectedBaseTemplate = useMemo(
     () => builtinTemplates.find((template) => template.slug === addBaseSlug) ?? builtinTemplates[0],
     [addBaseSlug]
@@ -520,12 +689,37 @@ export default function ApprovalFormTypesManager() {
     const previewTemplateName =
       builtinTemplates.find((template) => template.slug === previewTemplateSlug)?.name || selectedName;
 
-    return resolveCurrentDesign(previewTemplateSlug, previewTemplateName, {});
-  }, [previewTemplateSlug, selectedName]);
+    return resolveCurrentDesign(previewTemplateSlug, previewTemplateName, {}, currentCompanyLabel);
+  }, [currentCompanyLabel, previewTemplateSlug, selectedName]);
 
   const previewSourceName = useMemo(
     () => builtinTemplates.find((template) => template.slug === previewTemplateSlug)?.name || selectedName,
     [previewTemplateSlug, selectedName]
+  );
+
+  const previewIdentityRows = useMemo(
+    () => buildPreviewIdentityRows(previewTemplateSlug),
+    [previewTemplateSlug]
+  );
+
+  const previewStatement = useMemo(
+    () => buildPreviewStatement(previewTemplateSlug, previewDesign.title || previewSourceName),
+    [previewDesign.title, previewSourceName, previewTemplateSlug]
+  );
+
+  const previewDetailRows = useMemo(
+    () => buildPreviewDetailRows(previewTemplateSlug),
+    [previewTemplateSlug]
+  );
+
+  const previewDateLabel = useMemo(
+    () => buildPreviewDateLabel(previewTemplateSlug),
+    [previewTemplateSlug]
+  );
+
+  const previewDocumentNumber = useMemo(
+    () => buildPreviewDocumentNumber(previewTemplateSlug),
+    [previewTemplateSlug]
   );
 
   const syncListState = (next: FormTypeRow[]) => {
@@ -585,10 +779,10 @@ export default function ApprovalFormTypesManager() {
           throw error;
         }
 
-        setDesigns(mergeWithDefaultDesigns(parsed));
+        setDesigns(mergeWithDefaultDesigns(parsed, currentCompanyLabel));
       } catch (error) {
         console.error(error);
-        setDesigns(createDefaultDesignMap());
+        setDesigns(createDefaultDesignMap(currentCompanyLabel));
       } finally {
         setDesignLoading(false);
       }
@@ -596,7 +790,7 @@ export default function ApprovalFormTypesManager() {
 
     void loadList();
     void loadSavedDesigns();
-  }, []);
+  }, [currentCompanyLabel]);
 
   useEffect(() => {
     if (!selectedSlug) return;
@@ -966,117 +1160,118 @@ export default function ApprovalFormTypesManager() {
         <div className="mt-6 rounded-[28px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--toss-gray-3)]">Selected Template</p>
+              <p className="text-[11px] font-semibold tracking-[0.16em] text-[var(--toss-gray-3)]">기본 문서 미리보기</p>
               <p className="mt-1 text-lg font-bold text-[var(--foreground)]">{selectedName}</p>
               <p className="mt-1 text-sm text-[var(--toss-gray-3)]">{previewSpec.summary}</p>
             </div>
             <div className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-[var(--toss-gray-4)]">
-              기본 프리셋: {previewSourceName}
+              기본값 기준 {previewSourceName}
             </div>
           </div>
 
-          <div className="mt-5 flex min-h-[640px] items-center justify-center rounded-[24px] border border-[var(--toss-border)] bg-[#e9edf0] px-6 py-10">
+          <div className="mt-5 flex min-h-[700px] items-center justify-center rounded-[24px] border border-[var(--toss-border)] bg-[#dde4e8] px-5 py-8">
             <div
-              className="relative h-[568px] w-[402px] overflow-hidden rounded-[8px] border bg-[#fffdfa] shadow-[0_30px_90px_rgba(15,23,42,0.16)]"
-              style={{ borderColor: previewDesign.borderColor || '#d7e3ff' }}
+              className="relative aspect-[210/297] w-full max-w-[430px] overflow-hidden bg-white shadow-[0_28px_70px_rgba(15,23,42,0.14)]"
+              style={{
+                border: `1px solid ${previewDesign.borderColor || '#d5dce4'}`,
+                boxShadow: '0 28px 70px rgba(15,23,42,0.14), 0 0 0 1px rgba(255,255,255,0.85) inset',
+              }}
             >
-              <div
-                className="absolute inset-0 opacity-70"
-                style={{
-                  backgroundImage:
-                    'linear-gradient(rgba(15,23,42,0.018) 1px, transparent 1px), linear-gradient(90deg, rgba(15,23,42,0.018) 1px, transparent 1px)',
-                  backgroundSize: '28px 28px',
-                }}
-              />
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,#ffffff_0%,#fdfefe_76%,#f5f8fa_100%)]" />
               {previewDesign.showBackgroundLogo !== false && previewDesign.backgroundLogoUrl && (
                 <img
                   src={previewDesign.backgroundLogoUrl}
                   alt=""
-                  className="absolute left-1/2 top-1/2 h-44 w-44 -translate-x-1/2 -translate-y-1/2 object-contain mix-blend-multiply"
-                  style={{ opacity: previewDesign.backgroundLogoOpacity ?? 0.025 }}
+                  className="absolute left-1/2 top-[50%] h-24 w-24 -translate-x-1/2 -translate-y-1/2 object-contain mix-blend-multiply"
+                  style={{ opacity: previewDesign.backgroundLogoOpacity ?? 0.055 }}
                 />
               )}
 
-              <div className="relative z-10 px-10 py-8">
-                <div className="flex items-end gap-4 border-b pb-5" style={{ borderColor: previewDesign.borderColor || '#d7e3ff' }}>
-                  <div className="flex h-[72px] w-[72px] items-center justify-center rounded-[14px] border bg-white shadow-sm" style={{ borderColor: previewDesign.borderColor || '#d7e3ff' }}>
-                    <img src="/logo.png" alt="" className="h-12 w-12 object-contain" />
+              <div className="relative z-10 flex h-full flex-col px-8 py-7 text-[#1f2937]">
+                <div className="flex items-start gap-4">
+                  <div
+                    className="flex h-[66px] w-[66px] shrink-0 items-center justify-center rounded-[16px] bg-white"
+                    style={{ border: `1px solid ${previewDesign.borderColor || '#d5dce4'}` }}
+                  >
+                    <img src="/logo.png" alt="" className="h-10 w-10 object-contain" />
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[10px] font-bold tracking-[0.18em] text-slate-400">{previewSpec.badge}</p>
-                    <h4 className="mt-1 text-[34px] font-black tracking-[-0.04em]" style={{ color: previewDesign.primaryColor || '#163b70' }}>
+                  <div className="min-w-0 flex-1 pt-1">
+                    <h4 className="mt-1 text-[26px] font-black tracking-[-0.04em] text-slate-900">
                       {previewDesign.title || previewSourceName}
                     </h4>
                   </div>
                 </div>
 
-                <div
-                  className="mt-3 h-[4px] rounded-full"
-                  style={{ background: `linear-gradient(90deg, ${alphaColor(previewDesign.primaryColor, 0.95)} 0%, ${alphaColor(previewDesign.primaryColor, 0.4)} 100%)` }}
-                />
+                <div className="mt-4 h-[3px] w-full" style={{ backgroundColor: previewDesign.primaryColor || '#2d93a8' }} />
 
-                <div className="mt-7 grid grid-cols-[102px_1fr] gap-5">
-                  <div className="rounded-[14px] border bg-white p-2.5" style={{ borderColor: previewDesign.borderColor || '#d7e3ff' }}>
-                    <div className="flex aspect-[3/4] items-center justify-center rounded-[10px] bg-[var(--toss-gray-1)] text-4xl font-black text-[var(--toss-gray-3)]">
-                      홍
+                <div className="mt-4 shrink-0 grid grid-cols-[74px_1fr] gap-3">
+                  <div>
+                    <div
+                      className="overflow-hidden rounded-[4px] bg-[#eef2f6]"
+                      style={{ border: `1px solid ${previewDesign.borderColor || '#d5dce4'}` }}
+                    >
+                      <div className="flex aspect-[3/4] items-center justify-center text-[34px] font-black text-slate-300">홍</div>
                     </div>
-                    <p className="mt-2 text-center text-[11px] font-semibold text-[var(--toss-gray-3)]">사진</p>
+                    <p className="mt-1 text-center text-[8px] font-medium text-slate-400">사진</p>
                   </div>
 
-                  <div className="rounded-[14px] border bg-white px-4 py-3" style={{ borderColor: previewDesign.borderColor || '#d7e3ff' }}>
-                    {previewSpec.metaRows.map((row, index) => (
+                  <div className="space-y-1 pt-0.5">
+                    {previewIdentityRows.map((row, index) => (
                       <div
                         key={row.label}
-                        className={`grid grid-cols-[74px_10px_1fr] gap-2 ${index < previewSpec.metaRows.length - 1 ? 'border-b pb-2.5' : ''} ${index > 0 ? 'pt-2.5' : ''}`}
-                        style={{ borderColor: previewDesign.borderColor || '#d7e3ff' }}
+                        className={`grid grid-cols-[42px_8px_1fr] gap-1.5 ${index < previewIdentityRows.length - 1 ? 'border-b pb-1.5' : ''}`}
+                        style={{ borderColor: previewDesign.borderColor || '#d5dce4' }}
                       >
-                        <span className="text-[12px] font-black text-[var(--foreground)]">{row.label}</span>
-                        <span className="text-[12px] font-black text-[var(--foreground)]">:</span>
-                        <span className="text-[12px] font-semibold text-[var(--foreground)]">{row.value}</span>
+                        <span className="text-[9px] font-bold text-slate-900">{row.label}</span>
+                        <span className="text-[9px] font-bold text-slate-900">:</span>
+                        <span className="text-[9px] font-medium leading-[1.35] text-slate-700">{row.value}</span>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                <div className="mt-7 text-center">
-                  <p className="text-[13px] font-semibold leading-relaxed text-[var(--foreground)]">
-                    {previewDesign.subtitle || previewSpec.summary}
+                <div className="mt-4 shrink-0 border-t pt-4 text-center" style={{ borderColor: previewDesign.borderColor || '#d5dce4' }}>
+                  <p className="mx-auto max-w-[290px] text-[11px] leading-[1.75] text-slate-700">
+                    {previewStatement}
                   </p>
                 </div>
 
-                <div className="mt-6 overflow-hidden rounded-[14px] border bg-white" style={{ borderColor: previewDesign.borderColor || '#d7e3ff' }}>
-                  {previewSpec.detailRows.map((row, index) => (
+                <div
+                  className="mt-4 shrink-0 overflow-hidden bg-white"
+                  style={{ borderTop: `2px solid ${previewDesign.primaryColor || '#2d93a8'}`, borderBottom: `2px solid ${previewDesign.primaryColor || '#2d93a8'}` }}
+                >
+                  {previewDetailRows.map((row, index) => (
                     <div
                       key={row.label}
-                      className={`grid grid-cols-[96px_10px_1fr] gap-3 px-4 py-3 ${index < previewSpec.detailRows.length - 1 ? 'border-b' : ''}`}
-                      style={{ borderColor: previewDesign.borderColor || '#d7e3ff' }}
+                      className={`grid grid-cols-[74px_10px_1fr] gap-2 px-3 py-2.5 ${index < previewDetailRows.length - 1 ? 'border-b' : ''}`}
+                      style={{ borderColor: previewDesign.borderColor || '#d5dce4' }}
                     >
-                      <span className="text-[12px] font-black text-[var(--foreground)]">{row.label}</span>
-                      <span className="text-[12px] font-black text-[var(--foreground)]">:</span>
-                      <span className="text-[12px] font-semibold text-[var(--foreground)]">{row.value}</span>
+                      <span className="text-[10px] font-bold text-slate-900">{row.label}</span>
+                      <span className="text-[10px] font-bold text-slate-900">:</span>
+                      <span className="text-[10px] font-medium leading-[1.65] text-slate-700">{row.value}</span>
                     </div>
                   ))}
                 </div>
 
-                <div className="mt-9 flex items-end justify-center gap-5 border-t pt-5" style={{ borderColor: previewDesign.borderColor || '#d7e3ff' }}>
-                  <div className="text-center">
-                    <p className="text-[28px] font-black tracking-tight text-[var(--foreground)]">{previewDesign.companyLabel || 'SY INC.'}</p>
-                    <p className="mt-1 text-[11px] font-semibold text-[var(--toss-gray-3)]">{previewSpec.footerNote}</p>
+                <div className="mt-4 shrink-0 border-t pt-4 text-center" style={{ borderColor: previewDesign.borderColor || '#d5dce4' }}>
+                  <div className="space-y-1 text-[10px] text-slate-500">
+                    <p>{previewDateLabel} 2026년 3월 13일</p>
+                    <p>발급번호 {previewDocumentNumber}</p>
                   </div>
-                  {previewDesign.showSeal !== false && (
-                    <div className="relative flex h-20 w-20 items-center justify-center">
-                      <div
-                        className="absolute inset-2 rounded-full blur-xl"
-                        style={{ backgroundColor: alphaColor(previewDesign.primaryColor, 0.12) }}
-                      />
-                      <div
-                        className="relative flex h-20 w-20 items-center justify-center rounded-full border-4 border-double text-[11px] font-black leading-4 opacity-75"
-                        style={{ borderColor: alphaColor(previewDesign.primaryColor, 0.75), color: previewDesign.primaryColor || '#163b70' }}
-                      >
+                  <div className="mt-4 flex justify-center">
+                    <div className="relative inline-flex items-end pr-8">
+                      <p className="text-[24px] font-black tracking-[-0.03em] text-slate-900">
+                        {previewDesign.companyLabel || 'SY INC.'}
+                      </p>
+                    </div>
+                    {previewDesign.showSeal !== false && (
+                      <div className="-ml-5 flex h-[66px] w-[66px] items-center justify-center rounded-full border-[3px] border-double border-[#b42318] bg-white text-center text-[10px] font-black leading-4 text-[#b42318] opacity-80">
+                        회사
+                        <br />
                         직인
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
