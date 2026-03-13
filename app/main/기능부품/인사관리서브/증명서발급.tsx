@@ -117,12 +117,14 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
   const watermarkSrc = seals[companyName] || '/logo.png';
   const profilePhotoUrl = getProfilePhotoUrl(selectedStaff) || undefined;
   const joinedAt = selectedStaff?.joined_at || selectedStaff?.join_date;
-  const resignedAt = selectedStaff?.resigned_at;
-  const workPeriod = joinedAt
-    ? `${formatDateLabel(joinedAt)} ~ ${resignedAt ? formatDateLabel(resignedAt) : formatDateLabel(new Date().toISOString())}`
-    : '-';
-
   const totalPay = Number(selectedStaff?.base_salary || selectedStaff?.base || 0) + Number(selectedStaff?.meal_allowance || selectedStaff?.meal || 0);
+  const rankLabel = selectedStaff?.rank || selectedStaff?.grade || selectedStaff?.level || '-';
+  const dutyLabel =
+    selectedStaff?.duty ||
+    selectedStaff?.job_duty ||
+    selectedStaff?.responsibility ||
+    selectedStaff?.role ||
+    '-';
   const identityRows: Array<[string, string]> = [
     ['성명', selectedStaff?.name || '-'],
     ['사번', selectedStaff?.employee_no || String(selectedStaff?.id || '-')],
@@ -130,9 +132,10 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
     ['직위', selectedStaff?.position || '-'],
   ];
   const certificateRows: Array<[string, string]> = [
+    ['근무부서', selectedStaff?.department || '-'],
+    ['직위/직급', [selectedStaff?.position, rankLabel].filter(Boolean).join(' / ') || '-'],
     ['입사일자', formatDateLabel(joinedAt)],
-    ['재직기간', workPeriod],
-    ['사용용도', purpose || '-'],
+    ['담당업무', dutyLabel],
     ['발급일자', formatDateLabel(new Date().toISOString())],
     ['발급번호', serialNo || '__SERIAL__'],
     ...(certType === '급여지급증명서' || certType === '소득금액증명서' || certType === '원천징수영수증'
@@ -147,10 +150,10 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
     if (!win) return;
 
     const printStyles = `
-      @page { size: A4 portrait; margin: 12mm; }
+      @page { size: A4 portrait; margin: 8mm; }
       * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       body { margin: 0; background: #fff; color: #111827; font-family: 'Noto Sans KR', sans-serif; }
-      .document-root { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 18mm 16mm; }
+      .document-root { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 10mm 10mm; }
     `;
 
     win.document.write(`
@@ -204,53 +207,50 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
 
   const renderCertificatePaper = () => {
     const certificateTitle = selectedCertificate?.label || design.title || '재직증명서';
+    const closingText = certificateTitle.includes('재직')
+      ? '상기인은 아래와 같이 근무하고 있음을 증명합니다.'
+      : getClosingText(certificateTitle);
 
     return (
       <div
         ref={printRef}
-        className="relative mx-auto w-full max-w-[720px] overflow-hidden rounded-[18px] bg-white px-8 py-10 shadow-[0_20px_80px_rgba(15,23,42,0.08)] md:px-10"
+        className="relative mx-auto w-full max-w-[780px] overflow-hidden bg-white px-8 py-8 shadow-[0_20px_80px_rgba(15,23,42,0.08)]"
         style={{
           border: `1px solid ${borderColor}`,
-          background: `linear-gradient(180deg, #fbfbfa 0%, #ffffff 18%, ${alphaColor(primaryColor, 0.025)} 100%)`,
+          minHeight: '980px',
+          background: 'linear-gradient(180deg, #ffffff 0%, #fdfefe 78%, #f5f8fa 100%)',
         }}
       >
         <div className="pointer-events-none absolute inset-0">
-          <div
-            className="absolute inset-0 opacity-60"
-            style={{
-              backgroundImage:
-                'linear-gradient(rgba(15,23,42,0.018) 1px, transparent 1px), linear-gradient(90deg, rgba(15,23,42,0.018) 1px, transparent 1px)',
-              backgroundSize: '28px 28px',
-            }}
-          />
           <img
             src={watermarkSrc}
             alt=""
-            className="absolute left-1/2 top-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 object-contain opacity-[0.025] mix-blend-multiply"
+            className="absolute left-1/2 top-[52%] h-32 w-32 -translate-x-1/2 -translate-y-1/2 object-contain opacity-[0.06] mix-blend-multiply"
           />
         </div>
 
-        <div className="relative z-10">
-          <div className="flex items-end gap-5 border-b pb-6" style={{ borderColor }}>
-            <div className="flex h-[82px] w-[82px] items-center justify-center rounded-[16px] border bg-white shadow-sm" style={{ borderColor }}>
-              <img src="/logo.png" alt="" className="h-14 w-14 object-contain" />
+        <div className="relative z-10 flex h-full flex-col">
+          <div className="flex items-start gap-4">
+            <div
+              className="flex h-[72px] w-[72px] items-center justify-center rounded-[16px] bg-white"
+              style={{ border: `1px solid ${borderColor}` }}
+            >
+              <img src="/logo.png" alt="" className="h-11 w-11 object-contain" />
             </div>
-            <div className="min-w-0 flex-1">
-              {design.subtitle ? (
-                <p className="text-[10px] font-semibold tracking-[0.18em] text-[var(--toss-gray-3)]">{design.subtitle}</p>
-              ) : null}
-              <h3 className="mt-1 text-[40px] font-black tracking-tight text-[var(--foreground)]">{certificateTitle}</h3>
+            <div className="min-w-0 flex-1 pt-1">
+              <h3 className="mt-1 text-[34px] font-black tracking-[-0.04em] text-[var(--foreground)]">{certificateTitle}</h3>
             </div>
           </div>
 
-          <div
-            className="mt-2 h-[4px] rounded-full"
-            style={{ background: `linear-gradient(90deg, ${alphaColor(primaryColor, 0.95)} 0%, ${alphaColor(primaryColor, 0.45)} 100%)` }}
-          />
+          <div className="mt-4 h-[3px] w-full" style={{ backgroundColor: primaryColor }} />
 
-          <div className="mt-7 grid gap-6 md:grid-cols-[132px_1fr]">
-            <div className="rounded-[16px] border bg-white p-3" style={{ borderColor }}>
-              <div className="aspect-[3/4] overflow-hidden rounded-[12px]" style={{ backgroundColor: surface }}>
+          <div className="mt-5 grid gap-3 md:grid-cols-[86px_1fr]">
+            <div>
+              <div
+                className="overflow-hidden rounded-[4px] bg-white"
+                style={{ border: `1px solid ${borderColor}` }}
+              >
+                <div className="aspect-[3/4] overflow-hidden bg-[#eef2f6]" style={{ backgroundColor: profilePhotoUrl ? undefined : surface }}>
                 {profilePhotoUrl ? (
                   <img src={profilePhotoUrl} alt={selectedStaff?.name || '직원 사진'} className="h-full w-full object-cover" />
                 ) : (
@@ -259,67 +259,75 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
                   </div>
                 )}
               </div>
-              <p className="mt-2 text-center text-[11px] font-semibold text-[var(--toss-gray-3)]">사진</p>
+              </div>
+              <p className="mt-1 text-center text-[8px] font-medium text-[var(--toss-gray-3)]">사진</p>
             </div>
 
-            <div className="rounded-[16px] border bg-white px-5 py-4" style={{ borderColor }}>
+            <div className="space-y-1 pt-0.5">
               {identityRows.map(([label, value], index) => (
                 <div
                   key={label}
-                  className={`grid grid-cols-[84px_18px_1fr] items-start gap-2.5 ${index < identityRows.length - 1 ? 'border-b pb-3' : ''} ${index > 0 ? 'pt-3' : ''}`}
+                  className={`grid grid-cols-[42px_8px_1fr] items-start gap-1.5 ${index < identityRows.length - 1 ? 'border-b pb-1.5' : ''}`}
                   style={{ borderColor }}
                 >
-                  <span className="text-[13px] font-black text-[var(--foreground)]">{label}</span>
-                  <span className="text-[13px] font-black text-[var(--foreground)]">:</span>
-                  <span className="text-[13px] font-semibold text-[var(--foreground)]">{value}</span>
+                  <span className="text-[9px] font-bold text-[var(--foreground)]">{label}</span>
+                  <span className="text-[9px] font-bold text-[var(--foreground)]">:</span>
+                  <span className="text-[9px] font-medium leading-[1.35] text-[var(--foreground)]">{value}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="mt-8 text-center">
-            <p className="text-[15px] font-semibold leading-relaxed text-[var(--foreground)]">
-              {getClosingText(certificateTitle)}
+          <div className="mt-6 text-center">
+            <p className="text-[14px] font-semibold leading-relaxed text-[var(--foreground)]">
+              {closingText}
             </p>
             {design.footerText ? (
               <p className="mt-3 text-[12px] leading-relaxed text-[var(--toss-gray-3)]">{design.footerText}</p>
             ) : null}
           </div>
 
-          <div className="mt-6 overflow-hidden rounded-[16px] border bg-white" style={{ borderColor }}>
+          <div
+            className="mt-5 overflow-hidden bg-white"
+            style={{
+              borderTop: `2px solid ${primaryColor}`,
+              borderBottom: `2px solid ${primaryColor}`,
+            }}
+          >
             {certificateRows.map(([label, value], index) => (
               <div
                 key={label}
-                className={`grid grid-cols-[108px_18px_1fr] items-start gap-3 px-5 py-3 ${index < certificateRows.length - 1 ? 'border-b' : ''}`}
+                className={`grid grid-cols-[92px_14px_1fr] items-start gap-2 px-4 py-2.5 ${index < certificateRows.length - 1 ? 'border-b' : ''}`}
                 style={{ borderColor }}
               >
-                <span className="text-[13px] font-black text-[var(--foreground)]">{label}</span>
-                <span className="text-[13px] font-black text-[var(--foreground)]">:</span>
-                <span className="text-[13px] font-semibold text-[var(--foreground)]">{value}</span>
+                <span className="text-[11px] font-bold text-[var(--foreground)]">{label}</span>
+                <span className="text-[11px] font-bold text-[var(--foreground)]">:</span>
+                <span className="text-[11px] font-medium leading-[1.65] text-[var(--foreground)]">{value}</span>
               </div>
             ))}
           </div>
 
           {design.showSignArea ? (
-            <div className="mt-10 flex justify-center border-t pt-6" style={{ borderColor }}>
-              <div className="flex items-end gap-5">
-                <div className="text-center">
-                  <p className="text-3xl font-black tracking-tight text-[var(--foreground)]">{companyLabel}</p>
-                  <p className="mt-1 text-[11px] font-semibold text-[var(--toss-gray-3)]">대표자 / 직인</p>
+            <div className="mt-auto pt-8 text-center">
+              <p className="text-[12px] text-[var(--toss-gray-3)]">발급일자 {formatDateLabel(new Date().toISOString())}</p>
+              <div className="mt-4 flex justify-center">
+                <div className="relative inline-flex items-end pr-8">
+                  <div className="text-center">
+                    <p className="text-[34px] font-black tracking-[-0.03em] text-[var(--foreground)]">{companyLabel}</p>
+                    <p className="mt-1 text-[12px] font-medium text-[var(--toss-gray-3)]">대표자 / 직인</p>
+                  </div>
                 </div>
-                <div className="relative flex h-20 w-20 items-center justify-center">
-                  <div
-                    className="absolute inset-2 rounded-full blur-xl"
-                    style={{ backgroundColor: alphaColor(primaryColor, 0.12) }}
-                  />
+                <div className="-ml-5 relative flex h-[72px] w-[72px] items-center justify-center">
                   {seals[companyName] ? (
                     <img
                       src={seals[companyName]}
                       alt="seal"
-                      className="relative h-20 w-20 rotate-12 object-contain opacity-95 mix-blend-multiply"
+                      className="relative h-[72px] w-[72px] rotate-12 object-contain opacity-95 mix-blend-multiply"
                     />
                   ) : (
-                    <div className="relative flex h-20 w-20 items-center justify-center rounded-full border-4 border-double border-red-600 text-[12px] font-black text-red-600 opacity-70">
+                    <div className="relative flex h-[72px] w-[72px] items-center justify-center rounded-full border-[3px] border-double border-red-700 text-center text-[10px] font-black leading-4 text-red-700 opacity-80">
+                      회사
+                      <br />
                       직인
                     </div>
                   )}
