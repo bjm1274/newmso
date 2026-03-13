@@ -115,7 +115,7 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
   const borderColor = design.borderColor;
   const surface = alphaColor(primaryColor, 0.08);
   const watermarkSrc = seals[companyName] || '/logo.png';
-  const profilePhotoUrl = getProfilePhotoUrl(selectedStaff);
+  const profilePhotoUrl = getProfilePhotoUrl(selectedStaff) || undefined;
   const joinedAt = selectedStaff?.joined_at || selectedStaff?.join_date;
   const resignedAt = selectedStaff?.resigned_at;
   const workPeriod = joinedAt
@@ -200,6 +200,136 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
     }
 
     setTimeout(() => openPrintWindow(nextSerial), 80);
+  };
+
+  const renderCertificatePaper = () => {
+    const certificateTitle = selectedCertificate?.label || design.title || '재직증명서';
+
+    return (
+      <div
+        ref={printRef}
+        className="relative mx-auto w-full max-w-[720px] overflow-hidden rounded-[18px] bg-white px-8 py-10 shadow-[0_20px_80px_rgba(15,23,42,0.08)] md:px-10"
+        style={{
+          border: `1px solid ${borderColor}`,
+          background: `linear-gradient(180deg, #fbfbfa 0%, #ffffff 18%, ${alphaColor(primaryColor, 0.025)} 100%)`,
+        }}
+      >
+        <div className="pointer-events-none absolute inset-0">
+          <div
+            className="absolute inset-0 opacity-60"
+            style={{
+              backgroundImage:
+                'linear-gradient(rgba(15,23,42,0.018) 1px, transparent 1px), linear-gradient(90deg, rgba(15,23,42,0.018) 1px, transparent 1px)',
+              backgroundSize: '28px 28px',
+            }}
+          />
+          <img
+            src={watermarkSrc}
+            alt=""
+            className="absolute left-1/2 top-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 object-contain opacity-[0.025] mix-blend-multiply"
+          />
+        </div>
+
+        <div className="relative z-10">
+          <div className="flex items-end gap-5 border-b pb-6" style={{ borderColor }}>
+            <div className="flex h-[82px] w-[82px] items-center justify-center rounded-[16px] border bg-white shadow-sm" style={{ borderColor }}>
+              <img src="/logo.png" alt="" className="h-14 w-14 object-contain" />
+            </div>
+            <div className="min-w-0 flex-1">
+              {design.subtitle ? (
+                <p className="text-[10px] font-semibold tracking-[0.18em] text-[var(--toss-gray-3)]">{design.subtitle}</p>
+              ) : null}
+              <h3 className="mt-1 text-[40px] font-black tracking-tight text-[var(--foreground)]">{certificateTitle}</h3>
+            </div>
+          </div>
+
+          <div
+            className="mt-2 h-[4px] rounded-full"
+            style={{ background: `linear-gradient(90deg, ${alphaColor(primaryColor, 0.95)} 0%, ${alphaColor(primaryColor, 0.45)} 100%)` }}
+          />
+
+          <div className="mt-7 grid gap-6 md:grid-cols-[132px_1fr]">
+            <div className="rounded-[16px] border bg-white p-3" style={{ borderColor }}>
+              <div className="aspect-[3/4] overflow-hidden rounded-[12px]" style={{ backgroundColor: surface }}>
+                {profilePhotoUrl ? (
+                  <img src={profilePhotoUrl} alt={selectedStaff?.name || '직원 사진'} className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-4xl font-black text-[var(--toss-gray-3)]">
+                    {String(selectedStaff?.name || '?').slice(0, 1)}
+                  </div>
+                )}
+              </div>
+              <p className="mt-2 text-center text-[11px] font-semibold text-[var(--toss-gray-3)]">사진</p>
+            </div>
+
+            <div className="rounded-[16px] border bg-white px-5 py-4" style={{ borderColor }}>
+              {identityRows.map(([label, value], index) => (
+                <div
+                  key={label}
+                  className={`grid grid-cols-[84px_18px_1fr] items-start gap-2.5 ${index < identityRows.length - 1 ? 'border-b pb-3' : ''} ${index > 0 ? 'pt-3' : ''}`}
+                  style={{ borderColor }}
+                >
+                  <span className="text-[13px] font-black text-[var(--foreground)]">{label}</span>
+                  <span className="text-[13px] font-black text-[var(--foreground)]">:</span>
+                  <span className="text-[13px] font-semibold text-[var(--foreground)]">{value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-8 text-center">
+            <p className="text-[15px] font-semibold leading-relaxed text-[var(--foreground)]">
+              {getClosingText(certificateTitle)}
+            </p>
+            {design.footerText ? (
+              <p className="mt-3 text-[12px] leading-relaxed text-[var(--toss-gray-3)]">{design.footerText}</p>
+            ) : null}
+          </div>
+
+          <div className="mt-6 overflow-hidden rounded-[16px] border bg-white" style={{ borderColor }}>
+            {certificateRows.map(([label, value], index) => (
+              <div
+                key={label}
+                className={`grid grid-cols-[108px_18px_1fr] items-start gap-3 px-5 py-3 ${index < certificateRows.length - 1 ? 'border-b' : ''}`}
+                style={{ borderColor }}
+              >
+                <span className="text-[13px] font-black text-[var(--foreground)]">{label}</span>
+                <span className="text-[13px] font-black text-[var(--foreground)]">:</span>
+                <span className="text-[13px] font-semibold text-[var(--foreground)]">{value}</span>
+              </div>
+            ))}
+          </div>
+
+          {design.showSignArea ? (
+            <div className="mt-10 flex justify-center border-t pt-6" style={{ borderColor }}>
+              <div className="flex items-end gap-5">
+                <div className="text-center">
+                  <p className="text-3xl font-black tracking-tight text-[var(--foreground)]">{companyLabel}</p>
+                  <p className="mt-1 text-[11px] font-semibold text-[var(--toss-gray-3)]">대표자 / 직인</p>
+                </div>
+                <div className="relative flex h-20 w-20 items-center justify-center">
+                  <div
+                    className="absolute inset-2 rounded-full blur-xl"
+                    style={{ backgroundColor: alphaColor(primaryColor, 0.12) }}
+                  />
+                  {seals[companyName] ? (
+                    <img
+                      src={seals[companyName]}
+                      alt="seal"
+                      className="relative h-20 w-20 rotate-12 object-contain opacity-95 mix-blend-multiply"
+                    />
+                  ) : (
+                    <div className="relative flex h-20 w-20 items-center justify-center rounded-full border-4 border-double border-red-600 text-[12px] font-black text-red-600 opacity-70">
+                      직인
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -311,7 +441,7 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
         </div>
 
         <div className="rounded-[28px] border border-[var(--toss-border)] bg-white p-6 shadow-sm md:p-10">
-          {selectedStaff ? (
+          {selectedStaff ? renderCertificatePaper() : false ? (
             <div
               ref={printRef}
               className="relative mx-auto w-full max-w-[720px] overflow-hidden rounded-[28px] p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)] md:p-10"
