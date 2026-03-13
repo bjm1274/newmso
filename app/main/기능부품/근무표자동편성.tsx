@@ -48,9 +48,11 @@ const SHIFT_META_MARKER = '[SHIFT_META]';
 const CUSTOM_PATTERN_VALUE = '커스텀';
 const WEEKLY_TEMPLATE_PATTERN_VALUE = '주차템플릿';
 const ROSTER_WIZARD_PRESET_STORAGE_KEY = 'erp_roster_wizard_presets_v1';
+const ROSTER_PREFERRED_OFF_STORAGE_PREFIX = 'erp_roster_preferred_off_v1';
 const WEEKDAY_PICKER_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
 type ManualAssignmentMap = Record<string, string>;
+type PreferredOffSelectionMap = Record<string, string[]>;
 type WizardStep = 1 | 2 | 3 | 4;
 
 const PATTERN_OPTIONS = [
@@ -157,6 +159,25 @@ type GeminiRosterRecommendation = {
   summary?: string;
   teamAnalysis?: GeminiTeamAnalysis;
   staffPlans?: GeminiRosterStaffPlan[];
+  leaveSummary?: string;
+  preferredOffSummary?: string;
+};
+
+type PlannerResolvedPatternGroup = {
+  key: string;
+  label: string;
+  mode: RosterPatternGroupMode;
+  shiftIds: string[];
+  rationale: string;
+  source: 'profile' | 'auto';
+};
+
+type PlannerPatternPreviewGroup = {
+  key: string;
+  label: string;
+  mode: RosterPatternGroupMode;
+  count: number;
+  source: 'profile' | 'auto' | 'default';
 };
 
 type PreviewCell = {
@@ -209,6 +230,129 @@ function getMonthDates(month: string) {
   );
 }
 
+function formatDateKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
+    date.getDate()
+  ).padStart(2, '0')}`;
+}
+
+function collectDateRangeWithinMonth(startDate: string, endDate: string, monthDateSet: Set<string>) {
+  if (!startDate) return [];
+
+  const start = new Date(`${startDate}T00:00:00`);
+  const end = new Date(`${endDate || startDate}T00:00:00`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return [];
+
+  const rangeStart = start.getTime() <= end.getTime() ? start : end;
+  const rangeEnd = start.getTime() <= end.getTime() ? end : start;
+  const dates: string[] = [];
+  const cursor = new Date(rangeStart);
+
+  while (cursor.getTime() <= rangeEnd.getTime()) {
+    const dateKey = formatDateKey(cursor);
+    if (monthDateSet.has(dateKey)) {
+      dates.push(dateKey);
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return dates;
+}
+
+function buildBlockedDatesByStaff(
+  leaveRequests: Array<{ staff_id: string; start_date: string; end_date: string }>,
+  monthDateSet: Set<string>
+) {
+  const blockedDatesByStaff = new Map<string, Set<string>>();
+
+  leaveRequests.forEach((leave) => {
+    const staffId = String(leave.staff_id || '');
+    if (!staffId) return;
+
+    const blockedDates = collectDateRangeWithinMonth(
+      String(leave.start_date || ''),
+      String(leave.end_date || ''),
+      monthDateSet
+    );
+    if (blockedDates.length === 0) return;
+
+    const existing = blockedDatesByStaff.get(staffId) || new Set<string>();
+    blockedDates.forEach((date) => existing.add(date));
+    blockedDatesByStaff.set(staffId, existing);
+  });
+
+  return blockedDatesByStaff;
+}
+
+function countBlockedDateEntries(blockedDatesByStaff: Map<string, Set<string>>) {
+  return Array.from(blockedDatesByStaff.values()).reduce(
+    (sum, blockedDates) => sum + blockedDates.size,
+    0
+  );
+}
+
+function mergeBlockedDateMaps(...maps: Array<Map<string, Set<string>>>) {
+  const merged = new Map<string, Set<string>>();
+
+  maps.forEach((currentMap) => {
+    currentMap.forEach((blockedDates, staffId) => {
+      const nextDates = merged.get(staffId) || new Set<string>();
+      blockedDates.forEach((date) => nextDates.add(date));
+      merged.set(staffId, nextDates);
+    });
+  });
+
+  return merged;
+}
+
+function buildPreferredOffStorageKey(companyName: string, department: string, month: string) {
+  return [
+    ROSTER_PREFERRED_OFF_STORAGE_PREFIX,
+    companyName || 'all-companies',
+    department || 'all-departments',
+    month || 'all-months',
+  ].join('::');
+}
+
+function normalizePreferredOffSelections(value: unknown, monthDateSet: Set<string>) {
+  if (!value || typeof value !== 'object') return {} as PreferredOffSelectionMap;
+
+  const normalized: PreferredOffSelectionMap = {};
+
+  Object.entries(value as Record<string, unknown>).forEach(([staffId, rawDates]) => {
+    if (!Array.isArray(rawDates)) return;
+
+    const dates = [...new Set(rawDates.map((date) => String(date || '').trim()))]
+      .filter((date) => monthDateSet.has(date))
+      .sort();
+
+    if (dates.length > 0) {
+      normalized[String(staffId)] = dates;
+    }
+  });
+
+  return normalized;
+}
+
+function buildPreferredOffDateMap(
+  preferredOffSelections: PreferredOffSelectionMap,
+  validStaffIds: Set<string>,
+  monthDateSet: Set<string>
+) {
+  const preferredOffByStaff = new Map<string, Set<string>>();
+
+  Object.entries(preferredOffSelections).forEach(([staffId, dates]) => {
+    if (!validStaffIds.has(staffId)) return;
+
+    const filteredDates = dates.filter((date) => monthDateSet.has(date));
+    if (filteredDates.length === 0) return;
+
+    preferredOffByStaff.set(staffId, new Set(filteredDates));
+  });
+
+  return preferredOffByStaff;
+}
+
 function normalizeAiAssignments(
   assignments: string[] | undefined,
   monthDates: string[],
@@ -241,7 +385,32 @@ const THREE_SHIFT_PATTERN_KEYWORDS = ['3\uad50\ub300', '3shift', '3-shift'];
 const TWO_SHIFT_PATTERN_KEYWORDS = ['2\uad50\ub300', '2shift', '2-shift'];
 const TWO_WORK_ONE_OFF_PATTERN_KEYWORDS = ['2\uc77c\uadfc\ubb341\uc77c\ud734\ubb34'];
 const ONE_WORK_ONE_OFF_PATTERN_KEYWORDS = ['1\uc77c\uadfc\ubb341\uc77c\ud734\ubb34'];
-const NIGHT_DEDICATED_PATTERN_KEYWORDS = ['\uc57c\uac04\uc804\ub2f4'];
+const DAY_DEDICATED_PATTERN_KEYWORDS = [
+  '\uB370\uC774\uC804\uB2F4',
+  '\uC8FC\uAC04\uC804\uB2F4',
+  '\uC8FC\uAC04\uACE0\uC815',
+  'daydedicated',
+  'dayfixed',
+  'dayonly',
+];
+const EVENING_DEDICATED_PATTERN_KEYWORDS = [
+  '\uC774\uBE0C\uC804\uB2F4',
+  '\uC774\uBE0C\uB2DD\uC804\uB2F4',
+  '\uC774\uBE0C\uACE0\uC815',
+  'eveningdedicated',
+  'eveningfixed',
+  'evefixed',
+  'eveonly',
+];
+const NIGHT_DEDICATED_PATTERN_KEYWORDS = [
+  '\uB098\uC774\uD2B8\uC804\uB2F4',
+  '\uC57C\uAC04\uC804\uB2F4',
+  '\uC57C\uAC04\uACE0\uC815',
+  'nightdedicated',
+  'nightfixed',
+  'nightonly',
+];
+const FIXED_PATTERN_KEYWORDS = ['\uC804\uB2F4', '\uACE0\uC815', 'fixed', 'dedicated', 'only'];
 const MANAGEMENT_TEAM_KEYWORDS = ['관리팀', '시설관리', '환경관리'];
 const WARD_TEAM_KEYWORDS = ['병동', '입원', '간호', 'ward'];
 const OUTPATIENT_TEAM_KEYWORDS = ['외래', '검사', '원무', 'opd', 'outpatient'];
@@ -352,6 +521,16 @@ function getTeamRecommendationCategory(department: string) {
   }
 
   return 'general';
+}
+
+function getDefaultPlannerMode(
+  teamRecommendationCategory: ReturnType<typeof getTeamRecommendationCategory>
+): RosterPatternGroupMode {
+  if (teamRecommendationCategory === 'management' || teamRecommendationCategory === 'outpatient') {
+    return 'day_fixed';
+  }
+
+  return 'rotation';
 }
 
 function recommendShiftIdsForTeam(department: string, shifts: WorkShift[]) {
@@ -476,17 +655,21 @@ function buildProgrammaticAssignments({
   cycle,
   staffIndex,
   mode,
+  blockedDateSet,
 }: {
   monthDates: string[];
   shiftMap: Map<string, WorkShift>;
   cycle: string[];
   staffIndex: number;
   mode: RosterPatternGroupMode;
+  blockedDateSet?: Set<string>;
 }) {
   const cycleLength = Math.max(cycle.length, 1);
   const offset = mode === 'rotation' ? (staffIndex * 2) % cycleLength : staffIndex % cycleLength;
 
   return monthDates.map((date, index) => {
+    if (blockedDateSet?.has(date)) return OFF_SHIFT_TOKEN;
+
     const token = cycle[(index + offset) % cycleLength] || OFF_SHIFT_TOKEN;
     if (token === OFF_SHIFT_TOKEN) return OFF_SHIFT_TOKEN;
 
@@ -501,8 +684,67 @@ function buildProgrammaticAssignments({
       return OFF_SHIFT_TOKEN;
     }
 
-    return token;
+  return token;
   });
+}
+
+function getAssignedShiftBand(token: string, shiftMap: Map<string, WorkShift>) {
+  if (!token || token === OFF_SHIFT_TOKEN) return null;
+  const shift = shiftMap.get(token);
+  if (!shift) return null;
+  return resolveShiftBand(shift);
+}
+
+function countPreviousBandStreak(
+  assignments: string[],
+  index: number,
+  shiftMap: Map<string, WorkShift>
+) {
+  if (index <= 0) return 0;
+
+  const previousBand = getAssignedShiftBand(assignments[index - 1], shiftMap);
+  if (!previousBand) return 0;
+
+  let streak = 0;
+  for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+    if (getAssignedShiftBand(assignments[cursor], shiftMap) !== previousBand) {
+      break;
+    }
+    streak += 1;
+  }
+
+  return streak;
+}
+
+function countPreviousWorkStreak(assignments: string[], index: number) {
+  if (index <= 0) return 0;
+
+  let streak = 0;
+  for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+    if (!assignments[cursor] || assignments[cursor] === OFF_SHIFT_TOKEN) {
+      break;
+    }
+    streak += 1;
+  }
+
+  return streak;
+}
+
+function canStillMeetMinimumStaffing({
+  projectedCounts,
+  minStaffingTargets,
+  remainingStaff,
+}: {
+  projectedCounts: Record<'day' | 'evening' | 'night', number>;
+  minStaffingTargets: Record<'day' | 'evening' | 'night', number>;
+  remainingStaff: number;
+}) {
+  const requiredRemaining =
+    Math.max(0, minStaffingTargets.day - projectedCounts.day) +
+    Math.max(0, minStaffingTargets.evening - projectedCounts.evening) +
+    Math.max(0, minStaffingTargets.night - projectedCounts.night);
+
+  return requiredRemaining <= remainingStaff;
 }
 
 function buildFallbackGenerationRuleForDepartment(
@@ -520,6 +762,8 @@ function buildFallbackGenerationRuleForDepartment(
     rotationNightCount: category === 'ward' ? Math.max(4, Math.round(days / 5)) : 0,
     offDaysAfterNight: category === 'ward' ? 1 : 0,
     nightBlockSize: category === 'ward' ? 2 : 1,
+    maxConsecutiveWorkDays: category === 'ward' ? 5 : 6,
+    distributeWeekendShifts: category === 'ward',
   };
 }
 
@@ -530,6 +774,9 @@ function buildRuleAwareRotationAssignments({
   staffIndex,
   rule,
   sharedDailyBandCounts,
+  totalStaffCount,
+  weekendAssignmentCounts,
+  blockedDateSet,
 }: {
   monthDates: string[];
   shiftMap: Map<string, WorkShift>;
@@ -537,6 +784,9 @@ function buildRuleAwareRotationAssignments({
   staffIndex: number;
   rule: RosterGenerationRule;
   sharedDailyBandCounts?: Array<Record<'day' | 'evening' | 'night', number>>;
+  totalStaffCount: number;
+  weekendAssignmentCounts?: number[];
+  blockedDateSet?: Set<string>;
 }) {
   const sortedShiftIds = sortShifts(
     shiftIds.map((shiftId) => shiftMap.get(shiftId)).filter((shift): shift is WorkShift => Boolean(shift))
@@ -562,11 +812,19 @@ function buildRuleAwareRotationAssignments({
       cycle: fallbackCycle,
       staffIndex,
       mode: 'rotation',
+      blockedDateSet,
     });
   }
 
   const days = monthDates.length;
   const assignments = Array.from({ length: days }, () => '');
+  if (blockedDateSet?.size) {
+    monthDates.forEach((date, index) => {
+      if (blockedDateSet.has(date)) {
+        assignments[index] = OFF_SHIFT_TOKEN;
+      }
+    });
+  }
   const dayBandCounts =
     sharedDailyBandCounts ||
     Array.from({ length: days }, () => ({
@@ -574,9 +832,20 @@ function buildRuleAwareRotationAssignments({
       evening: 0,
       night: 0,
     }));
-  const targetNightCount = clampNightShiftCount(rule.rotationNightCount, days);
+  const averageNightLoadForMinimum =
+    totalStaffCount > 0 ? Math.ceil((days * Math.max(0, rule.minNightStaff || 0)) / totalStaffCount) : 0;
+  const targetNightCount = clampNightShiftCount(
+    Math.max(rule.rotationNightCount, averageNightLoadForMinimum),
+    days
+  );
   const nightBlockSize = Math.max(1, Math.min(3, Math.floor(rule.nightBlockSize || 1)));
   const offDaysAfterNight = Math.max(0, Math.min(3, Math.floor(rule.offDaysAfterNight || 0)));
+  const maxConsecutiveWorkDays = Math.max(2, Math.min(7, Math.floor(rule.maxConsecutiveWorkDays || 5)));
+  const minStaffingTargets = {
+    day: Math.max(0, Math.floor(rule.minDayStaff || 0)),
+    evening: Math.max(0, Math.floor(rule.minEveningStaff || 0)),
+    night: Math.max(0, Math.floor(rule.minNightStaff || 0)),
+  } satisfies Record<'day' | 'evening' | 'night', number>;
 
   if (targetNightCount > 0) {
     const blockCount = Math.ceil(targetNightCount / nightBlockSize);
@@ -651,6 +920,11 @@ function buildRuleAwareRotationAssignments({
     evening: 0,
     night: assignments.filter((token) => token === nightShiftId).length,
   };
+  let weekendWorkCount = assignments.reduce((count, token, index) => {
+    if (!token || token === OFF_SHIFT_TOKEN) return count;
+    const dayOfWeek = new Date(`${monthDates[index]}T00:00:00`).getDay();
+    return dayOfWeek === 0 || dayOfWeek === 6 ? count + 1 : count;
+  }, 0);
 
   const preferredFillOrder =
     rule.balanceRotationBands && staffIndex % 2 === 1
@@ -659,10 +933,19 @@ function buildRuleAwareRotationAssignments({
 
   for (let index = 0; index < days; index += 1) {
     if (assignments[index]) continue;
+    if (blockedDateSet?.has(monthDates[index])) {
+      assignments[index] = OFF_SHIFT_TOKEN;
+      continue;
+    }
 
     const date = monthDates[index];
     const dayOfWeek = new Date(`${date}T00:00:00`).getDay();
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
     const previousToken = index > 0 ? assignments[index - 1] : '';
+    const previousBand = getAssignedShiftBand(previousToken, shiftMap);
+    const previousBandStreak = countPreviousBandStreak(assignments, index, shiftMap);
+    const previousWorkStreak = countPreviousWorkStreak(assignments, index);
+    const remainingStaff = Math.max(totalStaffCount - staffIndex - 1, 0);
     let candidates = preferredFillOrder.filter(Boolean);
 
     candidates = candidates.filter((shiftId) => {
@@ -679,31 +962,161 @@ function buildRuleAwareRotationAssignments({
       );
     }
 
+    const projectedOffCounts = {
+      day: dayBandCounts[index]?.day || 0,
+      evening: dayBandCounts[index]?.evening || 0,
+      night: dayBandCounts[index]?.night || 0,
+    };
+    const offIsFeasible = canStillMeetMinimumStaffing({
+      projectedCounts: projectedOffCounts,
+      minStaffingTargets,
+      remainingStaff,
+    });
+
+    if (previousWorkStreak >= maxConsecutiveWorkDays && offIsFeasible) {
+      assignments[index] = OFF_SHIFT_TOKEN;
+      continue;
+    }
+
+    if (rule.distributeWeekendShifts && isWeekend && offIsFeasible && weekendAssignmentCounts?.length) {
+      const lowestWeekendLoad = Math.min(...weekendAssignmentCounts);
+      if (weekendWorkCount > lowestWeekendLoad) {
+        assignments[index] = OFF_SHIFT_TOKEN;
+        continue;
+      }
+    }
+
     if (candidates.length === 0) {
       assignments[index] = OFF_SHIFT_TOKEN;
       continue;
     }
 
-    const orderedCandidates = rule.balanceRotationBands
-      ? [...candidates].sort((left, right) => {
-          const leftBand = resolveShiftBand(shiftMap.get(left)!);
-          const rightBand = resolveShiftBand(shiftMap.get(right)!);
-          const sharedCountDiff =
-            (dayBandCounts[index]?.[leftBand as 'day' | 'evening' | 'night'] || 0) -
-            (dayBandCounts[index]?.[rightBand as 'day' | 'evening' | 'night'] || 0);
-          if (sharedCountDiff !== 0) return sharedCountDiff;
-          const personalCountDiff =
-            (bandCounts[leftBand as 'day' | 'evening' | 'night'] || 0) -
-            (bandCounts[rightBand as 'day' | 'evening' | 'night'] || 0);
-          if (personalCountDiff !== 0) return personalCountDiff;
+    const orderedCandidates = [...candidates].sort((left, right) => {
+        const leftBand = resolveShiftBand(shiftMap.get(left)!);
+        const rightBand = resolveShiftBand(shiftMap.get(right)!);
+        const currentCounts = dayBandCounts[index] || { day: 0, evening: 0, night: 0 };
+        const leftProjectedCounts = {
+          ...currentCounts,
+          [leftBand]: (currentCounts[leftBand as 'day' | 'evening' | 'night'] || 0) + 1,
+        };
+        const rightProjectedCounts = {
+          ...currentCounts,
+          [rightBand]: (currentCounts[rightBand as 'day' | 'evening' | 'night'] || 0) + 1,
+        };
+        const leftFeasible = canStillMeetMinimumStaffing({
+          projectedCounts: leftProjectedCounts,
+          minStaffingTargets,
+          remainingStaff,
+        });
+        const rightFeasible = canStillMeetMinimumStaffing({
+          projectedCounts: rightProjectedCounts,
+          minStaffingTargets,
+          remainingStaff,
+        });
+
+        if (leftFeasible !== rightFeasible) {
+          return leftFeasible ? -1 : 1;
+        }
+
+        const leftUrgency = Math.max(
+          0,
+          minStaffingTargets[leftBand as 'day' | 'evening' | 'night'] -
+            (currentCounts[leftBand as 'day' | 'evening' | 'night'] || 0)
+        );
+        const rightUrgency = Math.max(
+          0,
+          minStaffingTargets[rightBand as 'day' | 'evening' | 'night'] -
+            (currentCounts[rightBand as 'day' | 'evening' | 'night'] || 0)
+        );
+        if (leftUrgency !== rightUrgency) {
+          return rightUrgency - leftUrgency;
+        }
+
+        if (previousBand && previousBand !== 'night') {
+          const continuityTarget = 2;
+          const leftKeepsBlock = leftBand === previousBand;
+          const rightKeepsBlock = rightBand === previousBand;
+          const preferKeepingBlock = previousBandStreak < continuityTarget;
+
+          if (leftKeepsBlock !== rightKeepsBlock) {
+            if (preferKeepingBlock) {
+              return leftKeepsBlock ? -1 : 1;
+            }
+            return leftKeepsBlock ? 1 : -1;
+          }
+        }
+
+        if (!rule.balanceRotationBands) {
           return preferredFillOrder.indexOf(left) - preferredFillOrder.indexOf(right);
-        })
-      : candidates;
+        }
+
+        const sharedCountDiff =
+          (dayBandCounts[index]?.[leftBand as 'day' | 'evening' | 'night'] || 0) -
+          (dayBandCounts[index]?.[rightBand as 'day' | 'evening' | 'night'] || 0);
+        if (sharedCountDiff !== 0) return sharedCountDiff;
+
+        const personalCountDiff =
+          (bandCounts[leftBand as 'day' | 'evening' | 'night'] || 0) -
+          (bandCounts[rightBand as 'day' | 'evening' | 'night'] || 0);
+        if (personalCountDiff !== 0) return personalCountDiff;
+
+        return preferredFillOrder.indexOf(left) - preferredFillOrder.indexOf(right);
+      });
 
     assignments[index] = orderedCandidates[0];
     const assignedBand = resolveShiftBand(shiftMap.get(orderedCandidates[0])!);
     bandCounts[assignedBand as 'day' | 'evening' | 'night'] += 1;
     dayBandCounts[index][assignedBand as 'day' | 'evening' | 'night'] += 1;
+    if (isWeekend) {
+      weekendWorkCount += 1;
+    }
+  }
+
+  let finalWorkStreak = 0;
+  const remainingStaff = Math.max(totalStaffCount - staffIndex - 1, 0);
+  for (let index = 0; index < days; index += 1) {
+    const token = assignments[index] || OFF_SHIFT_TOKEN;
+    if (!token || token === OFF_SHIFT_TOKEN) {
+      finalWorkStreak = 0;
+      continue;
+    }
+
+    finalWorkStreak += 1;
+    if (finalWorkStreak <= maxConsecutiveWorkDays) continue;
+
+    const assignedBand = getAssignedShiftBand(token, shiftMap);
+    if (!assignedBand) continue;
+
+    const currentCounts = dayBandCounts[index] || { day: 0, evening: 0, night: 0 };
+    const projectedCounts = {
+      ...currentCounts,
+      [assignedBand]: Math.max(0, (currentCounts[assignedBand as 'day' | 'evening' | 'night'] || 0) - 1),
+    };
+    const canRestHere = canStillMeetMinimumStaffing({
+      projectedCounts,
+      minStaffingTargets,
+      remainingStaff,
+    });
+    if (!canRestHere) continue;
+
+    assignments[index] = OFF_SHIFT_TOKEN;
+    dayBandCounts[index][assignedBand as 'day' | 'evening' | 'night'] = Math.max(
+      0,
+      (dayBandCounts[index][assignedBand as 'day' | 'evening' | 'night'] || 0) - 1
+    );
+    bandCounts[assignedBand as 'day' | 'evening' | 'night'] = Math.max(
+      0,
+      (bandCounts[assignedBand as 'day' | 'evening' | 'night'] || 0) - 1
+    );
+    const dayOfWeek = new Date(`${monthDates[index]}T00:00:00`).getDay();
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      weekendWorkCount = Math.max(0, weekendWorkCount - 1);
+    }
+    finalWorkStreak = 0;
+  }
+
+  if (weekendAssignmentCounts) {
+    weekendAssignmentCounts[staffIndex] = weekendWorkCount;
   }
 
   return assignments.map((token) => token || OFF_SHIFT_TOKEN);
@@ -748,6 +1161,153 @@ function inferPattern(staff: any, shifts: WorkShift[]) {
   }
   if (shifts.length >= 3) return '3교대';
   return '상근';
+}
+
+function getBandShiftIds(
+  band: 'day' | 'evening' | 'night',
+  shifts: WorkShift[],
+  preferredShiftId = ''
+) {
+  const bandShiftIds = sortShifts(shifts.filter((shift) => resolveShiftBand(shift) === band)).map(
+    (shift) => shift.id
+  );
+
+  if (preferredShiftId && bandShiftIds.includes(preferredShiftId)) {
+    return [preferredShiftId, ...bandShiftIds.filter((shiftId) => shiftId !== preferredShiftId)];
+  }
+
+  return bandShiftIds;
+}
+
+function inferDedicatedPatternGroup(
+  staff: any,
+  shifts: WorkShift[]
+): PlannerResolvedPatternGroup | null {
+  if (shifts.length === 0) return null;
+
+  const assignedShift = shifts.find((shift) => shift.id === staff?.shift_id) || null;
+  const sources = [
+    staff?.shift_type,
+    staff?.position,
+    staff?.role,
+    assignedShift?.shift_type,
+    assignedShift?.name,
+    assignedShift?.description,
+  ];
+
+  const buildGroup = (
+    band: 'day' | 'evening' | 'night',
+    mode: RosterPatternGroupMode,
+    label: string,
+    rationale: string
+  ) => {
+    const shiftIds = getBandShiftIds(band, shifts, assignedShift?.id || '');
+    if (shiftIds.length === 0) return null;
+
+    return {
+      key: `auto-${mode}`,
+      label,
+      mode,
+      shiftIds,
+      rationale,
+      source: 'auto' as const,
+    };
+  };
+
+  if (hasPatternKeyword(sources, DAY_DEDICATED_PATTERN_KEYWORDS)) {
+    return buildGroup(
+      'day',
+      'day_fixed',
+      '\uB370\uC774\uC804\uB2F4',
+      '\uC9C1\uC6D0 \uADFC\uBB34\uC720\uD615\uACFC \uBC30\uC815 \uADFC\uBB34\uB97C \uAE30\uC900\uC73C\uB85C \uB370\uC774 \uC804\uB2F4\uC790\uB85C \uC790\uB3D9 \uAC10\uC9C0\uD588\uC2B5\uB2C8\uB2E4.'
+    );
+  }
+
+  if (hasPatternKeyword(sources, EVENING_DEDICATED_PATTERN_KEYWORDS)) {
+    return buildGroup(
+      'evening',
+      'evening_fixed',
+      '\uC774\uBE0C\uC804\uB2F4',
+      '\uC9C1\uC6D0 \uADFC\uBB34\uC720\uD615\uACFC \uBC30\uC815 \uADFC\uBB34\uB97C \uAE30\uC900\uC73C\uB85C \uC774\uBE0C \uC804\uB2F4\uC790\uB85C \uC790\uB3D9 \uAC10\uC9C0\uD588\uC2B5\uB2C8\uB2E4.'
+    );
+  }
+
+  if (hasPatternKeyword(sources, NIGHT_DEDICATED_PATTERN_KEYWORDS)) {
+    return buildGroup(
+      'night',
+      'night_fixed',
+      '\uB098\uC774\uD2B8\uC804\uB2F4',
+      '\uC9C1\uC6D0 \uADFC\uBB34\uC720\uD615\uACFC \uBC30\uC815 \uADFC\uBB34\uB97C \uAE30\uC900\uC73C\uB85C \uB098\uC774\uD2B8 \uC804\uB2F4\uC790\uB85C \uC790\uB3D9 \uAC10\uC9C0\uD588\uC2B5\uB2C8\uB2E4.'
+    );
+  }
+
+  if (assignedShift && hasPatternKeyword(sources, FIXED_PATTERN_KEYWORDS)) {
+    const assignedBand = resolveShiftBand(assignedShift);
+    if (assignedBand === 'day') {
+      return buildGroup(
+        'day',
+        'day_fixed',
+        '\uB370\uC774\uC804\uB2F4',
+        '\uACE0\uC815 \uADFC\uBB34 \uD78C\uD2B8\uC640 \uBC30\uC815 \uADFC\uBB34 \uC2DC\uAC04\uC744 \uAE30\uC900\uC73C\uB85C \uB370\uC774 \uC804\uB2F4\uC790\uB85C \uD310\uB2E8\uD588\uC2B5\uB2C8\uB2E4.'
+      );
+    }
+    if (assignedBand === 'evening') {
+      return buildGroup(
+        'evening',
+        'evening_fixed',
+        '\uC774\uBE0C\uC804\uB2F4',
+        '\uACE0\uC815 \uADFC\uBB34 \uD78C\uD2B8\uC640 \uBC30\uC815 \uADFC\uBB34 \uC2DC\uAC04\uC744 \uAE30\uC900\uC73C\uB85C \uC774\uBE0C \uC804\uB2F4\uC790\uB85C \uD310\uB2E8\uD588\uC2B5\uB2C8\uB2E4.'
+      );
+    }
+    if (assignedBand === 'night') {
+      return buildGroup(
+        'night',
+        'night_fixed',
+        '\uB098\uC774\uD2B8\uC804\uB2F4',
+        '\uACE0\uC815 \uADFC\uBB34 \uD78C\uD2B8\uC640 \uBC30\uC815 \uADFC\uBB34 \uC2DC\uAC04\uC744 \uAE30\uC900\uC73C\uB85C \uB098\uC774\uD2B8 \uC804\uB2F4\uC790\uB85C \uD310\uB2E8\uD588\uC2B5\uB2C8\uB2E4.'
+      );
+    }
+  }
+
+  return null;
+}
+
+function resolvePlannerPatternGroup({
+  staff,
+  patternProfile,
+  availableShifts,
+  allShifts,
+}: {
+  staff: any;
+  patternProfile?: RosterPatternProfile | null;
+  availableShifts: WorkShift[];
+  allShifts: WorkShift[];
+}): PlannerResolvedPatternGroup | null {
+  const matchedGroup = patternProfile
+    ? findPatternStaffGroup(patternProfile, {
+        name: String(staff.name || ''),
+        position: String(staff.position || ''),
+        role: String(staff.role || ''),
+        employmentType: String(staff.employment_type || ''),
+        department: String(getDepartmentName(staff) || ''),
+        shiftType: String(staff.shift_type || ''),
+        assignedShiftId: String(staff.shift_id || ''),
+        assignedShiftName: getShiftNameById(String(staff.shift_id || ''), allShifts),
+      })
+    : null;
+
+  if (matchedGroup) {
+    return {
+      key: matchedGroup.id,
+      label: matchedGroup.label,
+      mode: matchedGroup.mode,
+      shiftIds: matchedGroup.shiftIds,
+      rationale: `${matchedGroup.label} 그룹 설정을 기준으로 고정 사이클을 적용했습니다.`,
+      source: 'profile',
+    };
+  }
+
+  return inferDedicatedPatternGroup(staff, availableShifts);
 }
 
 function isNightPattern(pattern: string) {
@@ -1304,6 +1864,10 @@ export default function AutoRosterPlanner({
   const [geminiSummary, setGeminiSummary] = useState('');
   const [geminiAppliedAt, setGeminiAppliedAt] = useState('');
   const [aiRecommendation, setAiRecommendation] = useState<GeminiRosterRecommendation | null>(null);
+  const [leaveAppliedSummary, setLeaveAppliedSummary] = useState('');
+  const [preferredOffSelections, setPreferredOffSelections] = useState<PreferredOffSelectionMap>({});
+  const [preferredOffStaffId, setPreferredOffStaffId] = useState('');
+  const [preferredOffDate, setPreferredOffDate] = useState('');
   const [selectedAiShiftIds, setSelectedAiShiftIds] = useState<string[]>([]);
 
   useEffect(() => {
@@ -1550,6 +2114,10 @@ export default function AutoRosterPlanner({
     () => getTeamRecommendationCategory(selectedDepartment),
     [selectedDepartment]
   );
+  const defaultPlannerMode = useMemo(
+    () => getDefaultPlannerMode(teamRecommendationCategory),
+    [teamRecommendationCategory]
+  );
   const usesStrictTeamRecommendation = teamRecommendationCategory !== 'general' || Boolean(selectedPatternProfile);
   const recommendedAiShiftIds = useMemo(
     () =>
@@ -1566,6 +2134,11 @@ export default function AutoRosterPlanner({
     return workingShifts.filter((shift) => recommendedIdSet.has(shift.id));
   }, [recommendedAiShiftIds, usesStrictTeamRecommendation, workingShifts]);
   const monthDates = useMemo(() => getMonthDates(selectedMonth), [selectedMonth]);
+  const monthDateSet = useMemo(() => new Set(monthDates), [monthDates]);
+  const preferredOffStorageKey = useMemo(
+    () => buildPreferredOffStorageKey(selectedCompany, selectedDepartment, selectedMonth),
+    [selectedCompany, selectedDepartment, selectedMonth]
+  );
   const companyLockedByHrFilter = selectedCo !== '전체';
   const teamOptions = useMemo(
     () => departmentOptions.filter((department) => department !== '전체 부서'),
@@ -1607,7 +2180,17 @@ export default function AutoRosterPlanner({
     setGeminiSummary('');
     setGeminiAppliedAt('');
     setAiRecommendation(null);
+    setLeaveAppliedSummary('');
   }, [selectedMonth, selectedCompany, selectedDepartment]);
+
+  useEffect(() => {
+    if (!monthDates.length) {
+      setPreferredOffDate('');
+      return;
+    }
+
+    setPreferredOffDate((prev) => (monthDates.includes(prev) ? prev : monthDates[0]));
+  }, [monthDates]);
 
   useEffect(() => {
     if (workingShifts.length === 0) {
@@ -1638,6 +2221,56 @@ export default function AutoRosterPlanner({
       return true;
     });
   }, [activeStaffs, selectedCompany, selectedDepartment]);
+
+  useEffect(() => {
+    if (targetStaffs.length === 0) {
+      setPreferredOffStaffId('');
+      return;
+    }
+
+    setPreferredOffStaffId((prev) =>
+      targetStaffs.some((staff: any) => String(staff.id) === prev) ? prev : String(targetStaffs[0].id)
+    );
+  }, [targetStaffs]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!selectedCompany || !selectedDepartment) {
+      setPreferredOffSelections({});
+      return;
+    }
+
+    try {
+      const raw = window.localStorage.getItem(preferredOffStorageKey);
+      if (!raw) {
+        setPreferredOffSelections({});
+        return;
+      }
+
+      const parsed = JSON.parse(raw);
+      setPreferredOffSelections(normalizePreferredOffSelections(parsed, monthDateSet));
+    } catch (error) {
+      console.error('희망 OFF 로드 실패:', error);
+      setPreferredOffSelections({});
+    }
+  }, [monthDateSet, preferredOffStorageKey, selectedCompany, selectedDepartment]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!selectedCompany || !selectedDepartment) return;
+
+    try {
+      const normalized = normalizePreferredOffSelections(preferredOffSelections, monthDateSet);
+      if (Object.keys(normalized).length === 0) {
+        window.localStorage.removeItem(preferredOffStorageKey);
+        return;
+      }
+
+      window.localStorage.setItem(preferredOffStorageKey, JSON.stringify(normalized));
+    } catch (error) {
+      console.error('희망 OFF 저장 실패:', error);
+    }
+  }, [monthDateSet, preferredOffSelections, preferredOffStorageKey, selectedCompany, selectedDepartment]);
   const effectivePlannerPattern = plannerPattern;
   const plannerShiftIds = useMemo(
     () =>
@@ -1939,6 +2572,59 @@ export default function AutoRosterPlanner({
     });
   }, [wizardOpen, wizardOverrideDateOptions, wizardOverrideShiftOptions, wizardSelectedStaffIds]);
 
+  const preferredOffEntries = useMemo(
+    () =>
+      targetStaffs
+        .map((staff: any) => ({
+          staff,
+          dates: [...(preferredOffSelections[String(staff.id)] || [])].sort(),
+        }))
+        .filter((entry) => entry.dates.length > 0),
+    [preferredOffSelections, targetStaffs]
+  );
+  const preferredOffCount = useMemo(
+    () => preferredOffEntries.reduce((sum, entry) => sum + entry.dates.length, 0),
+    [preferredOffEntries]
+  );
+
+  const addPreferredOffDate = () => {
+    if (!preferredOffStaffId || !preferredOffDate) return;
+
+    setPreferredOffSelections((prev) => {
+      const nextDates = [...new Set([...(prev[preferredOffStaffId] || []), preferredOffDate])].sort();
+      return {
+        ...prev,
+        [preferredOffStaffId]: nextDates,
+      };
+    });
+  };
+
+  const removePreferredOffDate = (staffId: string, date: string) => {
+    setPreferredOffSelections((prev) => {
+      const nextDates = (prev[staffId] || []).filter((item) => item !== date);
+      if (nextDates.length === 0) {
+        const { [staffId]: _removed, ...rest } = prev;
+        return rest;
+      }
+
+      return {
+        ...prev,
+        [staffId]: nextDates,
+      };
+    });
+  };
+
+  const clearPreferredOffForStaff = (staffId: string) => {
+    setPreferredOffSelections((prev) => {
+      const { [staffId]: _removed, ...rest } = prev;
+      return rest;
+    });
+  };
+
+  const clearAllPreferredOff = () => {
+    setPreferredOffSelections({});
+  };
+
   const setManualAssignment = ({
     staffId,
     date,
@@ -2051,6 +2737,49 @@ export default function AutoRosterPlanner({
     () => workingShifts.filter((shift) => selectedAiShiftIds.includes(shift.id)),
     [selectedAiShiftIds, workingShifts]
   );
+  const plannerPatternPreviewGroups = useMemo<PlannerPatternPreviewGroup[]>(() => {
+    if (targetStaffs.length === 0) return [];
+
+    const groups = new Map<string, PlannerPatternPreviewGroup>();
+    targetStaffs.forEach((staff: any) => {
+      const resolvedGroup = resolvePlannerPatternGroup({
+        staff,
+        patternProfile: selectedPatternProfile,
+        availableShifts: selectedAiShifts,
+        allShifts: workShifts,
+      });
+
+      const previewGroup = resolvedGroup
+        ? {
+            key: resolvedGroup.key,
+            label: resolvedGroup.label,
+            mode: resolvedGroup.mode,
+            source: resolvedGroup.source,
+          }
+        : {
+            key: `default-${defaultPlannerMode}`,
+            label:
+              defaultPlannerMode === 'rotation'
+                ? '\uC21C\uD658\uADFC\uBB34'
+                : '\uAE30\uBCF8 \uACE0\uC815\uADFC\uBB34',
+            mode: defaultPlannerMode,
+            source: 'default' as const,
+          };
+
+      const existing = groups.get(previewGroup.key);
+      if (existing) {
+        existing.count += 1;
+        return;
+      }
+
+      groups.set(previewGroup.key, {
+        ...previewGroup,
+        count: 1,
+      });
+    });
+
+    return Array.from(groups.values());
+  }, [defaultPlannerMode, selectedAiShifts, selectedPatternProfile, targetStaffs, workShifts]);
 
   const persistPatternProfiles = (nextProfiles: RosterPatternProfile[]) => {
     if (typeof window === 'undefined') return;
@@ -2117,8 +2846,13 @@ export default function AutoRosterPlanner({
       | 'offDaysAfterNight'
       | 'nightBlockSize'
       | 'rotationNightCount'
+      | 'maxConsecutiveWorkDays'
       | 'fixedShiftOnly'
-      | 'balanceRotationBands',
+      | 'balanceRotationBands'
+      | 'distributeWeekendShifts'
+      | 'minDayStaff'
+      | 'minEveningStaff'
+      | 'minNightStaff',
     value: string | number | boolean
   ) => {
     setGenerationRuleDraft((prev) => {
@@ -2132,7 +2866,15 @@ export default function AutoRosterPlanner({
         };
       }
 
-      if (field === 'offDaysAfterNight' || field === 'nightBlockSize' || field === 'rotationNightCount') {
+      if (
+        field === 'offDaysAfterNight' ||
+        field === 'nightBlockSize' ||
+        field === 'rotationNightCount' ||
+        field === 'maxConsecutiveWorkDays' ||
+        field === 'minDayStaff' ||
+        field === 'minEveningStaff' ||
+        field === 'minNightStaff'
+      ) {
         return {
           ...prev,
           [field]: Math.max(0, Math.floor(Number(value) || 0)),
@@ -2303,6 +3045,13 @@ export default function AutoRosterPlanner({
       offDaysAfterNight: Math.max(0, Math.min(3, Math.floor(generationRuleDraft.offDaysAfterNight || 0))),
       nightBlockSize: Math.max(1, Math.min(3, Math.floor(generationRuleDraft.nightBlockSize || 1))),
       rotationNightCount: Math.max(0, Math.min(31, Math.floor(generationRuleDraft.rotationNightCount || 0))),
+      maxConsecutiveWorkDays: Math.max(
+        2,
+        Math.min(7, Math.floor(generationRuleDraft.maxConsecutiveWorkDays || 5))
+      ),
+      minDayStaff: Math.max(0, Math.min(20, Math.floor(generationRuleDraft.minDayStaff || 0))),
+      minEveningStaff: Math.max(0, Math.min(20, Math.floor(generationRuleDraft.minEveningStaff || 0))),
+      minNightStaff: Math.max(0, Math.min(20, Math.floor(generationRuleDraft.minNightStaff || 0))),
       updatedAt: new Date().toISOString(),
     };
 
@@ -2353,7 +3102,10 @@ export default function AutoRosterPlanner({
     }
 
     setGeminiLoading(true);
+    setLeaveAppliedSummary('');
     try {
+      const approvedLeaveRequestCount = 0;
+      const approvedLeaveDayCount = 0;
       const response = await fetch('/api/ai/roster-recommendation', {
         method: 'POST',
         headers: {
@@ -2395,6 +3147,7 @@ export default function AutoRosterPlanner({
             department: String(getDepartmentName(staff) || ''),
             assignedShiftId: String(staff.shift_id || ''),
             shiftType: String(staff.shift_type || ''),
+            preferredOffDates: preferredOffSelections[String(staff.id)] || [],
           })),
         }),
       });
@@ -2405,9 +3158,23 @@ export default function AutoRosterPlanner({
       }
 
       const recommendation = payload as GeminiRosterRecommendation;
+      const groupUsage = new Map<string, number>();
+      const effectiveGenerationRule =
+        selectedGenerationRule ||
+        buildFallbackGenerationRuleForDepartment(selectedDepartment, selectedCompany, monthDates.length);
 
       if (!Array.isArray(recommendation.staffPlans) || recommendation.staffPlans.length === 0) {
         throw new Error('Gemini가 월간 근무표 초안을 돌려주지 않았습니다.');
+      }
+
+      if (!selectedPatternProfile && !recommendation.summary) {
+        recommendation.summary = `${selectedDepartment} 팀 기준으로 월간 초안을 생성했습니다.`;
+      }
+
+      if (!selectedPatternProfile && groupUsage.size > 0) {
+        recommendation.summary = `${selectedDepartment} 팀에 "${effectiveGenerationRule.name || '기본 근무규칙'}" 규칙을 적용해 월간 초안을 생성했습니다. 자동 감지 전담자: ${Array.from(groupUsage.entries())
+          .map(([label, count]) => `${label} ${count}명`)
+          .join(', ')}`;
       }
 
       setAiRecommendation(recommendation);
@@ -2416,6 +3183,19 @@ export default function AutoRosterPlanner({
       setGeminiSummary(
         recommendation.summary?.trim() || `${selectedDepartment} 팀 AI 근무표 초안을 적용했습니다.`
       );
+      if (approvedLeaveDayCount > 0) {
+        recommendation.summary = `${recommendation.summary} 승인 휴가 ${approvedLeaveRequestCount}건, ${approvedLeaveDayCount}일을 OFF로 반영했습니다.`;
+      }
+      setLeaveAppliedSummary(
+        approvedLeaveDayCount > 0
+          ? `승인 휴가 ${approvedLeaveRequestCount}건 · ${approvedLeaveDayCount}일 반영`
+          : ''
+      );
+      if (approvedLeaveDayCount > 0) {
+        setGeminiSummary(
+          recommendation.summary?.trim() || `${selectedDepartment} ? ?⑦꽩 湲곕컲 珥덉븞???곸슜?섏뿀?듬땲??`
+        );
+      }
       setGeminiAppliedAt(new Date().toLocaleString('ko-KR'));
       alert('Gemini가 팀 특성을 분석해 월간 근무표 초안을 만들었습니다. 아래 미리보기에서 확인하세요.');
     } catch (error: any) {
@@ -2451,8 +3231,11 @@ export default function AutoRosterPlanner({
     setGeminiLoading(true);
     try {
       const shiftMap = new Map(selectedAiShifts.map((shift) => [shift.id, shift]));
+      const monthDateSet = new Set(monthDates);
       const groupUsage = new Map<string, number>();
       const groupMemberIndexMap = new Map<string, number>();
+      const groupSizeMap = new Map<string, number>();
+      const weekendWorkCountsByGroup = new Map<string, number[]>();
       const rotationDailyBandCountsByGroup = new Map<
         string,
         Array<Record<'day' | 'evening' | 'night', number>>
@@ -2464,8 +3247,68 @@ export default function AutoRosterPlanner({
           selectedCompany,
           monthDates.length
         );
+      let approvedLeaveRequestCount = 0;
+      let approvedLeaveDayCount = 0;
+      let approvedLeaveBlockedDatesByStaff = new Map<string, Set<string>>();
+
+      const targetStaffIds = targetStaffs
+        .map((staff: any) => String(staff?.id || ''))
+        .filter(Boolean);
+      const targetStaffIdSet = new Set(targetStaffIds);
+
+      if (targetStaffIds.length > 0 && monthDates.length > 0) {
+        const { data: approvedLeaves, error: approvedLeavesError } = await supabase
+          .from('leave_requests')
+          .select('staff_id, start_date, end_date')
+          .eq('status', '승인')
+          .in('staff_id', targetStaffIds)
+          .lte('start_date', monthDates[monthDates.length - 1])
+          .gte('end_date', monthDates[0]);
+
+        if (approvedLeavesError) {
+          console.error('승인 휴가 반영 데이터 로드 실패:', approvedLeavesError);
+        } else {
+          approvedLeaveBlockedDatesByStaff = buildBlockedDatesByStaff(
+            (approvedLeaves || []) as Array<{ staff_id: string; start_date: string; end_date: string }>,
+            monthDateSet
+          );
+          approvedLeaveRequestCount = (approvedLeaves || []).length;
+          approvedLeaveDayCount = countBlockedDateEntries(approvedLeaveBlockedDatesByStaff);
+        }
+      }
+      const preferredOffBlockedDatesByStaff = buildPreferredOffDateMap(
+        preferredOffSelections,
+        targetStaffIdSet,
+        monthDateSet
+      );
+      const preferredOffDateCount = countBlockedDateEntries(preferredOffBlockedDatesByStaff);
+      const blockedDatesByStaff = mergeBlockedDateMaps(
+        approvedLeaveBlockedDatesByStaff,
+        preferredOffBlockedDatesByStaff
+      );
+      const resolvedGroupsByStaff = targetStaffs.map((staff: any) => {
+        const resolvedGroup = resolvePlannerPatternGroup({
+          staff,
+          patternProfile: selectedPatternProfile,
+          availableShifts: selectedAiShifts,
+          allShifts: workShifts,
+        });
+        const groupKey = resolvedGroup?.key || `default-${defaultPlannerMode}`;
+        groupSizeMap.set(groupKey, (groupSizeMap.get(groupKey) || 0) + 1);
+        return {
+          staffId: String(staff.id),
+          resolvedGroup,
+          groupKey,
+        };
+      });
       const recommendation: GeminiRosterRecommendation = {
         summary: '',
+        leaveSummary:
+          approvedLeaveDayCount > 0
+            ? `승인 휴가 ${approvedLeaveRequestCount}건 · ${approvedLeaveDayCount}일 반영`
+            : '',
+        preferredOffSummary:
+          preferredOffDateCount > 0 ? `희망 OFF ${preferredOffDateCount}건 반영` : '',
         teamAnalysis: {
           teamPurpose: selectedPatternProfile
             ? `${selectedPatternProfile.name} 패턴을 기준으로 ${selectedDepartment} 근무표를 생성`
@@ -2487,32 +3330,20 @@ export default function AutoRosterPlanner({
           ],
         },
         staffPlans: targetStaffs.map((staff: any) => {
-          const matchedGroup = selectedPatternProfile
-            ? findPatternStaffGroup(selectedPatternProfile, {
-                name: String(staff.name || ''),
-                position: String(staff.position || ''),
-                role: String(staff.role || ''),
-                employmentType: String(staff.employment_type || ''),
-                department: String(getDepartmentName(staff) || ''),
-                shiftType: String(staff.shift_type || ''),
-                assignedShiftId: String(staff.shift_id || ''),
-                assignedShiftName: getShiftNameById(String(staff.shift_id || ''), workShifts),
-              })
-            : null;
-          const matchedGroupKey = matchedGroup?.id || `default-${matchedGroup?.mode || 'rotation'}`;
-          const groupMemberIndex = groupMemberIndexMap.get(matchedGroupKey) || 0;
-          groupMemberIndexMap.set(matchedGroupKey, groupMemberIndex + 1);
+          const resolvedStaffGroup =
+            resolvedGroupsByStaff.find((entry) => entry.staffId === String(staff.id)) || null;
+          const resolvedGroup = resolvedStaffGroup?.resolvedGroup || null;
+          const matchedGroup = resolvedGroup;
+          const groupKey = resolvedStaffGroup?.groupKey || `default-${defaultPlannerMode}`;
+          const totalStaffCount = groupSizeMap.get(groupKey) || 1;
+          const groupMemberIndex = groupMemberIndexMap.get(groupKey) || 0;
+          const blockedDateSet = blockedDatesByStaff.get(String(staff.id));
+          groupMemberIndexMap.set(groupKey, groupMemberIndex + 1);
           const allowedShiftIds = (
-            matchedGroup?.shiftIds.filter((shiftId) => shiftMap.has(shiftId)) ||
+            resolvedGroup?.shiftIds.filter((shiftId) => shiftMap.has(shiftId)) ||
             selectedAiShifts.map((shift) => shift.id)
           ).filter(Boolean);
-          const rawMode: RosterPatternGroupMode =
-            matchedGroup?.mode ||
-            (teamRecommendationCategory === 'ward'
-              ? 'rotation'
-              : teamRecommendationCategory === 'management' || teamRecommendationCategory === 'outpatient'
-                ? 'day_fixed'
-                : 'rotation');
+          const rawMode: RosterPatternGroupMode = resolvedGroup?.mode || defaultPlannerMode;
           const effectiveMode: RosterPatternGroupMode =
             !effectiveGenerationRule.fixedShiftOnly && rawMode !== 'rotation'
               ? 'rotation'
@@ -2521,13 +3352,26 @@ export default function AutoRosterPlanner({
             effectiveMode === 'rotation' && effectiveGenerationRule.balanceRotationBands
               ? (() => {
                   const current =
-                    rotationDailyBandCountsByGroup.get(matchedGroupKey) ||
+                    rotationDailyBandCountsByGroup.get(groupKey) ||
                     Array.from({ length: monthDates.length }, () => ({
                       day: 0,
                       evening: 0,
                       night: 0,
                     }));
-                  rotationDailyBandCountsByGroup.set(matchedGroupKey, current);
+                  rotationDailyBandCountsByGroup.set(groupKey, current);
+                  return current;
+                })()
+              : undefined;
+          const sharedWeekendAssignmentCounts =
+            effectiveMode === 'rotation' && effectiveGenerationRule.distributeWeekendShifts
+              ? (() => {
+                  const current =
+                    weekendWorkCountsByGroup.get(groupKey) ||
+                    Array.from({ length: Math.max(totalStaffCount, 1) }, () => 0);
+                  if (current.length < totalStaffCount) {
+                    current.push(...Array.from({ length: totalStaffCount - current.length }, () => 0));
+                  }
+                  weekendWorkCountsByGroup.set(groupKey, current);
                   return current;
                 })()
               : undefined;
@@ -2540,6 +3384,9 @@ export default function AutoRosterPlanner({
                   staffIndex: groupMemberIndex,
                   rule: effectiveGenerationRule,
                   sharedDailyBandCounts,
+                  totalStaffCount,
+                  weekendAssignmentCounts: sharedWeekendAssignmentCounts,
+                  blockedDateSet,
                 })
               : buildProgrammaticAssignments({
                   monthDates,
@@ -2547,19 +3394,20 @@ export default function AutoRosterPlanner({
                   cycle: buildProgrammaticCycle(effectiveMode, allowedShiftIds, shiftMap),
                   staffIndex: groupMemberIndex,
                   mode: effectiveMode,
+                  blockedDateSet,
                 });
 
-          if (matchedGroup) {
-            groupUsage.set(matchedGroup.label, (groupUsage.get(matchedGroup.label) || 0) + 1);
+          if (resolvedGroup) {
+            groupUsage.set(resolvedGroup.label, (groupUsage.get(resolvedGroup.label) || 0) + 1);
           }
 
           return {
             staffId: String(staff.id),
-            modeLabel: matchedGroup
-              ? `${matchedGroup.label} · ${PATTERN_GROUP_MODE_OPTIONS.find((option) => option.value === effectiveMode)?.label || effectiveMode}`
+            modeLabel: resolvedGroup
+              ? `${resolvedGroup.label} · ${PATTERN_GROUP_MODE_OPTIONS.find((option) => option.value === effectiveMode)?.label || effectiveMode}`
               : PATTERN_GROUP_MODE_OPTIONS.find((option) => option.value === effectiveMode)?.label || '기본 패턴',
-            rationale: matchedGroup
-              ? `${matchedGroup.label} 그룹 키워드와 연결된 근무유형을 기준으로 고정 사이클을 적용했습니다.`
+            rationale: resolvedGroup
+              ? `${resolvedGroup.label} 그룹 키워드와 연결된 근무유형을 기준으로 고정 사이클을 적용했습니다.`
               : '팀 기본 규칙과 선택한 근무유형 순서를 기준으로 자동 사이클을 적용했습니다.',
             assignments,
           };
@@ -3275,6 +4123,57 @@ export default function AutoRosterPlanner({
                   data-testid="generation-rule-team-keywords-input"
                 />
               </label>
+
+              <div className="rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-4 py-3 md:col-span-2">
+                <p className="text-sm font-bold text-[var(--foreground)]">일자별 최소 인원</p>
+                <p className="mt-1 text-xs text-[var(--toss-gray-3)]">
+                  자동생성 시 각 날짜마다 우선 확보하려는 최소 D / E / N 인원입니다. 부족한 경우 가능한 범위 안에서 최대한 맞춥니다.
+                </p>
+                <div className="mt-3 grid gap-3 md:grid-cols-3">
+                  <label className="flex flex-col gap-2">
+                    <span className="text-xs font-bold text-[var(--toss-gray-3)]">D 최소</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={20}
+                      value={generationRuleDraft.minDayStaff}
+                      onChange={(event) =>
+                        updateGenerationRuleDraftField('minDayStaff', event.target.value)
+                      }
+                      className="rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                      data-testid="generation-rule-min-day-staff"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-2">
+                    <span className="text-xs font-bold text-[var(--toss-gray-3)]">E 최소</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={20}
+                      value={generationRuleDraft.minEveningStaff}
+                      onChange={(event) =>
+                        updateGenerationRuleDraftField('minEveningStaff', event.target.value)
+                      }
+                      className="rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                      data-testid="generation-rule-min-evening-staff"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-2">
+                    <span className="text-xs font-bold text-[var(--toss-gray-3)]">N 최소</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={20}
+                      value={generationRuleDraft.minNightStaff}
+                      onChange={(event) =>
+                        updateGenerationRuleDraftField('minNightStaff', event.target.value)
+                      }
+                      className="rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                      data-testid="generation-rule-min-night-staff"
+                    />
+                  </label>
+                </div>
+              </div>
             </div>
 
             <label className="mt-4 flex flex-col gap-2">
@@ -3337,6 +4236,22 @@ export default function AutoRosterPlanner({
                 />
               </label>
 
+              <label className="flex items-center justify-between rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-4 py-3">
+                <div>
+                  <p className="text-sm font-bold text-[var(--foreground)]">주말 근무 균등 분산</p>
+                  <p className="mt-1 text-xs text-[var(--toss-gray-3)]">토·일 근무가 특정 직원에게 몰리지 않도록 OFF를 우선 분산합니다.</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={generationRuleDraft.distributeWeekendShifts}
+                  onChange={(event) =>
+                    updateGenerationRuleDraftField('distributeWeekendShifts', event.target.checked)
+                  }
+                  className="h-5 w-5"
+                  data-testid="generation-rule-distribute-weekends"
+                />
+              </label>
+
               <label className="flex flex-col gap-2 rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-4 py-3">
                 <span className="text-sm font-bold text-[var(--foreground)]">나이트 뒤 OFF 일수</span>
                 <input
@@ -3364,6 +4279,21 @@ export default function AutoRosterPlanner({
                   }
                   className="rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
                   data-testid="generation-rule-night-block-size"
+                />
+              </label>
+
+              <label className="flex flex-col gap-2 rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-4 py-3">
+                <span className="text-sm font-bold text-[var(--foreground)]">최대 연속근무일</span>
+                <input
+                  type="number"
+                  min={2}
+                  max={7}
+                  value={generationRuleDraft.maxConsecutiveWorkDays}
+                  onChange={(event) =>
+                    updateGenerationRuleDraftField('maxConsecutiveWorkDays', event.target.value)
+                  }
+                  className="rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                  data-testid="generation-rule-max-consecutive-work-days"
                 />
               </label>
 
@@ -3443,6 +4373,19 @@ export default function AutoRosterPlanner({
                             삭제
                           </button>
                         </div>
+                        <span className="rounded-full border border-[var(--toss-border)] bg-white px-3 py-1">
+                          연속근무 {rule.maxConsecutiveWorkDays}일
+                        </span>
+                        {rule.distributeWeekendShifts ? (
+                          <span className="rounded-full border border-[var(--toss-border)] bg-white px-3 py-1">
+                            주말 분산
+                          </span>
+                        ) : null}
+                        {(rule.minDayStaff || rule.minEveningStaff || rule.minNightStaff) > 0 ? (
+                          <span className="rounded-full border border-[var(--toss-border)] bg-white px-3 py-1">
+                            최소 D/E/N {rule.minDayStaff}/{rule.minEveningStaff}/{rule.minNightStaff}
+                          </span>
+                        ) : null}
                       </div>
 
                       <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold text-[var(--foreground)]">
@@ -3881,6 +4824,40 @@ export default function AutoRosterPlanner({
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
+            <div className="w-full rounded-[18px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)]/70 px-4 py-3 text-sm font-semibold text-[var(--foreground)]">
+              {selectedPatternProfile
+                ? '\uC120\uD0DD\uD55C \uD300 \uD328\uD134 \uD504\uB85C\uD544\uC744 \uAE30\uC900\uC73C\uB85C \uB370\uC774/\uC774\uBE0C/\uB098\uC774\uD2B8 \uC804\uB2F4\uC790\uC640 \uC21C\uD658 \uADFC\uBB34\uC790\uB97C \uAC19\uC774 \uD3B8\uC131\uD569\uB2C8\uB2E4.'
+                : '\uC800\uC7A5\uB41C \uD300 \uD328\uD134 \uD504\uB85C\uD544\uC774 \uC5C6\uC5B4\uB3C4 \uC9C1\uC6D0\uC758 shift_type\uACFC \uBC30\uC815 \uADFC\uBB34\uB97C \uAE30\uC900\uC73C\uB85C \uB370\uC774/\uC774\uBE0C/\uB098\uC774\uD2B8 \uC804\uB2F4\uC790\uB97C \uC790\uB3D9 \uAC10\uC9C0\uD558\uACE0, \uB098\uBA38\uC9C0\uB294 \uC21C\uD658 \uADFC\uBB34\uB85C \uD3B8\uC131\uD569\uB2C8\uB2E4.'}
+            </div>
+            {plannerPatternPreviewGroups.length > 0 ? (
+              <div
+                className="w-full rounded-[18px] border border-[var(--toss-border)] bg-white px-4 py-3"
+                data-testid="roster-pattern-group-preview"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  {plannerPatternPreviewGroups.map((group) => {
+                    const modeLabel =
+                      PATTERN_GROUP_MODE_OPTIONS.find((option) => option.value === group.mode)?.label ||
+                      group.mode;
+                    const toneClass =
+                      group.source === 'profile'
+                        ? 'border-[var(--toss-blue)]/20 bg-[var(--toss-blue-light)]/60'
+                        : group.source === 'auto'
+                          ? 'border-emerald-200 bg-emerald-50'
+                          : 'border-[var(--toss-border)] bg-[var(--toss-gray-1)]';
+
+                    return (
+                      <span
+                        key={group.key}
+                        className={`rounded-full border px-3 py-2 text-[11px] font-semibold text-[var(--foreground)] ${toneClass}`}
+                      >
+                        {group.label} {group.count}명 · {modeLabel}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
             {selectedPatternProfile ? (
               <div className="rounded-[16px] border border-[var(--toss-blue)]/20 bg-[var(--toss-blue-light)]/60 px-4 py-3 text-sm font-semibold text-[var(--foreground)]">
                 적용 패턴 · {selectedPatternProfile.name}
@@ -3910,6 +4887,128 @@ export default function AutoRosterPlanner({
                 규칙 탭에서 팀별 근무규칙을 먼저 저장할 수 있습니다.
               </div>
             ) : null}
+            <div
+              className="w-full rounded-[18px] border border-amber-200 bg-amber-50/80 px-4 py-4"
+              data-testid="preferred-off-manager"
+            >
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-amber-700">
+                    Preferred Off
+                  </p>
+                  <h4 className="mt-1 text-base font-bold text-[var(--foreground)]">개인 희망 OFF</h4>
+                  <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">
+                    자동 생성 전에 직원별 희망 휴무일을 등록하면 해당 날짜를 OFF로 우선 반영합니다.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={preferredOffStaffId}
+                    onChange={(event) => setPreferredOffStaffId(event.target.value)}
+                    disabled={targetStaffs.length === 0}
+                    className="rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--foreground)] disabled:opacity-50"
+                    data-testid="preferred-off-staff-select"
+                  >
+                    {targetStaffs.length === 0 ? (
+                      <option value="">직원 없음</option>
+                    ) : (
+                      targetStaffs.map((staff: any) => (
+                        <option key={staff.id} value={String(staff.id)}>
+                          {staff.name}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                  <select
+                    value={preferredOffDate}
+                    onChange={(event) => setPreferredOffDate(event.target.value)}
+                    disabled={monthDates.length === 0}
+                    className="rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--foreground)] disabled:opacity-50"
+                    data-testid="preferred-off-date-select"
+                  >
+                    {monthDates.map((date) => (
+                      <option key={date} value={date}>
+                        {date}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={addPreferredOffDate}
+                    disabled={!preferredOffStaffId || !preferredOffDate}
+                    className="rounded-[12px] bg-amber-500 px-3 py-2 text-sm font-bold text-white disabled:opacity-50"
+                    data-testid="preferred-off-add"
+                  >
+                    희망 OFF 추가
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearAllPreferredOff}
+                    disabled={preferredOffCount === 0}
+                    className="rounded-[12px] border border-amber-200 bg-white px-3 py-2 text-sm font-bold text-amber-700 disabled:opacity-50"
+                    data-testid="preferred-off-clear-all"
+                  >
+                    전체 비우기
+                  </button>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="rounded-full border border-amber-200 bg-white px-3 py-1 text-[11px] font-semibold text-amber-700">
+                  등록 {preferredOffCount}건
+                </span>
+                {preferredOffEntries.map((entry) => (
+                  <span
+                    key={`preferred-off-summary-${entry.staff.id}`}
+                    className="rounded-full border border-amber-100 bg-white/80 px-3 py-1 text-[11px] font-semibold text-[var(--foreground)]"
+                  >
+                    {entry.staff.name} {entry.dates.length}일
+                  </span>
+                ))}
+              </div>
+              <div className="mt-3 space-y-2">
+                {preferredOffEntries.length === 0 ? (
+                  <p className="text-[12px] font-semibold text-[var(--toss-gray-3)]">
+                    등록된 개인 희망 OFF가 없습니다.
+                  </p>
+                ) : (
+                  preferredOffEntries.map((entry) => (
+                    <div
+                      key={`preferred-off-row-${entry.staff.id}`}
+                      className="rounded-[14px] border border-amber-100 bg-white/90 px-3 py-3"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-bold text-[var(--foreground)]">{entry.staff.name}</p>
+                          <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                            {entry.dates.length}일 등록
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => clearPreferredOffForStaff(String(entry.staff.id))}
+                          className="rounded-full border border-amber-200 px-3 py-1 text-[11px] font-bold text-amber-700"
+                        >
+                          직원 비우기
+                        </button>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {entry.dates.map((date) => (
+                          <button
+                            type="button"
+                            key={`${entry.staff.id}-${date}`}
+                            onClick={() => removePreferredOffDate(String(entry.staff.id), date)}
+                            className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-700"
+                            data-testid={`preferred-off-chip-${entry.staff.id}-${date}`}
+                          >
+                            {date} x
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -3923,6 +5022,22 @@ export default function AutoRosterPlanner({
                 <p className="mt-2 text-sm font-semibold leading-6 text-[var(--foreground)]">
                   {geminiSummary}
                 </p>
+                {(leaveAppliedSummary || aiRecommendation?.leaveSummary) ? (
+                  <span
+                    className="mt-3 inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-700"
+                    data-testid="roster-leave-coverage-summary"
+                  >
+                    {leaveAppliedSummary || aiRecommendation?.leaveSummary}
+                  </span>
+                ) : null}
+                {aiRecommendation?.preferredOffSummary ? (
+                  <span
+                    className="mt-3 ml-2 inline-flex rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-700"
+                    data-testid="roster-preferred-off-summary"
+                  >
+                    {aiRecommendation.preferredOffSummary}
+                  </span>
+                ) : null}
               </div>
               {geminiAppliedAt && (
                 <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">

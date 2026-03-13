@@ -47,8 +47,8 @@ const DEFAULT_APPROVAL_TEMPLATE_DESIGN = {
   footerText: '전자결재 승인 문서입니다.',
   showSignArea: true,
   showBackgroundLogo: true,
-  backgroundLogoUrl: '/sy-logo.png',
-  backgroundLogoOpacity: 0.06,
+  backgroundLogoUrl: '/logo.png',
+  backgroundLogoOpacity: 0.055,
   showSeal: true,
   sealLabel: 'SY INC. 직인',
 };
@@ -250,7 +250,9 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   <title>${escapeHtml(templateMeta.name || '결재문서')}</title>
   <style>
     body{font-family:'Malgun Gothic',sans-serif;background:#f5f7fb;margin:0;padding:24px;color:#111827}
-    .sheet{max-width:860px;margin:0 auto;background:#fff;border:1px solid ${escapeHtml(design.borderColor || '#d7e3ff')};border-radius:28px;overflow:hidden;box-shadow:0 24px 60px rgba(15,23,42,.12)}
+    .sheet{position:relative;max-width:860px;margin:0 auto;background:#fff;border:1px solid ${escapeHtml(design.borderColor || '#d7e3ff')};border-radius:28px;overflow:hidden;box-shadow:0 24px 60px rgba(15,23,42,.12)}
+    .sheet::before{content:'';position:absolute;inset:0;background:url('${escapeHtml(design.backgroundLogoUrl || DEFAULT_APPROVAL_TEMPLATE_DESIGN.backgroundLogoUrl)}') center 52% / 88px 88px no-repeat;opacity:${escapeHtml(String(design.backgroundLogoOpacity ?? DEFAULT_APPROVAL_TEMPLATE_DESIGN.backgroundLogoOpacity))};pointer-events:none;mix-blend-mode:multiply}
+    .sheet > *{position:relative;z-index:1}
     .hero{position:relative;padding:36px 40px 28px;background:linear-gradient(135deg, ${escapeHtml(alphaColor(design.primaryColor, 0.18))} 0%, rgba(255,255,255,0) 68%)}
     .kicker{display:inline-flex;align-items:center;gap:8px;padding:7px 12px;border-radius:999px;background:rgba(255,255,255,.92);font-size:10px;font-weight:800;letter-spacing:.24em;text-transform:uppercase;color:#64748b}
     .dot{width:8px;height:8px;border-radius:999px;background:${escapeHtml(design.primaryColor || '#155eef')}}

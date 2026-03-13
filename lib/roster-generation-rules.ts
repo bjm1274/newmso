@@ -10,8 +10,13 @@ export type RosterGenerationRule = {
   offDaysAfterNight: number;
   nightBlockSize: number;
   rotationNightCount: number;
+  maxConsecutiveWorkDays: number;
   fixedShiftOnly: boolean;
   balanceRotationBands: boolean;
+  distributeWeekendShifts: boolean;
+  minDayStaff: number;
+  minEveningStaff: number;
+  minNightStaff: number;
   updatedAt: string;
 };
 
@@ -43,6 +48,10 @@ function normalizeRule(rule: RosterGenerationRule): RosterGenerationRule {
     offDaysAfterNight: clampInteger(rule.offDaysAfterNight, 0, 3, 1),
     nightBlockSize: clampInteger(rule.nightBlockSize, 1, 3, 2),
     rotationNightCount: clampInteger(rule.rotationNightCount, 0, 31, 6),
+    maxConsecutiveWorkDays: clampInteger(rule.maxConsecutiveWorkDays, 2, 7, 5),
+    minDayStaff: clampInteger(rule.minDayStaff, 0, 20, 0),
+    minEveningStaff: clampInteger(rule.minEveningStaff, 0, 20, 0),
+    minNightStaff: clampInteger(rule.minNightStaff, 0, 20, 0),
   };
 }
 
@@ -59,8 +68,13 @@ export function buildDefaultGenerationRule(companyName = ''): RosterGenerationRu
     offDaysAfterNight: 1,
     nightBlockSize: 2,
     rotationNightCount: 6,
+    maxConsecutiveWorkDays: 5,
     fixedShiftOnly: true,
     balanceRotationBands: true,
+    distributeWeekendShifts: true,
+    minDayStaff: 0,
+    minEveningStaff: 0,
+    minNightStaff: 0,
     updatedAt: new Date().toISOString(),
   };
 }
@@ -83,8 +97,13 @@ export function normalizeGenerationRule(record: unknown): RosterGenerationRule |
     offDaysAfterNight: clampInteger(source.offDaysAfterNight, 0, 3, 1),
     nightBlockSize: clampInteger(source.nightBlockSize, 1, 3, 2),
     rotationNightCount: clampInteger(source.rotationNightCount, 0, 31, 6),
+    maxConsecutiveWorkDays: clampInteger(source.maxConsecutiveWorkDays, 2, 7, 5),
     fixedShiftOnly: source.fixedShiftOnly !== false,
     balanceRotationBands: source.balanceRotationBands !== false,
+    distributeWeekendShifts: source.distributeWeekendShifts !== false,
+    minDayStaff: clampInteger(source.minDayStaff, 0, 20, 0),
+    minEveningStaff: clampInteger(source.minEveningStaff, 0, 20, 0),
+    minNightStaff: clampInteger(source.minNightStaff, 0, 20, 0),
     updatedAt: String(source.updatedAt || new Date().toISOString()),
   });
 }
