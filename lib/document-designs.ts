@@ -25,6 +25,7 @@ export type DocumentDesignStore = {
 };
 
 const DOCUMENT_DESIGN_TYPES: DocumentDesignType[] = ['payroll_slip', 'certificate'];
+const CERTIFICATE_DEFAULT_TITLE = '재직증명서';
 const DOCUMENT_DESIGN_FIELDS: (keyof DocumentDesign)[] = [
   'title',
   'subtitle',
@@ -49,8 +50,8 @@ export const DEFAULT_DOCUMENT_DESIGNS: Record<DocumentDesignType, DocumentDesign
     title: '공식 증명서',
     subtitle: '',
     companyLabel: 'SY INC.',
-    primaryColor: '#0f4c5c',
-    borderColor: '#d5e3e5',
+    primaryColor: '#2d93a8',
+    borderColor: '#d7e0e6',
     footerText: '',
     showSignArea: true,
   },
@@ -232,10 +233,12 @@ export function resolveDocumentDesignReference(
   companyName?: string | null,
 ) {
   const base = DEFAULT_DOCUMENT_DESIGNS[type];
+  const fallbackTitle = type === 'certificate' ? CERTIFICATE_DEFAULT_TITLE : base.title;
 
   if (!companyName) {
     return {
       ...base,
+      title: fallbackTitle,
       companyLabel: base.companyLabel,
     };
   }
@@ -244,6 +247,7 @@ export function resolveDocumentDesignReference(
   return {
     ...base,
     ...defaults,
+    title: defaults.title || fallbackTitle,
     companyLabel: buildCompanyLabel(base, defaults, companyName),
   };
 }
@@ -256,11 +260,13 @@ export function resolveDocumentDesign(
   const base = DEFAULT_DOCUMENT_DESIGNS[type];
   const defaults = store?.defaults?.[type] || {};
   const companyScoped = companyName ? store?.companies?.[companyName]?.[type] || {} : {};
+  const fallbackTitle = type === 'certificate' ? CERTIFICATE_DEFAULT_TITLE : base.title;
 
   return {
     ...base,
     ...defaults,
     ...companyScoped,
+    title: companyScoped.title || defaults.title || fallbackTitle,
     companyLabel:
       companyScoped.companyLabel ||
       buildCompanyLabel(base, defaults, companyName),

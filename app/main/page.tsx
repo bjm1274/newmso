@@ -201,6 +201,7 @@ function MainPageContent() {
                   openChatRoom: params.get('open_chat_room')?.trim() || null,
                   openMessage: params.get('open_msg')?.trim() || null,
                   openMenu: params.get('open_menu')?.trim() || null,
+                  openSubView: params.get('open_subview')?.trim() || null,
                   openPost: params.get('open_post')?.trim() || null,
                 };
               })()
@@ -249,7 +250,8 @@ function MainPageContent() {
         const shouldRestoreSubView = !(
           navigationQuery?.openChatRoom ||
           navigationQuery?.openMessage ||
-          navigationQuery?.openPost
+          navigationQuery?.openPost ||
+          navigationQuery?.openSubView
         );
 
         if (shouldRestoreMenu) {
@@ -403,11 +405,13 @@ function MainPageContent() {
   // 페이지 이동 처리 (알림 인박스에서 메뉴 오픈용)
   useEffect(() => {
     const targetMenu = searchParams.get('open_menu')?.trim();
+    const targetSubView = searchParams.get('open_subview')?.trim();
     const openPost = searchParams.get('open_post')?.trim();
     const openInventoryView = searchParams.get('open_inventory_view')?.trim();
     const openInventoryApproval = searchParams.get('open_inventory_approval')?.trim();
-    if (targetMenu || openPost || openInventoryView || openInventoryApproval) {
+    if (targetMenu || targetSubView || openPost || openInventoryView || openInventoryApproval) {
       if (targetMenu) setMainMenu(targetMenu);
+      if (targetSubView) setSubView(targetSubView);
       if (targetMenu === '재고관리' || openInventoryView || openInventoryApproval) {
         setMainMenu('재고관리');
         if (openInventoryView) {

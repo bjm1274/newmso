@@ -67,19 +67,30 @@ export async function POST(request: NextRequest) {
 
   const { adminName, adminPasswordHash, masterId, masterPasswordHash } = getAdminCredentialConfig();
 
-  if (!adminName || !adminPasswordHash || !masterId || !masterPasswordHash) {
-    return failureResponse('마스터 로그인 환경변수를 읽지 못했습니다. 서버를 재시작한 뒤 다시 시도해주세요.', 500);
-  }
-
   const privilegedLogin = await verifyPrivilegedLogin(loginId, password);
 
   if (privilegedLogin.ok && privilegedLogin.kind === 'admin') {
     const supabase = getAdminClient();
-    const { data: msoRow } = await supabase
-      .from('staff_members')
-      .select('*')
-      .eq('name', adminName)
-      .maybeSingle();
+    const adminDisplayName = adminName || 'MSO 관리자';
+    let msoRow: any = null;
+
+    if (adminName) {
+      const { data } = await supabase
+        .from('staff_members')
+        .select('*')
+        .eq('name', adminName)
+        .maybeSingle();
+      msoRow = data ?? null;
+    }
+
+    if (!msoRow && /^\d+$/.test(loginId)) {
+      const { data } = await supabase
+        .from('staff_members')
+        .select('*')
+        .eq('employee_no', loginId)
+        .maybeSingle();
+      msoRow = data ?? null;
+    }
 
     const user = msoRow
       ? {
@@ -97,7 +108,7 @@ export async function POST(request: NextRequest) {
       : {
           id: null,
           employee_no: '1',
-          name: adminName,
+          name: adminDisplayName,
           role: 'admin',
           department: '경영지원팀',
           company: 'SY INC.',
