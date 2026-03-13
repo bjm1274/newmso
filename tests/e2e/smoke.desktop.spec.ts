@@ -688,7 +688,7 @@ test("offboarding start flow updates the selected staff member to a pending resi
   });
 
   await page.goto(
-    `/main?${new URLSearchParams({ open_menu: "인사관리" }).toString()}`,
+    `/main?${new URLSearchParams({ open_menu: "인사관리", open_subview: "오프보딩" }).toString()}`,
   );
 
   await expect(page.getByTestId("offboarding-view")).toBeVisible();
@@ -2124,7 +2124,7 @@ test("employee and admin can complete a realistic monthly operations lifecycle",
     `/main?${new URLSearchParams({ open_menu: "인사관리" }).toString()}`,
   );
 
-  await expect(page.getByText("전문 연차/휴가 통합 관리")).toBeVisible();
+  await expect(page.getByTestId("leave-management-view")).toBeVisible();
   await expect(page.getByText(employeeUser.name)).toBeVisible();
   const leaveApproveRequest = page.waitForRequest(
     (request) =>
