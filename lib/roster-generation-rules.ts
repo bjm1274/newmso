@@ -7,13 +7,19 @@ export type RosterGenerationRule = {
   teamKeywords: string[];
   description: string;
   avoidDayAfterNight: boolean;
+  avoidDayAfterEvening: boolean;
+  maxConsecutiveEveningShifts: number;
   offDaysAfterNight: number;
   nightBlockSize: number;
   rotationNightCount: number;
+  minMonthlyOffDays: number;
   maxConsecutiveWorkDays: number;
+  maxConsecutiveWeekendWorkDays: number;
   fixedShiftOnly: boolean;
   balanceRotationBands: boolean;
   distributeWeekendShifts: boolean;
+  distributeHolidayShifts: boolean;
+  separateNewNursesByShift: boolean;
   minDayStaff: number;
   minEveningStaff: number;
   minNightStaff: number;
@@ -45,10 +51,13 @@ function normalizeRule(rule: RosterGenerationRule): RosterGenerationRule {
   return {
     ...rule,
     teamKeywords: [...rule.teamKeywords],
-    offDaysAfterNight: clampInteger(rule.offDaysAfterNight, 0, 3, 1),
-    nightBlockSize: clampInteger(rule.nightBlockSize, 1, 3, 2),
+    maxConsecutiveEveningShifts: clampInteger(rule.maxConsecutiveEveningShifts, 0, 7, 0),
+    offDaysAfterNight: clampInteger(rule.offDaysAfterNight, 0, 5, 1),
+    nightBlockSize: clampInteger(rule.nightBlockSize, 1, 5, 2),
     rotationNightCount: clampInteger(rule.rotationNightCount, 0, 31, 6),
+    minMonthlyOffDays: clampInteger(rule.minMonthlyOffDays, 7, 31, 7),
     maxConsecutiveWorkDays: clampInteger(rule.maxConsecutiveWorkDays, 2, 7, 5),
+    maxConsecutiveWeekendWorkDays: clampInteger(rule.maxConsecutiveWeekendWorkDays, 0, 4, 0),
     minDayStaff: clampInteger(rule.minDayStaff, 0, 20, 0),
     minEveningStaff: clampInteger(rule.minEveningStaff, 0, 20, 0),
     minNightStaff: clampInteger(rule.minNightStaff, 0, 20, 0),
@@ -65,13 +74,19 @@ export function buildDefaultGenerationRule(companyName = ''): RosterGenerationRu
     teamKeywords: [],
     description: '',
     avoidDayAfterNight: true,
+    avoidDayAfterEvening: false,
+    maxConsecutiveEveningShifts: 0,
     offDaysAfterNight: 1,
     nightBlockSize: 2,
     rotationNightCount: 6,
+    minMonthlyOffDays: 7,
     maxConsecutiveWorkDays: 5,
+    maxConsecutiveWeekendWorkDays: 0,
     fixedShiftOnly: true,
     balanceRotationBands: true,
     distributeWeekendShifts: true,
+    distributeHolidayShifts: false,
+    separateNewNursesByShift: false,
     minDayStaff: 0,
     minEveningStaff: 0,
     minNightStaff: 0,
@@ -94,13 +109,19 @@ export function normalizeGenerationRule(record: unknown): RosterGenerationRule |
     teamKeywords: normalizeKeywordList(source.teamKeywords),
     description: String(source.description || '').trim(),
     avoidDayAfterNight: source.avoidDayAfterNight !== false,
-    offDaysAfterNight: clampInteger(source.offDaysAfterNight, 0, 3, 1),
-    nightBlockSize: clampInteger(source.nightBlockSize, 1, 3, 2),
+    avoidDayAfterEvening: source.avoidDayAfterEvening === true,
+    maxConsecutiveEveningShifts: clampInteger(source.maxConsecutiveEveningShifts, 0, 7, 0),
+    offDaysAfterNight: clampInteger(source.offDaysAfterNight, 0, 5, 1),
+    nightBlockSize: clampInteger(source.nightBlockSize, 1, 5, 2),
     rotationNightCount: clampInteger(source.rotationNightCount, 0, 31, 6),
+    minMonthlyOffDays: clampInteger(source.minMonthlyOffDays, 7, 31, 7),
     maxConsecutiveWorkDays: clampInteger(source.maxConsecutiveWorkDays, 2, 7, 5),
+    maxConsecutiveWeekendWorkDays: clampInteger(source.maxConsecutiveWeekendWorkDays, 0, 4, 0),
     fixedShiftOnly: source.fixedShiftOnly !== false,
     balanceRotationBands: source.balanceRotationBands !== false,
     distributeWeekendShifts: source.distributeWeekendShifts !== false,
+    distributeHolidayShifts: source.distributeHolidayShifts === true,
+    separateNewNursesByShift: source.separateNewNursesByShift === true,
     minDayStaff: clampInteger(source.minDayStaff, 0, 20, 0),
     minEveningStaff: clampInteger(source.minEveningStaff, 0, 20, 0),
     minNightStaff: clampInteger(source.minNightStaff, 0, 20, 0),

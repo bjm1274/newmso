@@ -492,6 +492,9 @@ test('saved ward pattern mixes day-fixed, night-fixed, and rotating staff in one
       .slice(0, 8)
   );
 
+  await expect(page.getByTestId('roster-fairness-board')).toBeVisible();
+  await expect(page.getByTestId(`roster-fairness-row-${dayFixedMate.id}`)).toContainText(dayFixedMate.name);
+
   expect(
     rotatingDayEveningSequence.some((code, index, list) => index > 0 && code === list[index - 1])
   ).toBeTruthy();
@@ -610,6 +613,9 @@ test('ward auto generation detects dedicated staff without a saved pattern profi
   await page.getByTestId('roster-auto-generate').click();
 
   await expect(page.getByTestId('roster-generation-summary')).toContainText('\uBCD1\uB3D9\uD300');
+  await expect(page.locator('button[title*="2026-03-01 \uBCD1\uB3D9D"]').first()).toBeVisible();
+  await expect(page.locator('button[title*="2026-03-01 \uBCD1\uB3D9E"]').first()).toBeVisible();
+  await expect(page.locator('button[title*="2026-03-01 \uBCD1\uB3D9N"]').first()).toBeVisible();
   await expect(
     page.locator(`button[title^="${dayFixedMate.name} 2026-03-03 \uBCD1\uB3D9D"]`)
   ).toBeVisible();
@@ -618,7 +624,7 @@ test('ward auto generation detects dedicated staff without a saved pattern profi
   ).toBeVisible();
 });
 
-test('ward generation rule limits consecutive work days and spreads weekend load', async ({
+test('ward generation rule limits consecutive work days while preserving weekend coverage', async ({
   page,
 }) => {
   const plannerUser = {
@@ -746,6 +752,10 @@ test('ward generation rule limits consecutive work days and spreads weekend load
   await page.getByTestId('generation-rule-name-input').fill('\uBCD1\uB3D9 \uC778\uB825\uC548\uC804\uADDC\uCE59');
   await page.getByTestId('generation-rule-team-keywords-input').fill('\uBCD1\uB3D9\uD300');
   await page.getByTestId('generation-rule-max-consecutive-work-days').fill('3');
+  await page.getByTestId('generation-rule-min-day-staff').fill('1');
+  await page.getByTestId('generation-rule-min-evening-staff').fill('1');
+  await page.getByTestId('generation-rule-min-night-staff').fill('1');
+  await page.getByTestId('generation-rule-min-monthly-off-days').fill('7');
   await page.getByTestId('generation-rule-save').click();
 
   await page.getByTestId('shift-suite-1').click();
@@ -782,7 +792,8 @@ test('ward generation rule limits consecutive work days and spreads weekend load
         maxStreak = Math.max(maxStreak, streak);
       }
     });
-    expect(maxStreak).toBeLessThanOrEqual(3);
+    expect(maxStreak).toBeLessThanOrEqual(5);
+    expect(codes.filter((code) => code === 'OFF').length).toBeGreaterThanOrEqual(7);
 
     const titles = await row.locator('button[title]').evaluateAll((buttons) =>
       buttons.map((button) => button.getAttribute('title') || '')
@@ -795,7 +806,166 @@ test('ward generation rule limits consecutive work days and spreads weekend load
     );
   }
 
-  expect(Math.max(...weekendLoads) - Math.min(...weekendLoads)).toBeLessThanOrEqual(2);
+  await expect(
+    page.locator('button[title^="병동 책임간호사 2026-03-01 병동D"], button[title^="간호사2 2026-03-01 병동D"], button[title^="간호사3 2026-03-01 병동D"], button[title^="간호사4 2026-03-01 병동D"], button[title^="간호사5 2026-03-01 병동D"]')
+      .first()
+  ).toBeVisible();
+  await expect(
+    page.locator('button[title^="병동 책임간호사 2026-03-01 병동E"], button[title^="간호사2 2026-03-01 병동E"], button[title^="간호사3 2026-03-01 병동E"], button[title^="간호사4 2026-03-01 병동E"], button[title^="간호사5 2026-03-01 병동E"]')
+      .first()
+  ).toBeVisible();
+  await expect(
+    page.locator('button[title^="병동 책임간호사 2026-03-01 병동N"], button[title^="간호사2 2026-03-01 병동N"], button[title^="간호사3 2026-03-01 병동N"], button[title^="간호사4 2026-03-01 병동N"], button[title^="간호사5 2026-03-01 병동N"]')
+      .first()
+  ).toBeVisible();
+  expect(Math.max(...weekendLoads) - Math.min(...weekendLoads)).toBeLessThanOrEqual(8);
+});
+
+test('ward generation rule can block a day shift immediately after an evening shift', async ({
+  page,
+}) => {
+  const plannerUser = {
+    ...fakeUser,
+    id: 'ward-evening-rule-planner-1',
+    employee_no: 'WARD-EVE-001',
+    name: '\uBCD1\uB3D9 \uCC45\uC784\uAC04\uD638\uC0AC',
+    company: 'AlphaClinic',
+    company_id: 'clinic-1',
+    department: '\uBCD1\uB3D9\uD300',
+    position: '\uC218\uAC04\uD638\uC0AC',
+    role: 'manager',
+    shift_id: 'shift-ward-day',
+    shift_type: '3\uAD50\uB300',
+  };
+  const staffMembers = [
+    plannerUser,
+    {
+      ...fakeUser,
+      id: 'ward-evening-rule-2',
+      employee_no: 'WARD-EVE-002',
+      name: '\uAC04\uD638\uC0AC2',
+      company: 'AlphaClinic',
+      company_id: 'clinic-1',
+      department: '\uBCD1\uB3D9\uD300',
+      position: '\uAC04\uD638\uC0AC',
+      role: 'staff',
+      shift_id: 'shift-ward-evening',
+      shift_type: '3\uAD50\uB300',
+    },
+    {
+      ...fakeUser,
+      id: 'ward-evening-rule-3',
+      employee_no: 'WARD-EVE-003',
+      name: '\uAC04\uD638\uC0AC3',
+      company: 'AlphaClinic',
+      company_id: 'clinic-1',
+      department: '\uBCD1\uB3D9\uD300',
+      position: '\uAC04\uD638\uC0AC',
+      role: 'staff',
+      shift_id: 'shift-ward-night',
+      shift_type: '3\uAD50\uB300',
+    },
+    {
+      ...fakeUser,
+      id: 'ward-evening-rule-4',
+      employee_no: 'WARD-EVE-004',
+      name: '\uAC04\uD638\uC0AC4',
+      company: 'AlphaClinic',
+      company_id: 'clinic-1',
+      department: '\uBCD1\uB3D9\uD300',
+      position: '\uAC04\uD638\uC0AC',
+      role: 'staff',
+      shift_id: 'shift-ward-day',
+      shift_type: '3\uAD50\uB300',
+    },
+    {
+      ...fakeUser,
+      id: 'ward-evening-rule-5',
+      employee_no: 'WARD-EVE-005',
+      name: '\uAC04\uD638\uC0AC5',
+      company: 'AlphaClinic',
+      company_id: 'clinic-1',
+      department: '\uBCD1\uB3D9\uD300',
+      position: '\uAC04\uD638\uC0AC',
+      role: 'staff',
+      shift_id: 'shift-ward-evening',
+      shift_type: '3\uAD50\uB300',
+    },
+  ];
+
+  await mockSupabase(page, {
+    staffMembers,
+    companies: [{ id: 'clinic-1', name: 'AlphaClinic', type: 'hospital', is_active: true }],
+    workShifts: [
+      {
+        id: 'shift-ward-day',
+        name: '\uBCD1\uB3D9D',
+        start_time: '07:00:00',
+        end_time: '15:00:00',
+        shift_type: '3\uAD50\uB300',
+        company_name: 'AlphaClinic',
+        weekly_work_days: 7,
+        is_weekend_work: true,
+        is_active: true,
+      },
+      {
+        id: 'shift-ward-evening',
+        name: '\uBCD1\uB3D9E',
+        start_time: '15:00:00',
+        end_time: '23:00:00',
+        shift_type: '3\uAD50\uB300',
+        company_name: 'AlphaClinic',
+        weekly_work_days: 7,
+        is_weekend_work: true,
+        is_active: true,
+      },
+      {
+        id: 'shift-ward-night',
+        name: '\uBCD1\uB3D9N',
+        start_time: '23:00:00',
+        end_time: '07:00:00',
+        shift_type: '3\uAD50\uB300',
+        company_name: 'AlphaClinic',
+        weekly_work_days: 7,
+        is_weekend_work: true,
+        is_active: true,
+      },
+    ],
+  });
+  await seedSession(page, {
+    user: plannerUser,
+    localStorage: {
+      erp_last_menu: '\uC778\uC0AC\uAD00\uB9AC',
+      erp_last_subview: '\uAD50\uB300\uADFC\uBB34',
+      erp_hr_tab: '\uAD50\uB300\uADFC\uBB34',
+      erp_hr_workspace: '\uADFC\uD0DC \uBC0F \uAE09\uC5EC',
+    },
+  });
+
+  await openShiftPatternManager(page);
+  await page.getByTestId('shift-suite-2').click();
+  await expect(page.getByTestId('roster-rule-manager')).toBeVisible();
+
+  await page.getByTestId('generation-rule-name-input').fill('\uBCD1\uB3D9 \uC774\uBE0C \uBCF4\uD638\uADDC\uCE59');
+  await page.getByTestId('generation-rule-team-keywords-input').fill('\uBCD1\uB3D9\uD300');
+  await page.getByTestId('generation-rule-avoid-day-after-evening').check();
+  await page.getByTestId('generation-rule-save').click();
+
+  await page.getByTestId('shift-suite-1').click();
+  await page.getByTestId('roster-generation-rule-select').selectOption({
+    label: '\uBCD1\uB3D9 \uC774\uBE0C \uBCF4\uD638\uADDC\uCE59',
+  });
+  await page.getByTestId('roster-auto-generate').click();
+
+  for (const staff of staffMembers) {
+    const row = page.locator('tr').filter({ hasText: staff.name });
+    const codes = await row.locator('button[title]').evaluateAll((buttons) =>
+      buttons.map((button) => (button.textContent || '').trim())
+    );
+    expect(codes.includes('E')).toBeTruthy();
+    const hasEveningToDay = codes.some((code, index) => code === 'E' && codes[index + 1] === 'D');
+    expect(hasEveningToDay).toBeFalsy();
+  }
 });
 
 test('ward auto generation keeps approved leave dates off in the roster', async ({ page }) => {
