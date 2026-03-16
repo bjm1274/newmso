@@ -1,13 +1,26 @@
 'use client';
-import { useState, useEffect, useRef, useCallback } from 'react';
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { formatPatientBedLabel, normalizeHandoverNote, type HandoverNoteRow } from '@/lib/handover-notes';
+
+type SearchType = 'staff' | 'post' | 'approval' | 'message' | 'handover';
 
 type SearchResult = {
-  type: 'staff' | 'post' | 'approval' | 'message' | 'handover';
+  type: SearchType;
   id: string;
   title: string;
   subtitle?: string;
   meta?: string;
+};
+
+type GlobalSearchProps = {
+  user: any;
+  onSelect: (type: string, id: string, item?: any) => void;
+  staffs?: any[];
+  posts?: any[];
+  variant?: 'input' | 'icon';
+  compact?: boolean;
 };
 
 export default function GlobalSearch({
@@ -17,180 +30,296 @@ export default function GlobalSearch({
   posts = [],
   variant = 'input',
   compact = false,
-}: {
-  user: any;
-  onSelect: (type: string, id: string, item?: any) => void;
-  staffs?: any[];
-  posts?: any[];
-  variant?: 'input' | 'icon';
-  compact?: boolean;
-}) {
+}: GlobalSearchProps) {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<SearchResult[]>([]);
-  const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
-  const [activeIdx, setActiveIdx] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const listRef = useRef<HTMLDivElement>(null);
+  const [loading, setLoading] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [results, setResults] = useState<SearchResult[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (variant === 'icon' && open) inputRef.current?.focus();
-  }, [variant, open]);
+    if (variant === 'icon' && open) {
+      inputRef.current?.focus();
+    }
+  }, [open, variant]);
 
   useEffect(() => {
-    if (variant !== 'icon' || !open) return;
-    const onOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+    if (!open) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
     };
-    document.addEventListener('click', onOutside);
-    return () => document.removeEventListener('click', onOutside);
-  }, [variant, open]);
 
-  const search = useCallback(async (q: string) => {
-    if (!q || q.trim().length < 2) {
-      setResults([]);
-      return;
-    }
-    setLoading(true);
-    const term = `%${q.trim()}%`;
-    const list: SearchResult[] = [];
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
 
-    try {
-      // 직원 (이름, 부서, 직함)
-      const staffMatches = (staffs || []).filter(
-        (s: any) =>
-          (s.name && String(s.name).toLowerCase().includes(q.trim().toLowerCase())) ||
-          (s.department && String(s.department).toLowerCase().includes(q.trim().toLowerCase())) ||
-          (s.position && String(s.position).toLowerCase().includes(q.trim().toLowerCase())) ||
-          (s.company && String(s.company).toLowerCase().includes(q.trim().toLowerCase()))
-      );
-      staffMatches.slice(0, 5).forEach((s: any) =>
-        list.push({ type: 'staff', id: s.id, title: s.name, subtitle: `${s.department || ''} ${s.position || ''}`.trim(), meta: s.company })
-      );
+  const searchLocally = useMemo(
+    () => (term: string) => {
+      const normalized = term.trim().toLowerCase();
+      const nextResults: SearchResult[] = [];
 
-      // 게시글
-      const postMatches = (posts || []).filter(
-        (p: any) =>
-          (p.title && String(p.title).toLowerCase().includes(q.trim().toLowerCase())) ||
-          (p.content && String(p.content).toLowerCase().includes(q.trim().toLowerCase()))
-      );
-      postMatches.slice(0, 5).forEach((p: any) =>
-        list.push({ type: 'post', id: p.id, title: p.title, subtitle: p.content?.slice(0, 80), meta: p.board_type })
-      );
+      (staffs || [])
+        .filter((staff: any) => {
+          return [
+            staff?.name,
+            staff?.department,
+            staff?.position,
+            staff?.company,
+          ]
+            .filter(Boolean)
+            .some((value) => String(value).toLowerCase().includes(normalized));
+        })
+        .slice(0, 5)
+        .forEach((staff: any) => {
+          nextResults.push({
+            type: 'staff',
+            id: String(staff.id),
+            title: staff.name || '이름 없음',
+            subtitle: [staff.department, staff.position].filter(Boolean).join(' '),
+            meta: staff.company || '',
+          });
+        });
 
-      // 결재 (실시간 조회)
-      const { data: approvalsByTitle } = await supabase.from('approvals').select('id, title, type, status, sender_name, created_at').ilike('title', term);
-      const { data: approvalsByContent } = await supabase.from('approvals').select('id, title, type, status, sender_name, created_at').ilike('content', term);
-      const approvalMap = new Map<string, any>();
-      [...(approvalsByTitle || []), ...(approvalsByContent || [])].forEach((a: any) => approvalMap.set(a.id, a));
-      Array.from(approvalMap.values()).slice(0, 5).forEach((a: any) =>
-        list.push({ type: 'approval', id: a.id, title: a.title, subtitle: a.sender_name, meta: `${a.type} · ${a.status}` })
-      );
+      (posts || [])
+        .filter((post: any) => {
+          return [post?.title, post?.content]
+            .filter(Boolean)
+            .some((value) => String(value).toLowerCase().includes(normalized));
+        })
+        .slice(0, 5)
+        .forEach((post: any) => {
+          nextResults.push({
+            type: 'post',
+            id: String(post.id),
+            title: post.title || '제목 없음',
+            subtitle: String(post.content || '').slice(0, 80),
+            meta: post.board_type || '',
+          });
+        });
 
-      // 채팅 (내가 참여한 방의 메시지)
-      const { data: myRooms } = await supabase.from('chat_rooms').select('id').contains('members', [user?.id]);
-      const roomIds = (myRooms || []).map((r: any) => r.id);
-      if (roomIds.length > 0) {
-        const { data: msgs } = await supabase
-          .from('messages')
-          .select('id, content, room_id')
-          .in('room_id', roomIds)
-          .ilike('content', term)
-          .eq('is_deleted', false)
-          .order('created_at', { ascending: false })
-          .limit(5);
-        (msgs || []).forEach((m: any) =>
-          list.push({ type: 'message', id: m.id, title: (m.content || '').slice(0, 60), subtitle: '채팅', meta: '' })
-        );
+      return nextResults;
+    },
+    [posts, staffs]
+  );
+
+  const search = useCallback(
+    async (term: string) => {
+      const normalized = term.trim();
+      if (normalized.length < 2) {
+        setResults([]);
+        setLoading(false);
+        return;
       }
 
-      // 병동팀 한정 인계노트 검색
-      if (user?.department === '병동팀') {
-        const { data: notes } = await supabase
-          .from('handover_notes')
-          .select('id, content, author_name, created_at')
-          .ilike('content', term)
-          .order('created_at', { ascending: false })
+      setLoading(true);
+      const nextResults = searchLocally(normalized);
+      const likeTerm = `%${normalized}%`;
+
+      try {
+        const { data: approvalsByTitle } = await supabase
+          .from('approvals')
+          .select('id, title, type, status, sender_name')
+          .ilike('title', likeTerm)
           .limit(5);
 
-        (notes || []).forEach((n: any) =>
-          list.push({ type: 'handover', id: n.id, title: (n.content || '').slice(0, 60), subtitle: `[인계] ${n.author_name}`, meta: n.created_at.slice(0, 10).replace(/-/g, '.') })
-        );
-      }
+        const { data: approvalsByContent } = await supabase
+          .from('approvals')
+          .select('id, title, type, status, sender_name')
+          .ilike('content', likeTerm)
+          .limit(5);
 
-      setResults(list);
-      setActiveIdx(0);
-    } catch (e) {
-      console.error(e);
-      setResults([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.id, staffs, posts]);
+        const approvalMap = new Map<string, any>();
+        [...(approvalsByTitle || []), ...(approvalsByContent || [])].forEach((approval: any) => {
+          approvalMap.set(String(approval.id), approval);
+        });
+        Array.from(approvalMap.values())
+          .slice(0, 5)
+          .forEach((approval: any) => {
+            nextResults.push({
+              type: 'approval',
+              id: String(approval.id),
+              title: approval.title || '결재 문서',
+              subtitle: approval.sender_name || '',
+              meta: [approval.type, approval.status].filter(Boolean).join(' · '),
+            });
+          });
+
+        if (user?.id) {
+          const { data: myRooms } = await supabase
+            .from('chat_rooms')
+            .select('id')
+            .contains('members', [user.id]);
+
+          const roomIds = (myRooms || []).map((room: any) => room.id).filter(Boolean);
+          if (roomIds.length > 0) {
+            const { data: messages } = await supabase
+              .from('messages')
+              .select('id, content')
+              .in('room_id', roomIds)
+              .ilike('content', likeTerm)
+              .eq('is_deleted', false)
+              .order('created_at', { ascending: false })
+              .limit(5);
+
+            (messages || []).forEach((message: any) => {
+              nextResults.push({
+                type: 'message',
+                id: String(message.id),
+                title: String(message.content || '').slice(0, 60) || '채팅 메시지',
+                subtitle: '채팅',
+              });
+            });
+          }
+        }
+
+        if (user?.department === '병동팀') {
+          const { data: notes } = await supabase
+            .from('handover_notes')
+            .select('id, content, author_name, created_at')
+            .ilike('content', likeTerm)
+            .order('created_at', { ascending: false })
+            .limit(5);
+
+          (notes || []).forEach((note: any) => {
+            const normalized = normalizeHandoverNote(note as HandoverNoteRow);
+            if (normalized.handover_kind === 'room_config') return;
+            nextResults.push({
+              type: 'handover',
+              id: String(normalized.id),
+              title: normalized.content.slice(0, 60) || '인계노트',
+              subtitle: normalized.note_scope === 'patient'
+                ? formatPatientBedLabel(normalized)
+                : (normalized.author_name ? `[인계] ${normalized.author_name}` : '인계노트'),
+              meta: normalized.handover_date || (normalized.created_at ? String(normalized.created_at).slice(0, 10) : ''),
+            });
+          });
+        }
+
+        setResults(nextResults);
+        setActiveIndex(0);
+      } catch (error) {
+        console.error('통합 검색 실패:', error);
+        setResults(nextResults);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [searchLocally, user?.department, user?.id]
+  );
 
   useEffect(() => {
-    const t = setTimeout(() => search(query), 300);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => {
+      void search(query);
+    }, 250);
+
+    return () => clearTimeout(timer);
   }, [query, search]);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleSelect = (result: SearchResult) => {
+    onSelect(result.type, result.id, result);
+    setOpen(false);
+    setQuery('');
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (!open) return;
-    if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIdx((i) => Math.min(i + 1, results.length - 1)); return; }
-    if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIdx((i) => Math.max(i - 1, 0)); return; }
-    if (e.key === 'Enter' && results[activeIdx]) {
-      e.preventDefault();
-      const r = results[activeIdx];
-      onSelect(r.type, r.id);
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setActiveIndex((prev) => Math.min(prev + 1, Math.max(results.length - 1, 0)));
+      return;
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setActiveIndex((prev) => Math.max(prev - 1, 0));
+      return;
+    }
+    if (event.key === 'Enter' && results[activeIndex]) {
+      event.preventDefault();
+      handleSelect(results[activeIndex]);
+    }
+    if (event.key === 'Escape') {
       setOpen(false);
-      setQuery('');
     }
   };
 
-  const typeLabel: Record<string, string> = { staff: '👤 직원', post: '📋 게시글', approval: '✍️ 결재', message: '💬 채팅', handover: '📝 인계' };
+  const typeLabel: Record<SearchType, string> = {
+    staff: '직원',
+    post: '게시글',
+    approval: '결재',
+    message: '채팅',
+    handover: '인계',
+  };
 
-  const dropdown = open && (variant === 'icon' ? true : query.length >= 2 || results.length > 0) ? (
+  const dropdown = open ? (
     <div
-      ref={listRef}
-      className={`absolute z-[999] bg-[var(--toss-card)] rounded-[12px] shadow-lg border border-[var(--toss-border)] overflow-hidden max-h-[320px] overflow-y-auto ${variant === 'icon' ? 'left-full top-0 ml-1 min-w-[280px]' : 'top-full left-0 right-0 mt-1'
-        }`}
+      className={`absolute z-[999] overflow-hidden rounded-[14px] border border-[var(--toss-border)] bg-[var(--toss-card)] shadow-lg ${
+        variant === 'icon'
+          ? 'left-full top-0 ml-2 min-w-[320px]'
+          : 'left-0 right-0 top-full mt-2'
+      }`}
     >
-      {variant === 'icon' && (
-        <div className="p-2 border-b border-[var(--toss-border)]">
+      {variant === 'icon' ? (
+        <div className="border-b border-[var(--toss-border)] p-2">
           <input
             ref={inputRef}
             type="search"
-            placeholder="직원·게시글·결재·채팅 검색..."
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(event) => setQuery(event.target.value)}
             onKeyDown={handleKeyDown}
-            className="w-full min-h-[40px] px-3 py-2 rounded-[10px] bg-[var(--input-bg)] text-sm text-[var(--foreground)] placeholder:text-[var(--toss-gray-3)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+            placeholder="직원, 게시글, 결재, 채팅 검색"
+            className="w-full rounded-[12px] bg-[var(--input-bg)] px-3 py-2 text-sm text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20"
           />
         </div>
-      )}
-      {(query.length >= 2 || results.length > 0) && (
-        <>
-          {loading ? (
-            <div className="p-6 text-center text-[var(--toss-gray-3)] text-sm">검색 중...</div>
-          ) : results.length === 0 ? (
-            <div className="p-6 text-center text-[var(--toss-gray-3)] text-sm">검색 결과 없음</div>
-          ) : (
-            results.map((r, i) => (
-              <button
-                key={`${r.type}-${r.id}`}
-                type="button"
-                onMouseDown={(e) => { e.preventDefault(); onSelect(r.type, r.id); setOpen(false); setQuery(''); }}
-                className={`w-full text-left min-h-[44px] px-4 py-3 flex gap-3 items-start hover:bg-[var(--toss-gray-1)] transition-colors touch-manipulation ${i === activeIdx ? 'bg-[var(--toss-blue-light)]' : ''}`}
-              >
-                <span className="text-[10px] font-semibold text-[var(--toss-gray-3)] shrink-0">{typeLabel[r.type]}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-[var(--foreground)] truncate">{r.title}</p>
-                  {r.subtitle && <p className="text-xs text-[var(--toss-gray-3)] truncate">{r.subtitle}</p>}
+      ) : null}
+
+      {query.trim().length < 2 ? (
+        <div className="px-4 py-6 text-center text-sm text-[var(--toss-gray-3)]">
+          두 글자 이상 입력해 주세요.
+        </div>
+      ) : loading ? (
+        <div className="px-4 py-6 text-center text-sm text-[var(--toss-gray-3)]">
+          검색 중입니다.
+        </div>
+      ) : results.length === 0 ? (
+        <div className="px-4 py-6 text-center text-sm text-[var(--toss-gray-3)]">
+          검색 결과가 없습니다.
+        </div>
+      ) : (
+        <div className="max-h-[320px] overflow-y-auto">
+          {results.map((result, index) => (
+            <button
+              key={`${result.type}-${result.id}`}
+              type="button"
+              onMouseDown={(event) => {
+                event.preventDefault();
+                handleSelect(result);
+              }}
+              className={`flex w-full items-start gap-3 px-4 py-3 text-left transition ${
+                index === activeIndex ? 'bg-[var(--toss-blue-light)]' : 'hover:bg-[var(--page-bg)]'
+              }`}
+            >
+              <span className="shrink-0 text-[10px] font-semibold text-[var(--toss-gray-3)]">
+                {typeLabel[result.type]}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-semibold text-[var(--foreground)]">
+                  {result.title}
                 </div>
-              </button>
-            ))
-          )}
-        </>
+                {result.subtitle ? (
+                  <div className="truncate text-xs text-[var(--toss-gray-3)]">{result.subtitle}</div>
+                ) : null}
+                {result.meta ? (
+                  <div className="truncate text-[11px] text-[var(--toss-gray-3)]">{result.meta}</div>
+                ) : null}
+              </div>
+            </button>
+          ))}
+        </div>
       )}
     </div>
   ) : null;
@@ -200,33 +329,31 @@ export default function GlobalSearch({
       <div className="relative" ref={containerRef}>
         <button
           type="button"
-          onClick={() => setOpen((o) => !o)}
-          className={`flex items-center justify-center text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)] hover:text-[var(--foreground)] transition-colors touch-manipulation ${
-            compact
-              ? 'min-h-[30px] min-w-[30px] rounded-full p-1'
-              : 'min-h-[44px] min-w-[44px] rounded-[12px] p-2'
+          onClick={() => setOpen((prev) => !prev)}
+          className={`flex items-center justify-center rounded-[12px] text-[var(--toss-gray-3)] transition hover:bg-[var(--page-bg)] hover:text-[var(--foreground)] ${
+            compact ? 'min-h-[38px] min-w-[38px] p-2' : 'min-h-[44px] min-w-[44px] p-2.5'
           }`}
           aria-label="검색"
         >
-          <span className={compact ? 'text-lg' : 'text-xl'}>🔍</span>
+          <span className="text-lg">⌕</span>
         </button>
-        {open && dropdown}
+        {dropdown}
       </div>
     );
   }
 
   return (
-    <div className="relative">
+    <div className="relative" ref={containerRef}>
       <input
         ref={inputRef}
         type="search"
-        placeholder="직원·게시글·결재·채팅 검색..."
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={(event) => setQuery(event.target.value)}
         onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 200)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
         onKeyDown={handleKeyDown}
-        className="w-full max-w-[240px] min-h-[44px] px-4 py-2 rounded-[12px] bg-[var(--input-bg)] text-sm text-[var(--foreground)] placeholder:text-[var(--toss-gray-3)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 touch-manipulation"
+        placeholder="직원, 게시글, 결재, 채팅 검색"
+        className="w-full rounded-[12px] bg-[var(--input-bg)] px-4 py-2 text-sm text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20"
       />
       {dropdown}
     </div>

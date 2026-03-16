@@ -1,487 +1,795 @@
-'use client';
+﻿'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { withMissingColumnsFallback } from '@/lib/supabase-compat';
+import {
+  buildBedKey,
+  buildHandoverSearchText,
+  buildPatientKey,
+  buildRoomConfigNoteContent,
+  encodeHandoverContent,
+  formatBedLabel,
+  formatPatientBedLabel,
+  normalizeHandoverNote,
+  normalizeHandoverRoomConfigs,
+  normalizeRoomCapacity,
+  normalizeRoomNumber,
+  parseRoomConfigsFromNote,
+  type HandoverNote,
+  type HandoverNoteRow,
+  type HandoverNoteScope,
+  type HandoverRoomConfig,
+} from '@/lib/handover-notes';
 
-interface HandoverNote {
-    id: string;
-    content: string;
-    author_id: string;
-    author_name: string;
-    shift: string; // Day, Evening, Night
-    priority: string; // High, Normal
-    created_at: string;
-    is_completed: boolean;
+type Props = { user?: any };
+type BedOption = {
+  bedKey: string;
+  roomNumber: string;
+  roomCapacity: number;
+  bedNumber: number;
+  patientName: string;
+  label: string;
+};
+
+type Summary = { general: number; patient: number; total: number };
+type RoomStatus = 'idle' | 'saving' | 'saved' | 'error';
+
+const WEEKDAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
+const DEFAULT_SHIFT = 'Day';
+const DEFAULT_PRIORITY = 'Normal';
+const DEFAULT_SCOPE: HandoverNoteScope = 'general';
+
+function pad(value: number) {
+  return String(value).padStart(2, '0');
 }
 
-export default function HandoverNotes({ user }: { user: any }) {
-    const [notes, setNotes] = useState<HandoverNote[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [searchQuery, setSearchQuery] = useState('');
+function toDateKey(date: Date) {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
 
-    // Calendar State
-    const [currentDate, setCurrentDate] = useState(new Date());
-    const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-    const [isCalendarVisible, setIsCalendarVisible] = useState(true);
+function fromDateKey(value: string) {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, (month || 1) - 1, day || 1);
+}
 
-    // Form State
-    const [isComposing, setIsComposing] = useState(false);
-    const [newContent, setNewContent] = useState('');
-    const [newShift, setNewShift] = useState('Day');
-    const [newPriority, setNewPriority] = useState('Normal');
+function monthStart(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
 
-    // Edit State
-    const [editingId, setEditingId] = useState<string | null>(null);
-    const [editContent, setEditContent] = useState('');
-    const [editShift, setEditShift] = useState('Day');
-    const [editPriority, setEditPriority] = useState('Normal');
+function monthGrid(date: Date) {
+  const firstDay = monthStart(date);
+  const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  const cells: Array<Date | null> = [];
 
-    useEffect(() => {
-        fetchNotes();
-    }, []);
+  for (let index = 0; index < firstDay.getDay(); index += 1) {
+    cells.push(null);
+  }
+  for (let day = 1; day <= lastDay.getDate(); day += 1) {
+    cells.push(new Date(date.getFullYear(), date.getMonth(), day));
+  }
+  while (cells.length % 7 !== 0) {
+    cells.push(null);
+  }
+  return cells;
+}
 
-    const fetchNotes = async () => {
-        setLoading(true);
-        try {
-            const { data, error } = await supabase
-                .from('handover_notes')
-                .select('*')
-                .order('created_at', { ascending: false })
-                .limit(500); // 달력에 뿌리기 위해 조금 더 많이 가져옵니다.
+function monthLabel(date: Date) {
+  return date.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' });
+}
 
-            if (error) {
-                console.warn('Supabase fetch failed:', error.message);
-                setNotes([]);
-            } else {
-                setNotes(data || []);
-            }
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
+function fullDateLabel(date: Date) {
+  return date.toLocaleDateString('ko-KR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    weekday: 'long',
+  });
+}
+
+function createdLabel(value?: string | null) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function emptySummary(): Summary {
+  return { general: 0, patient: 0, total: 0 };
+}
+
+function compareRooms(left?: string | null, right?: string | null) {
+  return String(left || '').localeCompare(String(right || ''), 'ko-KR', {
+    numeric: true,
+    sensitivity: 'base',
+  });
+}
+
+function createRoom(roomNumber: string, capacity: number): HandoverRoomConfig {
+  return {
+    id: crypto.randomUUID(),
+    roomNumber,
+    capacity,
+    beds: Array.from({ length: capacity }, (_, index) => ({
+      bedNumber: index + 1,
+      patientName: '',
+    })),
+  };
+}
+
+export default function HandoverNotes({ user }: Props) {
+  const [notes, setNotes] = useState<HandoverNote[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedDate, setSelectedDate] = useState(() => new Date());
+  const [shift, setShift] = useState(DEFAULT_SHIFT);
+  const [priority, setPriority] = useState(DEFAULT_PRIORITY);
+  const [noteScope, setNoteScope] = useState<HandoverNoteScope>(DEFAULT_SCOPE);
+  const [content, setContent] = useState('');
+  const [roomConfigs, setRoomConfigs] = useState<HandoverRoomConfig[]>([]);
+  const [selectedBedKey, setSelectedBedKey] = useState('');
+  const [newRoomNumber, setNewRoomNumber] = useState('');
+  const [newRoomCapacity, setNewRoomCapacity] = useState(4);
+  const [roomStatus, setRoomStatus] = useState<RoomStatus>('idle');
+  const [showBedSettings, setShowBedSettings] = useState(false);
+
+  const skipRoomPersistRef = useRef(true);
+  const roomStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const selectedDateKey = useMemo(() => toDateKey(selectedDate), [selectedDate]);
+  const todayKey = useMemo(() => toDateKey(new Date()), []);
+  const currentMonth = useMemo(() => new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1), [selectedDate]);
+  const currentMonthGrid = useMemo(() => monthGrid(currentMonth), [currentMonth]);
+
+  useEffect(() => {
+    void loadNotes();
+    return () => {
+      if (roomStatusTimerRef.current) clearTimeout(roomStatusTimerRef.current);
     };
+  }, []);
 
-    const handleCreateNote = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!newContent.trim()) return;
-
-        // 선택된 날짜의 현재 시간으로 작성 (또는 단순히 선택된 날짜의 09:00 등으로 고정할 수도 있으나, 여기선 실제 시간 사용하되 날짜는 선택된 날짜로)
-        const now = new Date();
-        const created_at = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), now.getHours(), now.getMinutes(), now.getSeconds()).toISOString();
-
-        const newNote = {
-            content: newContent,
-            author_id: user?.id || 'unknown',
-            author_name: user?.name || '알 수 없음',
-            shift: newShift,
-            priority: newPriority,
-            is_completed: false,
-            created_at: created_at
-        };
-
-        try {
-            const { data, error } = await supabase
-                .from('handover_notes')
-                .insert([newNote])
-                .select();
-
-            if (error) {
-                alert('인계사항 저장에 실패했습니다. (DB 연결 확인 필요)');
-            } else if (data) {
-                setNotes([data[0] as HandoverNote, ...notes]);
-            }
-        } catch (err) {
-            console.error(err);
-        }
-
-        setNewContent('');
-        setIsComposing(false);
-    };
-
-    const toggleComplete = async (id: string, currentStatus: boolean) => {
-        setNotes(prev => prev.map(n => n.id === id ? { ...n, is_completed: !currentStatus } : n));
-        const { error } = await supabase
-            .from('handover_notes')
-            .update({ is_completed: !currentStatus })
-            .eq('id', id);
-        if (error) {
-            console.error('인계 완료 상태 변경 실패:', error);
-            setNotes(prev => prev.map(n => n.id === id ? { ...n, is_completed: currentStatus } : n));
-        }
-    };
-
-    // 수정 시작
-    const startEditing = (note: HandoverNote) => {
-        setEditingId(note.id);
-        setEditContent(note.content);
-        setEditShift(note.shift);
-        setEditPriority(note.priority);
-    };
-
-    // 수정 저장
-    const handleUpdateNote = async (id: string) => {
-        if (!editContent.trim()) return;
-        setNotes(notes.map(n => n.id === id ? { ...n, content: editContent, shift: editShift, priority: editPriority } : n));
-        setEditingId(null);
-        try {
-            await supabase
-                .from('handover_notes')
-                .update({ content: editContent, shift: editShift, priority: editPriority })
-                .eq('id', id);
-        } catch (err) {
-            console.error(err);
-            alert('수정에 실패했습니다.');
-            fetchNotes();
-        }
-    };
-
-    // 삭제
-    const handleDeleteNote = async (id: string) => {
-        if (!confirm('이 인계사항을 삭제하시겠습니까?')) return;
-        setNotes(notes.filter(n => n.id !== id));
-        try {
-            await supabase
-                .from('handover_notes')
-                .delete()
-                .eq('id', id);
-        } catch (err) {
-            console.error(err);
-            alert('삭제에 실패했습니다.');
-            fetchNotes();
-        }
-    };
-
-    // Calendar Helpers
-    const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
-    const getFirstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay();
-
-    const currentYear = currentDate.getFullYear();
-    const currentMonth = currentDate.getMonth();
-
-    const handlePrevMonth = () => {
-        setCurrentDate(new Date(currentYear, currentMonth - 1, 1));
-        setIsCalendarVisible(true);
-    };
-    const handleNextMonth = () => {
-        setCurrentDate(new Date(currentYear, currentMonth + 1, 1));
-        setIsCalendarVisible(true);
-    };
-
-    const isSameDate = (d1: Date, stringDate: string) => {
-        const d2 = new Date(stringDate);
-        return d1.getFullYear() === d2.getFullYear() &&
-            d1.getMonth() === d2.getMonth() &&
-            d1.getDate() === d2.getDate();
-    };
-
-    // Filter Logic
-    const isSearching = searchQuery.trim().length > 0;
-
-    const filteredNotes = useMemo(() => {
-        if (isSearching) {
-            const q = searchQuery.toLowerCase();
-            return notes.filter(n => n.content.toLowerCase().includes(q) || n.author_name.toLowerCase().includes(q));
-        } else {
-            return notes.filter(n => isSameDate(selectedDate, n.created_at));
-        }
-    }, [notes, isSearching, searchQuery, selectedDate]);
-
-    // Calendar Cells Generation
-    const daysInMonth = getDaysInMonth(currentYear, currentMonth);
-    const firstDay = getFirstDayOfMonth(currentYear, currentMonth);
-    const blanks = Array.from({ length: firstDay }, (_, i) => i);
-    const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
-
-    const checkNotesForDay = (day: number) => {
-        const d = new Date(currentYear, currentMonth, day);
-        return notes.filter(n => isSameDate(d, n.created_at));
-    };
-
-    return (
-        <div className="bg-[var(--page-bg)] animate-in fade-in duration-300">
-            {/* Header & Search */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-6 bg-white border-b border-[var(--toss-border)] shrink-0 gap-4">
-                <div>
-                    <h2 className="text-xl font-bold text-[var(--foreground)] flex items-center gap-2">
-                        <span>📝</span> 병동 인계노트
-                    </h2>
-                </div>
-                <div className="flex items-center gap-3 w-full md:w-auto">
-                    <div className="relative flex-1 md:w-64">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
-                        <input
-                            type="text"
-                            placeholder="내용 또는 작성자 검색..."
-                            value={searchQuery}
-                            onChange={(e) => {
-                                setSearchQuery(e.target.value);
-                                if (e.target.value.trim().length > 0) setIsCalendarVisible(false);
-                            }}
-                            className="w-full pl-9 pr-4 py-2 text-sm font-medium bg-gray-100 border-none rounded-2xl focus:ring-2 focus:ring-[var(--toss-blue)]/50 outline-none transition-all placeholder:text-gray-400"
-                        />
-                        {searchQuery && (
-                            <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs font-bold">✕</button>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            <div>
-                {/* 1. Calendar View */}
-                {!isSearching && (
-                    <div className="p-1 md:p-2 bg-gray-50/50">
-                        <div className="flex justify-between items-center mb-1">
-                            <button onClick={handlePrevMonth} className="px-3 py-1 bg-white border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 font-bold transition-colors">⟵</button>
-                            <h3 className="text-base font-bold text-gray-800 tracking-tight">{currentYear}년 {currentMonth + 1}월</h3>
-                            <button onClick={handleNextMonth} className="px-3 py-1 bg-white border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 font-bold transition-colors">⟶</button>
-                        </div>
-
-                        <div className="grid grid-cols-7 gap-1 flex-1">
-                            {['일', '월', '화', '수', '목', '금', '토'].map(day => (
-                                <div key={day} className="text-center text-[10px] font-bold text-gray-400 py-2 uppercase tracking-widest">{day}</div>
-                            ))}
-
-                            {blanks.map(b => <div key={`blank-${b}`} className="min-h-[20px] md:min-h-0 bg-transparent rounded-xl border border-transparent"></div>)}
-
-                            {days.map(day => {
-                                const dateObj = new Date(currentYear, currentMonth, day);
-                                const isSelected = selectedDate.getDate() === day && selectedDate.getMonth() === currentMonth && selectedDate.getFullYear() === currentYear;
-                                const today = new Date();
-                                const isToday = today.getDate() === day && today.getMonth() === currentMonth && today.getFullYear() === currentYear;
-
-                                const dayNotes = checkNotesForDay(day);
-                                const uncompletedHtml = dayNotes.filter(n => !n.is_completed).length;
-                                const hasHighPriority = dayNotes.some(n => n.priority === 'High' && !n.is_completed);
-
-                                return (
-                                    <button
-                                        key={day}
-                                        onClick={() => {
-                                            setSelectedDate(dateObj);
-                                        }}
-                                        className={`
-                                                relative p-0.5 md:p-1 flex flex-col items-center md:items-start min-h-[24px] md:min-h-[28px] overflow-hidden rounded-lg border transition-all
-                                                ${isSelected ? 'bg-blue-50/80 border-[var(--toss-blue)]/50 ring-1 ring-[var(--toss-blue)]/20 shadow-sm z-10' : 'bg-white border-transparent hover:border-gray-200 hover:bg-gray-50/80 hover:shadow-sm'}
-                                                ${isToday && !isSelected ? 'border-blue-100 bg-blue-50/20' : ''}
-                                            `}
-                                    >
-                                        <span className={`text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full mb-0 ${isToday ? 'bg-[var(--toss-blue)] text-white shadow-sm' : isSelected ? 'text-[var(--toss-blue)]' : 'text-gray-700'}`}>
-                                            {day}
-                                        </span>
-
-                                        <div className="flex gap-1 flex-wrap mt-auto w-full justify-center md:justify-start px-0.5">
-                                            {hasHighPriority && <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 shadow-sm shadow-red-500/30"></span>}
-                                            {uncompletedHtml > 0 && <span className="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0 shadow-sm shadow-orange-400/30"></span>}
-                                            {dayNotes.length > 0 && uncompletedHtml === 0 && <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0 shadow-sm shadow-green-400/30"></span>}
-                                        </div>
-
-                                        {/* PC 뷰 전용 텍스트 지시자 (공간 확보를 위해 아주 작게 하거나 생략) */}
-                                        <div className="hidden md:block w-full text-[7px] font-bold text-gray-400 mt-0 truncate px-0.5">
-                                            {uncompletedHtml > 0 ? `${uncompletedHtml}개` : dayNotes.length > 0 ? '완료' : ''}
-                                        </div>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-                )}
-
-                {/* 2. Detail & Search Results View */}
-                <div className="bg-white relative">
-                    <div className="p-4 md:p-4 pb-2 shrink-0 border-b border-[var(--toss-border)] bg-white sticky top-0 z-20 flex justify-between items-end">
-                        <div className="space-y-1">
-                            {isSearching ? (
-                                <>
-                                    <h3 className="text-xl font-bold text-gray-900 tracking-tight">검색 결과</h3>
-                                    <p className="text-sm font-semibold text-[var(--toss-blue)]">&quot;{searchQuery}&quot;에 대한 인계사항</p>
-                                </>
-                            ) : (
-                                <div className="flex items-center gap-3">
-                                    <div className="flex flex-col space-y-1">
-                                        <h3 className="text-2xl font-black text-gray-900 tracking-tight">
-                                            {selectedDate.getDate()}일 <span className="text-lg text-gray-400 font-bold ml-1">{['일', '월', '화', '수', '목', '금', '토'][selectedDate.getDay()]}요일</span>
-                                        </h3>
-                                        <p className="text-xs font-bold text-gray-400 tracking-widest uppercase">{selectedDate.getFullYear()}. {String(selectedDate.getMonth() + 1).padStart(2, '0')}</p>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                        {!isSearching && (
-                            <button
-                                onClick={() => setIsComposing(!isComposing)}
-                                className={`px-4 py-2.5 text-[12px] font-bold rounded-xl transition-all shadow-sm flex items-center gap-2 ${isComposing ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-gray-900 text-white hover:bg-black hover:scale-105 active:scale-95'}`}
-                            >
-                                {isComposing ? '작성 취소' : '✍️ 새 인계사항'}
-                            </button>
-                        )}
-                    </div>
-
-                    <div className="bg-gray-50/30 p-4 md:p-6 relative z-10 inner-shadow-sm">
-                        {isComposing && !isSearching && (
-                            <form onSubmit={handleCreateNote} className="bg-white p-5 rounded-3xl border border-gray-200/60 shadow-lg shadow-gray-200/50 space-y-4 mb-6 animate-in slide-in-from-top-4">
-                                <div className="flex gap-2">
-                                    <select
-                                        value={newShift}
-                                        onChange={(e) => setNewShift(e.target.value)}
-                                        className="py-2.5 px-4 bg-gray-50 border-none font-bold rounded-xl text-xs outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 text-gray-700 cursor-pointer"
-                                    >
-                                        <option value="Day">☀️ Day 근무조</option>
-                                        <option value="Evening">🌆 Evening 근무조</option>
-                                        <option value="Night">🌙 Night 근무조</option>
-                                    </select>
-                                    <select
-                                        value={newPriority}
-                                        onChange={(e) => setNewPriority(e.target.value)}
-                                        className={`py-2.5 px-4 border-none font-bold rounded-xl text-xs outline-none focus:ring-2 cursor-pointer transition-colors ${newPriority === 'High' ? 'bg-red-50 text-red-700 focus:ring-red-200' : 'bg-gray-50 text-gray-700 focus:ring-[var(--toss-blue)]/30'}`}
-                                    >
-                                        <option value="Normal">🟢 일반 전달사항</option>
-                                        <option value="High">🔥 병동 중요사항</option>
-                                    </select>
-                                </div>
-                                <textarea
-                                    value={newContent}
-                                    onChange={(e) => setNewContent(e.target.value)}
-                                    placeholder="다음 근무자가 반드시 알아야 할 환자 특이사항, 처방 변경, 비품 부족 등의 내용을 상세히 입력하세요..."
-                                    className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-medium outline-none focus:bg-white focus:ring-2 focus:ring-[var(--toss-blue)]/20 transition-all resize-none h-32 custom-scrollbar placeholder:text-gray-400"
-                                    autoFocus
-                                />
-                                <div className="flex justify-end gap-2 pt-1 border-t border-gray-100">
-                                    <button
-                                        type="submit"
-                                        disabled={!newContent.trim() || loading}
-                                        className="px-6 py-3 bg-[var(--toss-blue)] text-white text-xs font-black tracking-wide rounded-xl disabled:opacity-50 disabled:bg-gray-300 transition-all active:scale-95 shadow-md shadow-blue-500/20"
-                                    >
-                                        {loading ? '저장 중...' : '작성 완료'}
-                                    </button>
-                                </div>
-                            </form>
-                        )}
-
-                        {loading ? (
-                            <div className="flex justify-center py-20">
-                                <div className="w-10 h-10 border-4 border-gray-100 border-t-[var(--toss-blue)] rounded-full animate-spin"></div>
-                            </div>
-                        ) : filteredNotes.length === 0 ? (
-                            <div className="text-center py-24 px-4 h-full flex flex-col items-center justify-center">
-                                <div className="text-6xl mb-6 opacity-30 grayscale saturate-0 animate-pulse">📋</div>
-                                <h4 className="text-lg font-bold text-gray-800 mb-1">{isSearching ? '검색 결과가 없습니다' : '전달된 인계사항이 없습니다'}</h4>
-                                <p className="text-sm font-medium text-gray-400 max-w-xs leading-relaxed">
-                                    {isSearching ? '다른 검색어를 입력해보세요.' : '평화로운 하루네요! 특이사항이 발생하면 새 인계사항을 작성해주세요.'}
-                                </p>
-                            </div>
-                        ) : (
-                            <div className="space-y-4">
-                                {filteredNotes.map((note) => (
-                                    <div
-                                        key={note.id}
-                                        className={`p-5 rounded-3xl border transition-all duration-300 relative overflow-hidden group 
-                                            ${note.is_completed
-                                                ? 'bg-gray-50/50 border-gray-200'
-                                                : note.priority === 'High'
-                                                    ? 'bg-white border-red-200 shadow-sm shadow-red-100/50 hover:shadow-md hover:shadow-red-200/50 hover:-translate-y-0.5'
-                                                    : 'bg-white border-gray-200 shadow-sm shadow-gray-100/50 hover:border-gray-300 hover:shadow-md hover:shadow-gray-200/50 hover:-translate-y-0.5'
-                                            }`}
-                                    >
-                                        {/* Status Line */}
-                                        <div className={`absolute top-0 left-0 w-1.5 h-full ${note.is_completed ? 'bg-gray-300' : note.priority === 'High' ? 'bg-red-500' : 'bg-blue-400'}`}></div>
-
-                                        <div className="flex justify-between items-start mb-3 ml-2">
-                                            <div className="flex items-center gap-2 flex-wrap text-xs font-bold">
-                                                <span className={`px-2.5 py-1 rounded-lg ${note.is_completed ? 'bg-gray-200 text-gray-500' : note.shift === 'Day' ? 'bg-orange-100 text-orange-700' : note.shift === 'Evening' ? 'bg-purple-100 text-purple-700' : 'bg-indigo-100 text-indigo-700'}`}>
-                                                    {note.shift === 'Day' ? '☀️ Day' : note.shift === 'Evening' ? '🌆 Ev' : '🌙 Night'}
-                                                </span>
-                                                {note.priority === 'High' && !note.is_completed && (
-                                                    <span className="px-2.5 py-1 rounded-lg bg-red-100 text-red-600 animate-pulse">
-                                                        🔥 중요
-                                                    </span>
-                                                )}
-                                                <span className="text-gray-800 flex items-center gap-1.5 ml-1">
-                                                    <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center text-[10px] text-gray-500">{note.author_name[0]}</div>
-                                                    {note.author_name}
-                                                </span>
-                                                <span className="text-gray-400 font-medium ml-1 flex items-center gap-1">
-                                                    {isSearching && (
-                                                        <span className="bg-gray-100 px-1.5 py-0.5 rounded text-[10px] mr-1 text-gray-500 font-bold">
-                                                            {new Date(note.created_at).toLocaleDateString()}
-                                                        </span>
-                                                    )}
-                                                    {new Date(note.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
-                                                </span>
-                                            </div>
-
-                                            <button
-                                                onClick={() => toggleComplete(note.id, note.is_completed)}
-                                                className={`w-7 h-7 shrink-0 rounded-full flex items-center justify-center border-2 transition-all ${note.is_completed
-                                                    ? 'bg-green-500 border-green-500 text-white shadow-inner scale-95'
-                                                    : 'border-gray-300 text-transparent hover:border-green-400 hover:bg-green-50 group-hover:shadow-sm'
-                                                    }`}
-                                                title={note.is_completed ? '미완료로 변경' : '완료 처리'}
-                                            >
-                                                ✓
-                                            </button>
-                                        </div>
-                                        {editingId === note.id ? (
-                                            /* 수정 모드 */
-                                            <div className="ml-2 space-y-3 mt-2">
-                                                <div className="flex gap-2">
-                                                    <select value={editShift} onChange={e => setEditShift(e.target.value)} className="py-1.5 px-3 bg-gray-50 border-none font-bold rounded-lg text-xs outline-none">
-                                                        <option value="Day">☀️ Day</option>
-                                                        <option value="Evening">🌆 Evening</option>
-                                                        <option value="Night">🌙 Night</option>
-                                                    </select>
-                                                    <select value={editPriority} onChange={e => setEditPriority(e.target.value)} className={`py-1.5 px-3 border-none font-bold rounded-lg text-xs outline-none ${editPriority === 'High' ? 'bg-red-50 text-red-700' : 'bg-gray-50 text-gray-700'}`}>
-                                                        <option value="Normal">🟢 일반</option>
-                                                        <option value="High">🔥 중요</option>
-                                                    </select>
-                                                </div>
-                                                <textarea
-                                                    value={editContent}
-                                                    onChange={e => setEditContent(e.target.value)}
-                                                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20 resize-none h-24"
-                                                    autoFocus
-                                                />
-                                                <div className="flex gap-2 justify-end">
-                                                    <button onClick={() => setEditingId(null)} className="px-4 py-2 text-xs font-bold text-gray-500 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
-                                                        취소
-                                                    </button>
-                                                    <button onClick={() => handleUpdateNote(note.id)} className="px-4 py-2 text-xs font-bold text-white bg-[var(--toss-blue)] rounded-lg hover:opacity-90 transition-all">
-                                                        저장
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            /* 일반 보기 모드 */
-                                            <>
-                                                <p className={`text-sm leading-relaxed whitespace-pre-wrap ml-2 ${note.is_completed ? 'line-through text-gray-400 decoration-gray-300' : 'text-gray-700 font-medium'}`}>
-                                                    {note.content}
-                                                </p>
-                                                {/* 수정/삭제 버튼 - 본인 작성 노트만 */}
-                                                {(note.author_id === user?.id || user?.role === 'admin') && (
-                                                    <div className="flex gap-2 ml-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <button
-                                                            onClick={() => startEditing(note)}
-                                                            className="px-3 py-1.5 text-[11px] font-bold text-[var(--toss-blue)] bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-                                                        >
-                                                            ✏️ 수정
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDeleteNote(note.id)}
-                                                            className="px-3 py-1.5 text-[11px] font-bold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
-                                                        >
-                                                            🗑️ 삭제
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-        </div>
+  useEffect(() => {
+    const configNote = notes.find(
+      (note) => note.handover_kind === 'room_config' && note.handover_date === selectedDateKey,
     );
+    skipRoomPersistRef.current = true;
+    setRoomConfigs(configNote ? parseRoomConfigsFromNote(configNote) : []);
+    setSelectedBedKey('');
+  }, [notes, selectedDateKey]);
+
+  useEffect(() => {
+    if (skipRoomPersistRef.current) {
+      skipRoomPersistRef.current = false;
+      return;
+    }
+    const timer = setTimeout(() => {
+      void persistRoomConfigs(roomConfigs);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [roomConfigs, selectedDateKey]);
+
+  async function loadNotes() {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('handover_notes')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1500);
+
+      if (error) {
+        console.error('인계노트 조회 실패:', error);
+        setNotes([]);
+        return;
+      }
+
+      setNotes(((data || []) as HandoverNoteRow[]).map(normalizeHandoverNote));
+    } catch (error) {
+      console.error('인계노트 조회 중 오류:', error);
+      setNotes([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function updateRoomStatus(nextStatus: RoomStatus) {
+    setRoomStatus(nextStatus);
+    if (roomStatusTimerRef.current) {
+      clearTimeout(roomStatusTimerRef.current);
+      roomStatusTimerRef.current = null;
+    }
+    if (nextStatus === 'saved' || nextStatus === 'error') {
+      roomStatusTimerRef.current = setTimeout(() => setRoomStatus('idle'), 1800);
+    }
+  }
+
+  async function persistRoomConfigs(nextConfigs: HandoverRoomConfig[]) {
+    const normalizedRooms = normalizeHandoverRoomConfigs(nextConfigs);
+    const currentConfigNote = notes.find(
+      (note) => note.handover_kind === 'room_config' && note.handover_date === selectedDateKey,
+    );
+
+    if (!currentConfigNote && normalizedRooms.length === 0) {
+      setRoomStatus('idle');
+      return;
+    }
+
+    setRoomStatus('saving');
+    try {
+      const roomContent = buildRoomConfigNoteContent(normalizedRooms, selectedDateKey);
+      const { data, error } = currentConfigNote
+        ? await withMissingColumnsFallback(
+            (omittedColumns) => {
+              const payload: Record<string, any> = {
+                content: roomContent,
+                author_id: user?.id || currentConfigNote.author_id || 'unknown',
+                author_name: user?.name || currentConfigNote.author_name || '이름 없음',
+              };
+              if (!omittedColumns.has('note_scope')) payload.note_scope = 'general';
+              if (!omittedColumns.has('handover_date')) payload.handover_date = selectedDateKey;
+              return supabase.from('handover_notes').update(payload).eq('id', currentConfigNote.id).select('*').single();
+            },
+            ['note_scope', 'handover_date'],
+          )
+        : await withMissingColumnsFallback(
+            (omittedColumns) => {
+              const payload: Record<string, any> = {
+                content: roomContent,
+                author_id: user?.id || 'unknown',
+                author_name: user?.name || '이름 없음',
+                shift: 'System',
+                priority: 'Normal',
+                is_completed: false,
+                created_at: new Date().toISOString(),
+              };
+              if (!omittedColumns.has('note_scope')) payload.note_scope = 'general';
+              if (!omittedColumns.has('handover_date')) payload.handover_date = selectedDateKey;
+              return supabase.from('handover_notes').insert([payload]).select('*').single();
+            },
+            ['note_scope', 'handover_date'],
+          );
+
+      if (error) {
+        console.error('병상 설정 저장 실패:', error);
+        updateRoomStatus('error');
+        return;
+      }
+
+      if (data) {
+        const normalized = normalizeHandoverNote(data as HandoverNoteRow);
+        setNotes((prev) => [normalized, ...prev.filter((note) => note.id !== normalized.id)]);
+      }
+
+      updateRoomStatus('saved');
+    } catch (error) {
+      console.error('병상 설정 저장 중 오류:', error);
+      updateRoomStatus('error');
+    }
+  }
+
+  const summaryByDate = useMemo(() => {
+    const next = new Map<string, Summary>();
+    notes.forEach((note) => {
+      if (note.handover_kind !== 'note') return;
+      const dateKey = note.handover_date || String(note.created_at || '').slice(0, 10);
+      if (!dateKey) return;
+      const current = next.get(dateKey) || emptySummary();
+      current.total += 1;
+      if (note.note_scope === 'patient') current.patient += 1;
+      else current.general += 1;
+      next.set(dateKey, current);
+    });
+    return next;
+  }, [notes]);
+
+  const selectedDateNotes = useMemo(() => {
+    return notes
+      .filter((note) => note.handover_kind === 'note' && note.handover_date === selectedDateKey)
+      .sort((left, right) => new Date(right.created_at || 0).getTime() - new Date(left.created_at || 0).getTime());
+  }, [notes, selectedDateKey]);
+
+  const filteredNotes = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return selectedDateNotes;
+    return selectedDateNotes.filter((note) => buildHandoverSearchText(note).includes(query));
+  }, [searchQuery, selectedDateNotes]);
+
+  const generalNotes = useMemo(() => {
+    return filteredNotes.filter((note) => note.note_scope !== 'patient' || !note.patient_name);
+  }, [filteredNotes]);
+
+  const patientGroups = useMemo(() => {
+    const groups = new Map<string, { label: string; roomNumber: string | null; bedNumber: number | null; patientName: string; notes: HandoverNote[] }>();
+    filteredNotes.forEach((note) => {
+      if (note.note_scope !== 'patient' || !note.patient_name) return;
+      const key = note.bed_key || note.patient_key || note.id;
+      const current = groups.get(key);
+      if (current) {
+        current.notes.push(note);
+        return;
+      }
+      groups.set(key, {
+        label: formatPatientBedLabel(note),
+        roomNumber: note.room_number,
+        bedNumber: note.bed_number,
+        patientName: note.patient_name,
+        notes: [note],
+      });
+    });
+    return Array.from(groups.entries())
+      .map(([key, value]) => ({
+        key,
+        ...value,
+        notes: value.notes.sort((left, right) => new Date(right.created_at || 0).getTime() - new Date(left.created_at || 0).getTime()),
+      }))
+      .sort((left, right) => {
+        const roomCompare = compareRooms(left.roomNumber, right.roomNumber);
+        if (roomCompare !== 0) return roomCompare;
+        return (left.bedNumber || 0) - (right.bedNumber || 0);
+      });
+  }, [filteredNotes]);
+
+  const bedOptions = useMemo<BedOption[]>(() => {
+    return roomConfigs
+      .flatMap((room) =>
+        room.beds.map((bed) => ({
+          bedKey: buildBedKey(room.roomNumber, bed.bedNumber) || `${room.id}-${bed.bedNumber}`,
+          roomNumber: room.roomNumber,
+          roomCapacity: room.capacity,
+          bedNumber: bed.bedNumber,
+          patientName: bed.patientName,
+          label: formatPatientBedLabel({ roomNumber: room.roomNumber, bedNumber: bed.bedNumber, patientName: bed.patientName }),
+        })),
+      )
+      .filter((option) => option.patientName)
+      .sort((left, right) => {
+        const roomCompare = compareRooms(left.roomNumber, right.roomNumber);
+        if (roomCompare !== 0) return roomCompare;
+        return left.bedNumber - right.bedNumber;
+      });
+  }, [roomConfigs]);
+
+  useEffect(() => {
+    if (noteScope !== 'patient') return;
+    if (selectedBedKey && !bedOptions.some((option) => option.bedKey === selectedBedKey)) {
+      setSelectedBedKey('');
+    }
+  }, [bedOptions, noteScope, selectedBedKey]);
+
+  const selectedBed = useMemo(() => bedOptions.find((option) => option.bedKey === selectedBedKey) || null, [bedOptions, selectedBedKey]);
+  function replaceRooms(nextRooms: HandoverRoomConfig[]) {
+    setRoomConfigs(normalizeHandoverRoomConfigs(nextRooms));
+  }
+
+  function handleAddRoom() {
+    const roomNumber = normalizeRoomNumber(newRoomNumber);
+    const capacity = normalizeRoomCapacity(newRoomCapacity) || 4;
+    if (!roomNumber) {
+      alert('병실 호수를 입력해주세요.');
+      return;
+    }
+    if (roomConfigs.some((room) => room.roomNumber === roomNumber)) {
+      alert('같은 병실 호수가 이미 있습니다.');
+      return;
+    }
+    replaceRooms([...roomConfigs, createRoom(roomNumber, capacity)]);
+    setNewRoomNumber('');
+    setNewRoomCapacity(4);
+  }
+
+  function handleRoomNumberChange(roomId: string, value: string) {
+    replaceRooms(roomConfigs.map((room) => (room.id === roomId ? { ...room, roomNumber: value } : room)));
+  }
+
+  function handleRoomCapacityChange(roomId: string, value: number) {
+    const capacity = normalizeRoomCapacity(value) || 4;
+    replaceRooms(
+      roomConfigs.map((room) => {
+        if (room.id !== roomId) return room;
+        return {
+          ...room,
+          capacity,
+          beds: Array.from({ length: capacity }, (_, index) => ({
+            bedNumber: index + 1,
+            patientName: room.beds.find((bed) => bed.bedNumber === index + 1)?.patientName || '',
+          })),
+        };
+      }),
+    );
+  }
+
+  function handleBedPatientChange(roomId: string, bedNumber: number, patientName: string) {
+    replaceRooms(
+      roomConfigs.map((room) => {
+        if (room.id !== roomId) return room;
+        return {
+          ...room,
+          beds: room.beds.map((bed) => (bed.bedNumber === bedNumber ? { ...bed, patientName } : bed)),
+        };
+      }),
+    );
+  }
+
+  async function handleCreateNote() {
+    const trimmedContent = content.trim();
+    if (!trimmedContent || saving) return;
+    if (noteScope === 'patient' && !selectedBed) {
+      alert('환자별 인계는 병상 설정에서 환자를 지정한 뒤 선택해주세요.');
+      return;
+    }
+
+    const patientName = selectedBed?.patientName || null;
+    const roomNumber = selectedBed?.roomNumber || null;
+    const roomCapacity = selectedBed?.roomCapacity || null;
+    const bedNumber = selectedBed?.bedNumber || null;
+
+    setSaving(true);
+    try {
+      const { data, error } = await withMissingColumnsFallback(
+        (omittedColumns) => {
+          const storeMetadataInContent =
+            omittedColumns.has('patient_name') ||
+            omittedColumns.has('patient_key') ||
+            omittedColumns.has('note_scope') ||
+            omittedColumns.has('handover_date') ||
+            omittedColumns.has('room_number') ||
+            omittedColumns.has('room_capacity') ||
+            omittedColumns.has('bed_number') ||
+            omittedColumns.has('bed_key');
+
+          const payload: Record<string, any> = {
+            content: storeMetadataInContent
+              ? encodeHandoverContent(trimmedContent, {
+                  noteScope,
+                  patientName,
+                  handoverDate: selectedDateKey,
+                  roomNumber,
+                  roomCapacity,
+                  bedNumber,
+                })
+              : trimmedContent,
+            author_id: user?.id || 'unknown',
+            author_name: user?.name || '이름 없음',
+            shift,
+            priority,
+            is_completed: false,
+            created_at: new Date().toISOString(),
+          };
+
+          if (!omittedColumns.has('patient_name')) payload.patient_name = noteScope === 'patient' ? patientName : null;
+          if (!omittedColumns.has('patient_key')) payload.patient_key = noteScope === 'patient' ? buildPatientKey(patientName) : null;
+          if (!omittedColumns.has('note_scope')) payload.note_scope = noteScope;
+          if (!omittedColumns.has('handover_date')) payload.handover_date = selectedDateKey;
+          if (!omittedColumns.has('room_number')) payload.room_number = noteScope === 'patient' ? roomNumber : null;
+          if (!omittedColumns.has('room_capacity')) payload.room_capacity = noteScope === 'patient' ? roomCapacity : null;
+          if (!omittedColumns.has('bed_number')) payload.bed_number = noteScope === 'patient' ? bedNumber : null;
+          if (!omittedColumns.has('bed_key')) payload.bed_key = noteScope === 'patient' ? buildBedKey(roomNumber, bedNumber) : null;
+
+          return supabase.from('handover_notes').insert([payload]).select('*').single();
+        },
+        ['patient_name', 'patient_key', 'note_scope', 'handover_date', 'room_number', 'room_capacity', 'bed_number', 'bed_key'],
+      );
+
+      if (error) {
+        console.error('인계노트 저장 실패:', error);
+        alert('인계노트 저장 중 오류가 발생했습니다.');
+        return;
+      }
+
+      if (data) {
+        const normalized = normalizeHandoverNote(data as HandoverNoteRow);
+        setNotes((prev) => [normalized, ...prev.filter((note) => note.id !== normalized.id)]);
+      }
+
+      setContent('');
+      setShift(DEFAULT_SHIFT);
+      setPriority(DEFAULT_PRIORITY);
+      setNoteScope(DEFAULT_SCOPE);
+      setSelectedBedKey('');
+    } catch (error) {
+      console.error('인계노트 저장 중 오류:', error);
+      alert('인계노트 저장 중 오류가 발생했습니다.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function toggleCompleted(targetNote: HandoverNote) {
+    const nextCompleted = !targetNote.is_completed;
+    setNotes((prev) => prev.map((note) => (note.id === targetNote.id ? { ...note, is_completed: nextCompleted } : note)));
+    const { error } = await supabase.from('handover_notes').update({ is_completed: nextCompleted }).eq('id', targetNote.id);
+    if (error) {
+      console.error('인계노트 완료 상태 변경 실패:', error);
+      setNotes((prev) => prev.map((note) => (note.id === targetNote.id ? { ...note, is_completed: targetNote.is_completed } : note)));
+      alert('인계노트 상태 변경 중 오류가 발생했습니다.');
+    }
+  }
+
+  function renderNote(note: HandoverNote) {
+    return (
+      <div key={note.id} className={`rounded-[18px] border px-4 py-3 shadow-sm ${note.is_completed ? 'border-[var(--toss-border)] bg-[var(--page-bg)]' : note.priority === 'High' ? 'border-red-200 bg-red-50/60' : 'border-[var(--toss-border)] bg-[var(--toss-card)]'}`}>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
+              <span className="rounded-full bg-[var(--toss-blue-light)] px-2.5 py-1 text-[var(--toss-blue)]">{note.shift}</span>
+              <span className={`rounded-full px-2.5 py-1 ${note.priority === 'High' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-[var(--toss-gray-3)]'}`}>{note.priority === 'High' ? '중요' : '일반'}</span>
+              <span className={`rounded-full px-2.5 py-1 ${note.note_scope === 'patient' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{note.note_scope === 'patient' ? '환자별' : '공통'}</span>
+              {note.note_scope === 'patient' ? <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700">{formatPatientBedLabel(note)}</span> : null}
+              <span className="text-[var(--toss-gray-3)]">{note.author_name || '이름 없음'} · {createdLabel(note.created_at)}</span>
+            </div>
+            <p className={`whitespace-pre-wrap text-sm leading-6 ${note.is_completed ? 'text-[var(--toss-gray-3)] line-through' : 'text-[var(--foreground)]'}`}>{note.content}</p>
+          </div>
+          <button type="button" onClick={() => toggleCompleted(note)} className={`shrink-0 rounded-[12px] px-3 py-2 text-xs font-semibold transition ${note.is_completed ? 'bg-emerald-100 text-emerald-700' : 'bg-[var(--page-bg)] text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'}`}>
+            {note.is_completed ? '완료됨' : '완료 처리'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4 rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4 shadow-sm">
+      <div className="flex flex-col gap-3 border-b border-[var(--toss-border)] pb-4 lg:flex-row lg:items-center lg:justify-between">
+        <h2 className="text-xl font-bold text-[var(--foreground)]">병동 인계노트</h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="date"
+            value={selectedDateKey}
+            onChange={(event) => setSelectedDate(fromDateKey(event.target.value))}
+            className="rounded-[12px] border border-[var(--toss-border)] bg-[var(--input-bg)] px-3 py-2 text-sm text-[var(--foreground)] outline-none transition focus:border-[var(--toss-blue)] focus:ring-2 focus:ring-[var(--toss-blue)]/20"
+          />
+          <button
+            type="button"
+            onClick={() => setSelectedDate(new Date())}
+            className="rounded-[12px] border border-[var(--toss-border)] bg-[var(--page-bg)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] transition hover:bg-[var(--toss-gray-1)]"
+          >
+            오늘
+          </button>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="검색"
+            className="w-[140px] rounded-[12px] border border-[var(--toss-border)] bg-[var(--input-bg)] px-3 py-2 text-sm text-[var(--foreground)] outline-none transition focus:border-[var(--toss-blue)] focus:ring-2 focus:ring-[var(--toss-blue)]/20"
+          />
+          <button
+            type="button"
+            onClick={() => setShowBedSettings(true)}
+            className="rounded-[12px] bg-[var(--toss-blue)] px-3 py-2 text-sm font-semibold text-white transition hover:opacity-90"
+          >
+            병상설정
+          </button>
+        </div>
+      </div>
+
+      <section className="rounded-[16px] border border-[var(--toss-border)] bg-[var(--page-bg)] p-3">
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => setSelectedDate(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))}
+            className="rounded-[10px] bg-white px-2.5 py-1.5 text-xs font-semibold text-[var(--foreground)]"
+          >
+            이전
+          </button>
+          <h4 className="text-sm font-bold text-[var(--foreground)]">{monthLabel(currentMonth)}</h4>
+          <button
+            type="button"
+            onClick={() => setSelectedDate(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))}
+            className="rounded-[10px] bg-white px-2.5 py-1.5 text-xs font-semibold text-[var(--foreground)]"
+          >
+            다음
+          </button>
+        </div>
+
+        <div className="mt-2 grid grid-cols-7 gap-1">
+          {WEEKDAY_LABELS.map((label) => <div key={label} className="py-0.5 text-center text-[10px] font-bold text-[var(--toss-gray-3)]">{label}</div>)}
+        </div>
+        <div className="mt-1 grid grid-cols-7 gap-1">
+          {currentMonthGrid.map((cell, index) => {
+            if (!cell) return <div key={`empty-${index}`} className="min-h-[52px] rounded-[10px] border border-transparent" />;
+            const dateKey = toDateKey(cell);
+            const summary = summaryByDate.get(dateKey) || emptySummary();
+            const isSelected = dateKey === selectedDateKey;
+            const isToday = dateKey === todayKey;
+            return (
+              <button
+                key={dateKey}
+                type="button"
+                onClick={() => setSelectedDate(cell)}
+                className={`min-h-[52px] rounded-[10px] border px-2 py-1.5 text-left transition ${isSelected ? 'border-[var(--toss-blue)] bg-[var(--toss-blue-light)]/60 shadow-sm' : 'border-[var(--toss-border)] bg-[var(--toss-card)] hover:border-[var(--toss-blue)]/40 hover:bg-[var(--toss-blue-light)]/20'}`}
+              >
+                <div className="flex items-start justify-between">
+                  <span className={`text-[11px] font-black ${isToday ? 'text-emerald-600' : 'text-[var(--foreground)]'}`}>{cell.getDate()}</span>
+                  {summary.total > 0 ? <span className="mt-1 h-1.5 w-1.5 rounded-full bg-[var(--toss-blue)]" /> : null}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="space-y-3 rounded-[18px] bg-[var(--page-bg)] p-4">
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => { setNoteScope('general'); setSelectedBedKey(''); }} className={`rounded-full px-3 py-2 text-sm font-semibold ${noteScope === 'general' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}`}>공통 인계</button>
+          <button type="button" onClick={() => setNoteScope('patient')} className={`rounded-full px-3 py-2 text-sm font-semibold ${noteScope === 'patient' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700'}`}>환자별 인계</button>
+        </div>
+
+        {noteScope === 'patient' ? (
+          <div className="space-y-3 rounded-[16px] border border-emerald-100 bg-emerald-50/70 p-3">
+            {bedOptions.length === 0 ? (
+              <div className="rounded-[12px] border border-amber-200 bg-amber-50 px-3 py-3 text-sm font-medium text-amber-700">먼저 병상 설정에서 환자를 지정해주세요.</div>
+            ) : (
+              <>
+                <select value={selectedBedKey} onChange={(event) => setSelectedBedKey(event.target.value)} className="w-full rounded-[12px] border border-emerald-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-300 md:max-w-[320px]">
+                  <option value="">환자 선택</option>
+                  {bedOptions.map((option) => <option key={option.bedKey} value={option.bedKey}>{option.label}</option>)}
+                </select>
+                <div className="flex flex-wrap gap-2">
+                  {bedOptions.map((option) => (
+                    <button key={option.bedKey} type="button" onClick={() => setSelectedBedKey(option.bedKey)} className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${selectedBedKey === option.bedKey ? 'bg-emerald-600 text-white' : 'bg-white text-emerald-700'}`}>{option.label}</button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        ) : null}
+
+        <div className="grid gap-3 lg:grid-cols-[140px_140px_minmax(0,1fr)_auto]">
+          <select value={shift} onChange={(event) => setShift(event.target.value)} className="rounded-[14px] border border-[var(--toss-border)] bg-[var(--toss-card)] px-3 py-2 text-sm font-semibold outline-none transition focus:border-[var(--toss-blue)]"><option value="Day">Day</option><option value="Evening">Evening</option><option value="Night">Night</option></select>
+          <select value={priority} onChange={(event) => setPriority(event.target.value)} className="rounded-[14px] border border-[var(--toss-border)] bg-[var(--toss-card)] px-3 py-2 text-sm font-semibold outline-none transition focus:border-[var(--toss-blue)]"><option value="Normal">일반</option><option value="High">중요</option></select>
+          <input type="text" value={content} onChange={(event) => setContent(event.target.value)} placeholder={noteScope === 'patient' ? '선택한 환자에게 필요한 인계 내용을 입력해주세요' : '공통 인계 내용을 입력해주세요'} className="rounded-[14px] border border-[var(--toss-border)] bg-[var(--toss-card)] px-3 py-2 text-sm text-[var(--foreground)] outline-none transition focus:border-[var(--toss-blue)] focus:ring-2 focus:ring-[var(--toss-blue)]/20" />
+          <button type="button" onClick={handleCreateNote} disabled={saving || !content.trim()} className="rounded-[14px] bg-[var(--toss-blue)] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">{saving ? '저장 중' : '인계 추가'}</button>
+        </div>
+      </section>
+
+      {loading ? (
+        <div className="rounded-[18px] border border-dashed border-[var(--toss-border)] px-4 py-10 text-center text-sm text-[var(--toss-gray-3)]">인계노트를 불러오는 중입니다.</div>
+      ) : filteredNotes.length === 0 ? (
+        <div className="rounded-[18px] border border-dashed border-[var(--toss-border)] px-4 py-10 text-center text-sm text-[var(--toss-gray-3)]">선택한 날짜에 표시할 인계노트가 없습니다.</div>
+      ) : (
+        <div className="space-y-5">
+          {generalNotes.length > 0 ? (
+            <section className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-[var(--foreground)]">공통 인계</h3>
+                <span className="text-xs text-[var(--toss-gray-3)]">{generalNotes.length}건</span>
+              </div>
+              <div className="space-y-3">{generalNotes.map(renderNote)}</div>
+            </section>
+          ) : null}
+
+          {patientGroups.length > 0 ? (
+            <section className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-[var(--foreground)]">환자별 인계</h3>
+                <span className="text-xs text-[var(--toss-gray-3)]">{patientGroups.length}병상</span>
+              </div>
+              <div className="space-y-4">
+                {patientGroups.map((group) => (
+                  <div key={group.key} className="rounded-[18px] border border-emerald-100 bg-emerald-50/40 p-3">
+                    <div className="mb-3 flex items-center justify-between">
+                      <div>
+                        <h4 className="text-sm font-bold text-emerald-900">{group.label}</h4>
+                        <p className="mt-1 text-xs text-emerald-700">{group.patientName} 관련 인계 {group.notes.length}건</p>
+                      </div>
+                      <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-emerald-700">{group.notes.length}건</span>
+                    </div>
+                    <div className="space-y-3">{group.notes.map(renderNote)}</div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
+        </div>
+      )}
+
+      {showBedSettings ? (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/45 px-4 py-6">
+          <div className="max-h-[82vh] w-full max-w-[720px] overflow-hidden rounded-[18px] border border-[var(--toss-border)] bg-[var(--toss-card)] shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[var(--toss-border)] px-4 py-3">
+              <div>
+                <h3 className="text-sm font-bold text-[var(--foreground)]">병상 설정</h3>
+                <p className="mt-0.5 text-[11px] text-[var(--toss-gray-3)]">{fullDateLabel(selectedDate)}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {roomStatus === 'saving' ? <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-700">저장 중</span> : null}
+                {roomStatus === 'saved' ? <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">저장됨</span> : null}
+                {roomStatus === 'error' ? <span className="rounded-full bg-red-100 px-2.5 py-1 text-[11px] font-semibold text-red-600">저장 실패</span> : null}
+                <button
+                  type="button"
+                  onClick={() => setShowBedSettings(false)}
+                  className="rounded-[10px] bg-[var(--page-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--foreground)] transition hover:bg-[var(--toss-gray-1)]"
+                >
+                  닫기
+                </button>
+              </div>
+            </div>
+
+            <div className="max-h-[calc(82vh-62px)] overflow-y-auto px-3 py-2.5">
+              <div className="grid gap-1.5 rounded-[12px] border border-[var(--toss-border)] bg-[var(--page-bg)] p-1.5 sm:grid-cols-[72px_72px_auto]">
+                <input
+                  type="text"
+                  value={newRoomNumber}
+                  onChange={(event) => setNewRoomNumber(event.target.value)}
+                  placeholder="예: 101"
+                  className="rounded-[8px] border border-[var(--toss-border)] bg-white px-2.5 py-1.5 text-xs outline-none transition focus:border-[var(--toss-blue)]"
+                />
+                <select
+                  value={newRoomCapacity}
+                  onChange={(event) => setNewRoomCapacity(Number(event.target.value))}
+                  className="rounded-[8px] border border-[var(--toss-border)] bg-white px-2 py-1.5 text-xs font-semibold outline-none transition focus:border-[var(--toss-blue)]"
+                >
+                  {[1, 2, 3, 4].map((capacity) => (
+                    <option key={capacity} value={capacity}>
+                      {capacity}인실
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={handleAddRoom}
+                  className="rounded-[8px] bg-[var(--toss-blue)] px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90"
+                >
+                  병실 추가
+                </button>
+              </div>
+
+              {roomConfigs.length === 0 ? (
+                <div className="mt-4 rounded-[16px] border border-dashed border-[var(--toss-border)] px-4 py-10 text-center text-sm text-[var(--toss-gray-3)]">
+                  등록된 병상 설정이 없습니다.
+                </div>
+              ) : (
+                 <div className="mt-2 grid gap-2 md:grid-cols-2">
+                    {roomConfigs.map((room) => (
+                     <div key={room.id} className="rounded-[12px] border border-[var(--toss-border)] bg-[var(--page-bg)] p-2 shadow-sm">
+                       <div className="grid gap-1.5 sm:grid-cols-[minmax(0,1fr)_68px_auto] sm:items-center">
+                         <input
+                           type="text"
+                           value={room.roomNumber}
+                           onChange={(event) => handleRoomNumberChange(room.id, event.target.value)}
+                            className="rounded-[8px] border border-[var(--toss-border)] bg-white px-2.5 py-1.5 text-xs font-semibold outline-none transition focus:border-[var(--toss-blue)]"
+                         />
+                         <select
+                           value={room.capacity}
+                           onChange={(event) => handleRoomCapacityChange(room.id, Number(event.target.value))}
+                            className="rounded-[8px] border border-[var(--toss-border)] bg-white px-2 py-1.5 text-xs font-semibold outline-none transition focus:border-[var(--toss-blue)]"
+                         >
+                           {[1, 2, 3, 4].map((capacity) => (
+                             <option key={capacity} value={capacity}>
+                               {capacity}인실
+                             </option>
+                           ))}
+                         </select>
+                         <button
+                           type="button"
+                           onClick={() => replaceRooms(roomConfigs.filter((item) => item.id !== room.id))}
+                            className="rounded-[8px] bg-red-50 px-2 py-1.5 text-[11px] font-semibold text-red-600 transition hover:bg-red-100"
+                         >
+                           호수 삭제
+                         </button>
+                       </div>
+
+                        <div className="mt-1.5 grid gap-1.5 sm:grid-cols-2">
+                          {room.beds.map((bed) => (
+                            <input
+                              key={`${room.id}-${bed.bedNumber}`}
+                              type="text"
+                              value={bed.patientName}
+                              onChange={(event) => handleBedPatientChange(room.id, bed.bedNumber, event.target.value)}
+                              placeholder="환자 이름"
+                              className="rounded-[8px] border border-[var(--toss-border)] bg-white px-2.5 py-1.5 text-xs outline-none transition focus:border-[var(--toss-blue)]"
+                            />
+                          ))}
+                       </div>
+                     </div>
+                   ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
 }

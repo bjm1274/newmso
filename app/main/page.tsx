@@ -187,6 +187,35 @@ function MainPageContent() {
     }
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleProfileUpdated = (event: Event) => {
+      const customEvent = event as CustomEvent<{ user?: any }>;
+      const nextUser = normalizeProfileUser(customEvent.detail?.user);
+      if (!nextUser?.id) return;
+
+      persistClientUser(nextUser);
+      setData((prev) => ({
+        ...prev,
+        staffs: prev.staffs.map((staff: any) =>
+          staff?.id === nextUser.id
+            ? normalizeProfileUser({
+                ...staff,
+                ...nextUser,
+                permissions: nextUser.permissions || staff.permissions,
+              })
+            : staff
+        ),
+      }));
+    };
+
+    window.addEventListener('erp-profile-updated', handleProfileUpdated as EventListener);
+    return () => {
+      window.removeEventListener('erp-profile-updated', handleProfileUpdated as EventListener);
+    };
+  }, [persistClientUser]);
+
   // 1. 초기 로드 시 사용자 정보 및 이전 상태 복구
   useEffect(() => {
     let ignore = false;

@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { persistSupabaseAccessToken } from '@/lib/supabase-bridge';
 import { isMissingColumnError } from '@/lib/supabase-compat';
+import { buildAuditDiff, logAudit, readClientAuditActor } from '@/lib/audit';
 import {
   buildProfilePhotoUrlFromPath,
   getProfilePhotoUrl,
@@ -32,8 +33,8 @@ export default function MyProfileCard({
     phone: initialUser?.phone || '',
     extension: initialUser?.extension || initialUser?.permissions?.extension || '',
     address: initialUser?.address || '',
-    bank_name: initialUser?.bank_name || '',
-    bank_account: initialUser?.bank_account || '',
+    bank_name: initialUser?.bank_name || initialUser?.permissions?.bank_name || '',
+    bank_account: initialUser?.bank_account || initialUser?.permissions?.bank_account || '',
   });
   // 다크모드 토글은 사용하지 않도록 제거 (항상 라이트 모드)
 
@@ -69,12 +70,12 @@ export default function MyProfileCard({
 
   // [핵심] 페이지 로드 시 ID가 없으면 '이름'으로 ID를 찾아내는 복구 로직
   useEffect(() => {
-    if (initialUser?.name) {
+    if (!initialUser?.id && initialUser?.name) {
       recoverUserIdentity(initialUser.name);
     } else {
       setDebugMsg("초기 사용자 이름조차 없습니다. 재로그인 필요.");
     }
-  }, [initialUser]);
+  }, [initialUser?.id, initialUser?.name]);
 
   // 편집 폼은 user 정보가 바뀔 때 동기화
   useEffect(() => {
@@ -84,8 +85,8 @@ export default function MyProfileCard({
         phone: user.phone || '',
         extension: user.extension || user.permissions?.extension || '',
         address: user.address || '',
-        bank_name: user.bank_name || '',
-        bank_account: user.bank_account || '',
+        bank_name: user.bank_name || user.permissions?.bank_name || '',
+        bank_account: user.bank_account || user.permissions?.bank_account || '',
       });
     }
   }, [user]);
@@ -306,6 +307,103 @@ export default function MyProfileCard({
     }
   };
 
+  const saveProfileDirectly = async (currentUser: any) => {
+    const { extension, bank_name, ...otherForm } = editForm;
+    const actor = readClientAuditActor();
+    const beforeUser = normalizeProfileUser(currentUser);
+    const updatedPermissions = {
+      ...(currentUser.permissions || {}),
+      extension: extension || null,
+      bank_name: bank_name || null,
+    };
+    const baseUpdatePayload = {
+      email: otherForm.email || null,
+      phone: otherForm.phone || null,
+      address: otherForm.address || null,
+      bank_account: otherForm.bank_account || null,
+      permissions: updatedPermissions,
+    };
+
+    let savedRow: any = null;
+    const primaryUpdate = await supabase
+      .from('staff_members')
+      .update({
+        ...baseUpdatePayload,
+        bank_name: bank_name || null,
+      })
+      .eq('id', currentUser.id)
+      .select('*')
+      .single();
+
+    if (primaryUpdate.error) {
+      if (!isMissingColumnError(primaryUpdate.error, 'bank_name')) {
+        throw primaryUpdate.error;
+      }
+
+      const fallbackUpdate = await supabase
+        .from('staff_members')
+        .update(baseUpdatePayload)
+        .eq('id', currentUser.id)
+        .select('*')
+        .single();
+
+      if (fallbackUpdate.error) {
+        throw fallbackUpdate.error;
+      }
+
+      savedRow = fallbackUpdate.data;
+    } else {
+      savedRow = primaryUpdate.data;
+    }
+
+    const updatedUser = normalizeProfileUser({
+      ...currentUser,
+      ...savedRow,
+      ...baseUpdatePayload,
+      bank_name: bank_name || null,
+      permissions: updatedPermissions,
+    });
+
+    setUser(updatedUser);
+    setAvatarUrl(getProfilePhotoUrl(updatedUser));
+    setEditForm({
+      email: updatedUser.email || '',
+      phone: updatedUser.phone || '',
+      extension: updatedUser.extension || updatedUser.permissions?.extension || '',
+      address: updatedUser.address || '',
+      bank_name: updatedUser.bank_name || updatedUser.permissions?.bank_name || '',
+      bank_account: updatedUser.bank_account || updatedUser.permissions?.bank_account || '',
+    });
+    localStorage.setItem('user_session', JSON.stringify(updatedUser));
+    localStorage.setItem('erp_user', JSON.stringify(updatedUser));
+    broadcastProfileUpdate(updatedUser);
+
+    await logAudit(
+      '내정보수정',
+      'staff_member',
+      String(currentUser.id),
+      {
+        staff_name: updatedUser.name,
+        ...buildAuditDiff(beforeUser, updatedUser, [
+          'email',
+          'phone',
+          'address',
+          'bank_account',
+          'bank_name',
+          'extension',
+          'permissions',
+        ]),
+      },
+      actor.userId,
+      actor.userName
+    );
+
+    applyIsEditing(false);
+    alert('내 정보가 바로 저장되었고 인사관리에도 즉시 반영되었습니다.');
+    return;
+    alert('내 정보가 바로 저장되었습니다. 인사관리에도 즉시 반영됩니다.');
+  };
+
   const handleSaveProfile = async () => {
     try {
       let currentUser = user;
@@ -321,6 +419,12 @@ export default function MyProfileCard({
         return;
       }
 
+      await saveProfileDirectly(currentUser);
+      return;
+
+      if (currentUser?.id) {
+        await saveProfileDirectly(currentUser);
+      } else {
       const { extension, ...otherForm } = editForm;
       const updatedPermissions = {
         ...(currentUser.permissions || {}),
@@ -328,7 +432,7 @@ export default function MyProfileCard({
       };
 
       // 내 정보를 즉시 수정하지 않고, 인사팀 승인을 받기 위한 요청(ESS) 데이터 전송
-      const { error } = await supabase
+      const { error }: any = await supabase
         .from('audit_logs')
         .insert([{
           user_id: currentUser.id,
@@ -344,13 +448,17 @@ export default function MyProfileCard({
         }]);
 
       if (error) {
+        const safeError: any = error;
         console.error(error);
+        alert(`정보 변경 요청 중 오류가 발생했습니다.\n상세: ${safeError.message || JSON.stringify(safeError)}`);
+        return;
         alert(`정보 변경 요청 중 오류가 발생했습니다.\n상세: ${error.message || JSON.stringify(error)}`);
         return;
       }
 
       applyIsEditing(false);
       alert('인사팀으로 내 정보 변경 요청(결재 대기)이 전송되었습니다. 관리자 승인 후 반영됩니다.');
+      }
     } catch (err) {
       console.error(err);
       alert('요청 전송에 실패했습니다.');
@@ -371,6 +479,7 @@ export default function MyProfileCard({
       <button
         type="button"
         onClick={() => { if (isEditing) applyIsEditing(false); else verifyPasswordAndRun(() => applyIsEditing(true)); }}
+        data-testid="mypage-profile-edit-toggle"
         className={`rounded-full border px-3 py-1.5 text-[11px] font-bold transition-all ${isEditing
           ? 'bg-red-50 text-red-500 border-red-100 hover:bg-red-100'
           : 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)] border-[var(--toss-blue-light)] hover:bg-[var(--toss-blue-light)]'
@@ -470,18 +579,21 @@ export default function MyProfileCard({
                     label="연락처"
                     value={editForm.phone}
                     onChange={(v: string) => setEditForm((f) => ({ ...f, phone: v }))}
+                    testId="mypage-profile-phone-input"
                     placeholder="'-' 없이 숫자만 입력"
                   />
                   <EditableItem
                     label="내선번호"
                     value={editForm.extension}
                     onChange={(v: string) => setEditForm((f) => ({ ...f, extension: v }))}
+                    testId="mypage-profile-extension-input"
                     placeholder="내선번호 입력"
                   />
                   <EditableItem
                     label="거주지"
                     value={editForm.address}
                     onChange={(v: string) => setEditForm((f) => ({ ...f, address: v }))}
+                    testId="mypage-profile-address-input"
                     placeholder="도로명 주소를 입력하세요"
                   />
                 </div>
@@ -491,6 +603,7 @@ export default function MyProfileCard({
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       <input
                         type="text"
+                        data-testid="mypage-profile-bank-name-input"
                         value={editForm.bank_name}
                         onChange={(e) =>
                           setEditForm((f) => ({ ...f, bank_name: e.target.value }))
@@ -500,6 +613,7 @@ export default function MyProfileCard({
                       />
                       <input
                         type="text"
+                        data-testid="mypage-profile-bank-account-input"
                         value={editForm.bank_account}
                         onChange={(e) =>
                           setEditForm((f) => ({ ...f, bank_account: e.target.value }))
@@ -568,6 +682,7 @@ export default function MyProfileCard({
           <button
             type="button"
             onClick={handleSaveProfile}
+            data-testid="mypage-profile-save"
             className="w-full sm:w-auto px-5 py-2.5 rounded-[16px] bg-emerald-500 text-white text-[11px] sm:text-[12px] font-semibold hover:bg-emerald-600 transition-all shadow-sm flex items-center justify-center gap-2"
           >
             <span className="text-sm">💾</span>
@@ -597,12 +712,13 @@ function InfoItem({ label, value, isMasked }: any) {
   );
 }
 
-function EditableItem({ label, value, onChange, placeholder }: any) {
+function EditableItem({ label, value, onChange, placeholder, testId }: any) {
   return (
     <div className="flex flex-col gap-1">
       <span className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-wide">{label}</span>
       <input
         type="text"
+        data-testid={testId}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
