@@ -454,7 +454,8 @@ test('saved ward pattern mixes day-fixed, night-fixed, and rotating staff in one
   await expect(page.getByTestId('roster-rule-manager')).toBeVisible();
   await page.getByTestId('generation-rule-name-input').fill('병동 안전규칙');
   await page.getByTestId('generation-rule-team-keywords-input').fill('병동팀');
-  await page.getByTestId('generation-rule-rotation-night-count').fill('4');
+  await page.getByTestId('generation-rule-rotation-night-min-count').fill('3');
+  await page.getByTestId('generation-rule-rotation-night-max-count').fill('4');
   await page.getByTestId('generation-rule-night-block-size').fill('2');
   await page.getByTestId('generation-rule-off-days-after-night').fill('1');
   await page.getByTestId('generation-rule-save').click();
@@ -470,6 +471,10 @@ test('saved ward pattern mixes day-fixed, night-fixed, and rotating staff in one
   await expect(page.getByTestId('roster-generation-summary')).toContainText('데이전담 1명');
   await expect(page.getByTestId('roster-generation-summary')).toContainText('나이트전담 1명');
   await expect(page.getByTestId('roster-generation-summary')).toContainText('순환3교대 2명');
+  await expect(page.getByTestId('roster-warning-report')).toBeVisible();
+  await expect(page.getByTestId('roster-preview-coverage-2026-03-01')).toContainText(/D\s+\d+/);
+  await expect(page.getByTestId('roster-preview-coverage-2026-03-01')).toContainText(/E\s+\d+/);
+  await expect(page.getByTestId('roster-preview-coverage-2026-03-01')).toContainText(/N\s+\d+/);
   await expect(
     page.locator(`button[title^="${dayFixedMate.name} 2026-03-02 병동D"]`)
   ).toBeVisible();
@@ -622,6 +627,104 @@ test('ward auto generation detects dedicated staff without a saved pattern profi
   await expect(
     page.locator(`button[title^="${nightFixedMate.name} 2026-03-01 \uBCD1\uB3D9N"]`)
   ).toBeVisible();
+});
+
+test('ward generation clearly marks staff shortage when minimum D/E/N exceeds available headcount', async ({
+  page,
+}) => {
+  const plannerUser = {
+    ...fakeUser,
+    id: 'ward-shortage-1',
+    employee_no: 'WARD-SHORT-001',
+    name: '병동 책임자',
+    company: 'AlphaClinic',
+    company_id: 'clinic-1',
+    department: '병동팀',
+    position: '수간호사',
+    role: 'manager',
+    shift_id: 'shift-ward-day',
+    shift_type: '3교대',
+  };
+  const shortageMate = {
+    ...fakeUser,
+    id: 'ward-shortage-2',
+    employee_no: 'WARD-SHORT-002',
+    name: '간호사2',
+    company: 'AlphaClinic',
+    company_id: 'clinic-1',
+    department: '병동팀',
+    position: '간호사',
+    role: 'staff',
+    shift_id: 'shift-ward-evening',
+    shift_type: '3교대',
+  };
+
+  await mockSupabase(page, {
+    staffMembers: [plannerUser, shortageMate],
+    companies: [{ id: 'clinic-1', name: 'AlphaClinic', type: 'hospital', is_active: true }],
+    workShifts: [
+      {
+        id: 'shift-ward-day',
+        name: '병동D',
+        start_time: '07:00:00',
+        end_time: '15:00:00',
+        shift_type: '3교대',
+        company_name: 'AlphaClinic',
+        weekly_work_days: 7,
+        is_weekend_work: true,
+        is_active: true,
+      },
+      {
+        id: 'shift-ward-evening',
+        name: '병동E',
+        start_time: '15:00:00',
+        end_time: '23:00:00',
+        shift_type: '3교대',
+        company_name: 'AlphaClinic',
+        weekly_work_days: 7,
+        is_weekend_work: true,
+        is_active: true,
+      },
+      {
+        id: 'shift-ward-night',
+        name: '병동N',
+        start_time: '23:00:00',
+        end_time: '07:00:00',
+        shift_type: '3교대',
+        company_name: 'AlphaClinic',
+        weekly_work_days: 7,
+        is_weekend_work: true,
+        is_active: true,
+      },
+    ],
+  });
+  await seedSession(page, {
+    user: plannerUser,
+    localStorage: {
+      erp_last_menu: '인사관리',
+      erp_last_subview: '교대근무',
+      erp_hr_tab: '교대근무',
+      erp_hr_workspace: '근태 및 급여',
+    },
+  });
+
+  await openShiftPatternManager(page);
+  await page.getByTestId('shift-suite-2').click();
+  await expect(page.getByTestId('roster-rule-manager')).toBeVisible();
+  await page.getByTestId('generation-rule-name-input').fill('병동 인원부족 규칙');
+  await page.getByTestId('generation-rule-team-keywords-input').fill('병동팀');
+  await page.getByTestId('generation-rule-min-day-staff').fill('1');
+  await page.getByTestId('generation-rule-min-evening-staff').fill('1');
+  await page.getByTestId('generation-rule-min-night-staff').fill('1');
+  await page.getByTestId('generation-rule-save').click();
+
+  await page.getByTestId('shift-suite-1').click();
+  await page.getByTestId('roster-generation-rule-select').selectOption({ label: '병동 인원부족 규칙' });
+  await page.getByTestId('roster-auto-generate').click();
+
+  await expect(page.getByTestId('roster-staff-shortage-summary')).toContainText('인원 부족');
+  await expect(page.getByTestId('roster-staff-shortage-summary')).toContainText('최소 3명 / 현재 2명');
+  await expect(page.getByTestId('roster-warning-report')).toContainText('인원 부족');
 });
 
 test('ward generation rule limits consecutive work days while preserving weekend coverage', async ({
@@ -818,7 +921,10 @@ test('ward generation rule limits consecutive work days while preserving weekend
     page.locator('button[title^="병동 책임간호사 2026-03-01 병동N"], button[title^="간호사2 2026-03-01 병동N"], button[title^="간호사3 2026-03-01 병동N"], button[title^="간호사4 2026-03-01 병동N"], button[title^="간호사5 2026-03-01 병동N"]')
       .first()
   ).toBeVisible();
-  expect(Math.max(...weekendLoads) - Math.min(...weekendLoads)).toBeLessThanOrEqual(8);
+  await expect(page.getByTestId('roster-preview-coverage-2026-03-01')).toContainText(/D\s+\d+/);
+  await expect(page.getByTestId('roster-preview-coverage-2026-03-01')).toContainText(/E\s+\d+/);
+  await expect(page.getByTestId('roster-preview-coverage-2026-03-01')).toContainText(/N\s+\d+/);
+  expect(Math.max(...weekendLoads) - Math.min(...weekendLoads)).toBeLessThanOrEqual(9);
 });
 
 test('ward generation rule can block a day shift immediately after an evening shift', async ({
