@@ -11,7 +11,8 @@ export type RosterGenerationRule = {
   maxConsecutiveEveningShifts: number;
   offDaysAfterNight: number;
   nightBlockSize: number;
-  rotationNightCount: number;
+  minRotationNightCount: number;
+  maxRotationNightCount: number;
   minMonthlyOffDays: number;
   maxConsecutiveWorkDays: number;
   maxConsecutiveWeekendWorkDays: number;
@@ -48,13 +49,21 @@ function clampInteger(value: unknown, min: number, max: number, fallback: number
 }
 
 function normalizeRule(rule: RosterGenerationRule): RosterGenerationRule {
+  const minRotationNightCount = clampInteger(rule.minRotationNightCount, 0, 31, 4);
+  const maxRotationNightCount = clampInteger(
+    rule.maxRotationNightCount,
+    minRotationNightCount,
+    31,
+    Math.max(minRotationNightCount, 6)
+  );
   return {
     ...rule,
     teamKeywords: [...rule.teamKeywords],
     maxConsecutiveEveningShifts: clampInteger(rule.maxConsecutiveEveningShifts, 0, 7, 0),
     offDaysAfterNight: clampInteger(rule.offDaysAfterNight, 0, 5, 1),
     nightBlockSize: clampInteger(rule.nightBlockSize, 1, 5, 2),
-    rotationNightCount: clampInteger(rule.rotationNightCount, 0, 31, 6),
+    minRotationNightCount,
+    maxRotationNightCount,
     minMonthlyOffDays: clampInteger(rule.minMonthlyOffDays, 7, 31, 7),
     maxConsecutiveWorkDays: clampInteger(rule.maxConsecutiveWorkDays, 2, 7, 5),
     maxConsecutiveWeekendWorkDays: clampInteger(rule.maxConsecutiveWeekendWorkDays, 0, 4, 0),
@@ -78,7 +87,8 @@ export function buildDefaultGenerationRule(companyName = ''): RosterGenerationRu
     maxConsecutiveEveningShifts: 0,
     offDaysAfterNight: 1,
     nightBlockSize: 2,
-    rotationNightCount: 6,
+    minRotationNightCount: 4,
+    maxRotationNightCount: 6,
     minMonthlyOffDays: 7,
     maxConsecutiveWorkDays: 5,
     maxConsecutiveWeekendWorkDays: 0,
@@ -101,6 +111,19 @@ export function normalizeGenerationRule(record: unknown): RosterGenerationRule |
   const id = String(source.id || '').trim();
   const name = String(source.name || '').trim();
   if (!id || !name) return null;
+  const legacyRotationNightCount = clampInteger(source.rotationNightCount, 0, 31, 6);
+  const minRotationNightCount = clampInteger(
+    source.minRotationNightCount,
+    0,
+    31,
+    legacyRotationNightCount
+  );
+  const maxRotationNightCount = clampInteger(
+    source.maxRotationNightCount,
+    minRotationNightCount,
+    31,
+    Math.max(minRotationNightCount, legacyRotationNightCount)
+  );
 
   return normalizeRule({
     id,
@@ -113,7 +136,8 @@ export function normalizeGenerationRule(record: unknown): RosterGenerationRule |
     maxConsecutiveEveningShifts: clampInteger(source.maxConsecutiveEveningShifts, 0, 7, 0),
     offDaysAfterNight: clampInteger(source.offDaysAfterNight, 0, 5, 1),
     nightBlockSize: clampInteger(source.nightBlockSize, 1, 5, 2),
-    rotationNightCount: clampInteger(source.rotationNightCount, 0, 31, 6),
+    minRotationNightCount,
+    maxRotationNightCount,
     minMonthlyOffDays: clampInteger(source.minMonthlyOffDays, 7, 31, 7),
     maxConsecutiveWorkDays: clampInteger(source.maxConsecutiveWorkDays, 2, 7, 5),
     maxConsecutiveWeekendWorkDays: clampInteger(source.maxConsecutiveWeekendWorkDays, 0, 4, 0),

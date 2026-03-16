@@ -133,7 +133,8 @@ test('ward generation rule applies advanced safety constraints for evening, week
   await openShiftRuleManager(page);
   await page.getByTestId('generation-rule-name-input').fill('병동 고급 안전규칙');
   await page.getByTestId('generation-rule-team-keywords-input').fill('병동팀');
-  await page.getByTestId('generation-rule-rotation-night-count').fill('0');
+  await page.getByTestId('generation-rule-rotation-night-min-count').fill('0');
+  await page.getByTestId('generation-rule-rotation-night-max-count').fill('0');
   await page.getByTestId('generation-rule-max-consecutive-evening-shifts').fill('1');
   await page.getByTestId('generation-rule-max-consecutive-weekend-work-days').fill('1');
   await page.getByTestId('generation-rule-distribute-holidays').check();

@@ -42,6 +42,8 @@ const eslintConfig = defineConfig([
     "main/**",
     // 작업 중 생성된 별도 worktree는 실제 앱 검증 대상에서 제외
     ".claude/**",
+    // Local deployment inspection scratch files should not affect app linting.
+    "tmp_vercel_inspect/**",
   ]),
 ]);
 
