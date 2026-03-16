@@ -274,6 +274,109 @@ test("mypage tabs switch across profile, commute, todo, certificates, salary, do
   await expect(page.getByTestId("mypage-notifications-tab")).toBeVisible();
   await expect(page.getByRole("heading", { name: "알림" })).toBeVisible();
 });
+
+test("mypage profile edits save immediately and do not create an ESS approval request", async ({
+  page,
+}) => {
+  const profileUser = {
+    ...fakeUser,
+    phone: "01011112222",
+    address: "서울시 강남구 테스트 1",
+    bank_account: "111-222-3333",
+    permissions: {
+      ...fakeUser.permissions,
+      extension: "1234",
+    },
+  };
+
+  let staffPatchCount = 0;
+  let essApprovalRequestCreated = false;
+
+  await mockSupabase(page, {
+    staffMembers: [profileUser],
+  });
+  await seedSession(page, {
+    user: profileUser,
+    localStorage: {
+      erp_last_menu: "내정보",
+      erp_mypage_tab: "profile",
+    },
+  });
+
+  page.removeAllListeners("dialog");
+  page.on("dialog", async (dialog) => {
+    if (dialog.type() === "prompt") {
+      await dialog.accept("password");
+      return;
+    }
+    await dialog.accept();
+  });
+
+  await page.route("**/api/auth/verify-password", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ verified: true }),
+    });
+  });
+
+  page.on("request", (request) => {
+    if (request.url().includes("/rest/v1/staff_members") && request.method() === "PATCH") {
+      staffPatchCount += 1;
+      return;
+    }
+
+    if (request.url().includes("/rest/v1/audit_logs") && request.method() === "POST") {
+      try {
+        const payload = request.postDataJSON();
+        const entries = Array.isArray(payload) ? payload : [payload];
+        if (entries.some((entry: any) => entry?.target_type === "ESS_PROFILE_UPDATE_PENDING")) {
+          essApprovalRequestCreated = true;
+        }
+      } catch {
+        // ignore malformed mock payloads
+      }
+    }
+  });
+
+  await page.goto("/main");
+  await expect(page.getByTestId("mypage-profile-tab")).toBeVisible();
+
+  await page.getByTestId("mypage-profile-edit-toggle").click();
+  await page.getByTestId("mypage-profile-phone-input").fill("01099998888");
+  await page.getByTestId("mypage-profile-extension-input").fill("7777");
+  await page.getByTestId("mypage-profile-address-input").fill("서울시 송파구 테스트 9");
+  await page.getByTestId("mypage-profile-bank-name-input").fill("국민은행");
+  await page.getByTestId("mypage-profile-bank-account-input").fill("999-888-7777");
+  await page.getByTestId("mypage-profile-save").click();
+
+  await expect(page.getByTestId("mypage-profile-save")).toHaveCount(0);
+  await expect
+    .poll(() =>
+      page.evaluate(() => JSON.parse(window.localStorage.getItem("erp_user") || "{}").phone || null)
+    )
+    .toBe("01099998888");
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const user = JSON.parse(window.localStorage.getItem("erp_user") || "{}");
+        return user.extension || user.permissions?.extension || null;
+      })
+    )
+    .toBe("7777");
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const user = JSON.parse(window.localStorage.getItem("erp_user") || "{}");
+        return user.bank_name || user.permissions?.bank_name || null;
+      })
+    )
+    .toBe("국민은행");
+
+  expect(staffPatchCount).toBeGreaterThan(0);
+  expect(essApprovalRequestCreated).toBeFalsy();
+});
+
 test("chat view opens from the main menu routing state", async ({ page }) => {
   await mockSupabase(page, {
     chatRooms: [

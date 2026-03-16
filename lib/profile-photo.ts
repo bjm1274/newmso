@@ -65,6 +65,15 @@ export function normalizeProfileUser<T>(source: T): T {
 
   const base = source as Record<string, any>;
   const permissions = asRecord(base.permissions);
+  const extension =
+    cleanString(base.extension) ||
+    cleanString(permissions.extension);
+  const bankName =
+    cleanString(base.bank_name) ||
+    cleanString(permissions.bank_name);
+  const bankAccount =
+    cleanString(base.bank_account) ||
+    cleanString(permissions.bank_account);
   const photoPath = getProfilePhotoPath(base);
   const photoUpdatedAt =
     cleanString(base.profile_photo_updated_at) ||
@@ -85,6 +94,9 @@ export function normalizeProfileUser<T>(source: T): T {
   return {
     ...base,
     permissions: normalizedPermissions,
+    extension,
+    bank_name: bankName,
+    bank_account: bankAccount,
     profile_photo_path: photoPath,
     profile_photo_updated_at: photoUpdatedAt,
     avatar_url: photoUrl,

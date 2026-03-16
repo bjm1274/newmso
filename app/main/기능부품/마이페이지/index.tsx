@@ -626,6 +626,7 @@ function ProfileHeaderSummary({
           <button
             type="button"
             onClick={onToggleEdit}
+            data-testid="mypage-profile-edit-toggle"
             className={`rounded-full border px-3 py-1.5 text-[10px] font-bold transition-all ${
               isEditing
                 ? 'bg-red-50 text-red-500 border-red-100 hover:bg-red-100'
