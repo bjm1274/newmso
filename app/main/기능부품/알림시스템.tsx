@@ -116,6 +116,58 @@ function getPushVapidStorageKey(staffId?: string) {
   return `erp_push_vapid_public_key:${staffId || 'guest'}`;
 }
 
+function getPushSubscriptionActiveKey(staffId?: string) {
+  return `erp_push_subscription_active:${staffId || 'guest'}`;
+}
+
+function setPushSubscriptionActiveState(staffId: string | undefined, isActive: boolean) {
+  if (typeof window === 'undefined') return;
+  try {
+    if (isActive) {
+      window.localStorage.setItem(getPushSubscriptionActiveKey(staffId), '1');
+      return;
+    }
+    window.localStorage.removeItem(getPushSubscriptionActiveKey(staffId));
+  } catch {
+    // ignore
+  }
+}
+
+function hasPushSubscriptionActive(staffId?: string) {
+  if (typeof window === 'undefined') return false;
+  try {
+    return window.localStorage.getItem(getPushSubscriptionActiveKey(staffId)) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function claimNotificationSlot(key: string, ownerId: string, ttlMs: number) {
+  if (typeof window === 'undefined') return true;
+  try {
+    const now = Date.now();
+    const currentRaw = window.localStorage.getItem(key);
+    if (currentRaw) {
+      const current = JSON.parse(currentRaw);
+      if (Number(current?.expiresAt || 0) > now && current?.ownerId !== ownerId) {
+        return false;
+      }
+    }
+
+    const nextClaim = JSON.stringify({
+      ownerId,
+      expiresAt: now + ttlMs,
+    });
+    window.localStorage.setItem(key, nextClaim);
+    const confirmedRaw = window.localStorage.getItem(key);
+    if (!confirmedRaw) return false;
+    const confirmed = JSON.parse(confirmedRaw);
+    return confirmed?.ownerId === ownerId;
+  } catch {
+    return true;
+  }
+}
+
 async function syncPushSubscriptionOnServer(staffId: string | undefined, subscription: PushSubscriptionJSON) {
   if (!staffId || !subscription.endpoint || !subscription.keys?.p256dh || !subscription.keys?.auth) return;
 
@@ -190,10 +242,18 @@ export async function initNotificationService(staffId?: string) {
         if (j.endpoint && j.keys?.p256dh && j.keys?.auth) {
           await syncPushSubscriptionOnServer(staffId, j);
           window.localStorage.setItem(getPushVapidStorageKey(staffId), vapidKey);
+          setPushSubscriptionActiveState(staffId, true);
         }
+      } else {
+        setPushSubscriptionActiveState(staffId, false);
       }
+    } else {
+      setPushSubscriptionActiveState(staffId, false);
     }
-  } catch (e) { console.warn('SW 등록 건너뜀:', e); }
+  } catch (e) {
+    setPushSubscriptionActiveState(staffId, false);
+    console.warn('SW 등록 건너뜀:', e);
+  }
 }
 
 export function sendNotification(title: string, options?: NotificationOptions) {
@@ -277,6 +337,11 @@ export default function NotificationSystem({
   const mountedAtRef = useRef(new Date().toISOString());
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const onActionRef = useRef<(n: ToastItem) => void>(() => { });
+  const tabIdRef = useRef(
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`
+  );
 
   // 탭 타이틀 배지
   useEffect(() => {
@@ -304,6 +369,15 @@ export default function NotificationSystem({
     if (existing) clearTimeout(existing);
     timersRef.current.set(item.id, setTimeout(() => removeToast(item.id), 7000));
   }, [removeToast]);
+
+  const claimCrossTabNotification = useCallback((scope: string, dedupeKey: string, ttlMs: number) => {
+    if (!user?.id) return true;
+    return claimNotificationSlot(
+      `erp_notification_${scope}:${String(user.id)}:${dedupeKey}`,
+      tabIdRef.current,
+      ttlMs
+    );
+  }, [user?.id]);
 
   const emitIncomingNotification = useCallback((row: any) => {
     if (!row?.id) return;
@@ -345,9 +419,13 @@ export default function NotificationSystem({
     }
     if (settings.vibration && !isDND) vibrateIfSupported();
 
-    sendNotification(row.title, { body: row.body, tag: type, data: row.metadata });
+    const isChatType = type === 'message' || type === 'mention';
+    const canShowNativeNotification = claimCrossTabNotification('display', rowId, 5000);
+    if (canShowNativeNotification && (!isChatType || !hasPushSubscriptionActive(user?.id))) {
+      sendNotification(row.title, { body: row.body, tag: type, data: row.metadata });
+    }
     void syncBadge();
-  }, [addToast, syncBadge]);
+  }, [addToast, claimCrossTabNotification, syncBadge, user?.id]);
 
   useEffect(() => {
     onActionRef.current = (notif: ToastItem) => {
@@ -381,10 +459,22 @@ export default function NotificationSystem({
     void syncBadge();
 
     // insertNoti: 이벤트 → notifications 테이블 INSERT (그러면 nTableChannel이 toast 표시)
-    const insertNoti = async (n: { type: string; title: string; body: string; data?: any; senderName?: string }) => {
+    const insertNoti = async (
+      n: { type: string; title: string; body: string; data?: any; senderName?: string },
+      dedupeKey?: string,
+      dedupeWindowMs = 15000
+    ) => {
+      if (dedupeKey && !claimCrossTabNotification('write', dedupeKey, dedupeWindowMs)) {
+        return null;
+      }
+
+      const metadata = dedupeKey
+        ? { ...(n.data || {}), dedupe_key: dedupeKey }
+        : (n.data || null);
+
       const { data: inserted } = await supabase.from('notifications').insert([{
         user_id: uid, type: n.type, title: n.title, body: n.body,
-        metadata: n.data, read_at: null, created_at: new Date().toISOString(),
+        metadata, read_at: null, created_at: new Date().toISOString(),
       }]).select().single();
       return inserted;
     };
@@ -401,19 +491,42 @@ export default function NotificationSystem({
     const approvalsCh = supabase.channel(`approvals-trigger-${uid}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'approvals' }, (p: any) => {
         if (String(p.new.current_approver_id) === uid && p.new.status === '대기')
-          insertNoti({ type: 'approval', title: `📋 새 결재 요청: ${p.new.title}`, body: `${p.new.sender_name || '신청자'}님이 결재를 요청했습니다.`, data: { id: p.new.id, type: 'approval' } });
+          insertNoti(
+            { type: 'approval', title: `📋 새 결재 요청: ${p.new.title}`, body: `${p.new.sender_name || '신청자'}님이 결재를 요청했습니다.`, data: { id: p.new.id, type: 'approval' } },
+            `approval:insert:${String(p.new.id)}:${uid}`
+          );
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'approvals' }, (p: any) => {
-        if (String(p.new.current_approver_id) === uid && p.new.status === '대기')
-          insertNoti({ type: 'approval', title: `📋 결재 차례: ${p.new.title}`, body: `${p.new.sender_name || '신청자'} 문서의 결재 순서입니다.`, data: { id: p.new.id, type: 'approval' } });
+        const nextApproverId = String(p.new.current_approver_id || '');
+        const prevApproverId = String(p.old?.current_approver_id || '');
+        const nextStatus = String(p.new.status || '');
+        const prevStatus = String(p.old?.status || '');
+        if (
+          nextApproverId === uid &&
+          nextStatus === '대기' &&
+          (prevApproverId !== nextApproverId || prevStatus !== nextStatus)
+        )
+          insertNoti(
+            { type: 'approval', title: `📋 결재 차례: ${p.new.title}`, body: `${p.new.sender_name || '신청자'} 문서의 결재 순서입니다.`, data: { id: p.new.id, type: 'approval' } },
+            `approval:update:${String(p.new.id)}:${nextApproverId}:${nextStatus}`
+          );
       })
       .subscribe();
 
     // C. 재고 부족
     const inventoryCh = supabase.channel(`inventory-trigger-${uid}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'inventory' }, (p: any) => {
-        if (p.new.stock <= p.new.min_stock && (user.permissions?.inventory || user.department === '행정팀'))
-          insertNoti({ type: 'inventory', title: `⚠️ 재고 부족 경고`, body: `${p.new.item_name || p.new.name}: 현재 ${p.new.stock}개 (최소 ${p.new.min_stock}개)`, data: { id: p.new.id, type: 'inventory' } });
+        const nextStock = Number(p.new.stock || 0);
+        const nextMinStock = Number(p.new.min_stock || 0);
+        const prevStock = Number(p.old?.stock ?? Number.POSITIVE_INFINITY);
+        const prevMinStock = Number(p.old?.min_stock ?? nextMinStock);
+        const enteredLowStock = nextStock <= nextMinStock && (prevStock > prevMinStock || prevMinStock !== nextMinStock);
+        if (enteredLowStock && (user.permissions?.inventory || user.department === '행정팀'))
+          insertNoti(
+            { type: 'inventory', title: `⚠️ 재고 부족 경고`, body: `${p.new.item_name || p.new.name}: 현재 ${p.new.stock}개 (최소 ${p.new.min_stock}개)`, data: { id: p.new.id, type: 'inventory' } },
+            `inventory:low:${String(p.new.id)}:${nextStock}:${nextMinStock}`,
+            60000
+          );
       })
       .subscribe();
 
@@ -421,7 +534,11 @@ export default function NotificationSystem({
     const payrollCh = supabase.channel(`payroll-trigger-${uid}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'payroll_records' }, (p: any) => {
         if (String(p.new.staff_id) === uid)
-          insertNoti({ type: 'payroll', title: `💰 급여 정산 완료`, body: `${new Date().getFullYear()}년 ${new Date().getMonth() + 1}월 급여가 정산되었습니다.`, data: { id: p.new.id, type: 'payroll' } });
+          insertNoti(
+            { type: 'payroll', title: `💰 급여 정산 완료`, body: `${new Date().getFullYear()}년 ${new Date().getMonth() + 1}월 급여가 정산되었습니다.`, data: { id: p.new.id, type: 'payroll' } },
+            `payroll:${String(p.new.id)}`,
+            60000
+          );
       })
       .subscribe();
 
@@ -429,8 +546,15 @@ export default function NotificationSystem({
     const educationCh = supabase.channel(`education-trigger-${uid}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'education_records' }, (p: any) => {
         const daysLeft = Math.ceil((new Date(p.new.deadline).getTime() - Date.now()) / 86400000);
-        if (daysLeft <= 7 && daysLeft > 0 && String(p.new.staff_id) === uid)
-          insertNoti({ type: 'education', title: `📚 교육 이수 기한 임박`, body: `${p.new.education_name}: ${daysLeft}일 남았습니다.`, data: { id: p.new.id, type: 'education' } });
+        const previousDaysLeft = p.old?.deadline
+          ? Math.ceil((new Date(p.old.deadline).getTime() - Date.now()) / 86400000)
+          : Number.POSITIVE_INFINITY;
+        if (daysLeft <= 7 && daysLeft > 0 && previousDaysLeft > 7 && String(p.new.staff_id) === uid)
+          insertNoti(
+            { type: 'education', title: `📚 교육 이수 기한 임박`, body: `${p.new.education_name}: ${daysLeft}일 남았습니다.`, data: { id: p.new.id, type: 'education' } },
+            `education:deadline:${String(p.new.id)}`,
+            3600000
+          );
       })
       .subscribe();
 
@@ -457,7 +581,7 @@ export default function NotificationSystem({
           body: (content || '📎 파일').slice(0, 80),
           senderName,
           data: { room_id: msg.room_id, id: msg.id, sender_name: senderName },
-        });
+        }, `message:${String(msg.id)}`);
       })
       .subscribe();
 
@@ -466,12 +590,13 @@ export default function NotificationSystem({
       .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, (p: any) => {
         if (String(p.new?.staff_id) !== uid) return;
         const s = p.new.status; const isOut = p.new.check_out != null;
+        const statusKey = isOut ? 'checkout' : s === '지각' ? 'late' : 'checkin';
         insertNoti({
           type: 'attendance',
           title: s === '지각' ? '⏰ 지각 등록' : isOut ? '⏰ 퇴근 처리됨' : '⏰ 출근 처리됨',
           body: s === '지각' ? '오늘 출근이 지각으로 기록되었습니다.' : isOut ? '퇴근이 기록되었습니다.' : '정상 출근이 기록되었습니다.',
           data: { id: p.new.id, type: 'attendance' },
-        });
+        }, `attendance:${String(p.new.id)}:${statusKey}`, 60000);
       })
       .subscribe();
 
@@ -533,7 +658,7 @@ export default function NotificationSystem({
       clearInterval(fallbackPoll);
       channels.forEach(ch => supabase.removeChannel(ch));
     };
-  }, [user?.id, addToast, emitIncomingNotification, syncBadge]);
+  }, [user?.department, user?.id, user?.name, user?.permissions?.inventory, claimCrossTabNotification, emitIncomingNotification, syncBadge]);
 
   // 백그라운드 복귀 시 놓친 알림 재조회
   useEffect(() => {

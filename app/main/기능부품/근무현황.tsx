@@ -1,118 +1,669 @@
 'use client';
-/* eslint-disable react-hooks/rules-of-hooks */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
-export default function 근무현황({ user }: { user?: any }) {
-    const [workShifts, setWorkShifts] = useState<any[]>([]);
-    const [staffsForShift, setStaffsForShift] = useState<any[]>([]);
-    const [todayAssignments, setTodayAssignments] = useState<any[]>([]);
-    const [hoverShiftId, setHoverShiftId] = useState<string | null>(null);
+type WorkShiftRow = {
+  id: string;
+  name?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+};
 
-    useEffect(() => {
-        const today = new Date().toISOString().slice(0, 10);
-        const load = async () => {
-            try {
-                const [resShifts, resStaffs, resAssign] = await Promise.allSettled([
-                    supabase.from('work_shifts').select('id, name, start_time, end_time').eq('is_active', true),
-                    supabase.from('staff_members').select('id, name, shift_id, department, position, status'),
-                    supabase.from('shift_assignments').select('staff_id, shift_id').eq('work_date', today),
-                ]);
-                const shifts = resShifts.status === 'fulfilled' ? resShifts.value.data : null;
-                const staffs = resStaffs.status === 'fulfilled' ? resStaffs.value.data : null;
-                const assignments = resAssign.status === 'fulfilled' ? resAssign.value.data : [];
-                setWorkShifts(shifts || []);
-                setStaffsForShift(staffs || []);
-                setTodayAssignments(Array.isArray(assignments) ? assignments : []);
-            } catch {
-                setWorkShifts([]);
-                setStaffsForShift([]);
-                setTodayAssignments([]);
-            }
-        };
-        load();
-    }, []);
+type StaffRow = {
+  id: string;
+  name?: string | null;
+  shift_id?: string | null;
+  department?: string | null;
+  position?: string | null;
+  status?: string | null;
+};
 
-    const todayByShift = useMemo(() => {
-        const list = staffsForShift.filter((s: any) => s.status !== '퇴사');
-        const assignmentMap = new Map(todayAssignments.map((a: any) => [a.staff_id, a.shift_id]));
-        const grouped = new Map<string | 'none', any[]>();
-        list.forEach((s: any) => {
-            const key = assignmentMap.has(s.id) ? (assignmentMap.get(s.id) || 'none') : (s.shift_id || 'none');
-            if (!grouped.has(key)) grouped.set(key, []);
-            grouped.get(key)!.push(s);
-        });
-        const byShift: { shiftId: string | null; shiftName: string; timeRange: string; staffs: any[] }[] = [];
-        workShifts.forEach((shift: any) => {
-            const staffsInShift = grouped.get(shift.id) || [];
-            const start = shift.start_time ? String(shift.start_time).slice(0, 5) : '09:00';
-            const end = shift.end_time ? String(shift.end_time).slice(0, 5) : '18:00';
-            byShift.push({
-                shiftId: shift.id,
-                shiftName: shift.name || '근무',
-                timeRange: `${start}-${end}`,
-                staffs: staffsInShift,
-            });
-        });
-        const noShift = grouped.get('none') || [];
-        if (noShift.length > 0) {
-            byShift.push({
-                shiftId: 'none',
-                shiftName: '일정 미등록',
-                timeRange: '-',
-                staffs: noShift,
-            });
-        }
-        // Filter out rows with empty staffs if preferred, or keep them
-        return byShift.filter(b => b.staffs.length > 0).sort((a, b) => b.staffs.length - a.staffs.length);
-    }, [workShifts, staffsForShift, todayAssignments]);
+type ShiftAssignmentRow = {
+  staff_id: string;
+  shift_id?: string | null;
+  work_date: string;
+};
 
-    return (
-        <div className="space-y-4">
-            <div className="mb-4">
-                <h3 className="text-base font-bold text-[var(--foreground)]">오늘 근무형태별 근무 현황</h3>
-                <p className="text-[12px] text-[var(--toss-gray-3)]">
-                    {new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
-                </p>
-            </div>
+type AttendanceRow = {
+  staff_id: string;
+  date?: string | null;
+  check_in?: string | null;
+  check_out?: string | null;
+  check_in_time?: string | null;
+  check_out_time?: string | null;
+  status?: string | null;
+};
 
-            <div className="flex flex-wrap gap-2.5">
-                {todayByShift.length === 0 ? (
-                    <div className="w-full py-8 text-center text-[12px] font-bold text-[var(--toss-gray-3)] bg-[var(--toss-gray-0)] rounded-[12px] border border-[var(--toss-border)]">
-                        오늘 등록된 근무자가 없거나 편성되지 않았습니다.
-                    </div>
-                ) : (
-                    todayByShift.map((row) => (
-                        <div
-                            key={row.shiftId}
-                            className="relative inline-flex flex-col items-start gap-1 rounded-2xl border border-[var(--toss-border)] bg-[var(--toss-card)] p-4 shadow-sm min-w-[200px]"
-                            onMouseEnter={() => setHoverShiftId(row.shiftId)}
-                            onMouseLeave={() => setHoverShiftId(null)}
-                        >
-                            <div className="flex w-full items-center justify-between mb-1">
-                                <span className="font-bold text-[var(--foreground)] text-[14px]">{row.shiftName}</span>
-                                <span className="flex h-5 min-w-[24px] items-center justify-center rounded-full bg-[var(--toss-blue-light)] text-[11px] font-black text-[var(--toss-blue)]">
-                                    {row.staffs.length}명
-                                </span>
-                            </div>
-                            <span className="text-[11px] font-medium text-[var(--toss-gray-3)]">{row.timeRange}</span>
+type ShiftBand = 'D' | 'E' | 'N' | 'OTHER' | 'NONE';
 
-                            {/* 근무자 목록 리스트업 */}
-                            <div className="mt-3 w-full border-t border-[var(--toss-border)] pt-3">
-                                <p className="text-[10px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider mb-2">근무자 명단</p>
-                                <div className="flex flex-wrap gap-1.5">
-                                    {row.staffs.map((s: any) => (
-                                        <span key={s.id} className="inline-block px-2 py-1 bg-[var(--toss-gray-1)] rounded-[8px] text-[11px] font-bold text-[var(--toss-gray-5)]">
-                                            {s.name}
-                                        </span>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    ))
-                )}
-            </div>
-        </div>
+type ShiftCardRow = {
+  shiftId: string;
+  shiftName: string;
+  timeRange: string;
+  band: ShiftBand;
+  staffs: StaffRow[];
+  activeStaffIds: Set<string>;
+};
+
+type DayShiftCounts = {
+  total: number;
+  D: number;
+  E: number;
+  N: number;
+  OTHER: number;
+};
+
+const WEEKDAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
+const BAND_ORDER: Record<ShiftBand, number> = {
+  D: 0,
+  E: 1,
+  N: 2,
+  OTHER: 3,
+  NONE: 4,
+};
+
+function padDatePart(value: number) {
+  return String(value).padStart(2, '0');
+}
+
+function toDateKey(date: Date) {
+  return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}`;
+}
+
+function shiftTimeLabel(value?: string | null) {
+  if (!value) return '--:--';
+  return String(value).slice(0, 5);
+}
+
+function formatShiftRange(shift?: WorkShiftRow | null) {
+  if (!shift) return '-';
+  return `${shiftTimeLabel(shift.start_time)} - ${shiftTimeLabel(shift.end_time)}`;
+}
+
+function formatDisplayDate(date: Date) {
+  return date.toLocaleDateString('ko-KR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    weekday: 'long',
+  });
+}
+
+function formatMonthLabel(date: Date) {
+  return date.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' });
+}
+
+function formatClockLabel(value?: string | null) {
+  if (!value) return null;
+  const raw = String(value);
+  const isoMatch = raw.match(/T(\d{2}:\d{2})/);
+  if (isoMatch) return isoMatch[1];
+  const timeMatch = raw.match(/(\d{2}:\d{2})/);
+  if (timeMatch) return timeMatch[1];
+  return raw.slice(0, 5);
+}
+
+function getMonthStart(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function getMonthEnd(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0);
+}
+
+function addMonths(date: Date, amount: number) {
+  return new Date(date.getFullYear(), date.getMonth() + amount, 1);
+}
+
+function getMonthGrid(date: Date) {
+  const firstDay = getMonthStart(date);
+  const endDay = getMonthEnd(date);
+  const startWeekday = firstDay.getDay();
+  const daysInMonth = endDay.getDate();
+
+  const cells: Array<Date | null> = [];
+  for (let index = 0; index < startWeekday; index += 1) cells.push(null);
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    cells.push(new Date(date.getFullYear(), date.getMonth(), day));
+  }
+  while (cells.length % 7 !== 0) cells.push(null);
+  return cells;
+}
+
+function inferShiftBand(shift?: WorkShiftRow | null): ShiftBand {
+  if (!shift) return 'NONE';
+
+  const name = String(shift.name || '').toLowerCase();
+  if (name.includes('day') || name.includes('데이') || name.includes('주간') || /^d\b/.test(name)) {
+    return 'D';
+  }
+  if (name.includes('evening') || name.includes('eve') || name.includes('이브') || name.includes('오후') || /^e\b/.test(name)) {
+    return 'E';
+  }
+  if (name.includes('night') || name.includes('나이트') || name.includes('야간') || /^n\b/.test(name)) {
+    return 'N';
+  }
+
+  const startHour = Number(String(shift.start_time || '').slice(0, 2));
+  if (!Number.isNaN(startHour)) {
+    if (startHour >= 20 || startHour < 5) return 'N';
+    if (startHour >= 12) return 'E';
+    return 'D';
+  }
+
+  return 'OTHER';
+}
+
+function getBandLabel(band: ShiftBand) {
+  if (band === 'D') return 'Day';
+  if (band === 'E') return 'Evening';
+  if (band === 'N') return 'Night';
+  if (band === 'NONE') return '미지정';
+  return '기타';
+}
+
+function getBandBadgeClass(band: ShiftBand) {
+  if (band === 'D') return 'bg-sky-100 text-sky-700 border-sky-200';
+  if (band === 'E') return 'bg-amber-100 text-amber-700 border-amber-200';
+  if (band === 'N') return 'bg-violet-100 text-violet-700 border-violet-200';
+  if (band === 'NONE') return 'bg-slate-100 text-slate-600 border-slate-200';
+  return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+}
+
+function buildEmptyCounts(): DayShiftCounts {
+  return { total: 0, D: 0, E: 0, N: 0, OTHER: 0 };
+}
+
+function cloneCounts(source: DayShiftCounts) {
+  return { total: source.total, D: source.D, E: source.E, N: source.N, OTHER: source.OTHER };
+}
+
+export default function WorkStatus({ user }: { user?: any }) {
+  const [selectedDate, setSelectedDate] = useState(() => new Date());
+  const [workShifts, setWorkShifts] = useState<WorkShiftRow[]>([]);
+  const [staffs, setStaffs] = useState<StaffRow[]>([]);
+  const [assignments, setAssignments] = useState<ShiftAssignmentRow[]>([]);
+  const [todayAttendance, setTodayAttendance] = useState<AttendanceRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+
+  const today = useMemo(() => new Date(), []);
+  const todayKey = useMemo(() => toDateKey(today), [today]);
+  const selectedDateKey = useMemo(() => toDateKey(selectedDate), [selectedDate]);
+
+  const queryRange = useMemo(() => {
+    const start = getMonthStart(selectedDate);
+    const end = getMonthEnd(selectedDate);
+    return {
+      startKey: toDateKey(start),
+      endKey: toDateKey(end),
+    };
+  }, [selectedDate]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      setLoading(true);
+      try {
+        const [shiftRes, staffRes, assignmentRes, attendanceRes] = await Promise.allSettled([
+          supabase.from('work_shifts').select('id, name, start_time, end_time').eq('is_active', true),
+          supabase.from('staff_members').select('id, name, shift_id, department, position, status'),
+          supabase
+            .from('shift_assignments')
+            .select('staff_id, shift_id, work_date')
+            .gte('work_date', queryRange.startKey)
+            .lte('work_date', queryRange.endKey),
+          supabase
+            .from('attendance')
+            .select('staff_id, date, check_in, check_out, check_in_time, check_out_time, status')
+            .eq('date', todayKey),
+        ]);
+
+        if (cancelled) return;
+
+        setWorkShifts(
+          shiftRes.status === 'fulfilled' && Array.isArray(shiftRes.value.data)
+            ? (shiftRes.value.data as WorkShiftRow[])
+            : [],
+        );
+        setStaffs(
+          staffRes.status === 'fulfilled' && Array.isArray(staffRes.value.data)
+            ? (staffRes.value.data as StaffRow[])
+            : [],
+        );
+        setAssignments(
+          assignmentRes.status === 'fulfilled' && Array.isArray(assignmentRes.value.data)
+            ? (assignmentRes.value.data as ShiftAssignmentRow[])
+            : [],
+        );
+        setTodayAttendance(
+          attendanceRes.status === 'fulfilled' && Array.isArray(attendanceRes.value.data)
+            ? (attendanceRes.value.data as AttendanceRow[])
+            : [],
+        );
+      } catch {
+        if (cancelled) return;
+        setWorkShifts([]);
+        setStaffs([]);
+        setAssignments([]);
+        setTodayAttendance([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [queryRange.endKey, queryRange.startKey, todayKey]);
+
+  useEffect(() => {
+    if (!isDetailModalOpen) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsDetailModalOpen(false);
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [isDetailModalOpen]);
+
+  const activeStaffsOnly = useMemo(
+    () =>
+      staffs
+        .filter((staff) => staff.status !== '퇴사')
+        .sort((left, right) =>
+          String(left.name || '').localeCompare(String(right.name || ''), 'ko'),
+        ),
+    [staffs],
+  );
+
+  const shiftMap = useMemo(() => new Map(workShifts.map((shift) => [shift.id, shift])), [workShifts]);
+  const staffMap = useMemo(() => new Map(activeStaffsOnly.map((staff) => [staff.id, staff])), [activeStaffsOnly]);
+
+  const activeStaffs = useMemo(() => {
+    const assignmentMap = new Map(
+      assignments
+        .filter((assignment) => assignment.work_date === todayKey)
+        .map((assignment) => [assignment.staff_id, assignment.shift_id || 'none']),
     );
+    const grouped = new Map<string, Array<{ staff: StaffRow; attendance: AttendanceRow }>>();
+
+    todayAttendance.forEach((record) => {
+      const hasCheckedIn = Boolean(record.check_in || record.check_in_time);
+      const hasCheckedOut = Boolean(record.check_out || record.check_out_time);
+      if (!hasCheckedIn || hasCheckedOut) return;
+
+      const staff = staffMap.get(record.staff_id);
+      if (!staff) return;
+
+      const shiftId = assignmentMap.get(record.staff_id) || staff.shift_id || 'none';
+      if (!grouped.has(shiftId)) grouped.set(shiftId, []);
+      grouped.get(shiftId)?.push({ staff, attendance: record });
+    });
+
+    return Array.from(grouped.entries())
+      .map(([shiftId, items]) => {
+        const shift = shiftMap.get(shiftId);
+        return {
+          shiftId,
+          shiftName: shift?.name || (shiftId === 'none' ? '근무형태 미지정' : '기타 근무'),
+          timeRange: formatShiftRange(shift),
+          band: inferShiftBand(shift),
+          items: items.sort((left, right) =>
+            String(left.staff.name || '').localeCompare(String(right.staff.name || ''), 'ko'),
+          ),
+        };
+      })
+      .sort((left, right) => {
+        if (BAND_ORDER[left.band] !== BAND_ORDER[right.band]) {
+          return BAND_ORDER[left.band] - BAND_ORDER[right.band];
+        }
+        return right.items.length - left.items.length;
+      });
+  }, [assignments, shiftMap, staffMap, todayAttendance, todayKey]);
+
+  const assignmentCountsByDate = useMemo(() => {
+    const counts = new Map<string, DayShiftCounts>();
+
+    assignments.forEach((assignment) => {
+      const key = assignment.work_date;
+      if (!counts.has(key)) counts.set(key, buildEmptyCounts());
+
+      const current = counts.get(key)!;
+      current.total += 1;
+
+      const band = inferShiftBand(shiftMap.get(assignment.shift_id || ''));
+      if (band === 'D' || band === 'E' || band === 'N') current[band] += 1;
+      else current.OTHER += 1;
+    });
+
+    return counts;
+  }, [assignments, shiftMap]);
+
+  const staffNamesByDate = useMemo(() => {
+    const grouped = new Map<string, string[]>();
+
+    assignments.forEach((assignment) => {
+      const staff = staffMap.get(assignment.staff_id);
+      if (!staff) return;
+      if (!grouped.has(assignment.work_date)) grouped.set(assignment.work_date, []);
+      grouped.get(assignment.work_date)?.push(String(staff.name || '이름 없음'));
+    });
+
+    grouped.forEach((names, key) => {
+      grouped.set(key, names.sort((left, right) => left.localeCompare(right, 'ko')));
+    });
+
+    return grouped;
+  }, [assignments, staffMap]);
+
+  const defaultStaffCount = useMemo(() => activeStaffsOnly.length, [activeStaffsOnly]);
+
+  const selectedDateRows = useMemo(() => {
+    const activeStaffIds = new Set(
+      todayAttendance
+        .filter((record) => (record.check_in || record.check_in_time) && !(record.check_out || record.check_out_time))
+        .map((record) => record.staff_id),
+    );
+
+    const selectedAssignments = assignments.filter((assignment) => assignment.work_date === selectedDateKey);
+    const hasExplicitAssignments = selectedAssignments.length > 0;
+    const grouped = new Map<string, StaffRow[]>();
+
+    if (hasExplicitAssignments) {
+      selectedAssignments.forEach((assignment) => {
+        const staff = staffMap.get(assignment.staff_id);
+        if (!staff) return;
+        const key = assignment.shift_id || 'none';
+        if (!grouped.has(key)) grouped.set(key, []);
+        grouped.get(key)?.push(staff);
+      });
+    } else {
+      activeStaffsOnly.forEach((staff) => {
+        const key = staff.shift_id || 'none';
+        if (!grouped.has(key)) grouped.set(key, []);
+        grouped.get(key)?.push(staff);
+      });
+    }
+
+    const rows: ShiftCardRow[] = Array.from(grouped.entries()).map(([shiftId, groupedStaffs]) => {
+      const shift = shiftMap.get(shiftId);
+      return {
+        shiftId,
+        shiftName: shift?.name || (shiftId === 'none' ? '근무형태 미지정' : '기타 근무'),
+        timeRange: formatShiftRange(shift),
+        band: inferShiftBand(shift),
+        staffs: groupedStaffs.sort((left, right) =>
+          String(left.name || '').localeCompare(String(right.name || ''), 'ko'),
+        ),
+        activeStaffIds,
+      };
+    });
+
+    rows.sort((left, right) => {
+      if (BAND_ORDER[left.band] !== BAND_ORDER[right.band]) {
+        return BAND_ORDER[left.band] - BAND_ORDER[right.band];
+      }
+      return right.staffs.length - left.staffs.length;
+    });
+
+    const selectedCounts = assignmentCountsByDate.get(selectedDateKey);
+    const fallbackCounts = hasExplicitAssignments
+      ? selectedCounts || buildEmptyCounts()
+      : rows.reduce((acc, row) => {
+          const next = cloneCounts(acc);
+          next.total += row.staffs.length;
+          if (row.band === 'D' || row.band === 'E' || row.band === 'N') next[row.band] += row.staffs.length;
+          else next.OTHER += row.staffs.length;
+          return next;
+        }, buildEmptyCounts());
+
+    return {
+      rows,
+      hasExplicitAssignments,
+      counts: fallbackCounts,
+    };
+  }, [activeStaffsOnly, assignmentCountsByDate, assignments, selectedDateKey, shiftMap, staffMap, todayAttendance]);
+
+  return (
+    <div className="space-y-5">
+      <section className="rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4 shadow-sm">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h3 className="text-lg font-bold text-[var(--foreground)]">근무현황</h3>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--toss-blue)]">
+              선택일 {formatDisplayDate(selectedDate)}
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedDate(new Date())}
+              className="rounded-full border border-[var(--toss-border)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-3)] transition hover:border-[var(--toss-blue)] hover:text-[var(--toss-blue)]"
+            >
+              오늘로
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-3 lg:grid-cols-3">
+          {activeStaffs.length === 0 ? (
+            <div className="lg:col-span-3 rounded-[18px] border border-dashed border-[var(--toss-border)] bg-[var(--page-bg)] px-4 py-8 text-center text-sm text-[var(--toss-gray-3)]">
+              오늘 출근해서 현재 근무중인 직원이 없습니다.
+            </div>
+          ) : (
+            activeStaffs.map((group) => (
+              <div
+                key={group.shiftId}
+                className="rounded-[18px] border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-emerald-100/70 p-4 shadow-sm"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black ${getBandBadgeClass(group.band)}`}>
+                      현재 근무중 · {getBandLabel(group.band)}
+                    </div>
+                    <h4 className="mt-2 text-base font-bold text-[var(--foreground)]">{group.shiftName}</h4>
+                    <p className="mt-1 text-[12px] font-medium text-[var(--toss-gray-3)]">{group.timeRange}</p>
+                  </div>
+                  <span className="rounded-full bg-emerald-500 px-2.5 py-1 text-[11px] font-black text-white shadow-sm">
+                    {group.items.length}명
+                  </span>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {group.items.map(({ staff, attendance }) => (
+                    <div
+                      key={staff.id}
+                      className="rounded-[14px] border border-white/80 bg-white/90 px-3 py-2 shadow-sm"
+                    >
+                      <p className="text-[12px] font-bold text-[var(--foreground)]">{staff.name || '이름 없음'}</p>
+                      <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
+                        {[staff.position, staff.department].filter(Boolean).join(' · ') || '근무중'} · 출근 {formatClockLabel(attendance.check_in || attendance.check_in_time) || '--:--'}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
+      <section className="rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4 shadow-sm">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h4 className="text-base font-bold text-[var(--foreground)]">월간 캘린더</h4>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedDate((prev) => addMonths(prev, -1))}
+              className="rounded-full border border-[var(--toss-border)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-3)] transition hover:border-[var(--toss-blue)] hover:text-[var(--toss-blue)]"
+            >
+              이전달
+            </button>
+            <span className="rounded-full bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--toss-blue)]">
+              {formatMonthLabel(selectedDate)}
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedDate((prev) => addMonths(prev, 1))}
+              className="rounded-full border border-[var(--toss-border)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-3)] transition hover:border-[var(--toss-blue)] hover:text-[var(--toss-blue)]"
+            >
+              다음달
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-[18px] border border-[var(--toss-border)] bg-[var(--page-bg)] p-3">
+          <div className="mb-2 grid grid-cols-7 gap-1">
+            {WEEKDAY_LABELS.map((label) => (
+              <div key={label} className="py-1 text-center text-[10px] font-bold text-[var(--toss-gray-3)]">
+                {label}
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            {getMonthGrid(selectedDate).map((cell, index) => {
+              if (!cell) {
+                return <div key={`empty-${index}`} className="min-h-[86px] rounded-[12px] border border-transparent" />;
+              }
+
+              const dayKey = toDateKey(cell);
+              const explicitStaffCount = staffNamesByDate.get(dayKey)?.length || 0;
+              const totalStaff = explicitStaffCount > 0 ? explicitStaffCount : defaultStaffCount;
+              const isSelected = dayKey === selectedDateKey;
+              const isToday = dayKey === todayKey;
+
+              return (
+                <button
+                  key={dayKey}
+                  type="button"
+                  onClick={() => {
+                    setSelectedDate(cell);
+                    setIsDetailModalOpen(true);
+                  }}
+                  className={`min-h-[86px] rounded-[12px] border px-2 py-2 text-left transition ${
+                    isSelected
+                      ? 'border-[var(--toss-blue)] bg-[var(--toss-blue-light)]/70 shadow-sm'
+                      : 'border-[var(--toss-border)] bg-[var(--toss-card)] hover:border-[var(--toss-blue)]/40 hover:bg-[var(--toss-blue-light)]/30'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className={`text-[11px] font-black ${isToday ? 'text-emerald-600' : 'text-[var(--foreground)]'}`}>
+                      {cell.getDate()}
+                    </span>
+                    <span className="rounded-full bg-[var(--toss-gray-1)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--toss-gray-3)]">
+                      {totalStaff}명
+                    </span>
+                  </div>
+                  <div className="mt-2 space-y-1">
+                    <div className="text-[10px] font-bold text-[var(--foreground)]">
+                      총 {totalStaff}명
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {isDetailModalOpen ? (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/45 px-4 py-6" onClick={() => setIsDetailModalOpen(false)}>
+          <div
+            className="max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-[24px] border border-[var(--toss-border)] bg-[var(--toss-card)] shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex flex-col gap-3 border-b border-[var(--toss-border)] px-5 py-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <h4 className="text-lg font-bold text-[var(--foreground)]">선택일 전체 근무자 상세</h4>
+                <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">{formatDisplayDate(selectedDate)}</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold">
+                <span className="rounded-full bg-sky-100 px-2.5 py-1 text-sky-700">Day {selectedDateRows.counts.D}명</span>
+                <span className="rounded-full bg-amber-100 px-2.5 py-1 text-amber-700">Evening {selectedDateRows.counts.E}명</span>
+                <span className="rounded-full bg-violet-100 px-2.5 py-1 text-violet-700">Night {selectedDateRows.counts.N}명</span>
+                <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-700">기타 {selectedDateRows.counts.OTHER}명</span>
+                <span className="rounded-full bg-[var(--toss-gray-1)] px-2.5 py-1 text-[var(--toss-gray-3)]">총 {selectedDateRows.counts.total}명</span>
+                <button
+                  type="button"
+                  onClick={() => setIsDetailModalOpen(false)}
+                  className="rounded-full border border-[var(--toss-border)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-3)] transition hover:border-[var(--toss-blue)] hover:text-[var(--toss-blue)]"
+                >
+                  닫기
+                </button>
+              </div>
+            </div>
+
+            <div className="max-h-[calc(90vh-92px)] overflow-y-auto p-5">
+              {!selectedDateRows.hasExplicitAssignments ? (
+                <div className="mb-4 rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] font-medium text-amber-700">
+                  선택일의 실제 배정표가 없어 기본 근무형태 기준으로 보여주고 있습니다.
+                </div>
+              ) : null}
+
+              <div className="grid gap-3 xl:grid-cols-2">
+                {loading ? (
+                  <div className="xl:col-span-2 rounded-[18px] border border-dashed border-[var(--toss-border)] bg-[var(--page-bg)] px-4 py-10 text-center text-sm text-[var(--toss-gray-3)]">
+                    근무현황을 불러오는 중입니다.
+                  </div>
+                ) : selectedDateRows.rows.length === 0 ? (
+                  <div className="xl:col-span-2 rounded-[18px] border border-dashed border-[var(--toss-border)] bg-[var(--page-bg)] px-4 py-10 text-center text-sm text-[var(--toss-gray-3)]">
+                    선택한 날짜의 근무 배치가 없습니다.
+                  </div>
+                ) : (
+                  selectedDateRows.rows.map((row) => (
+                    <div key={row.shiftId} className="rounded-[18px] border border-[var(--toss-border)] bg-[var(--page-bg)] p-4 shadow-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black ${getBandBadgeClass(row.band)}`}>
+                            {getBandLabel(row.band)}
+                          </div>
+                          <h5 className="mt-2 text-base font-bold text-[var(--foreground)]">{row.shiftName}</h5>
+                          <p className="mt-1 text-[12px] font-medium text-[var(--toss-gray-3)]">{row.timeRange}</p>
+                        </div>
+                        <span className="rounded-full bg-[var(--toss-blue-light)] px-2.5 py-1 text-[11px] font-black text-[var(--toss-blue)]">
+                          {row.staffs.length}명
+                        </span>
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {row.staffs.map((staff) => {
+                          const isActiveNow = selectedDateKey === todayKey && row.activeStaffIds.has(staff.id);
+                          return (
+                            <div
+                              key={staff.id}
+                              className={`rounded-[14px] border px-3 py-2 shadow-sm ${
+                                isActiveNow
+                                  ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                                  : 'border-[var(--toss-border)] bg-[var(--toss-card)] text-[var(--foreground)]'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <p className="text-[12px] font-bold">{staff.name || '이름 없음'}</p>
+                                {isActiveNow ? (
+                                  <span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-black text-white">
+                                    근무중
+                                  </span>
+                                ) : null}
+                              </div>
+                              <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
+                                {[staff.department, staff.position].filter(Boolean).join(' · ') || '근무 정보'}
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
 }
