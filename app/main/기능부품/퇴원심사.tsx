@@ -409,7 +409,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
     const stayDays = (a: string, d: string) => { const v = Math.ceil((new Date(d).getTime() - new Date(a).getTime()) / 86400000); return v > 0 ? v : 0; };
 
     return (
-        <div className="bg-[var(--page-bg)] animate-in fade-in duration-300">
+        <div className="bg-[var(--page-bg)] animate-in fade-in duration-300" data-testid="discharge-review-view">
             {/* 헤더 */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-6 bg-white border-b border-[var(--toss-border)] gap-4">
                 <div>
@@ -417,7 +417,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                 </div>
                 <div className="flex gap-2">
                     {(['reviews', 'new', 'template'] as Tab[]).map(t => (
-                        <button key={t} onClick={() => { setTab(t); if (t !== 'reviews') setSelectedReview(null); setCompareResult(null); }}
+                        <button key={t} data-testid={`discharge-tab-${t}`} onClick={() => { setTab(t); if (t !== 'reviews') setSelectedReview(null); setCompareResult(null); }}
                             className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${tab === t ? 'bg-gray-900 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
                             {t === 'reviews' ? '📋 심사 목록' : t === 'new' ? '➕ 새 심사' : '⚙️ 기본 항목 설정'}
                         </button>
@@ -434,7 +434,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                         <div className="bg-white rounded-2xl border border-[var(--toss-border)] p-6 shadow-sm space-y-4">
                             <div className="flex justify-between items-center">
                                 <h3 className="text-sm font-bold text-gray-800">📋 항목 템플릿 목록 ({templates.length}개)</h3>
-                                <button onClick={startNewTemplate} className="px-4 py-2 text-xs font-bold text-white bg-gray-900 rounded-xl hover:bg-black transition-all">➕ 새 템플릿 추가</button>
+                                <button data-testid="discharge-template-new" onClick={startNewTemplate} className="px-4 py-2 text-xs font-bold text-white bg-gray-900 rounded-xl hover:bg-black transition-all">➕ 새 템플릿 추가</button>
                             </div>
                             <p className="text-xs text-gray-400 font-medium">진단명/입원사유별로 기본 항목 템플릿을 만들어 두면, 심사 시 드롭다운으로 선택할 수 있습니다.</p>
 
@@ -469,14 +469,14 @@ export default function DischargeReviewPage({ user }: { user: any }) {
 
                                 <div className="space-y-1.5">
                                     <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">항목 제목 (진단명/입원사유) *</label>
-                                    <input value={editTmplTitle} onChange={e => setEditTmplTitle(e.target.value)}
+                                    <input data-testid="discharge-template-title" value={editTmplTitle} onChange={e => setEditTmplTitle(e.target.value)}
                                         placeholder="예: TKR 슬관절 전치환술, 폐렴 치료, 척추수술..."
                                         className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30" />
                                 </div>
 
                                 <div className="space-y-1.5">
                                     <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">차트 기본 항목 데이터 *</label>
-                                    <textarea value={editTmplData} onChange={e => setEditTmplData(e.target.value)}
+                                    <textarea data-testid="discharge-template-data" value={editTmplData} onChange={e => setEditTmplData(e.target.value)}
                                         placeholder="차트 프로그램에서 해당 진단의 표준 항목을 복사-붙여넣기..."
                                         className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20 resize-none h-48 custom-scrollbar placeholder:text-gray-400" />
                                 </div>
@@ -490,7 +490,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                 <div className="flex gap-2 justify-end">
                                     <button onClick={() => { setEditTmplId(null); setEditTmplTitle(''); setEditTmplData(''); }}
                                         className="px-4 py-2.5 text-xs font-bold text-gray-500 bg-gray-100 rounded-xl hover:bg-gray-200">취소</button>
-                                    <button onClick={handleSaveTemplate}
+                                    <button data-testid="discharge-template-save" onClick={handleSaveTemplate}
                                         className="px-6 py-2.5 text-xs font-bold text-white bg-[var(--toss-blue)] rounded-xl hover:opacity-90">저장하기</button>
                                 </div>
                             </div>
@@ -508,7 +508,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div className="space-y-1.5">
                                     <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">환자명 *</label>
-                                    <input value={patientName} onChange={e => setPatientName(e.target.value)} placeholder="검색 또는 입력"
+                                    <input data-testid="discharge-patient-name" value={patientName} onChange={e => setPatientName(e.target.value)} placeholder="검색 또는 입력"
                                         className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30" />
                                 </div>
                                 <div className="space-y-1.5">
@@ -529,12 +529,12 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div className="space-y-1.5">
                                     <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">진료과 *</label>
-                                    <input value={department} onChange={e => setDepartment(e.target.value)} placeholder="정형외과, 내과..."
+                                    <input data-testid="discharge-department" value={department} onChange={e => setDepartment(e.target.value)} placeholder="정형외과, 내과..."
                                         className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30" />
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">입원일 *</label>
-                                    <SmartDatePicker value={admissionDate} onChange={val => setAdmissionDate(val)} className="w-full h-[46px] px-4 bg-gray-50 border-none rounded-xl text-sm font-medium" />
+                                    <SmartDatePicker value={admissionDate} onChange={val => setAdmissionDate(val)} data-testid="discharge-admission-date" className="w-full h-[46px] px-4 bg-gray-50 border-none rounded-xl text-sm font-medium" />
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">퇴원 예정일</label>
@@ -645,7 +645,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                             {/* 진단명 드롭다운 */}
                             <div className="space-y-1.5">
                                 <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">진단명 / 입원 사유 (템플릿 선택)</label>
-                                <select value={selectedTemplateId} onChange={e => setSelectedTemplateId(e.target.value)}
+                                <select data-testid="discharge-template-select" value={selectedTemplateId} onChange={e => setSelectedTemplateId(e.target.value)}
                                     className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 appearance-none cursor-pointer">
                                     <option value="">-- 템플릿 선택 (선택 안 함) --</option>
                                     {templates.map(t => (
@@ -672,7 +672,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                             <h3 className="text-sm font-bold text-gray-800">📊 환자 차트 데이터 붙여넣기 *</h3>
                             <p className="text-xs text-gray-400 font-medium">차트 프로그램에서 환자의 계산내역을 복사해서 붙여넣기 하세요.</p>
 
-                            <textarea value={newChartData} onChange={e => setNewChartData(e.target.value)}
+                            <textarea data-testid="discharge-chart-data" value={newChartData} onChange={e => setNewChartData(e.target.value)}
                                 placeholder="차트 프로그램에서 복사한 데이터를 여기에 붙여넣기..."
                                 className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20 resize-none h-48 custom-scrollbar placeholder:text-gray-400" />
 
@@ -688,7 +688,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                 </div>
                             )}
 
-                            <button onClick={createReview} disabled={parsedNewChart.length === 0}
+                            <button data-testid="discharge-create-review" onClick={createReview} disabled={parsedNewChart.length === 0}
                                 className="w-full py-4 bg-gray-900 text-white text-sm font-bold rounded-xl hover:bg-black transition-all active:scale-[0.99] disabled:opacity-40">
                                 퇴원심사 생성하기 ({parsedNewChart.length}개 항목) {selectedTemplate ? `→ "${selectedTemplate.title}" 자동 비교` : ''}
                             </button>
@@ -708,7 +708,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                 <button onClick={() => setTab('new')} className="px-6 py-3 bg-gray-900 text-white text-xs font-bold rounded-xl">➕ 새 심사 등록</button>
                             </div>
                         ) : reviews.map(r => (
-                            <button key={r.id} onClick={() => { setSelectedReview(r); setAiResult(r.ai_analysis || ''); setCompareResult(null); }}
+                            <button key={r.id} data-testid={`discharge-review-card-${r.id}`} onClick={() => { setSelectedReview(r); setAiResult(r.ai_analysis || ''); setCompareResult(null); }}
                                 className="w-full p-5 bg-white rounded-2xl border border-[var(--toss-border)] shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all text-left">
                                 <div className="flex justify-between items-start">
                                     <div className="space-y-1">
@@ -737,7 +737,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
 
                 {/* ===== 심사 상세 ===== */}
                 {tab === 'reviews' && selectedReview && (
-                    <div className="max-w-4xl mx-auto space-y-4">
+                    <div className="max-w-4xl mx-auto space-y-4" data-testid="discharge-review-detail">
                         <div className="flex justify-between items-center">
                             <button onClick={() => { setSelectedReview(null); setCompareResult(null); setIsEditing(false); }} className="text-[11px] font-bold text-[var(--toss-blue)] hover:underline">← 목록으로</button>
                             {!isEditing && selectedReview.status !== 'approved' && (
@@ -949,7 +949,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                     <span className="text-xs font-bold text-[var(--toss-blue)]">{selectedReview.items.length > 0 ? Math.round((selectedReview.items.filter(i => i.checked).length / selectedReview.items.length) * 100) : 0}%</span>
                                     {selectedReview.status !== 'approved' && (
                                         <div className="flex gap-1">
-                                            <button onClick={() => toggleAll(true)} className="px-2 py-1 text-[10px] font-bold text-green-600 bg-green-50 rounded hover:bg-green-100">전체✓</button>
+                                            <button data-testid="discharge-review-toggle-all" onClick={() => toggleAll(true)} className="px-2 py-1 text-[10px] font-bold text-green-600 bg-green-50 rounded hover:bg-green-100">전체✓</button>
                                             <button onClick={() => toggleAll(false)} className="px-2 py-1 text-[10px] font-bold text-gray-500 bg-gray-100 rounded hover:bg-gray-200">해제</button>
                                         </div>
                                     )}
@@ -1041,7 +1041,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                         </div>
 
                         {selectedReview.status !== 'approved' && (
-                            <button onClick={() => approveReview(selectedReview.id)}
+                            <button data-testid="discharge-review-approve" onClick={() => approveReview(selectedReview.id)}
                                 className="w-full py-4 bg-green-600 text-white text-sm font-bold rounded-xl hover:bg-green-700 transition-all active:scale-[0.99] shadow-lg shadow-green-600/20">✅ 퇴원 승인</button>
                         )}
                     </div>

@@ -30,8 +30,12 @@ export default function RewardDisciplineManagement({ staffs = [], selectedCo, us
         const cat = activeTab === '포상' ? '포상' : '징계';
         const newRec = { ...form, category: cat, staff_name: staff.name, company: staff.company, department: staff.department || '', issued_by: user?.name || '관리자' };
         const { data, error } = await supabase.from('reward_discipline').insert([newRec]).select();
-        if (error) { setRecords([{ ...newRec, id: crypto.randomUUID(), created_at: new Date().toISOString() }, ...records]); }
-        else if (data) { setRecords([data[0], ...records]); }
+        if (error) {
+            console.error('reward_discipline insert failed:', error);
+            alert('포상/징계 기록 저장에 실패했습니다.');
+            return;
+        }
+        if (data?.[0]) { setRecords([data[0], ...records]); }
         setShowForm(false);
         setForm({ staff_id: '', category: '포상', type: '', date: '', reason: '', detail: '', amount: 0, committee_date: '', committee_members: '', committee_result: '', memo: '' });
     };

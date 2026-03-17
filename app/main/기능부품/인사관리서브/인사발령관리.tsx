@@ -36,14 +36,22 @@ export default function PersonnelAppointment({ staffs = [], selectedCo, user }: 
         if (!staff) return alert('직원을 선택해주세요.');
         const newRec = { ...form, staff_name: staff.name, company: staff.company, status: '발령완료', issued_by: user?.name || '관리자', issued_at: new Date().toISOString() };
         const { data, error } = await supabase.from('personnel_appointments').insert([newRec]).select();
-        if (error) { setRecords([{ ...newRec, id: crypto.randomUUID(), created_at: new Date().toISOString() }, ...records]); }
-        else if (data) { setRecords([data[0], ...records]); }
+        if (error || !data?.[0]) {
+            console.error('personnel_appointments insert failed:', error);
+            alert('인사발령 저장에 실패했습니다.');
+            return;
+        }
+        setRecords([data[0], ...records]);
         // 직원 정보 실제 업데이트 (부서/직급 변경 반영)
         if (form.after_dept || form.after_position) {
             const updates: any = {};
             if (form.after_dept) updates.department = form.after_dept;
             if (form.after_position) updates.position = form.after_position;
-            await supabase.from('staff_members').update(updates).eq('id', form.staff_id);
+            const { error: staffUpdateError } = await supabase.from('staff_members').update(updates).eq('id', form.staff_id);
+            if (staffUpdateError) {
+                console.error('staff_members update failed after appointment insert:', staffUpdateError);
+                alert('인사발령 기록은 저장됐지만 직원 정보 반영에는 실패했습니다.');
+            }
         }
         setShowForm(false);
         setForm({ staff_id: '', order_type: '승진', effective_date: '', before_dept: '', after_dept: '', before_position: '', after_position: '', before_role: '', after_role: '', reason: '', memo: '' });

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { persistSupabaseAccessToken } from '@/lib/supabase-bridge';
@@ -21,7 +21,7 @@ export default function MyProfileCard({
   isEditing: controlledIsEditing,
   setIsEditing: setControlledIsEditing,
 }: any) {
-  const MASKED_TEXT = '••••••••';
+  const MASKED_TEXT = '********';
   const [user, setUser] = useState<any>(normalizeProfileUser(initialUser || {}));
   const [avatarUrl, setAvatarUrl] = useState<string | null>(getProfilePhotoUrl(initialUser));
   const [uploading, setUploading] = useState(false);

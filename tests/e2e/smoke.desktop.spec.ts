@@ -4,6 +4,7 @@ import {
   dismissDialogs,
   fakeUser,
   mockSupabase,
+  replaceSession,
   seedSession,
 } from "./helpers";
 test.beforeEach(async ({ page }) => {
@@ -15,41 +16,11 @@ async function loginWithSession(
   user: Record<string, unknown>,
   localStorage: Record<string, string> = {},
 ) {
-  const cookieHeader = await buildSessionCookieHeader(user);
-  const [nameValue] = cookieHeader.split(";");
-  const separatorIndex = nameValue.indexOf("=");
-  const cookieName = nameValue.slice(0, separatorIndex);
-  const cookieValue = nameValue.slice(separatorIndex + 1);
-
-  await page.context().clearCookies();
   await page.goto("/login");
-  await page.evaluate(
-    ({ seededUser, seededStorage }) => {
-      window.localStorage.clear();
-      window.localStorage.setItem("erp_user", JSON.stringify(seededUser));
-      window.localStorage.setItem("erp_login_at", new Date().toISOString());
-      Object.entries(seededStorage).forEach(([key, value]) => {
-        window.localStorage.setItem(key, value);
-      });
-    },
-    {
-      seededUser: user,
-      seededStorage: {
-        erp_permission_prompt_shown: "1",
-        ...localStorage,
-      },
-    },
-  );
-  await page.context().addCookies([
-    {
-      name: cookieName,
-      value: cookieValue,
-      url: "http://127.0.0.1:3000",
-      httpOnly: true,
-      secure: false,
-      sameSite: "Lax",
-    },
-  ]);
+  await replaceSession(page, {
+    user,
+    localStorage,
+  });
 }
 
 /* const lockedDownMsoUser = {

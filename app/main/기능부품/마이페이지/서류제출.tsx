@@ -109,7 +109,7 @@ export default function MyDocuments({ user }: any) {
     };
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-500">
+        <div data-testid="mypage-documents-panel" className="space-y-6 animate-in fade-in duration-500">
             <div className="flex justify-between items-end border-b border-[var(--toss-border)] pb-4">
                 <div>
                     <h2 className="text-xl md:text-2xl font-bold text-[var(--foreground)] tracking-tight">스마트 서류 제출</h2>
@@ -127,10 +127,10 @@ export default function MyDocuments({ user }: any) {
                     </div>
                 </div>
 
-                {REQUIRED_DOCS.map(doc => {
+                {REQUIRED_DOCS.map((doc, index) => {
                     const existingDoc = documents.find(d => d.category === doc.id);
                     return (
-                        <div key={doc.id} className={`border p-3.5 rounded-2xl shadow-sm transition-all relative group h-full flex flex-col justify-between ${existingDoc ? 'border-emerald-100 bg-emerald-50/20' : 'border-slate-100 bg-white hover:border-blue-400'}`}>
+                        <div data-testid={`document-card-${index}`} key={doc.id} className={`border p-3.5 rounded-2xl shadow-sm transition-all relative group h-full flex flex-col justify-between ${existingDoc ? 'border-emerald-100 bg-emerald-50/20' : 'border-slate-100 bg-white hover:border-blue-400'}`}>
                             <div>
                                 <div className="flex justify-between items-start">
                                     <h4 className="pr-4 text-[11px] font-black leading-tight text-[var(--foreground)]">{doc.label}</h4>
@@ -138,7 +138,7 @@ export default function MyDocuments({ user }: any) {
                                         <span className="text-emerald-500 text-[10px] font-black">✓</span>
                                     )}
                                 </div>
-                                <span className={`inline-block mt-1 rounded px-1.5 py-0.5 text-[8px] font-black ${existingDoc ? 'bg-emerald-100/50 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-5)]'}`}>
+                                <span data-testid={`document-status-${index}`} className={`inline-block mt-1 rounded px-1.5 py-0.5 text-[8px] font-black ${existingDoc ? 'bg-emerald-100/50 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-5)]'}`}>
                                     {existingDoc ? '제출 완료' : '미제출'}
                                 </span>
                             </div>
@@ -146,7 +146,7 @@ export default function MyDocuments({ user }: any) {
                             <div className="mt-3 flex gap-1.5">
                                 {existingDoc ? (
                                     <>
-                                        <button onClick={() => window.open(existingDoc.file_url, '_blank')} className="flex-1 rounded-lg bg-[var(--toss-gray-1)] py-1.5 text-[10px] font-black text-[var(--foreground)] transition-colors hover:bg-[var(--toss-gray-2)]">보기</button>
+                                        <button data-testid={`document-view-${index}`} onClick={() => window.open(existingDoc.file_url, '_blank')} className="flex-1 rounded-lg bg-[var(--toss-gray-1)] py-1.5 text-[10px] font-black text-[var(--foreground)] transition-colors hover:bg-[var(--toss-gray-2)]">보기</button>
                                         <button onClick={() => setScanningDoc(doc)} className="rounded-lg border border-[var(--toss-border)] bg-[var(--toss-card)] px-2 py-1.5 text-[10px] text-[var(--toss-gray-5)] transition-colors hover:text-[var(--toss-blue)]" title="재촬영">📷</button>
                                     </>
                                 ) : (
@@ -158,6 +158,7 @@ export default function MyDocuments({ user }: any) {
                                             📷 촬영
                                         </button>
                                         <button
+                                            data-testid={`document-upload-file-${index}`}
                                             onClick={() => {
                                                 setUploadingDocId(doc.id);
                                                 fileInputRef.current?.click();
@@ -185,6 +186,7 @@ export default function MyDocuments({ user }: any) {
             <input
                 type="file"
                 ref={fileInputRef}
+                data-testid="document-file-input"
                 className="hidden"
                 accept="image/*,.pdf"
                 onChange={(e) => {

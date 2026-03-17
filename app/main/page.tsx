@@ -39,6 +39,21 @@ function canAccessAdminSubMenu(user: any, subMenuId: string) {
   return canAccessAdminSection(user, subMenuId);
 }
 
+function buildSubMenuTestId(mainMenuId: string, subMenuId: string) {
+  const slug = `${mainMenuId}-${subMenuId}`
+    .split('')
+    .map((char) => {
+      const code = char.charCodeAt(0);
+      const isAsciiLetter = (code >= 48 && code <= 57) || (code >= 65 && code <= 90) || (code >= 97 && code <= 122);
+      return isAsciiLetter ? char.toLowerCase() : `u${code.toString(16)}`;
+    })
+    .join('-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+
+  return `submenu-${slug}`;
+}
+
 function MainPageFallback() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-[var(--background)] p-6 text-center">
@@ -745,6 +760,7 @@ function MainPageContent() {
                     <button
                       key={sub.id}
                       onClick={() => setSubView(sub.id)}
+                      data-testid={buildSubMenuTestId(mainMenu, sub.id)}
                       className={`flex-none md:w-full text-center md:text-left px-4 md:px-3 py-2 md:py-2.5 text-[11px] font-bold rounded-[12px] transition-all whitespace-nowrap md:flex md:items-center md:gap-2 ${subView === sub.id
                         ? 'bg-[var(--foreground)] text-white shadow-md'
                         : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
@@ -762,6 +778,7 @@ function MainPageContent() {
               <button
                 key={sub.id}
                 onClick={() => setSubView(sub.id)}
+                data-testid={buildSubMenuTestId(mainMenu, sub.id)}
                 className={`flex-none md:w-full text-center md:text-left px-4 md:px-3 py-2 md:py-2.5 text-[11px] font-bold rounded-[12px] transition-all whitespace-nowrap md:flex md:items-center md:gap-2 ${subView === sub.id
                   ? 'bg-[var(--toss-blue)] text-white shadow-md'
                   : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'

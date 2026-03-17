@@ -97,22 +97,46 @@ export type MockFixtures = {
   notifications?: any[];
   chatRooms?: any[];
   messages?: any[];
+  pinnedMessages?: any[];
+  polls?: any[];
+  pollVotes?: any[];
+  messageReactions?: any[];
+  messageReads?: any[];
+  messageBookmarks?: any[];
   messageInsertFailures?: number;
   approvals?: any[];
   payrollRecords?: any[];
   boardPosts?: any[];
+  boardPostComments?: any[];
   companies?: any[];
   inventoryItems?: any[];
   inventoryLogs?: any[];
   inventoryTransfers?: any[];
+  suppliers?: any[];
+  inventoryCategories?: any[];
+  purchaseOrders?: any[];
+  asRepairRecords?: any[];
+  returnRecords?: any[];
+  workSchedules?: any[];
   workShifts?: any[];
   orgTeams?: any[];
   approvalFormTypes?: any[];
   systemConfigs?: any[];
   generatedContracts?: any[];
   insuranceRecords?: any[];
+  documentRepository?: any[];
+  certificateIssuances?: any[];
   attendance?: any[];
   attendances?: any[];
+  shiftAssignments?: any[];
+  handoverNotes?: any[];
+  dischargeTemplates?: any[];
+  dischargeReviews?: any[];
+  surgeryTemplates?: any[];
+  dailyClosures?: any[];
+  dailyClosureItems?: any[];
+  dailyChecks?: any[];
+  staffEvaluations?: any[];
   attendanceCorrections?: any[];
   legacyAttendanceCorrectionsSchema?: boolean;
   legacyInventoryDepartmentSchema?: boolean;
@@ -258,6 +282,12 @@ function buildFixtures(overrides: MockFixtures = {}) {
         },
       ],
     messages: overrides.messages ?? [],
+    pinnedMessages: overrides.pinnedMessages ?? [],
+    polls: overrides.polls ?? [],
+    pollVotes: overrides.pollVotes ?? [],
+    messageReactions: overrides.messageReactions ?? [],
+    messageReads: overrides.messageReads ?? [],
+    messageBookmarks: overrides.messageBookmarks ?? [],
     messageInsertFailures: overrides.messageInsertFailures ?? 0,
     approvals:
       overrides.approvals ??
@@ -292,6 +322,7 @@ function buildFixtures(overrides: MockFixtures = {}) {
         },
       ],
     boardPosts: overrides.boardPosts ?? [],
+    boardPostComments: overrides.boardPostComments ?? [],
     companies:
       overrides.companies ?? [
         {
@@ -304,13 +335,30 @@ function buildFixtures(overrides: MockFixtures = {}) {
     inventoryItems: overrides.inventoryItems ?? [],
     inventoryLogs: overrides.inventoryLogs ?? [],
     inventoryTransfers: overrides.inventoryTransfers ?? [],
+    suppliers: overrides.suppliers ?? [],
+    inventoryCategories: overrides.inventoryCategories ?? [],
+    purchaseOrders: overrides.purchaseOrders ?? [],
+    asRepairRecords: overrides.asRepairRecords ?? [],
+    returnRecords: overrides.returnRecords ?? [],
+    workSchedules: overrides.workSchedules ?? [],
     workShifts: overrides.workShifts ?? [],
     orgTeams: overrides.orgTeams ?? [],
     approvalFormTypes: overrides.approvalFormTypes ?? [],
     generatedContracts: overrides.generatedContracts ?? [],
     insuranceRecords: overrides.insuranceRecords ?? [],
+    documentRepository: overrides.documentRepository ?? [],
+    certificateIssuances: overrides.certificateIssuances ?? [],
     attendance: overrides.attendance ?? [],
     attendances: overrides.attendances ?? [],
+    shiftAssignments: overrides.shiftAssignments ?? [],
+    handoverNotes: overrides.handoverNotes ?? [],
+    dischargeTemplates: overrides.dischargeTemplates ?? [],
+    dischargeReviews: overrides.dischargeReviews ?? [],
+    surgeryTemplates: overrides.surgeryTemplates ?? [],
+    dailyClosures: overrides.dailyClosures ?? [],
+    dailyClosureItems: overrides.dailyClosureItems ?? [],
+    dailyChecks: overrides.dailyChecks ?? [],
+    staffEvaluations: overrides.staffEvaluations ?? [],
     attendanceCorrections: overrides.attendanceCorrections ?? [],
     legacyAttendanceCorrectionsSchema: overrides.legacyAttendanceCorrectionsSchema ?? false,
     legacyInventoryDepartmentSchema: overrides.legacyInventoryDepartmentSchema ?? false,
@@ -502,16 +550,39 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
   let approvals = [...fixtures.approvals];
   let messages = [...fixtures.messages];
   let chatRooms = [...fixtures.chatRooms];
+  let pinnedMessages = [...fixtures.pinnedMessages];
+  let polls = [...fixtures.polls];
+  let pollVotes = [...fixtures.pollVotes];
+  let messageReactions = [...fixtures.messageReactions];
+  let messageReads = [...fixtures.messageReads];
+  let messageBookmarks = [...fixtures.messageBookmarks];
   let companies = [...fixtures.companies];
   let inventoryItems = [...fixtures.inventoryItems];
   let inventoryLogs = [...fixtures.inventoryLogs];
   let inventoryTransfers = [...fixtures.inventoryTransfers];
+  let suppliers = [...fixtures.suppliers];
+  let inventoryCategories = [...fixtures.inventoryCategories];
+  let purchaseOrders = [...fixtures.purchaseOrders];
+  let asRepairRecords = [...fixtures.asRepairRecords];
+  let returnRecords = [...fixtures.returnRecords];
+  let workSchedules = [...fixtures.workSchedules];
   let workShifts = [...fixtures.workShifts];
   let orgTeams = [...fixtures.orgTeams];
   let generatedContracts = [...fixtures.generatedContracts];
   let insuranceRecords = [...fixtures.insuranceRecords];
+  let documentRepository = [...fixtures.documentRepository];
+  let certificateIssuances = [...fixtures.certificateIssuances];
   let attendance = [...(fixtures.attendance ?? [])];
   let attendances = [...fixtures.attendances];
+  let shiftAssignments = [...fixtures.shiftAssignments];
+  let handoverNotes = [...fixtures.handoverNotes];
+  let dischargeTemplates = [...fixtures.dischargeTemplates];
+  let dischargeReviews = [...fixtures.dischargeReviews];
+  const surgeryTemplates = [...fixtures.surgeryTemplates];
+  let dailyClosures = [...fixtures.dailyClosures];
+  let dailyClosureItems = [...fixtures.dailyClosureItems];
+  let dailyChecks = [...fixtures.dailyChecks];
+  let staffEvaluations = [...fixtures.staffEvaluations];
   let attendanceCorrections = [...fixtures.attendanceCorrections];
   let leaveRequests = [...(fixtures.leaveRequests ?? [])];
   const attendanceDeductionRules = [...fixtures.attendanceDeductionRules];
@@ -520,6 +591,8 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
   const legacyInventoryDepartmentSchema = fixtures.legacyInventoryDepartmentSchema;
   let messageInsertFailures = fixtures.messageInsertFailures;
   let payrollRecords = [...fixtures.payrollRecords];
+  let boardPosts = [...fixtures.boardPosts];
+  let boardPostComments = [...fixtures.boardPostComments];
 
   const updateChatRoomMeta = (roomId?: string, content?: string | null, createdAt?: string) => {
     if (!roomId) return;
@@ -533,6 +606,14 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
         : room
     );
   };
+
+  await page.route('**/api/notifications/chat-push', async (route) => {
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true }),
+    });
+  });
 
   await page.route('**/rest/v1/**', async (route) => {
     const request = route.request();
@@ -591,7 +672,72 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
     }
 
     if (path.includes('/board_posts')) {
-      return json(route, fixtures.boardPosts);
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(boardPosts, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const inserted = payloads.map((payload: any, index: number) => ({
+          id: payload.id || `board-post-${boardPosts.length + index + 1}`,
+          created_at: payload.created_at || new Date().toISOString(),
+          views: payload.views ?? 0,
+          likes_count: payload.likes_count ?? 0,
+          attachments: payload.attachments ?? [],
+          tags: payload.tags ?? [],
+          ...payload,
+        }));
+        boardPosts = [...inserted, ...boardPosts];
+        return json(route, wantsObject ? inserted[0] : inserted);
+      }
+
+      if (method === 'PATCH') {
+        const body = request.postDataJSON();
+        boardPosts = boardPosts.map((post: any) =>
+          matchFilters(post, url) ? { ...post, ...body } : post
+        );
+        const updated = applyQueryFilters(boardPosts, url);
+        return json(route, wantsObject ? updated[0] ?? null : updated);
+      }
+
+      if (method === 'DELETE') {
+        const deleting = applyQueryFilters(boardPosts, url);
+        const deleteIds = new Set(deleting.map((post: any) => String(post.id)));
+        boardPosts = boardPosts.filter((post: any) => !deleteIds.has(String(post.id)));
+        return json(route, wantsObject ? deleting[0] ?? null : deleting);
+      }
+
+      return json(route, boardPosts);
+    }
+
+    if (path.includes('/board_post_comments')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(boardPostComments, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const inserted = payloads.map((payload: any, index: number) => ({
+          id: payload.id || `board-comment-${boardPostComments.length + index + 1}`,
+          created_at: payload.created_at || new Date().toISOString(),
+          ...payload,
+        }));
+        boardPostComments = [...boardPostComments, ...inserted];
+        return json(route, wantsObject ? inserted[0] : inserted);
+      }
+
+      if (method === 'DELETE') {
+        const deleting = applyQueryFilters(boardPostComments, url);
+        const deleteIds = new Set(deleting.map((comment: any) => String(comment.id)));
+        boardPostComments = boardPostComments.filter(
+          (comment: any) => !deleteIds.has(String(comment.id))
+        );
+        return json(route, wantsObject ? deleting[0] ?? null : deleting);
+      }
+
+      return json(route, boardPostComments);
     }
 
     if (path.includes('/notifications')) {
@@ -704,12 +850,28 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
       if (method === 'GET') {
         return json(route, applyQueryFilters(chatRooms, url));
       }
+      if (method === 'PATCH') {
+        const body = request.postDataJSON();
+        chatRooms = chatRooms.map((room: any) =>
+          matchFilters(room, url) ? { ...room, ...body } : room
+        );
+        const updated = applyQueryFilters(chatRooms, url);
+        return json(route, wantsObject ? updated[0] ?? null : updated);
+      }
       return json(route, chatRooms);
     }
 
     if (path.includes('/messages')) {
       if (method === 'GET') {
         return json(route, applyQueryFilters(messages, url));
+      }
+      if (method === 'PATCH') {
+        const body = request.postDataJSON();
+        messages = messages.map((message: any) =>
+          matchFilters(message, url) ? { ...message, ...body } : message
+        );
+        const updated = applyQueryFilters(messages, url);
+        return json(route, firstOrList(updated, wantsObject));
       }
       if (method === 'POST') {
         if (messageInsertFailures > 0) {
@@ -735,12 +897,206 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
       return json(route, messages);
     }
 
+    if (path.includes('/pinned_messages')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(pinnedMessages, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const inserted = payloads.map((payload: any, index: number) => ({
+          id: payload.id || `pinned-message-${pinnedMessages.length + index + 1}`,
+          created_at: payload.created_at || new Date().toISOString(),
+          ...payload,
+        }));
+        pinnedMessages = [...pinnedMessages, ...inserted];
+        return json(route, wantsObject ? inserted[0] : inserted);
+      }
+
+      if (method === 'DELETE') {
+        const deleting = applyQueryFilters(pinnedMessages, url);
+        const deleteIds = new Set(deleting.map((row: any) => String(row.id)));
+        pinnedMessages = pinnedMessages.filter((row: any) => !deleteIds.has(String(row.id)));
+        return json(route, wantsObject ? deleting[0] ?? null : deleting);
+      }
+
+      return json(route, pinnedMessages);
+    }
+
+    if (path.includes('/message_reactions')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(messageReactions, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const inserted = payloads.map((payload: any, index: number) => ({
+          id: payload.id || `message-reaction-${messageReactions.length + index + 1}`,
+          created_at: payload.created_at || new Date().toISOString(),
+          ...payload,
+        }));
+        messageReactions = [...messageReactions, ...inserted];
+        return json(route, wantsObject ? inserted[0] : inserted);
+      }
+
+      if (method === 'DELETE') {
+        const deleting = applyQueryFilters(messageReactions, url);
+        const deleteIds = new Set(deleting.map((row: any) => String(row.id)));
+        messageReactions = messageReactions.filter(
+          (row: any) => !deleteIds.has(String(row.id))
+        );
+        return json(route, wantsObject ? deleting[0] ?? null : deleting);
+      }
+
+      return json(route, messageReactions);
+    }
+
+    if (path.includes('/message_reads')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(messageReads, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const upserted = payloads.map((payload: any) => {
+          const existing = messageReads.find(
+            (row: any) =>
+              String(row.message_id) === String(payload.message_id) &&
+              String(row.user_id) === String(payload.user_id)
+          );
+
+          if (existing) {
+            return { ...existing, ...payload };
+          }
+
+          return {
+            id: payload.id || `message-read-${messageReads.length + 1}`,
+            created_at: payload.created_at || new Date().toISOString(),
+            ...payload,
+          };
+        });
+
+        messageReads = [
+          ...messageReads.filter(
+            (row: any) =>
+              !upserted.some(
+                (candidate: any) =>
+                  String(candidate.message_id) === String(row.message_id) &&
+                  String(candidate.user_id) === String(row.user_id)
+              )
+          ),
+          ...upserted,
+        ];
+
+        return json(route, wantsObject ? upserted[0] : upserted);
+      }
+
+      return json(route, messageReads);
+    }
+
+    if (path.includes('/message_bookmarks')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(messageBookmarks, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const inserted = payloads.map((payload: any, index: number) => ({
+          id: payload.id || `message-bookmark-${messageBookmarks.length + index + 1}`,
+          created_at: payload.created_at || new Date().toISOString(),
+          ...payload,
+        }));
+        messageBookmarks = [...messageBookmarks, ...inserted];
+        return json(route, wantsObject ? inserted[0] : inserted);
+      }
+
+      if (method === 'DELETE') {
+        const deleting = applyQueryFilters(messageBookmarks, url);
+        const deleteIds = new Set(deleting.map((row: any) => String(row.id)));
+        messageBookmarks = messageBookmarks.filter(
+          (row: any) => !deleteIds.has(String(row.id))
+        );
+        return json(route, wantsObject ? deleting[0] ?? null : deleting);
+      }
+
+      return json(route, messageBookmarks);
+    }
+
+    if (path.includes('/polls')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(polls, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const inserted = payloads.map((payload: any, index: number) => ({
+          id: payload.id || `poll-${polls.length + index + 1}`,
+          created_at: payload.created_at || new Date().toISOString(),
+          ...payload,
+        }));
+        polls = [...polls, ...inserted];
+        return json(route, wantsObject ? inserted[0] : inserted);
+      }
+
+      return json(route, polls);
+    }
+
+    if (path.includes('/poll_votes')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(pollVotes, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const upserted = payloads.map((payload: any) => {
+          const existing = pollVotes.find(
+            (row: any) =>
+              String(row.poll_id) === String(payload.poll_id) &&
+              String(row.user_id) === String(payload.user_id)
+          );
+
+          if (existing) {
+            return { ...existing, ...payload };
+          }
+
+          return {
+            id: payload.id || `poll-vote-${pollVotes.length + 1}`,
+            created_at: payload.created_at || new Date().toISOString(),
+            ...payload,
+          };
+        });
+
+        pollVotes = [
+          ...pollVotes.filter(
+            (row: any) =>
+              !upserted.some(
+                (candidate: any) =>
+                  String(candidate.poll_id) === String(row.poll_id) &&
+                  String(candidate.user_id) === String(row.user_id)
+              )
+          ),
+          ...upserted,
+        ];
+
+        return json(route, wantsObject ? upserted[0] : upserted);
+      }
+
+      return json(route, pollVotes);
+    }
+
     if (path.includes('/approvals')) {
       if (method === 'HEAD') {
+        const count = applyQueryFilters(approvals, url).length;
         return route.fulfill({
           status: 200,
           headers: {
-            'content-range': `0-0/${approvals.length}`,
+            'content-range': `0-0/${count}`,
           },
         });
       }
@@ -870,6 +1226,315 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
       return json(route, workShifts);
     }
 
+    if (path.includes('/shift_assignments')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(shiftAssignments, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const inserted = payloads.map((payload: any, index: number) => ({
+          id: payload.id || `shift-assignment-${shiftAssignments.length + index + 1}`,
+          created_at: payload.created_at || new Date().toISOString(),
+          ...payload,
+        }));
+        shiftAssignments = [...shiftAssignments, ...inserted];
+        return json(route, wantsObject ? inserted[0] : inserted);
+      }
+
+      if (method === 'PATCH') {
+        const body = request.postDataJSON();
+        shiftAssignments = shiftAssignments.map((row: any) =>
+          matchFilters(row, url) ? { ...row, ...body } : row
+        );
+        const updated = applyQueryFilters(shiftAssignments, url);
+        return json(route, wantsObject ? updated[0] ?? null : updated);
+      }
+
+      return json(route, shiftAssignments);
+    }
+
+    if (path.includes('/handover_notes')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(handoverNotes, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const inserted = payloads.map((payload: any, index: number) => ({
+          id: payload.id || `handover-note-${handoverNotes.length + index + 1}`,
+          created_at: payload.created_at || new Date().toISOString(),
+          is_completed: payload.is_completed ?? false,
+          ...payload,
+        }));
+        handoverNotes = [...inserted, ...handoverNotes];
+        return json(route, wantsObject ? inserted[0] : inserted);
+      }
+
+      if (method === 'PATCH') {
+        const body = request.postDataJSON();
+        handoverNotes = handoverNotes.map((row: any) =>
+          matchFilters(row, url) ? { ...row, ...body } : row
+        );
+        const updated = applyQueryFilters(handoverNotes, url);
+        return json(route, wantsObject ? updated[0] ?? null : updated);
+      }
+
+      return json(route, handoverNotes);
+    }
+
+    if (path.includes('/discharge_templates')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(dischargeTemplates, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const upserted = payloads.map((payload: any, index: number) => {
+          const existingIndex = dischargeTemplates.findIndex(
+            (row: any) => String(row.id) === String(payload.id)
+          );
+          const nextRow = {
+            id:
+              payload.id ||
+              (existingIndex >= 0
+                ? dischargeTemplates[existingIndex].id
+                : `discharge-template-${dischargeTemplates.length + index + 1}`),
+            created_at: payload.created_at || new Date().toISOString(),
+            ...payload,
+          };
+          if (existingIndex >= 0) {
+            dischargeTemplates[existingIndex] = { ...dischargeTemplates[existingIndex], ...nextRow };
+            return dischargeTemplates[existingIndex];
+          }
+          dischargeTemplates = [...dischargeTemplates, nextRow];
+          return nextRow;
+        });
+        return json(route, wantsObject ? upserted[0] : upserted);
+      }
+
+      if (method === 'DELETE') {
+        const deleting = applyQueryFilters(dischargeTemplates, url);
+        const deleteIds = new Set(deleting.map((row: any) => String(row.id)));
+        dischargeTemplates = dischargeTemplates.filter((row: any) => !deleteIds.has(String(row.id)));
+        return json(route, wantsObject ? deleting[0] ?? null : deleting);
+      }
+
+      return json(route, dischargeTemplates);
+    }
+
+    if (path.includes('/discharge_reviews')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(dischargeReviews, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const inserted = payloads.map((payload: any, index: number) => ({
+          id: payload.id || `discharge-review-${dischargeReviews.length + index + 1}`,
+          created_at: payload.created_at || new Date().toISOString(),
+          items: payload.items ?? [],
+          status: payload.status ?? 'pending',
+          ...payload,
+        }));
+        dischargeReviews = [...inserted, ...dischargeReviews];
+        return json(route, wantsObject ? inserted[0] : inserted);
+      }
+
+      if (method === 'PATCH') {
+        const body = request.postDataJSON();
+        dischargeReviews = dischargeReviews.map((row: any) =>
+          matchFilters(row, url) ? { ...row, ...body } : row
+        );
+        const updated = applyQueryFilters(dischargeReviews, url);
+        return json(route, wantsObject ? updated[0] ?? null : updated);
+      }
+
+      if (method === 'DELETE') {
+        const deleting = applyQueryFilters(dischargeReviews, url);
+        const deleteIds = new Set(deleting.map((row: any) => String(row.id)));
+        dischargeReviews = dischargeReviews.filter((row: any) => !deleteIds.has(String(row.id)));
+        return json(route, wantsObject ? deleting[0] ?? null : deleting);
+      }
+
+      return json(route, dischargeReviews);
+    }
+
+    if (path.includes('/surgery_templates')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(surgeryTemplates, url), wantsObject));
+      }
+
+      return json(route, surgeryTemplates);
+    }
+
+    if (path.includes('/daily_closures')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(dailyClosures, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const upserted = payloads.map((payload: any, index: number) => {
+          const existingIndex = dailyClosures.findIndex(
+            (row: any) =>
+              String(row.company_id) === String(payload.company_id) &&
+              String(row.date) === String(payload.date)
+          );
+          const nextRow = {
+            id:
+              payload.id ||
+              (existingIndex >= 0
+                ? dailyClosures[existingIndex].id
+                : `daily-closure-${dailyClosures.length + index + 1}`),
+            created_at: payload.created_at || new Date().toISOString(),
+            ...payload,
+          };
+          if (existingIndex >= 0) {
+            dailyClosures[existingIndex] = { ...dailyClosures[existingIndex], ...nextRow };
+            return dailyClosures[existingIndex];
+          }
+          dailyClosures = [nextRow, ...dailyClosures];
+          return nextRow;
+        });
+        return json(route, wantsObject ? upserted[0] : upserted);
+      }
+
+      return json(route, dailyClosures);
+    }
+
+    if (path.includes('/daily_closure_items')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(dailyClosureItems, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const inserted = payloads.map((payload: any, index: number) => ({
+          id: payload.id || `daily-closure-item-${dailyClosureItems.length + index + 1}`,
+          created_at: payload.created_at || new Date().toISOString(),
+          ...payload,
+        }));
+        dailyClosureItems = [...dailyClosureItems, ...inserted];
+        return json(route, wantsObject ? inserted[0] : inserted);
+      }
+
+      if (method === 'DELETE') {
+        const deleting = applyQueryFilters(dailyClosureItems, url);
+        dailyClosureItems = dailyClosureItems.filter((row: any) => !matchFilters(row, url));
+        return json(route, wantsObject ? deleting[0] ?? null : deleting);
+      }
+
+      return json(route, dailyClosureItems);
+    }
+
+    if (path.includes('/daily_checks')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(dailyChecks, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const inserted = payloads.map((payload: any, index: number) => ({
+          id: payload.id || `daily-check-${dailyChecks.length + index + 1}`,
+          created_at: payload.created_at || new Date().toISOString(),
+          ...payload,
+        }));
+        dailyChecks = [...dailyChecks, ...inserted];
+        return json(route, wantsObject ? inserted[0] : inserted);
+      }
+
+      if (method === 'DELETE') {
+        const deleting = applyQueryFilters(dailyChecks, url);
+        dailyChecks = dailyChecks.filter((row: any) => !matchFilters(row, url));
+        return json(route, wantsObject ? deleting[0] ?? null : deleting);
+      }
+
+      return json(route, dailyChecks);
+    }
+
+    if (path.includes('/staff_evaluations')) {
+      if (method === 'GET') {
+        const rows = applyQueryFilters(staffEvaluations, url).map((row: any) => {
+          const evaluator = staffMembers.find(
+            (staff: any) => String(staff.id) === String(row.evaluator_id)
+          );
+          return {
+            ...row,
+            evaluator: evaluator
+              ? {
+                  name: evaluator.name,
+                  position: evaluator.position,
+                }
+              : null,
+          };
+        });
+        return json(route, firstOrList(rows, wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const inserted = payloads.map((payload: any, index: number) => ({
+          id: payload.id || `staff-evaluation-${staffEvaluations.length + index + 1}`,
+          created_at: payload.created_at || new Date().toISOString(),
+          ...payload,
+        }));
+        staffEvaluations = [...inserted, ...staffEvaluations];
+        return json(route, wantsObject ? inserted[0] : inserted);
+      }
+
+      if (method === 'DELETE') {
+        const deleting = applyQueryFilters(staffEvaluations, url);
+        const deleteIds = new Set(deleting.map((row: any) => String(row.id)));
+        staffEvaluations = staffEvaluations.filter((row: any) => !deleteIds.has(String(row.id)));
+        return json(route, wantsObject ? deleting[0] ?? null : deleting);
+      }
+
+      return json(route, staffEvaluations);
+    }
+
+    if (path.includes('/work_schedules')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(workSchedules, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const inserted = payloads.map((payload: any, index: number) => ({
+          id: payload.id || `work-schedule-${workSchedules.length + index + 1}`,
+          created_at: payload.created_at || new Date().toISOString(),
+          ...payload,
+        }));
+        workSchedules = [...workSchedules, ...inserted];
+        return json(route, wantsObject ? inserted[0] : inserted);
+      }
+
+      if (method === 'PATCH') {
+        const body = request.postDataJSON();
+        workSchedules = workSchedules.map((row: any) =>
+          matchFilters(row, url) ? { ...row, ...body } : row
+        );
+        const updated = applyQueryFilters(workSchedules, url);
+        return json(route, wantsObject ? updated[0] ?? null : updated);
+      }
+
+      if (method === 'DELETE') {
+        workSchedules = workSchedules.filter((row: any) => !matchFilters(row, url));
+        return json(route, []);
+      }
+
+      return json(route, workSchedules);
+    }
+
     if (path.includes('/attendance') && !path.includes('/attendances')) {
       if (method === 'GET') {
         return json(route, firstOrList(applyQueryFilters(attendance, url), wantsObject));
@@ -974,6 +1639,16 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
     }
 
     if (path.includes('/payroll_records')) {
+      if (method === 'HEAD') {
+        const count = applyQueryFilters(payrollRecords, url).length;
+        return route.fulfill({
+          status: 200,
+          headers: {
+            'content-range': `0-0/${count}`,
+          },
+        });
+      }
+
       if (method === 'GET') {
         return json(route, firstOrList(applyQueryFilters(payrollRecords, url), wantsObject));
       }
@@ -1043,6 +1718,174 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
       }
 
       return json(route, inventoryTransfers);
+    }
+
+    if (path.includes('/suppliers')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(suppliers, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const inserted = payloads.map((payload: any, index: number) => ({
+          id: payload.id || `supplier-${suppliers.length + index + 1}`,
+          created_at: payload.created_at || new Date().toISOString(),
+          ...payload,
+        }));
+        suppliers = [...suppliers, ...inserted];
+        return json(route, wantsObject ? inserted[0] : inserted);
+      }
+
+      if (method === 'PATCH') {
+        const body = request.postDataJSON();
+        suppliers = suppliers.map((row: any) => (matchFilters(row, url) ? { ...row, ...body } : row));
+        const updated = applyQueryFilters(suppliers, url);
+        return json(route, wantsObject ? updated[0] ?? null : updated);
+      }
+
+      if (method === 'DELETE') {
+        suppliers = suppliers.filter((row: any) => !matchFilters(row, url));
+        return json(route, []);
+      }
+
+      return json(route, suppliers);
+    }
+
+    if (path.includes('/inventory_categories')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(inventoryCategories, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const inserted = payloads.map((payload: any, index: number) => ({
+          id: payload.id || `inventory-category-${inventoryCategories.length + index + 1}`,
+          created_at: payload.created_at || new Date().toISOString(),
+          ...payload,
+        }));
+        inventoryCategories = [...inventoryCategories, ...inserted];
+        return json(route, wantsObject ? inserted[0] : inserted);
+      }
+
+      if (method === 'PATCH') {
+        const body = request.postDataJSON();
+        inventoryCategories = inventoryCategories.map((row: any) =>
+          matchFilters(row, url) ? { ...row, ...body } : row
+        );
+        const updated = applyQueryFilters(inventoryCategories, url);
+        return json(route, wantsObject ? updated[0] ?? null : updated);
+      }
+
+      if (method === 'DELETE') {
+        inventoryCategories = inventoryCategories.filter((row: any) => !matchFilters(row, url));
+        return json(route, []);
+      }
+
+      return json(route, inventoryCategories);
+    }
+
+    if (path.includes('/purchase_orders')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(purchaseOrders, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const inserted = payloads.map((payload: any, index: number) => ({
+          id: payload.id || `purchase-order-${purchaseOrders.length + index + 1}`,
+          created_at: payload.created_at || new Date().toISOString(),
+          ...payload,
+        }));
+        purchaseOrders = [...inserted, ...purchaseOrders];
+        return json(route, wantsObject ? inserted[0] : inserted);
+      }
+
+      if (method === 'PATCH') {
+        const body = request.postDataJSON();
+        purchaseOrders = purchaseOrders.map((row: any) =>
+          matchFilters(row, url) ? { ...row, ...body } : row
+        );
+        const updated = applyQueryFilters(purchaseOrders, url);
+        return json(route, wantsObject ? updated[0] ?? null : updated);
+      }
+
+      if (method === 'DELETE') {
+        purchaseOrders = purchaseOrders.filter((row: any) => !matchFilters(row, url));
+        return json(route, []);
+      }
+
+      return json(route, purchaseOrders);
+    }
+
+    if (path.includes('/as_repair_records')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(asRepairRecords, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const inserted = payloads.map((payload: any, index: number) => ({
+          id: payload.id || `as-repair-record-${asRepairRecords.length + index + 1}`,
+          created_at: payload.created_at || new Date().toISOString(),
+          ...payload,
+        }));
+        asRepairRecords = [...inserted, ...asRepairRecords];
+        return json(route, wantsObject ? inserted[0] : inserted);
+      }
+
+      if (method === 'PATCH') {
+        const body = request.postDataJSON();
+        asRepairRecords = asRepairRecords.map((row: any) =>
+          matchFilters(row, url) ? { ...row, ...body } : row
+        );
+        const updated = applyQueryFilters(asRepairRecords, url);
+        return json(route, wantsObject ? updated[0] ?? null : updated);
+      }
+
+      if (method === 'DELETE') {
+        asRepairRecords = asRepairRecords.filter((row: any) => !matchFilters(row, url));
+        return json(route, []);
+      }
+
+      return json(route, asRepairRecords);
+    }
+
+    if (path.includes('/return_records')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(returnRecords, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const inserted = payloads.map((payload: any, index: number) => ({
+          id: payload.id || `return-record-${returnRecords.length + index + 1}`,
+          created_at: payload.created_at || new Date().toISOString(),
+          ...payload,
+        }));
+        returnRecords = [...inserted, ...returnRecords];
+        return json(route, wantsObject ? inserted[0] : inserted);
+      }
+
+      if (method === 'PATCH') {
+        const body = request.postDataJSON();
+        returnRecords = returnRecords.map((row: any) =>
+          matchFilters(row, url) ? { ...row, ...body } : row
+        );
+        const updated = applyQueryFilters(returnRecords, url);
+        return json(route, wantsObject ? updated[0] ?? null : updated);
+      }
+
+      if (method === 'DELETE') {
+        returnRecords = returnRecords.filter((row: any) => !matchFilters(row, url));
+        return json(route, []);
+      }
+
+      return json(route, returnRecords);
     }
 
     if (path.includes('/inventory')) {
@@ -1140,15 +1983,83 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
       return json(route, insuranceRecords);
     }
 
+    if (path.includes('/document_repository')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(documentRepository, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const inserted = payloads.map((payload: any, index: number) => ({
+          id: payload.id || `document-repository-${documentRepository.length + index + 1}`,
+          created_at: payload.created_at || new Date().toISOString(),
+          ...payload,
+        }));
+        documentRepository = [...inserted, ...documentRepository];
+        return json(route, wantsObject ? inserted[0] : inserted);
+      }
+
+      if (method === 'PATCH') {
+        const body = request.postDataJSON();
+        documentRepository = documentRepository.map((row: any) =>
+          matchFilters(row, url) ? { ...row, ...body } : row
+        );
+        const updated = applyQueryFilters(documentRepository, url);
+        return json(route, wantsObject ? updated[0] ?? null : updated);
+      }
+
+      if (method === 'DELETE') {
+        documentRepository = documentRepository.filter((row: any) => !matchFilters(row, url));
+        return json(route, []);
+      }
+
+      return json(route, documentRepository);
+    }
+
+    if (path.includes('/certificate_issuances')) {
+      if (method === 'HEAD') {
+        const count = applyQueryFilters(certificateIssuances, url).length;
+        return route.fulfill({
+          status: 200,
+          headers: {
+            'content-range': `0-0/${count}`,
+          },
+        });
+      }
+
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(certificateIssuances, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const inserted = payloads.map((payload: any, index: number) => ({
+          id: payload.id || `certificate-issuance-${certificateIssuances.length + index + 1}`,
+          issued_at: payload.issued_at || new Date().toISOString(),
+          ...payload,
+        }));
+        certificateIssuances = [...inserted, ...certificateIssuances];
+        return json(route, wantsObject ? inserted[0] : inserted);
+      }
+
+      if (method === 'PATCH') {
+        const body = request.postDataJSON();
+        certificateIssuances = certificateIssuances.map((row: any) =>
+          matchFilters(row, url) ? { ...row, ...body } : row
+        );
+        const updated = applyQueryFilters(certificateIssuances, url);
+        return json(route, wantsObject ? updated[0] ?? null : updated);
+      }
+
+      return json(route, certificateIssuances);
+    }
+
     if (
       path.includes('/push_subscriptions') ||
       path.includes('/education_records') ||
-      path.includes('/message_reads') ||
       path.includes('/room_read_cursors') ||
-      path.includes('/pinned_messages') ||
-      path.includes('/message_reactions') ||
-      path.includes('/polls') ||
-      path.includes('/poll_votes') ||
       path.includes('/room_notification_settings') ||
       path.includes('/messenger_drive_links')
     ) {

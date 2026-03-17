@@ -1,103 +1,140 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+
+import { useEffect, useState } from 'react';
 import SmartDatePicker from '../공통/SmartDatePicker';
 
-export default function AnnualLeavePlanForm({ user, staffs, setExtraData, setFormTitle }: any) {
-    const [remainingLeave, setRemainingLeave] = useState(0);
-    const [planDates, setPlanDates] = useState<{ date: string; reason: string }[]>([{ date: '', reason: '연차 촉진에 따른 사용 계획' }]);
+type PlanDateRow = {
+  date: string;
+  reason: string;
+};
 
-    useEffect(() => {
-        const staff = staffs.find((s: any) => s.id === user.id);
-        if (staff) {
-            const total = staff.annual_leave_total ?? 15;
-            const used = staff.annual_leave_used ?? 0;
-            setRemainingLeave(Math.max(0, total - used));
-        }
-    }, [user.id, staffs]);
+const DEFAULT_REASON = '연차 촉진제도에 따른 사용 계획';
 
-    useEffect(() => {
-        setFormTitle(`[연차계획서] ${user.name} (${new Date().getFullYear()}년 미사용 연차)`);
-        setExtraData({
-            planDates,
-            remainingLeave,
-            type: 'annual_leave_plan'
-        });
-    }, [planDates, remainingLeave, user.name, setFormTitle, setExtraData]);
+export default function AnnualLeavePlanForm({
+  user,
+  staffs,
+  setExtraData,
+  setFormTitle,
+}: any) {
+  const [remainingLeave, setRemainingLeave] = useState(0);
+  const [planDates, setPlanDates] = useState<PlanDateRow[]>([
+    { date: '', reason: DEFAULT_REASON },
+  ]);
 
-    const addDateRow = () => {
-        setPlanDates([...planDates, { date: '', reason: '연차 촉진에 따른 사용 계획' }]);
-    };
+  useEffect(() => {
+    const staff = staffs.find((item: any) => item.id === user.id);
+    if (!staff) return;
 
-    const removeDateRow = (index: number) => {
-        setPlanDates(planDates.filter((_, i) => i !== index));
-    };
+    const total = staff.annual_leave_total ?? 15;
+    const used = staff.annual_leave_used ?? 0;
+    setRemainingLeave(Math.max(0, total - used));
+  }, [staffs, user.id]);
 
-    const updateDate = (index: number, date: string) => {
-        const newDates = [...planDates];
-        newDates[index].date = date;
-        setPlanDates(newDates);
-    };
+  useEffect(() => {
+    setFormTitle(`[연차계획서] ${user.name} (${new Date().getFullYear()}년 미사용 연차)`);
+    setExtraData({
+      planDates,
+      remainingLeave,
+      type: 'annual_leave_plan',
+    });
+  }, [planDates, remainingLeave, setExtraData, setFormTitle, user.name]);
 
-    return (
-        <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-3xl overflow-hidden shadow-sm animate-in fade-in duration-500">
-            <div className="p-6 bg-indigo-50 border-b border-indigo-100 flex justify-between items-center">
-                <div>
-                    <p className="text-xs text-blue-500 bg-blue-50 px-2 py-0.5 rounded-lg font-bold">&apos;{user.name}&apos;님의 연차사용계획서</p>
-                    <p className="text-[11px] font-semibold text-indigo-500/70 mt-1">미사용 연차에 대한 사용 시기를 지정하여 제출해 주세요.</p>
-                </div>
-                <div className="text-right">
-                    <p className="text-[10px] font-bold text-indigo-400 uppercase">나의 잔여 연차</p>
-                    <p className="text-lg font-bold text-indigo-700">{remainingLeave}일</p>
-                </div>
-            </div>
+  const addDateRow = () => {
+    setPlanDates((prev) => [...prev, { date: '', reason: DEFAULT_REASON }]);
+  };
 
-            <div className="p-6 space-y-4 bg-gray-50/30">
-                <div className="space-y-3">
-                    {planDates.map((item, index) => (
-                        <div key={index} className="flex gap-2 items-center bg-white p-3 rounded-[16px] border border-[var(--toss-border)] shadow-sm animate-in slide-in-from-top-1">
-                            <div className="flex-1">
-                                <label className="block text-[10px] font-bold text-[var(--toss-gray-3)] mb-1 ml-1">사용 예정일</label>
-                                <SmartDatePicker
-                                    value={item.date}
-                                    onChange={(val) => updateDate(index, val)}
-                                    className="w-full h-[41px] px-2.5 rounded-[12px] bg-[var(--toss-gray-1)] border-none text-xs font-bold"
-                                />
-                            </div>
-                            <div className="flex-[1.5]">
-                                <label className="block text-[10px] font-bold text-[var(--toss-gray-3)] mb-1 ml-1">사유 (기본값 유지 가능)</label>
-                                <input
-                                    type="text"
-                                    value={item.reason}
-                                    disabled
-                                    className="w-full p-2.5 rounded-[12px] bg-[var(--toss-gray-1)] border-none text-xs font-bold text-[var(--toss-gray-3)]"
-                                />
-                            </div>
-                            {planDates.length > 1 && (
-                                <button
-                                    onClick={() => removeDateRow(index)}
-                                    className="mt-4 p-2 text-red-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
-                                >
-                                    ✕
-                                </button>
-                            )}
-                        </div>
-                    ))}
-                </div>
+  const removeDateRow = (index: number) => {
+    setPlanDates((prev) => prev.filter((_, currentIndex) => currentIndex !== index));
+  };
 
-                <button
-                    onClick={addDateRow}
-                    className="w-full py-3 border-2 border-dashed border-indigo-200 rounded-[16px] text-[11px] font-bold text-indigo-500 hover:bg-indigo-50 hover:border-indigo-300 transition-all flex items-center justify-center gap-2"
-                >
-                    <span>➕ 사용 날짜 추가하기</span>
-                </button>
-
-                <div className="p-4 bg-amber-50 rounded-[16px] border border-amber-100 mt-4">
-                    <p className="text-[10px] text-amber-700 font-bold leading-relaxed">
-                        💡 안내: 계획서에 기재한 날짜에 실제 휴가를 사용하시려면, 추후 해당 날짜 이전에 별도의 [연차/휴가] 신청서를 상신하여 결재를 득해야 합니다. 본 계획서는 &apos;사용 의사&apos;를 확인하기 위한 서류입니다.
-                    </p>
-                </div>
-            </div>
-        </div>
+  const updateDate = (index: number, date: string) => {
+    setPlanDates((prev) =>
+      prev.map((item, currentIndex) =>
+        currentIndex === index ? { ...item, date } : item
+      )
     );
+  };
+
+  return (
+    <div
+      data-testid="annual-leave-plan-view"
+      className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-3xl overflow-hidden shadow-sm animate-in fade-in duration-500"
+    >
+      <div className="flex items-center justify-between border-b border-indigo-100 bg-indigo-50 p-6">
+        <div>
+          <p className="rounded-lg bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-500">
+            {user.name}님의 연차사용계획서
+          </p>
+          <p className="mt-1 text-[11px] font-semibold text-indigo-500/70">
+            미사용 연차의 사용 시기를 정리해 제출해주세요.
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-[10px] font-bold uppercase text-indigo-400">남은 연차</p>
+          <p className="text-lg font-bold text-indigo-700">{remainingLeave}일</p>
+        </div>
+      </div>
+
+      <div className="space-y-4 bg-gray-50/30 p-6">
+        <div className="space-y-3">
+          {planDates.map((item, index) => (
+            <div
+              key={`${index}-${item.date}`}
+              className="flex items-center gap-2 rounded-[16px] border border-[var(--toss-border)] bg-white p-3 shadow-sm animate-in slide-in-from-top-1"
+            >
+              <div className="flex-1">
+                <label className="mb-1 ml-1 block text-[10px] font-bold text-[var(--toss-gray-3)]">
+                  사용 예정일
+                </label>
+                <SmartDatePicker
+                  value={item.date}
+                  onChange={(value) => updateDate(index, value)}
+                  data-testid={`annual-leave-plan-date-${index}`}
+                  inputClassName="w-full h-[41px] rounded-[12px] bg-[var(--toss-gray-1)] px-2.5 text-xs font-bold"
+                />
+              </div>
+              <div className="flex-[1.5]">
+                <label className="mb-1 ml-1 block text-[10px] font-bold text-[var(--toss-gray-3)]">
+                  사유
+                </label>
+                <input
+                  type="text"
+                  value={item.reason}
+                  disabled
+                  className="w-full rounded-[12px] bg-[var(--toss-gray-1)] p-2.5 text-xs font-bold text-[var(--toss-gray-3)]"
+                />
+              </div>
+              {planDates.length > 1 ? (
+                <button
+                  type="button"
+                  data-testid={`annual-leave-plan-remove-row-${index}`}
+                  onClick={() => removeDateRow(index)}
+                  className="mt-4 rounded-full p-2 text-red-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                >
+                  삭제
+                </button>
+              ) : null}
+            </div>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          data-testid="annual-leave-plan-add-row"
+          onClick={addDateRow}
+          className="flex w-full items-center justify-center gap-2 rounded-[16px] border-2 border-dashed border-indigo-200 py-3 text-[11px] font-bold text-indigo-500 transition-all hover:border-indigo-300 hover:bg-indigo-50"
+        >
+          <span>사용 예정일 추가</span>
+        </button>
+
+        <div className="mt-4 rounded-[16px] border border-amber-100 bg-amber-50 p-4">
+          <p className="text-[10px] font-bold leading-relaxed text-amber-700">
+            안내: 계획서에 기재한 날짜에 실제 연차를 사용하실 경우, 해당 날짜 이전에 별도의
+            연차/휴가 신청서를 상신해 결재를 받아야 합니다. 이 문서는 사용 계획을 공유하기 위한
+            사전 계획서입니다.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
 }
