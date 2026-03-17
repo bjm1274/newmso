@@ -98,6 +98,21 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
 
             if (error) throw error;
 
+            setEvaluations(prev => [
+                {
+                    id: crypto.randomUUID(),
+                    staff_id: selectedStaff.id,
+                    evaluator_id: user.id,
+                    category,
+                    content,
+                    score: category === '?깃낵' ? score : null,
+                    created_at: new Date().toISOString(),
+                    evaluator_name: user.name || '관리자',
+                    evaluator_position: user.position || '',
+                },
+                ...prev,
+            ]);
+
             setContent('');
             setCategory('성과');
             setScore(3);
@@ -115,13 +130,14 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
         try {
             const { error } = await supabase.from('staff_evaluations').delete().eq('id', id);
             if (error) throw error;
+            setEvaluations(prev => prev.filter((item) => item.id !== id));
         } catch (err) {
             alert('삭제에 실패했습니다.');
         }
     };
 
     return (
-        <div className="flex flex-col lg:flex-row h-full gap-6 animate-in fade-in duration-500">
+        <div className="flex flex-col lg:flex-row h-full gap-6 animate-in fade-in duration-500" data-testid="staff-evaluation-view">
             {/* 1. 직원 목록 (좌측) */}
             <aside className="w-full lg:w-80 flex flex-col bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[24px] shadow-sm overflow-hidden">
                 <div className="p-5 border-b border-[var(--toss-border)] bg-[var(--toss-gray-1)]/30">
@@ -131,6 +147,7 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
                     {staffs.map((s) => (
                         <button
                             key={s.id}
+                            data-testid={`staff-evaluation-select-${s.id}`}
                             onClick={() => setSelectedStaff(s)}
                             className={`w-full flex items-center gap-3 p-3 rounded-[16px] transition-all text-left ${selectedStaff?.id === s.id
                                     ? 'bg-[var(--toss-blue)] text-white shadow-md'
@@ -215,6 +232,7 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
                                 <div className="space-y-2">
                                     <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">상세 기록 사항</label>
                                     <textarea
+                                        data-testid="staff-evaluation-content"
                                         value={content}
                                         onChange={(e) => setContent(e.target.value)}
                                         placeholder="업무 성과, 태도 변화, 발생한 이슈 등을 구체적으로 기록하세요..."
@@ -226,6 +244,7 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
                                 <div className="flex justify-end">
                                     <button
                                         type="submit"
+                                        data-testid="staff-evaluation-submit"
                                         disabled={isSubmitting}
                                         className="px-8 py-3 bg-[var(--toss-blue)] text-white text-xs font-bold rounded-[14px] shadow-sm hover:opacity-95 active:scale-95 transition-all disabled:opacity-50"
                                     >
@@ -255,7 +274,7 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
                                 ) : (
                                     <div className="relative border-l-2 border-[var(--toss-gray-1)] ml-2 pl-6 space-y-8">
                                         {evaluations.map((ev) => (
-                                            <div key={ev.id} className="relative group">
+                                            <div key={ev.id} data-testid={`staff-evaluation-item-${ev.id}`} className="relative group">
                                                 {/* 타임라인 점 */}
                                                 <div className={`absolute -left-[31px] top-0 w-4 h-4 rounded-full border-4 border-[var(--toss-card)] shadow-sm ${ev.category === '문제사항' ? 'bg-red-500' :
                                                         ev.category === '칭찬' ? 'bg-emerald-500' :

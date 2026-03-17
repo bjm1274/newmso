@@ -31,16 +31,25 @@ export default function HealthCheckupManagement({ staffs = [], selectedCo }: any
         if (!staff) return alert('직원을 선택해주세요.');
         const newRec = { staff_id: form.staff_id, staff_name: staff.name, company: staff.company, department: staff.department || '', checkup_type: form.checkup_type, scheduled_date: form.scheduled_date, completed_date: null, status: '예정', hospital: form.hospital, result: '', memo: form.memo };
         const { data, error } = await supabase.from('health_checkups').insert([newRec]).select();
-        if (error) { setRecords([{ ...newRec, id: crypto.randomUUID(), created_at: new Date().toISOString() }, ...records]); }
-        else if (data) { setRecords([data[0], ...records]); }
+        if (error) {
+            console.error('health_checkups insert failed:', error);
+            alert('건강검진 일정 저장에 실패했습니다.');
+            return;
+        }
+        if (data?.[0]) { setRecords([data[0], ...records]); }
         setShowForm(false);
         setForm({ staff_id: '', checkup_type: '일반검진', scheduled_date: '', hospital: '', memo: '' });
     };
 
     const markComplete = async (id: string) => {
         const now = new Date().toISOString().slice(0, 10);
+        const { error } = await supabase.from('health_checkups').update({ status: '완료', completed_date: now }).eq('id', id);
+        if (error) {
+            console.error('health_checkups update failed:', error);
+            alert('건강검진 완료 처리에 실패했습니다.');
+            return;
+        }
         setRecords(records.map((r: any) => r.id === id ? { ...r, status: '완료', completed_date: now } : r));
-        await supabase.from('health_checkups').update({ status: '완료', completed_date: now }).eq('id', id);
     };
 
     return (

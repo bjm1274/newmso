@@ -77,19 +77,21 @@ export default function IncidentReport({ staffs, selectedCo, user }: Props) {
     if (!form.location.trim() || !form.description.trim()) return alert('장소와 사고 경위를 입력해주세요.');
     setSaving(true);
     try {
-      await supabase.from('incident_reports').insert({
+      const { error } = await supabase.from('incident_reports').insert({
         ...form,
         involved_persons: selectedPersons,
         reporter_id: user?.id,
         reporter_name: user?.name || user?.email || '',
         created_at: new Date().toISOString(),
       });
+      if (error) throw error;
       alert('사고 보고서가 등록되었습니다.');
       setForm(emptyForm());
       setSelectedPersons([]);
       setTab('목록');
       fetchReports();
-    } catch {
+    } catch (error) {
+      console.error('incident_reports insert failed:', error);
       alert('저장에 실패했습니다.');
     } finally {
       setSaving(false);
@@ -98,9 +100,11 @@ export default function IncidentReport({ staffs, selectedCo, user }: Props) {
 
   const handleStatusChange = async (id: string, status: string) => {
     try {
-      await supabase.from('incident_reports').update({ status }).eq('id', id);
+      const { error } = await supabase.from('incident_reports').update({ status }).eq('id', id);
+      if (error) throw error;
       setReports(prev => prev.map(r => r.id === id ? { ...r, status } : r));
-    } catch {
+    } catch (error) {
+      console.error('incident_reports status update failed:', error);
       alert('상태 변경에 실패했습니다.');
     }
   };

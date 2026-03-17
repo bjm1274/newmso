@@ -428,7 +428,7 @@ export default function WorkStatus({ user }: { user?: any }) {
   }, [activeStaffsOnly, assignmentCountsByDate, assignments, selectedDateKey, shiftMap, staffMap, todayAttendance]);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5" data-testid="work-status-view">
       <section className="rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4 shadow-sm">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
@@ -441,6 +441,7 @@ export default function WorkStatus({ user }: { user?: any }) {
             <button
               type="button"
               onClick={() => setSelectedDate(new Date())}
+              data-testid="work-status-today"
               className="rounded-full border border-[var(--toss-border)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-3)] transition hover:border-[var(--toss-blue)] hover:text-[var(--toss-blue)]"
             >
               오늘로
@@ -499,6 +500,7 @@ export default function WorkStatus({ user }: { user?: any }) {
             <button
               type="button"
               onClick={() => setSelectedDate((prev) => addMonths(prev, -1))}
+              data-testid="work-status-prev-month"
               className="rounded-full border border-[var(--toss-border)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-3)] transition hover:border-[var(--toss-blue)] hover:text-[var(--toss-blue)]"
             >
               이전달
@@ -509,6 +511,7 @@ export default function WorkStatus({ user }: { user?: any }) {
             <button
               type="button"
               onClick={() => setSelectedDate((prev) => addMonths(prev, 1))}
+              data-testid="work-status-next-month"
               className="rounded-full border border-[var(--toss-border)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-3)] transition hover:border-[var(--toss-blue)] hover:text-[var(--toss-blue)]"
             >
               다음달
@@ -540,6 +543,7 @@ export default function WorkStatus({ user }: { user?: any }) {
                 <button
                   key={dayKey}
                   type="button"
+                  data-testid={`work-status-day-${dayKey}`}
                   onClick={() => {
                     setSelectedDate(cell);
                     setIsDetailModalOpen(true);
@@ -571,7 +575,7 @@ export default function WorkStatus({ user }: { user?: any }) {
       </section>
 
       {isDetailModalOpen ? (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/45 px-4 py-6" onClick={() => setIsDetailModalOpen(false)}>
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/45 px-4 py-6" data-testid="work-status-detail-modal" onClick={() => setIsDetailModalOpen(false)}>
           <div
             className="max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-[24px] border border-[var(--toss-border)] bg-[var(--toss-card)] shadow-2xl"
             onClick={(event) => event.stopPropagation()}
@@ -590,6 +594,7 @@ export default function WorkStatus({ user }: { user?: any }) {
                 <button
                   type="button"
                   onClick={() => setIsDetailModalOpen(false)}
+                  data-testid="work-status-detail-close"
                   className="rounded-full border border-[var(--toss-border)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-3)] transition hover:border-[var(--toss-blue)] hover:text-[var(--toss-blue)]"
                 >
                   닫기

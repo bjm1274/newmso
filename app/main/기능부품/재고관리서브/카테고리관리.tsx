@@ -33,7 +33,7 @@ function CategoryNode({ cat, onEdit, onDelete, onAdd, depth = 0 }: {
   const [expanded, setExpanded] = useState(true);
   return (
     <div style={{ marginLeft: depth * 20 }}>
-      <div className={`flex items-center justify-between p-2.5 rounded-[10px] mb-1 border ${depth === 0 ? 'border-[var(--toss-border)] bg-[var(--toss-card)]' : 'border-[var(--toss-border)]/50 bg-[var(--toss-gray-1)]/30'} group`}>
+      <div className={`flex items-center justify-between p-2.5 rounded-[10px] mb-1 border ${depth === 0 ? 'border-[var(--toss-border)] bg-[var(--toss-card)]' : 'border-[var(--toss-border)]/50 bg-[var(--toss-gray-1)]/30'} group`} data-testid={`category-row-${cat.id}`}>
         <div className="flex items-center gap-2">
           {(cat.children?.length ?? 0) > 0 && (
             <button onClick={() => setExpanded(v => !v)} className="w-4 h-4 text-[var(--toss-gray-3)] text-[10px]">{expanded ? '▼' : '▶'}</button>
@@ -45,9 +45,9 @@ function CategoryNode({ cat, onEdit, onDelete, onAdd, depth = 0 }: {
           <span className="text-[9px] text-[var(--toss-gray-3)]">(하위 {cat.children?.length || 0}개)</span>
         </div>
         <div className="hidden group-hover:flex gap-1">
-          <button onClick={() => onAdd(cat.id)} className="px-2 py-0.5 text-[10px] bg-green-50 text-green-700 font-bold rounded-[5px]">+ 하위</button>
-          <button onClick={() => onEdit(cat)} className="px-2 py-0.5 text-[10px] bg-blue-50 text-blue-600 font-bold rounded-[5px]">편집</button>
-          <button onClick={() => onDelete(cat.id)} className="px-2 py-0.5 text-[10px] bg-red-50 text-red-500 font-bold rounded-[5px]">삭제</button>
+          <button data-testid={`category-add-child-${cat.id}`} onClick={() => onAdd(cat.id)} className="px-2 py-0.5 text-[10px] bg-green-50 text-green-700 font-bold rounded-[5px]">+ 하위</button>
+          <button data-testid={`category-edit-${cat.id}`} onClick={() => onEdit(cat)} className="px-2 py-0.5 text-[10px] bg-blue-50 text-blue-600 font-bold rounded-[5px]">편집</button>
+          <button data-testid={`category-delete-${cat.id}`} onClick={() => onDelete(cat.id)} className="px-2 py-0.5 text-[10px] bg-red-50 text-red-500 font-bold rounded-[5px]">삭제</button>
         </div>
       </div>
       {expanded && cat.children?.map(child => (
@@ -124,14 +124,14 @@ export default function CategoryManager({ user }: { user: any }) {
   };
 
   return (
-    <div className="p-4 md:p-8 space-y-5">
+    <div className="p-4 md:p-8 space-y-5" data-testid="inventory-category-manager-view">
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div>
           <h2 className="text-base font-bold text-[var(--foreground)]">재고 카테고리 트리 관리</h2>
         </div>
         <div className="flex gap-2">
-          <button onClick={importFromInventory} className="px-3 py-1.5 bg-purple-500 text-white rounded-[10px] text-xs font-bold">재고에서 가져오기</button>
-          <button onClick={() => openAdd()} className="px-3 py-1.5 bg-[var(--toss-blue)] text-white rounded-[10px] text-xs font-bold">+ 카테고리 추가</button>
+          <button onClick={importFromInventory} data-testid="category-import-from-inventory" className="px-3 py-1.5 bg-purple-500 text-white rounded-[10px] text-xs font-bold">재고에서 가져오기</button>
+          <button onClick={() => openAdd()} data-testid="category-add-button" className="px-3 py-1.5 bg-[var(--toss-blue)] text-white rounded-[10px] text-xs font-bold">+ 카테고리 추가</button>
         </div>
       </div>
 
@@ -139,7 +139,7 @@ export default function CategoryManager({ user }: { user: any }) {
         <div className="flex flex-col items-center justify-center py-16 gap-4">
           <p className="text-[var(--toss-gray-3)] font-bold text-sm">카테고리가 없습니다.</p>
           <div className="flex gap-2">
-            <button onClick={() => openAdd()} className="px-4 py-2 bg-[var(--toss-blue)] text-white rounded-[12px] text-sm font-bold">직접 추가</button>
+            <button onClick={() => openAdd()} data-testid="category-add-empty-button" className="px-4 py-2 bg-[var(--toss-blue)] text-white rounded-[12px] text-sm font-bold">직접 추가</button>
             <button onClick={importFromInventory} className="px-4 py-2 bg-purple-500 text-white rounded-[12px] text-sm font-bold">재고에서 가져오기</button>
           </div>
         </div>
@@ -156,23 +156,23 @@ export default function CategoryManager({ user }: { user: any }) {
 
       {showModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
-          <div className="bg-[var(--toss-card)] rounded-[20px] shadow-2xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
+          <div className="bg-[var(--toss-card)] rounded-[20px] shadow-2xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()} data-testid="category-modal">
             <h3 className="text-base font-bold text-[var(--foreground)] mb-4">{editId ? '카테고리 편집' : '카테고리 추가'}</h3>
             <div className="space-y-3">
               <div>
                 <label className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">카테고리명 *</label>
-                <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="예: 진단용품" className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm bg-[var(--toss-card)] outline-none" />
+                <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} data-testid="category-field-name" placeholder="예: 진단용품" className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm bg-[var(--toss-card)] outline-none" />
               </div>
               <div>
                 <label className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">상위 카테고리</label>
-                <select value={form.parent_id} onChange={e => setForm(f => ({ ...f, parent_id: e.target.value }))} className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm bg-[var(--toss-card)] outline-none">
+                <select value={form.parent_id} onChange={e => setForm(f => ({ ...f, parent_id: e.target.value }))} data-testid="category-field-parent" className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm bg-[var(--toss-card)] outline-none">
                   <option value="">최상위 (없음)</option>
                   {categories.filter(c => c.id !== editId).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">설명</label>
-                <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="카테고리 설명" className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm bg-[var(--toss-card)] outline-none" />
+                <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} data-testid="category-field-description" placeholder="카테고리 설명" className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm bg-[var(--toss-card)] outline-none" />
               </div>
               <div>
                 <label className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">색상</label>

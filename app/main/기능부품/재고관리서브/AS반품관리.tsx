@@ -354,7 +354,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
   ];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-testid="as-return-management-view">
       {/* 요약 카드 */}
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <div className="bg-[var(--toss-card)] p-4 rounded-[14px] border border-[var(--toss-border)] shadow-sm text-center">
@@ -382,6 +382,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
+              data-testid={`as-return-tab-${tab.id}`}
               className={`px-3.5 py-2 rounded-[10px] text-[11px] font-semibold transition-all ${activeTab === tab.id
                   ? 'bg-[var(--toss-blue)] text-white shadow-sm'
                   : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-border)]'
@@ -394,6 +395,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
         {activeTab === 'as' && (
           <button
             onClick={() => { setAsForm({ ...DEFAULT_AS_FORM }); setEditingAsId(null); setShowAsModal(true); }}
+            data-testid="as-record-add-button"
             className="px-3.5 py-2 rounded-[10px] bg-[var(--toss-blue)] text-white text-[11px] font-semibold hover:opacity-90 transition-opacity shadow-sm"
           >
             + AS 등록
@@ -402,6 +404,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
         {activeTab === 'return' && (
           <button
             onClick={() => { setReturnForm({ ...DEFAULT_RETURN_FORM }); setEditingReturnId(null); setShowReturnModal(true); }}
+            data-testid="return-record-add-button"
             className="px-3.5 py-2 rounded-[10px] bg-[var(--toss-blue)] text-white text-[11px] font-semibold hover:opacity-90 transition-opacity shadow-sm"
           >
             + 반품 등록
@@ -433,7 +436,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
                 </thead>
                 <tbody className="divide-y divide-[var(--toss-border)]">
                   {asRecords.map(record => (
-                    <tr key={record.id} className="hover:bg-[var(--toss-blue-light)]/40 transition-all group">
+                    <tr key={record.id} className="hover:bg-[var(--toss-blue-light)]/40 transition-all group" data-testid={`as-record-row-${record.id}`}>
                       <td className="px-4 py-3">
                         <p className="text-xs font-semibold text-[var(--foreground)] group-hover:text-[var(--toss-blue)] transition-colors">{record.device_name}</p>
                         {record.model_name && (
@@ -456,6 +459,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
                         <select
                           value={record.status}
                           onChange={e => updateAsStatus(record.id, e.target.value as AsStatus)}
+                          data-testid={`as-status-${record.id}`}
                           className={`px-2 py-1 rounded-full text-[11px] font-semibold border-0 cursor-pointer outline-none ${AS_STATUS_COLORS[record.status]}`}
                         >
                           {(['접수', '처리중', '완료', '반품'] as AsStatus[]).map(s => (
@@ -466,12 +470,14 @@ export default function ASReturnManagement({ user }: { user: any }) {
                       <td className="px-4 py-3 text-right space-x-1">
                         <button
                           onClick={() => openAsEdit(record)}
+                          data-testid={`as-edit-${record.id}`}
                           className="px-2 py-1 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] text-[11px] font-semibold rounded-md hover:opacity-80"
                         >
                           수정
                         </button>
                         <button
                           onClick={() => deleteAsRecord(record.id)}
+                          data-testid={`as-delete-${record.id}`}
                           className="px-2 py-1 bg-red-50 text-red-600 text-[11px] font-semibold rounded-md hover:bg-red-100"
                         >
                           삭제
@@ -511,7 +517,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
                 </thead>
                 <tbody className="divide-y divide-[var(--toss-border)]">
                   {returnRecords.map(record => (
-                    <tr key={record.id} className="hover:bg-[var(--toss-blue-light)]/40 transition-all group">
+                    <tr key={record.id} className="hover:bg-[var(--toss-blue-light)]/40 transition-all group" data-testid={`return-record-row-${record.id}`}>
                       <td className="px-4 py-3">
                         <p className="text-xs font-semibold text-[var(--foreground)] group-hover:text-[var(--toss-blue)] transition-colors">{record.item_name}</p>
                       </td>
@@ -533,6 +539,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
                         <select
                           value={record.status}
                           onChange={e => updateReturnStatus(record.id, e.target.value as ReturnStatus)}
+                          data-testid={`return-status-${record.id}`}
                           className={`px-2 py-1 rounded-full text-[11px] font-semibold border-0 cursor-pointer outline-none ${RETURN_STATUS_COLORS[record.status]}`}
                         >
                           {(['요청', '승인', '완료'] as ReturnStatus[]).map(s => (
@@ -543,12 +550,14 @@ export default function ASReturnManagement({ user }: { user: any }) {
                       <td className="px-4 py-3 text-right space-x-1">
                         <button
                           onClick={() => openReturnEdit(record)}
+                          data-testid={`return-edit-${record.id}`}
                           className="px-2 py-1 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] text-[11px] font-semibold rounded-md hover:opacity-80"
                         >
                           수정
                         </button>
                         <button
                           onClick={() => deleteReturnRecord(record.id)}
+                          data-testid={`return-delete-${record.id}`}
                           className="px-2 py-1 bg-red-50 text-red-600 text-[11px] font-semibold rounded-md hover:bg-red-100"
                         >
                           삭제
@@ -609,6 +618,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
           <div
             className="bg-[var(--toss-card)] rounded-[16px] shadow-2xl p-6 w-full max-w-[420px] max-h-[90vh] overflow-y-auto"
             onClick={e => e.stopPropagation()}
+            data-testid="as-record-modal"
           >
             <div className="mb-5 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-[var(--foreground)]">
@@ -624,6 +634,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
                   type="text"
                   value={asForm.device_name}
                   onChange={e => setAsForm(p => ({ ...p, device_name: e.target.value }))}
+                  data-testid="as-field-device-name"
                   placeholder="예: 내시경 세척기"
                   className="w-full px-3.5 py-2.5 rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)] outline-none"
                 />
@@ -634,6 +645,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
                   type="text"
                   value={asForm.model_name}
                   onChange={e => setAsForm(p => ({ ...p, model_name: e.target.value }))}
+                  data-testid="as-field-model-name"
                   placeholder="예: OES-V1"
                   className="w-full px-3.5 py-2.5 rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)] outline-none"
                 />
@@ -644,6 +656,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
                   type="date"
                   value={asForm.received_date}
                   onChange={e => setAsForm(p => ({ ...p, received_date: e.target.value }))}
+                  data-testid="as-field-received-date"
                   className="w-full px-3.5 py-2.5 rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)] outline-none"
                 />
               </div>
@@ -652,6 +665,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
                 <textarea
                   value={asForm.problem_description}
                   onChange={e => setAsForm(p => ({ ...p, problem_description: e.target.value }))}
+                  data-testid="as-field-problem-description"
                   placeholder="증상 및 문제 내용을 입력하세요"
                   rows={3}
                   className="w-full px-3.5 py-2.5 rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)] outline-none resize-none"
@@ -664,6 +678,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
                     type="text"
                     value={asForm.company_name}
                     onChange={e => setAsForm(p => ({ ...p, company_name: e.target.value }))}
+                    data-testid="as-field-company-name"
                     placeholder="업체명"
                     className="w-full px-4 py-3 rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)] outline-none"
                   />
@@ -674,6 +689,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
                     type="text"
                     value={asForm.manager_name}
                     onChange={e => setAsForm(p => ({ ...p, manager_name: e.target.value }))}
+                    data-testid="as-field-manager-name"
                     placeholder="담당자명"
                     className="w-full px-4 py-3 rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)] outline-none"
                   />
@@ -684,6 +700,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
                 <select
                   value={asForm.status}
                   onChange={e => setAsForm(p => ({ ...p, status: e.target.value as AsStatus }))}
+                  data-testid="as-field-status"
                   className="w-full px-4 py-3 rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)] outline-none"
                 >
                   <option value="접수">접수</option>
@@ -696,7 +713,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
 
               <div className="mt-5 flex gap-3">
                 <button onClick={closeAsModal} className="flex-1 rounded-[12px] bg-[var(--toss-gray-1)] py-2.5 text-sm font-semibold text-[var(--toss-gray-4)] transition-all hover:bg-[var(--toss-border)]">취소</button>
-                <button onClick={saveAsRecord} className="flex-1 rounded-[12px] bg-[var(--toss-blue)] py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 shadow-sm">
+                <button onClick={saveAsRecord} data-testid="as-save-button" className="flex-1 rounded-[12px] bg-[var(--toss-blue)] py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 shadow-sm">
                   {editingAsId ? '수정 완료' : '등록'}
                 </button>
               </div>
@@ -713,6 +730,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
           <div
             className="bg-[var(--toss-card)] rounded-[16px] shadow-2xl p-6 w-full max-w-[420px] max-h-[90vh] overflow-y-auto"
             onClick={e => e.stopPropagation()}
+            data-testid="return-record-modal"
           >
             <div className="mb-5 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-[var(--foreground)]">
@@ -727,7 +745,8 @@ export default function ASReturnManagement({ user }: { user: any }) {
                 <input
                   type="text"
                   value={returnForm.item_name}
-                  onChange={e => setReturnForm(p => ({ ...p, item_name: e.target.value }))}
+                    onChange={e => setReturnForm(p => ({ ...p, item_name: e.target.value }))}
+                    data-testid="return-field-item-name"
                   placeholder="예: 봉합사 2-0"
                   className="w-full px-3.5 py-2.5 rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)] outline-none"
                 />
@@ -738,7 +757,8 @@ export default function ASReturnManagement({ user }: { user: any }) {
                   type="number"
                   min={1}
                   value={returnForm.quantity}
-                  onChange={e => setReturnForm(p => ({ ...p, quantity: Math.max(1, parseInt(e.target.value) || 1) }))}
+                    onChange={e => setReturnForm(p => ({ ...p, quantity: Math.max(1, parseInt(e.target.value) || 1) }))}
+                    data-testid="return-field-quantity"
                   className="w-full px-3.5 py-2.5 rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)] outline-none"
                 />
               </div>
@@ -747,6 +767,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
                 <textarea
                   value={returnForm.return_reason}
                   onChange={e => setReturnForm(p => ({ ...p, return_reason: e.target.value }))}
+                  data-testid="return-field-reason"
                   placeholder="반품 사유를 입력하세요"
                   rows={3}
                   className="w-full px-3.5 py-2.5 rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)] outline-none resize-none"
@@ -757,7 +778,8 @@ export default function ASReturnManagement({ user }: { user: any }) {
                 <input
                   type="text"
                   value={returnForm.company_name}
-                  onChange={e => setReturnForm(p => ({ ...p, company_name: e.target.value }))}
+                    onChange={e => setReturnForm(p => ({ ...p, company_name: e.target.value }))}
+                    data-testid="return-field-company-name"
                   placeholder="업체명"
                   className="w-full px-3.5 py-2.5 rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)] outline-none"
                 />
@@ -768,6 +790,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
                   type="date"
                   value={returnForm.return_date}
                   onChange={e => setReturnForm(p => ({ ...p, return_date: e.target.value }))}
+                  data-testid="return-field-return-date"
                   className="w-full px-3.5 py-2.5 rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)] outline-none"
                 />
               </div>
@@ -776,6 +799,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
                 <select
                   value={returnForm.status}
                   onChange={e => setReturnForm(p => ({ ...p, status: e.target.value as ReturnStatus }))}
+                  data-testid="return-field-status"
                   className="w-full px-4 py-3 rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)] outline-none"
                 >
                   <option value="요청">요청</option>
@@ -787,7 +811,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
 
               <div className="mt-5 flex gap-3">
                 <button onClick={closeReturnModal} className="flex-1 rounded-[12px] bg-[var(--toss-gray-1)] py-2.5 text-sm font-semibold text-[var(--toss-gray-4)] transition-all hover:bg-[var(--toss-border)]">취소</button>
-                <button onClick={saveReturnRecord} className="flex-1 rounded-[12px] bg-[var(--toss-blue)] py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 shadow-sm">
+                <button onClick={saveReturnRecord} data-testid="return-save-button" className="flex-1 rounded-[12px] bg-[var(--toss-blue)] py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 shadow-sm">
                   {editingReturnId ? '수정 완료' : '등록'}
                 </button>
               </div>

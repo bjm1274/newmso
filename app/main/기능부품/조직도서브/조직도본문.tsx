@@ -79,7 +79,7 @@ export default function MainContent({
       )}
 
       {mainMenu === '조직도' && (
-        <div className="min-h-0 flex-1 overflow-x-hidden">
+        <div className="min-h-0 flex-1 overflow-x-hidden" data-testid="org-view">
           <OrgChart user={user} staffs={data.staffs} depts={data.depts} selectedCo={selectedCo} setSelectedCo={setSelectedCo} />
         </div>
       )}
