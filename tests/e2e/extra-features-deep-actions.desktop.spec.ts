@@ -1,0 +1,269 @@
+import { expect, test, type Page } from '@playwright/test';
+import { dismissDialogs, fakeUser, mockSupabase, seedSession } from './helpers';
+
+function trackRuntimeErrors(page: Page) {
+  const errors: string[] = [];
+
+  page.on('pageerror', (error) => {
+    errors.push(`pageerror: ${error.message}`);
+  });
+
+  page.on('console', (message) => {
+    if (message.type() !== 'error') return;
+
+    const text = message.text();
+    if (
+      text.includes('favicon') ||
+      text.includes('Failed to load resource') ||
+      text.includes('ERR_ABORTED')
+    ) {
+      return;
+    }
+
+    errors.push(`console: ${text}`);
+  });
+
+  return errors;
+}
+
+const extraFeaturesUser = {
+  ...fakeUser,
+  department: '병동팀',
+  position: '수간호사',
+  permissions: {
+    ...fakeUser.permissions,
+    'extra_\uC870\uC9C1\uB3C4': true,
+    'extra_\uBD80\uC11C\uBCC4\uC7AC\uACE0': true,
+    'extra_\uADFC\uBB34\uD604\uD669': true,
+    'extra_\uC778\uACC4\uB178\uD2B8': true,
+    'extra_\uD1F4\uC6D0\uC2EC\uC0AC': true,
+    'extra_\uB9C8\uAC10\uBCF4\uACE0': true,
+    'extra_\uC9C1\uC6D0\uD3C9\uAC00': true,
+  },
+};
+
+const targetNurse = {
+  ...fakeUser,
+  id: '66666666-6666-6666-6666-666666666666',
+  employee_no: 'E2E-002',
+  name: '테스트간호사',
+  department: '병동팀',
+  position: '간호사',
+  company: extraFeaturesUser.company,
+  company_id: extraFeaturesUser.company_id,
+};
+
+const supportNurse = {
+  ...fakeUser,
+  id: '77777777-7777-7777-7777-777777777777',
+  employee_no: 'E2E-003',
+  name: '지원간호사',
+  department: '병동팀',
+  position: '간호사',
+  company: extraFeaturesUser.company,
+  company_id: extraFeaturesUser.company_id,
+};
+
+function getTodayKey() {
+  return new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Asia/Seoul',
+  }).format(new Date());
+}
+
+async function prepareExtraFeature(page: Page, fixtures: Parameters<typeof mockSupabase>[1], cardTestId: string) {
+  await page.addInitScript(() => {
+    window.alert = () => {};
+    window.confirm = () => true;
+  });
+
+  await mockSupabase(page, fixtures);
+  await seedSession(page, {
+    user: extraFeaturesUser,
+    localStorage: {
+      erp_last_menu: '추가기능',
+    },
+  });
+
+  await page.goto(`/main?open_menu=${encodeURIComponent('추가기능')}`);
+  await expect(page.getByTestId('extra-view')).toBeVisible();
+  await page.getByTestId(cardTestId).click();
+  await expect(page.getByTestId('extra-subview')).toBeVisible();
+}
+
+test.beforeEach(async ({ page }) => {
+  await dismissDialogs(page);
+});
+
+test('work status supports real month/day navigation flow', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+  const todayKey = getTodayKey();
+
+  await prepareExtraFeature(
+    page,
+    {
+      staffMembers: [extraFeaturesUser, targetNurse, supportNurse],
+      workShifts: [
+        { id: 'shift-day', name: 'Day', start_time: '07:00:00', end_time: '15:00:00', is_active: true },
+        { id: 'shift-evening', name: 'Evening', start_time: '15:00:00', end_time: '23:00:00', is_active: true },
+        { id: 'shift-night', name: 'Night', start_time: '23:00:00', end_time: '07:00:00', is_active: true },
+      ],
+      shiftAssignments: [
+        { id: 'assign-1', staff_id: extraFeaturesUser.id, shift_id: 'shift-day', work_date: todayKey },
+        { id: 'assign-2', staff_id: targetNurse.id, shift_id: 'shift-evening', work_date: todayKey },
+        { id: 'assign-3', staff_id: supportNurse.id, shift_id: 'shift-night', work_date: todayKey },
+      ],
+      attendance: [
+        { id: 'attendance-1', staff_id: extraFeaturesUser.id, date: todayKey, check_in: `${todayKey}T07:01:00` },
+      ],
+    },
+    'extra-card-work-status'
+  );
+
+  await expect(page.getByTestId('work-status-view')).toBeVisible();
+  await page.getByTestId('work-status-next-month').click();
+  await page.getByTestId('work-status-prev-month').click();
+  await page.getByTestId('work-status-today').click();
+  await page.getByTestId(`work-status-day-${todayKey}`).click();
+  await expect(page.getByTestId('work-status-detail-modal')).toBeVisible();
+  await page.getByTestId('work-status-detail-close').click();
+  await expect(page.getByTestId('work-status-detail-modal')).toBeHidden();
+  await page.getByTestId('extra-back-button').click();
+  await expect(page.getByTestId('extra-features-list')).toBeVisible();
+
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('handover notes can save bed settings and patient handover entries', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+
+  await prepareExtraFeature(
+    page,
+    {
+      staffMembers: [extraFeaturesUser, targetNurse],
+      handoverNotes: [],
+    },
+    'extra-card-handover-note'
+  );
+
+  await expect(page.getByTestId('handover-notes-view')).toBeVisible();
+  await page.getByTestId('handover-bed-settings-open').click();
+  await expect(page.getByTestId('handover-bed-settings-modal')).toBeVisible();
+  await page.getByTestId('handover-new-room-number').fill('101');
+  await page.getByTestId('handover-add-room').click();
+  await page.getByTestId('handover-room-0-patient-0').fill('김환자');
+  await page.waitForTimeout(700);
+  await page.getByTestId('handover-bed-settings-close').click();
+
+  await page.getByTestId('handover-scope-patient').click();
+  await page.getByTestId('handover-patient-select').selectOption({ index: 1 });
+  await page.getByTestId('handover-note-content').fill('투약 시간과 활력징후를 다음 근무자에게 인계합니다.');
+  await page.getByTestId('handover-note-add').click();
+
+  await expect(page.getByText('투약 시간과 활력징후를 다음 근무자에게 인계합니다.')).toBeVisible();
+  const completeButton = page.locator('[data-testid^="handover-note-complete-"]').first();
+  await completeButton.click();
+  await expect(completeButton).toContainText('완료');
+  await page.getByTestId('extra-back-button').click();
+  await expect(page.getByTestId('extra-features-list')).toBeVisible();
+
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('discharge review can save a template, create a review, and approve it', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+
+  await prepareExtraFeature(
+    page,
+    {
+      staffMembers: [extraFeaturesUser],
+      dischargeTemplates: [],
+      dischargeReviews: [],
+      surgeryTemplates: [{ id: 'surgery-1', name: '슬관절 수술', is_active: true, sort_order: 1 }],
+    },
+    'extra-card-discharge-review'
+  );
+
+  await expect(page.getByTestId('discharge-review-view')).toBeVisible();
+  await page.getByTestId('discharge-tab-template').click();
+  await page.getByTestId('discharge-template-new').click();
+  await page.getByTestId('discharge-template-title').fill('슬관절 퇴원기준');
+  await page.getByTestId('discharge-template-data').fill('A001\t항목\t기본치료\t분류\t0\t0\t1000\t1000');
+  await page.getByTestId('discharge-template-save').click();
+  await expect(page.getByText('슬관절 퇴원기준')).toBeVisible();
+
+  await page.getByTestId('discharge-tab-new').click();
+  await page.getByTestId('discharge-patient-name').fill('홍길동');
+  await page.getByTestId('discharge-department').fill('정형외과');
+  await page.getByTestId('discharge-admission-date').fill('2026-03-15');
+  await page.getByTestId('discharge-template-select').selectOption({ index: 1 });
+  await page.getByTestId('discharge-chart-data').fill('A001\t항목\t기본치료\t분류\t0\t0\t1000\t1000');
+  await page.getByTestId('discharge-create-review').click();
+
+  await expect(page.getByTestId('discharge-review-detail')).toBeVisible();
+  await page.getByTestId('discharge-review-toggle-all').click();
+  await page.getByTestId('discharge-review-approve').click();
+  await expect(page.getByTestId('discharge-review-approve')).toBeHidden();
+  await page.getByTestId('extra-back-button').click();
+  await expect(page.getByTestId('extra-features-list')).toBeVisible();
+
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('daily closure can save settlement items and return to the list', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+  const todayKey = getTodayKey();
+
+  await prepareExtraFeature(
+    page,
+    {
+      staffMembers: [extraFeaturesUser],
+      dailyClosures: [],
+      dailyClosureItems: [],
+      dailyChecks: [],
+    },
+    'extra-card-closing-report'
+  );
+
+  await expect(page.getByTestId('daily-closure-view')).toBeVisible();
+  await page.getByTestId('daily-closure-toggle-view').click();
+  await page.getByTestId('daily-closure-date').fill(todayKey);
+  await page.getByTestId('daily-closure-add-item').click();
+  await page.getByTestId('daily-closure-item-patient-0').fill('홍길동');
+  await page.getByTestId('daily-closure-item-amount-0').fill('32000');
+  await page.getByTestId('daily-closure-add-check').click();
+  await page.getByTestId('daily-closure-check-number-0').fill('CHK-001');
+  await page.getByTestId('daily-closure-memo').fill('오후 외래 수납 마감 보고');
+  await page.getByTestId('daily-closure-save').click();
+
+  await expect(page.getByText(todayKey)).toBeVisible();
+  await expect(page.getByText('32,000')).toBeVisible();
+  await page.getByTestId('extra-back-button').click();
+  await expect(page.getByTestId('extra-features-list')).toBeVisible();
+
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('staff evaluation can save a new review entry for a selected nurse', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+
+  await prepareExtraFeature(
+    page,
+    {
+      staffMembers: [extraFeaturesUser, targetNurse],
+      staffEvaluations: [],
+    },
+    'extra-card-staff-evaluation'
+  );
+
+  await expect(page.getByTestId('staff-evaluation-view')).toBeVisible();
+  await page.getByTestId(`staff-evaluation-select-${targetNurse.id}`).click();
+  await page.getByTestId('staff-evaluation-content').fill('야간 인계 정리가 꼼꼼하고 환자 대응이 안정적입니다.');
+  await page.getByTestId('staff-evaluation-submit').click();
+
+  await expect(page.getByText('야간 인계 정리가 꼼꼼하고 환자 대응이 안정적입니다.')).toBeVisible();
+  await expect(page.locator('[data-testid^="staff-evaluation-item-"]')).toHaveCount(1);
+  await page.getByTestId('extra-back-button').click();
+  await expect(page.getByTestId('extra-features-list')).toBeVisible();
+
+  expect(runtimeErrors).toEqual([]);
+});

@@ -90,13 +90,18 @@ export default function CorporateCardTransactions({ staffs = [] }: any) {
 
   const handleAddCard = async () => {
     if (!cardForm.company_name || !cardForm.card_nickname) return alert('회사와 카드별칭을 입력하세요.');
-    await supabase.from('corporate_cards').insert({
+    const { error } = await supabase.from('corporate_cards').insert({
       company_name: cardForm.company_name,
       card_nickname: cardForm.card_nickname,
       last_four: cardForm.last_four || null,
       issuer: cardForm.issuer || null,
       holder_id: cardForm.holder_id || null,
     });
+    if (error) {
+      console.error('corporate_cards insert failed:', error);
+      alert('법인카드 저장에 실패했습니다.');
+      return;
+    }
     setCardForm({ company_name: '박철홍정형외과', card_nickname: '', last_four: '', issuer: '', holder_id: '' });
     setAddingCard(false);
     fetchCards();
@@ -104,14 +109,19 @@ export default function CorporateCardTransactions({ staffs = [] }: any) {
 
   const handleDeleteCard = async (id: string) => {
     if (!confirm('카드를 비활성화하시겠습니까?')) return;
-    await supabase.from('corporate_cards').update({ status: 'inactive' }).eq('id', id);
+    const { error } = await supabase.from('corporate_cards').update({ status: 'inactive' }).eq('id', id);
+    if (error) {
+      console.error('corporate_cards update failed:', error);
+      alert('카드 비활성화에 실패했습니다.');
+      return;
+    }
     fetchCards();
   };
 
   const handleAdd = async () => {
     if (!form.date || !form.merchant || form.amount <= 0) return alert('필수 항목을 입력하세요.');
     const co = selectedCo !== '전체' ? selectedCo : (form.card_id ? cards.find((c: any) => c.id === form.card_id)?.company_name : null) || '전체';
-    await supabase.from('corporate_card_transactions').insert({
+    const { error } = await supabase.from('corporate_card_transactions').insert({
       transaction_date: form.date,
       merchant: form.merchant,
       category: form.category,
@@ -120,6 +130,11 @@ export default function CorporateCardTransactions({ staffs = [] }: any) {
       company_name: co,
       card_id: form.card_id || null,
     });
+    if (error) {
+      console.error('corporate_card_transactions insert failed:', error);
+      alert('사용내역 저장에 실패했습니다.');
+      return;
+    }
     setForm({ date: '', merchant: '', category: '식비', amount: 0, description: '', card_id: '' });
     setAdding(false);
     fetchTransactions();
@@ -128,6 +143,7 @@ export default function CorporateCardTransactions({ staffs = [] }: any) {
   const handleCsvImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setImporting(true);
     const text = await file.text();
     const lines = text.trim().split(/\r?\n/).filter(Boolean);
     const header = lines[0].toLowerCase();
@@ -136,30 +152,39 @@ export default function CorporateCardTransactions({ staffs = [] }: any) {
     const co = selectedCo !== '전체' ? selectedCo : '전체';
 
     let imported = 0;
-    for (const line of rows) {
-      const parts = line.split(/[\t,]/).map((p: string) => p.trim());
-      if (parts.length < 3) continue;
-      const dateMatch = parts[0].match(/(\d{4})-(\d{2})-(\d{2})/) || parts[0].match(/(\d{4})\/(\d{1,2})\/(\d{1,2})/);
-      const date = dateMatch ? `${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}` : '';
-      const merchant = parts[1] || '';
-      const amount = parseInt(String(parts[2]).replace(/[^0-9]/g, '')) || 0;
-      if (!date || amount <= 0) continue;
-      // 카테고리가 명시되지 않은 경우 자동 분류
-      const category = CATEGORIES.includes(parts[3]) ? parts[3] : autoClassify(merchant);
-      await supabase.from('corporate_card_transactions').insert({
-        transaction_date: date,
-        merchant,
-        amount,
-        category,
-        description: parts[4] || '',
-        company_name: co,
-      });
-      imported++;
+    let failed = 0;
+    try {
+      for (const line of rows) {
+        const parts = line.split(/[\t,]/).map((p: string) => p.trim());
+        if (parts.length < 3) continue;
+        const dateMatch = parts[0].match(/(\d{4})-(\d{2})-(\d{2})/) || parts[0].match(/(\d{4})\/(\d{1,2})\/(\d{1,2})/);
+        const date = dateMatch ? `${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}` : '';
+        const merchant = parts[1] || '';
+        const amount = parseInt(String(parts[2]).replace(/[^0-9]/g, '')) || 0;
+        if (!date || amount <= 0) continue;
+        // 카테고리가 명시되지 않은 경우 자동 분류
+        const category = CATEGORIES.includes(parts[3]) ? parts[3] : autoClassify(merchant);
+        const { error } = await supabase.from('corporate_card_transactions').insert({
+          transaction_date: date,
+          merchant,
+          amount,
+          category,
+          description: parts[4] || '',
+          company_name: co,
+        });
+        if (error) {
+          failed++;
+          console.error('corporate_card_transactions csv insert failed:', error);
+          continue;
+        }
+        imported++;
+      }
+      alert(failed > 0 ? `${imported}건 가져왔고 ${failed}건은 실패했습니다.` : `${imported}건 가져왔습니다. (카테고리 자동 분류 적용)`);
+      fetchTransactions();
+    } finally {
+      setImporting(false);
+      (e.target as HTMLInputElement).value = '';
     }
-    setImporting(false);
-    (e.target as HTMLInputElement).value = '';
-    alert(`${imported}건 가져왔습니다. (카테고리 자동 분류 적용)`);
-    fetchTransactions();
   };
 
   // '기타'로 분류된 항목을 일괄 자동 분류
@@ -168,14 +193,20 @@ export default function CorporateCardTransactions({ staffs = [] }: any) {
     if (unclassified.length === 0) return alert('자동 분류할 항목이 없습니다. (이미 분류됨)');
     if (!confirm(`${unclassified.length}건을 자동 분류하시겠습니까?`)) return;
     let updated = 0;
+    let failed = 0;
     for (const r of unclassified) {
       const cat = autoClassify(r.merchant);
       if (cat !== '기타') {
-        await supabase.from('corporate_card_transactions').update({ category: cat }).eq('id', r.id);
+        const { error } = await supabase.from('corporate_card_transactions').update({ category: cat }).eq('id', r.id);
+        if (error) {
+          failed++;
+          console.error('corporate_card_transactions auto classify update failed:', error);
+          continue;
+        }
         updated++;
       }
     }
-    alert(`${updated}건 자동 분류 완료.`);
+    alert(failed > 0 ? `${updated}건 자동 분류, ${failed}건 실패했습니다.` : `${updated}건 자동 분류 완료.`);
     fetchTransactions();
   };
 

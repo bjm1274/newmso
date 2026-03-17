@@ -143,7 +143,7 @@ export default function DailyClosurePage({ user }: { user: any }) {
     };
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6" data-testid="daily-closure-view">
             <div className="flex justify-between items-center">
                 <div>
                     <h2 className="text-xl font-bold text-[var(--foreground)] flex items-center gap-2">
@@ -151,6 +151,7 @@ export default function DailyClosurePage({ user }: { user: any }) {
                     </h2>
                 </div>
                 <button
+                    data-testid="daily-closure-toggle-view"
                     onClick={() => setView(view === 'list' ? 'form' : 'list')}
                     className="px-4 py-2 text-xs font-bold rounded-xl bg-gray-900 text-white shadow-sm hover:bg-black transition-all"
                 >
@@ -187,7 +188,7 @@ export default function DailyClosurePage({ user }: { user: any }) {
                     <div className="bg-white rounded-2xl border border-[var(--toss-border)] p-6 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div className="space-y-1.5">
                             <label className="text-[11px] font-bold text-gray-500 uppercase">마감 일자 *</label>
-                            <SmartDatePicker value={selectedDate} onChange={setSelectedDate} className="w-full h-11 px-4 bg-gray-50 border-none rounded-xl text-sm font-medium" />
+                            <SmartDatePicker value={selectedDate} onChange={setSelectedDate} data-testid="daily-closure-date" className="w-full h-11 px-4 bg-gray-50 border-none rounded-xl text-sm font-medium" />
                         </div>
                         <div className="space-y-1.5">
                             <label className="text-[11px] font-bold text-gray-500 uppercase">기초 시재 (전일 이월) *</label>
@@ -213,7 +214,7 @@ export default function DailyClosurePage({ user }: { user: any }) {
                     <div className="bg-white rounded-2xl border border-[var(--toss-border)] p-6 shadow-sm space-y-4">
                         <div className="flex justify-between items-center">
                             <h3 className="text-sm font-bold text-gray-800">📊 수납 내역 상세</h3>
-                            <button onClick={addItem} className="px-3 py-1.5 text-[11px] font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700">➕ 항목 추가</button>
+                            <button data-testid="daily-closure-add-item" onClick={addItem} className="px-3 py-1.5 text-[11px] font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700">➕ 항목 추가</button>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-xs">
@@ -230,8 +231,8 @@ export default function DailyClosurePage({ user }: { user: any }) {
                                 <tbody>
                                     {items.map((item, idx) => (
                                         <tr key={idx} className="border-b border-gray-50 last:border-0">
-                                            <td className="py-2 px-1"><input value={item.patient_name} onChange={e => updateItem(idx, 'patient_name', e.target.value)} className="w-full bg-transparent outline-none font-medium" placeholder="환자명" /></td>
-                                            <td className="py-2 px-1"><input type="number" value={item.amount} onChange={e => updateItem(idx, 'amount', Number(e.target.value))} className="w-full bg-transparent outline-none font-bold text-blue-600" /></td>
+                                            <td className="py-2 px-1"><input data-testid={`daily-closure-item-patient-${idx}`} value={item.patient_name} onChange={e => updateItem(idx, 'patient_name', e.target.value)} className="w-full bg-transparent outline-none font-medium" placeholder="환자명" /></td>
+                                            <td className="py-2 px-1"><input data-testid={`daily-closure-item-amount-${idx}`} type="number" value={item.amount} onChange={e => updateItem(idx, 'amount', Number(e.target.value))} className="w-full bg-transparent outline-none font-bold text-blue-600" /></td>
                                             <td className="py-2 px-1">
                                                 <select value={item.payment_method} onChange={e => updateItem(idx, 'payment_method', e.target.value)} className="bg-transparent outline-none">
                                                     <option value="카드">카드</option>
@@ -261,7 +262,7 @@ export default function DailyClosurePage({ user }: { user: any }) {
                             <h3 className="text-sm font-bold text-gray-800">🏴 수표 및 자기앞수표 기록</h3>
                             <div className="flex gap-2">
                                 <a href="https://www.giro.or.kr/check/check_01.do" target="_blank" className="px-3 py-1.5 text-[11px] font-bold text-gray-500 bg-gray-100 rounded-lg hover:bg-gray-200">기로 수표조회 가기 ↗</a>
-                                <button onClick={addCheck} className="px-3 py-1.5 text-[11px] font-bold text-white bg-purple-600 rounded-lg hover:bg-purple-700">➕ 수표 추가</button>
+                                <button data-testid="daily-closure-add-check" onClick={addCheck} className="px-3 py-1.5 text-[11px] font-bold text-white bg-purple-600 rounded-lg hover:bg-purple-700">➕ 수표 추가</button>
                             </div>
                         </div>
                         <div className="grid gap-3 sm:grid-cols-2">
@@ -271,6 +272,7 @@ export default function DailyClosurePage({ user }: { user: any }) {
                                         <div className="space-y-1">
                                             <label className="text-[10px] font-bold text-gray-400">수표번호</label>
                                             <input
+                                                data-testid={`daily-closure-check-number-${idx}`}
                                                 value={check.check_number}
                                                 onChange={e => {
                                                     const newChecks = [...checks];
@@ -319,6 +321,7 @@ export default function DailyClosurePage({ user }: { user: any }) {
                         <div className="space-y-3">
                             <label className="text-[11px] font-bold text-gray-400 uppercase">마감 총평 및 특이사항</label>
                             <textarea
+                                data-testid="daily-closure-memo"
                                 value={memo}
                                 onChange={e => setMemo(e.target.value)}
                                 className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm text-white outline-none focus:ring-2 focus:ring-white/20 h-24 resize-none"
@@ -327,6 +330,7 @@ export default function DailyClosurePage({ user }: { user: any }) {
                         </div>
 
                         <button
+                            data-testid="daily-closure-save"
                             onClick={saveClosure}
                             disabled={loading}
                             className="w-full py-4 bg-white text-gray-900 text-sm font-black rounded-2xl hover:bg-gray-100 transition-all active:scale-[0.98] disabled:opacity-50"

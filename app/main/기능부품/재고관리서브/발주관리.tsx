@@ -262,6 +262,7 @@ export default function PurchaseOrderManagement({
           <button
             onClick={handleAutoGeneratePurchaseOrder}
             disabled={loading || lowStockItems.length === 0}
+            data-testid="purchase-order-auto-generate"
             className="w-full md:w-auto px-8 py-4 bg-orange-600 text-white rounded-[12px] text-sm font-semibold shadow-xl shadow-orange-100 hover:scale-[0.98] transition-all disabled:opacity-50"
           >
             부족 품목 자동 발주 생성 ({lowStockItems.length})
@@ -370,6 +371,7 @@ export default function PurchaseOrderManagement({
                       order.status === '대기' && (
                         <button
                           onClick={() => handleApprovePurchaseOrder(order.id)}
+                          data-testid={`purchase-order-approve-${order.id}`}
                           className="w-full md:w-auto py-4 px-6 bg-green-600 text-white rounded-[16px] font-semibold text-xs shadow-lg hover:scale-[0.98] transition-all"
                         >
                           발주 확인

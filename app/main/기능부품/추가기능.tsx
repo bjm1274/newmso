@@ -4,12 +4,12 @@ import { useEffect, useState } from 'react';
 import { canAccessExtraFeature } from '@/lib/access-control';
 import ThemeToggle from '@/app/components/ThemeToggle';
 import GlobalSearch from '@/app/components/GlobalSearch';
-import 부서별물품장비현황 from './재고관리서브/부서별물품장비현황';
-import 근무현황 from './근무현황';
-import 인계노트 from './인계노트';
-import 퇴원심사 from './퇴원심사';
-import 마감보고 from './마감보고';
-import 직원평가시스템 from './직원평가시스템';
+import DepartmentInventoryView from './재고관리서브/부서별물품장비현황';
+import WorkStatusView from './근무현황';
+import HandoverNotesView from './인계노트';
+import DischargeReviewView from './퇴원심사';
+import ClosingReportView from './마감보고';
+import StaffEvaluationView from './직원평가시스템';
 
 const EXTERNAL_LINKS = [
   { id: 'km-park', label: 'KM Park', url: 'http://kmp0001103.iptime.org/login?redirectTo=undefined', icon: '🏥' },
@@ -33,6 +33,16 @@ const FEATURE_CARDS: FeatureCard[] = [
   { id: '마감보고', label: '마감보고', icon: '💰', subView: '마감보고' },
   { id: '직원평가', label: '직원평가', icon: '✍️', subView: '직원평가' },
 ];
+
+const FEATURE_CARD_TEST_IDS = [
+  'org-chart',
+  'department-inventory',
+  'work-status',
+  'handover-note',
+  'discharge-review',
+  'closing-report',
+  'staff-evaluation',
+] as const;
 
 const MAX_RECENT = 5;
 const LS_FAVORITES = 'erp_favorites';
@@ -117,6 +127,11 @@ export default function ExtraFeatures({
     return true;
   });
 
+  const getFeatureCardTestId = (card: FeatureCard) => {
+    const cardIndex = FEATURE_CARDS.findIndex((item) => item.id === card.id);
+    return FEATURE_CARD_TEST_IDS[cardIndex] || `feature-${cardIndex}`;
+  };
+
   const favoriteCards = visibleCards.filter((card) => favorites.includes(card.id));
   const normalCards = visibleCards.filter((card) => !favorites.includes(card.id));
 
@@ -158,10 +173,12 @@ export default function ExtraFeatures({
   const renderCard = (card: FeatureCard) => (
     <div
       key={card.id}
+      data-testid={`extra-card-shell-${getFeatureCardTestId(card)}`}
       className="relative flex items-center gap-3 rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-3 shadow-sm transition-all hover:border-[var(--toss-blue)]/30 hover:bg-[var(--toss-blue-light)]/50 group"
     >
       <button
         type="button"
+        data-testid={`extra-card-${getFeatureCardTestId(card)}`}
         onClick={() => handleFeatureClick(card.id, card.subView, card.isOrgChart)}
         className="flex min-w-0 flex-1 items-center gap-3 text-left"
       >
@@ -175,6 +192,7 @@ export default function ExtraFeatures({
       </button>
       <button
         type="button"
+        data-testid={`extra-favorite-${getFeatureCardTestId(card)}`}
         onClick={(event) => toggleFavorite(card.id, event)}
         className="shrink-0 text-lg leading-none transition-transform hover:scale-110"
         title={favorites.includes(card.id) ? '즐겨찾기 해제' : '즐겨찾기 추가'}
@@ -186,13 +204,13 @@ export default function ExtraFeatures({
 
   if (subView === '부서별재고') {
     return (
-      <div className="flex-1 overflow-y-auto bg-[var(--page-bg)] p-3 md:p-4 custom-scrollbar">
+      <div data-testid="extra-subview" className="flex-1 overflow-y-auto bg-[var(--page-bg)] p-3 md:p-4 custom-scrollbar">
         <div className="mx-auto w-full max-w-5xl space-y-3">
-          <button type="button" onClick={() => setSubView(null)} className="text-[11px] font-bold text-[var(--toss-blue)] hover:underline">
+          <button data-testid="extra-back-button" type="button" onClick={() => setSubView(null)} className="text-[11px] font-bold text-[var(--toss-blue)] hover:underline">
             ← 목록으로
           </button>
           <div className="rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4 shadow-sm">
-            <부서별물품장비현황 user={user || {}} />
+            <DepartmentInventoryView user={user || {}} />
           </div>
         </div>
       </div>
@@ -201,13 +219,13 @@ export default function ExtraFeatures({
 
   if (subView === '근무현황') {
     return (
-      <div className="flex-1 overflow-y-auto bg-[var(--page-bg)] p-3 md:p-4 custom-scrollbar">
+      <div data-testid="extra-subview" className="flex-1 overflow-y-auto bg-[var(--page-bg)] p-3 md:p-4 custom-scrollbar">
         <div className="mx-auto w-full max-w-5xl space-y-3">
-          <button type="button" onClick={() => setSubView(null)} className="text-[11px] font-bold text-[var(--toss-blue)] hover:underline">
+          <button data-testid="extra-back-button" type="button" onClick={() => setSubView(null)} className="text-[11px] font-bold text-[var(--toss-blue)] hover:underline">
             ← 목록으로
           </button>
           <div className="rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4 shadow-sm">
-            <근무현황 user={user || {}} />
+            <WorkStatusView user={user || {}} />
           </div>
         </div>
       </div>
@@ -216,12 +234,12 @@ export default function ExtraFeatures({
 
   if (subView === '인계노트') {
     return (
-      <div className="flex-1 overflow-y-auto bg-[var(--page-bg)] p-3 md:p-4 custom-scrollbar">
+      <div data-testid="extra-subview" className="flex-1 overflow-y-auto bg-[var(--page-bg)] p-3 md:p-4 custom-scrollbar">
         <div className="mx-auto w-full max-w-5xl space-y-3">
-          <button type="button" onClick={() => setSubView(null)} className="text-[11px] font-bold text-[var(--toss-blue)] hover:underline">
+          <button data-testid="extra-back-button" type="button" onClick={() => setSubView(null)} className="text-[11px] font-bold text-[var(--toss-blue)] hover:underline">
             ← 목록으로
           </button>
-          <인계노트 user={user || {}} />
+          <HandoverNotesView user={user || {}} />
         </div>
       </div>
     );
@@ -229,12 +247,12 @@ export default function ExtraFeatures({
 
   if (subView === '퇴원심사') {
     return (
-      <div className="flex-1 overflow-y-auto bg-[var(--page-bg)] p-3 md:p-4 custom-scrollbar">
+      <div data-testid="extra-subview" className="flex-1 overflow-y-auto bg-[var(--page-bg)] p-3 md:p-4 custom-scrollbar">
         <div className="mx-auto w-full max-w-5xl space-y-3">
-          <button type="button" onClick={() => setSubView(null)} className="text-[11px] font-bold text-[var(--toss-blue)] hover:underline">
+          <button data-testid="extra-back-button" type="button" onClick={() => setSubView(null)} className="text-[11px] font-bold text-[var(--toss-blue)] hover:underline">
             ← 목록으로
           </button>
-          <퇴원심사 user={user || {}} />
+          <DischargeReviewView user={user || {}} />
         </div>
       </div>
     );
@@ -242,12 +260,12 @@ export default function ExtraFeatures({
 
   if (subView === '마감보고') {
     return (
-      <div className="flex-1 overflow-y-auto bg-[var(--page-bg)] p-3 md:p-4 custom-scrollbar">
+      <div data-testid="extra-subview" className="flex-1 overflow-y-auto bg-[var(--page-bg)] p-3 md:p-4 custom-scrollbar">
         <div className="mx-auto w-full max-w-5xl space-y-3">
-          <button type="button" onClick={() => setSubView(null)} className="text-[11px] font-bold text-[var(--toss-blue)] hover:underline">
+          <button data-testid="extra-back-button" type="button" onClick={() => setSubView(null)} className="text-[11px] font-bold text-[var(--toss-blue)] hover:underline">
             ← 목록으로
           </button>
-          <마감보고 user={user || {}} />
+          <ClosingReportView user={user || {}} />
         </div>
       </div>
     );
@@ -255,13 +273,13 @@ export default function ExtraFeatures({
 
   if (subView === '직원평가') {
     return (
-      <div className="flex-1 overflow-y-auto bg-[var(--page-bg)] p-3 md:p-4 custom-scrollbar">
+      <div data-testid="extra-subview" className="flex-1 overflow-y-auto bg-[var(--page-bg)] p-3 md:p-4 custom-scrollbar">
         <div className="mx-auto w-full max-w-5xl space-y-3">
-          <button type="button" onClick={() => setSubView(null)} className="text-[11px] font-bold text-[var(--toss-blue)] hover:underline">
+          <button data-testid="extra-back-button" type="button" onClick={() => setSubView(null)} className="text-[11px] font-bold text-[var(--toss-blue)] hover:underline">
             ← 목록으로
           </button>
           <div className="rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4 shadow-sm">
-            <직원평가시스템 user={user || {}} staffs={staffs} />
+            <StaffEvaluationView user={user || {}} staffs={staffs} />
           </div>
         </div>
       </div>
@@ -281,7 +299,7 @@ export default function ExtraFeatures({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto bg-[var(--page-bg)] p-3 md:p-4 custom-scrollbar">
+    <div data-testid="extra-features-list" className="flex-1 overflow-y-auto bg-[var(--page-bg)] p-3 md:p-4 custom-scrollbar">
       <div className="mx-auto w-full max-w-5xl">
         <h2 className="mb-1 text-lg font-bold text-[var(--foreground)]">추가 기능</h2>
 

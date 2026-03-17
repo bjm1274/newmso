@@ -1,55 +1,80 @@
 'use client';
+
 import { useState } from 'react';
 import SmartDatePicker from '../공통/SmartDatePicker';
 
-/**
- * 수리요청서 전자결재 양식
- * 장비/시설 수리 요청 시 사용 (제목은 사용자가 직접 입력)
- */
 export default function RepairRequestForm({ setExtraData }: any) {
   const [localDesiredDate, setLocalDesiredDate] = useState('');
+
   return (
-    <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-3xl overflow-hidden shadow-sm animate-in fade-in duration-300">
-      <div className="p-4 md:p-6 bg-amber-50/50 border-b border-amber-100">
+    <div
+      data-testid="repair-request-view"
+      className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-3xl overflow-hidden shadow-sm animate-in fade-in duration-300"
+    >
+      <div className="border-b border-amber-100 bg-amber-50/50 p-4 md:p-6">
         <h4 className="text-sm font-bold text-amber-700">수리/정비 요청서</h4>
-        <p className="text-[11px] font-semibold text-amber-600/70 mt-1">장비 및 시설 고장 시 작성하는 전자결재 표준 양식</p>
+        <p className="mt-1 text-[11px] font-semibold text-amber-600/70">
+          장비와 시설의 고장 또는 불편 사항을 접수하는 전자결재 양식입니다.
+        </p>
       </div>
 
-      <div className="p-4 md:p-6 space-y-6 bg-gray-50/30">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="space-y-6 bg-gray-50/30 p-4 md:p-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           <div className="space-y-2">
-            <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] ml-1 uppercase">장비/시설명</label>
+            <label className="ml-1 text-[11px] font-semibold uppercase text-[var(--toss-gray-4)]">
+              장비/시설명
+            </label>
             <input
               type="text"
-              placeholder="예: 엘리베이터, 에어컨, PC, 복합기"
-              className="w-full p-4 rounded-[12px] border bg-[var(--toss-card)] font-bold text-xs outline-none shadow-sm focus:ring-2 focus:ring-amber-200 border-none"
-              onChange={e => setExtraData((p: any) => ({ ...p, equipmentName: e.target.value }))}
+              data-testid="repair-request-equipment-name"
+              placeholder="예: 체외충격기, 접수창구 PC, 복합기"
+              className="w-full rounded-[12px] bg-[var(--toss-card)] p-4 text-xs font-bold outline-none shadow-sm focus:ring-2 focus:ring-amber-200"
+              onChange={(event) =>
+                setExtraData((prev: any) => ({ ...prev, equipmentName: event.target.value }))
+              }
             />
           </div>
           <div className="space-y-2">
-            <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] ml-1 uppercase">위치</label>
+            <label className="ml-1 text-[11px] font-semibold uppercase text-[var(--toss-gray-4)]">
+              위치
+            </label>
             <input
               type="text"
-              placeholder="예: 3층 원장실, 1층 원무과"
-              className="w-full p-4 rounded-[12px] border bg-[var(--toss-card)] font-bold text-xs outline-none shadow-sm focus:ring-2 focus:ring-amber-200 border-none"
-              onChange={e => setExtraData((p: any) => ({ ...p, location: e.target.value }))}
+              data-testid="repair-request-location"
+              placeholder="예: 3층 수술실, 1층 원무과"
+              className="w-full rounded-[12px] bg-[var(--toss-card)] p-4 text-xs font-bold outline-none shadow-sm focus:ring-2 focus:ring-amber-200"
+              onChange={(event) =>
+                setExtraData((prev: any) => ({ ...prev, location: event.target.value }))
+              }
             />
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           <div className="space-y-2">
-            <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] ml-1 uppercase">희망 수리일</label>
+            <label className="ml-1 text-[11px] font-semibold uppercase text-[var(--toss-gray-4)]">
+              희망 수리일
+            </label>
             <SmartDatePicker
               value={localDesiredDate}
-              onChange={val => { setLocalDesiredDate(val); setExtraData((p: any) => ({ ...p, desiredDate: val })); }}
-              inputClassName="w-full h-[46px] px-4 rounded-[12px] bg-[var(--toss-card)] font-bold text-xs"
+              onChange={(value) => {
+                setLocalDesiredDate(value);
+                setExtraData((prev: any) => ({ ...prev, desiredDate: value }));
+              }}
+              data-testid="repair-request-desired-date"
+              inputClassName="w-full h-[46px] rounded-[12px] bg-[var(--toss-card)] px-4 text-xs font-bold"
             />
           </div>
           <div className="space-y-2">
-            <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] ml-1 uppercase">긴급도</label>
+            <label className="ml-1 text-[11px] font-semibold uppercase text-[var(--toss-gray-4)]">
+              긴급도
+            </label>
             <select
-              className="w-full p-4 rounded-[12px] border bg-[var(--toss-card)] font-semibold text-xs outline-none shadow-sm focus:ring-2 focus:ring-amber-200 border-none"
-              onChange={e => setExtraData((p: any) => ({ ...p, urgency: e.target.value }))}
+              data-testid="repair-request-urgency"
+              className="w-full rounded-[12px] bg-[var(--toss-card)] p-4 text-xs font-semibold outline-none shadow-sm focus:ring-2 focus:ring-amber-200"
+              onChange={(event) =>
+                setExtraData((prev: any) => ({ ...prev, urgency: event.target.value }))
+              }
             >
               <option value="일반">일반</option>
               <option value="긴급">긴급</option>
@@ -57,18 +82,25 @@ export default function RepairRequestForm({ setExtraData }: any) {
             </select>
           </div>
         </div>
+
         <div className="space-y-2">
-          <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] ml-1 uppercase">요청 내용 (고장·불편 사항)</label>
+          <label className="ml-1 text-[11px] font-semibold uppercase text-[var(--toss-gray-4)]">
+            요청 내용
+          </label>
           <textarea
-            placeholder="수리 요청 사유 및 상세 내용을 입력하세요."
-            className="w-full h-28 p-4 rounded-[12px] border bg-[var(--toss-card)] font-bold text-xs outline-none shadow-sm focus:ring-2 focus:ring-amber-200 border-none resize-none"
-            onChange={e => setExtraData((p: any) => ({ ...p, repairContent: e.target.value }))}
+            data-testid="repair-request-content"
+            placeholder="고장 증상이나 불편 사항을 자세히 입력해주세요."
+            className="h-28 w-full resize-none rounded-[12px] bg-[var(--toss-card)] p-4 text-xs font-bold outline-none shadow-sm focus:ring-2 focus:ring-amber-200"
+            onChange={(event) =>
+              setExtraData((prev: any) => ({ ...prev, repairContent: event.target.value }))
+            }
           />
         </div>
       </div>
-      <div className="p-4 bg-white border-t border-[var(--toss-border)] text-center">
+
+      <div className="border-t border-[var(--toss-border)] bg-white p-4 text-center">
         <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">
-          하단 본문에 추가 사항이 있으면 작성하세요.
+          하단 본문에 추가 사항이 있으면 함께 작성해주세요.
         </p>
       </div>
     </div>

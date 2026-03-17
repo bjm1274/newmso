@@ -1113,6 +1113,20 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             ...row,
             staff: resolveStaffProfile(row.sender_id, row.sender_name) || { name: '이름 없음', photo_url: null },
           };
+          const optimisticIndex = prev.findIndex((message: any) => {
+            if (!String(message.id || '').startsWith('temp-')) return false;
+            if (String(message.room_id || '') !== String(row.room_id || '')) return false;
+            if (String(message.sender_id || '') !== String(row.sender_id || '')) return false;
+            return (
+              (message.content || '') === (row.content || '') &&
+              (message.file_url || null) === (row.file_url || null)
+            );
+          });
+          if (optimisticIndex >= 0) {
+            return prev.map((message: any, index: number) =>
+              index === optimisticIndex ? newMsg : message
+            );
+          }
           return [...prev, newMsg];
         });
         setChatRooms((prev) =>
@@ -1533,6 +1547,60 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     }
   };
 
+  const removeRoomMember = async (memberId: string) => {
+    if (!selectedRoom) return;
+    if (selectedRoom?.created_by !== user.id) return;
+    if (String(memberId) === String(user.id)) return;
+    if (!confirm('이 참여자를 채팅방에서 제거하시겠습니까?')) return;
+
+    try {
+      const currentMembers: any[] = Array.isArray(selectedRoom.members)
+        ? selectedRoom.members
+        : [];
+      const newMembers = currentMembers.filter(
+        (id: any) => String(id) !== String(memberId)
+      );
+
+      await supabase
+        .from('chat_rooms')
+        .update({ members: newMembers })
+        .eq('id', selectedRoom.id);
+
+      const removedName =
+        resolveRoomMemberProfile(selectedRoom, String(memberId))?.name ||
+        resolveStaffProfile(memberId)?.name ||
+        '이름 없음';
+      const removerName = user?.name || '이름 없음';
+      const systemContent = `[제거] ${removerName}님이 ${removedName}님을 채팅방에서 제거했습니다.`;
+      const { data: removedMessage } = await supabase
+        .from('messages')
+        .insert([
+          {
+            room_id: selectedRoom.id,
+            sender_id: user.id,
+            content: systemContent,
+          },
+        ])
+        .select('id, room_id')
+        .single();
+
+      if (removedMessage?.id && removedMessage?.room_id) {
+        await triggerChatPush(String(removedMessage.room_id), String(removedMessage.id));
+      }
+
+      setChatRooms((prev) =>
+        prev.map((room: any) =>
+          room.id === selectedRoom.id ? { ...room, members: newMembers } : room
+        )
+      );
+      await fetchData();
+      alert('참여자를 제거했습니다.');
+    } catch (error) {
+      console.error('remove member error', error);
+      alert('참여자 제거 중 오류가 발생했습니다.');
+    }
+  };
+
 
   const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;
   const handleSendMessage = useCallback(async (
@@ -1660,11 +1728,19 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         ...inserted,
         staff: { name: user.name, photo_url: getProfilePhotoUrl(user) },
       };
-      setMessages((prev) =>
-        prev.map((message: any) =>
-          message.id === optimisticId ? optimisticMsg : message
-        )
-      );
+      setMessages((prev) => {
+        const seenIds = new Set<string>();
+        return prev
+          .map((message: any) =>
+            message.id === optimisticId ? optimisticMsg : message
+          )
+          .filter((message: any) => {
+            const normalizedId = String(message.id || '');
+            if (seenIds.has(normalizedId)) return false;
+            seenIds.add(normalizedId);
+            return true;
+          });
+      });
       setDeliveryStates((prev) => {
         const next = { ...prev };
         delete next[optimisticId];
@@ -2227,6 +2303,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         <div className="p-4 md:p-6 space-y-4 flex flex-col min-h-0">
           <div className="flex gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl glass">
             <button
+              data-testid="chat-tab-chat"
               onClick={() => setViewMode('chat')}
               className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all ${viewMode === 'chat'
                 ? 'bg-white dark:bg-zinc-700 text-foreground shadow-premium'
@@ -2236,6 +2313,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
               채팅
             </button>
             <button
+              data-testid="chat-tab-org"
               onClick={() => setViewMode('org')}
               className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all ${viewMode === 'org'
                 ? 'bg-white dark:bg-zinc-700 text-foreground shadow-premium'
@@ -2251,13 +2329,25 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
               {viewMode === 'chat' ? '최근 대화' : '조직도'}
             </span>
             {viewMode === 'chat' && (
+              <>
               <button
+                type="button"
+                data-testid="chat-open-group-modal"
+                onClick={() => setShowGroupModal(true)}
+                className="text-[12px] text-zinc-400 hover:text-emerald-500 transition-colors p-1 flex items-center justify-center shrink-0"
+                title="새 그룹 채팅방 만들기"
+              >
+                +
+              </button>
+              <button
+                data-testid="chat-open-global-search"
                 onClick={() => setShowGlobalSearch(true)}
                 className="text-[12px] text-zinc-400 hover:text-blue-500 transition-colors p-1 flex items-center justify-center shrink-0"
                 title="채팅 내용 전체 검색"
               >
                 검색
               </button>
+              </>
             )}
           </div>
         </div>
@@ -2271,6 +2361,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 </span>
                 <button
                   type="button"
+                  data-testid="chat-toggle-hidden-rooms"
                   onClick={() => setShowHiddenRooms((prev) => !prev)}
                   className="text-[10px] font-semibold text-blue-500 hover:text-blue-600"
                 >
@@ -2299,6 +2390,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   return (
                     <div
                       key={room.id}
+                      data-testid={`chat-room-${room.id}`}
                       onClick={() => setRoom(room.id)}
                       className={`group p-3.5 rounded-xl cursor-pointer transition-all flex items-center justify-between gap-3 border relative overflow-hidden ${isSelected
                         ? 'bg-zinc-800 border-zinc-700 shadow-sm'
@@ -2337,6 +2429,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                           <>
                             <button
                               type="button"
+                              data-testid={`chat-room-pin-${room.id}`}
                               onClick={(event) => {
                                 event.stopPropagation();
                                 updateRoomPreference(room.id, { pinned: !isPinned });
@@ -2348,6 +2441,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                             </button>
                             <button
                               type="button"
+                              data-testid={`chat-room-hide-${room.id}`}
                               onClick={(event) => {
                                 event.stopPropagation();
                                 updateRoomPreference(room.id, { hidden: !isHidden });
@@ -2365,7 +2459,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 })}
             </>
           ) : (
-            <div className="space-y-6">
+            <div data-testid="chat-org-list" className="space-y-6">
               {Object.entries(groupedStaffs).map(([company, depts]) => (
                 <div key={company} className="space-y-4">
                   <div className="flex items-center gap-2 px-1">
@@ -2390,6 +2484,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                 </div>
                               </div>
                               <button
+                                data-testid={`chat-direct-${s.id}`}
                                 onClick={() => {
                                   void openDirectChat(s);
                                 }}
@@ -2436,6 +2531,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
             <div className="flex items-center gap-2">
               <button
+                data-testid="chat-open-drawer"
                 onClick={() => setShowDrawer(true)}
                 className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-foreground"
                 title="채팅방 정보 및 참여자 보기"
@@ -2505,7 +2601,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   const votes = pollVotes[item.id] || {};
                   const totalVotes = (Object.values(votes) as number[]).reduce((a: number, b: number) => a + b, 0);
                   return (
-                    <div key={`poll-${item.id}`} className="max-w-[85%] md:max-w-[70%] bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 rounded-2xl p-4 shadow-soft">
+                    <div data-testid={`chat-poll-${item.id}`} key={`poll-${item.id}`} className="max-w-[85%] md:max-w-[70%] bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 rounded-2xl p-4 shadow-soft">
                       <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
                         <span className="text-sm">🗳️</span> 투표
                       </p>
@@ -2513,6 +2609,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       <div className="space-y-1.5">
                         {item.options.map((opt: string, idx: number) => (
                           <button
+                            data-testid={`chat-poll-vote-${item.id}-${idx}`}
                             key={idx}
                             onClick={() => handleVote(item.id, idx)}
                             className="w-full flex justify-between items-center px-4 py-2.5 rounded-xl bg-white dark:bg-zinc-800/50 border border-blue-200/50 dark:border-blue-700/30 hover:border-blue-400 dark:hover:border-blue-500 transition-all text-[11px] font-medium group"
@@ -2593,6 +2690,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                           </span>
                         )}
                         <div
+                          data-testid={`chat-message-${msg.id}`}
                           onClick={(e) => {
                             e.stopPropagation();
                             openMessageActions(msg);
@@ -2854,7 +2952,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         {showDrawer && (
           <>
             <div className="absolute inset-0 bg-black/10 z-50 animate-in fade-in duration-200" onClick={() => setShowDrawer(false)} aria-hidden="true" />
-            <div className="absolute top-0 right-0 bottom-0 w-full md:w-80 bg-white dark:bg-zinc-900 shadow-2xl z-[60] flex flex-col animate-in slide-in-from-right duration-300 border-l border-[var(--toss-border)]">
+            <div data-testid="chat-room-drawer" className="absolute top-0 right-0 bottom-0 w-full md:w-80 bg-white dark:bg-zinc-900 shadow-2xl z-[60] flex flex-col animate-in slide-in-from-right duration-300 border-l border-[var(--toss-border)]">
               <div className="p-4 border-b border-[var(--toss-border)] flex items-center justify-between bg-[var(--toss-card)]">
                 <span className="text-sm font-bold">채팅방 정보</span>
               <button onClick={() => setShowDrawer(false)} className="p-2 text-[var(--toss-gray-3)] hover:text-black dark:hover:text-white rounded-full">닫기</button>
@@ -2871,7 +2969,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   </button>
                 </div>
 
-                <button onClick={() => { setShowPollModal(true); setShowDrawer(false); }} className="w-full flex items-center justify-between p-3.5 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800/50 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors group">
+                <button data-testid="chat-open-poll-modal" onClick={() => { setShowPollModal(true); setShowDrawer(false); }} className="w-full flex items-center justify-between p-3.5 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800/50 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors group">
                   <div className="flex items-center gap-3">
                     <span className="text-lg">🗳️</span>
                     <span className="text-xs font-bold text-blue-700 dark:text-blue-300">새 투표 만들기</span>
@@ -2881,7 +2979,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
                 <div className="space-y-3">
                   <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider px-1">상단 공지</p>
-                  <div className="p-4 bg-orange-50 dark:bg-orange-950/20 rounded-2xl border border-orange-100 dark:border-orange-900/30">
+                  <div data-testid="chat-drawer-notice" className="p-4 bg-orange-50 dark:bg-orange-950/20 rounded-2xl border border-orange-100 dark:border-orange-900/30">
                     <p className="text-xs font-bold text-orange-800 dark:text-orange-300 mb-1">공지</p>
                     <p className="text-xs text-orange-900/70 dark:text-orange-200/50 leading-relaxed whitespace-pre-wrap">
                       {currentNoticeMessage?.content || '등록된 공지가 없습니다.'}
@@ -2936,14 +3034,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 <div className="space-y-3">
                   <div className="flex justify-between items-center px-1">
                     <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider">참여자 ({selectedRoom?.members?.length || 0})</p>
-              <button onClick={() => setShowGroupModal(true)} className="w-6 h-6 flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 rounded-full text-zinc-500 hover:text-emerald-500 transition-colors">+</button>
+              <button data-testid="chat-open-add-member-modal" onClick={() => setShowAddMemberModal(true)} className="w-6 h-6 flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 rounded-full text-zinc-500 hover:text-emerald-500 transition-colors">+</button>
                   </div>
                   <div className="space-y-3">
                     {selectedRoom?.members?.map((memberId: string) => {
                       const s = resolveRoomMemberProfile(selectedRoom, String(memberId));
                       const isOwner = selectedRoom?.created_by === user.id;
                       return (
-                        <div key={memberId} className="flex items-center justify-between group">
+                        <div data-testid={`chat-room-member-${memberId}`} key={memberId} className="flex items-center justify-between group">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-[10px] font-bold text-emerald-600">
                               {s?.photo_url ? <img src={s.photo_url} alt={`${s.name}'s profile`} className="w-full h-full rounded-full object-cover" /> : (s?.name?.[0] || '?')}
@@ -2954,7 +3052,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                             </div>
                           </div>
                           {isOwner && memberId !== user.id && (
-                            <button className="opacity-0 group-hover:opacity-100 p-1 text-red-500 text-[10px] font-bold hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-all">내보내기</button>
+                            <button data-testid={`chat-remove-member-${memberId}`} onClick={() => { void removeRoomMember(String(memberId)); }} className="opacity-0 group-hover:opacity-100 p-1 text-red-500 text-[10px] font-bold hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-all">내보내기</button>
                           )}
                         </div>
                       );
@@ -2992,7 +3090,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     <span className="text-xl">📢</span>
                     <span className="text-sm font-bold">{pinnedIds.includes(String(activeActionMsg.id)) ? '공지 해제' : '공지 등록'}</span>
                   </button>
-                  <button onClick={() => { if (!activeActionMsg) return; void toggleBookmark(activeActionMsg.id); setActiveActionMsg(null); }} className="w-full flex items-center gap-4 p-4 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[12px] transition-colors">
+                  <button data-testid="chat-message-action-bookmark-mobile" onClick={() => { if (!activeActionMsg) return; void toggleBookmark(activeActionMsg.id); setActiveActionMsg(null); }} className="w-full flex items-center gap-4 p-4 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[12px] transition-colors">
                     <span className="text-xl">🔖</span>
                     <span className="text-sm font-bold">{bookmarkedIds.has(String(activeActionMsg.id)) ? '북마크 해제' : '북마크 등록'}</span>
                   </button>
@@ -3018,7 +3116,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
               </div>
             </div>
 
-            <div className="hidden md:flex absolute top-0 right-0 bottom-0 w-80 bg-[var(--toss-card)] border-l border-[var(--toss-border)] shadow-2xl z-40 flex-col animate-in slide-in-from-right duration-300">
+            <div data-testid="chat-message-actions-panel" className="hidden md:flex absolute top-0 right-0 bottom-0 w-80 bg-[var(--toss-card)] border-l border-[var(--toss-border)] shadow-2xl z-40 flex-col animate-in slide-in-from-right duration-300">
               <div className="p-4 border-b border-[var(--toss-border)] flex items-center justify-between">
                 <span className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">메시지 작업</span>
             <button onClick={() => { setActiveActionMsg(null); setEditingMsg(null) }} className="p-2 text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] rounded-[12px] hover:bg-[var(--toss-gray-1)]">닫기</button>
@@ -3042,28 +3140,30 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   </button>
                   {activeActionMsg.sender_id === user.id && (
                     <>
-                      <button onClick={() => { startEditMessage(activeActionMsg); }} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">메시지 수정</button>
-                      <button onClick={() => { void deleteMessageFromActions(activeActionMsg); }} className="w-full p-3 text-left hover:bg-red-50 rounded-[12px] text-xs font-semibold text-red-600 transition-colors">메시지 삭제</button>
+                      <button data-testid="chat-message-action-edit" onClick={() => { startEditMessage(activeActionMsg); }} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">메시지 수정</button>
+                      <button data-testid="chat-message-action-delete" onClick={() => { void deleteMessageFromActions(activeActionMsg); }} className="w-full p-3 text-left hover:bg-red-50 rounded-[12px] text-xs font-semibold text-red-600 transition-colors">메시지 삭제</button>
                     </>
                   )}
-                  <button onClick={() => { void togglePin(activeActionMsg.id); setActiveActionMsg(null); }} className={`w-full p-3 text-left rounded-[12px] text-xs font-semibold transition-colors ${pinnedIds.includes(String(activeActionMsg.id)) ? 'hover:bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]' : 'hover:bg-orange-50 text-orange-500'}`}>{pinnedIds.includes(String(activeActionMsg.id)) ? '공지 해제' : '공지로 등록'}</button>
+                  <button data-testid="chat-message-action-pin" onClick={() => { void togglePin(activeActionMsg.id); setActiveActionMsg(null); }} className={`w-full p-3 text-left rounded-[12px] text-xs font-semibold transition-colors ${pinnedIds.includes(String(activeActionMsg.id)) ? 'hover:bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]' : 'hover:bg-orange-50 text-orange-500'}`}>{pinnedIds.includes(String(activeActionMsg.id)) ? '공지 해제' : '공지로 등록'}</button>
                   <button onClick={() => { handleAction('task'); setActiveActionMsg(null) }} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">할 일로 등록</button>
                   <button
+                    data-testid="chat-message-action-read-status"
                     onClick={() => { openReadStatusPanel(activeActionMsg); }}
                     className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors"
                   >
                     읽음 확인
                   </button>
                   <button
+                    data-testid="chat-message-action-forward"
                     onClick={() => { startForwardMessage(activeActionMsg); }}
                     className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors"
                   >
                     다른 채팅방으로 전달
                   </button>
-                  <button onClick={() => { openThreadPanel(activeActionMsg); }} className="w-full p-3 text-left hover:bg-[var(--toss-blue-light)] rounded-[12px] text-xs font-semibold text-[var(--toss-blue)] transition-colors">이 메시지 스레드 보기</button>
+                  <button data-testid="chat-message-action-thread" onClick={() => { openThreadPanel(activeActionMsg); }} className="w-full p-3 text-left hover:bg-[var(--toss-blue-light)] rounded-[12px] text-xs font-semibold text-[var(--toss-blue)] transition-colors">이 메시지 스레드 보기</button>
                   <button onClick={async () => { try { const base = `[채팅] ${activeActionMsg.staff?.name || '이름 없음'} (${new Date(activeActionMsg.created_at).toLocaleString('ko-KR')})\n${activeActionMsg.content || ''}${activeActionMsg.file_url ? `\n파일: ${activeActionMsg.file_url}` : ''}`; await navigator.clipboard?.writeText(`[전자결재 메모]\n${base}`); alert('전자결재용으로 복사했습니다.'); } catch { alert('복사 실패'); } setActiveActionMsg(null); }} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">전자결재용 내용 복사</button>
                   <button onClick={async () => { try { const base = `[채팅] ${activeActionMsg.staff?.name || '이름 없음'} (${new Date(activeActionMsg.created_at).toLocaleString('ko-KR')})\n${activeActionMsg.content || ''}${activeActionMsg.file_url ? `\n파일: ${activeActionMsg.file_url}` : ''}`; await navigator.clipboard?.writeText(`[게시판 메모]\n${base}`); alert('게시판용으로 복사했습니다.'); } catch { alert('복사 실패'); } setActiveActionMsg(null); }} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">게시판용 내용 복사</button>
-                  <button onClick={() => { void toggleBookmark(activeActionMsg.id); setActiveActionMsg(null); }} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">{bookmarkedIds.has(String(activeActionMsg.id)) ? '북마크 해제' : '중요 메시지 북마크'}</button>
+                  <button data-testid="chat-message-action-bookmark" onClick={() => { void toggleBookmark(activeActionMsg.id); setActiveActionMsg(null); }} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">{bookmarkedIds.has(String(activeActionMsg.id)) ? '북마크 해제' : '중요 메시지 북마크'}</button>
                 </div>
               </div>
             </div>
@@ -3074,17 +3174,17 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           <div className="absolute inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-30" onClick={() => { setEditingMsg(null); setEditContent(''); }}>
             <div className="bg-[var(--toss-card)] p-6 rounded-[12px] w-80 shadow-2xl" onClick={e => e.stopPropagation()}>
               <p className="text-xs font-semibold text-[var(--toss-gray-3)] mb-2">메시지 수정</p>
-              <input value={editContent} onChange={e => setEditContent(e.target.value)} className="w-full p-3 border rounded-[16px] text-sm mb-4" />
+              <input data-testid="chat-message-edit-input" value={editContent} onChange={e => setEditContent(e.target.value)} className="w-full p-3 border rounded-[16px] text-sm mb-4" />
               <div className="flex gap-2">
                 <button onClick={() => { setEditingMsg(null); setEditContent(''); }} className="flex-1 py-2 bg-[var(--toss-gray-1)] rounded-[16px] text-xs font-semibold">취소</button>
-            <button onClick={saveEditMessage} className="flex-1 py-2 bg-[var(--toss-blue)] text-white rounded-[16px] text-xs font-semibold">저장</button>
+            <button data-testid="chat-message-edit-save" onClick={saveEditMessage} className="flex-1 py-2 bg-[var(--toss-blue)] text-white rounded-[16px] text-xs font-semibold">저장</button>
               </div>
             </div>
           </div>
         )}
 
         {showGroupModal && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-[110] p-4" onClick={() => setShowGroupModal(false)}>
+          <div data-testid="chat-group-modal" className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-[110] p-4" onClick={() => setShowGroupModal(false)}>
             <div className="bg-[var(--toss-card)] w-full max-w-md rounded-[3rem] p-10 shadow-2xl space-y-8" onClick={e => e.stopPropagation()}>
               <h3 className="text-xl font-semibold text-[var(--foreground)] italic">새 그룹 채팅방</h3>
               <div className="space-y-6">
@@ -3117,7 +3217,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       </main>
 
       {showPollModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4">
+        <div data-testid="chat-poll-modal" className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4">
           <div className="bg-[var(--toss-card)] w-full max-w-md rounded-3xl p-6 space-y-4 shadow-2xl border border-[var(--toss-border)]">
               <h3 className="text-lg font-semibold text-[var(--foreground)]">새 투표 만들기</h3>
             <p className="text-[11px] text-[var(--toss-gray-3)] font-bold">
@@ -3127,6 +3227,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
               <div>
                 <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">질문</label>
                 <input
+                  data-testid="chat-poll-question"
                   value={pollQuestion}
                   onChange={(e) => setPollQuestion(e.target.value)}
                   className="w-full mt-1 p-3 bg-[var(--input-bg)] border border-[var(--toss-border)] rounded-[16px] text-xs font-bold outline-none focus:border-[var(--toss-blue)]"
@@ -3139,6 +3240,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   {pollOptions.map((opt, idx) => (
                     <div key={idx} className="flex gap-2">
                       <input
+                        data-testid={`chat-poll-option-${idx}`}
                         value={opt}
                         onChange={(e) => {
                           const newOpts = [...pollOptions];
@@ -3178,6 +3280,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 취소
               </button>
               <button
+                data-testid="chat-poll-submit"
                 type="button"
                 onClick={handleCreatePoll}
                 className="flex-1 py-3 rounded-[16px] text-[11px] font-semibold bg-[var(--toss-blue)] text-white hover:bg-[var(--toss-blue)] shadow-md"
@@ -3380,7 +3483,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             onClick={() => setThreadRoot(null)}
             aria-hidden="true"
           />
-          <aside className="absolute top-0 right-0 bottom-0 w-80 bg-[var(--toss-card)] border-l border-[var(--toss-border)] shadow-2xl z-50 flex flex-col animate-in slide-in-from-right duration-300">
+          <aside data-testid="chat-thread-panel" className="absolute top-0 right-0 bottom-0 w-80 bg-[var(--toss-card)] border-l border-[var(--toss-border)] shadow-2xl z-50 flex flex-col animate-in slide-in-from-right duration-300">
             <div className="p-4 border-b border-[var(--toss-border)] flex items-center justify-between">
               <div className="min-w-0">
                 <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
@@ -3451,7 +3554,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       )}
 
       {unreadModalMsg && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4" onClick={() => setUnreadModalMsg(null)}>
+        <div data-testid="chat-read-status-modal" className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4" onClick={() => setUnreadModalMsg(null)}>
           <div className="bg-[var(--toss-card)] w-full max-w-md rounded-3xl p-6 space-y-4 shadow-2xl border border-[var(--toss-border)]" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <div>
@@ -3530,7 +3633,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       )}
 
       {showForwardModal && forwardSourceMsg && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4" onClick={() => { setShowForwardModal(false); setForwardSourceMsg(null); }}>
+        <div data-testid="chat-forward-modal" className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4" onClick={() => { setShowForwardModal(false); setForwardSourceMsg(null); }}>
           <div className="bg-[var(--toss-card)] w-full max-w-md rounded-3xl p-6 space-y-4 shadow-2xl border border-[var(--toss-border)]" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-[var(--foreground)]">다른 채팅방으로 전달</h3>
             <p className="text-[11px] text-[var(--toss-gray-3)] font-bold">
@@ -3541,6 +3644,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 .filter((r: any) => r.id !== selectedRoomId)
                 .map((room: any) => (
                   <button
+                    data-testid={`chat-forward-target-${room.id}`}
                     key={room.id}
                     type="button"
                     onClick={async () => {
@@ -3594,6 +3698,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
       {showAddMemberModal && selectedRoom && (
         <div
+          data-testid="chat-add-member-modal"
           className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4"
           onClick={() => {
             setShowAddMemberModal(false);
@@ -3611,6 +3716,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
               현재 채팅방에 새로 초대할 직원을 선택하세요.
             </p>
             <input
+              data-testid="chat-add-member-search"
               type="text"
               value={addMemberSearch}
               onChange={(e) => setAddMemberSearch(e.target.value)}
@@ -3627,6 +3733,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   const checked = addMemberSelectingIds.includes(s.id);
                   return (
                     <label
+                      data-testid={`chat-add-member-option-${s.id}`}
                       key={s.id}
                       className="flex items-center gap-3 px-3 py-2 rounded-[16px] border border-[var(--toss-border)] hover:bg-[var(--toss-gray-1)] cursor-pointer text-[11px]"
                     >
@@ -3664,6 +3771,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             </div>
             <div className="flex gap-2 pt-2">
               <button
+                data-testid="chat-add-member-cancel"
                 type="button"
                 onClick={() => {
                   setShowAddMemberModal(false);
@@ -3674,6 +3782,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 취소
               </button>
               <button
+                data-testid="chat-add-member-submit"
                 type="button"
                 disabled={addMemberSelectingIds.length === 0}
                 onClick={async () => {
@@ -3788,11 +3897,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       )}
 
       {showGlobalSearch && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-start md:items-center justify-center p-4 pt-12 md:p-6 animate-in fade-in" onClick={() => setShowGlobalSearch(false)}>
+        <div data-testid="chat-global-search-modal" className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-start md:items-center justify-center p-4 pt-12 md:p-6 animate-in fade-in" onClick={() => setShowGlobalSearch(false)}>
           <div className="bg-white dark:bg-zinc-900 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh] md:max-h-[85vh] border border-zinc-200 dark:border-zinc-800" onClick={e => e.stopPropagation()}>
             <div className="p-4 md:p-6 border-b border-zinc-100 dark:border-zinc-800 flex items-center gap-3">
               <span className="text-xl">🔎</span>
               <input
+                data-testid="chat-global-search-input"
                 autoFocus
                 value={globalSearchQuery}
                 onChange={e => setGlobalSearchQuery(e.target.value)}
@@ -3801,6 +3911,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 className="flex-1 bg-transparent text-foreground text-sm font-bold outline-none placeholder:text-zinc-400"
               />
               <button
+                data-testid="chat-global-search-submit"
                 onClick={handleGlobalSearch}
                 className="px-4 py-2 bg-[var(--toss-blue)] text-white font-bold text-xs rounded-xl shadow-sm hover:opacity-90 transition-opacity whitespace-nowrap"
               >
@@ -3824,6 +3935,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   }
                   return (
                     <div
+                      data-testid={`chat-global-search-result-${msg.id}`}
                       key={msg.id}
                       onClick={() => {
                         setRoom(msg.room_id);

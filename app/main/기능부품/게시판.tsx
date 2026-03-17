@@ -861,6 +861,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
               {canCreatePost && (
                 <div className="flex justify-start md:justify-end">
                   <button
+                    data-testid="board-toggle-new-post"
                     onClick={() => setShowNewPost(!showNewPost)}
                     className="px-4 md:px-6 py-2.5 md:py-3 bg-[var(--toss-blue)] text-white rounded-[12px] text-[11px] md:text-xs font-bold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all"
                   >
@@ -873,7 +874,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
 
           {/* 새 게시물 작성 폼 (사내위키일 때는 표시 안함) */}
           {showNewPost && activeBoard !== '사내위키' && (
-            <div className="bg-[var(--toss-card)] p-6 md:p-8 border border-[var(--toss-border)] shadow-sm rounded-[16px] space-y-6 animate-in fade-in slide-in-from-top-4 duration-300">
+            <div data-testid="board-new-post-form" className="bg-[var(--toss-card)] p-6 md:p-8 border border-[var(--toss-border)] shadow-sm rounded-[16px] space-y-6 animate-in fade-in slide-in-from-top-4 duration-300">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h3 className="text-lg font-bold text-[var(--foreground)]">새 게시물 작성</h3>
                 {(activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
@@ -947,6 +948,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                     <>
                       <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">제목</label>
                       <input
+                        data-testid="board-new-post-title"
                         value={title}
                         onChange={e => setTitle(e.target.value)}
                         placeholder="게시물 제목을 입력하세요."
@@ -1103,6 +1105,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                     <div>
                       <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">내용</label>
                       <textarea
+                        data-testid="board-new-post-content"
                         value={content}
                         onChange={e => setContent(e.target.value)}
                         placeholder="게시물 내용을 입력하세요."
@@ -1175,6 +1178,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
               </div>
 
               <button
+                data-testid="board-new-post-submit"
                 onClick={handleNewPost}
                 disabled={loading}
                 className="w-full py-4 bg-[var(--toss-blue)] text-white rounded-[12px] font-bold text-sm shadow-sm hover:opacity-95 active:scale-[0.99] transition-all disabled:opacity-50"
@@ -1473,7 +1477,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
 
           {/* 게시물 목록 (수술일정·MRI일정은 달력으로만 표시) */}
           {(activeBoard !== '수술일정' && activeBoard !== 'MRI일정') && (
-            <div className="space-y-2">
+            <div data-testid="board-post-list" className="space-y-2">
               {posts.length > 0 ? (
                 posts.map((post, idx) => {
                   const rowNumber = posts.length - idx;
@@ -1481,6 +1485,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                   return (
                     <div
                       key={post.id || idx}
+                      data-testid={`board-post-${post.id}`}
                       className={`bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-[14px] px-3 md:px-4 py-2.5 md:py-3 hover:border-[var(--toss-blue)]/40 hover:shadow-md transition-all cursor-pointer`}
                       onClick={() => setSelectedPostId(post.id)}
                     >
@@ -1585,8 +1590,8 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
 
           {/* 게시글 상세 보기 모달 */}
           {selectedPost && (
-            <div className="fixed inset-0 z-[110] flex items-end md:items-center justify-center bg-black/40 p-0 md:p-8">
-              <div className="w-full max-w-4xl max-h-[90dvh] overflow-y-auto bg-[var(--toss-card)] border-0 md:border border-[var(--toss-border)] rounded-t-[24px] md:rounded-[24px] shadow-2xl p-4 md:p-8 pb-8 space-y-5 text-[13px] md:text-[14px] safe-area-pb">
+            <div data-testid="board-post-detail-overlay" className="fixed inset-0 z-[110] flex items-end md:items-center justify-center bg-black/40 p-0 md:p-8">
+              <div data-testid="board-post-detail" className="w-full max-w-4xl max-h-[90dvh] overflow-y-auto bg-[var(--toss-card)] border-0 md:border border-[var(--toss-border)] rounded-t-[24px] md:rounded-[24px] shadow-2xl p-4 md:p-8 pb-8 space-y-5 text-[13px] md:text-[14px] safe-area-pb">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
                     <p className="text-[11px] md:text-[12px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">
@@ -1621,6 +1626,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                     )}
                     <button
                       type="button"
+                      data-testid="board-post-detail-close"
                       onClick={() => setSelectedPostId(null)}
                       className="px-3 py-1.5 rounded-full border border-[var(--toss-border)] text-[11px] font-bold text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]"
                     >
@@ -1856,6 +1862,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                   })()}
                   <div className="flex gap-2">
                     <input
+                      data-testid="board-comment-input"
                       value={newComment}
                       onChange={(e) => setNewComment(e.target.value)}
                       placeholder={user?.id ? '댓글을 입력하세요.' : '로그인한 후 댓글을 입력할 수 있습니다.'}
@@ -1864,6 +1871,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                     />
                     <button
                       type="button"
+                      data-testid="board-comment-submit"
                       onClick={() => handleAddComment(selectedPost.id, replyParentId)}
                       disabled={!user?.id}
                       className="px-3 py-2 bg-[var(--toss-blue)] text-white rounded-[12px] text-xs font-bold hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed"

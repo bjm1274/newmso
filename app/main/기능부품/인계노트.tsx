@@ -520,7 +520,7 @@ export default function HandoverNotes({ user }: Props) {
             </div>
             <p className={`whitespace-pre-wrap text-sm leading-6 ${note.is_completed ? 'text-[var(--toss-gray-3)] line-through' : 'text-[var(--foreground)]'}`}>{note.content}</p>
           </div>
-          <button type="button" onClick={() => toggleCompleted(note)} className={`shrink-0 rounded-[12px] px-3 py-2 text-xs font-semibold transition ${note.is_completed ? 'bg-emerald-100 text-emerald-700' : 'bg-[var(--page-bg)] text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'}`}>
+          <button type="button" data-testid={`handover-note-complete-${note.id}`} onClick={() => toggleCompleted(note)} className={`shrink-0 rounded-[12px] px-3 py-2 text-xs font-semibold transition ${note.is_completed ? 'bg-emerald-100 text-emerald-700' : 'bg-[var(--page-bg)] text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'}`}>
             {note.is_completed ? '완료됨' : '완료 처리'}
           </button>
         </div>
@@ -529,7 +529,7 @@ export default function HandoverNotes({ user }: Props) {
   }
 
   return (
-    <div className="space-y-4 rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4 shadow-sm">
+    <div className="space-y-4 rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4 shadow-sm" data-testid="handover-notes-view">
       <div className="flex flex-col gap-3 border-b border-[var(--toss-border)] pb-4 lg:flex-row lg:items-center lg:justify-between">
         <h2 className="text-xl font-bold text-[var(--foreground)]">병동 인계노트</h2>
         <div className="flex flex-wrap items-center gap-2">
@@ -537,6 +537,7 @@ export default function HandoverNotes({ user }: Props) {
             type="date"
             value={selectedDateKey}
             onChange={(event) => setSelectedDate(fromDateKey(event.target.value))}
+            data-testid="handover-date-input"
             className="rounded-[12px] border border-[var(--toss-border)] bg-[var(--input-bg)] px-3 py-2 text-sm text-[var(--foreground)] outline-none transition focus:border-[var(--toss-blue)] focus:ring-2 focus:ring-[var(--toss-blue)]/20"
           />
           <button
@@ -551,11 +552,13 @@ export default function HandoverNotes({ user }: Props) {
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
             placeholder="검색"
+            data-testid="handover-search-input"
             className="w-[140px] rounded-[12px] border border-[var(--toss-border)] bg-[var(--input-bg)] px-3 py-2 text-sm text-[var(--foreground)] outline-none transition focus:border-[var(--toss-blue)] focus:ring-2 focus:ring-[var(--toss-blue)]/20"
           />
           <button
             type="button"
             onClick={() => setShowBedSettings(true)}
+            data-testid="handover-bed-settings-open"
             className="rounded-[12px] bg-[var(--toss-blue)] px-3 py-2 text-sm font-semibold text-white transition hover:opacity-90"
           >
             병상설정
@@ -611,8 +614,8 @@ export default function HandoverNotes({ user }: Props) {
 
       <section className="space-y-3 rounded-[18px] bg-[var(--page-bg)] p-4">
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => { setNoteScope('general'); setSelectedBedKey(''); }} className={`rounded-full px-3 py-2 text-sm font-semibold ${noteScope === 'general' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}`}>공통 인계</button>
-          <button type="button" onClick={() => setNoteScope('patient')} className={`rounded-full px-3 py-2 text-sm font-semibold ${noteScope === 'patient' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700'}`}>환자별 인계</button>
+          <button type="button" data-testid="handover-scope-general" onClick={() => { setNoteScope('general'); setSelectedBedKey(''); }} className={`rounded-full px-3 py-2 text-sm font-semibold ${noteScope === 'general' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}`}>공통 인계</button>
+          <button type="button" data-testid="handover-scope-patient" onClick={() => setNoteScope('patient')} className={`rounded-full px-3 py-2 text-sm font-semibold ${noteScope === 'patient' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700'}`}>환자별 인계</button>
         </div>
 
         {noteScope === 'patient' ? (
@@ -621,7 +624,7 @@ export default function HandoverNotes({ user }: Props) {
               <div className="rounded-[12px] border border-amber-200 bg-amber-50 px-3 py-3 text-sm font-medium text-amber-700">먼저 병상 설정에서 환자를 지정해주세요.</div>
             ) : (
               <>
-                <select value={selectedBedKey} onChange={(event) => setSelectedBedKey(event.target.value)} className="w-full rounded-[12px] border border-emerald-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-300 md:max-w-[320px]">
+                <select data-testid="handover-patient-select" value={selectedBedKey} onChange={(event) => setSelectedBedKey(event.target.value)} className="w-full rounded-[12px] border border-emerald-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-300 md:max-w-[320px]">
                   <option value="">환자 선택</option>
                   {bedOptions.map((option) => <option key={option.bedKey} value={option.bedKey}>{option.label}</option>)}
                 </select>
@@ -638,8 +641,8 @@ export default function HandoverNotes({ user }: Props) {
         <div className="grid gap-3 lg:grid-cols-[140px_140px_minmax(0,1fr)_auto]">
           <select value={shift} onChange={(event) => setShift(event.target.value)} className="rounded-[14px] border border-[var(--toss-border)] bg-[var(--toss-card)] px-3 py-2 text-sm font-semibold outline-none transition focus:border-[var(--toss-blue)]"><option value="Day">Day</option><option value="Evening">Evening</option><option value="Night">Night</option></select>
           <select value={priority} onChange={(event) => setPriority(event.target.value)} className="rounded-[14px] border border-[var(--toss-border)] bg-[var(--toss-card)] px-3 py-2 text-sm font-semibold outline-none transition focus:border-[var(--toss-blue)]"><option value="Normal">일반</option><option value="High">중요</option></select>
-          <input type="text" value={content} onChange={(event) => setContent(event.target.value)} placeholder={noteScope === 'patient' ? '선택한 환자에게 필요한 인계 내용을 입력해주세요' : '공통 인계 내용을 입력해주세요'} className="rounded-[14px] border border-[var(--toss-border)] bg-[var(--toss-card)] px-3 py-2 text-sm text-[var(--foreground)] outline-none transition focus:border-[var(--toss-blue)] focus:ring-2 focus:ring-[var(--toss-blue)]/20" />
-          <button type="button" onClick={handleCreateNote} disabled={saving || !content.trim()} className="rounded-[14px] bg-[var(--toss-blue)] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">{saving ? '저장 중' : '인계 추가'}</button>
+          <input type="text" data-testid="handover-note-content" value={content} onChange={(event) => setContent(event.target.value)} placeholder={noteScope === 'patient' ? '선택한 환자에게 필요한 인계 내용을 입력해주세요' : '공통 인계 내용을 입력해주세요'} className="rounded-[14px] border border-[var(--toss-border)] bg-[var(--toss-card)] px-3 py-2 text-sm text-[var(--foreground)] outline-none transition focus:border-[var(--toss-blue)] focus:ring-2 focus:ring-[var(--toss-blue)]/20" />
+          <button type="button" data-testid="handover-note-add" onClick={handleCreateNote} disabled={saving || !content.trim()} className="rounded-[14px] bg-[var(--toss-blue)] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">{saving ? '저장 중' : '인계 추가'}</button>
         </div>
       </section>
 
@@ -685,7 +688,7 @@ export default function HandoverNotes({ user }: Props) {
       )}
 
       {showBedSettings ? (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/45 px-4 py-6">
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/45 px-4 py-6" data-testid="handover-bed-settings-modal">
           <div className="max-h-[82vh] w-full max-w-[720px] overflow-hidden rounded-[18px] border border-[var(--toss-border)] bg-[var(--toss-card)] shadow-2xl">
             <div className="flex items-center justify-between border-b border-[var(--toss-border)] px-4 py-3">
               <div>
@@ -699,6 +702,7 @@ export default function HandoverNotes({ user }: Props) {
                 <button
                   type="button"
                   onClick={() => setShowBedSettings(false)}
+                  data-testid="handover-bed-settings-close"
                   className="rounded-[10px] bg-[var(--page-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--foreground)] transition hover:bg-[var(--toss-gray-1)]"
                 >
                   닫기
@@ -713,11 +717,13 @@ export default function HandoverNotes({ user }: Props) {
                   value={newRoomNumber}
                   onChange={(event) => setNewRoomNumber(event.target.value)}
                   placeholder="예: 101"
+                  data-testid="handover-new-room-number"
                   className="rounded-[8px] border border-[var(--toss-border)] bg-white px-2.5 py-1.5 text-xs outline-none transition focus:border-[var(--toss-blue)]"
                 />
                 <select
                   value={newRoomCapacity}
                   onChange={(event) => setNewRoomCapacity(Number(event.target.value))}
+                  data-testid="handover-new-room-capacity"
                   className="rounded-[8px] border border-[var(--toss-border)] bg-white px-2 py-1.5 text-xs font-semibold outline-none transition focus:border-[var(--toss-blue)]"
                 >
                   {[1, 2, 3, 4].map((capacity) => (
@@ -729,6 +735,7 @@ export default function HandoverNotes({ user }: Props) {
                 <button
                   type="button"
                   onClick={handleAddRoom}
+                  data-testid="handover-add-room"
                   className="rounded-[8px] bg-[var(--toss-blue)] px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90"
                 >
                   병실 추가
@@ -741,7 +748,7 @@ export default function HandoverNotes({ user }: Props) {
                 </div>
               ) : (
                  <div className="mt-2 grid gap-2 md:grid-cols-2">
-                    {roomConfigs.map((room) => (
+                    {roomConfigs.map((room, roomIndex) => (
                      <div key={room.id} className="rounded-[12px] border border-[var(--toss-border)] bg-[var(--page-bg)] p-2 shadow-sm">
                        <div className="grid gap-1.5 sm:grid-cols-[minmax(0,1fr)_68px_auto] sm:items-center">
                          <input
@@ -771,13 +778,14 @@ export default function HandoverNotes({ user }: Props) {
                        </div>
 
                         <div className="mt-1.5 grid gap-1.5 sm:grid-cols-2">
-                          {room.beds.map((bed) => (
+                          {room.beds.map((bed, bedIndex) => (
                             <input
                               key={`${room.id}-${bed.bedNumber}`}
                               type="text"
                               value={bed.patientName}
                               onChange={(event) => handleBedPatientChange(room.id, bed.bedNumber, event.target.value)}
                               placeholder="환자 이름"
+                              data-testid={`handover-room-${roomIndex}-patient-${bedIndex}`}
                               className="rounded-[8px] border border-[var(--toss-border)] bg-white px-2.5 py-1.5 text-xs outline-none transition focus:border-[var(--toss-blue)]"
                             />
                           ))}

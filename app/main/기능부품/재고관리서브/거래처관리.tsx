@@ -83,13 +83,14 @@ export default function SupplierManagement({ user }: { user: any }) {
         value={form[k]}
         onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))}
         placeholder={placeholder}
+        data-testid={`supplier-field-${String(k).replace(/_/g, '-')}`}
         className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm font-medium bg-[var(--toss-card)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)]"
       />
     </div>
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-testid="supplier-management-view">
       {/* 헤더 */}
       <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
         <div className="flex gap-3 items-center">
@@ -98,12 +99,14 @@ export default function SupplierManagement({ user }: { user: any }) {
             placeholder="거래처명·담당자·연락처 검색..."
             value={search}
             onChange={e => setSearch(e.target.value)}
+            data-testid="supplier-search-input"
             className="flex-1 min-w-[200px] px-4 py-3 rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-bold outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)]"
           />
           <button onClick={fetchSuppliers} className="px-3 py-3 rounded-[12px] bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] text-xs font-semibold hover:bg-[var(--toss-border)]">🔄</button>
         </div>
         <button
           onClick={openAdd}
+          data-testid="supplier-add-button"
           className="px-5 py-3 bg-[var(--toss-blue)] text-white rounded-[12px] text-sm font-semibold shadow-sm hover:opacity-90 transition-all"
         >
           + 거래처 등록
@@ -142,7 +145,7 @@ export default function SupplierManagement({ user }: { user: any }) {
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={7} className="text-center py-12 text-[var(--toss-gray-3)] font-bold text-sm">등록된 거래처가 없습니다.</td></tr>
               ) : filtered.map(s => (
-                <tr key={s.id} className="hover:bg-[var(--toss-blue-light)]/30 transition-colors group">
+                <tr key={s.id} className="hover:bg-[var(--toss-blue-light)]/30 transition-colors group" data-testid={`supplier-row-${s.id}`}>
                   <td className="px-4 py-3">
                     <p className="text-sm font-semibold text-[var(--foreground)]">{s.name}</p>
                     {s.business_number && <p className="text-[10px] text-[var(--toss-gray-3)]">사업자: {s.business_number}</p>}
@@ -169,8 +172,8 @@ export default function SupplierManagement({ user }: { user: any }) {
                     )}
                   </td>
                   <td className="px-4 py-3 space-x-1">
-                    <button onClick={() => openEdit(s)} className="px-2 py-1 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] text-[10px] font-semibold rounded-md">수정</button>
-                    <button onClick={() => handleDelete(s.id, s.name)} className="px-2 py-1 bg-red-50 text-red-500 text-[10px] font-semibold rounded-md">삭제</button>
+                    <button data-testid={`supplier-edit-${s.id}`} onClick={() => openEdit(s)} className="px-2 py-1 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] text-[10px] font-semibold rounded-md">수정</button>
+                    <button data-testid={`supplier-delete-${s.id}`} onClick={() => handleDelete(s.id, s.name)} className="px-2 py-1 bg-red-50 text-red-500 text-[10px] font-semibold rounded-md">삭제</button>
                   </td>
                 </tr>
               ))}
@@ -182,7 +185,7 @@ export default function SupplierManagement({ user }: { user: any }) {
       {/* 등록/수정 모달 */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
-          <div className="bg-[var(--toss-card)] rounded-[20px] shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="bg-[var(--toss-card)] rounded-[20px] shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()} data-testid="supplier-modal">
             <div className="p-6 border-b border-[var(--toss-border)] flex justify-between items-center">
               <h3 className="text-base font-bold text-[var(--foreground)]">{editTarget ? '거래처 수정' : '거래처 등록'}</h3>
               <button onClick={() => setShowModal(false)} className="p-1.5 hover:bg-[var(--toss-gray-1)] rounded-full text-[var(--toss-gray-3)]">✕</button>
@@ -205,6 +208,7 @@ export default function SupplierManagement({ user }: { user: any }) {
                     value={form.notes}
                     onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
                     rows={3}
+                    data-testid="supplier-field-notes"
                     className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm bg-[var(--toss-card)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20 resize-none"
                   />
                 </div>
@@ -212,7 +216,7 @@ export default function SupplierManagement({ user }: { user: any }) {
             </div>
             <div className="p-6 border-t border-[var(--toss-border)] flex gap-3">
               <button onClick={() => setShowModal(false)} className="flex-1 py-3 rounded-[12px] bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] font-semibold text-sm">취소</button>
-              <button onClick={handleSave} disabled={saving} className="flex-1 py-3 rounded-[12px] bg-[var(--toss-blue)] text-white font-semibold text-sm disabled:opacity-50">
+              <button onClick={handleSave} disabled={saving} data-testid="supplier-save-button" className="flex-1 py-3 rounded-[12px] bg-[var(--toss-blue)] text-white font-semibold text-sm disabled:opacity-50">
                 {saving ? '저장 중...' : '저장'}
               </button>
             </div>
