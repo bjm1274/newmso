@@ -411,50 +411,50 @@ export default function DischargeReviewPage({ user }: { user: any }) {
     return (
         <div className="bg-[var(--page-bg)] animate-in fade-in duration-300" data-testid="discharge-review-view">
             {/* 헤더 */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-6 bg-white border-b border-[var(--toss-border)] gap-4">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-4 bg-[var(--card)] border-b border-[var(--border)] gap-4">
                 <div>
                     <h2 className="text-xl font-bold text-[var(--foreground)] flex items-center gap-2"><span>🏥</span> 퇴원심사</h2>
                 </div>
                 <div className="flex gap-2">
                     {(['reviews', 'new', 'template'] as Tab[]).map(t => (
                         <button key={t} data-testid={`discharge-tab-${t}`} onClick={() => { setTab(t); if (t !== 'reviews') setSelectedReview(null); setCompareResult(null); }}
-                            className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${tab === t ? 'bg-gray-900 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                            className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${tab === t ? 'bg-gray-900 text-white shadow-sm' : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)] hover:bg-[var(--tab-bg)]'}`}>
                             {t === 'reviews' ? '📋 심사 목록' : t === 'new' ? '➕ 새 심사' : '⚙️ 기본 항목 설정'}
                         </button>
                     ))}
                 </div>
             </div>
 
-            <div className="p-4 md:p-6">
+            <div className="p-4 md:p-4">
 
                 {/* ===== 기본 항목 설정 탭 ===== */}
                 {tab === 'template' && (
-                    <div className="max-w-4xl mx-auto space-y-6">
+                    <div className="max-w-4xl mx-auto space-y-4">
                         {/* 템플릿 목록 */}
-                        <div className="bg-white rounded-2xl border border-[var(--toss-border)] p-6 shadow-sm space-y-4">
+                        <div className="bg-[var(--card)] rounded-2xl border border-[var(--border)] p-4 shadow-sm space-y-4">
                             <div className="flex justify-between items-center">
-                                <h3 className="text-sm font-bold text-gray-800">📋 항목 템플릿 목록 ({templates.length}개)</h3>
+                                <h3 className="text-sm font-bold text-[var(--foreground)]">📋 항목 템플릿 목록 ({templates.length}개)</h3>
                                 <button data-testid="discharge-template-new" onClick={startNewTemplate} className="px-4 py-2 text-xs font-bold text-white bg-gray-900 rounded-xl hover:bg-black transition-all">➕ 새 템플릿 추가</button>
                             </div>
-                            <p className="text-xs text-gray-400 font-medium">진단명/입원사유별로 기본 항목 템플릿을 만들어 두면, 심사 시 드롭다운으로 선택할 수 있습니다.</p>
+                            <p className="text-xs text-[var(--toss-gray-3)] font-medium">진단명/입원사유별로 기본 항목 템플릿을 만들어 두면, 심사 시 드롭다운으로 선택할 수 있습니다.</p>
 
                             {templates.length === 0 && !editTmplId && (
                                 <div className="text-center py-10 space-y-3">
                                     <div className="text-4xl opacity-30">📋</div>
-                                    <p className="text-sm text-gray-400 font-medium">아직 등록된 템플릿이 없습니다.</p>
-                                    <button onClick={startNewTemplate} className="px-4 py-2 text-xs font-bold text-[var(--toss-blue)] bg-blue-50 rounded-xl hover:bg-blue-100">첫 번째 템플릿 만들기</button>
+                                    <p className="text-sm text-[var(--toss-gray-3)] font-medium">아직 등록된 템플릿이 없습니다.</p>
+                                    <button onClick={startNewTemplate} className="px-4 py-2 text-xs font-bold text-[var(--accent)] bg-blue-50 rounded-xl hover:bg-blue-100">첫 번째 템플릿 만들기</button>
                                 </div>
                             )}
 
                             <div className="space-y-2">
                                 {templates.map(t => (
-                                    <div key={t.id} className={`flex items-center gap-3 p-4 rounded-xl border transition-all ${editTmplId === t.id ? 'border-[var(--toss-blue)] bg-blue-50/30' : 'border-gray-200 bg-gray-50 hover:border-gray-300'}`}>
+                                    <div key={t.id} className={`flex items-center gap-3 p-4 rounded-xl border transition-all ${editTmplId === t.id ? 'border-[var(--accent)] bg-blue-50/30' : 'border-[var(--border)] bg-[var(--tab-bg)] hover:border-[var(--border)]'}`}>
                                         <div className="flex-1 min-w-0">
-                                            <h4 className="text-sm font-bold text-gray-800">{t.title}</h4>
-                                            <p className="text-[10px] text-gray-400 font-medium mt-0.5">{parseChartData(t.data).length}개 항목</p>
+                                            <h4 className="text-sm font-bold text-[var(--foreground)]">{t.title}</h4>
+                                            <p className="text-[10px] text-[var(--toss-gray-3)] font-medium mt-0.5">{parseChartData(t.data).length}개 항목</p>
                                         </div>
                                         <div className="flex gap-1 shrink-0">
-                                            <button onClick={() => startEditTemplate(t)} className="px-3 py-1.5 text-[11px] font-bold text-[var(--toss-blue)] bg-blue-50 rounded-lg hover:bg-blue-100">수정</button>
+                                            <button onClick={() => startEditTemplate(t)} className="px-3 py-1.5 text-[11px] font-bold text-[var(--accent)] bg-blue-50 rounded-lg hover:bg-blue-100">수정</button>
                                             <button onClick={() => deleteTemplate(t.id)} className="px-3 py-1.5 text-[11px] font-bold text-red-500 bg-red-50 rounded-lg hover:bg-red-100">삭제</button>
                                         </div>
                                     </div>
@@ -464,34 +464,34 @@ export default function DischargeReviewPage({ user }: { user: any }) {
 
                         {/* 템플릿 편집 폼 */}
                         {editTmplId && (
-                            <div className="bg-white rounded-2xl border-2 border-[var(--toss-blue)] p-6 shadow-sm space-y-4">
-                                <h3 className="text-sm font-bold text-gray-800">{templates.find(t => t.id === editTmplId) ? '✏️ 템플릿 수정' : '➕ 새 템플릿 추가'}</h3>
+                            <div className="bg-[var(--card)] rounded-2xl border-2 border-[var(--accent)] p-4 shadow-sm space-y-4">
+                                <h3 className="text-sm font-bold text-[var(--foreground)]">{templates.find(t => t.id === editTmplId) ? '✏️ 템플릿 수정' : '➕ 새 템플릿 추가'}</h3>
 
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">항목 제목 (진단명/입원사유) *</label>
+                                    <label className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">항목 제목 (진단명/입원사유) *</label>
                                     <input data-testid="discharge-template-title" value={editTmplTitle} onChange={e => setEditTmplTitle(e.target.value)}
                                         placeholder="예: TKR 슬관절 전치환술, 폐렴 치료, 척추수술..."
-                                        className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30" />
+                                        className="w-full px-4 py-3 bg-[var(--tab-bg)] border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--accent)]/30" />
                                 </div>
 
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">차트 기본 항목 데이터 *</label>
+                                    <label className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">차트 기본 항목 데이터 *</label>
                                     <textarea data-testid="discharge-template-data" value={editTmplData} onChange={e => setEditTmplData(e.target.value)}
                                         placeholder="차트 프로그램에서 해당 진단의 표준 항목을 복사-붙여넣기..."
-                                        className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20 resize-none h-48 custom-scrollbar placeholder:text-gray-400" />
+                                        className="w-full p-4 bg-[var(--tab-bg)] border border-[var(--border)] rounded-xl text-xs font-mono outline-none focus:ring-2 focus:ring-[var(--accent)]/20 resize-none h-48 custom-scrollbar placeholder:text-[var(--toss-gray-3)]" />
                                 </div>
 
                                 {editParsed.length > 0 && (
                                     <div className="bg-blue-50 p-3 rounded-xl">
-                                        <p className="text-xs font-bold text-[var(--toss-blue)]">📋 {editParsed.length}개 항목 인식됨</p>
+                                        <p className="text-xs font-bold text-[var(--accent)]">📋 {editParsed.length}개 항목 인식됨</p>
                                     </div>
                                 )}
 
                                 <div className="flex gap-2 justify-end">
                                     <button onClick={() => { setEditTmplId(null); setEditTmplTitle(''); setEditTmplData(''); }}
-                                        className="px-4 py-2.5 text-xs font-bold text-gray-500 bg-gray-100 rounded-xl hover:bg-gray-200">취소</button>
+                                        className="px-4 py-2.5 text-xs font-bold text-[var(--toss-gray-4)] bg-[var(--tab-bg)] rounded-xl hover:bg-[var(--tab-bg)]">취소</button>
                                     <button data-testid="discharge-template-save" onClick={handleSaveTemplate}
-                                        className="px-6 py-2.5 text-xs font-bold text-white bg-[var(--toss-blue)] rounded-xl hover:opacity-90">저장하기</button>
+                                        className="px-4 py-2.5 text-xs font-bold text-white bg-[var(--accent)] rounded-xl hover:opacity-90">저장하기</button>
                                 </div>
                             </div>
                         )}
@@ -500,25 +500,25 @@ export default function DischargeReviewPage({ user }: { user: any }) {
 
                 {/* ===== 새 심사 탭 ===== */}
                 {tab === 'new' && (
-                    <div className="max-w-4xl mx-auto space-y-6">
-                        <div className="bg-white rounded-2xl border border-[var(--toss-border)] p-6 shadow-sm space-y-5">
-                            <h3 className="text-base font-bold text-gray-800">새 퇴원심사 등록</h3>
+                    <div className="max-w-4xl mx-auto space-y-4">
+                        <div className="bg-[var(--card)] rounded-2xl border border-[var(--border)] p-4 shadow-sm space-y-5">
+                            <h3 className="text-base font-bold text-[var(--foreground)]">새 퇴원심사 등록</h3>
 
                             {/* 필수 환자 정보 */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">환자명 *</label>
+                                    <label className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">환자명 *</label>
                                     <input data-testid="discharge-patient-name" value={patientName} onChange={e => setPatientName(e.target.value)} placeholder="검색 또는 입력"
-                                        className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30" />
+                                        className="w-full px-4 py-3 bg-[var(--tab-bg)] border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--accent)]/30" />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">생년월일</label>
-                                    <SmartDatePicker value={birthDate} onChange={val => setBirthDate(val)} className="w-full h-[46px] px-4 bg-gray-50 border-none rounded-xl text-sm font-medium" />
+                                    <label className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">생년월일</label>
+                                    <SmartDatePicker value={birthDate} onChange={val => setBirthDate(val)} className="w-full h-[46px] px-4 bg-[var(--tab-bg)] border-none rounded-xl text-sm font-medium" />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">성별</label>
+                                    <label className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">성별</label>
                                     <select value={gender} onChange={e => setGender(e.target.value)}
-                                        className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 appearance-none cursor-pointer">
+                                        className="w-full px-4 py-3 bg-[var(--tab-bg)] border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--accent)]/30 appearance-none cursor-pointer">
                                         <option value="">선택</option>
                                         <option value="남">남</option>
                                         <option value="여">여</option>
@@ -528,26 +528,26 @@ export default function DischargeReviewPage({ user }: { user: any }) {
 
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">진료과 *</label>
+                                    <label className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">진료과 *</label>
                                     <input data-testid="discharge-department" value={department} onChange={e => setDepartment(e.target.value)} placeholder="정형외과, 내과..."
-                                        className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30" />
+                                        className="w-full px-4 py-3 bg-[var(--tab-bg)] border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--accent)]/30" />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">입원일 *</label>
-                                    <SmartDatePicker value={admissionDate} onChange={val => setAdmissionDate(val)} data-testid="discharge-admission-date" className="w-full h-[46px] px-4 bg-gray-50 border-none rounded-xl text-sm font-medium" />
+                                    <label className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">입원일 *</label>
+                                    <SmartDatePicker value={admissionDate} onChange={val => setAdmissionDate(val)} data-testid="discharge-admission-date" className="w-full h-[46px] px-4 bg-[var(--tab-bg)] border-none rounded-xl text-sm font-medium" />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">퇴원 예정일</label>
-                                    <SmartDatePicker value={dischargeDate} onChange={val => setDischargeDate(val)} className="w-full h-[46px] px-4 bg-gray-50 border-none rounded-xl text-sm font-medium" />
+                                    <label className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">퇴원 예정일</label>
+                                    <SmartDatePicker value={dischargeDate} onChange={val => setDischargeDate(val)} className="w-full h-[46px] px-4 bg-[var(--tab-bg)] border-none rounded-xl text-sm font-medium" />
                                 </div>
                             </div>
 
                             {/* 보험 및 의료 정보 */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">보험 구분</label>
+                                    <label className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">보험 구분</label>
                                     <select value={insuranceType} onChange={e => setInsuranceType(e.target.value)}
-                                        className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 appearance-none cursor-pointer">
+                                        className="w-full px-4 py-3 bg-[var(--tab-bg)] border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--accent)]/30 appearance-none cursor-pointer">
                                         <option value="">선택</option>
                                         <option value="건강보험">건강보험</option>
                                         <option value="의료급여 1종">의료급여 1종</option>
@@ -560,14 +560,14 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                     </select>
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">주치의</label>
+                                    <label className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">주치의</label>
                                     <input value={doctorName} onChange={e => setDoctorName(e.target.value)} placeholder="김OO"
-                                        className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30" />
+                                        className="w-full px-4 py-3 bg-[var(--tab-bg)] border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--accent)]/30" />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">병실 등급</label>
+                                    <label className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">병실 등급</label>
                                     <select value={roomGrade} onChange={e => setRoomGrade(e.target.value)}
-                                        className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 appearance-none cursor-pointer">
+                                        className="w-full px-4 py-3 bg-[var(--tab-bg)] border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--accent)]/30 appearance-none cursor-pointer">
                                         <option value="">선택</option>
                                         <option value="1인실">1인실</option>
                                         <option value="2인실">2인실</option>
@@ -579,9 +579,9 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                             {/* 수술 정보 */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">수술명</label>
+                                    <label className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">수술명</label>
                                     <select value={surgeryName} onChange={e => setSurgeryName(e.target.value)}
-                                        className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 appearance-none cursor-pointer">
+                                        className="w-full px-4 py-3 bg-[var(--tab-bg)] border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--accent)]/30 appearance-none cursor-pointer">
                                         <option value="">수술 없음</option>
                                         {surgeryOptions.map(s => (
                                             <option key={s.id} value={s.name}>{s.name}</option>
@@ -589,17 +589,17 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                     </select>
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">수술일</label>
-                                    <SmartDatePicker value={surgeryDate} onChange={val => setSurgeryDate(val)} className="w-full h-[46px] px-4 bg-gray-50 border-none rounded-xl text-sm font-medium" />
+                                    <label className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">수술일</label>
+                                    <SmartDatePicker value={surgeryDate} onChange={val => setSurgeryDate(val)} className="w-full h-[46px] px-4 bg-[var(--tab-bg)] border-none rounded-xl text-sm font-medium" />
                                 </div>
                             </div>
 
                             {/* 기타 정보 */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">입원 경로</label>
+                                    <label className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">입원 경로</label>
                                     <select value={admissionRoute} onChange={e => setAdmissionRoute(e.target.value)}
-                                        className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 appearance-none cursor-pointer">
+                                        className="w-full px-4 py-3 bg-[var(--tab-bg)] border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--accent)]/30 appearance-none cursor-pointer">
                                         <option value="">선택</option>
                                         <option value="외래">외래</option>
                                         <option value="응급">응급</option>
@@ -607,9 +607,9 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                     </select>
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">퇴원 유형</label>
+                                    <label className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">퇴원 유형</label>
                                     <select value={dischargeType} onChange={e => setDischargeType(e.target.value)}
-                                        className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 appearance-none cursor-pointer">
+                                        className="w-full px-4 py-3 bg-[var(--tab-bg)] border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--accent)]/30 appearance-none cursor-pointer">
                                         <option value="">선택</option>
                                         <option value="정상퇴원">정상퇴원</option>
                                         <option value="전원">전원</option>
@@ -617,26 +617,26 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                     </select>
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">DRG 코드</label>
+                                    <label className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">DRG 코드</label>
                                     <input value={drgCode} onChange={e => setDrgCode(e.target.value)} placeholder="포괄수가 코드"
-                                        className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30" />
+                                        className="w-full px-4 py-3 bg-[var(--tab-bg)] border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--accent)]/30" />
                                 </div>
                             </div>
 
                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">동반 질환</label>
+                                <label className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">동반 질환</label>
                                 <input value={comorbidities} onChange={e => setComorbidities(e.target.value)} placeholder="고혈압, 당뇨, 심부전..."
-                                    className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30" />
+                                    className="w-full px-4 py-3 bg-[var(--tab-bg)] border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--accent)]/30" />
                             </div>
 
                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">상병명 (진단코드)</label>
+                                <label className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">상병명 (진단코드)</label>
                                 <textarea value={diseaseCodes} onChange={e => setDiseaseCodes(e.target.value)}
                                     placeholder="차트에서 상병명을 복사-붙여넣기 (여러 줄 가능)
 예: M17.1 원발성 무릎관절증
     I10 고혈압
     E11 2형 당뇨"
-                                    className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20 resize-none h-28 custom-scrollbar placeholder:text-gray-400" />
+                                    className="w-full p-4 bg-[var(--tab-bg)] border border-[var(--border)] rounded-xl text-xs font-mono outline-none focus:ring-2 focus:ring-[var(--accent)]/20 resize-none h-28 custom-scrollbar placeholder:text-[var(--toss-gray-3)]" />
                                 {diseaseCodes.trim() && (
                                     <p className="text-[11px] font-bold text-purple-500">🏥 {diseaseCodes.trim().split('\n').filter(l => l.trim()).length}개 상병 입력됨</p>
                                 )}
@@ -644,9 +644,9 @@ export default function DischargeReviewPage({ user }: { user: any }) {
 
                             {/* 진단명 드롭다운 */}
                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">진단명 / 입원 사유 (템플릿 선택)</label>
+                                <label className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">진단명 / 입원 사유 (템플릿 선택)</label>
                                 <select data-testid="discharge-template-select" value={selectedTemplateId} onChange={e => setSelectedTemplateId(e.target.value)}
-                                    className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 appearance-none cursor-pointer">
+                                    className="w-full px-4 py-3 bg-[var(--tab-bg)] border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--accent)]/30 appearance-none cursor-pointer">
                                     <option value="">-- 템플릿 선택 (선택 안 함) --</option>
                                     {templates.map(t => (
                                         <option key={t.id} value={t.id}>{t.title} ({parseChartData(t.data).length}개 항목)</option>
@@ -654,34 +654,34 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                 </select>
                                 {selectedTemplate && (
                                     <div className="bg-blue-50 p-3 rounded-xl mt-2">
-                                        <p className="text-xs font-bold text-[var(--toss-blue)]">📋 &quot;{selectedTemplate.title}&quot; 템플릿 선택됨 &mdash; 심사 생성 시 자동 비교</p>
+                                        <p className="text-xs font-bold text-[var(--accent)]">📋 &quot;{selectedTemplate.title}&quot; 템플릿 선택됨 &mdash; 심사 생성 시 자동 비교</p>
                                     </div>
                                 )}
                             </div>
 
                             {admissionDate && dischargeDate && (
                                 <div className="bg-blue-50 p-3 rounded-xl flex items-center gap-4">
-                                    <p className="text-sm font-bold text-[var(--toss-blue)]">입원 기간: {stayDays(admissionDate, dischargeDate)}일</p>
-                                    {birthDate && <p className="text-sm font-medium text-gray-500">나이: {Math.floor((Date.now() - new Date(birthDate).getTime()) / 31557600000)}세</p>}
+                                    <p className="text-sm font-bold text-[var(--accent)]">입원 기간: {stayDays(admissionDate, dischargeDate)}일</p>
+                                    {birthDate && <p className="text-sm font-medium text-[var(--toss-gray-4)]">나이: {Math.floor((Date.now() - new Date(birthDate).getTime()) / 31557600000)}세</p>}
                                 </div>
                             )}
                         </div>
 
                         {/* 차트 데이터 */}
-                        <div className="bg-white rounded-2xl border border-[var(--toss-border)] p-6 shadow-sm space-y-4">
-                            <h3 className="text-sm font-bold text-gray-800">📊 환자 차트 데이터 붙여넣기 *</h3>
-                            <p className="text-xs text-gray-400 font-medium">차트 프로그램에서 환자의 계산내역을 복사해서 붙여넣기 하세요.</p>
+                        <div className="bg-[var(--card)] rounded-2xl border border-[var(--border)] p-4 shadow-sm space-y-4">
+                            <h3 className="text-sm font-bold text-[var(--foreground)]">📊 환자 차트 데이터 붙여넣기 *</h3>
+                            <p className="text-xs text-[var(--toss-gray-3)] font-medium">차트 프로그램에서 환자의 계산내역을 복사해서 붙여넣기 하세요.</p>
 
                             <textarea data-testid="discharge-chart-data" value={newChartData} onChange={e => setNewChartData(e.target.value)}
                                 placeholder="차트 프로그램에서 복사한 데이터를 여기에 붙여넣기..."
-                                className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20 resize-none h-48 custom-scrollbar placeholder:text-gray-400" />
+                                className="w-full p-4 bg-[var(--tab-bg)] border border-[var(--border)] rounded-xl text-xs font-mono outline-none focus:ring-2 focus:ring-[var(--accent)]/20 resize-none h-48 custom-scrollbar placeholder:text-[var(--toss-gray-3)]" />
 
                             {parsedNewChart.length > 0 && (
                                 <div className="bg-blue-50 p-4 rounded-xl space-y-2">
-                                    <p className="text-xs font-bold text-[var(--toss-blue)]">📋 {parsedNewChart.length}개 항목이 체크리스트로 생성됩니다</p>
+                                    <p className="text-xs font-bold text-[var(--accent)]">📋 {parsedNewChart.length}개 항목이 체크리스트로 생성됩니다</p>
                                     <div className="flex flex-wrap gap-1.5">
                                         {parsedNewChart.slice(0, 8).map((it, i) => (
-                                            <span key={i} className="px-2 py-1 bg-white rounded-lg text-[10px] font-medium text-gray-600 border border-blue-200 truncate max-w-[180px]">{it.name}</span>
+                                            <span key={i} className="px-2 py-1 bg-[var(--card)] rounded-lg text-[10px] font-medium text-[var(--toss-gray-4)] border border-blue-200 truncate max-w-[180px]">{it.name}</span>
                                         ))}
                                         {parsedNewChart.length > 8 && <span className="px-2 py-1 text-[10px] font-bold text-blue-400">+{parsedNewChart.length - 8}개 더</span>}
                                     </div>
@@ -700,34 +700,34 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                 {tab === 'reviews' && !selectedReview && (
                     <div className="max-w-3xl mx-auto space-y-4">
                         {loading ? (
-                            <div className="flex justify-center py-20"><div className="w-10 h-10 border-4 border-gray-100 border-t-[var(--toss-blue)] rounded-full animate-spin" /></div>
+                            <div className="flex justify-center py-20"><div className="w-10 h-10 border-4 border-[var(--border-subtle)] border-t-[var(--accent)] rounded-full animate-spin" /></div>
                         ) : reviews.length === 0 ? (
                             <div className="text-center py-20 space-y-4">
                                 <div className="text-6xl opacity-30">🏥</div>
-                                <h4 className="text-lg font-bold text-gray-800">등록된 퇴원심사가 없습니다</h4>
-                                <button onClick={() => setTab('new')} className="px-6 py-3 bg-gray-900 text-white text-xs font-bold rounded-xl">➕ 새 심사 등록</button>
+                                <h4 className="text-lg font-bold text-[var(--foreground)]">등록된 퇴원심사가 없습니다</h4>
+                                <button onClick={() => setTab('new')} className="px-4 py-3 bg-gray-900 text-white text-xs font-bold rounded-xl">➕ 새 심사 등록</button>
                             </div>
                         ) : reviews.map(r => (
                             <button key={r.id} data-testid={`discharge-review-card-${r.id}`} onClick={() => { setSelectedReview(r); setAiResult(r.ai_analysis || ''); setCompareResult(null); }}
-                                className="w-full p-5 bg-white rounded-2xl border border-[var(--toss-border)] shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all text-left">
+                                className="w-full p-5 bg-[var(--card)] rounded-2xl border border-[var(--border)] shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all text-left">
                                 <div className="flex justify-between items-start">
                                     <div className="space-y-1">
                                         <div className="flex items-center gap-2">
                                             <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${r.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
                                                 {r.status === 'approved' ? '✅ 승인' : '⏳ 심사 중'}
                                             </span>
-                                            <span className="text-sm font-bold text-gray-800">{r.patient_name}</span>
+                                            <span className="text-sm font-bold text-[var(--foreground)]">{r.patient_name}</span>
                                             {r.diagnosis && <span className="text-[10px] font-bold text-purple-500 bg-purple-50 px-2 py-0.5 rounded-lg">{r.diagnosis}</span>}
                                         </div>
-                                        <p className="text-xs text-gray-400 font-medium">{r.department} · {stayDays(r.admission_date, r.discharge_date)}일 · {r.items.length}개 항목</p>
+                                        <p className="text-xs text-[var(--toss-gray-3)] font-medium">{r.department} · {stayDays(r.admission_date, r.discharge_date)}일 · {r.items.length}개 항목</p>
                                     </div>
                                     <div className="text-right space-y-1">
-                                        <p className="text-[10px] font-bold text-gray-400">{new Date(r.created_at).toLocaleDateString()}</p>
-                                        <p className="text-[10px] text-gray-400">{r.items.filter(i => i.checked).length}/{r.items.length}</p>
+                                        <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">{new Date(r.created_at).toLocaleDateString()}</p>
+                                        <p className="text-[10px] text-[var(--toss-gray-3)]">{r.items.filter(i => i.checked).length}/{r.items.length}</p>
                                     </div>
                                 </div>
-                                <div className="mt-3 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                    <div className={`h-full rounded-full transition-all ${r.status === 'approved' ? 'bg-green-500' : 'bg-[var(--toss-blue)]'}`}
+                                <div className="mt-3 h-1.5 bg-[var(--tab-bg)] rounded-full overflow-hidden">
+                                    <div className={`h-full rounded-full transition-all ${r.status === 'approved' ? 'bg-green-500' : 'bg-[var(--accent)]'}`}
                                         style={{ width: `${r.items.length > 0 ? (r.items.filter(i => i.checked).length / r.items.length) * 100 : 0}%` }} />
                                 </div>
                             </button>
@@ -739,14 +739,14 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                 {tab === 'reviews' && selectedReview && (
                     <div className="max-w-4xl mx-auto space-y-4" data-testid="discharge-review-detail">
                         <div className="flex justify-between items-center">
-                            <button onClick={() => { setSelectedReview(null); setCompareResult(null); setIsEditing(false); }} className="text-[11px] font-bold text-[var(--toss-blue)] hover:underline">← 목록으로</button>
+                            <button onClick={() => { setSelectedReview(null); setCompareResult(null); setIsEditing(false); }} className="text-[11px] font-bold text-[var(--accent)] hover:underline">← 목록으로</button>
                             {!isEditing && selectedReview.status !== 'approved' && (
-                                <button onClick={handleStartEdit} className="px-3 py-1.5 text-[11px] font-bold text-[var(--toss-blue)] bg-blue-50 rounded-lg hover:bg-blue-100">✏️ 정보 수정</button>
+                                <button onClick={handleStartEdit} className="px-3 py-1.5 text-[11px] font-bold text-[var(--accent)] bg-blue-50 rounded-lg hover:bg-blue-100">✏️ 정보 수정</button>
                             )}
                         </div>
 
                         {/* 환자 정보 */}
-                        <div className="bg-white rounded-2xl border border-[var(--toss-border)] p-6 shadow-sm">
+                        <div className="bg-[var(--card)] rounded-2xl border border-[var(--border)] p-4 shadow-sm">
                             <div className="flex justify-between items-start mb-4">
                                 <div>
                                     <div className="flex items-center gap-2 mb-1">
@@ -781,62 +781,62 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                     <div className="flex items-center gap-2">
                                         {isEditing ? (
                                             <input value={editForm.patient_name} onChange={e => setEditForm({ ...editForm, patient_name: e.target.value })}
-                                                className="text-xl font-bold text-gray-800 bg-gray-50 px-2 py-1 rounded-lg w-32 border-none outline-none" />
+                                                className="text-xl font-bold text-[var(--foreground)] bg-[var(--tab-bg)] px-2 py-1 rounded-lg w-32 border-none outline-none" />
                                         ) : (
-                                            <h3 className="text-xl font-bold text-gray-800">{selectedReview.patient_name}</h3>
+                                            <h3 className="text-xl font-bold text-[var(--foreground)]">{selectedReview.patient_name}</h3>
                                         )}
                                         {isEditing ? (
                                             <div className="flex gap-1 items-center">
-                                                <select value={editForm.gender} onChange={e => setEditForm({ ...editForm, gender: e.target.value })} className="text-sm bg-gray-50 px-1 py-1 rounded-lg border-none outline-none">
+                                                <select value={editForm.gender} onChange={e => setEditForm({ ...editForm, gender: e.target.value })} className="text-sm bg-[var(--tab-bg)] px-1 py-1 rounded-lg border-none outline-none">
                                                     <option value="남">남</option>
                                                     <option value="여">여</option>
                                                 </select>
-                                                <SmartDatePicker value={editForm.birth_date || ''} onChange={val => setEditForm({ ...editForm, birth_date: val })} className="text-sm bg-gray-50 h-8 px-2 rounded-lg border-none outline-none w-32" />
+                                                <SmartDatePicker value={editForm.birth_date || ''} onChange={val => setEditForm({ ...editForm, birth_date: val })} className="text-sm bg-[var(--tab-bg)] h-8 px-2 rounded-lg border-none outline-none w-32" />
                                             </div>
                                         ) : (
                                             <>
-                                                {selectedReview.gender && <span className="text-sm font-medium text-gray-400 ml-1">({selectedReview.gender})</span>}
-                                                {selectedReview.birth_date && <span className="text-sm font-medium text-gray-400 ml-1">만 {Math.floor((Date.now() - new Date(selectedReview.birth_date).getTime()) / 31557600000)}세</span>}
+                                                {selectedReview.gender && <span className="text-sm font-medium text-[var(--toss-gray-3)] ml-1">({selectedReview.gender})</span>}
+                                                {selectedReview.birth_date && <span className="text-sm font-medium text-[var(--toss-gray-3)] ml-1">만 {Math.floor((Date.now() - new Date(selectedReview.birth_date).getTime()) / 31557600000)}세</span>}
                                             </>
                                         )}
                                     </div>
                                     <div className="mt-1 flex items-center gap-2">
                                         {isEditing ? (
                                             <div className="flex gap-2 items-center">
-                                                <input value={editForm.department} onChange={e => setEditForm({ ...editForm, department: e.target.value })} className="text-sm bg-gray-50 px-2 py-1 rounded-lg border-none outline-none w-24" />
-                                                <span className="text-gray-300">|</span>
-                                                <input value={editForm.doctor_name} onChange={e => setEditForm({ ...editForm, doctor_name: e.target.value })} placeholder="주치의" className="text-sm bg-gray-50 px-2 py-1 rounded-lg border-none outline-none w-24" />
+                                                <input value={editForm.department} onChange={e => setEditForm({ ...editForm, department: e.target.value })} className="text-sm bg-[var(--tab-bg)] px-2 py-1 rounded-lg border-none outline-none w-24" />
+                                                <span className="text-[var(--toss-gray-3)]">|</span>
+                                                <input value={editForm.doctor_name} onChange={e => setEditForm({ ...editForm, doctor_name: e.target.value })} placeholder="주치의" className="text-sm bg-[var(--tab-bg)] px-2 py-1 rounded-lg border-none outline-none w-24" />
                                             </div>
                                         ) : (
-                                            <p className="text-sm text-gray-400 font-medium">{selectedReview.department} · {stayDays(selectedReview.admission_date, selectedReview.discharge_date)}일 입원{selectedReview.doctor_name ? ` · 주치의: ${selectedReview.doctor_name}` : ''}</p>
+                                            <p className="text-sm text-[var(--toss-gray-3)] font-medium">{selectedReview.department} · {stayDays(selectedReview.admission_date, selectedReview.discharge_date)}일 입원{selectedReview.doctor_name ? ` · 주치의: ${selectedReview.doctor_name}` : ''}</p>
                                         )}
                                     </div>
                                 </div>
                                 {!isEditing && <button onClick={() => deleteReview(selectedReview.id)} className="px-3 py-2 text-[11px] font-bold text-red-500 bg-red-50 rounded-lg hover:bg-red-100">🗑️</button>}
                             </div>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
-                                <div className="bg-gray-50 rounded-xl p-3">
-                                    <p className="text-[10px] font-bold text-gray-400 mb-1">입원일</p>
+                                <div className="bg-[var(--tab-bg)] rounded-xl p-3">
+                                    <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mb-1">입원일</p>
                                     {isEditing ? (
                                         <SmartDatePicker value={editForm.admission_date || ''} onChange={val => setEditForm({ ...editForm, admission_date: val })} className="w-full text-xs font-bold bg-transparent border-none outline-none text-center" />
                                     ) : (
-                                        <p className="text-sm font-bold text-gray-700">{selectedReview.admission_date}</p>
+                                        <p className="text-sm font-bold text-[var(--toss-gray-5)]">{selectedReview.admission_date}</p>
                                     )}
                                 </div>
-                                <div className="bg-gray-50 rounded-xl p-3">
-                                    <p className="text-[10px] font-bold text-gray-400 mb-1">퇴원일</p>
+                                <div className="bg-[var(--tab-bg)] rounded-xl p-3">
+                                    <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mb-1">퇴원일</p>
                                     {isEditing ? (
                                         <SmartDatePicker value={editForm.discharge_date || ''} onChange={val => setEditForm({ ...editForm, discharge_date: val })} className="w-full text-xs font-bold bg-transparent border-none outline-none text-center" />
                                     ) : (
-                                        <p className="text-sm font-bold text-gray-700">{selectedReview.discharge_date}</p>
+                                        <p className="text-sm font-bold text-[var(--toss-gray-5)]">{selectedReview.discharge_date}</p>
                                     )}
                                 </div>
-                                <div className="bg-gray-50 rounded-xl p-3">
-                                    <p className="text-[10px] font-bold text-gray-400 mb-1">입원 기간</p>
-                                    <p className="text-sm font-bold text-[var(--toss-blue)]">{stayDays(isEditing ? (editForm.admission_date || '') : selectedReview.admission_date, isEditing ? (editForm.discharge_date || '') : selectedReview.discharge_date)}일</p>
+                                <div className="bg-[var(--tab-bg)] rounded-xl p-3">
+                                    <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mb-1">입원 기간</p>
+                                    <p className="text-sm font-bold text-[var(--accent)]">{stayDays(isEditing ? (editForm.admission_date || '') : selectedReview.admission_date, isEditing ? (editForm.discharge_date || '') : selectedReview.discharge_date)}일</p>
                                 </div>
-                                <div className="bg-gray-50 rounded-xl p-3">
-                                    <p className="text-[10px] font-bold text-gray-400 mb-1">병실</p>
+                                <div className="bg-[var(--tab-bg)] rounded-xl p-3">
+                                    <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mb-1">병실</p>
                                     {isEditing ? (
                                         <select value={editForm.room_grade} onChange={e => setEditForm({ ...editForm, room_grade: e.target.value })} className="w-full text-xs font-bold bg-transparent border-none outline-none text-center">
                                             <option value="">선택</option>
@@ -845,37 +845,37 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                             <option value="4인실">4인실</option>
                                         </select>
                                     ) : (
-                                        <p className="text-sm font-bold text-gray-700">{selectedReview.room_grade || '-'}</p>
+                                        <p className="text-sm font-bold text-[var(--toss-gray-5)]">{selectedReview.room_grade || '-'}</p>
                                     )}
                                 </div>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-                                <div className="bg-gray-50 rounded-xl p-3 flex flex-col items-center">
-                                    <p className="text-[10px] font-bold text-gray-400 mb-1">수술/시술</p>
+                                <div className="bg-[var(--tab-bg)] rounded-xl p-3 flex flex-col items-center">
+                                    <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mb-1">수술/시술</p>
                                     {isEditing ? (
                                         <div className="flex gap-2 w-full">
-                                            <select value={editForm.surgery_name} onChange={e => setEditForm({ ...editForm, surgery_name: e.target.value })} className="flex-1 text-xs font-bold bg-white px-2 py-1 rounded border border-gray-100">
+                                            <select value={editForm.surgery_name} onChange={e => setEditForm({ ...editForm, surgery_name: e.target.value })} className="flex-1 text-xs font-bold bg-[var(--card)] px-2 py-1 rounded border border-[var(--border-subtle)]">
                                                 <option value="">수술 없음</option>
                                                 {surgeryOptions.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
                                             </select>
-                                            <SmartDatePicker value={editForm.surgery_date || ''} onChange={val => setEditForm({ ...editForm, surgery_date: val })} className="w-28 text-xs font-bold bg-white px-2 py-1 rounded border border-gray-100" />
+                                            <SmartDatePicker value={editForm.surgery_date || ''} onChange={val => setEditForm({ ...editForm, surgery_date: val })} className="w-28 text-xs font-bold bg-[var(--card)] px-2 py-1 rounded border border-[var(--border-subtle)]" />
                                         </div>
                                     ) : (
-                                        <p className="text-xs font-bold text-gray-700">{selectedReview.surgery_name || '-'}{selectedReview.surgery_date ? ` (${selectedReview.surgery_date})` : ''}</p>
+                                        <p className="text-xs font-bold text-[var(--toss-gray-5)]">{selectedReview.surgery_name || '-'}{selectedReview.surgery_date ? ` (${selectedReview.surgery_date})` : ''}</p>
                                     )}
                                 </div>
-                                <div className="bg-gray-50 rounded-xl p-3 flex flex-col items-center">
-                                    <p className="text-[10px] font-bold text-gray-400 mb-1">동반질환/참고사항</p>
+                                <div className="bg-[var(--tab-bg)] rounded-xl p-3 flex flex-col items-center">
+                                    <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mb-1">동반질환/참고사항</p>
                                     {isEditing ? (
-                                        <input value={editForm.comorbidities} onChange={e => setEditForm({ ...editForm, comorbidities: e.target.value })} className="w-full text-xs font-bold bg-white px-2 py-1 rounded border border-gray-100 text-center" />
+                                        <input value={editForm.comorbidities} onChange={e => setEditForm({ ...editForm, comorbidities: e.target.value })} className="w-full text-xs font-bold bg-[var(--card)] px-2 py-1 rounded border border-[var(--border-subtle)] text-center" />
                                     ) : (
-                                        <p className="text-xs font-bold text-gray-700">{selectedReview.comorbidities || '-'}</p>
+                                        <p className="text-xs font-bold text-[var(--toss-gray-5)]">{selectedReview.comorbidities || '-'}</p>
                                     )}
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-center mt-3">
-                                <div className="bg-gray-50 rounded-xl p-3">
-                                    <p className="text-[10px] font-bold text-gray-400 mb-1">입원경로</p>
+                                <div className="bg-[var(--tab-bg)] rounded-xl p-3">
+                                    <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mb-1">입원경로</p>
                                     {isEditing ? (
                                         <select value={editForm.admission_route} onChange={e => setEditForm({ ...editForm, admission_route: e.target.value })} className="w-full text-xs font-bold bg-transparent border-none outline-none text-center">
                                             <option value="">선택</option>
@@ -884,11 +884,11 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                             <option value="전원">전원</option>
                                         </select>
                                     ) : (
-                                        <p className="text-sm font-bold text-gray-700">{selectedReview.admission_route || '-'}</p>
+                                        <p className="text-sm font-bold text-[var(--toss-gray-5)]">{selectedReview.admission_route || '-'}</p>
                                     )}
                                 </div>
-                                <div className="bg-gray-50 rounded-xl p-3">
-                                    <p className="text-[10px] font-bold text-gray-400 mb-1">퇴원유형</p>
+                                <div className="bg-[var(--tab-bg)] rounded-xl p-3">
+                                    <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mb-1">퇴원유형</p>
                                     {isEditing ? (
                                         <select value={editForm.discharge_type} onChange={e => setEditForm({ ...editForm, discharge_type: e.target.value })} className="w-full text-xs font-bold bg-transparent border-none outline-none text-center">
                                             <option value="">선택</option>
@@ -897,15 +897,15 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                             <option value="자의퇴원">자의퇴원</option>
                                         </select>
                                     ) : (
-                                        <p className="text-sm font-bold text-gray-700">{selectedReview.discharge_type || '-'}</p>
+                                        <p className="text-sm font-bold text-[var(--toss-gray-5)]">{selectedReview.discharge_type || '-'}</p>
                                     )}
                                 </div>
-                                <div className="bg-gray-50 rounded-xl p-3">
-                                    <p className="text-[10px] font-bold text-gray-400 mb-1">DRG</p>
+                                <div className="bg-[var(--tab-bg)] rounded-xl p-3">
+                                    <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mb-1">DRG</p>
                                     {isEditing ? (
                                         <input value={editForm.drg_code} onChange={e => setEditForm({ ...editForm, drg_code: e.target.value })} className="w-full text-xs font-bold bg-transparent border-none outline-none text-center" />
                                     ) : (
-                                        <p className="text-sm font-bold text-gray-700">{selectedReview.drg_code || '-'}</p>
+                                        <p className="text-sm font-bold text-[var(--toss-gray-5)]">{selectedReview.drg_code || '-'}</p>
                                     )}
                                 </div>
                             </div>
@@ -914,13 +914,13 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                 <div className="space-y-1.5 mt-3">
                                     <label className="text-[10px] font-bold text-purple-500 uppercase tracking-wider">상병명 (진단코드)</label>
                                     <textarea value={editForm.disease_codes} onChange={e => setEditForm({ ...editForm, disease_codes: e.target.value })}
-                                        className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-[11px] font-mono outline-none focus:ring-2 focus:ring-purple-200 resize-none h-24 custom-scrollbar" />
+                                        className="w-full p-3 bg-[var(--tab-bg)] border border-[var(--border)] rounded-xl text-[11px] font-mono outline-none focus:ring-2 focus:ring-purple-200 resize-none h-24 custom-scrollbar" />
                                 </div>
                             ) : (
                                 selectedReview.disease_codes && (
                                     <div className="bg-purple-50 p-3 rounded-xl mt-3">
                                         <p className="text-[10px] font-bold text-purple-500 mb-1">🏥 상병명</p>
-                                        <p className="text-xs font-mono text-gray-700 whitespace-pre-line">{selectedReview.disease_codes}</p>
+                                        <p className="text-xs font-mono text-[var(--toss-gray-5)] whitespace-pre-line">{selectedReview.disease_codes}</p>
                                     </div>
                                 )
                             )}
@@ -929,53 +929,53 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                 <div className="space-y-1.5 mt-3">
                                     <label className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">차트 데이터 (수정 시 체크리스트 재구성 가능)</label>
                                     <textarea value={editForm.chart_data} onChange={e => setEditForm({ ...editForm, chart_data: e.target.value })}
-                                        className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-[10px] font-mono outline-none focus:ring-2 focus:ring-blue-200 resize-none h-32 custom-scrollbar" />
+                                        className="w-full p-3 bg-[var(--tab-bg)] border border-[var(--border)] rounded-xl text-[10px] font-mono outline-none focus:ring-2 focus:ring-blue-200 resize-none h-32 custom-scrollbar" />
                                 </div>
                             )}
                         </div>
 
                         {isEditing && (
                             <div className="flex gap-2">
-                                <button onClick={handleCancelEdit} className="flex-1 py-3 bg-gray-100 text-gray-600 text-sm font-bold rounded-xl hover:bg-gray-200 transition-all">취소</button>
-                                <button onClick={handleUpdateReview} className="flex-[2] py-3 bg-[var(--toss-blue)] text-white text-sm font-bold rounded-xl hover:opacity-90 transition-all shadow-lg shadow-blue-600/20">변경 내용 저장</button>
+                                <button onClick={handleCancelEdit} className="flex-1 py-3 bg-[var(--tab-bg)] text-[var(--toss-gray-4)] text-sm font-bold rounded-xl hover:bg-[var(--tab-bg)] transition-all">취소</button>
+                                <button onClick={handleUpdateReview} className="flex-[2] py-3 bg-[var(--accent)] text-white text-sm font-bold rounded-xl hover:opacity-90 transition-all shadow-sm shadow-blue-600/20">변경 내용 저장</button>
                             </div>
                         )}
 
                         {/* 체크리스트 */}
-                        <div className="bg-white rounded-2xl border border-[var(--toss-border)] p-6 shadow-sm space-y-3">
+                        <div className="bg-[var(--card)] rounded-2xl border border-[var(--border)] p-4 shadow-sm space-y-3">
                             <div className="flex justify-between items-center">
-                                <h3 className="text-sm font-bold text-gray-800">체크리스트 ({selectedReview.items.filter(i => i.checked).length}/{selectedReview.items.length})</h3>
+                                <h3 className="text-sm font-bold text-[var(--foreground)]">체크리스트 ({selectedReview.items.filter(i => i.checked).length}/{selectedReview.items.length})</h3>
                                 <div className="flex items-center gap-2">
-                                    <span className="text-xs font-bold text-[var(--toss-blue)]">{selectedReview.items.length > 0 ? Math.round((selectedReview.items.filter(i => i.checked).length / selectedReview.items.length) * 100) : 0}%</span>
+                                    <span className="text-xs font-bold text-[var(--accent)]">{selectedReview.items.length > 0 ? Math.round((selectedReview.items.filter(i => i.checked).length / selectedReview.items.length) * 100) : 0}%</span>
                                     {selectedReview.status !== 'approved' && (
                                         <div className="flex gap-1">
                                             <button data-testid="discharge-review-toggle-all" onClick={() => toggleAll(true)} className="px-2 py-1 text-[10px] font-bold text-green-600 bg-green-50 rounded hover:bg-green-100">전체✓</button>
-                                            <button onClick={() => toggleAll(false)} className="px-2 py-1 text-[10px] font-bold text-gray-500 bg-gray-100 rounded hover:bg-gray-200">해제</button>
+                                            <button onClick={() => toggleAll(false)} className="px-2 py-1 text-[10px] font-bold text-[var(--toss-gray-4)] bg-[var(--tab-bg)] rounded hover:bg-[var(--tab-bg)]">해제</button>
                                         </div>
                                     )}
                                 </div>
                             </div>
-                            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                                <div className="h-full bg-[var(--toss-blue)] rounded-full transition-all duration-500"
+                            <div className="h-2 bg-[var(--tab-bg)] rounded-full overflow-hidden">
+                                <div className="h-full bg-[var(--accent)] rounded-full transition-all duration-500"
                                     style={{ width: `${selectedReview.items.length > 0 ? (selectedReview.items.filter(i => i.checked).length / selectedReview.items.length) * 100 : 0}%` }} />
                             </div>
                             <div className="space-y-1 max-h-[400px] overflow-y-auto custom-scrollbar">
                                 {selectedReview.items.map(item => (
                                     <button key={item.id} onClick={() => selectedReview.status !== 'approved' && toggleItem(selectedReview.id, item.id)}
                                         disabled={selectedReview.status === 'approved'}
-                                        className={`w-full flex items-center gap-3 p-2.5 rounded-lg text-left transition-all ${item.checked ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-transparent hover:border-gray-200'} ${selectedReview.status === 'approved' ? 'cursor-default' : 'cursor-pointer'}`}>
-                                        <div className={`w-4 h-4 rounded-full flex items-center justify-center border-2 shrink-0 text-[10px] ${item.checked ? 'bg-green-500 border-green-500 text-white' : 'border-gray-300'}`}>{item.checked && '✓'}</div>
-                                        {item.code && <span className="font-mono text-[10px] text-gray-400 w-20 shrink-0 truncate">{item.code}</span>}
-                                        <span className={`text-xs font-medium flex-1 ${item.checked ? 'text-green-700 line-through' : 'text-gray-700'}`}>{item.label}</span>
+                                        className={`w-full flex items-center gap-3 p-2.5 rounded-lg text-left transition-all ${item.checked ? 'bg-green-50 border border-green-200' : 'bg-[var(--tab-bg)] border border-transparent hover:border-[var(--border)]'} ${selectedReview.status === 'approved' ? 'cursor-default' : 'cursor-pointer'}`}>
+                                        <div className={`w-4 h-4 rounded-full flex items-center justify-center border-2 shrink-0 text-[10px] ${item.checked ? 'bg-green-500 border-green-500 text-white' : 'border-[var(--border)]'}`}>{item.checked && '✓'}</div>
+                                        {item.code && <span className="font-mono text-[10px] text-[var(--toss-gray-3)] w-20 shrink-0 truncate">{item.code}</span>}
+                                        <span className={`text-xs font-medium flex-1 ${item.checked ? 'text-green-700 line-through' : 'text-[var(--toss-gray-5)]'}`}>{item.label}</span>
                                     </button>
                                 ))}
                             </div>
                         </div>
 
                         {/* 자동 비교 */}
-                        <div className="bg-white rounded-2xl border border-[var(--toss-border)] p-6 shadow-sm space-y-4">
+                        <div className="bg-[var(--card)] rounded-2xl border border-[var(--border)] p-4 shadow-sm space-y-4">
                             <div className="flex justify-between items-center">
-                                <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2"><span className="text-lg">🔍</span> 템플릿 자동 비교</h3>
+                                <h3 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2"><span className="text-lg">🔍</span> 템플릿 자동 비교</h3>
                                 <button onClick={autoCompare} disabled={templates.length === 0}
                                     className="px-4 py-2 text-xs font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 disabled:opacity-40 transition-all">
                                     {templates.length > 0 ? '🔍 자동 비교' : '⚙️ 템플릿 설정 필요'}
@@ -1022,27 +1022,27 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                         </div>
 
                         {/* AI 분석 */}
-                        <div className="bg-white rounded-2xl border border-[var(--toss-border)] p-6 shadow-sm space-y-4">
+                        <div className="bg-[var(--card)] rounded-2xl border border-[var(--border)] p-4 shadow-sm space-y-4">
                             <div className="flex justify-between items-center">
-                                <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2"><span className="text-lg">🤖</span> AI 분석 <span className="text-[10px] font-bold text-purple-500 bg-purple-50 px-2 py-0.5 rounded-lg">Gemini 3</span></h3>
+                                <h3 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2"><span className="text-lg">🤖</span> AI 분석 <span className="text-[10px] font-bold text-purple-500 bg-purple-50 px-2 py-0.5 rounded-lg">Gemini 3</span></h3>
                                 <button onClick={requestAiAnalysis} disabled={aiLoading}
                                     className="px-4 py-2 text-xs font-bold text-white bg-purple-600 rounded-xl hover:bg-purple-700 disabled:opacity-50 transition-all flex items-center gap-1.5">
                                     {aiLoading ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> 분석 중...</> : '✨ AI 분석'}
                                 </button>
                             </div>
                             {(aiResult || aiLoading) && (
-                                <div className={`p-5 rounded-xl border ${aiLoading ? 'bg-purple-50/50 border-purple-100' : 'bg-gray-50 border-gray-200'}`}>
+                                <div className={`p-5 rounded-xl border ${aiLoading ? 'bg-purple-50/50 border-purple-100' : 'bg-[var(--tab-bg)] border-[var(--border)]'}`}>
                                     {aiLoading ? (
                                         <div className="flex items-center gap-3"><div className="w-5 h-5 border-2 border-purple-200 border-t-purple-600 rounded-full animate-spin" /><p className="text-sm text-purple-600 font-medium">심사 분석 중...</p></div>
-                                    ) : <div className="text-sm text-gray-700 font-medium leading-relaxed whitespace-pre-wrap">{aiResult}</div>}
+                                    ) : <div className="text-sm text-[var(--toss-gray-5)] font-medium leading-relaxed whitespace-pre-wrap">{aiResult}</div>}
                                 </div>
                             )}
-                            {!aiResult && !aiLoading && <p className="text-xs text-gray-400 font-medium text-center py-4">AI 분석으로 누락/과잉 청구를 확인하세요.</p>}
+                            {!aiResult && !aiLoading && <p className="text-xs text-[var(--toss-gray-3)] font-medium text-center py-4">AI 분석으로 누락/과잉 청구를 확인하세요.</p>}
                         </div>
 
                         {selectedReview.status !== 'approved' && (
                             <button data-testid="discharge-review-approve" onClick={() => approveReview(selectedReview.id)}
-                                className="w-full py-4 bg-green-600 text-white text-sm font-bold rounded-xl hover:bg-green-700 transition-all active:scale-[0.99] shadow-lg shadow-green-600/20">✅ 퇴원 승인</button>
+                                className="w-full py-4 bg-green-600 text-white text-sm font-bold rounded-xl hover:bg-green-700 transition-all active:scale-[0.99] shadow-sm shadow-green-600/20">✅ 퇴원 승인</button>
                         )}
                     </div>
                 )}

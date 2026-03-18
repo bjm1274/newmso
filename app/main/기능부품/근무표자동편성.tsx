@@ -2409,7 +2409,7 @@ function getShiftCode(name: string) {
 function getShiftBadgeClass(name: string) {
   const normalized = normalizeShiftName(name);
   if (normalized.includes('휴무') || normalized.includes('off') || normalized.includes('비번') || normalized.includes('오프')) {
-    return 'bg-zinc-100 text-zinc-500 border-zinc-200';
+    return 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)] border-[var(--border)]';
   }
   if (normalized.includes('휴가') || normalized.includes('연차')) {
     return 'bg-green-50 text-green-700 border-green-200';
@@ -3796,7 +3796,7 @@ export default function AutoRosterPlanner({
 
     return (
       <div
-        className="mt-4 rounded-[24px] border border-[var(--toss-border)] bg-white p-5 shadow-sm"
+        className="mt-4 rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm"
         data-testid="roster-warning-report"
       >
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -3807,23 +3807,23 @@ export default function AutoRosterPlanner({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <span className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-[11px] font-semibold text-rose-700">
+            <span className="rounded-[var(--radius-md)] border border-rose-200 bg-rose-50 px-3 py-1 text-[11px] font-semibold text-rose-700">
               인원 부족 {rosterWarningReport.headcountCount}건
             </span>
-            <span className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-[11px] font-semibold text-red-700">
+            <span className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-3 py-1 text-[11px] font-semibold text-red-700">
               인력 부족 {rosterWarningReport.coverageCount}건
             </span>
-            <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-700">
+            <span className="rounded-[var(--radius-md)] border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-700">
               나이트 범위 {rosterWarningReport.nightRangeCount}건
             </span>
-            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold text-slate-700">
+            <span className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--tab-bg)] px-3 py-1 text-[11px] font-semibold text-[var(--toss-gray-5)]">
               OFF 미달 {rosterWarningReport.offDaysCount}건
             </span>
           </div>
         </div>
 
         {rosterWarningReport.items.length === 0 ? (
-          <div className="mt-4 rounded-[18px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+          <div className="mt-4 rounded-[var(--radius-xl)] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
             현재 기준으로 생성 경고가 없습니다.
           </div>
         ) : (
@@ -3833,7 +3833,7 @@ export default function AutoRosterPlanner({
                 key={item.id}
                 type="button"
                 onClick={() => jumpToRosterWarningTarget(item.targetTestId)}
-                className={`w-full rounded-[18px] border px-4 py-3 text-left transition-colors ${
+                className={`w-full rounded-[var(--radius-xl)] border px-4 py-3 text-left transition-colors ${
                   item.tone === 'red'
                     ? 'border-red-200 bg-red-50'
                     : item.tone === 'amber'
@@ -3869,7 +3869,7 @@ export default function AutoRosterPlanner({
 
     return (
       <div
-        className="mt-4 rounded-[24px] border border-[var(--toss-border)] bg-white p-5 shadow-sm"
+        className="mt-4 rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm"
         data-testid="roster-fairness-board"
       >
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -3880,19 +3880,19 @@ export default function AutoRosterPlanner({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <span className="rounded-full border border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-3 py-1 text-[11px] font-semibold text-[var(--foreground)]">
+            <span className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] px-3 py-1 text-[11px] font-semibold text-[var(--foreground)]">
               평균 N {fairnessScoreboard.averageNight.toFixed(1)}
             </span>
-            <span className="rounded-full border border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-3 py-1 text-[11px] font-semibold text-[var(--foreground)]">
+            <span className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] px-3 py-1 text-[11px] font-semibold text-[var(--foreground)]">
               평균 주말 {fairnessScoreboard.averageWeekend.toFixed(1)}
             </span>
-            <span className="rounded-full border border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-3 py-1 text-[11px] font-semibold text-[var(--foreground)]">
+            <span className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] px-3 py-1 text-[11px] font-semibold text-[var(--foreground)]">
               평균 공휴일 {fairnessScoreboard.averageHoliday.toFixed(1)}
             </span>
-            <span className="rounded-full border border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-3 py-1 text-[11px] font-semibold text-[var(--foreground)]">
+            <span className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] px-3 py-1 text-[11px] font-semibold text-[var(--foreground)]">
               평균 연속근무 {fairnessScoreboard.averageConsecutive.toFixed(1)}일
             </span>
-            <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[11px] font-semibold text-sky-700">
+            <span className="rounded-[var(--radius-md)] border border-sky-200 bg-sky-50 px-3 py-1 text-[11px] font-semibold text-sky-700">
               공휴일 {fairnessScoreboard.holidayCount}일 기준
             </span>
           </div>
@@ -3901,7 +3901,7 @@ export default function AutoRosterPlanner({
         <div className="mt-4 overflow-x-auto">
           <table className="min-w-[760px] table-fixed border-collapse">
             <thead>
-              <tr className="border-b border-[var(--toss-border)]">
+              <tr className="border-b border-[var(--border)]">
                 <th className="px-3 py-3 text-left text-[11px] font-bold text-[var(--toss-gray-3)]">직원</th>
                 <th className="px-3 py-3 text-center text-[11px] font-bold text-[var(--toss-gray-3)]">나이트</th>
                 <th className="px-3 py-3 text-center text-[11px] font-bold text-[var(--toss-gray-3)]">주말</th>
@@ -3923,7 +3923,7 @@ export default function AutoRosterPlanner({
                 return (
                   <tr
                     key={row.staffId}
-                    className="border-b border-[var(--toss-border)] last:border-b-0"
+                    className="border-b border-[var(--border)] last:border-b-0"
                     data-testid={`roster-fairness-row-${row.staffId}`}
                   >
                     <td className="px-3 py-3 text-sm font-bold text-[var(--foreground)]">{row.staffName}</td>
@@ -3934,7 +3934,7 @@ export default function AutoRosterPlanner({
                       {row.maxConsecutiveWorkDays}일
                     </td>
                     <td className="px-3 py-3 text-center">
-                      <span className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-bold ${scoreToneClass}`}>
+                      <span className={`inline-flex rounded-[var(--radius-md)] border px-3 py-1 text-[11px] font-bold ${scoreToneClass}`}>
                         {row.fairnessScore}점
                       </span>
                     </td>
@@ -5426,7 +5426,7 @@ export default function AutoRosterPlanner({
 
   if (!canAccess) {
     return (
-      <div className="rounded-[20px] border border-red-100 bg-red-50 p-6 text-sm font-semibold text-red-600">
+      <div className="rounded-[var(--radius-xl)] border border-red-100 bg-red-50 p-4 text-sm font-semibold text-red-600">
         부서장 이상만 교대근무 자동생성 기능을 사용할 수 있습니다.
       </div>
     );
@@ -5434,8 +5434,8 @@ export default function AutoRosterPlanner({
 
   if (panelMode === 'rules') {
     return (
-      <div className="space-y-6" data-testid="roster-rule-manager">
-        <div className="rounded-[24px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-6 shadow-sm">
+      <div className="space-y-4" data-testid="roster-rule-manager">
+        <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h3 className="text-xl font-bold text-[var(--foreground)]">근무규칙생성</h3>
@@ -5443,14 +5443,14 @@ export default function AutoRosterPlanner({
                 나이트 뒤 데이 금지, OFF 일수, 3교대자 월 나이트 최소·최대 같은 병동 운영 규칙을 저장해 근무표 자동생성에 반영합니다.
               </p>
             </div>
-            <div className="rounded-[18px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-4 py-3 text-sm font-semibold text-[var(--foreground)]">
+            <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--muted)] px-4 py-3 text-sm font-semibold text-[var(--foreground)]">
               적용 사업체 · {selectedCompany || '미선택'}
             </div>
           </div>
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-          <div className="rounded-[24px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-6 shadow-sm">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+          <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <h4 className="text-lg font-bold text-[var(--foreground)]">규칙 편집</h4>
@@ -5461,21 +5461,21 @@ export default function AutoRosterPlanner({
               <button
                 type="button"
                 onClick={resetGenerationRuleDraft}
-                className="rounded-[14px] border border-[var(--toss-border)] bg-white px-4 py-3 text-sm font-bold text-[var(--foreground)]"
+                className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-bold text-[var(--foreground)]"
                 data-testid="generation-rule-reset"
               >
                 새 규칙
               </button>
             </div>
 
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
               <label className="flex flex-col gap-2">
                 <span className="text-xs font-bold text-[var(--toss-gray-3)]">규칙 이름</span>
                 <input
                   value={generationRuleDraft.name}
                   onChange={(event) => updateGenerationRuleDraftField('name', event.target.value)}
                   placeholder="예: 병동 기본 안전규칙"
-                  className="rounded-[14px] border border-[var(--toss-border)] bg-white px-4 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                  className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
                   data-testid="generation-rule-name-input"
                 />
               </label>
@@ -5485,12 +5485,12 @@ export default function AutoRosterPlanner({
                   value={generationRuleDraft.teamKeywords.join(', ')}
                   onChange={(event) => updateGenerationRuleDraftField('teamKeywords', event.target.value)}
                   placeholder="예: 병동팀, 1병동"
-                  className="rounded-[14px] border border-[var(--toss-border)] bg-white px-4 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                  className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
                   data-testid="generation-rule-team-keywords-input"
                 />
               </label>
 
-              <div className="rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-4 py-3 md:col-span-2">
+              <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)] px-4 py-3 md:col-span-2">
                 <p className="text-sm font-bold text-[var(--foreground)]">일자별 최소 인원</p>
                 <p className="mt-1 text-xs text-[var(--toss-gray-3)]">
                   자동생성 시 각 날짜마다 우선 확보하려는 최소 D / E / N 인원입니다. 부족한 경우 가능한 범위 안에서 최대한 맞춥니다.
@@ -5506,7 +5506,7 @@ export default function AutoRosterPlanner({
                       onChange={(event) =>
                         updateGenerationRuleDraftField('minDayStaff', event.target.value)
                       }
-                      className="rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                      className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
                       data-testid="generation-rule-min-day-staff"
                     />
                   </label>
@@ -5520,7 +5520,7 @@ export default function AutoRosterPlanner({
                       onChange={(event) =>
                         updateGenerationRuleDraftField('minEveningStaff', event.target.value)
                       }
-                      className="rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                      className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
                       data-testid="generation-rule-min-evening-staff"
                     />
                   </label>
@@ -5534,7 +5534,7 @@ export default function AutoRosterPlanner({
                       onChange={(event) =>
                         updateGenerationRuleDraftField('minNightStaff', event.target.value)
                       }
-                      className="rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                      className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
                       data-testid="generation-rule-min-night-staff"
                     />
                   </label>
@@ -5549,12 +5549,12 @@ export default function AutoRosterPlanner({
                 onChange={(event) => updateGenerationRuleDraftField('description', event.target.value)}
                 placeholder="예: 병동 3교대자는 월 6번 나이트, 나이트 뒤 최소 하루 OFF"
                 rows={3}
-                className="rounded-[16px] border border-[var(--toss-border)] bg-white px-4 py-3 text-sm leading-6 text-[var(--foreground)] outline-none"
+                className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm leading-6 text-[var(--foreground)] outline-none"
               />
             </label>
 
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
-              <label className="flex items-center justify-between rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-4 py-3">
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <label className="flex items-center justify-between rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)] px-4 py-3">
                 <div>
                   <p className="text-sm font-bold text-[var(--foreground)]">나이트 다음 데이 금지</p>
                   <p className="mt-1 text-xs text-[var(--toss-gray-3)]">나이트 다음날은 OFF 또는 이브만 허용합니다.</p>
@@ -5570,7 +5570,7 @@ export default function AutoRosterPlanner({
                 />
               </label>
 
-              <label className="flex items-center justify-between rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-4 py-3">
+              <label className="flex items-center justify-between rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)] px-4 py-3">
                 <div>
                   <p className="text-sm font-bold text-[var(--foreground)]">이브 다음날 데이 금지</p>
                   <p className="mt-1 text-xs text-[var(--toss-gray-3)]">이브 근무 다음날에는 데이 대신 OFF나 이브/나이트만 배치합니다.</p>
@@ -5586,7 +5586,7 @@ export default function AutoRosterPlanner({
                 />
               </label>
 
-              <label className="flex items-center justify-between rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-4 py-3">
+              <label className="flex items-center justify-between rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)] px-4 py-3">
                 <div>
                   <p className="text-sm font-bold text-[var(--foreground)]">전담자는 자기 시간대만</p>
                   <p className="mt-1 text-xs text-[var(--toss-gray-3)]">데이/이브/나이트 전담은 연결된 시간대만 근무합니다.</p>
@@ -5602,7 +5602,7 @@ export default function AutoRosterPlanner({
                 />
               </label>
 
-              <label className="flex items-center justify-between rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-4 py-3">
+              <label className="flex items-center justify-between rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)] px-4 py-3">
                 <div>
                   <p className="text-sm font-bold text-[var(--foreground)]">순환근무 밴드 균형</p>
                   <p className="mt-1 text-xs text-[var(--toss-gray-3)]">병동 전체에서 데이/이브/나이트가 한쪽으로 치우치지 않게 분산합니다.</p>
@@ -5618,7 +5618,7 @@ export default function AutoRosterPlanner({
                 />
               </label>
 
-              <label className="flex items-center justify-between rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-4 py-3">
+              <label className="flex items-center justify-between rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)] px-4 py-3">
                 <div>
                   <p className="text-sm font-bold text-[var(--foreground)]">주말 근무 균등 분산</p>
                   <p className="mt-1 text-xs text-[var(--toss-gray-3)]">토·일 근무가 특정 직원에게 몰리지 않도록 OFF를 우선 분산합니다.</p>
@@ -5634,7 +5634,7 @@ export default function AutoRosterPlanner({
                 />
               </label>
 
-              <label className="flex items-center justify-between rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-4 py-3">
+              <label className="flex items-center justify-between rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)] px-4 py-3">
                 <div>
                   <p className="text-sm font-bold text-[var(--foreground)]">공휴일 근무 공정 배분</p>
                   <p className="mt-1 text-xs text-[var(--toss-gray-3)]">법정 공휴일 근무도 주말처럼 균등하게 분산합니다.</p>
@@ -5650,7 +5650,7 @@ export default function AutoRosterPlanner({
                 />
               </label>
 
-              <label className="flex items-center justify-between rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-4 py-3">
+              <label className="flex items-center justify-between rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)] px-4 py-3">
                 <div>
                   <p className="text-sm font-bold text-[var(--foreground)]">신규간호사 분산 배치</p>
                   <p className="mt-1 text-xs text-[var(--toss-gray-3)]">입사 12개월 이하 간호사가 같은 근무에만 몰리지 않게 배치합니다.</p>
@@ -5666,7 +5666,7 @@ export default function AutoRosterPlanner({
                 />
               </label>
 
-              <label className="flex flex-col gap-2 rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-4 py-3">
+              <label className="flex flex-col gap-2 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)] px-4 py-3">
                 <span className="text-sm font-bold text-[var(--foreground)]">나이트 뒤 OFF 일수</span>
                 <input
                   type="number"
@@ -5676,13 +5676,13 @@ export default function AutoRosterPlanner({
                   onChange={(event) =>
                     updateGenerationRuleDraftField('offDaysAfterNight', event.target.value)
                   }
-                  className="rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                  className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
                   data-testid="generation-rule-off-days-after-night"
                 />
                 <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">최대값 안에서 자동으로 조정됩니다.</span>
               </label>
 
-              <label className="flex flex-col gap-2 rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-4 py-3">
+              <label className="flex flex-col gap-2 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)] px-4 py-3">
                 <span className="text-sm font-bold text-[var(--foreground)]">나이트 연속 블록</span>
                 <input
                   type="number"
@@ -5692,13 +5692,13 @@ export default function AutoRosterPlanner({
                   onChange={(event) =>
                     updateGenerationRuleDraftField('nightBlockSize', event.target.value)
                   }
-                  className="rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                  className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
                   data-testid="generation-rule-night-block-size"
                 />
                 <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">최대 연속 일수까지만 나이트를 묶습니다.</span>
               </label>
 
-              <label className="flex flex-col gap-2 rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-4 py-3">
+              <label className="flex flex-col gap-2 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)] px-4 py-3">
                 <span className="text-sm font-bold text-[var(--foreground)]">최대 연속근무일</span>
                 <input
                   type="number"
@@ -5708,12 +5708,12 @@ export default function AutoRosterPlanner({
                   onChange={(event) =>
                     updateGenerationRuleDraftField('maxConsecutiveWorkDays', event.target.value)
                   }
-                  className="rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                  className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
                   data-testid="generation-rule-max-consecutive-work-days"
                 />
               </label>
 
-              <label className="flex flex-col gap-2 rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-4 py-3">
+              <label className="flex flex-col gap-2 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)] px-4 py-3">
                 <span className="text-sm font-bold text-[var(--foreground)]">연속 이브 최대 횟수</span>
                 <input
                   type="number"
@@ -5723,13 +5723,13 @@ export default function AutoRosterPlanner({
                   onChange={(event) =>
                     updateGenerationRuleDraftField('maxConsecutiveEveningShifts', event.target.value)
                   }
-                  className="rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                  className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
                   data-testid="generation-rule-max-consecutive-evening-shifts"
                 />
                 <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">0이면 제한하지 않습니다.</span>
               </label>
 
-              <label className="flex flex-col gap-2 rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-4 py-3">
+              <label className="flex flex-col gap-2 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)] px-4 py-3">
                 <span className="text-sm font-bold text-[var(--foreground)]">주말 연속근무 최대 일수</span>
                 <input
                   type="number"
@@ -5739,13 +5739,13 @@ export default function AutoRosterPlanner({
                   onChange={(event) =>
                     updateGenerationRuleDraftField('maxConsecutiveWeekendWorkDays', event.target.value)
                   }
-                  className="rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                  className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
                   data-testid="generation-rule-max-consecutive-weekend-work-days"
                 />
                 <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">0이면 토·일 연속근무 제한을 적용하지 않습니다.</span>
               </label>
 
-              <div className="flex flex-col gap-2 rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-4 py-3 md:col-span-2">
+              <div className="flex flex-col gap-2 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)] px-4 py-3 md:col-span-2">
                 <span className="text-sm font-bold text-[var(--foreground)]">3교대자 월 나이트 범위</span>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <label className="flex flex-col gap-2">
@@ -5758,7 +5758,7 @@ export default function AutoRosterPlanner({
                       onChange={(event) =>
                         updateGenerationRuleDraftField('minRotationNightCount', event.target.value)
                       }
-                      className="rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                      className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
                       data-testid="generation-rule-rotation-night-min-count"
                     />
                   </label>
@@ -5772,14 +5772,14 @@ export default function AutoRosterPlanner({
                       onChange={(event) =>
                         updateGenerationRuleDraftField('maxRotationNightCount', event.target.value)
                       }
-                      className="rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                      className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
                       data-testid="generation-rule-rotation-night-max-count"
                     />
                   </label>
                 </div>
               </div>
 
-              <label className="flex flex-col gap-2 rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-4 py-3 md:col-span-2">
+              <label className="flex flex-col gap-2 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)] px-4 py-3 md:col-span-2">
                 <span className="text-sm font-bold text-[var(--foreground)]">최소 OFF 일수</span>
                 <input
                   type="number"
@@ -5789,7 +5789,7 @@ export default function AutoRosterPlanner({
                   onChange={(event) =>
                     updateGenerationRuleDraftField('minMonthlyOffDays', event.target.value)
                   }
-                  className="rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                  className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
                   data-testid="generation-rule-min-monthly-off-days"
                 />
                 <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">최소 휴무일은 7일 이상부터 설정됩니다.</span>
@@ -5800,7 +5800,7 @@ export default function AutoRosterPlanner({
               <button
                 type="button"
                 onClick={saveGenerationRule}
-                className="rounded-[14px] bg-[var(--toss-blue)] px-4 py-3 text-sm font-bold text-white"
+                className="rounded-[var(--radius-lg)] bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white"
                 data-testid="generation-rule-save"
               >
                 규칙 저장
@@ -5808,15 +5808,15 @@ export default function AutoRosterPlanner({
             </div>
           </div>
 
-          <div className="space-y-6">
-            <div className="rounded-[24px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-6 shadow-sm">
+          <div className="space-y-4">
+            <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
               <h4 className="text-lg font-bold text-[var(--foreground)]">저장된 규칙</h4>
               <p className="mt-1 text-sm text-[var(--toss-gray-3)]">
                 팀 기준으로 자동 선택되며, 생성 화면에서 직접 골라 적용할 수도 있습니다.
               </p>
 
               {companyGenerationRules.length === 0 ? (
-                <div className="mt-4 rounded-[18px] border border-dashed border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-5 text-sm font-semibold text-[var(--toss-gray-3)]">
+                <div className="mt-4 rounded-[var(--radius-xl)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-5 text-sm font-semibold text-[var(--toss-gray-3)]">
                   아직 저장된 근무규칙이 없습니다.
                 </div>
               ) : (
@@ -5824,13 +5824,13 @@ export default function AutoRosterPlanner({
                   {companyGenerationRules.map((rule) => (
                     <div
                       key={rule.id}
-                      className="rounded-[18px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)]/80 p-4"
+                      className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--muted)]/80 p-4"
                       data-testid={`generation-rule-card-${rule.id}`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="text-sm font-bold text-[var(--foreground)]">{rule.name}</p>
-                          <p className="mt-1 text-xs font-semibold text-[var(--toss-blue)]">
+                          <p className="mt-1 text-xs font-semibold text-[var(--accent)]">
                             {rule.teamKeywords.join(', ')}
                           </p>
                         </div>
@@ -5838,7 +5838,7 @@ export default function AutoRosterPlanner({
                           <button
                             type="button"
                             onClick={() => editGenerationRule(rule)}
-                            className="rounded-[10px] border border-[var(--toss-border)] bg-white px-3 py-2 text-xs font-bold text-[var(--foreground)]"
+                            className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-xs font-bold text-[var(--foreground)]"
                             data-testid={`generation-rule-edit-${rule.id}`}
                           >
                             수정
@@ -5850,57 +5850,57 @@ export default function AutoRosterPlanner({
                                 deleteGenerationRule(rule.id);
                               }
                             }}
-                            className="rounded-[10px] border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600"
+                            className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600"
                             data-testid={`generation-rule-delete-${rule.id}`}
                           >
                             삭제
                           </button>
                         </div>
-                        <span className="rounded-full border border-[var(--toss-border)] bg-white px-3 py-1">
+                        <span className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1">
                           연속근무 {rule.maxConsecutiveWorkDays}일
                         </span>
                         {rule.distributeWeekendShifts ? (
-                          <span className="rounded-full border border-[var(--toss-border)] bg-white px-3 py-1">
+                          <span className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1">
                             주말 분산
                           </span>
                         ) : null}
                         {rule.distributeHolidayShifts ? (
-                          <span className="rounded-full border border-[var(--toss-border)] bg-white px-3 py-1">
+                          <span className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1">
                             공휴일 분산
                           </span>
                         ) : null}
                         {rule.separateNewNursesByShift ? (
-                          <span className="rounded-full border border-[var(--toss-border)] bg-white px-3 py-1">
+                          <span className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1">
                             신규간호사 분산
                           </span>
                         ) : null}
                         {(rule.minDayStaff || rule.minEveningStaff || rule.minNightStaff) > 0 ? (
-                          <span className="rounded-full border border-[var(--toss-border)] bg-white px-3 py-1">
+                          <span className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1">
                             최소 D/E/N {rule.minDayStaff}/{rule.minEveningStaff}/{rule.minNightStaff}
                           </span>
                         ) : null}
                       </div>
 
                       <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold text-[var(--foreground)]">
-                        <span className="rounded-full border border-[var(--toss-border)] bg-white px-3 py-1">
+                        <span className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1">
                           월 나이트 {rule.minRotationNightCount}~{rule.maxRotationNightCount}개
                         </span>
-                        <span className="rounded-full border border-[var(--toss-border)] bg-white px-3 py-1">
+                        <span className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1">
                           연속 나이트 {rule.nightBlockSize}개
                         </span>
-                        <span className="rounded-full border border-[var(--toss-border)] bg-white px-3 py-1">
+                        <span className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1">
                           OFF {rule.offDaysAfterNight}일
                         </span>
-                        <span className="rounded-full border border-[var(--toss-border)] bg-white px-3 py-1">
+                        <span className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1">
                           최소 OFF {rule.minMonthlyOffDays}일
                         </span>
                         {rule.maxConsecutiveEveningShifts > 0 ? (
-                          <span className="rounded-full border border-[var(--toss-border)] bg-white px-3 py-1">
+                          <span className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1">
                             연속 이브 최대 {rule.maxConsecutiveEveningShifts}회
                           </span>
                         ) : null}
                         {rule.maxConsecutiveWeekendWorkDays > 0 ? (
-                          <span className="rounded-full border border-[var(--toss-border)] bg-white px-3 py-1">
+                          <span className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1">
                             주말 연속근무 최대 {rule.maxConsecutiveWeekendWorkDays}일
                           </span>
                         ) : null}
@@ -5922,8 +5922,8 @@ export default function AutoRosterPlanner({
 
   if (panelMode === 'patterns') {
     return (
-      <div className="space-y-6" data-testid="roster-pattern-manager">
-        <div className="rounded-[24px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-6 shadow-sm">
+      <div className="space-y-4" data-testid="roster-pattern-manager">
+        <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h3 className="text-xl font-bold text-[var(--foreground)]">교대방식 패턴</h3>
@@ -5931,14 +5931,14 @@ export default function AutoRosterPlanner({
                 팀별 기본 사이클과 전담자 그룹을 저장해 두고, 생성 화면에서 바로 불러와 월간 근무표를 자동 편성합니다.
               </p>
             </div>
-            <div className="rounded-[18px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-4 py-3 text-sm font-semibold text-[var(--foreground)]">
+            <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--muted)] px-4 py-3 text-sm font-semibold text-[var(--foreground)]">
               적용 사업체 · {selectedCompany || '미선택'}
             </div>
           </div>
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.7fr)]">
-          <div className="rounded-[24px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-6 shadow-sm">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.7fr)]">
+          <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <h4 className="text-lg font-bold text-[var(--foreground)]">패턴 편집</h4>
@@ -5949,21 +5949,21 @@ export default function AutoRosterPlanner({
               <button
                 type="button"
                 onClick={resetPatternDraft}
-                className="rounded-[14px] border border-[var(--toss-border)] bg-white px-4 py-3 text-sm font-bold text-[var(--foreground)]"
+                className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-bold text-[var(--foreground)]"
                 data-testid="pattern-profile-reset"
               >
                 새 패턴
               </button>
             </div>
 
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
               <label className="flex flex-col gap-2">
                 <span className="text-xs font-bold text-[var(--toss-gray-3)]">패턴 이름</span>
                 <input
                   value={patternDraft.name}
                   onChange={(event) => updatePatternDraftField('name', event.target.value)}
                   placeholder="예: 병동 3교대 기본"
-                  className="rounded-[14px] border border-[var(--toss-border)] bg-white px-4 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                  className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
                   data-testid="pattern-name-input"
                 />
               </label>
@@ -5973,7 +5973,7 @@ export default function AutoRosterPlanner({
                   value={patternDraft.teamKeywords.join(', ')}
                   onChange={(event) => updatePatternDraftField('teamKeywords', event.target.value)}
                   placeholder="예: 병동팀, 1병동, 간호병동"
-                  className="rounded-[14px] border border-[var(--toss-border)] bg-white px-4 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                  className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
                   data-testid="pattern-team-keywords-input"
                 />
               </label>
@@ -5986,15 +5986,15 @@ export default function AutoRosterPlanner({
                 onChange={(event) => updatePatternDraftField('description', event.target.value)}
                 placeholder="예: 병동 순환 3교대 + 나이트전담 1명 + 데이전담 1명"
                 rows={3}
-                className="rounded-[16px] border border-[var(--toss-border)] bg-white px-4 py-3 text-sm leading-6 text-[var(--foreground)] outline-none"
+                className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm leading-6 text-[var(--foreground)] outline-none"
               />
             </label>
 
-            <div className="mt-6 space-y-4">
+            <div className="mt-4 space-y-4">
               {patternDraft.staffGroups.map((group, index) => (
                 <div
                   key={group.id}
-                  className="rounded-[22px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)]/80 p-5"
+                  className="rounded-2xl border border-[var(--border)] bg-[var(--muted)]/80 p-5"
                   data-testid={`pattern-group-card-${group.id}`}
                 >
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -6005,7 +6005,7 @@ export default function AutoRosterPlanner({
                           value={group.label}
                           onChange={(event) => updatePatternGroup(group.id, { label: event.target.value })}
                           placeholder={`그룹 ${index + 1}`}
-                          className="rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2.5 text-sm font-semibold text-[var(--foreground)] outline-none"
+                          className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-sm font-semibold text-[var(--foreground)] outline-none"
                           data-testid={`pattern-group-label-${group.id}`}
                         />
                       </label>
@@ -6018,7 +6018,7 @@ export default function AutoRosterPlanner({
                               mode: event.target.value as RosterPatternGroupMode,
                             })
                           }
-                          className="rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2.5 text-sm font-semibold text-[var(--foreground)] outline-none"
+                          className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-sm font-semibold text-[var(--foreground)] outline-none"
                           data-testid={`pattern-group-mode-${group.id}`}
                         >
                           {PATTERN_GROUP_MODE_OPTIONS.map((option) => (
@@ -6033,7 +6033,7 @@ export default function AutoRosterPlanner({
                       type="button"
                       onClick={() => removePatternGroup(group.id)}
                       disabled={patternDraft.staffGroups.length === 1}
-                      className="rounded-[12px] border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       그룹 삭제
                     </button>
@@ -6053,7 +6053,7 @@ export default function AutoRosterPlanner({
                           })
                         }
                         placeholder="예: 나이트전담, 고정N, 야간전담"
-                        className="rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2.5 text-sm font-semibold text-[var(--foreground)] outline-none"
+                        className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-sm font-semibold text-[var(--foreground)] outline-none"
                       />
                     </label>
                     <label className="flex flex-col gap-2">
@@ -6062,7 +6062,7 @@ export default function AutoRosterPlanner({
                         value={group.note || ''}
                         onChange={(event) => updatePatternGroup(group.id, { note: event.target.value })}
                         placeholder="예: N N OFF OFF 반복"
-                        className="rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2.5 text-sm font-semibold text-[var(--foreground)] outline-none"
+                        className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-sm font-semibold text-[var(--foreground)] outline-none"
                       />
                     </label>
                   </div>
@@ -6070,7 +6070,7 @@ export default function AutoRosterPlanner({
                   <div className="mt-4">
                     <p className="text-xs font-bold text-[var(--toss-gray-3)]">연결 근무유형</p>
                     {workingShifts.length === 0 ? (
-                      <div className="mt-2 rounded-[14px] border border-dashed border-[var(--toss-border)] bg-white px-4 py-3 text-sm font-semibold text-[var(--toss-gray-3)]">
+                      <div className="mt-2 rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-semibold text-[var(--toss-gray-3)]">
                         먼저 근무형태를 등록해 주세요.
                       </div>
                     ) : (
@@ -6082,10 +6082,10 @@ export default function AutoRosterPlanner({
                               key={shift.id}
                               type="button"
                               onClick={() => togglePatternGroupShift(group.id, shift.id)}
-                              className={`rounded-full border px-3 py-2 text-[11px] font-semibold transition-all ${
+                              className={`rounded-[var(--radius-md)] border px-3 py-2 text-[11px] font-semibold transition-all ${
                                 active
-                                  ? `${getShiftBadgeClass(shift.name)} ring-2 ring-[var(--toss-blue)]/20`
-                                  : 'border-[var(--toss-border)] bg-white text-[var(--foreground)]'
+                                  ? `${getShiftBadgeClass(shift.name)} ring-2 ring-[var(--accent)]/20`
+                                  : 'border-[var(--border)] bg-[var(--card)] text-[var(--foreground)]'
                               }`}
                               data-testid={`pattern-group-shift-${group.id}-${shift.id}`}
                             >
@@ -6104,7 +6104,7 @@ export default function AutoRosterPlanner({
               <button
                 type="button"
                 onClick={addPatternGroup}
-                className="rounded-[14px] border border-[var(--toss-border)] bg-white px-4 py-3 text-sm font-bold text-[var(--foreground)]"
+                className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-bold text-[var(--foreground)]"
                 data-testid="pattern-group-add"
               >
                 그룹 추가
@@ -6112,7 +6112,7 @@ export default function AutoRosterPlanner({
               <button
                 type="button"
                 onClick={savePatternProfile}
-                className="rounded-[14px] bg-[var(--toss-blue)] px-4 py-3 text-sm font-bold text-white"
+                className="rounded-[var(--radius-lg)] bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white"
                 data-testid="pattern-profile-save"
               >
                 패턴 저장
@@ -6120,15 +6120,15 @@ export default function AutoRosterPlanner({
             </div>
           </div>
 
-          <div className="space-y-6">
-            <div className="rounded-[24px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-6 shadow-sm">
+          <div className="space-y-4">
+            <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
               <h4 className="text-lg font-bold text-[var(--foreground)]">저장된 패턴</h4>
               <p className="mt-1 text-sm text-[var(--toss-gray-3)]">
                 선택한 사업체에 맞는 팀 패턴만 모아 보여줍니다.
               </p>
 
               {companyPatternProfiles.length === 0 ? (
-                <div className="mt-4 rounded-[18px] border border-dashed border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-5 text-sm font-semibold text-[var(--toss-gray-3)]">
+                <div className="mt-4 rounded-[var(--radius-xl)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-5 text-sm font-semibold text-[var(--toss-gray-3)]">
                   아직 저장된 교대방식 패턴이 없습니다.
                 </div>
               ) : (
@@ -6136,13 +6136,13 @@ export default function AutoRosterPlanner({
                   {companyPatternProfiles.map((profile) => (
                     <div
                       key={profile.id}
-                      className="rounded-[18px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)]/80 p-4"
+                      className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--muted)]/80 p-4"
                       data-testid={`pattern-profile-card-${profile.id}`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="text-sm font-bold text-[var(--foreground)]">{profile.name}</p>
-                          <p className="mt-1 text-xs font-semibold text-[var(--toss-blue)]">
+                          <p className="mt-1 text-xs font-semibold text-[var(--accent)]">
                             {profile.teamKeywords.join(', ')}
                           </p>
                         </div>
@@ -6150,7 +6150,7 @@ export default function AutoRosterPlanner({
                           <button
                             type="button"
                             onClick={() => editPatternProfile(profile)}
-                            className="rounded-[10px] border border-[var(--toss-border)] bg-white px-3 py-2 text-xs font-bold text-[var(--foreground)]"
+                            className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-xs font-bold text-[var(--foreground)]"
                             data-testid={`pattern-profile-edit-${profile.id}`}
                           >
                             수정
@@ -6162,7 +6162,7 @@ export default function AutoRosterPlanner({
                                 deletePatternProfile(profile.id);
                               }
                             }}
-                            className="rounded-[10px] border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600"
+                            className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600"
                             data-testid={`pattern-profile-delete-${profile.id}`}
                           >
                             삭제
@@ -6182,7 +6182,7 @@ export default function AutoRosterPlanner({
                           return (
                             <span
                               key={group.id}
-                              className="rounded-full border border-[var(--toss-border)] bg-white px-3 py-1 text-[11px] font-semibold text-[var(--foreground)]"
+                              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1 text-[11px] font-semibold text-[var(--foreground)]"
                             >
                               {group.label} · {modeLabel}
                             </span>
@@ -6195,7 +6195,7 @@ export default function AutoRosterPlanner({
               )}
             </div>
 
-            <div className="rounded-[24px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-6 shadow-sm">
+            <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
               <h4 className="text-lg font-bold text-[var(--foreground)]">활용 방식</h4>
               <div className="mt-3 space-y-2 text-sm leading-6 text-[var(--toss-gray-4)]">
                 <p>1. 팀 키워드로 어떤 팀에 쓸 패턴인지 지정합니다.</p>
@@ -6212,8 +6212,8 @@ export default function AutoRosterPlanner({
   const aiOnlyPlannerMode = true;
   if (aiOnlyPlannerMode) {
     return (
-      <div className="space-y-6" data-testid="roster-pattern-planner">
-        <div className="rounded-[24px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-6 shadow-sm">
+      <div className="space-y-4" data-testid="roster-pattern-planner">
+        <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
           <div className="flex flex-wrap items-center gap-3">
             <h3 className="shrink-0 text-xl font-bold text-[var(--foreground)]">패턴 기반 근무표 생성</h3>
 
@@ -6222,7 +6222,7 @@ export default function AutoRosterPlanner({
               <select
                 value={selectedDepartment}
                 onChange={(event) => setSelectedDepartment(event.target.value)}
-                className="min-w-[180px] rounded-[14px] border border-[var(--toss-border)] bg-white px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                className="min-w-[180px] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
                 data-testid="roster-team-select"
               >
                 {teamOptions.map((department) => (
@@ -6238,7 +6238,7 @@ export default function AutoRosterPlanner({
               <select
                 value={selectedPatternProfileId}
                 onChange={(event) => setSelectedPatternProfileId(event.target.value)}
-                className="min-w-[220px] rounded-[14px] border border-[var(--toss-border)] bg-white px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                className="min-w-[220px] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
                 data-testid="roster-pattern-profile-select"
               >
                 <option value="">팀 기준 기본 규칙</option>
@@ -6255,7 +6255,7 @@ export default function AutoRosterPlanner({
               <select
                 value={selectedGenerationRuleId}
                 onChange={(event) => setSelectedGenerationRuleId(event.target.value)}
-                className="min-w-[220px] rounded-[14px] border border-[var(--toss-border)] bg-white px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                className="min-w-[220px] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
                 data-testid="roster-generation-rule-select"
               >
                 <option value="">팀 기준 기본 규칙</option>
@@ -6270,13 +6270,13 @@ export default function AutoRosterPlanner({
             <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
               <span className="shrink-0 text-[11px] font-bold text-[var(--toss-gray-3)]">적용 근무유형</span>
               {loadingShifts ? (
-                <span className="text-[12px] font-semibold text-[var(--toss-blue)]">근무형태 불러오는 중...</span>
+                <span className="text-[12px] font-semibold text-[var(--accent)]">근무형태 불러오는 중...</span>
               ) : workingShifts.length === 0 ? (
-                <span className="rounded-full border border-dashed border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-3 py-2 text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                <span className="rounded-[var(--radius-md)] border border-dashed border-[var(--border)] bg-[var(--muted)] px-3 py-2 text-[11px] font-semibold text-[var(--toss-gray-3)]">
                   등록된 근무형태가 없습니다.
                 </span>
               ) : recommendedAiShifts.length === 0 ? (
-                <span className="rounded-full border border-dashed border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-3 py-2 text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                <span className="rounded-[var(--radius-md)] border border-dashed border-[var(--border)] bg-[var(--muted)] px-3 py-2 text-[11px] font-semibold text-[var(--toss-gray-3)]">
                   이 팀에 맞는 추천 근무유형이 없습니다.
                 </span>
               ) : (
@@ -6284,7 +6284,7 @@ export default function AutoRosterPlanner({
                   return (
                     <span
                       key={shift.id}
-                      className={`rounded-full border px-3 py-2 text-[11px] font-semibold ${getShiftBadgeClass(shift.name)}`}
+                      className={`rounded-[var(--radius-md)] border px-3 py-2 text-[11px] font-semibold ${getShiftBadgeClass(shift.name)}`}
                       data-testid={`planner-shift-chip-${shift.id}`}
                     >
                       {shift.name}
@@ -6300,7 +6300,7 @@ export default function AutoRosterPlanner({
 
             <div className="ml-auto flex flex-wrap items-center gap-3">
               <label className="flex flex-col gap-0">
-                <div className="rounded-[14px] border border-[var(--toss-border)] bg-[var(--input-bg)] px-3 py-2">
+                <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--input-bg)] px-3 py-2">
                   <SmartMonthPicker
                     value={selectedMonth}
                     onChange={(value) => setSelectedMonth(value)}
@@ -6318,7 +6318,7 @@ export default function AutoRosterPlanner({
                     workingShifts.length === 0 ||
                     enabledTargetStaffs.length === 0
                   }
-                  className="rounded-[14px] border border-[var(--toss-blue)] bg-[var(--toss-blue-light)] px-4 py-3 text-sm font-bold text-[var(--toss-blue)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-[var(--radius-lg)] border border-[var(--accent)] bg-[var(--toss-blue-light)] px-4 py-3 text-sm font-bold text-[var(--accent)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                   data-testid="roster-auto-generate"
                 >
                 {geminiLoading ? '자동 생성 중...' : '근무표 자동 생성'}
@@ -6327,7 +6327,7 @@ export default function AutoRosterPlanner({
                 type="button"
                 onClick={saveAssignments}
                 disabled={saving || loadingShifts || previewRows.length === 0}
-                className="rounded-[14px] bg-[var(--toss-blue)] px-4 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-[var(--radius-lg)] bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {saving ? '저장 중...' : '월간 근무표 저장'}
               </button>
@@ -6335,14 +6335,14 @@ export default function AutoRosterPlanner({
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <div className="w-full rounded-[18px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)]/70 px-4 py-3 text-sm font-semibold text-[var(--foreground)]">
+            <div className="w-full rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--muted)]/70 px-4 py-3 text-sm font-semibold text-[var(--foreground)]">
               {selectedPatternProfile
                 ? '\uC120\uD0DD\uD55C \uD300 \uD328\uD134 \uD504\uB85C\uD544\uC744 \uAE30\uC900\uC73C\uB85C \uB370\uC774/\uC774\uBE0C/\uB098\uC774\uD2B8 \uC804\uB2F4\uC790\uC640 \uC21C\uD658 \uADFC\uBB34\uC790\uB97C \uAC19\uC774 \uD3B8\uC131\uD569\uB2C8\uB2E4.'
                 : '\uC800\uC7A5\uB41C \uD300 \uD328\uD134 \uD504\uB85C\uD544\uC774 \uC5C6\uC5B4\uB3C4 \uC9C1\uC6D0\uC758 shift_type\uACFC \uBC30\uC815 \uADFC\uBB34\uB97C \uAE30\uC900\uC73C\uB85C \uB370\uC774/\uC774\uBE0C/\uB098\uC774\uD2B8 \uC804\uB2F4\uC790\uB97C \uC790\uB3D9 \uAC10\uC9C0\uD558\uACE0, \uB098\uBA38\uC9C0\uB294 \uC21C\uD658 \uADFC\uBB34\uB85C \uD3B8\uC131\uD569\uB2C8\uB2E4.'}
             </div>
             {plannerPatternPreviewGroups.length > 0 ? (
               <div
-                className="w-full rounded-[18px] border border-[var(--toss-border)] bg-white px-4 py-3"
+                className="w-full rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] px-4 py-3"
                 data-testid="roster-pattern-group-preview"
               >
                 <div className="flex flex-wrap items-center gap-2">
@@ -6352,15 +6352,15 @@ export default function AutoRosterPlanner({
                       group.mode;
                     const toneClass =
                       group.source === 'profile'
-                        ? 'border-[var(--toss-blue)]/20 bg-[var(--toss-blue-light)]/60'
+                        ? 'border-[var(--accent)]/20 bg-[var(--toss-blue-light)]/60'
                         : group.source === 'auto'
                           ? 'border-emerald-200 bg-emerald-50'
-                          : 'border-[var(--toss-border)] bg-[var(--toss-gray-1)]';
+                          : 'border-[var(--border)] bg-[var(--muted)]';
 
                     return (
                       <span
                         key={group.key}
-                        className={`rounded-full border px-3 py-2 text-[11px] font-semibold text-[var(--foreground)] ${toneClass}`}
+                        className={`rounded-[var(--radius-md)] border px-3 py-2 text-[11px] font-semibold text-[var(--foreground)] ${toneClass}`}
                       >
                         {group.label} {group.count}명 · {modeLabel}
                       </span>
@@ -6370,36 +6370,36 @@ export default function AutoRosterPlanner({
               </div>
             ) : null}
             {selectedPatternProfile ? (
-              <div className="rounded-[16px] border border-[var(--toss-blue)]/20 bg-[var(--toss-blue-light)]/60 px-4 py-3 text-sm font-semibold text-[var(--foreground)]">
+              <div className="rounded-[var(--radius-lg)] border border-[var(--accent)]/20 bg-[var(--toss-blue-light)]/60 px-4 py-3 text-sm font-semibold text-[var(--foreground)]">
                 적용 패턴 · {selectedPatternProfile.name}
                 {selectedPatternProfile.description ? ` · ${selectedPatternProfile.description}` : ''}
               </div>
             ) : (
-              <div className="rounded-[16px] border border-dashed border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-4 py-3 text-sm font-semibold text-[var(--toss-gray-3)]">
+              <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--muted)] px-4 py-3 text-sm font-semibold text-[var(--toss-gray-3)]">
                 저장된 교대방식 패턴이 있으면 우선 적용하고, 없으면 팀 기본 규칙으로 자동 생성합니다.
               </div>
             )}
             {selectedGenerationRule ? (
-              <div className="rounded-[16px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-[var(--foreground)]">
+              <div className="rounded-[var(--radius-lg)] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-[var(--foreground)]">
                 적용 규칙 · {selectedGenerationRule.name}
               </div>
             ) : (
-              <div className="rounded-[16px] border border-dashed border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-4 py-3 text-sm font-semibold text-[var(--toss-gray-3)]">
+              <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--muted)] px-4 py-3 text-sm font-semibold text-[var(--toss-gray-3)]">
                 저장된 규칙이 없으면 팀 기본 안전규칙으로 자동 생성합니다.
               </div>
             )}
             {matchingPatternProfiles.length === 0 && companyPatternProfiles.length === 0 ? (
-              <div className="rounded-[16px] border border-dashed border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-4 py-3 text-sm font-semibold text-[var(--toss-gray-3)]">
+              <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--muted)] px-4 py-3 text-sm font-semibold text-[var(--toss-gray-3)]">
                 패턴 탭에서 팀별 교대방식 패턴을 먼저 저장할 수 있습니다.
               </div>
             ) : null}
             {matchingGenerationRules.length === 0 && companyGenerationRules.length === 0 ? (
-              <div className="rounded-[16px] border border-dashed border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-4 py-3 text-sm font-semibold text-[var(--toss-gray-3)]">
+              <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--muted)] px-4 py-3 text-sm font-semibold text-[var(--toss-gray-3)]">
                 규칙 탭에서 팀별 근무규칙을 먼저 저장할 수 있습니다.
               </div>
             ) : null}
             <div
-              className="w-full rounded-[18px] border border-amber-200 bg-amber-50/80 px-4 py-4"
+              className="w-full rounded-[var(--radius-xl)] border border-amber-200 bg-amber-50/80 px-4 py-4"
               data-testid="preferred-off-manager"
             >
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -6417,7 +6417,7 @@ export default function AutoRosterPlanner({
                     value={preferredOffStaffId}
                     onChange={(event) => setPreferredOffStaffId(event.target.value)}
                     disabled={targetStaffs.length === 0}
-                    className="rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--foreground)] disabled:opacity-50"
+                    className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] disabled:opacity-50"
                     data-testid="preferred-off-staff-select"
                   >
                     {targetStaffs.length === 0 ? (
@@ -6434,7 +6434,7 @@ export default function AutoRosterPlanner({
                     value={preferredOffDate}
                     onChange={(event) => setPreferredOffDate(event.target.value)}
                     disabled={monthDates.length === 0}
-                    className="rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--foreground)] disabled:opacity-50"
+                    className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] disabled:opacity-50"
                     data-testid="preferred-off-date-select"
                   >
                     {monthDates.map((date) => (
@@ -6447,7 +6447,7 @@ export default function AutoRosterPlanner({
                     type="button"
                     onClick={addPreferredOffDate}
                     disabled={!preferredOffStaffId || !preferredOffDate}
-                    className="rounded-[12px] bg-amber-500 px-3 py-2 text-sm font-bold text-white disabled:opacity-50"
+                    className="rounded-[var(--radius-md)] bg-amber-500 px-3 py-2 text-sm font-bold text-white disabled:opacity-50"
                     data-testid="preferred-off-add"
                   >
                     희망 OFF 추가
@@ -6456,7 +6456,7 @@ export default function AutoRosterPlanner({
                     type="button"
                     onClick={clearAllPreferredOff}
                     disabled={preferredOffCount === 0}
-                    className="rounded-[12px] border border-amber-200 bg-white px-3 py-2 text-sm font-bold text-amber-700 disabled:opacity-50"
+                    className="rounded-[var(--radius-md)] border border-amber-200 bg-[var(--card)] px-3 py-2 text-sm font-bold text-amber-700 disabled:opacity-50"
                     data-testid="preferred-off-clear-all"
                   >
                     전체 비우기
@@ -6464,13 +6464,13 @@ export default function AutoRosterPlanner({
                 </div>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                <span className="rounded-full border border-amber-200 bg-white px-3 py-1 text-[11px] font-semibold text-amber-700">
+                <span className="rounded-[var(--radius-md)] border border-amber-200 bg-[var(--card)] px-3 py-1 text-[11px] font-semibold text-amber-700">
                   등록 {preferredOffCount}건
                 </span>
                 {preferredOffEntries.map((entry) => (
                   <span
                     key={`preferred-off-summary-${entry.staff.id}`}
-                    className="rounded-full border border-amber-100 bg-white/80 px-3 py-1 text-[11px] font-semibold text-[var(--foreground)]"
+                    className="rounded-[var(--radius-md)] border border-amber-100 bg-[var(--card)]/80 px-3 py-1 text-[11px] font-semibold text-[var(--foreground)]"
                   >
                     {entry.staff.name} {entry.dates.length}일
                   </span>
@@ -6485,7 +6485,7 @@ export default function AutoRosterPlanner({
                   preferredOffEntries.map((entry) => (
                     <div
                       key={`preferred-off-row-${entry.staff.id}`}
-                      className="rounded-[14px] border border-amber-100 bg-white/90 px-3 py-3"
+                      className="rounded-[var(--radius-lg)] border border-amber-100 bg-[var(--card)]/90 px-3 py-3"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
@@ -6497,7 +6497,7 @@ export default function AutoRosterPlanner({
                         <button
                           type="button"
                           onClick={() => clearPreferredOffForStaff(String(entry.staff.id))}
-                          className="rounded-full border border-amber-200 px-3 py-1 text-[11px] font-bold text-amber-700"
+                          className="rounded-[var(--radius-md)] border border-amber-200 px-3 py-1 text-[11px] font-bold text-amber-700"
                         >
                           직원 비우기
                         </button>
@@ -6508,7 +6508,7 @@ export default function AutoRosterPlanner({
                             type="button"
                             key={`${entry.staff.id}-${date}`}
                             onClick={() => removePreferredOffDate(String(entry.staff.id), date)}
-                            className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-700"
+                            className="rounded-[var(--radius-md)] border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-700"
                             data-testid={`preferred-off-chip-${entry.staff.id}-${date}`}
                           >
                             {date} x
@@ -6525,7 +6525,7 @@ export default function AutoRosterPlanner({
 
         {(geminiSummary || aiRecommendation?.teamAnalysis) && (
           <div
-            className="rounded-[24px] border border-[var(--toss-blue)]/20 bg-[var(--toss-blue-light)]/60 p-6 shadow-sm"
+            className="rounded-[var(--radius-xl)] border border-[var(--accent)]/20 bg-[var(--toss-blue-light)]/60 p-4 shadow-sm"
             data-testid="roster-generation-summary"
           >
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -6535,7 +6535,7 @@ export default function AutoRosterPlanner({
                 </p>
                 {(leaveAppliedSummary || aiRecommendation?.leaveSummary) ? (
                   <span
-                    className="mt-3 inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-700"
+                    className="mt-3 inline-flex rounded-[var(--radius-md)] border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-700"
                     data-testid="roster-leave-coverage-summary"
                   >
                     {leaveAppliedSummary || aiRecommendation?.leaveSummary}
@@ -6543,7 +6543,7 @@ export default function AutoRosterPlanner({
                 ) : null}
                 {aiRecommendation?.preferredOffSummary ? (
                   <span
-                    className="mt-3 ml-2 inline-flex rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-700"
+                    className="mt-3 ml-2 inline-flex rounded-[var(--radius-md)] border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-700"
                     data-testid="roster-preferred-off-summary"
                   >
                     {aiRecommendation.preferredOffSummary}
@@ -6551,7 +6551,7 @@ export default function AutoRosterPlanner({
                 ) : null}
                 {structuralStaffingGap.isShortage ? (
                   <span
-                    className="mt-3 ml-2 inline-flex rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-[11px] font-semibold text-rose-700"
+                    className="mt-3 ml-2 inline-flex rounded-[var(--radius-md)] border border-rose-200 bg-rose-50 px-3 py-1 text-[11px] font-semibold text-rose-700"
                     data-testid="roster-staff-shortage-summary"
                   >
                     인원 부족 · 최소 {structuralStaffingGap.requiredHeadcount}명 / 현재 {structuralStaffingGap.availableHeadcount}명
@@ -6569,7 +6569,7 @@ export default function AutoRosterPlanner({
         {renderRosterWarningReport()}
         {renderRosterFairnessBoard()}
 
-        <div className="rounded-[24px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-6 shadow-sm">
+        <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h4 className="text-base font-bold text-[var(--foreground)]">월간 근무표 미리보기</h4>
@@ -6581,7 +6581,7 @@ export default function AutoRosterPlanner({
               <button
                 type="button"
                 onClick={() => setManualEditMode((prev) => !prev)}
-                className={`rounded-full px-3 py-1 text-[11px] font-bold ${manualEditMode ? 'bg-orange-100 text-orange-700' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'}`}
+                className={`rounded-[var(--radius-md)] px-3 py-1 text-[11px] font-bold ${manualEditMode ? 'bg-orange-100 text-orange-700' : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'}`}
               >
                 {manualEditMode ? '수동 수정 중' : '수동 수정'}
               </button>
@@ -6589,26 +6589,26 @@ export default function AutoRosterPlanner({
                 type="button"
                 onClick={() => setManualAssignments({})}
                 disabled={summary.manualCount === 0}
-                className="rounded-full bg-[var(--toss-gray-1)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-4)] disabled:opacity-40"
+                className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-4)] disabled:opacity-40"
               >
                 수정 초기화
               </button>
-              <span className="rounded-full bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--toss-blue)]">
+              <span className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--accent)]">
                 {previewRows.length}명 표시 · 수동 수정 {summary.manualCount}건
               </span>
             </div>
           </div>
 
           {workingShifts.length === 0 ? (
-            <div className="mt-4 rounded-[18px] border border-dashed border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-6 text-sm font-semibold text-[var(--toss-gray-3)]">
+            <div className="mt-4 rounded-[var(--radius-xl)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-4 text-sm font-semibold text-[var(--toss-gray-3)]">
               선택한 사업체에 등록된 근무형태가 없습니다. 먼저 근무형태 관리에서 근무유형을 등록하세요.
             </div>
           ) : targetStaffs.length === 0 ? (
-            <div className="mt-4 rounded-[18px] border border-dashed border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-6 text-sm font-semibold text-[var(--toss-gray-3)]">
+            <div className="mt-4 rounded-[var(--radius-xl)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-4 text-sm font-semibold text-[var(--toss-gray-3)]">
               선택한 팀에 직원이 없습니다.
             </div>
           ) : previewRows.length === 0 ? (
-            <div className="mt-4 rounded-[18px] border border-dashed border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-6 text-sm font-semibold text-[var(--toss-gray-3)]">
+            <div className="mt-4 rounded-[var(--radius-xl)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-4 text-sm font-semibold text-[var(--toss-gray-3)]">
               근무표 자동 생성 버튼을 누르면 저장된 패턴 기준의 월간 초안이 여기에 표시됩니다.
             </div>
           ) : (
@@ -6616,7 +6616,7 @@ export default function AutoRosterPlanner({
               <table className="border-collapse" style={{ minWidth: `${260 + monthDates.length * 64}px` }}>
                 <thead>
                   <tr>
-                    <th className="sticky left-0 z-20 min-w-[260px] border-b border-[var(--toss-border)] bg-[var(--toss-card)] px-4 py-3 text-left text-[11px] font-bold text-[var(--toss-gray-3)]">
+                    <th className="sticky left-0 z-20 min-w-[260px] border-b border-[var(--border)] bg-[var(--card)] px-4 py-3 text-left text-[11px] font-bold text-[var(--toss-gray-3)]">
                       직원
                     </th>
                     {monthDates.map((date, index) => {
@@ -6640,25 +6640,25 @@ export default function AutoRosterPlanner({
                       return (
                         <th
                           key={date}
-                          className="min-w-[64px] border-b border-[var(--toss-border)] bg-[var(--toss-card)] px-2 py-3 text-center text-[10px] font-bold text-[var(--toss-gray-3)]"
+                          className="min-w-[64px] border-b border-[var(--border)] bg-[var(--card)] px-2 py-3 text-center text-[10px] font-bold text-[var(--toss-gray-3)]"
                         >
                           <div>{day}</div>
                           <div className="mt-1 text-[9px]">{weekday}</div>
-                          <div className={`mt-2 rounded-full border px-2 py-0.5 text-[8px] font-bold ${coverageToneClass}`}>
+                          <div className={`mt-2 rounded-[var(--radius-md)] border px-2 py-0.5 text-[8px] font-bold ${coverageToneClass}`}>
                             {coverage.statusLabel}
                           </div>
                           <div
-                            className={`mt-2 rounded-[10px] border px-1 py-1 text-[9px] font-semibold leading-4 shadow-sm transition-all ${
+                            className={`mt-2 rounded-[var(--radius-md)] border px-1 py-1 text-[9px] font-semibold leading-4 shadow-sm transition-all ${
                               highlightedRosterTarget === `roster-preview-coverage-${date}`
-                                ? 'border-[var(--toss-blue)] bg-[var(--toss-blue-light)] ring-2 ring-[var(--toss-blue)]/30'
-                                : 'border-[var(--toss-border)] bg-white'
+                                ? 'border-[var(--accent)] bg-[var(--toss-blue-light)] ring-2 ring-[var(--accent)]/30'
+                                : 'border-[var(--border)] bg-[var(--card)]'
                             }`}
                             data-testid={`roster-preview-coverage-${date}`}
                           >
-                            <div className="text-[var(--toss-blue)]">D {coverage.day}</div>
+                            <div className="text-[var(--accent)]">D {coverage.day}</div>
                             <div className="text-orange-600">E {coverage.evening}</div>
                             <div className="text-purple-600">N {coverage.night}</div>
-                            <div className="mt-1 border-t border-[var(--toss-border)] pt-1 text-[8px] text-[var(--toss-gray-3)]">
+                            <div className="mt-1 border-t border-[var(--border)] pt-1 text-[8px] text-[var(--toss-gray-3)]">
                               {coverage.statusDetail}
                             </div>
                           </div>
@@ -6671,14 +6671,14 @@ export default function AutoRosterPlanner({
                   {previewRows.map((row) => (
                     <tr
                       key={row.staff.id}
-                      className={`border-b border-[var(--toss-border)] last:border-b-0 ${
+                      className={`border-b border-[var(--border)] last:border-b-0 ${
                         highlightedRosterTarget === `roster-preview-row-${row.staff.id}`
                           ? 'bg-[var(--toss-blue-light)]/40'
                           : ''
                       }`}
                       data-testid={`roster-preview-row-${row.staff.id}`}
                     >
-                      <td className="sticky left-0 z-10 bg-[var(--toss-card)] px-4 py-3">
+                      <td className="sticky left-0 z-10 bg-[var(--card)] px-4 py-3">
                         <p className="text-sm font-bold text-[var(--foreground)]">{row.staff.name}</p>
                         <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
                           {row.config.pattern} · {getDepartmentName(row.staff)}
@@ -6700,7 +6700,7 @@ export default function AutoRosterPlanner({
                                 baseShiftId: cell.baseShiftId,
                               })
                             }
-                            className={`inline-flex h-8 min-w-[40px] items-center justify-center rounded-[10px] border px-1 text-[11px] font-black transition-all ${cell.badgeClass} ${manualEditMode ? 'cursor-pointer hover:scale-105' : 'cursor-default'} ${cell.isManual ? 'ring-2 ring-[var(--toss-blue)] ring-offset-1' : ''}`}
+                            className={`inline-flex h-8 min-w-[40px] items-center justify-center rounded-[var(--radius-md)] border px-1 text-[11px] font-black transition-all ${cell.badgeClass} ${manualEditMode ? 'cursor-pointer hover:scale-105' : 'cursor-default'} ${cell.isManual ? 'ring-2 ring-[var(--accent)] ring-offset-1' : ''}`}
                             title={`${row.staff.name} ${cell.date} ${cell.shiftName}${manualEditMode ? ' · 클릭해서 변경' : ''}`}
                           >
                             {cell.code}
@@ -6720,15 +6720,15 @@ export default function AutoRosterPlanner({
 
   return (
     <>
-      <div className="space-y-6">
-      <div className="rounded-[24px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-6 shadow-sm">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+      <div className="space-y-4">
+      <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h3 className="mt-2 text-xl font-bold text-[var(--foreground)]">교대근무 생성 마법사</h3>
           </div>
           <div className="flex flex-wrap items-end gap-3">
             <label className="flex flex-col gap-0">
-              <div className="rounded-[14px] border border-[var(--toss-border)] bg-[var(--input-bg)] px-3 py-2">
+              <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--input-bg)] px-3 py-2">
                 <SmartMonthPicker
                   value={selectedMonth}
                   onChange={(value) => setSelectedMonth(value)}
@@ -6740,7 +6740,7 @@ export default function AutoRosterPlanner({
             <button
               type="button"
               onClick={openWizard}
-              className="rounded-[14px] border border-[var(--toss-border)] bg-white px-4 py-3 text-sm font-bold text-[var(--foreground)] transition-colors hover:border-[var(--toss-blue)] hover:text-[var(--toss-blue)]"
+              className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-bold text-[var(--foreground)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
               data-testid="roster-wizard-open"
             >
               근무표 생성 마법사
@@ -6749,7 +6749,7 @@ export default function AutoRosterPlanner({
               type="button"
               onClick={requestGeminiRecommendation}
               disabled={geminiLoading || loadingShifts || workingShifts.length === 0 || targetStaffs.length === 0}
-              className="rounded-[14px] border border-[var(--toss-blue)] bg-[var(--toss-blue-light)] px-4 py-3 text-sm font-bold text-[var(--toss-blue)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-[var(--radius-lg)] border border-[var(--accent)] bg-[var(--toss-blue-light)] px-4 py-3 text-sm font-bold text-[var(--accent)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               data-testid="roster-gemini-recommend"
             >
               {geminiLoading ? 'Gemini 추천 중...' : 'Gemini 팀 추천'}
@@ -6758,7 +6758,7 @@ export default function AutoRosterPlanner({
               type="button"
               onClick={saveAssignments}
               disabled={saving || loadingShifts || previewRows.length === 0}
-              className="rounded-[14px] bg-[var(--toss-blue)] px-4 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-[var(--radius-lg)] bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {saving ? '저장 중...' : '월간 근무표 저장'}
             </button>
@@ -6766,30 +6766,30 @@ export default function AutoRosterPlanner({
         </div>
 
         <div className="mt-5 grid gap-3 md:grid-cols-4 xl:grid-cols-6">
-          <div className="rounded-[18px] bg-[var(--toss-gray-1)] p-4">
+          <div className="rounded-[var(--radius-xl)] bg-[var(--muted)] p-4">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--toss-gray-3)]">사업체</p>
             <p className="mt-2 text-base font-bold text-[var(--foreground)]">{selectedCompany || '-'}</p>
             {companyLockedByHrFilter && (
               <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">인사관리 사업체 필터와 연동 중</p>
             )}
           </div>
-          <div className="rounded-[18px] bg-[var(--toss-gray-1)] p-4">
+          <div className="rounded-[var(--radius-xl)] bg-[var(--muted)] p-4">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--toss-gray-3)]">팀</p>
             <p className="mt-2 text-base font-bold text-[var(--foreground)]">{selectedDepartment || '-'}</p>
           </div>
-          <div className="rounded-[18px] bg-[var(--toss-gray-1)] p-4">
+          <div className="rounded-[var(--radius-xl)] bg-[var(--muted)] p-4">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--toss-gray-3)]">대상 인원</p>
             <p className="mt-2 text-2xl font-bold text-[var(--foreground)]">{summary.staffCount}명</p>
           </div>
-          <div className="rounded-[18px] bg-[var(--toss-gray-1)] p-4">
+          <div className="rounded-[var(--radius-xl)] bg-[var(--muted)] p-4">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--toss-gray-3)]">편성 인원</p>
             <p className="mt-2 text-2xl font-bold text-[var(--foreground)]">{summary.enabledCount}명</p>
           </div>
-          <div className="rounded-[18px] bg-[var(--toss-gray-1)] p-4">
+          <div className="rounded-[var(--radius-xl)] bg-[var(--muted)] p-4">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--toss-gray-3)]">선택 패턴</p>
             <p className="mt-2 text-base font-bold text-[var(--foreground)]">{effectivePlannerPattern}</p>
           </div>
-          <div className="rounded-[18px] bg-[var(--toss-gray-1)] p-4">
+          <div className="rounded-[var(--radius-xl)] bg-[var(--muted)] p-4">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--toss-gray-3)]">수동 수정</p>
             <p className="mt-2 text-2xl font-bold text-[var(--foreground)]">{summary.manualCount}건</p>
           </div>
@@ -6797,12 +6797,12 @@ export default function AutoRosterPlanner({
 
         {geminiSummary && (
           <div
-            className="mt-4 rounded-[20px] border border-[var(--toss-blue)]/20 bg-[var(--toss-blue-light)]/60 p-4"
+            className="mt-4 rounded-[var(--radius-xl)] border border-[var(--accent)]/20 bg-[var(--toss-blue-light)]/60 p-4"
             data-testid="roster-gemini-summary"
           >
             <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--toss-blue)]">
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--accent)]">
                   Gemini Team Recommendation
                 </p>
                 <p className="mt-2 text-sm font-semibold leading-6 text-[var(--foreground)]">
@@ -6820,7 +6820,7 @@ export default function AutoRosterPlanner({
         {renderRosterFairnessBoard()}
       </div>
 
-      <div className="rounded-[24px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-6 shadow-sm">
+      <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
         <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h4 className="text-base font-bold text-[var(--foreground)]">자동생성 규칙 만들기</h4>
@@ -6828,11 +6828,11 @@ export default function AutoRosterPlanner({
               규칙은 여기서 직접 만들고 저장합니다. 마법사에서는 저장된 규칙만 불러와 생성합니다.
             </p>
           </div>
-          {loadingShifts && <span className="text-[12px] font-semibold text-[var(--toss-blue)]">근무유형 불러오는 중...</span>}
+          {loadingShifts && <span className="text-[12px] font-semibold text-[var(--accent)]">근무유형 불러오는 중...</span>}
         </div>
 
         <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-          <div className="rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-4">
+          <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--muted)] p-4">
             <div className="grid gap-3 md:grid-cols-2">
               {[
                 { value: CUSTOM_PATTERN_VALUE, label: '순환 규칙', desc: '1차~3차와 OFF를 원하는 순서대로 반복' },
@@ -6842,7 +6842,7 @@ export default function AutoRosterPlanner({
                   key={option.value}
                   type="button"
                   onClick={() => setPlannerPattern(option.value)}
-                  className={`rounded-[18px] border p-4 text-left transition-all ${effectivePlannerPattern === option.value ? 'border-[var(--toss-blue)] bg-[var(--toss-blue-light)]/70 ring-1 ring-[var(--toss-blue)]/20' : 'border-[var(--toss-border)] bg-white hover:border-[var(--toss-blue)]/50'}`}
+                  className={`rounded-[var(--radius-xl)] border p-4 text-left transition-all ${effectivePlannerPattern === option.value ? 'border-[var(--accent)] bg-[var(--toss-blue-light)]/70 ring-1 ring-[var(--accent)]/20' : 'border-[var(--border)] bg-[var(--card)] hover:border-[var(--accent)]/50'}`}
                   data-testid={option.value === CUSTOM_PATTERN_VALUE ? 'planner-rule-type-custom' : 'planner-rule-type-weekly'}
                 >
                   <p className="text-sm font-bold text-[var(--foreground)]">{option.label}</p>
@@ -6862,7 +6862,7 @@ export default function AutoRosterPlanner({
                   <select
                     value={field.value}
                     onChange={(event) => field.setter(event.target.value)}
-                    className="rounded-[14px] border border-[var(--toss-border)] bg-white px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                    className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
                     data-testid={`planner-shift-${field.label.startsWith('1') ? '1' : field.label.startsWith('2') ? '2' : '3'}`}
                   >
                     {workingShifts.map((shift) => (
@@ -6876,16 +6876,16 @@ export default function AutoRosterPlanner({
             </div>
 
             <div className="mt-4 flex flex-wrap gap-2">
-              <span className="rounded-full bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--toss-blue)]">
+              <span className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--accent)]">
                 {selectedCompany || '사업체 미선택'} / {selectedDepartment || '팀 미선택'}
               </span>
-              <span className="rounded-full border border-[var(--toss-border)] bg-white px-3 py-1 text-[11px] font-semibold text-[var(--foreground)]">
+              <span className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1 text-[11px] font-semibold text-[var(--foreground)]">
                 규칙 타입: {effectivePlannerPattern}
               </span>
               {currentPlannerShifts.map((shiftName, index) => (
                 <span
                   key={`${shiftName}-${index}`}
-                  className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${getShiftBadgeClass(shiftName)}`}
+                  className={`rounded-[var(--radius-md)] border px-3 py-1 text-[11px] font-semibold ${getShiftBadgeClass(shiftName)}`}
                 >
                   {index + 1}차 · {shiftName} · {getShiftCode(shiftName)}
                 </span>
@@ -6893,7 +6893,7 @@ export default function AutoRosterPlanner({
             </div>
 
             {plannerUsesCustomPattern && (
-              <div className="mt-4 rounded-[18px] border border-dashed border-[var(--toss-blue)]/30 bg-white p-4">
+              <div className="mt-4 rounded-[var(--radius-xl)] border border-dashed border-[var(--accent)]/30 bg-[var(--card)] p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-bold text-[var(--foreground)]">순환 규칙 조립</p>
@@ -6904,7 +6904,7 @@ export default function AutoRosterPlanner({
                   <button
                     type="button"
                     onClick={clearPlannerCustomPatternSequence}
-                    className="rounded-full border border-[var(--toss-border)] bg-white px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-3)]"
+                    className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-3)]"
                     data-testid="planner-custom-clear"
                   >
                     순서 비우기
@@ -6919,7 +6919,7 @@ export default function AutoRosterPlanner({
                         key={shiftId}
                         type="button"
                         onClick={() => appendPlannerCustomPatternStep(shiftId)}
-                        className={`rounded-full border px-3 py-2 text-[11px] font-semibold transition-all hover:opacity-90 ${getShiftBadgeClass(shiftName)}`}
+                        className={`rounded-[var(--radius-md)] border px-3 py-2 text-[11px] font-semibold transition-all hover:opacity-90 ${getShiftBadgeClass(shiftName)}`}
                         data-testid={`planner-custom-add-shift-${index + 1}`}
                       >
                         + {index + 1}차 {shiftName}
@@ -6929,7 +6929,7 @@ export default function AutoRosterPlanner({
                   <button
                     type="button"
                     onClick={() => appendPlannerCustomPatternStep(OFF_SHIFT_TOKEN)}
-                    className="rounded-full border border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-3 py-2 text-[11px] font-semibold text-[var(--foreground)] transition-all hover:border-[var(--toss-blue)]/40"
+                    className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] px-3 py-2 text-[11px] font-semibold text-[var(--foreground)] transition-all hover:border-[var(--accent)]/40"
                     data-testid="planner-custom-add-off"
                   >
                     + OFF
@@ -6937,7 +6937,7 @@ export default function AutoRosterPlanner({
                 </div>
 
                 {effectivePlannerCustomPatternSequence.length === 0 ? (
-                  <div className="mt-4 rounded-[16px] border border-dashed border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-4 text-sm font-semibold text-[var(--toss-gray-3)]">
+                  <div className="mt-4 rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-4 text-sm font-semibold text-[var(--toss-gray-3)]">
                     아직 규칙 순서가 없습니다.
                   </div>
                 ) : (
@@ -6947,14 +6947,14 @@ export default function AutoRosterPlanner({
                       return (
                         <div
                           key={`${token}-${index}`}
-                          className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-[11px] font-semibold ${token === OFF_SHIFT_TOKEN ? 'border-[var(--toss-border)] bg-[var(--toss-gray-1)] text-[var(--foreground)]' : getShiftBadgeClass(tokenLabel)}`}
+                          className={`inline-flex items-center gap-2 rounded-[var(--radius-md)] border px-3 py-2 text-[11px] font-semibold ${token === OFF_SHIFT_TOKEN ? 'border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]' : getShiftBadgeClass(tokenLabel)}`}
                         >
                           <span>{index + 1}</span>
                           <span>{tokenLabel}</span>
                           <button
                             type="button"
                             onClick={() => removePlannerCustomPatternStep(index)}
-                            className="rounded-full bg-white/80 px-2 py-[2px] text-[10px] font-black text-[var(--foreground)]"
+                            className="rounded-[var(--radius-md)] bg-[var(--card)]/80 px-2 py-[2px] text-[10px] font-black text-[var(--foreground)]"
                           >
                             ×
                           </button>
@@ -6967,7 +6967,7 @@ export default function AutoRosterPlanner({
             )}
 
             {plannerUsesWeeklyTemplate && (
-              <div className="mt-4 rounded-[18px] border border-dashed border-[var(--toss-blue)]/30 bg-white p-4">
+              <div className="mt-4 rounded-[var(--radius-xl)] border border-dashed border-[var(--accent)]/30 bg-[var(--card)] p-4">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div>
                     <p className="text-sm font-bold text-[var(--foreground)]">주차 규칙 조립</p>
@@ -6981,7 +6981,7 @@ export default function AutoRosterPlanner({
                         key={count}
                         type="button"
                         onClick={() => setPlannerWeeklyTemplateWeekCount(count)}
-                        className={`rounded-full border px-3 py-1 text-[11px] font-bold ${effectivePlannerWeeklyTemplateWeeks.length === count ? 'border-[var(--toss-blue)] bg-[var(--toss-blue-light)] text-[var(--toss-blue)]' : 'border-[var(--toss-border)] bg-white text-[var(--toss-gray-3)]'}`}
+                        className={`rounded-[var(--radius-md)] border px-3 py-1 text-[11px] font-bold ${effectivePlannerWeeklyTemplateWeeks.length === count ? 'border-[var(--accent)] bg-[var(--toss-blue-light)] text-[var(--accent)]' : 'border-[var(--border)] bg-[var(--card)] text-[var(--toss-gray-3)]'}`}
                         data-testid={`planner-week-count-${count}`}
                       >
                         {count}주
@@ -6994,7 +6994,7 @@ export default function AutoRosterPlanner({
                   {effectivePlannerWeeklyTemplateWeeks.map((week, weekIndex) => (
                     <div
                       key={`${week.shiftId}-${weekIndex}`}
-                      className="rounded-[18px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-4"
+                      className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--muted)] p-4"
                     >
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                         <div>
@@ -7008,7 +7008,7 @@ export default function AutoRosterPlanner({
                           onChange={(event) =>
                             updatePlannerWeeklyTemplateWeek(weekIndex, { shiftId: event.target.value })
                           }
-                          className="rounded-[14px] border border-[var(--toss-border)] bg-white px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                          className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
                           data-testid={`planner-week-${weekIndex + 1}-shift`}
                         >
                           {availablePlannerShiftIds.map((shiftId) => (
@@ -7030,7 +7030,7 @@ export default function AutoRosterPlanner({
                             key={preset.label}
                             type="button"
                             onClick={() => applyPlannerWeeklyTemplateWeekdays(weekIndex, preset.weekdays)}
-                            className="rounded-full border border-[var(--toss-border)] bg-white px-3 py-1 text-[11px] font-bold text-[var(--foreground)]"
+                            className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1 text-[11px] font-bold text-[var(--foreground)]"
                             data-testid={`planner-week-${weekIndex + 1}-preset-${preset.weekdays.length === 5 ? 'weekdays' : preset.weekdays.length === 6 ? 'weekdays-sat' : preset.weekdays.length === 7 ? 'all-days' : 'off'}`}
                           >
                             {preset.label}
@@ -7046,7 +7046,7 @@ export default function AutoRosterPlanner({
                               key={`${weekIndex}-${weekday}`}
                               type="button"
                               onClick={() => togglePlannerWeeklyTemplateWeekday(weekIndex, weekday)}
-                              className={`rounded-[12px] border px-2 py-3 text-[11px] font-bold transition-all ${selected ? 'border-[var(--toss-blue)] bg-[var(--toss-blue-light)] text-[var(--toss-blue)]' : 'border-[var(--toss-border)] bg-white text-[var(--toss-gray-3)]'}`}
+                              className={`rounded-[var(--radius-md)] border px-2 py-3 text-[11px] font-bold transition-all ${selected ? 'border-[var(--accent)] bg-[var(--toss-blue-light)] text-[var(--accent)]' : 'border-[var(--border)] bg-[var(--card)] text-[var(--toss-gray-3)]'}`}
                             >
                               {WEEKDAY_LABELS[weekday]}
                             </button>
@@ -7060,8 +7060,8 @@ export default function AutoRosterPlanner({
             )}
           </div>
 
-          <div className="rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-4">
-            <div className="rounded-[18px] border border-[var(--toss-border)] bg-white p-4">
+          <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--muted)] p-4">
+            <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4">
               <p className="text-sm font-bold text-[var(--foreground)]">규칙 저장</p>
               <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">
                 지금 만든 규칙을 저장하면 자동생성 마법사에서 불러올 수 있습니다.
@@ -7072,13 +7072,13 @@ export default function AutoRosterPlanner({
                   value={plannerPresetName}
                   onChange={(event) => setPlannerPresetName(event.target.value)}
                   placeholder="예: 외래 1주5일 / 2주6일"
-                  className="rounded-[14px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                  className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
                   data-testid="planner-preset-name"
                 />
                 <button
                   type="button"
                   onClick={savePlannerPreset}
-                  className="rounded-[14px] bg-[var(--toss-blue)] px-4 py-3 text-sm font-bold text-white"
+                  className="rounded-[var(--radius-lg)] bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white"
                   data-testid="planner-preset-save"
                 >
                   규칙 저장
@@ -7086,7 +7086,7 @@ export default function AutoRosterPlanner({
               </div>
             </div>
 
-            <div className="mt-4 rounded-[18px] border border-[var(--toss-border)] bg-white p-4">
+            <div className="mt-4 rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-bold text-[var(--foreground)]">저장한 규칙</p>
@@ -7094,13 +7094,13 @@ export default function AutoRosterPlanner({
                     저장한 규칙은 여기서 다시 적용하거나 삭제할 수 있습니다.
                   </p>
                 </div>
-                <span className="rounded-full bg-[var(--toss-blue-light)] px-3 py-1 text-[10px] font-bold text-[var(--toss-blue)]">
+                <span className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-3 py-1 text-[10px] font-bold text-[var(--accent)]">
                   {userWizardPresets.length}개
                 </span>
               </div>
 
               {userWizardPresets.length === 0 ? (
-                <div className="mt-4 rounded-[16px] border border-dashed border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-4 text-sm font-semibold text-[var(--toss-gray-3)]">
+                <div className="mt-4 rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-4 text-sm font-semibold text-[var(--toss-gray-3)]">
                   아직 저장한 규칙이 없습니다.
                 </div>
               ) : (
@@ -7108,13 +7108,13 @@ export default function AutoRosterPlanner({
                   {userWizardPresets.map((preset) => (
                     <div
                       key={preset.id}
-                      className="rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-4"
+                      className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)] p-4"
                       data-testid={`planner-preset-${preset.id}`}
                     >
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                         <div>
                           <p className="text-sm font-bold text-[var(--foreground)]">{preset.name}</p>
-                          <p className="mt-1 text-[11px] font-semibold text-[var(--toss-blue)]">{preset.pattern}</p>
+                          <p className="mt-1 text-[11px] font-semibold text-[var(--accent)]">{preset.pattern}</p>
                           <p className="mt-2 text-[12px] leading-5 text-[var(--toss-gray-3)]">
                             {preset.description || buildWizardPresetDescription(preset.pattern, [], preset.shiftSlotCount)}
                           </p>
@@ -7123,7 +7123,7 @@ export default function AutoRosterPlanner({
                           <button
                             type="button"
                             onClick={() => applyPlannerPreset(preset)}
-                            className="rounded-full bg-[var(--toss-blue)] px-3 py-2 text-[11px] font-bold text-white"
+                            className="rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-2 text-[11px] font-bold text-white"
                             data-testid={`planner-preset-apply-${preset.id}`}
                           >
                             규칙 적용
@@ -7131,7 +7131,7 @@ export default function AutoRosterPlanner({
                           <button
                             type="button"
                             onClick={() => deleteWizardPreset(preset.id)}
-                            className="rounded-full border border-[var(--toss-border)] bg-white px-3 py-2 text-[11px] font-bold text-[var(--toss-gray-3)]"
+                            className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[11px] font-bold text-[var(--toss-gray-3)]"
                             data-testid={`planner-preset-delete-${preset.id}`}
                           >
                             삭제
@@ -7147,20 +7147,20 @@ export default function AutoRosterPlanner({
         </div>
       </div>
 
-      <div className="rounded-[24px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-6 shadow-sm">
+      <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h4 className="text-base font-bold text-[var(--foreground)]">대상 직원 세부 조정</h4>
           </div>
-          {loadingShifts && <span className="text-[12px] font-semibold text-[var(--toss-blue)]">근무형태 불러오는 중...</span>}
+          {loadingShifts && <span className="text-[12px] font-semibold text-[var(--accent)]">근무형태 불러오는 중...</span>}
         </div>
 
         {workingShifts.length === 0 ? (
-          <div className="mt-4 rounded-[18px] border border-dashed border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-6 text-sm font-semibold text-[var(--toss-gray-3)]">
+          <div className="mt-4 rounded-[var(--radius-xl)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-4 text-sm font-semibold text-[var(--toss-gray-3)]">
             선택한 사업체에 등록된 근무유형이 없습니다. 먼저 근무형태 관리에서 주간/이브닝/나이트/휴무 코드를 등록하세요.
           </div>
         ) : targetStaffs.length === 0 ? (
-          <div className="mt-4 rounded-[18px] border border-dashed border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-6 text-sm font-semibold text-[var(--toss-gray-3)]">
+          <div className="mt-4 rounded-[var(--radius-xl)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-4 text-sm font-semibold text-[var(--toss-gray-3)]">
             선택한 팀에 직원이 없습니다. 생성 마법사에서 사업체와 팀을 다시 선택하세요.
           </div>
         ) : (
@@ -7193,10 +7193,10 @@ export default function AutoRosterPlanner({
                   return (
                     <tr
                       key={staff.id}
-                      className={`rounded-[18px] ${
+                      className={`rounded-[var(--radius-xl)] ${
                         highlightedRosterTarget === `roster-config-row-${staff.id}`
-                          ? 'bg-[var(--toss-blue-light)]/50 ring-2 ring-[var(--toss-blue)]/30'
-                          : 'bg-[var(--toss-gray-1)]'
+                          ? 'bg-[var(--toss-blue-light)]/50 ring-2 ring-[var(--accent)]/30'
+                          : 'bg-[var(--muted)]'
                       }`}
                       data-testid={`roster-config-row-${staff.id}`}
                     >
@@ -7205,7 +7205,7 @@ export default function AutoRosterPlanner({
                           type="checkbox"
                           checked={config.enabled}
                           onChange={(e) => updateConfig(staff, index, { enabled: e.target.checked })}
-                          className="h-4 w-4 accent-[var(--toss-blue)]"
+                          className="h-4 w-4 accent-[var(--accent)]"
                         />
                       </td>
                       <td className="px-3 py-3">
@@ -7225,7 +7225,7 @@ export default function AutoRosterPlanner({
                                 : 0,
                             })
                           }
-                          className="w-full rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                          className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
                         >
                           {availablePatternOptions.map((option) => (
                             <option key={option.value} value={option.value}>
@@ -7253,7 +7253,7 @@ export default function AutoRosterPlanner({
                         <select
                           value={config.primaryShiftId}
                           onChange={(e) => updateConfig(staff, index, { primaryShiftId: e.target.value })}
-                          className="w-full rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                          className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
                         >
                           {workingShifts.map((shift) => (
                             <option key={shift.id} value={shift.id}>
@@ -7267,7 +7267,7 @@ export default function AutoRosterPlanner({
                           value={config.secondaryShiftId}
                           onChange={(e) => updateConfig(staff, index, { secondaryShiftId: e.target.value })}
                           disabled={requiredShiftCount < 2}
-                          className="w-full rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none disabled:cursor-not-allowed disabled:bg-zinc-100"
+                          className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none disabled:cursor-not-allowed disabled:bg-[var(--tab-bg)]"
                         >
                           {workingShifts.map((shift) => (
                             <option key={shift.id} value={shift.id}>
@@ -7281,7 +7281,7 @@ export default function AutoRosterPlanner({
                           value={config.tertiaryShiftId}
                           onChange={(e) => updateConfig(staff, index, { tertiaryShiftId: e.target.value })}
                           disabled={requiredShiftCount < 3}
-                          className="w-full rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none disabled:cursor-not-allowed disabled:bg-zinc-100"
+                          className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none disabled:cursor-not-allowed disabled:bg-[var(--tab-bg)]"
                         >
                           {workingShifts.map((shift) => (
                             <option key={shift.id} value={shift.id}>
@@ -7297,7 +7297,7 @@ export default function AutoRosterPlanner({
                           value={config.startOffset}
                           onChange={(e) => updateConfig(staff, index, { startOffset: Number(e.target.value) || 0 })}
                           disabled={isWeeklyTemplatePattern(config.pattern)}
-                          className="w-24 rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none disabled:cursor-not-allowed disabled:bg-zinc-100"
+                          className="w-24 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none disabled:cursor-not-allowed disabled:bg-[var(--tab-bg)]"
                         />
                       </td>
                       <td className="px-3 py-3">
@@ -7312,7 +7312,7 @@ export default function AutoRosterPlanner({
                               nightShiftCount: clampNightShiftCount(Number(e.target.value) || 0, monthDates.length),
                             })
                           }
-                          className="w-24 rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none disabled:cursor-not-allowed disabled:bg-zinc-100"
+                          className="w-24 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none disabled:cursor-not-allowed disabled:bg-[var(--tab-bg)]"
                         />
                       </td>
                       <td className="px-3 py-3">
@@ -7326,7 +7326,7 @@ export default function AutoRosterPlanner({
                               minNightShiftCount: clampNightShiftCount(Number(e.target.value) || 0, monthDates.length),
                             })
                           }
-                          className="w-24 rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                          className="w-24 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
                           data-testid={`staff-night-min-${staff.id}`}
                         />
                         <p className="mt-1 text-[10px] font-medium text-[var(--toss-gray-3)]">0이면 개인 최소 미적용</p>
@@ -7342,7 +7342,7 @@ export default function AutoRosterPlanner({
                               maxNightShiftCount: clampNightShiftCount(Number(e.target.value) || 0, monthDates.length),
                             })
                           }
-                          className="w-24 rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
+                          className="w-24 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] outline-none"
                           data-testid={`staff-night-max-${staff.id}`}
                         />
                         <p className="mt-1 text-[10px] font-medium text-[var(--toss-gray-3)]">0이면 개인 최대 미적용</p>
@@ -7356,7 +7356,7 @@ export default function AutoRosterPlanner({
         )}
       </div>
 
-      <div className="rounded-[24px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-6 shadow-sm">
+      <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h4 className="text-base font-bold text-[var(--foreground)]">월간 미리보기</h4>
@@ -7368,7 +7368,7 @@ export default function AutoRosterPlanner({
             <button
               type="button"
               onClick={() => setManualEditMode((prev) => !prev)}
-              className={`rounded-full px-3 py-1 text-[11px] font-bold ${manualEditMode ? 'bg-orange-100 text-orange-700' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'}`}
+              className={`rounded-[var(--radius-md)] px-3 py-1 text-[11px] font-bold ${manualEditMode ? 'bg-orange-100 text-orange-700' : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'}`}
             >
               {manualEditMode ? '수동 수정 중' : '수동 수정'}
             </button>
@@ -7376,11 +7376,11 @@ export default function AutoRosterPlanner({
               type="button"
               onClick={() => setManualAssignments({})}
               disabled={summary.manualCount === 0}
-              className="rounded-full bg-[var(--toss-gray-1)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-4)] disabled:opacity-40"
+              className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-4)] disabled:opacity-40"
             >
               수정 초기화
             </button>
-            <span className="rounded-full bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--toss-blue)]">
+            <span className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--accent)]">
               {previewRows.length}명 표시 · 수동 수정 {summary.manualCount}건
             </span>
           </div>
@@ -7391,7 +7391,7 @@ export default function AutoRosterPlanner({
         </p>
 
         {previewRows.length === 0 ? (
-          <div className="mt-4 rounded-[18px] border border-dashed border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-6 text-sm font-semibold text-[var(--toss-gray-3)]">
+          <div className="mt-4 rounded-[var(--radius-xl)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-4 text-sm font-semibold text-[var(--toss-gray-3)]">
             생성 마법사로 팀과 직원을 선택하면 여기에서 월간 근무표를 확인할 수 있습니다.
           </div>
         ) : (
@@ -7399,7 +7399,7 @@ export default function AutoRosterPlanner({
             <table className="border-collapse" style={{ minWidth: `${260 + monthDates.length * 50}px` }}>
               <thead>
                 <tr>
-                  <th className="sticky left-0 z-20 min-w-[260px] border-b border-[var(--toss-border)] bg-[var(--toss-card)] px-4 py-3 text-left text-[11px] font-bold text-[var(--toss-gray-3)]">
+                  <th className="sticky left-0 z-20 min-w-[260px] border-b border-[var(--border)] bg-[var(--card)] px-4 py-3 text-left text-[11px] font-bold text-[var(--toss-gray-3)]">
                     직원
                   </th>
                   {monthDates.map((date) => {
@@ -7408,7 +7408,7 @@ export default function AutoRosterPlanner({
                     return (
                       <th
                         key={date}
-                        className="min-w-[50px] border-b border-[var(--toss-border)] bg-[var(--toss-card)] px-2 py-3 text-center text-[10px] font-bold text-[var(--toss-gray-3)]"
+                        className="min-w-[50px] border-b border-[var(--border)] bg-[var(--card)] px-2 py-3 text-center text-[10px] font-bold text-[var(--toss-gray-3)]"
                       >
                         <div>{day}</div>
                         <div className="mt-1 text-[9px]">{weekday}</div>
@@ -7419,8 +7419,8 @@ export default function AutoRosterPlanner({
               </thead>
               <tbody>
                 {previewRows.map((row) => (
-                  <tr key={row.staff.id} className="border-b border-[var(--toss-border)] last:border-b-0">
-                    <td className="sticky left-0 z-10 bg-[var(--toss-card)] px-4 py-3">
+                  <tr key={row.staff.id} className="border-b border-[var(--border)] last:border-b-0">
+                    <td className="sticky left-0 z-10 bg-[var(--card)] px-4 py-3">
                       <p className="text-sm font-bold text-[var(--foreground)]">{row.staff.name}</p>
                       <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
                         {row.config.pattern} · {getDepartmentName(row.staff)}
@@ -7440,7 +7440,7 @@ export default function AutoRosterPlanner({
                             currentShiftId: cell.shiftId,
                             baseShiftId: cell.baseShiftId,
                           })}
-                          className={`inline-flex h-8 min-w-[40px] items-center justify-center rounded-[10px] border px-1 text-[11px] font-black transition-all ${cell.badgeClass} ${manualEditMode ? 'cursor-pointer hover:scale-105' : 'cursor-default'} ${cell.isManual ? 'ring-2 ring-[var(--toss-blue)] ring-offset-1' : ''}`}
+                          className={`inline-flex h-8 min-w-[40px] items-center justify-center rounded-[var(--radius-md)] border px-1 text-[11px] font-black transition-all ${cell.badgeClass} ${manualEditMode ? 'cursor-pointer hover:scale-105' : 'cursor-default'} ${cell.isManual ? 'ring-2 ring-[var(--accent)] ring-offset-1' : ''}`}
                           title={`${row.staff.name} ${cell.date} ${cell.shiftName}${manualEditMode ? ' · 클릭하여 변경' : ''}`}
                         >
                           {cell.code}
@@ -7457,13 +7457,13 @@ export default function AutoRosterPlanner({
       </div>
 
       {wizardOpen && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/45 px-4 py-6">
-          <div className="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-[28px] border border-[var(--toss-border)] bg-[var(--toss-card)] shadow-2xl">
-            <div className="border-b border-[var(--toss-border)] bg-[var(--page-bg)] px-6 py-5">
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/45 px-4 py-4">
+          <div className="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-sm">
+            <div className="border-b border-[var(--border)] bg-[var(--page-bg)] px-4 py-5">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <h3 className="text-2xl font-black tracking-[-0.03em] text-[var(--foreground)]">
-                    <span className="bg-gradient-to-r from-[var(--toss-blue)] to-fuchsia-500 bg-clip-text text-transparent">
+                    <span className="bg-gradient-to-r from-[var(--accent)] to-fuchsia-500 bg-clip-text text-transparent">
                       RUN SHIFT
                     </span>{' '}
                     마법사
@@ -7481,7 +7481,7 @@ export default function AutoRosterPlanner({
                   ].map(({ step, label }) => (
                     <div
                       key={step}
-                      className={`rounded-full px-4 py-2 text-sm font-semibold ${wizardStep === step ? 'bg-[var(--toss-blue)] text-white' : wizardStep > step ? 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)]' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]'}`}
+                      className={`rounded-[var(--radius-md)] px-4 py-2 text-sm font-semibold ${wizardStep === step ? 'bg-[var(--accent)] text-white' : wizardStep > step ? 'bg-[var(--toss-blue-light)] text-[var(--accent)]' : 'bg-[var(--muted)] text-[var(--toss-gray-3)]'}`}
                     >
                       {step}. {label}
                     </div>
@@ -7490,13 +7490,13 @@ export default function AutoRosterPlanner({
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
               {wizardStep === 1 && (
-                <div className="space-y-6">
+                <div className="space-y-4">
                   <div className="grid gap-4 lg:grid-cols-[180px_minmax(0,1fr)]">
                     <div className="space-y-4">
                       <label className="flex flex-col gap-0">
-                        <div className="rounded-[14px] border border-[var(--toss-border)] bg-[var(--input-bg)] px-3 py-2">
+                        <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--input-bg)] px-3 py-2">
                           <SmartMonthPicker
                             value={selectedMonth}
                             onChange={(value) => setSelectedMonth(value)}
@@ -7511,7 +7511,7 @@ export default function AutoRosterPlanner({
                           value={selectedCompany}
                           onChange={(e) => setSelectedCompany(e.target.value)}
                           disabled={!isAdmin || companyLockedByHrFilter}
-                          className="rounded-[14px] border border-[var(--toss-border)] bg-[var(--input-bg)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none disabled:cursor-not-allowed disabled:bg-zinc-50"
+                          className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--input-bg)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none disabled:cursor-not-allowed disabled:bg-[var(--tab-bg)]"
                         >
                           {companyOptions.map((company) => (
                             <option key={company} value={company}>
@@ -7523,7 +7523,7 @@ export default function AutoRosterPlanner({
                     </div>
 
                     <div className="space-y-4">
-                      <div className="rounded-[22px] border border-dashed border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-5 py-4">
+                      <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--muted)] px-5 py-4">
                         <p className="text-sm font-bold text-[var(--foreground)]">어떤 팀의 근무표를 만들까요?</p>
                         <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">
                           병동처럼 3교대 팀은 이후 단계에서 데이 / 이브닝 / 나이트를 체크해서 D / E / N / OFF 형태로 만들 수 있습니다.
@@ -7531,7 +7531,7 @@ export default function AutoRosterPlanner({
                       </div>
 
                       {teamOptions.length === 0 ? (
-                        <div className="rounded-[20px] border border-dashed border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-6 text-sm font-semibold text-[var(--toss-gray-3)]">
+                        <div className="rounded-[var(--radius-xl)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-4 text-sm font-semibold text-[var(--toss-gray-3)]">
                           No teams are registered for the selected company.
                         </div>
                       ) : (
@@ -7547,19 +7547,19 @@ export default function AutoRosterPlanner({
                                 key={department}
                                 type="button"
                                 onClick={() => setSelectedDepartment(department)}
-                                className={`rounded-[24px] border px-7 py-6 text-left transition-all ${selected ? 'border-[var(--toss-blue)] bg-[var(--toss-blue-light)]/70 shadow-[0_18px_40px_rgba(37,99,235,0.12)] ring-1 ring-[var(--toss-blue)]/20' : 'border-[var(--toss-border)] bg-white hover:border-[var(--toss-blue)]/40 hover:shadow-[0_16px_32px_rgba(15,23,42,0.08)]'}`}
+                                className={`rounded-[var(--radius-xl)] border px-7 py-4 text-left transition-all ${selected ? 'border-[var(--accent)] bg-[var(--toss-blue-light)]/70 shadow-[0_18px_40px_rgba(37,99,235,0.12)] ring-1 ring-[var(--accent)]/20' : 'border-[var(--border)] bg-[var(--card)] hover:border-[var(--accent)]/40 hover:shadow-[0_16px_32px_rgba(15,23,42,0.08)]'}`}
                               >
                                 <div className="flex items-start justify-between gap-4">
-                                  <div className={`flex h-12 w-12 items-center justify-center rounded-[16px] text-xl ${selected ? 'bg-white text-[var(--toss-blue)]' : 'bg-[var(--toss-gray-1)] text-[var(--toss-blue)]'}`}>
+                                  <div className={`flex h-12 w-12 items-center justify-center rounded-[var(--radius-lg)] text-xl ${selected ? 'bg-[var(--card)] text-[var(--accent)]' : 'bg-[var(--muted)] text-[var(--accent)]'}`}>
                                     W
                                   </div>
                                   {selected && (
-                                    <span className="rounded-full bg-[var(--toss-blue)] px-3 py-1 text-[10px] font-bold text-white">
+                                    <span className="rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-1 text-[10px] font-bold text-white">
                                       Selected
                                     </span>
                                   )}
                                 </div>
-                                <p className="mt-6 text-xl font-bold tracking-[-0.02em] text-[var(--foreground)]">{department}</p>
+                                <p className="mt-4 text-xl font-bold tracking-[-0.02em] text-[var(--foreground)]">{department}</p>
                                 <p className="mt-3 text-sm text-[var(--toss-gray-3)]">
                                   {selectedCompany || 'Company'} - Staff {teamStaffCount}
                                 </p>
@@ -7584,13 +7584,13 @@ export default function AutoRosterPlanner({
                       <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">Exclude specific team members from this auto-generation run.</p>
                       <div className="mt-3 flex flex-wrap gap-2">
                         <span
-                          className="rounded-full bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--toss-blue)]"
+                          className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--accent)]"
                           data-testid="roster-wizard-included-count"
                         >
                           Included {wizardSelectedStaffIds.length}
                         </span>
                         <span
-                          className="rounded-full border border-[var(--toss-border)] bg-white px-3 py-1 text-[11px] font-bold text-[var(--foreground)]"
+                          className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1 text-[11px] font-bold text-[var(--foreground)]"
                           data-testid="roster-wizard-excluded-count"
                         >
                           Excluded {wizardExcludedStaffs.length}
@@ -7601,7 +7601,7 @@ export default function AutoRosterPlanner({
                       <button
                         type="button"
                         onClick={includeAllWizardStaff}
-                        className="rounded-full border border-[var(--toss-border)] bg-white px-3 py-1 text-[11px] font-bold text-[var(--foreground)]"
+                        className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1 text-[11px] font-bold text-[var(--foreground)]"
                         data-testid="roster-wizard-include-all"
                       >
                         Include all
@@ -7609,7 +7609,7 @@ export default function AutoRosterPlanner({
                       <button
                         type="button"
                         onClick={clearWizardStaffSelection}
-                        className="rounded-full border border-[var(--toss-border)] bg-white px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-3)]"
+                        className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-3)]"
                         data-testid="roster-wizard-exclude-all"
                       >
                         Exclude all
@@ -7618,7 +7618,7 @@ export default function AutoRosterPlanner({
                   </div>
 
                   {targetStaffs.length === 0 ? (
-                    <div className="rounded-[20px] border border-dashed border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-6 text-sm font-semibold text-[var(--toss-gray-3)]">
+                    <div className="rounded-[var(--radius-xl)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-4 text-sm font-semibold text-[var(--toss-gray-3)]">
                       No staff found in this team.
                     </div>
                   ) : (
@@ -7630,12 +7630,12 @@ export default function AutoRosterPlanner({
                           return (
                             <div
                               key={staff.id}
-                              className={`rounded-[18px] border p-4 text-left transition-all ${selected ? 'border-[var(--toss-blue)] bg-[var(--toss-blue-light)]/70 ring-1 ring-[var(--toss-blue)]/30' : 'border-[var(--toss-border)] bg-[var(--toss-gray-1)]/70'}`}
+                              className={`rounded-[var(--radius-xl)] border p-4 text-left transition-all ${selected ? 'border-[var(--accent)] bg-[var(--toss-blue-light)]/70 ring-1 ring-[var(--accent)]/30' : 'border-[var(--border)] bg-[var(--muted)]/70'}`}
                               data-testid={`roster-wizard-staff-card-${staffId}`}
                             >
                               <div className="flex items-start justify-between gap-3">
                                 <div className="flex items-center gap-3">
-                                  <div className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-[var(--tab-bg)] text-sm font-bold text-[var(--toss-blue)]">
+                                  <div className="flex h-10 w-10 items-center justify-center rounded-[var(--radius-md)] bg-[var(--tab-bg)] text-sm font-bold text-[var(--accent)]">
                                     {String(staff.name || '?').slice(0, 1)}
                                   </div>
                                   <div>
@@ -7646,7 +7646,7 @@ export default function AutoRosterPlanner({
                                   </div>
                                 </div>
                                 <span
-                                  className={`rounded-full px-3 py-1 text-[10px] font-bold ${selected ? 'bg-white text-[var(--toss-blue)]' : 'bg-[var(--toss-gray-2)] text-[var(--toss-gray-3)]'}`}
+                                  className={`rounded-[var(--radius-md)] px-3 py-1 text-[10px] font-bold ${selected ? 'bg-[var(--card)] text-[var(--accent)]' : 'bg-[var(--toss-gray-2)] text-[var(--toss-gray-3)]'}`}
                                 >
                                   {selected ? 'Included' : 'Excluded'}
                                 </span>
@@ -7655,7 +7655,7 @@ export default function AutoRosterPlanner({
                                 <button
                                   type="button"
                                   onClick={() => toggleWizardStaff(staffId)}
-                                  className={`rounded-full px-3 py-2 text-[11px] font-bold transition-colors ${selected ? 'bg-rose-50 text-rose-600' : 'bg-[var(--toss-blue)] text-white'}`}
+                                  className={`rounded-[var(--radius-md)] px-3 py-2 text-[11px] font-bold transition-colors ${selected ? 'bg-rose-50 text-rose-600' : 'bg-[var(--accent)] text-white'}`}
                                   data-testid={`roster-wizard-toggle-${staffId}`}
                                 >
                                   {selected ? 'Exclude from this run' : 'Include again'}
@@ -7670,7 +7670,7 @@ export default function AutoRosterPlanner({
                       </div>
                       {wizardExcludedStaffs.length > 0 && (
                         <div
-                          className="rounded-[18px] border border-dashed border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-4 py-3 text-sm font-semibold text-[var(--foreground)]"
+                          className="rounded-[var(--radius-xl)] border border-dashed border-[var(--border)] bg-[var(--muted)] px-4 py-3 text-sm font-semibold text-[var(--foreground)]"
                           data-testid="roster-wizard-excluded-summary"
                         >
                           Excluded: {wizardExcludedStaffs.map((staff: any) => staff.name).join(', ')}
@@ -7682,7 +7682,7 @@ export default function AutoRosterPlanner({
               )}
 
               {wizardStep === 3 && (
-                <div className="space-y-6">
+                <div className="space-y-4">
                   <div>
                     <h4 className="text-base font-bold text-[var(--foreground)]">자동생성 규칙 불러오기</h4>
                     <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">
@@ -7690,7 +7690,7 @@ export default function AutoRosterPlanner({
                     </p>
                   </div>
 
-                  <div className="rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-4">
+                  <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--muted)] p-4">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                       <div>
                         <p className="text-sm font-bold text-[var(--foreground)]">저장한 규칙 선택</p>
@@ -7713,7 +7713,7 @@ export default function AutoRosterPlanner({
                               applyWizardPreset(preset);
                             }
                           }}
-                          className="rounded-[14px] border border-[var(--toss-border)] bg-white px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                          className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
                           data-testid="roster-wizard-preset-select"
                         >
                           <option value="">규칙을 선택하세요</option>
@@ -7726,28 +7726,28 @@ export default function AutoRosterPlanner({
                       </div>
                     </div>
                     {userWizardPresets.length === 0 ? (
-                      <div className="mt-4 rounded-[16px] border border-dashed border-[var(--toss-border)] bg-white p-4 text-sm font-semibold text-[var(--toss-gray-3)]">
+                      <div className="mt-4 rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--card)] p-4 text-sm font-semibold text-[var(--toss-gray-3)]">
                         먼저 바깥의 `자동생성 규칙 만들기`에서 규칙을 저장하세요.
                       </div>
                     ) : wizardSelectedPresetId ? (
-                      <div className="mt-4 rounded-[18px] border border-[var(--toss-border)] bg-white p-4">
+                      <div className="mt-4 rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4">
                         <div className="flex flex-wrap gap-2">
-                          <span className="rounded-full bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--toss-blue)]">
+                          <span className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--accent)]">
                             선택된 규칙
                           </span>
                           <span
-                            className="rounded-full border border-[var(--toss-border)] bg-white px-3 py-1 text-[11px] font-semibold text-[var(--foreground)]"
+                            className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1 text-[11px] font-semibold text-[var(--foreground)]"
                             data-testid="roster-wizard-loaded-preset-name"
                           >
                             {selectedWizardPreset?.name || ''}
                           </span>
-                          <span className="rounded-full border border-[var(--toss-border)] bg-white px-3 py-1 text-[11px] font-semibold text-[var(--foreground)]">
+                          <span className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1 text-[11px] font-semibold text-[var(--foreground)]">
                             타입: {wizardPattern}
                           </span>
                           {orderedWizardShiftIds.map((shiftId, index) => (
                             <span
                               key={shiftId}
-                              className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${getShiftBadgeClass(getShiftNameById(shiftId, workShifts))}`}
+                              className={`rounded-[var(--radius-md)] border px-3 py-1 text-[11px] font-semibold ${getShiftBadgeClass(getShiftNameById(shiftId, workShifts))}`}
                             >
                               {index + 1}차 · {getShiftNameById(shiftId, workShifts)}
                             </span>
@@ -7761,7 +7761,7 @@ export default function AutoRosterPlanner({
                               return (
                                 <span
                                   key={`${token}-${index}`}
-                                  className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${token === OFF_SHIFT_TOKEN ? 'border-[var(--toss-border)] bg-[var(--toss-gray-1)] text-[var(--foreground)]' : getShiftBadgeClass(tokenLabel)}`}
+                                  className={`rounded-[var(--radius-md)] border px-3 py-1 text-[11px] font-semibold ${token === OFF_SHIFT_TOKEN ? 'border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]' : getShiftBadgeClass(tokenLabel)}`}
                                 >
                                   {index + 1}. {tokenLabel}
                                 </span>
@@ -7775,7 +7775,7 @@ export default function AutoRosterPlanner({
                             {effectiveWizardWeeklyTemplateWeeks.map((week, index) => (
                               <span
                                 key={`${week.shiftId}-${index}`}
-                                className="rounded-full border border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-3 py-1 text-[11px] font-semibold text-[var(--foreground)]"
+                                className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] px-3 py-1 text-[11px] font-semibold text-[var(--foreground)]"
                               >
                                 {getWeeklyTemplateWeekLabel(index)} · {getShiftNameById(week.shiftId, workShifts)} · {formatWeekdaySummary(week.activeWeekdays)}
                               </span>
@@ -7784,19 +7784,19 @@ export default function AutoRosterPlanner({
                         )}
                       </div>
                     ) : (
-                      <div className="mt-4 rounded-[16px] border border-dashed border-[var(--toss-border)] bg-white p-4 text-sm font-semibold text-[var(--toss-gray-3)]">
+                      <div className="mt-4 rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--card)] p-4 text-sm font-semibold text-[var(--toss-gray-3)]">
                         사용할 규칙을 선택하면 요약이 표시됩니다.
                       </div>
                     )}
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-2">
-                    <div className="rounded-[18px] bg-[var(--toss-gray-1)] p-4">
+                    <div className="rounded-[var(--radius-xl)] bg-[var(--muted)] p-4">
                       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--toss-gray-3)]">생성 대상</p>
                       <p className="mt-2 text-lg font-bold text-[var(--foreground)]">{wizardSelectedStaffIds.length}명</p>
                       <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{selectedDepartment}</p>
                     </div>
-                    <div className="rounded-[18px] bg-[var(--toss-gray-1)] p-4">
+                    <div className="rounded-[var(--radius-xl)] bg-[var(--muted)] p-4">
                       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--toss-gray-3)]">적용 방식</p>
                       <p className="mt-2 text-lg font-bold text-[var(--foreground)]">
                         {wizardPattern || '규칙 미선택'}
@@ -7810,7 +7810,7 @@ export default function AutoRosterPlanner({
               )}
 
               {wizardStep === 4 && (
-                <div className="space-y-6" data-testid="roster-wizard-step-4">
+                <div className="space-y-4" data-testid="roster-wizard-step-4">
                   <div>
                     <h4 className="text-base font-bold text-[var(--foreground)]">직원별 예외 일정 설정</h4>
                     <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">
@@ -7819,7 +7819,7 @@ export default function AutoRosterPlanner({
                   </div>
 
                   {wizardSelectedStaffs.length === 0 ? (
-                    <div className="rounded-[20px] border border-dashed border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-6 text-sm font-semibold text-[var(--toss-gray-3)]">
+                    <div className="rounded-[var(--radius-xl)] border border-dashed border-[var(--border)] bg-[var(--muted)] p-4 text-sm font-semibold text-[var(--toss-gray-3)]">
                       먼저 직원을 한 명 이상 선택하세요.
                     </div>
                   ) : (
@@ -7837,7 +7837,7 @@ export default function AutoRosterPlanner({
                         return (
                           <div
                             key={staffId}
-                            className="rounded-[22px] border border-[var(--toss-border)] bg-white p-5 shadow-sm"
+                            className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm"
                           >
                             <div className="flex items-start justify-between gap-4">
                               <div>
@@ -7846,7 +7846,7 @@ export default function AutoRosterPlanner({
                                   {getDepartmentName(staff)} · {staff.position || '직원'}
                                 </p>
                               </div>
-                              <label className="inline-flex items-center gap-2 rounded-full bg-[var(--toss-gray-1)] px-3 py-2 text-[11px] font-bold text-[var(--foreground)]">
+                              <label className="inline-flex items-center gap-2 rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2 text-[11px] font-bold text-[var(--foreground)]">
                                 <input
                                   type="checkbox"
                                   checked={override.enabled}
@@ -7868,7 +7868,7 @@ export default function AutoRosterPlanner({
                                     onChange={(event) =>
                                       updateWizardOffOverride(staffId, { offDate: event.target.value })
                                     }
-                                    className="rounded-[14px] border border-[var(--toss-border)] bg-white px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                                    className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
                                     data-testid={`roster-wizard-off-date-${staffId}`}
                                   >
                                     {wizardOverrideDateOptions.map((date) => (
@@ -7885,7 +7885,7 @@ export default function AutoRosterPlanner({
                                     onChange={(event) =>
                                       updateWizardOffOverride(staffId, { nextShiftId: event.target.value })
                                     }
-                                    className="rounded-[14px] border border-[var(--toss-border)] bg-white px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
+                                    className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none"
                                     data-testid={`roster-wizard-post-off-shift-${staffId}`}
                                   >
                                     {wizardOverrideShiftOptions.map((shift) => (
@@ -7895,7 +7895,7 @@ export default function AutoRosterPlanner({
                                     ))}
                                   </select>
                                 </label>
-                                <div className="rounded-[16px] bg-[var(--toss-gray-1)] px-4 py-3 text-[12px] font-semibold text-[var(--foreground)] md:col-span-2">
+                                <div className="rounded-[var(--radius-lg)] bg-[var(--muted)] px-4 py-3 text-[12px] font-semibold text-[var(--foreground)] md:col-span-2">
                                   {override.offDate || '날짜 미선택'} OFF
                                   {nextDate
                                     ? ` → ${nextDate} ${getShiftNameById(override.nextShiftId, workShifts)}`
@@ -7916,12 +7916,12 @@ export default function AutoRosterPlanner({
               )}
             </div>
 
-            <div className="border-t border-[var(--toss-border)] px-6 py-4">
+            <div className="border-t border-[var(--border)] px-4 py-4">
               <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
                 <button
                   type="button"
                   onClick={closeWizard}
-                  className="rounded-[14px] border border-[var(--toss-border)] bg-white px-4 py-3 text-sm font-bold text-[var(--foreground)]"
+                  className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-bold text-[var(--foreground)]"
                 >
                   닫기
                 </button>
@@ -7930,7 +7930,7 @@ export default function AutoRosterPlanner({
                     <button
                       type="button"
                       onClick={() => setWizardStep((prev) => (prev - 1) as WizardStep)}
-                      className="rounded-[14px] border border-[var(--toss-border)] bg-white px-4 py-3 text-sm font-bold text-[var(--foreground)]"
+                      className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm font-bold text-[var(--foreground)]"
                       data-testid="roster-wizard-back"
                     >
                       이전
@@ -7986,7 +7986,7 @@ export default function AutoRosterPlanner({
                         }
                         setWizardStep((prev) => (prev + 1) as WizardStep);
                       }}
-                      className="rounded-[14px] bg-[var(--toss-blue)] px-4 py-3 text-sm font-bold text-white"
+                      className="rounded-[var(--radius-lg)] bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white"
                       data-testid="roster-wizard-next"
                     >
                       다음
@@ -7995,7 +7995,7 @@ export default function AutoRosterPlanner({
                     <button
                       type="button"
                       onClick={applyWizard}
-                      className="rounded-[14px] bg-[var(--toss-blue)] px-4 py-3 text-sm font-bold text-white"
+                      className="rounded-[var(--radius-lg)] bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white"
                       data-testid="roster-wizard-apply"
                     >
                       근무표 생성

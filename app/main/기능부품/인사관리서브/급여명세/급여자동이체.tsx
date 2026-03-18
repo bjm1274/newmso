@@ -112,7 +112,7 @@ export default function SalaryAutoTransfer() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* 월 선택 */}
       <div className="flex gap-4 items-center">
         <label className="text-sm font-medium text-[var(--foreground)]">정산 월</label>
@@ -120,51 +120,51 @@ export default function SalaryAutoTransfer() {
           type="month"
           value={selectedMonth}
           onChange={(e) => setSelectedMonth(e.target.value)}
-          className="h-9 px-3 border border-[var(--toss-border)] rounded-md text-sm font-medium focus:outline-none focus:border-[var(--toss-blue)]"
+          className="h-9 px-3 border border-[var(--border)] rounded-md text-sm font-medium focus:outline-none focus:border-[var(--accent)]"
         />
       </div>
 
       {/* 통계 */}
       <div className="grid grid-cols-4 gap-3">
-        <div className="bg-[var(--page-bg)] p-4 rounded-[12px] border border-[var(--toss-border)]">
+        <div className="bg-[var(--page-bg)] p-4 rounded-[var(--radius-md)] border border-[var(--border)]">
           <p className="text-xs font-medium text-[var(--toss-gray-3)] mb-1">총 급여액</p>
           <p className="text-lg font-semibold text-[var(--foreground)]">
             ₩{transferData.reduce((sum, item) => sum + item.salary_amount, 0).toLocaleString()}
           </p>
         </div>
-        <div className="bg-[var(--page-bg)] p-4 rounded-[12px] border border-[var(--toss-border)]">
+        <div className="bg-[var(--page-bg)] p-4 rounded-[var(--radius-md)] border border-[var(--border)]">
           <p className="text-xs font-medium text-[var(--toss-gray-3)] mb-1">총 공제액</p>
           <p className="text-lg font-semibold text-red-600">
             ₩{transferData.reduce((sum, item) => sum + item.deduction_amount, 0).toLocaleString()}
           </p>
         </div>
-        <div className="bg-[var(--page-bg)] p-4 rounded-[12px] border border-[var(--toss-border)]">
+        <div className="bg-[var(--page-bg)] p-4 rounded-[var(--radius-md)] border border-[var(--border)]">
           <p className="text-xs font-medium text-[var(--toss-gray-3)] mb-1">총 이체액</p>
           <p className="text-lg font-semibold text-emerald-600">
             ₩{transferData.reduce((sum, item) => sum + item.transfer_amount, 0).toLocaleString()}
           </p>
         </div>
-        <div className="bg-[var(--page-bg)] p-4 rounded-[12px] border border-[var(--toss-border)]">
+        <div className="bg-[var(--page-bg)] p-4 rounded-[var(--radius-md)] border border-[var(--border)]">
           <p className="text-xs font-medium text-[var(--toss-gray-3)] mb-1">이체 대상</p>
           <p className="text-lg font-semibold text-[var(--foreground)]">{transferData.length}명</p>
         </div>
       </div>
 
       {/* 이체 테이블 */}
-      <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-[12px] overflow-hidden">
-        <div className="p-4 border-b border-[var(--toss-border)] bg-[var(--tab-bg)] flex justify-between items-center">
+      <div className="bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-[var(--radius-md)] overflow-hidden">
+        <div className="p-4 border-b border-[var(--border)] bg-[var(--tab-bg)] flex justify-between items-center">
           <h3 className="text-sm font-semibold text-[var(--foreground)]">급여 이체 현황</h3>
           <div className="flex gap-2">
             <button
               onClick={downloadTransferFile}
-              className="px-3 py-2 bg-[var(--foreground)] text-white rounded-[12px] text-xs font-medium hover:opacity-90"
+              className="px-3 py-2 bg-[var(--foreground)] text-white rounded-[var(--radius-md)] text-xs font-medium hover:opacity-90"
             >
               CSV 다운로드
             </button>
             <button
               onClick={() => setShowTransferModal(true)}
               disabled={transferStatus === '진행중'}
-              className="px-3 py-2 bg-[var(--toss-blue)] text-white rounded-[12px] text-xs font-medium hover:opacity-90 disabled:opacity-50"
+              className="px-3 py-2 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-xs font-medium hover:opacity-90 disabled:opacity-50"
             >
               {transferStatus === '완료' ? '완료' : '이체 실행'}
             </button>
@@ -173,7 +173,7 @@ export default function SalaryAutoTransfer() {
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-[var(--tab-bg)] border-b border-[var(--toss-border)]">
+            <thead className="bg-[var(--tab-bg)] border-b border-[var(--border)]">
               <tr>
                 <th className="px-4 py-2.5 text-left font-semibold text-[var(--foreground)] text-sm">순번</th>
                 <th className="px-4 py-2.5 text-left font-semibold text-[var(--foreground)] text-sm">직원명</th>
@@ -188,7 +188,7 @@ export default function SalaryAutoTransfer() {
             </thead>
             <tbody>
               {transferData.map((item, idx) => (
-                <tr key={item.id} className="border-b border-[var(--toss-border)] hover:bg-[var(--page-bg)]">
+                <tr key={item.id} className="border-b border-[var(--border)] hover:bg-[var(--page-bg)]">
                   <td className="px-4 py-2.5 font-medium text-[var(--foreground)] text-sm">{idx + 1}</td>
                   <td className="px-4 py-2.5 font-medium text-[var(--foreground)] text-sm">{item.staff_name}</td>
                   <td className="px-4 py-2.5 font-medium text-[var(--foreground)] text-sm">{item.bank_name}</td>
@@ -222,10 +222,10 @@ export default function SalaryAutoTransfer() {
       {/* 이체 확인 모달 */}
       {showTransferModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]">
-          <div className="bg-[var(--toss-card)] rounded-[12px] p-6 w-full max-w-md shadow-xl">
+          <div className="bg-[var(--card)] rounded-[var(--radius-md)] p-4 w-full max-w-md shadow-sm">
             <h3 className="text-base font-semibold text-[var(--foreground)] mb-4">급여 이체 확인</h3>
             
-            <div className="space-y-2 mb-4 bg-[var(--page-bg)] p-4 rounded-[12px] border border-[var(--toss-border)]">
+            <div className="space-y-2 mb-4 bg-[var(--page-bg)] p-4 rounded-[var(--radius-md)] border border-[var(--border)]">
               <div className="flex justify-between text-sm">
                 <span className="font-medium text-[var(--toss-gray-4)]">이체 대상</span>
                 <span className="font-semibold text-[var(--foreground)]">{transferData.length}명</span>
@@ -249,7 +249,7 @@ export default function SalaryAutoTransfer() {
             <div className="flex gap-2">
               <button
                 onClick={() => setShowTransferModal(false)}
-                className="flex-1 py-2.5 bg-[var(--toss-gray-1)] text-[var(--foreground)] rounded-[12px] text-sm font-medium hover:opacity-90"
+                className="flex-1 py-2.5 bg-[var(--muted)] text-[var(--foreground)] rounded-[var(--radius-md)] text-sm font-medium hover:opacity-90"
               >
                 취소
               </button>
@@ -258,7 +258,7 @@ export default function SalaryAutoTransfer() {
                   executeTransfer();
                   setShowTransferModal(false);
                 }}
-                className="flex-1 py-2.5 bg-[var(--toss-blue)] text-white rounded-[12px] text-sm font-medium hover:opacity-90"
+                className="flex-1 py-2.5 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-sm font-medium hover:opacity-90"
               >
                 이체 실행
               </button>

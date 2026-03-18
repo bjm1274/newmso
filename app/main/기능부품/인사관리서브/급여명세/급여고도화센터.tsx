@@ -581,135 +581,135 @@ export default function PayrollAdvancedCenter({
   };
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-[24px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-6 shadow-sm">
+    <div className="space-y-4">
+      <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
         <h2 className="mt-2 text-xl font-bold text-[var(--foreground)]">급여 고도화 센터</h2>
       </div>
 
       {loading ? (
-        <div className="rounded-[24px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-10 text-center text-sm font-semibold text-[var(--toss-gray-3)] shadow-sm">
+        <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 text-center text-sm font-semibold text-[var(--toss-gray-3)] shadow-sm">
           급여 고도화 데이터를 불러오는 중입니다.
         </div>
       ) : (
-        <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-          <div className="space-y-6">
-            <div className="rounded-[24px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-6 shadow-sm">
+        <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+          <div className="space-y-4">
+            <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
               <h3 className="text-base font-bold text-[var(--foreground)]">상여·인센티브 엔진</h3>
               <div className="mt-4 grid gap-3 md:grid-cols-4">
-                <select value={bonusForm.staffId} onChange={(event) => setBonusForm({ ...bonusForm, staffId: event.target.value })} className="rounded-[12px] border border-[var(--toss-border)] px-3 py-3 text-sm font-semibold outline-none">
+                <select value={bonusForm.staffId} onChange={(event) => setBonusForm({ ...bonusForm, staffId: event.target.value })} className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-3 text-sm font-semibold outline-none">
                   <option value="">직원 선택</option>
                   {filteredStaffs.map((staff: any) => <option key={staff.id} value={staff.id}>{staff.name}</option>)}
                 </select>
-                <select value={bonusForm.category} onChange={(event) => setBonusForm({ ...bonusForm, category: event.target.value })} className="rounded-[12px] border border-[var(--toss-border)] px-3 py-3 text-sm font-semibold outline-none">
+                <select value={bonusForm.category} onChange={(event) => setBonusForm({ ...bonusForm, category: event.target.value })} className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-3 text-sm font-semibold outline-none">
                   <option value="상여">상여</option>
                   <option value="인센티브">인센티브</option>
                 </select>
-                <input type="number" value={bonusForm.amount} onChange={(event) => setBonusForm({ ...bonusForm, amount: Number(event.target.value) || 0 })} placeholder="지급액" className="rounded-[12px] border border-[var(--toss-border)] px-3 py-3 text-sm font-semibold outline-none" />
-                <button onClick={addBonusItem} disabled={savingKey === 'bonus'} className="rounded-[12px] bg-[var(--toss-blue)] px-4 py-3 text-sm font-bold text-white disabled:opacity-50">추가</button>
+                <input type="number" value={bonusForm.amount} onChange={(event) => setBonusForm({ ...bonusForm, amount: Number(event.target.value) || 0 })} placeholder="지급액" className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-3 text-sm font-semibold outline-none" />
+                <button onClick={addBonusItem} disabled={savingKey === 'bonus'} className="rounded-[var(--radius-md)] bg-[var(--accent)] px-4 py-3 text-sm font-bold text-white disabled:opacity-50">추가</button>
               </div>
-              <input type="text" value={bonusForm.note} onChange={(event) => setBonusForm({ ...bonusForm, note: event.target.value })} placeholder="성과 근거 / 산정 메모" className="mt-3 w-full rounded-[12px] border border-[var(--toss-border)] px-3 py-3 text-sm font-semibold outline-none" />
+              <input type="text" value={bonusForm.note} onChange={(event) => setBonusForm({ ...bonusForm, note: event.target.value })} placeholder="성과 근거 / 산정 메모" className="mt-3 w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-3 text-sm font-semibold outline-none" />
               <div className="mt-4 space-y-2">
                 {monthBonusItems.map((item) => {
                   const staff = filteredStaffs.find((row: any) => String(row.id) === item.staffId);
                   return (
-                    <div key={item.id} className="flex items-center justify-between rounded-[16px] bg-[var(--toss-gray-1)] px-4 py-3">
+                    <div key={item.id} className="flex items-center justify-between rounded-[var(--radius-lg)] bg-[var(--muted)] px-4 py-3">
                       <div>
                         <p className="text-sm font-bold text-[var(--foreground)]">{staff?.name || '직원'} · {item.category}</p>
                         <p className="text-[11px] text-[var(--toss-gray-3)]">{item.note || '메모 없음'}</p>
                       </div>
-                      <span className="text-sm font-bold text-[var(--toss-blue)]">{Number(item.amount).toLocaleString()}원</span>
+                      <span className="text-sm font-bold text-[var(--accent)]">{Number(item.amount).toLocaleString()}원</span>
                     </div>
                   );
                 })}
               </div>
             </div>
 
-            <div className="rounded-[24px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-6 shadow-sm">
+            <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
               <h3 className="text-base font-bold text-[var(--foreground)]">소급급여 계산 / 가압류·상계 / 프리랜서 지급</h3>
               <div className="mt-4 grid gap-4 lg:grid-cols-3">
-                <div className="rounded-[18px] bg-[var(--toss-gray-1)] p-4">
+                <div className="rounded-[var(--radius-xl)] bg-[var(--muted)] p-4">
                   <p className="text-sm font-bold text-[var(--foreground)]">소급급여 계산</p>
                   <div className="mt-3 space-y-2">
-                    <select value={retroForm.staffId} onChange={(event) => setRetroForm({ ...retroForm, staffId: event.target.value })} className="w-full rounded-[12px] border border-[var(--toss-border)] px-3 py-2 text-sm font-semibold outline-none">
+                    <select value={retroForm.staffId} onChange={(event) => setRetroForm({ ...retroForm, staffId: event.target.value })} className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-semibold outline-none">
                       <option value="">직원 선택</option>
                       {filteredStaffs.map((staff: any) => <option key={staff.id} value={staff.id}>{staff.name}</option>)}
                     </select>
                     <div className="grid grid-cols-2 gap-2">
-                      <input type="month" value={retroForm.startMonth} onChange={(event) => setRetroForm({ ...retroForm, startMonth: event.target.value })} className="rounded-[12px] border border-[var(--toss-border)] px-3 py-2 text-sm font-semibold outline-none" />
-                      <input type="month" value={retroForm.endMonth} onChange={(event) => setRetroForm({ ...retroForm, endMonth: event.target.value })} className="rounded-[12px] border border-[var(--toss-border)] px-3 py-2 text-sm font-semibold outline-none" />
+                      <input type="month" value={retroForm.startMonth} onChange={(event) => setRetroForm({ ...retroForm, startMonth: event.target.value })} className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-semibold outline-none" />
+                      <input type="month" value={retroForm.endMonth} onChange={(event) => setRetroForm({ ...retroForm, endMonth: event.target.value })} className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-semibold outline-none" />
                     </div>
                     <div className="grid grid-cols-2 gap-2">
-                      <input type="number" value={retroForm.beforeBase} onChange={(event) => setRetroForm({ ...retroForm, beforeBase: Number(event.target.value) || 0 })} placeholder="변경 전 기본급" className="rounded-[12px] border border-[var(--toss-border)] px-3 py-2 text-sm font-semibold outline-none" />
-                      <input type="number" value={retroForm.afterBase} onChange={(event) => setRetroForm({ ...retroForm, afterBase: Number(event.target.value) || 0 })} placeholder="변경 후 기본급" className="rounded-[12px] border border-[var(--toss-border)] px-3 py-2 text-sm font-semibold outline-none" />
+                      <input type="number" value={retroForm.beforeBase} onChange={(event) => setRetroForm({ ...retroForm, beforeBase: Number(event.target.value) || 0 })} placeholder="변경 전 기본급" className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-semibold outline-none" />
+                      <input type="number" value={retroForm.afterBase} onChange={(event) => setRetroForm({ ...retroForm, afterBase: Number(event.target.value) || 0 })} placeholder="변경 후 기본급" className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-semibold outline-none" />
                     </div>
-                    <input type="text" value={retroForm.reason} onChange={(event) => setRetroForm({ ...retroForm, reason: event.target.value })} className="w-full rounded-[12px] border border-[var(--toss-border)] px-3 py-2 text-sm font-semibold outline-none" />
-                    <p className="text-[12px] font-semibold text-[var(--toss-blue)]">소급 {monthCount}개월 · 예상 {retroPreviewTotal.toLocaleString()}원</p>
-                    <button onClick={addRetroItem} disabled={savingKey === 'retro'} className="w-full rounded-[12px] bg-[var(--toss-blue)] px-4 py-2 text-sm font-bold text-white disabled:opacity-50">소급 항목 추가</button>
+                    <input type="text" value={retroForm.reason} onChange={(event) => setRetroForm({ ...retroForm, reason: event.target.value })} className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-semibold outline-none" />
+                    <p className="text-[12px] font-semibold text-[var(--accent)]">소급 {monthCount}개월 · 예상 {retroPreviewTotal.toLocaleString()}원</p>
+                    <button onClick={addRetroItem} disabled={savingKey === 'retro'} className="w-full rounded-[var(--radius-md)] bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white disabled:opacity-50">소급 항목 추가</button>
                   </div>
                 </div>
 
-                <div className="rounded-[18px] bg-[var(--toss-gray-1)] p-4">
+                <div className="rounded-[var(--radius-xl)] bg-[var(--muted)] p-4">
                   <p className="text-sm font-bold text-[var(--foreground)]">가압류 / 상계 공제</p>
                   <div className="mt-3 space-y-2">
-                    <select value={deductionForm.staffId} onChange={(event) => setDeductionForm({ ...deductionForm, staffId: event.target.value })} className="w-full rounded-[12px] border border-[var(--toss-border)] px-3 py-2 text-sm font-semibold outline-none">
+                    <select value={deductionForm.staffId} onChange={(event) => setDeductionForm({ ...deductionForm, staffId: event.target.value })} className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-semibold outline-none">
                       <option value="">직원 선택</option>
                       {filteredStaffs.map((staff: any) => <option key={staff.id} value={staff.id}>{staff.name}</option>)}
                     </select>
-                    <select value={deductionForm.type} onChange={(event) => setDeductionForm({ ...deductionForm, type: event.target.value })} className="w-full rounded-[12px] border border-[var(--toss-border)] px-3 py-2 text-sm font-semibold outline-none">
+                    <select value={deductionForm.type} onChange={(event) => setDeductionForm({ ...deductionForm, type: event.target.value })} className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-semibold outline-none">
                       <option value="가압류">가압류</option>
                       <option value="상계">상계</option>
                       <option value="대여금">대여금 상환</option>
                     </select>
                     <div className="grid grid-cols-2 gap-2">
-                      <input type="number" value={deductionForm.monthlyAmount} onChange={(event) => setDeductionForm({ ...deductionForm, monthlyAmount: Number(event.target.value) || 0 })} placeholder="월 공제액" className="rounded-[12px] border border-[var(--toss-border)] px-3 py-2 text-sm font-semibold outline-none" />
-                      <input type="number" value={deductionForm.balance} onChange={(event) => setDeductionForm({ ...deductionForm, balance: Number(event.target.value) || 0 })} placeholder="잔액" className="rounded-[12px] border border-[var(--toss-border)] px-3 py-2 text-sm font-semibold outline-none" />
+                      <input type="number" value={deductionForm.monthlyAmount} onChange={(event) => setDeductionForm({ ...deductionForm, monthlyAmount: Number(event.target.value) || 0 })} placeholder="월 공제액" className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-semibold outline-none" />
+                      <input type="number" value={deductionForm.balance} onChange={(event) => setDeductionForm({ ...deductionForm, balance: Number(event.target.value) || 0 })} placeholder="잔액" className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-semibold outline-none" />
                     </div>
-                    <input type="text" value={deductionForm.note} onChange={(event) => setDeductionForm({ ...deductionForm, note: event.target.value })} placeholder="사유" className="w-full rounded-[12px] border border-[var(--toss-border)] px-3 py-2 text-sm font-semibold outline-none" />
-                    <button onClick={addDeductionItem} disabled={savingKey === 'deduction'} className="w-full rounded-[12px] bg-zinc-900 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">공제 등록</button>
+                    <input type="text" value={deductionForm.note} onChange={(event) => setDeductionForm({ ...deductionForm, note: event.target.value })} placeholder="사유" className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-semibold outline-none" />
+                    <button onClick={addDeductionItem} disabled={savingKey === 'deduction'} className="w-full rounded-[var(--radius-md)] bg-zinc-900 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">공제 등록</button>
                   </div>
                 </div>
 
-                <div className="rounded-[18px] bg-[var(--toss-gray-1)] p-4">
+                <div className="rounded-[var(--radius-xl)] bg-[var(--muted)] p-4">
                   <p className="text-sm font-bold text-[var(--foreground)]">프리랜서 지급 관리</p>
                   <div className="mt-3 space-y-2">
-                    <input type="text" value={freelancerForm.vendorName} onChange={(event) => setFreelancerForm({ ...freelancerForm, vendorName: event.target.value })} placeholder="지급 대상" className="w-full rounded-[12px] border border-[var(--toss-border)] px-3 py-2 text-sm font-semibold outline-none" />
-                    <input type="text" value={freelancerForm.workType} onChange={(event) => setFreelancerForm({ ...freelancerForm, workType: event.target.value })} placeholder="업무 내용" className="w-full rounded-[12px] border border-[var(--toss-border)] px-3 py-2 text-sm font-semibold outline-none" />
+                    <input type="text" value={freelancerForm.vendorName} onChange={(event) => setFreelancerForm({ ...freelancerForm, vendorName: event.target.value })} placeholder="지급 대상" className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-semibold outline-none" />
+                    <input type="text" value={freelancerForm.workType} onChange={(event) => setFreelancerForm({ ...freelancerForm, workType: event.target.value })} placeholder="업무 내용" className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-semibold outline-none" />
                     <div className="grid grid-cols-2 gap-2">
-                      <input type="date" value={freelancerForm.paymentDate} onChange={(event) => setFreelancerForm({ ...freelancerForm, paymentDate: event.target.value })} className="rounded-[12px] border border-[var(--toss-border)] px-3 py-2 text-sm font-semibold outline-none" />
-                      <input type="number" value={freelancerForm.supplyAmount} onChange={(event) => setFreelancerForm({ ...freelancerForm, supplyAmount: Number(event.target.value) || 0 })} placeholder="공급가액" className="rounded-[12px] border border-[var(--toss-border)] px-3 py-2 text-sm font-semibold outline-none" />
+                      <input type="date" value={freelancerForm.paymentDate} onChange={(event) => setFreelancerForm({ ...freelancerForm, paymentDate: event.target.value })} className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-semibold outline-none" />
+                      <input type="number" value={freelancerForm.supplyAmount} onChange={(event) => setFreelancerForm({ ...freelancerForm, supplyAmount: Number(event.target.value) || 0 })} placeholder="공급가액" className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-semibold outline-none" />
                     </div>
-                    <button onClick={addFreelancerItem} disabled={savingKey === 'freelancer'} className="w-full rounded-[12px] bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">지급 항목 추가</button>
+                    <button onClick={addFreelancerItem} disabled={savingKey === 'freelancer'} className="w-full rounded-[var(--radius-md)] bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">지급 항목 추가</button>
                   </div>
                 </div>
               </div>
 
               <div className="mt-4 grid gap-3 lg:grid-cols-3">
-                <div className="rounded-[16px] bg-[var(--toss-gray-1)] p-4">
+                <div className="rounded-[var(--radius-lg)] bg-[var(--muted)] p-4">
                   <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">소급급여 합계</p>
                   <p className="mt-2 text-xl font-bold text-[var(--foreground)]">{monthRetroItems.reduce((sum, item) => sum + Number(item.retroTotal || 0), 0).toLocaleString()}원</p>
                 </div>
-                <div className="rounded-[16px] bg-[var(--toss-gray-1)] p-4">
+                <div className="rounded-[var(--radius-lg)] bg-[var(--muted)] p-4">
                   <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">활성 공제</p>
                   <p className="mt-2 text-xl font-bold text-[var(--foreground)]">{activeDeductions.length}건</p>
                 </div>
-                <div className="rounded-[16px] bg-[var(--toss-gray-1)] p-4">
+                <div className="rounded-[var(--radius-lg)] bg-[var(--muted)] p-4">
                   <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">프리랜서 원천세(합계)</p>
                   <p className="mt-2 text-xl font-bold text-[var(--foreground)]">{visibleFreelancers.reduce((sum, item) => sum + Number(item.withholdingTax || 0), 0).toLocaleString()}원</p>
                 </div>
               </div>
             </div>
 
-            <div className="rounded-[24px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-6 shadow-sm">
+            <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-base font-bold text-[var(--foreground)]">홈택스/EDI 신고파일 고도화 · 회계 GL 전표 연동</h3>
                 </div>
-                <button onClick={() => downloadCsv(`payroll_gl_${yearMonth}.csv`, glRows)} className="rounded-[12px] bg-[var(--toss-blue)] px-4 py-2 text-sm font-bold text-white">GL CSV 다운로드</button>
+                <button onClick={() => downloadCsv(`payroll_gl_${yearMonth}.csv`, glRows)} className="rounded-[var(--radius-md)] bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white">GL CSV 다운로드</button>
               </div>
               <div className="mt-4 overflow-x-auto">
                 <table className="w-full text-left">
                   <thead>
-                    <tr className="border-b border-[var(--toss-border)] text-[11px] font-bold text-[var(--toss-gray-3)]">
+                    <tr className="border-b border-[var(--border)] text-[11px] font-bold text-[var(--toss-gray-3)]">
                       <th className="py-2">계정</th>
                       <th className="py-2">차변</th>
                       <th className="py-2">대변</th>
@@ -718,7 +718,7 @@ export default function PayrollAdvancedCenter({
                   </thead>
                   <tbody>
                     {glRows.map((row) => (
-                      <tr key={row.계정} className="border-b border-[var(--toss-border)] text-sm font-semibold text-[var(--foreground)]">
+                      <tr key={row.계정} className="border-b border-[var(--border)] text-sm font-semibold text-[var(--foreground)]">
                         <td className="py-3">{row.계정}</td>
                         <td className="py-3">{Number(row.차변).toLocaleString()}원</td>
                         <td className="py-3">{Number(row.대변).toLocaleString()}원</td>
@@ -729,55 +729,55 @@ export default function PayrollAdvancedCenter({
                 </table>
               </div>
               <div className="mt-4 flex gap-2">
-                <button onClick={() => downloadCsv(`tax_summary_${yearMonth}.csv`, companySummary.map((row) => ({ 회사: row.company, 인원: row.count, 과세합계: row.taxable, 공제합계: row.deductions, 실지급: row.net })))} className="rounded-[12px] border border-[var(--toss-border)] bg-white px-4 py-2 text-sm font-bold text-[var(--foreground)]">
+                <button onClick={() => downloadCsv(`tax_summary_${yearMonth}.csv`, companySummary.map((row) => ({ 회사: row.company, 인원: row.count, 과세합계: row.taxable, 공제합계: row.deductions, 실지급: row.net })))} className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 py-2 text-sm font-bold text-[var(--foreground)]">
                   홈택스/EDI 요약 다운로드
                 </button>
               </div>
             </div>
 
-            <div className="rounded-[24px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-6 shadow-sm">
+            <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
               <h3 className="text-base font-bold text-[var(--foreground)]">급여 캘린더 · 2단계 급여승인 · 변경 승인로그</h3>
               <div className="mt-4 space-y-3">
                 {calendarItems.filter((item) => item.yearMonth === yearMonth).map((item) => (
-                  <button key={item.id} onClick={() => toggleCalendarStatus(item.id)} disabled={savingKey === item.id} className="flex w-full items-center justify-between rounded-[16px] bg-[var(--toss-gray-1)] px-4 py-3 text-left disabled:opacity-50">
+                  <button key={item.id} onClick={() => toggleCalendarStatus(item.id)} disabled={savingKey === item.id} className="flex w-full items-center justify-between rounded-[var(--radius-lg)] bg-[var(--muted)] px-4 py-3 text-left disabled:opacity-50">
                     <div>
                       <p className="text-sm font-bold text-[var(--foreground)]">{item.title}</p>
                       <p className="text-[11px] text-[var(--toss-gray-3)]">{item.dueDate} · {item.owner}</p>
                     </div>
-                    <span className={`rounded-full px-3 py-1 text-[11px] font-bold ${item.status === '완료' ? 'bg-emerald-100 text-emerald-600' : item.status === '진행' ? 'bg-blue-100 text-blue-600' : 'bg-zinc-200 text-zinc-600'}`}>{item.status}</span>
+                    <span className={`rounded-[var(--radius-md)] px-3 py-1 text-[11px] font-bold ${item.status === '완료' ? 'bg-emerald-100 text-emerald-600' : item.status === '진행' ? 'bg-blue-100 text-blue-600' : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]'}`}>{item.status}</span>
                   </button>
                 ))}
               </div>
 
               <div className="mt-5 grid gap-4 md:grid-cols-2">
-                <div className="rounded-[18px] bg-[var(--toss-gray-1)] p-4">
+                <div className="rounded-[var(--radius-xl)] bg-[var(--muted)] p-4">
                   <p className="text-sm font-bold text-[var(--foreground)]">1차 급여 승인</p>
                   <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">인사책임자 확인 단계</p>
-                  <textarea value={step1Comment} onChange={(event) => setStep1Comment(event.target.value)} placeholder="검토 의견" className="mt-3 h-20 w-full rounded-[12px] border border-[var(--toss-border)] px-3 py-2 text-sm font-semibold outline-none" />
+                  <textarea value={step1Comment} onChange={(event) => setStep1Comment(event.target.value)} placeholder="검토 의견" className="mt-3 h-20 w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-semibold outline-none" />
                   <div className="mt-3 flex gap-2">
-                    <button onClick={() => updateApproval('step1', '승인', step1Comment)} disabled={savingKey === 'step1'} className="rounded-[12px] bg-[var(--toss-blue)] px-4 py-2 text-sm font-bold text-white disabled:opacity-50">승인</button>
-                    <button onClick={() => updateApproval('step1', '보류', step1Comment)} disabled={savingKey === 'step1'} className="rounded-[12px] border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-bold text-orange-600 disabled:opacity-50">보류</button>
+                    <button onClick={() => updateApproval('step1', '승인', step1Comment)} disabled={savingKey === 'step1'} className="rounded-[var(--radius-md)] bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white disabled:opacity-50">승인</button>
+                    <button onClick={() => updateApproval('step1', '보류', step1Comment)} disabled={savingKey === 'step1'} className="rounded-[var(--radius-md)] border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-bold text-orange-600 disabled:opacity-50">보류</button>
                   </div>
                   <p className="mt-3 text-[11px] font-semibold text-[var(--toss-gray-3)]">현재 상태: {currentApproval.step1Status}</p>
                 </div>
 
-                <div className="rounded-[18px] bg-[var(--toss-gray-1)] p-4">
+                <div className="rounded-[var(--radius-xl)] bg-[var(--muted)] p-4">
                   <p className="text-sm font-bold text-[var(--foreground)]">2차 급여 승인</p>
                   <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">대표/재무 최종 승인 단계</p>
-                  <textarea value={step2Comment} onChange={(event) => setStep2Comment(event.target.value)} placeholder="최종 의견" className="mt-3 h-20 w-full rounded-[12px] border border-[var(--toss-border)] px-3 py-2 text-sm font-semibold outline-none" />
+                  <textarea value={step2Comment} onChange={(event) => setStep2Comment(event.target.value)} placeholder="최종 의견" className="mt-3 h-20 w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-semibold outline-none" />
                   <div className="mt-3 flex gap-2">
-                    <button onClick={() => updateApproval('step2', '승인', step2Comment)} disabled={savingKey === 'step2'} className="rounded-[12px] bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">승인</button>
-                    <button onClick={() => updateApproval('step2', '보류', step2Comment)} disabled={savingKey === 'step2'} className="rounded-[12px] border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-bold text-orange-600 disabled:opacity-50">보류</button>
+                    <button onClick={() => updateApproval('step2', '승인', step2Comment)} disabled={savingKey === 'step2'} className="rounded-[var(--radius-md)] bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">승인</button>
+                    <button onClick={() => updateApproval('step2', '보류', step2Comment)} disabled={savingKey === 'step2'} className="rounded-[var(--radius-md)] border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-bold text-orange-600 disabled:opacity-50">보류</button>
                   </div>
                   <p className="mt-3 text-[11px] font-semibold text-[var(--toss-gray-3)]">현재 상태: {currentApproval.step2Status}</p>
                 </div>
               </div>
 
-              <div className="mt-5 rounded-[18px] bg-[var(--toss-gray-1)] p-4">
+              <div className="mt-5 rounded-[var(--radius-xl)] bg-[var(--muted)] p-4">
                 <p className="text-sm font-bold text-[var(--foreground)]">급여 변경 승인로그</p>
                 <div className="mt-3 space-y-2">
                   {approvalLogs.filter((log) => log.yearMonth === yearMonth && log.company === companyScope).slice(0, 8).map((log) => (
-                    <div key={log.id} className="rounded-[12px] bg-white px-4 py-3">
+                    <div key={log.id} className="rounded-[var(--radius-md)] bg-[var(--card)] px-4 py-3">
                       <p className="text-sm font-bold text-[var(--foreground)]">{log.action}</p>
                       <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{log.actor} · {new Date(log.createdAt).toLocaleString('ko-KR')}</p>
                       <p className="mt-1 text-[11px] text-[var(--foreground)]">{log.comment || '-'}</p>
@@ -787,14 +787,14 @@ export default function PayrollAdvancedCenter({
               </div>
             </div>
 
-            <div className="rounded-[24px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-6 shadow-sm">
+            <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
               <h3 className="text-base font-bold text-[var(--foreground)]">다법인 통합 급여대장</h3>
               <div className="mt-4 space-y-2">
                 {companySummary.map((row) => (
-                  <div key={row.company} className="rounded-[16px] bg-[var(--toss-gray-1)] px-4 py-3">
+                  <div key={row.company} className="rounded-[var(--radius-lg)] bg-[var(--muted)] px-4 py-3">
                     <p className="text-sm font-bold text-[var(--foreground)]">{row.company}</p>
                     <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{row.count}명 · 과세 {row.taxable.toLocaleString()}원 · 공제 {row.deductions.toLocaleString()}원</p>
-                    <p className="mt-2 text-lg font-bold text-[var(--toss-blue)]">{row.net.toLocaleString()}원</p>
+                    <p className="mt-2 text-lg font-bold text-[var(--accent)]">{row.net.toLocaleString()}원</p>
                   </div>
                 ))}
               </div>

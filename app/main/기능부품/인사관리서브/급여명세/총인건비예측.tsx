@@ -82,28 +82,28 @@ export default function TotalLaborCostForecast({ staffs, selectedCo, user }: Pro
   const perPerson = headcount > 0 ? forecastBase / headcount : 0;
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-4xl mx-auto">
+    <div className="p-4 md:p-4 space-y-4 max-w-4xl mx-auto">
       <div>
         <h2 className="text-lg font-bold text-[var(--foreground)]">연간 총인건비 예측</h2>
       </div>
 
       {/* 요약 카드 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="p-3 bg-[var(--toss-card)] rounded-[12px] border border-[var(--toss-border)]">
+        <div className="p-3 bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)]">
           <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">월 평균 인건비</p>
           <p className="text-sm font-bold text-[var(--foreground)] mt-1">{fmt(avg)}원</p>
         </div>
-        <div className="p-3 bg-[var(--toss-card)] rounded-[12px] border border-[var(--toss-border)]">
+        <div className="p-3 bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)]">
           <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">전월 대비 증감</p>
           <p className={`text-sm font-bold mt-1 ${changeRate === null ? 'text-[var(--toss-gray-3)]' : Number(changeRate) >= 0 ? 'text-red-500' : 'text-blue-500'}`}>
             {changeRate !== null ? `${Number(changeRate) >= 0 ? '+' : ''}${changeRate}%` : '-'}
           </p>
         </div>
-        <div className="p-3 bg-[var(--toss-card)] rounded-[12px] border border-[var(--toss-border)]">
+        <div className="p-3 bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)]">
           <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">연간 예상 총액</p>
           <p className="text-sm font-bold text-[var(--foreground)] mt-1">{fmt(annualEstimate)}원</p>
         </div>
-        <div className="p-3 bg-[var(--toss-card)] rounded-[12px] border border-[var(--toss-border)]">
+        <div className="p-3 bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)]">
           <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">1인당 평균 ({headcount}명)</p>
           <p className="text-sm font-bold text-[var(--foreground)] mt-1">{fmt(perPerson)}원</p>
         </div>
@@ -113,7 +113,7 @@ export default function TotalLaborCostForecast({ staffs, selectedCo, user }: Pro
       {loading ? (
         <div className="text-center py-10 text-sm text-[var(--toss-gray-3)]">로딩 중...</div>
       ) : (
-        <div className="bg-[var(--toss-card)] rounded-[12px] border border-[var(--toss-border)] p-4">
+        <div className="bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)] p-4">
           <h3 className="text-sm font-bold text-[var(--foreground)] mb-4">월별 인건비 추이 (파란색: 예측)</h3>
           <div className="flex items-end gap-1 h-48 overflow-x-auto pb-2">
             {allData.map((d, i) => {
@@ -124,7 +124,7 @@ export default function TotalLaborCostForecast({ staffs, selectedCo, user }: Pro
                   <span className="text-[8px] text-[var(--toss-gray-3)] font-bold">{fmt(d.total / 10000)}만</span>
                   <div
                     style={{ height: `${height}%` }}
-                    className={`w-7 rounded-t-[4px] transition-all ${isForecast ? 'bg-[var(--toss-blue)]/40 border border-[var(--toss-blue)] border-dashed' : d.total > 0 ? 'bg-[var(--toss-blue)]' : 'bg-[var(--toss-gray-2)]'}`}
+                    className={`w-7 rounded-t-[4px] transition-all ${isForecast ? 'bg-[var(--accent)]/40 border border-[var(--accent)] border-dashed' : d.total > 0 ? 'bg-[var(--accent)]' : 'bg-[var(--toss-gray-2)]'}`}
                   />
                   <span className="text-[8px] text-[var(--toss-gray-3)] font-bold rotate-[-30deg] origin-top-right whitespace-nowrap">
                     {d.month.slice(5)}월{isForecast ? '(예)' : ''}

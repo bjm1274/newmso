@@ -144,14 +144,14 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
     const ratio = executed / budget;
     if (ratio >= 1) {
       return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-600">
+        <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-md)] text-xs font-bold bg-red-100 text-red-600">
           초과
         </span>
       );
     }
     if (ratio >= 0.9) {
       return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-orange-100 text-orange-600">
+        <span className="inline-flex items-center px-2 py-0.5 rounded-[var(--radius-md)] text-xs font-bold bg-orange-100 text-orange-600">
           90% 초과
         </span>
       );
@@ -165,7 +165,7 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
   ];
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300" data-testid="admin-analysis-budget">
+    <div className="space-y-4 animate-in fade-in duration-300" data-testid="admin-analysis-budget">
       {/* 헤더 */}
       <div className="flex items-center justify-between">
         <div>
@@ -174,7 +174,7 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
         {activeTab === '집행현황' && (
           <button
             onClick={() => setShowExecForm(true)}
-            className="px-4 py-2 rounded-[10px] bg-[var(--toss-blue)] text-white text-sm font-bold hover:opacity-90 transition-opacity"
+            className="px-4 py-1.5 rounded-[var(--radius-md)] bg-[var(--accent)] text-white text-sm font-bold hover:opacity-90 transition-opacity"
           >
             + 집행 등록
           </button>
@@ -182,13 +182,13 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
       </div>
 
       {/* 탭 */}
-      <div className="flex gap-1 bg-[var(--toss-gray-1)] p-1 rounded-[12px] w-fit">
+      <div className="flex gap-1 bg-[var(--muted)] p-1 rounded-[var(--radius-md)] w-fit">
         {tabs.map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2 rounded-[10px] text-sm font-bold transition-all ${activeTab === tab.id
-              ? 'bg-white text-[var(--toss-blue)] shadow-sm'
+            className={`px-4 py-2 rounded-[var(--radius-md)] text-sm font-bold transition-all ${activeTab === tab.id
+              ? 'bg-[var(--card)] text-[var(--accent)] shadow-sm'
               : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'
               }`}
           >
@@ -201,8 +201,8 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
       {activeTab === '설정' && (
         <div className="space-y-4">
           {/* 등록 카드 */}
-          <div className="bg-[var(--toss-card)] rounded-[16px] p-5 border border-[var(--toss-border)] shadow-sm">
-            <h3 className="text-sm font-bold text-[var(--foreground)] mb-4">예산 등록</h3>
+          <div className="bg-[var(--card)] rounded-[var(--radius-lg)] p-4 border border-[var(--border)] shadow-sm">
+            <h3 className="text-sm font-bold text-[var(--foreground)] mb-3">예산 등록</h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               <div>
                 <label className="block text-xs font-bold text-[var(--toss-gray-3)] mb-1.5">부서명</label>
@@ -211,7 +211,7 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
                   value={settingForm.dept}
                   onChange={e => setSettingForm(f => ({ ...f, dept: e.target.value }))}
                   placeholder="부서 선택 또는 입력"
-                  className="w-full px-3 py-2 rounded-[10px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--toss-blue)] transition-colors"
+                  className="w-full px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--accent)] transition-colors"
                 />
                 <datalist id="dept-list-budget">
                   {deptList.map(d => <option key={d} value={d} />)}
@@ -223,7 +223,7 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
                   type="number"
                   value={settingForm.year}
                   onChange={e => setSettingForm(f => ({ ...f, year: Number(e.target.value) }))}
-                  className="w-full px-3 py-2 rounded-[10px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--toss-blue)] transition-colors"
+                  className="w-full px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--accent)] transition-colors"
                 />
               </div>
               <div>
@@ -231,7 +231,7 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
                 <select
                   value={settingForm.month}
                   onChange={e => setSettingForm(f => ({ ...f, month: Number(e.target.value) }))}
-                  className="w-full px-3 py-2 rounded-[10px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--toss-blue)] transition-colors"
+                  className="w-full px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--accent)] transition-colors"
                 >
                   {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
                     <option key={m} value={m}>{m}월</option>
@@ -243,7 +243,7 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
                 <select
                   value={settingForm.item}
                   onChange={e => setSettingForm(f => ({ ...f, item: e.target.value as BudgetItem }))}
-                  className="w-full px-3 py-2 rounded-[10px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--toss-blue)] transition-colors"
+                  className="w-full px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--accent)] transition-colors"
                 >
                   {BUDGET_ITEMS.map(item => <option key={item} value={item}>{item}</option>)}
                 </select>
@@ -255,14 +255,14 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
                   value={settingForm.amount}
                   onChange={e => setSettingForm(f => ({ ...f, amount: e.target.value }))}
                   placeholder="0"
-                  className="w-full px-3 py-2 rounded-[10px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--toss-blue)] transition-colors"
+                  className="w-full px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--accent)] transition-colors"
                 />
               </div>
               <div className="flex items-end">
                 <button
                   onClick={handleAddSetting}
                   disabled={!settingForm.dept || !settingForm.amount}
-                  className="w-full px-4 py-2 rounded-[10px] bg-[var(--toss-blue)] text-white text-sm font-bold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-2 rounded-[var(--radius-md)] bg-[var(--accent)] text-white text-sm font-bold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   등록
                 </button>
@@ -271,18 +271,18 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
           </div>
 
           {/* 등록된 예산 목록 */}
-          <div className="bg-[var(--toss-card)] rounded-[16px] border border-[var(--toss-border)] shadow-sm overflow-hidden">
-            <div className="px-5 py-3 border-b border-[var(--toss-border)]">
+          <div className="bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm overflow-hidden">
+            <div className="px-5 py-3 border-b border-[var(--border)]">
               <span className="text-sm font-bold text-[var(--foreground)]">등록된 예산 ({settings.length}건)</span>
             </div>
             {settings.length === 0 ? (
-              <div className="py-12 text-center text-sm text-[var(--toss-gray-3)]">등록된 예산이 없습니다.</div>
+              <div className="py-8 text-center text-sm text-[var(--toss-gray-3)]">등록된 예산이 없습니다.</div>
             ) : (
-              <div className="divide-y divide-[var(--toss-border)]">
+              <div className="divide-y divide-[var(--border)]">
                 {settings.map(s => (
-                  <div key={s.id} className="flex items-center justify-between px-5 py-3 hover:bg-[var(--toss-gray-1)]/50 transition-colors">
+                  <div key={s.id} className="flex items-center justify-between px-5 py-3 hover:bg-[var(--muted)]/50 transition-colors">
                     <div className="flex items-center gap-3">
-                      <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-[var(--toss-blue-light)] text-[var(--toss-blue)]">{s.item}</span>
+                      <span className="text-xs font-bold px-2 py-0.5 rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] text-[var(--accent)]">{s.item}</span>
                       <div>
                         <span className="text-sm font-bold text-[var(--foreground)]">{s.dept}</span>
                         <span className="text-xs text-[var(--toss-gray-3)] ml-2">{s.year}년 {s.month}월</span>
@@ -311,8 +311,8 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
           {/* 집행 등록 모달 */}
           {showExecForm && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-              <div className="bg-[var(--toss-card)] rounded-[20px] p-6 w-full max-w-md shadow-2xl border border-[var(--toss-border)] mx-4">
-                <h3 className="text-base font-bold text-[var(--foreground)] mb-4">집행 등록</h3>
+              <div className="bg-[var(--card)] rounded-[var(--radius-xl)] p-4 w-full max-w-md shadow-sm border border-[var(--border)] mx-4">
+                <h3 className="text-base font-bold text-[var(--foreground)] mb-3">집행 등록</h3>
                 <div className="space-y-3">
                   <div>
                     <label className="block text-xs font-bold text-[var(--toss-gray-3)] mb-1.5">부서</label>
@@ -321,7 +321,7 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
                       value={execForm.dept}
                       onChange={e => setExecForm(f => ({ ...f, dept: e.target.value }))}
                       placeholder="부서 선택 또는 입력"
-                      className="w-full px-3 py-2 rounded-[10px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--toss-blue)] transition-colors"
+                      className="w-full px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--accent)] transition-colors"
                     />
                     <datalist id="dept-list-exec">
                       {deptList.map(d => <option key={d} value={d} />)}
@@ -332,7 +332,7 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
                     <select
                       value={execForm.item}
                       onChange={e => setExecForm(f => ({ ...f, item: e.target.value as BudgetItem }))}
-                      className="w-full px-3 py-2 rounded-[10px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--toss-blue)] transition-colors"
+                      className="w-full px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--accent)] transition-colors"
                     >
                       {BUDGET_ITEMS.map(item => <option key={item} value={item}>{item}</option>)}
                     </select>
@@ -344,7 +344,7 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
                       value={execForm.amount}
                       onChange={e => setExecForm(f => ({ ...f, amount: e.target.value }))}
                       placeholder="0"
-                      className="w-full px-3 py-2 rounded-[10px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--toss-blue)] transition-colors"
+                      className="w-full px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--accent)] transition-colors"
                     />
                   </div>
                   <div>
@@ -353,7 +353,7 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
                       type="date"
                       value={execForm.date}
                       onChange={e => setExecForm(f => ({ ...f, date: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-[10px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--toss-blue)] transition-colors"
+                      className="w-full px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--accent)] transition-colors"
                     />
                   </div>
                   <div>
@@ -363,21 +363,21 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
                       value={execForm.memo}
                       onChange={e => setExecForm(f => ({ ...f, memo: e.target.value }))}
                       placeholder="메모 (선택)"
-                      className="w-full px-3 py-2 rounded-[10px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--toss-blue)] transition-colors"
+                      className="w-full px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--accent)] transition-colors"
                     />
                   </div>
                 </div>
-                <div className="flex gap-2 mt-5">
+                <div className="flex gap-2 mt-4">
                   <button
                     onClick={() => setShowExecForm(false)}
-                    className="flex-1 px-4 py-2 rounded-[10px] border border-[var(--toss-border)] text-sm font-bold text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)] transition-colors"
+                    className="flex-1 px-4 py-1.5 rounded-[var(--radius-md)] border border-[var(--border)] text-sm font-bold text-[var(--toss-gray-3)] hover:bg-[var(--muted)] transition-colors"
                   >
                     취소
                   </button>
                   <button
                     onClick={handleAddExecution}
                     disabled={!execForm.dept || !execForm.amount}
-                    className="flex-1 px-4 py-2 rounded-[10px] bg-[var(--toss-blue)] text-white text-sm font-bold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="flex-1 px-4 py-1.5 rounded-[var(--radius-md)] bg-[var(--accent)] text-white text-sm font-bold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     등록
                   </button>
@@ -388,11 +388,11 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
 
           {/* 차트 */}
           {chartData.length > 0 ? (
-            <div className="bg-[var(--toss-card)] rounded-[16px] p-5 border border-[var(--toss-border)] shadow-sm">
-              <h3 className="text-sm font-bold text-[var(--foreground)] mb-4">부서별 예산 vs 집행 현황</h3>
+            <div className="bg-[var(--card)] rounded-[var(--radius-lg)] p-4 border border-[var(--border)] shadow-sm">
+              <h3 className="text-sm font-bold text-[var(--foreground)] mb-3">부서별 예산 vs 집행 현황</h3>
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={chartData} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--toss-border)" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis dataKey="dept" tick={{ fontSize: 12, fill: 'var(--toss-gray-3)' }} />
                   <YAxis tickFormatter={(v: number) => `${(v / 10000).toFixed(0)}만`} tick={{ fontSize: 11, fill: 'var(--toss-gray-3)' }} />
                   <Tooltip
@@ -400,7 +400,7 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
                       `${(value || 0).toLocaleString()}원`,
                       name === 'budget' ? '예산' : name === 'executed' ? '집행' : '잔액'
                     ]}
-                    contentStyle={{ borderRadius: '10px', border: '1px solid var(--toss-border)', background: 'var(--toss-card)' }}
+                    contentStyle={{ borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--card)' }}
                   />
                   <Bar dataKey="budget" name="예산" fill="#4F8EF7" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="executed" name="집행" fill="#FF6B6B" radius={[4, 4, 0, 0]} />
@@ -409,7 +409,7 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
               </ResponsiveContainer>
             </div>
           ) : (
-            <div className="bg-[var(--toss-card)] rounded-[16px] p-5 border border-[var(--toss-border)] shadow-sm text-center py-12 text-sm text-[var(--toss-gray-3)]">
+            <div className="bg-[var(--card)] rounded-[var(--radius-lg)] p-4 border border-[var(--border)] shadow-sm text-center py-10 text-sm text-[var(--toss-gray-3)]">
               예산 데이터가 없습니다. 먼저 예산을 설정해주세요.
             </div>
           )}
@@ -419,7 +419,7 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
             {chartData.map(d => {
               const ratio = d.budget > 0 ? d.executed / d.budget : 0;
               return (
-                <div key={d.dept} className="bg-[var(--toss-card)] rounded-[16px] p-4 border border-[var(--toss-border)] shadow-sm">
+                <div key={d.dept} className="bg-[var(--card)] rounded-[var(--radius-lg)] p-4 border border-[var(--border)] shadow-sm">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm font-bold text-[var(--foreground)]">{d.dept}</span>
                     {getStatusBadge(d.budget, d.executed)}
@@ -441,9 +441,9 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
                     </div>
                     {d.budget > 0 && (
                       <div className="mt-2">
-                        <div className="w-full bg-[var(--toss-gray-1)] rounded-full h-1.5">
+                        <div className="w-full bg-[var(--muted)] rounded-full h-1.5">
                           <div
-                            className={`h-1.5 rounded-full transition-all ${ratio >= 1 ? 'bg-red-500' : ratio >= 0.9 ? 'bg-orange-400' : 'bg-[var(--toss-blue)]'}`}
+                            className={`h-1.5 rounded-full transition-all ${ratio >= 1 ? 'bg-red-500' : ratio >= 0.9 ? 'bg-orange-400' : 'bg-[var(--accent)]'}`}
                             style={{ width: `${Math.min(100, ratio * 100).toFixed(1)}%` }}
                           />
                         </div>
@@ -457,18 +457,18 @@ export default function BudgetManagement({ staffs = [] }: { staffs: any[] }) {
           </div>
 
           {/* 집행 내역 목록 */}
-          <div className="bg-[var(--toss-card)] rounded-[16px] border border-[var(--toss-border)] shadow-sm overflow-hidden">
-            <div className="px-5 py-3 border-b border-[var(--toss-border)]">
+          <div className="bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm overflow-hidden">
+            <div className="px-5 py-3 border-b border-[var(--border)]">
               <span className="text-sm font-bold text-[var(--foreground)]">집행 내역 ({executions.length}건)</span>
             </div>
             {executions.length === 0 ? (
-              <div className="py-12 text-center text-sm text-[var(--toss-gray-3)]">등록된 집행 내역이 없습니다.</div>
+              <div className="py-8 text-center text-sm text-[var(--toss-gray-3)]">등록된 집행 내역이 없습니다.</div>
             ) : (
-              <div className="divide-y divide-[var(--toss-border)]">
+              <div className="divide-y divide-[var(--border)]">
                 {[...executions].reverse().map(e => (
-                  <div key={e.id} className="flex items-center justify-between px-5 py-3 hover:bg-[var(--toss-gray-1)]/50 transition-colors">
+                  <div key={e.id} className="flex items-center justify-between px-5 py-3 hover:bg-[var(--muted)]/50 transition-colors">
                     <div className="flex items-center gap-3">
-                      <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]">{e.item}</span>
+                      <span className="text-xs font-bold px-2 py-0.5 rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--toss-gray-3)]">{e.item}</span>
                       <div>
                         <span className="text-sm font-bold text-[var(--foreground)]">{e.dept}</span>
                         <span className="text-xs text-[var(--toss-gray-3)] ml-2">{e.date}</span>

@@ -211,8 +211,8 @@ export default function CorporateCardTransactions({ staffs = [] }: any) {
   };
 
   return (
-    <div className="bg-[var(--toss-card)] p-6 md:p-10 rounded-[2.5rem] border border-[var(--toss-border)] shadow-xl">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+    <div className="bg-[var(--card)] p-4 md:p-5 rounded-2xl border border-[var(--border)] shadow-sm">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-5">
         <div>
           <h3 className="text-xl font-semibold text-[var(--foreground)] tracking-tight">법인카드 관리</h3>
         </div>
@@ -222,33 +222,33 @@ export default function CorporateCardTransactions({ staffs = [] }: any) {
               <button
                 key={c}
                 onClick={() => setSelectedCo(c)}
-                className={`px-4 py-2 text-[11px] font-semibold rounded-[12px] transition-all ${selectedCo === c ? 'bg-[var(--toss-card)] shadow-md text-[var(--toss-blue)]' : 'text-[var(--toss-gray-3)]'}`}
+                className={`px-4 py-2 text-[11px] font-semibold rounded-[var(--radius-md)] transition-all ${selectedCo === c ? 'bg-[var(--card)] shadow-md text-[var(--accent)]' : 'text-[var(--toss-gray-3)]'}`}
               >
                 {c}
               </button>
             ))}
           </div>
           <div className="flex gap-0.5 p-1 app-tab-bar">
-            <button onClick={() => setActiveTab('cards')} className={`px-4 py-2 text-[11px] font-semibold rounded-[12px] transition-all ${activeTab === 'cards' ? 'bg-[var(--toss-card)] shadow-md text-[var(--toss-blue)]' : 'text-[var(--toss-gray-3)]'}`}>카드 등록</button>
-            <button onClick={() => setActiveTab('transactions')} className={`px-4 py-2 text-[11px] font-semibold rounded-[12px] transition-all ${activeTab === 'transactions' ? 'bg-[var(--toss-card)] shadow-md text-[var(--toss-blue)]' : 'text-[var(--toss-gray-3)]'}`}>사용내역</button>
+            <button onClick={() => setActiveTab('cards')} className={`px-4 py-2 text-[11px] font-semibold rounded-[var(--radius-md)] transition-all ${activeTab === 'cards' ? 'bg-[var(--card)] shadow-md text-[var(--accent)]' : 'text-[var(--toss-gray-3)]'}`}>카드 등록</button>
+            <button onClick={() => setActiveTab('transactions')} className={`px-4 py-2 text-[11px] font-semibold rounded-[var(--radius-md)] transition-all ${activeTab === 'transactions' ? 'bg-[var(--card)] shadow-md text-[var(--accent)]' : 'text-[var(--toss-gray-3)]'}`}>사용내역</button>
           </div>
         </div>
       </div>
 
       {activeTab === 'cards' && (
-        <div className="space-y-6">
+        <div className="space-y-4">
           <div className="flex justify-between items-center">
             <h4 className="font-semibold text-[var(--foreground)]">회사별 법인카드 목록</h4>
-            <button onClick={() => setAddingCard(true)} className="px-4 py-2 bg-[var(--toss-blue)] text-white text-xs font-semibold rounded-[16px]">+ 카드 등록</button>
+            <button onClick={() => setAddingCard(true)} className="px-4 py-2 bg-[var(--accent)] text-white text-xs font-semibold rounded-[var(--radius-lg)]">+ 카드 등록</button>
           </div>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {cardsByCo.map((c: any) => (
-              <div key={c.id} className="p-5 border border-[var(--toss-border)] rounded-[12px] bg-[var(--toss-gray-1)]/50">
+              <div key={c.id} className="p-5 border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--muted)]/50">
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="text-xs font-semibold text-[var(--foreground)]">{c.card_nickname || '미지정'}</p>
                     <p className="text-[11px] text-[var(--toss-gray-3)]">{c.company_name} {c.last_four ? `· ****${c.last_four}` : ''}</p>
-                    {c.staff_members?.name && <p className="text-[11px] text-[var(--toss-blue)] mt-1">사용자: {c.staff_members.name}</p>}
+                    {c.staff_members?.name && <p className="text-[11px] text-[var(--accent)] mt-1">사용자: {c.staff_members.name}</p>}
                   </div>
                   <button onClick={() => handleDeleteCard(c.id)} className="text-red-500 text-[11px] font-semibold">비활성화</button>
                 </div>
@@ -263,45 +263,45 @@ export default function CorporateCardTransactions({ staffs = [] }: any) {
 
       {activeTab === 'transactions' && (
         <>
-          <div className="flex flex-wrap gap-2 items-center mb-6">
-            <SmartMonthPicker value={month} onChange={val => setMonth(val)} inputClassName="p-2 border rounded-[16px] text-sm font-bold bg-white" />
-            <select value={filterCat} onChange={(e) => setFilterCat(e.target.value)} className="p-2 border rounded-[16px] text-sm font-bold">
+          <div className="flex flex-wrap gap-2 items-center mb-4">
+            <SmartMonthPicker value={month} onChange={val => setMonth(val)} inputClassName="p-2 border rounded-[var(--radius-lg)] text-sm font-bold bg-[var(--card)]" />
+            <select value={filterCat} onChange={(e) => setFilterCat(e.target.value)} className="p-2 border rounded-[var(--radius-lg)] text-sm font-bold">
               <option value="">전체 항목</option>
               {CATEGORIES.map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
-            <select value={filterCardId} onChange={(e) => setFilterCardId(e.target.value)} className="p-2 border rounded-[16px] text-sm font-bold">
+            <select value={filterCardId} onChange={(e) => setFilterCardId(e.target.value)} className="p-2 border rounded-[var(--radius-lg)] text-sm font-bold">
               <option value="">전체 카드</option>
               {cardsByCo.map((c: any) => (
                 <option key={c.id} value={c.id}>{c.card_nickname || `****${c.last_four}`}</option>
               ))}
             </select>
-            <button onClick={() => setAdding(true)} className="px-4 py-2 bg-[var(--toss-blue)] text-white text-xs font-semibold rounded-[16px]">+ 수동 등록</button>
-            <button onClick={handleBulkAutoClassify} className="px-4 py-2 bg-amber-50 text-amber-700 border border-amber-200 text-xs font-semibold rounded-[16px] hover:bg-amber-100 transition-all">🤖 일괄 자동 분류</button>
-            <label className="px-4 py-2 bg-[var(--toss-gray-1)] text-[var(--foreground)] text-xs font-semibold rounded-[16px] cursor-pointer hover:opacity-90">
+            <button onClick={() => setAdding(true)} className="px-4 py-2 bg-[var(--accent)] text-white text-xs font-semibold rounded-[var(--radius-lg)]">+ 수동 등록</button>
+            <button onClick={handleBulkAutoClassify} className="px-4 py-2 bg-amber-50 text-amber-700 border border-amber-200 text-xs font-semibold rounded-[var(--radius-lg)] hover:bg-amber-100 transition-all">🤖 일괄 자동 분류</button>
+            <label className="px-4 py-2 bg-[var(--muted)] text-[var(--foreground)] text-xs font-semibold rounded-[var(--radius-lg)] cursor-pointer hover:opacity-90">
               CSV 가져오기
               <input type="file" accept=".csv,.txt" className="hidden" onChange={handleCsvImport} disabled={importing} />
             </label>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
             {Object.entries(totalByCat).map(([cat, amt]) => (
-              <div key={cat} className="p-4 bg-[var(--toss-gray-1)] rounded-[16px]">
+              <div key={cat} className="p-4 bg-[var(--muted)] rounded-[var(--radius-lg)]">
                 <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">{cat}</p>
                 <p className="text-lg font-semibold text-[var(--foreground)]">{amt.toLocaleString()}원</p>
               </div>
             ))}
-            <div className="p-4 bg-[var(--toss-blue-light)] rounded-[16px]">
-              <p className="text-[11px] font-bold text-[var(--toss-blue)]">합계</p>
-              <p className="text-lg font-semibold text-[var(--toss-blue)]">{grandTotal.toLocaleString()}원</p>
+            <div className="p-4 bg-[var(--toss-blue-light)] rounded-[var(--radius-lg)]">
+              <p className="text-[11px] font-bold text-[var(--accent)]">합계</p>
+              <p className="text-lg font-semibold text-[var(--accent)]">{grandTotal.toLocaleString()}원</p>
             </div>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-[var(--toss-border)] text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">
+                <tr className="border-b border-[var(--border)] text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">
                   <th className="p-4 text-left">날짜</th>
                   <th className="p-4 text-left">가맹점</th>
                   <th className="p-4 text-left">카드</th>
@@ -311,7 +311,7 @@ export default function CorporateCardTransactions({ staffs = [] }: any) {
               </thead>
               <tbody>
                 {list.map((r) => (
-                  <tr key={r.id} className="border-b border-[var(--toss-border)]">
+                  <tr key={r.id} className="border-b border-[var(--border)]">
                     <td className="p-4">{r.transaction_date}</td>
                     <td className="p-4">{r.merchant}</td>
                     <td className="p-4 text-[11px] text-[var(--toss-gray-3)]">{r.corporate_cards?.card_nickname || (r.corporate_cards?.last_four ? `****${r.corporate_cards.last_four}` : null) || '-'}</td>
@@ -323,7 +323,7 @@ export default function CorporateCardTransactions({ staffs = [] }: any) {
             </table>
           </div>
 
-          <div className="mt-6 p-4 bg-amber-50 rounded-[12px] border border-amber-100">
+          <div className="mt-4 p-4 bg-amber-50 rounded-[var(--radius-md)] border border-amber-100">
             <p className="text-[11px] font-semibold text-amber-800">💡 실시간 연동</p>
             <p className="text-[11px] text-amber-700 font-bold mt-1">사용내역은 실시간으로 반영됩니다. CSV는 은행/카드사에서 다운로드한 파일(날짜,가맹점,금액 순)을 업로드해 일괄 등록할 수 있습니다. KB·신한 등 은행 Open API 제휴 시 자동 연동이 가능합니다.</p>
           </div>
@@ -332,32 +332,32 @@ export default function CorporateCardTransactions({ staffs = [] }: any) {
 
       {adding && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]" onClick={() => setAdding(false)}>
-          <div className="bg-[var(--toss-card)] p-8 rounded-[12px] max-w-md w-full space-y-4" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-[var(--card)] p-5 rounded-[var(--radius-md)] max-w-md w-full space-y-4" onClick={(e) => e.stopPropagation()}>
             <h4 className="font-semibold">법인카드 사용 등록</h4>
-            <select value={form.card_id} onChange={(e) => setForm({ ...form, card_id: e.target.value })} className="w-full p-3 border rounded-[16px]">
+            <select value={form.card_id} onChange={(e) => setForm({ ...form, card_id: e.target.value })} className="w-full p-3 border rounded-[var(--radius-lg)]">
               <option value="">카드 선택 (선택)</option>
               {cardsByCo.map((c: any) => (
                 <option key={c.id} value={c.id}>{c.card_nickname || `****${c.last_four}`} - {c.company_name}</option>
               ))}
             </select>
-            <SmartDatePicker value={form.date} onChange={val => setForm({ ...form, date: val })} inputClassName="w-full p-3 border rounded-[16px] font-bold" />
+            <SmartDatePicker value={form.date} onChange={val => setForm({ ...form, date: val })} inputClassName="w-full p-3 border rounded-[var(--radius-lg)] font-bold" />
             <div className="relative">
               <input type="text" value={form.merchant} onChange={(e) => {
                 const m = e.target.value;
                 const suggested = autoClassify(m);
                 setForm({ ...form, merchant: m, category: suggested });
-              }} placeholder="가맹점 (입력 시 카테고리 자동 제안)" className="w-full p-3 border rounded-[16px]" />
-              {form.merchant && <span className="absolute right-3 top-3 text-[10px] text-[var(--toss-blue)] font-bold bg-blue-50 px-2 py-0.5 rounded-lg">자동: {autoClassify(form.merchant)}</span>}
+              }} placeholder="가맹점 (입력 시 카테고리 자동 제안)" className="w-full p-3 border rounded-[var(--radius-lg)]" />
+              {form.merchant && <span className="absolute right-3 top-3 text-[10px] text-[var(--accent)] font-bold bg-blue-50 px-2 py-0.5 rounded-lg">자동: {autoClassify(form.merchant)}</span>}
             </div>
-            <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full p-3 border rounded-[16px]">
+            <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full p-3 border rounded-[var(--radius-lg)]">
               {CATEGORIES.map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
-            <input type="number" value={form.amount || ''} onChange={(e) => setForm({ ...form, amount: parseInt(e.target.value) || 0 })} placeholder="금액" className="w-full p-3 border rounded-[16px]" />
+            <input type="number" value={form.amount || ''} onChange={(e) => setForm({ ...form, amount: parseInt(e.target.value) || 0 })} placeholder="금액" className="w-full p-3 border rounded-[var(--radius-lg)]" />
             <div className="flex gap-2">
-              <button onClick={handleAdd} className="flex-1 py-3 bg-[var(--toss-blue)] text-white font-semibold rounded-[16px]">등록</button>
-              <button onClick={() => setAdding(false)} className="flex-1 py-3 bg-[var(--toss-gray-1)] font-semibold rounded-[16px] text-[var(--foreground)]">취소</button>
+              <button onClick={handleAdd} className="flex-1 py-3 bg-[var(--accent)] text-white font-semibold rounded-[var(--radius-lg)]">등록</button>
+              <button onClick={() => setAdding(false)} className="flex-1 py-3 bg-[var(--muted)] font-semibold rounded-[var(--radius-lg)] text-[var(--foreground)]">취소</button>
             </div>
           </div>
         </div>
@@ -365,25 +365,25 @@ export default function CorporateCardTransactions({ staffs = [] }: any) {
 
       {addingCard && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110]" onClick={() => setAddingCard(false)}>
-          <div className="bg-[var(--toss-card)] p-8 rounded-[12px] max-w-md w-full space-y-4" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-[var(--card)] p-5 rounded-[var(--radius-md)] max-w-md w-full space-y-4" onClick={(e) => e.stopPropagation()}>
             <h4 className="font-semibold">법인카드 등록</h4>
-            <select value={cardForm.company_name} onChange={(e) => setCardForm({ ...cardForm, company_name: e.target.value })} className="w-full p-3 border rounded-[16px]">
+            <select value={cardForm.company_name} onChange={(e) => setCardForm({ ...cardForm, company_name: e.target.value })} className="w-full p-3 border rounded-[var(--radius-lg)]">
               {COMPANIES.filter((c) => c !== '전체').map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
-            <input type="text" value={cardForm.card_nickname} onChange={(e) => setCardForm({ ...cardForm, card_nickname: e.target.value })} placeholder="카드 별칭 (예: 대표카드, 경비카드)" className="w-full p-3 border rounded-[16px]" />
-            <input type="text" value={cardForm.last_four} onChange={(e) => setCardForm({ ...cardForm, last_four: e.target.value.replace(/\D/g, '').slice(0, 4) })} placeholder="카드번호 끝 4자리" className="w-full p-3 border rounded-[16px]" maxLength={4} />
-            <input type="text" value={cardForm.issuer} onChange={(e) => setCardForm({ ...cardForm, issuer: e.target.value })} placeholder="발급사 (KB, 신한 등)" className="w-full p-3 border rounded-[16px]" />
-            <select value={cardForm.holder_id} onChange={(e) => setCardForm({ ...cardForm, holder_id: e.target.value })} className="w-full p-3 border rounded-[16px]">
+            <input type="text" value={cardForm.card_nickname} onChange={(e) => setCardForm({ ...cardForm, card_nickname: e.target.value })} placeholder="카드 별칭 (예: 대표카드, 경비카드)" className="w-full p-3 border rounded-[var(--radius-lg)]" />
+            <input type="text" value={cardForm.last_four} onChange={(e) => setCardForm({ ...cardForm, last_four: e.target.value.replace(/\D/g, '').slice(0, 4) })} placeholder="카드번호 끝 4자리" className="w-full p-3 border rounded-[var(--radius-lg)]" maxLength={4} />
+            <input type="text" value={cardForm.issuer} onChange={(e) => setCardForm({ ...cardForm, issuer: e.target.value })} placeholder="발급사 (KB, 신한 등)" className="w-full p-3 border rounded-[var(--radius-lg)]" />
+            <select value={cardForm.holder_id} onChange={(e) => setCardForm({ ...cardForm, holder_id: e.target.value })} className="w-full p-3 border rounded-[var(--radius-lg)]">
               <option value="">사용자 (선택)</option>
               {staffs?.filter((s: any) => s.company === cardForm.company_name).map((s: any) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
             <div className="flex gap-2">
-              <button onClick={handleAddCard} className="flex-1 py-3 bg-[var(--toss-blue)] text-white font-semibold rounded-[16px]">등록</button>
-              <button onClick={() => setAddingCard(false)} className="flex-1 py-3 bg-[var(--toss-gray-1)] font-semibold rounded-[16px] text-[var(--foreground)]">취소</button>
+              <button onClick={handleAddCard} className="flex-1 py-3 bg-[var(--accent)] text-white font-semibold rounded-[var(--radius-lg)]">등록</button>
+              <button onClick={() => setAddingCard(false)} className="flex-1 py-3 bg-[var(--muted)] font-semibold rounded-[var(--radius-lg)] text-[var(--foreground)]">취소</button>
             </div>
           </div>
         </div>

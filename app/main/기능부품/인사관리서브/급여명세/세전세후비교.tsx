@@ -85,7 +85,7 @@ export default function GrossNetComparison({ staffs, selectedCo, user }: Props) 
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-5 max-w-5xl mx-auto">
+    <div className="p-4 md:p-4 space-y-5 max-w-5xl mx-auto">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)]">세전/세후 비교 분석</h2>
@@ -95,9 +95,9 @@ export default function GrossNetComparison({ staffs, selectedCo, user }: Props) 
             type="month"
             value={yearMonth}
             onChange={e => setYearMonth(e.target.value)}
-            className="p-2 rounded-[8px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-bold"
+            className="p-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-sm font-bold"
           />
-          <button onClick={handleCsvDownload} className="px-4 py-2 bg-[var(--toss-blue)] text-white text-xs font-bold rounded-[8px] hover:opacity-90">CSV</button>
+          <button onClick={handleCsvDownload} className="px-4 py-2 bg-[var(--accent)] text-white text-xs font-bold rounded-[var(--radius-md)] hover:opacity-90">CSV</button>
         </div>
       </div>
 
@@ -105,10 +105,10 @@ export default function GrossNetComparison({ staffs, selectedCo, user }: Props) 
         <div className="text-center py-10 text-sm text-[var(--toss-gray-3)]">로딩 중...</div>
       ) : (
         <>
-          <div className="overflow-x-auto rounded-[12px] border border-[var(--toss-border)]">
+          <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border)]">
             <table className="w-full text-xs">
               <thead>
-                <tr className="bg-[var(--toss-gray-1)]">
+                <tr className="bg-[var(--muted)]">
                   <th className="p-2 text-left font-bold text-[var(--toss-gray-4)]">직원명</th>
                   <th className="p-2 text-right font-bold text-[var(--toss-gray-4)]">총지급액</th>
                   <th className="p-2 text-right font-bold text-[var(--toss-gray-4)]">국민연금</th>
@@ -123,9 +123,9 @@ export default function GrossNetComparison({ staffs, selectedCo, user }: Props) 
               </thead>
               <tbody>
                 {rows.length === 0 ? (
-                  <tr><td colSpan={10} className="p-6 text-center text-[var(--toss-gray-3)]">데이터가 없습니다.</td></tr>
+                  <tr><td colSpan={10} className="p-4 text-center text-[var(--toss-gray-3)]">데이터가 없습니다.</td></tr>
                 ) : rows.map(r => (
-                  <tr key={r.staff.id} className="border-t border-[var(--toss-border)] hover:bg-[var(--toss-gray-1)]/50">
+                  <tr key={r.staff.id} className="border-t border-[var(--border)] hover:bg-[var(--muted)]/50">
                     <td className="p-2 font-bold">{r.staff.name}</td>
                     <td className="p-2 text-right">{fmt(r.gross)}</td>
                     <td className="p-2 text-right text-[var(--toss-gray-4)]">{fmt(r.breakdown.pension)}</td>
@@ -134,18 +134,18 @@ export default function GrossNetComparison({ staffs, selectedCo, user }: Props) 
                     <td className="p-2 text-right text-[var(--toss-gray-4)]">{fmt(r.breakdown.employment)}</td>
                     <td className="p-2 text-right text-[var(--toss-gray-4)]">{fmt(r.breakdown.incomeTax)}</td>
                     <td className="p-2 text-right text-red-600 font-bold">{fmt(r.deduction)}</td>
-                    <td className="p-2 text-right text-[var(--toss-blue)] font-bold">{fmt(r.net)}</td>
+                    <td className="p-2 text-right text-[var(--accent)] font-bold">{fmt(r.net)}</td>
                     <td className="p-2 text-right">{r.deductionRate}%</td>
                   </tr>
                 ))}
                 {rows.length > 0 && (
-                  <tr className="border-t-2 border-[var(--toss-blue)] bg-[var(--toss-blue)]/5 font-bold">
-                    <td className="p-2 font-bold text-[var(--toss-blue)]">전체 합계</td>
+                  <tr className="border-t-2 border-[var(--accent)] bg-[var(--accent)]/5 font-bold">
+                    <td className="p-2 font-bold text-[var(--accent)]">전체 합계</td>
                     <td className="p-2 text-right">{fmt(totalGross)}</td>
                     <td className="p-2" colSpan={4} />
                     <td className="p-2" />
                     <td className="p-2 text-right text-red-600">{fmt(totalDeduction)}</td>
-                    <td className="p-2 text-right text-[var(--toss-blue)]">{fmt(totalNet)}</td>
+                    <td className="p-2 text-right text-[var(--accent)]">{fmt(totalNet)}</td>
                     <td className="p-2 text-right">{totalRate}%</td>
                   </tr>
                 )}
@@ -155,15 +155,15 @@ export default function GrossNetComparison({ staffs, selectedCo, user }: Props) 
 
           {/* 실수령액 구간 분포 차트 */}
           {Object.keys(buckets).length > 0 && (
-            <div className="bg-[var(--toss-card)] rounded-[12px] border border-[var(--toss-border)] p-4">
+            <div className="bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)] p-4">
               <h3 className="text-sm font-bold text-[var(--foreground)] mb-3">실수령액 구간별 직원 수</h3>
               <div className="space-y-2">
                 {Object.entries(buckets).sort().map(([label, count]) => (
                   <div key={label} className="flex items-center gap-3">
                     <span className="text-xs font-bold text-[var(--toss-gray-4)] w-16 shrink-0">{label}원대</span>
-                    <div className="flex-1 bg-[var(--toss-gray-1)] rounded-full h-4 overflow-hidden">
+                    <div className="flex-1 bg-[var(--muted)] rounded-full h-4 overflow-hidden">
                       <div
-                        className="h-full bg-[var(--toss-blue)] rounded-full transition-all"
+                        className="h-full bg-[var(--accent)] rounded-full transition-all"
                         style={{ width: `${(count / maxBucket) * 100}%` }}
                       />
                     </div>

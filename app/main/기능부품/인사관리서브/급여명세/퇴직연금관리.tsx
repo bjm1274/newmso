@@ -83,12 +83,12 @@ export default function RetirementPensionManager({ staffs = [], selectedCo, user
   };
 
   return (
-    <div className="p-4 md:p-8 space-y-5">
+    <div className="p-4 md:p-4 space-y-5">
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div>
           <h2 className="text-base font-bold text-[var(--foreground)]">퇴직연금 (DC/DB) 관리</h2>
         </div>
-        <button onClick={openAdd} className="px-4 py-2 bg-[var(--toss-blue)] text-white rounded-[10px] text-sm font-bold shadow-sm hover:opacity-90">+ 등록</button>
+        <button onClick={openAdd} className="px-4 py-2 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-sm font-bold shadow-sm hover:opacity-90">+ 등록</button>
       </div>
 
       {/* 요약 */}
@@ -99,7 +99,7 @@ export default function RetirementPensionManager({ staffs = [], selectedCo, user
           { label: '미가입 직원', value: unregistered + '명', color: 'text-red-500' },
           { label: 'DC 기여율', value: `${(DC_RATE * 100).toFixed(2)}%`, color: 'text-green-600' },
         ].map(c => (
-          <div key={c.label} className="p-3 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[14px] text-center">
+          <div key={c.label} className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] text-center">
             <p className={`text-base font-bold ${c.color}`}>{c.value}</p>
             <p className="text-[9px] text-[var(--toss-gray-3)] mt-0.5">{c.label}</p>
           </div>
@@ -110,7 +110,7 @@ export default function RetirementPensionManager({ staffs = [], selectedCo, user
       <div className="flex gap-2 flex-wrap">
         {['전체', ...PENSION_TYPES].map(t => (
           <button key={t} onClick={() => setFilterType(t)}
-            className={`px-3 py-1.5 rounded-full text-xs font-bold ${filterType === t ? 'bg-[var(--toss-blue)] text-white' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'}`}>{t}</button>
+            className={`px-3 py-1.5 rounded-[var(--radius-md)] text-xs font-bold ${filterType === t ? 'bg-[var(--accent)] text-white' : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'}`}>{t}</button>
         ))}
       </div>
 
@@ -120,23 +120,23 @@ export default function RetirementPensionManager({ staffs = [], selectedCo, user
           const type = s.pension?.pension_type || '미가입';
           const contribution = s.pension?.monthly_contribution || (type.startsWith('DC') ? s.autoDC : 0);
           return (
-            <div key={s.id} className={`flex items-center justify-between p-4 bg-[var(--toss-card)] border rounded-[14px] shadow-sm ${!s.pension || type === '미가입' ? 'border-orange-200' : 'border-[var(--toss-border)]'}`}>
+            <div key={s.id} className={`flex items-center justify-between p-4 bg-[var(--card)] border rounded-[var(--radius-lg)] shadow-sm ${!s.pension || type === '미가입' ? 'border-orange-200' : 'border-[var(--border)]'}`}>
               <div className="flex items-center gap-3">
                 <div className={`w-2 h-12 rounded-full ${type.startsWith('DC') ? 'bg-blue-400' : type.startsWith('DB') ? 'bg-purple-400' : 'bg-gray-300'}`} />
                 <div>
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-bold text-[var(--foreground)]">{s.name}</p>
-                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${type.startsWith('DC') ? 'bg-blue-100 text-blue-700' : type.startsWith('DB') ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-500'}`}>{type}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${type.startsWith('DC') ? 'bg-blue-100 text-blue-700' : type.startsWith('DB') ? 'bg-purple-100 text-purple-700' : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]'}`}>{type}</span>
                   </div>
                   <p className="text-[10px] text-[var(--toss-gray-3)]">{s.position} · {s.yearsWorked}년 근속</p>
                   {s.pension?.fund_name && <p className="text-[10px] text-[var(--toss-gray-3)]">{s.pension.fund_name}</p>}
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-sm font-bold text-[var(--toss-blue)]">{contribution.toLocaleString()}원/월</p>
+                <p className="text-sm font-bold text-[var(--accent)]">{contribution.toLocaleString()}원/월</p>
                 {s.pension?.total_accumulated ? <p className="text-[10px] text-[var(--toss-gray-3)]">적립: {s.pension.total_accumulated.toLocaleString()}원</p> : null}
                 {type.startsWith('DC') && <p className="text-[9px] text-[var(--toss-gray-3)]">기준: 월급의 {(DC_RATE * 100).toFixed(2)}%</p>}
-                <button onClick={() => openEdit(s)} className="mt-1 px-2 py-0.5 text-[10px] bg-blue-50 text-blue-600 font-bold rounded-[6px] hover:bg-blue-100">
+                <button onClick={() => openEdit(s)} className="mt-1 px-2 py-0.5 text-[10px] bg-blue-50 text-blue-600 font-bold rounded-md hover:bg-blue-100">
                   {s.pension ? '편집' : '등록'}
                 </button>
               </div>
@@ -147,18 +147,18 @@ export default function RetirementPensionManager({ staffs = [], selectedCo, user
 
       {showModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
-          <div className="bg-[var(--toss-card)] rounded-[20px] shadow-2xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
+          <div className="bg-[var(--card)] rounded-[var(--radius-xl)] shadow-sm w-full max-w-sm p-4" onClick={e => e.stopPropagation()}>
             <h3 className="text-base font-bold text-[var(--foreground)] mb-4">퇴직연금 정보 {editId ? '편집' : '등록'}</h3>
             <div className="space-y-3">
               <div>
                 <label className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">직원</label>
-                <select value={form.staff_id} onChange={e => setForm(f => ({ ...f, staff_id: e.target.value }))} className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm bg-[var(--toss-card)] outline-none">
+                <select value={form.staff_id} onChange={e => setForm(f => ({ ...f, staff_id: e.target.value }))} className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none">
                   {filteredStaffs.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">연금 유형</label>
-                <select value={form.pension_type} onChange={e => setForm(f => ({ ...f, pension_type: e.target.value }))} className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm bg-[var(--toss-card)] outline-none">
+                <select value={form.pension_type} onChange={e => setForm(f => ({ ...f, pension_type: e.target.value }))} className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none">
                   {PENSION_TYPES.map(t => <option key={t}>{t}</option>)}
                 </select>
               </div>
@@ -173,13 +173,13 @@ export default function RetirementPensionManager({ staffs = [], selectedCo, user
                 <div key={key}>
                   <label className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">{label}</label>
                   <input type={type} value={(form as any)[key]} onChange={e => setForm(f => ({ ...f, [key]: type === 'number' ? Number(e.target.value) : e.target.value }))}
-                    placeholder={placeholder} className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm bg-[var(--toss-card)] outline-none" />
+                    placeholder={placeholder} className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none" />
                 </div>
               ))}
             </div>
             <div className="flex gap-2 mt-5">
-              <button onClick={() => setShowModal(false)} className="flex-1 py-3 rounded-[12px] bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] font-semibold text-sm">취소</button>
-              <button onClick={handleSave} disabled={saving} className="flex-1 py-3 rounded-[12px] bg-[var(--toss-blue)] text-white font-semibold text-sm disabled:opacity-50">{saving ? '저장 중...' : '저장'}</button>
+              <button onClick={() => setShowModal(false)} className="flex-1 py-3 rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--toss-gray-4)] font-semibold text-sm">취소</button>
+              <button onClick={handleSave} disabled={saving} className="flex-1 py-3 rounded-[var(--radius-md)] bg-[var(--accent)] text-white font-semibold text-sm disabled:opacity-50">{saving ? '저장 중...' : '저장'}</button>
             </div>
           </div>
         </div>

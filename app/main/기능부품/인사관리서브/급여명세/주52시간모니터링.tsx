@@ -79,12 +79,12 @@ export default function WeeklyHoursMonitor({ selectedCo, yearMonth: initialYm }:
   }, [yearMonth, selectedCo]);
 
   return (
-    <div className="border border-[var(--toss-border)] p-5 bg-[var(--toss-card)] rounded-[12px] shadow-sm">
-      <div className="pb-2 border-b border-[var(--toss-border)] mb-3">
+    <div className="border border-[var(--border)] p-4 bg-[var(--card)] rounded-[var(--radius-md)] shadow-sm">
+      <div className="pb-2 border-b border-[var(--border)] mb-3">
         <h3 className="text-sm font-semibold text-[var(--foreground)]">주 52시간 모니터링</h3>
       </div>
       <div className="mb-4">
-        <input type="month" value={yearMonth} onChange={(e) => setYearMonth(e.target.value)} className="h-9 px-3 border border-[var(--toss-border)] rounded-md text-sm font-medium w-full" />
+        <input type="month" value={yearMonth} onChange={(e) => setYearMonth(e.target.value)} className="h-9 px-3 border border-[var(--border)] rounded-md text-sm font-medium w-full" />
       </div>
       {loading ? (
         <p className="text-xs text-[var(--toss-gray-3)]">로딩 중...</p>
@@ -93,7 +93,7 @@ export default function WeeklyHoursMonitor({ selectedCo, yearMonth: initialYm }:
       ) : (
         <div className="space-y-1.5">
           {weeklyData.slice(0, 10).map((x, i) => (
-            <div key={i} className="flex justify-between items-center py-2 border-b border-[var(--toss-border)] last:border-0">
+            <div key={i} className="flex justify-between items-center py-2 border-b border-[var(--border)] last:border-0">
               <span className="text-xs font-medium text-[var(--foreground)]">{x.name}</span>
               <span className="text-xs font-medium text-red-600">{x.hours}h 초과</span>
             </div>

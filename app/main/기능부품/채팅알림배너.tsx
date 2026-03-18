@@ -11,7 +11,7 @@ type BannerItem =
 const DISPLAY_MS = 6000;
 
 const TYPE_CFG: Record<string, { bg: string; icon: string; label: string }> = {
-  message:    { bg: 'bg-[var(--toss-blue)]',  icon: '💬', label: '채팅 열기' },
+  message:    { bg: 'bg-[var(--accent)]',  icon: '💬', label: '채팅 열기' },
   mention:    { bg: 'bg-indigo-600',          icon: '📣', label: '채팅 열기' },
   approval:   { bg: 'bg-violet-600',          icon: '📋', label: '결재 확인' },
   inventory:  { bg: 'bg-orange-500',          icon: '📦', label: '재고 확인' },
@@ -98,7 +98,7 @@ export default function ChatAlertBanner({
 
   const cfg = current.kind === 'chat'
     ? TYPE_CFG['message']
-    : TYPE_CFG[(current as any).type] || { bg: 'bg-[var(--toss-blue)]', icon: '🔔', label: '확인' };
+    : TYPE_CFG[(current as any).type] || { bg: 'bg-[var(--accent)]', icon: '🔔', label: '확인' };
 
   const pendingCount = queueRef.current.length;
 
@@ -108,7 +108,7 @@ export default function ChatAlertBanner({
       tabIndex={0}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
-      className={`fixed top-0 left-0 right-0 z-[100] flex items-center gap-3 px-4 py-3 ${cfg.bg}/90 text-white shadow-xl animate-in slide-in-from-top duration-200 safe-area-inset-top select-none`}
+      className={`fixed top-0 left-0 right-0 z-[100] flex items-center gap-3 px-4 py-3 ${cfg.bg}/90 text-white shadow-sm animate-in slide-in-from-top duration-200 safe-area-inset-top select-none`}
     >
       {/* 아이콘 */}
       <span className="text-2xl shrink-0 drop-shadow-sm">{cfg.icon}</span>
@@ -121,7 +121,7 @@ export default function ChatAlertBanner({
 
       {/* 대기 알림 수 */}
       {pendingCount > 0 && (
-        <span className="bg-white/25 text-white text-[10px] font-black px-2 py-0.5 rounded-full shrink-0 backdrop-blur-sm">
+        <span className="bg-[var(--card)]/25 text-white text-[10px] font-black px-2 py-0.5 rounded-[var(--radius-md)] shrink-0 backdrop-blur-sm">
           +{pendingCount}
         </span>
       )}
@@ -137,7 +137,7 @@ export default function ChatAlertBanner({
 
       {/* 6초 진행바 */}
       <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-black/10 overflow-hidden">
-        <div key={progressKey} className="h-full bg-white/50 animate-progress-6s" style={{ transformOrigin: 'left center' }} />
+        <div key={progressKey} className="h-full bg-[var(--card)]/50 animate-progress-6s" style={{ transformOrigin: 'left center' }} />
       </div>
     </div>
   );

@@ -106,16 +106,16 @@ export default function SignaturePad({ onSignComplete, onCancel }: SignaturePadP
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-            <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-300">
-                <div className="p-6 border-b border-[var(--toss-border)] bg-[var(--toss-gray-1)]">
+            <div className="bg-[var(--card)] rounded-[var(--radius-xl)] shadow-sm w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-300">
+                <div className="p-4 border-b border-[var(--border)] bg-[var(--muted)]">
                     <h2 className="text-xl font-bold text-[var(--foreground)] tracking-tight">전자 서명 (E-Signature)</h2>
                     <p className="text-sm font-medium text-[var(--toss-gray-4)] mt-1">
                         아래 네모칸 안에 본인의 서명을 마우스나 손가락으로 정자체로 그려주세요.
                     </p>
                 </div>
 
-                <div className="p-6 bg-[var(--page-bg)]">
-                    <div className="border-2 border-dashed border-[var(--toss-blue)]/30 rounded-[16px] bg-white overflow-hidden relative touch-none">
+                <div className="p-4 bg-[var(--page-bg)]">
+                    <div className="border-2 border-dashed border-[var(--accent)]/30 rounded-[var(--radius-lg)] bg-[var(--card)] overflow-hidden relative touch-none">
                         <canvas
                             ref={canvasRef}
                             className="w-full h-48 cursor-crosshair touch-none"
@@ -136,7 +136,7 @@ export default function SignaturePad({ onSignComplete, onCancel }: SignaturePadP
                         <div className="absolute bottom-3 right-3 flex gap-2">
                             <button
                                 onClick={clearCanvas}
-                                className="px-3 py-1.5 bg-[var(--toss-gray-2)] text-[var(--toss-gray-5)] text-xs font-bold rounded-[8px] hover:bg-[var(--toss-gray-3)] transition-colors"
+                                className="px-3 py-1.5 bg-[var(--toss-gray-2)] text-[var(--toss-gray-5)] text-xs font-bold rounded-[var(--radius-md)] hover:bg-[var(--toss-gray-3)] transition-colors"
                                 title="서명 지우고 다시 쓰기"
                             >
                                 지우기 (Reset)
@@ -148,16 +148,16 @@ export default function SignaturePad({ onSignComplete, onCancel }: SignaturePadP
                     </p>
                 </div>
 
-                <div className="p-4 bg-[var(--toss-gray-1)] flex justify-end gap-3 border-t border-[var(--toss-border)]">
+                <div className="p-4 bg-[var(--muted)] flex justify-end gap-3 border-t border-[var(--border)]">
                     <button
                         onClick={onCancel}
-                        className="px-5 py-2.5 text-sm font-bold text-[var(--toss-gray-4)] hover:text-[var(--foreground)] rounded-[12px] transition-colors"
+                        className="px-5 py-2.5 text-sm font-bold text-[var(--toss-gray-4)] hover:text-[var(--foreground)] rounded-[var(--radius-md)] transition-colors"
                     >
                         취소
                     </button>
                     <button
                         onClick={handleSave}
-                        className="px-6 py-2.5 text-sm font-bold text-white bg-[var(--toss-blue)] hover:bg-blue-600 rounded-[12px] shadow-md transition-colors"
+                        className="px-4 py-2.5 text-sm font-bold text-white bg-[var(--accent)] hover:bg-blue-600 rounded-[var(--radius-md)] shadow-md transition-colors"
                     >
                         서명 완료 및 계약 승인
                     </button>

@@ -164,7 +164,7 @@ function InnerTabBar({
 }) {
   return (
     <div
-      className="mb-4 rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-3 shadow-sm"
+      className="mb-4 rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm"
       data-testid={testIdPrefix ? `${testIdPrefix}-bar` : undefined}
     >
       <div className="mb-2">
@@ -178,10 +178,10 @@ function InnerTabBar({
             type="button"
             onClick={() => onChange(tab.id)}
             data-testid={testIdPrefix ? `${testIdPrefix}-${index}` : undefined}
-            className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-[11px] font-bold transition-all ${
+            className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-[var(--radius-md)] px-4 py-2 text-[11px] font-bold transition-all ${
               activeTab === tab.id
-                ? 'bg-[var(--toss-blue)] text-white shadow-md'
-                : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-blue-light)] hover:text-[var(--foreground)]'
+                ? 'bg-[var(--accent)] text-white shadow-sm'
+                : 'bg-[var(--muted)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-blue-light)] hover:text-[var(--foreground)]'
             }`}
           >
             <span className="shrink-0">{tab.icon}</span>
@@ -262,7 +262,7 @@ export default function AdminView({ user, staffs = [], onRefresh, initialTab }: 
 
   if (!hasAdminMenuAccess || visibleAdminTabs.length === 0) {
     return (
-      <div className="flex h-full flex-col items-center justify-center bg-[var(--toss-gray-1)] p-6 text-center">
+      <div className="flex h-full flex-col items-center justify-center bg-[var(--muted)] p-4 text-center">
         <div className="mb-4 text-6xl">🔒</div>
         <h2 className="text-xl font-bold text-[var(--foreground)]">관리자 메뉴 접근 권한이 없습니다.</h2>
         <p className="mt-2 text-sm font-semibold text-[var(--toss-gray-3)]">
@@ -277,7 +277,7 @@ export default function AdminView({ user, staffs = [], onRefresh, initialTab }: 
       className="relative flex min-h-0 flex-1 flex-col bg-[var(--page-bg)] animate-in fade-in duration-500"
       data-testid="admin-view"
     >
-      <main className="custom-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto bg-[var(--toss-gray-1)]/30 p-3 pb-20 md:p-6">
+      <main className="custom-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto bg-[var(--muted)]/30 p-3 pb-20 md:p-4">
         {activeTab === '경영분석' && (
           <>
             <InnerTabBar

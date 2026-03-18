@@ -220,7 +220,7 @@ export default function EducationMain({ staffs, selectedCo }: any) {
   return (
     <div className="flex flex-col h-full animate-in fade-in duration-500 bg-[var(--tab-bg)]/20 relative">
       {activeAlerts.length > 0 && (
-        <div className="bg-red-600 text-white px-8 py-2 flex justify-between items-center animate-pulse">
+        <div className="bg-red-600 text-white px-5 py-2 flex justify-between items-center animate-pulse">
           <p className="text-[11px] font-semibold">{bannerText}</p>
           <button onClick={handleAlertPanel} className="text-[11px] font-semibold underline">
             {showNoti ? '패널 닫기' : '상세보기'}
@@ -228,39 +228,39 @@ export default function EducationMain({ staffs, selectedCo }: any) {
         </div>
       )}
 
-      <header className="px-8 pt-8 pb-4 border-b border-[var(--toss-border)] bg-[var(--toss-card)] flex flex-col gap-6 shrink-0">
+      <header className="px-5 pt-8 pb-4 border-b border-[var(--border)] bg-[var(--card)] flex flex-col gap-4 shrink-0">
         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-xl font-semibold text-[var(--foreground)] tracking-tight">
-              Compliance & 자격 관리 <span className="text-sm text-[var(--toss-blue)] ml-2">[{selectedCo}]</span>
+              Compliance & 자격 관리 <span className="text-sm text-[var(--accent)] ml-2">[{selectedCo}]</span>
             </h2>
           </div>
           <div className="flex gap-2 flex-wrap">
             <button
               type="button"
               onClick={handleAlertPanel}
-              className="px-6 py-3 bg-[var(--toss-card)] border border-[var(--toss-border)] text-[11px] font-semibold shadow-sm hover:bg-[var(--toss-gray-1)] transition-all"
+              className="px-4 py-3 bg-[var(--card)] border border-[var(--border)] text-[11px] font-semibold shadow-sm hover:bg-[var(--muted)] transition-all"
             >
               {showNoti ? '알림 패널 닫기' : '알림 대상 보기'}
             </button>
             <button
               type="button"
               onClick={handlePrimaryAction}
-              className="px-6 py-3 bg-[var(--toss-blue)] text-white text-[11px] font-semibold shadow-xl hover:scale-105 transition-all"
+              className="px-4 py-3 bg-[var(--accent)] text-white text-[11px] font-semibold shadow-sm hover:scale-105 transition-all"
             >
               {activeTab === '의무교육' ? '전체 명단으로 이동' : '자격면허 목록으로 이동'}
             </button>
           </div>
         </div>
 
-        <div className="flex gap-1 border-b border-[var(--toss-border)] -mb-4">
+        <div className="flex gap-1 border-b border-[var(--border)] -mb-4">
           {['의무교육', '자격면허'].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-6 py-3 text-[12px] font-black border-b-2 transition-all ${
+              className={`px-4 py-3 text-[12px] font-black border-b-2 transition-all ${
                 activeTab === tab
-                  ? 'border-[var(--toss-blue)] text-[var(--toss-blue)]'
+                  ? 'border-[var(--accent)] text-[var(--accent)]'
                   : 'border-transparent text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'
               }`}
             >
@@ -271,7 +271,7 @@ export default function EducationMain({ staffs, selectedCo }: any) {
       </header>
 
       {showNoti && (
-        <div className="absolute top-32 right-8 w-80 bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-2xl z-50 p-6 rounded-none animate-in slide-in-from-top-4">
+        <div className="absolute top-32 right-8 w-80 bg-[var(--card)] border border-[var(--border)] shadow-sm z-50 p-4 rounded-none animate-in slide-in-from-top-4">
           <div className="flex justify-between items-center mb-4 border-b pb-2">
             <h4 className="text-xs font-semibold text-[var(--foreground)]">
               {activeTab === '의무교육' ? '교육 이수 독려 대상' : '면허 갱신 독려 대상'}
@@ -317,7 +317,7 @@ export default function EducationMain({ staffs, selectedCo }: any) {
                       console.error(error);
                     }
                   }}
-                  className="mt-2 text-[11px] font-semibold text-[var(--toss-blue)] uppercase tracking-tight hover:opacity-70"
+                  className="mt-2 text-[11px] font-semibold text-[var(--accent)] uppercase tracking-tight hover:opacity-70"
                 >
                   알림톡 발송
                 </button>
@@ -327,7 +327,7 @@ export default function EducationMain({ staffs, selectedCo }: any) {
         </div>
       )}
 
-      <div className="flex-1 p-8 overflow-y-auto space-y-8 custom-scrollbar">
+      <div className="flex-1 p-5 overflow-y-auto space-y-5 custom-scrollbar">
         {activeTab === '의무교육' ? (
           <>
             <EducationStatus
@@ -335,7 +335,7 @@ export default function EducationMain({ staffs, selectedCo }: any) {
               summary={educationSummary}
               onOpenRoster={() => scrollToSection(educationListRef.current)}
             />
-            <div ref={educationListRef} className="bg-[var(--toss-card)] border border-[var(--toss-border)] p-8 shadow-sm rounded-2xl">
+            <div ref={educationListRef} className="bg-[var(--card)] border border-[var(--border)] p-5 shadow-sm rounded-2xl">
               <EducationList
                 selectedCo={selectedCo}
                 staffs={activeStaffs}
@@ -348,15 +348,15 @@ export default function EducationMain({ staffs, selectedCo }: any) {
         ) : (
           <>
             <div className="grid gap-4 md:grid-cols-3">
-              <div className="rounded-2xl border border-[var(--toss-border)] bg-[var(--toss-card)] p-5 shadow-sm">
+              <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--toss-gray-3)]">만료 임박</p>
                 <p className="mt-2 text-3xl font-bold text-red-500">{urgentLicenseCount}건</p>
               </div>
-              <div className="rounded-2xl border border-[var(--toss-border)] bg-[var(--toss-card)] p-5 shadow-sm">
+              <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--toss-gray-3)]">90일 내 갱신</p>
                 <p className="mt-2 text-3xl font-bold text-orange-500">{licenseNotifications.length}건</p>
               </div>
-              <div className="rounded-2xl border border-[var(--toss-border)] bg-[var(--toss-card)] p-5 shadow-sm">
+              <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--toss-gray-3)]">즉시 조치</p>
                 <p className="mt-2 text-sm font-semibold text-[var(--foreground)]">갱신 요청 발송 / 사본 확보 / 부서장 확인</p>
               </div>

@@ -181,7 +181,7 @@ export default function LeaveManagement({
       className="app-page flex h-full min-h-0 flex-col overflow-hidden animate-in fade-in duration-500"
       data-testid="leave-management-view"
     >
-      <div className="relative z-10 flex shrink-0 flex-col gap-4 border-b border-[var(--toss-border)] bg-[var(--toss-card)] p-4 md:flex-row md:items-center md:justify-between md:p-8">
+      <div className="relative z-10 flex shrink-0 flex-col gap-4 border-b border-[var(--border)] bg-[var(--card)] p-4 md:flex-row md:items-center md:justify-between md:p-4">
         <div className="flex min-h-[48px] shrink-0 items-center">
           <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tight">전문 연차/휴가 통합 관리</h2>
         </div>
@@ -192,9 +192,9 @@ export default function LeaveManagement({
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               data-testid={`leave-tab-${tab.id.replace(/[^\w가-힣]+/g, '-')}`}
-              className={`px-6 py-3 rounded-[12px] text-[11px] font-semibold whitespace-nowrap transition-all ${activeTab === tab.id
-                ? 'bg-[var(--foreground)] text-white shadow-xl'
-                : 'bg-[var(--toss-card)] text-[var(--toss-gray-3)] border border-[var(--toss-border)] hover:bg-[var(--toss-gray-1)]'
+              className={`px-4 py-3 rounded-[var(--radius-md)] text-[11px] font-semibold whitespace-nowrap transition-all ${activeTab === tab.id
+                ? 'bg-[var(--foreground)] text-white shadow-sm'
+                : 'bg-[var(--card)] text-[var(--toss-gray-3)] border border-[var(--border)] hover:bg-[var(--muted)]'
                 }`}
             >
               {tab.label}
@@ -203,13 +203,13 @@ export default function LeaveManagement({
         </div>
       </div>
 
-      <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto p-4 md:p-10">
+      <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto p-4 md:p-5">
         {activeTab === '연차/휴가 신청내역' && (
-          <div className="space-y-8">
+          <div className="space-y-5">
             {/* 법적 기준 안내 */}
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-100 rounded-[16px] p-6 md:p-8">
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-100 rounded-[var(--radius-lg)] p-4 md:p-4">
               <h3 className="text-sm font-semibold text-blue-900 mb-4 flex items-center gap-2">⚖️ 근로기준법 기준 연차·휴가 안내</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                 <div className="space-y-2">
                   <p className="font-semibold text-blue-800">제60조 (연차 유급휴가)</p>
                   <ul className="text-blue-700 font-bold space-y-1 list-disc list-inside">
@@ -225,7 +225,7 @@ export default function LeaveManagement({
                     <li>2차 촉진: 사용촉진 후 5일 이내 사용 시도</li>
                   </ul>
                 </div>
-                <div className="md:col-span-2 p-4 bg-white/60 rounded-[16px] border border-blue-100">
+                <div className="md:col-span-2 p-4 bg-[var(--card)]/60 rounded-[var(--radius-lg)] border border-blue-100">
                   <p className="font-semibold text-[var(--foreground)]">휴가 종류: 연차 · 반차 · 병가 · 경조 · 특별휴가 · 기타</p>
                 </div>
               </div>
@@ -233,14 +233,14 @@ export default function LeaveManagement({
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div
                 onClick={() => setShowPendingModal(true)}
-                className="p-6 bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-[16px] text-center cursor-pointer hover:shadow-md transition-all group"
+                className="p-4 bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-[var(--radius-lg)] text-center cursor-pointer hover:shadow-md transition-all group"
               >
-                <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase group-hover:text-[var(--toss-blue)] transition-colors">승인 대기</p>
+                <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase group-hover:text-[var(--accent)] transition-colors">승인 대기</p>
                 <p className="text-2xl font-semibold text-orange-500 mt-1">{leaves.filter(l => l.status === '대기').length}</p>
               </div>
-              <div className="p-6 bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-[16px] text-center">
+              <div className="p-4 bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-[var(--radius-lg)] text-center">
                 <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">잔여 연차 (직원별)</p>
-                <p className="text-2xl font-semibold text-[var(--toss-blue)] mt-1">
+                <p className="text-2xl font-semibold text-[var(--accent)] mt-1">
                   {staffList.filter((s: any) => {
                     const total = typeof s.annual_leave_total === 'number' ? s.annual_leave_total : 0;
                     const used = s.annual_leave_used ?? 0;
@@ -249,15 +249,15 @@ export default function LeaveManagement({
                 </p>
                 <p className="text-[11px] text-[var(--toss-gray-3)] mt-1">입사일·사용이력 기반</p>
               </div>
-              <div className="p-6 bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-[16px] text-center">
+              <div className="p-4 bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-[var(--radius-lg)] text-center">
                 <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">연차 사용</p>
-                <p className="text-2xl font-semibold text-[var(--toss-blue)] mt-1">{leaves.filter(l => l.leave_type === '연차' && l.status === '승인').length}</p>
+                <p className="text-2xl font-semibold text-[var(--accent)] mt-1">{leaves.filter(l => l.leave_type === '연차' && l.status === '승인').length}</p>
               </div>
-              <div className="p-6 bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-[16px] text-center">
+              <div className="p-4 bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-[var(--radius-lg)] text-center">
                 <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">기타 휴가</p>
                 <p className="text-2xl font-semibold text-purple-600 mt-1">{leaves.filter(l => l.leave_type !== '연차' && l.status === '승인').length}</p>
               </div>
-              <div className="p-6 bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-[16px] text-center">
+              <div className="p-4 bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-[var(--radius-lg)] text-center">
                 <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">준수율</p>
                 <p className="text-2xl font-semibold text-green-600 mt-1">
                   {staffList.length > 0 ? '100%' : '0%'}
@@ -265,25 +265,25 @@ export default function LeaveManagement({
               </div>
             </div>
 
-            <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[2.5rem] overflow-hidden shadow-xl">
+            <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
               <div className="overflow-x-auto no-scrollbar">
                 <table className="w-full text-left border-collapse min-w-[800px]">
-                  <thead className="bg-[var(--toss-gray-1)]/50 text-[11px] font-semibold text-[var(--toss-gray-3)] border-b border-[var(--toss-border)] uppercase">
+                  <thead className="bg-[var(--muted)]/50 text-[11px] font-semibold text-[var(--toss-gray-3)] border-b border-[var(--border)] uppercase">
                     <tr>
-                      <th className="px-8 py-5">신청자 정보</th>
-                      <th className="px-8 py-5">구분</th>
-                      <th className="px-8 py-5">신청 기간</th>
-                      <th className="px-8 py-5">사유</th>
-                      <th className="px-8 py-5">상태</th>
-                      <th className="px-8 py-5 text-right">관리</th>
+                      <th className="px-5 py-5">신청자 정보</th>
+                      <th className="px-5 py-5">구분</th>
+                      <th className="px-5 py-5">신청 기간</th>
+                      <th className="px-5 py-5">사유</th>
+                      <th className="px-5 py-5">상태</th>
+                      <th className="px-5 py-5 text-right">관리</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50 text-xs font-bold">
                     {leaves.map((l: any) => (
                       <tr key={l.id} className="hover:bg-[var(--toss-blue-light)]/30 transition-all group">
-                        <td className="px-8 py-5">
+                        <td className="px-5 py-5">
                           <div className="flex flex-col">
-                            <span className="font-semibold text-[var(--foreground)] group-hover:text-[var(--toss-blue)] transition-colors">
+                            <span className="font-semibold text-[var(--foreground)] group-hover:text-[var(--accent)] transition-colors">
                               {staffList.find((s: any) => s.id === l.staff_id)?.name ?? l.staff_members?.name ?? '-'}
                             </span>
                             <span className="text-[11px] text-[var(--toss-gray-3)] uppercase">
@@ -291,17 +291,17 @@ export default function LeaveManagement({
                             </span>
                           </div>
                         </td>
-                        <td className="px-8 py-5">
-                          <span className={`px-3 py-1 rounded-full text-[11px] font-semibold ${l.leave_type === '연차' ? 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)]' :
+                        <td className="px-5 py-5">
+                          <span className={`px-3 py-1 rounded-full text-[11px] font-semibold ${l.leave_type === '연차' ? 'bg-[var(--toss-blue-light)] text-[var(--accent)]' :
                             l.leave_type === '병가' ? 'bg-red-100 text-red-600' :
-                              'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'
+                              'bg-[var(--muted)] text-[var(--toss-gray-4)]'
                             }`}>
                             {l.leave_type}
                           </span>
                         </td>
-                        <td className="px-8 py-5 text-[var(--toss-gray-3)]">{l.start_date} ~ {l.end_date}</td>
-                        <td className="px-8 py-5 text-[var(--toss-gray-3)] max-w-xs truncate">{l.reason}</td>
-                        <td className="px-8 py-5">
+                        <td className="px-5 py-5 text-[var(--toss-gray-3)]">{l.start_date} ~ {l.end_date}</td>
+                        <td className="px-5 py-5 text-[var(--toss-gray-3)] max-w-xs truncate">{l.reason}</td>
+                        <td className="px-5 py-5">
                           <span className={`px-3 py-1 rounded-full text-[11px] font-semibold ${l.status === '승인' ? 'bg-green-100 text-green-600' :
                             l.status === '반려' ? 'bg-red-100 text-red-600' :
                               'bg-orange-100 text-orange-600'
@@ -309,11 +309,11 @@ export default function LeaveManagement({
                             {l.status}
                           </span>
                         </td>
-                        <td className="px-8 py-5 text-right">
+                        <td className="px-5 py-5 text-right">
                           {l.status === '대기' && (
                             <div className="flex justify-end gap-2">
-                              <button type="button" onClick={() => handleStatusUpdate(l.id, '승인')} className="px-4 py-2 bg-[var(--toss-blue)] text-white text-[11px] font-semibold rounded-[16px] shadow-lg hover:scale-[0.98] transition-all">승인</button>
-                              <button type="button" onClick={() => handleStatusUpdate(l.id, '반려')} className="px-4 py-2 bg-red-50 border border-red-200 text-[11px] font-semibold text-red-600 rounded-[16px] hover:bg-red-100 transition-all">반려</button>
+                              <button type="button" onClick={() => handleStatusUpdate(l.id, '승인')} className="px-4 py-2 bg-[var(--accent)] text-white text-[11px] font-semibold rounded-[var(--radius-lg)] shadow-sm hover:scale-[0.98] transition-all">승인</button>
+                              <button type="button" onClick={() => handleStatusUpdate(l.id, '반려')} className="px-4 py-2 bg-red-50 border border-red-200 text-[11px] font-semibold text-red-600 rounded-[var(--radius-lg)] hover:bg-red-100 transition-all">반려</button>
                             </div>
                           )}
                         </td>
@@ -332,20 +332,20 @@ export default function LeaveManagement({
         {activeTab === '연차사용촉진 자동화' && <AnnualLeavePromotion staffs={staffList} selectedCo={selectedCo} />}
 
         {activeTab === '연차 자동부여 설정' && (
-          <div className="bg-[var(--toss-card)] p-10 border border-[var(--toss-border)] shadow-xl rounded-[2.5rem] text-center max-w-2xl mx-auto">
-            <p className="text-5xl mb-6">⚙️</p>
+          <div className="bg-[var(--card)] p-5 border border-[var(--border)] shadow-sm rounded-2xl text-center max-w-2xl mx-auto">
+            <p className="text-5xl mb-4">⚙️</p>
             <h3 className="text-xl font-semibold text-[var(--foreground)] mb-4">연차 자동 부여 로직 설정</h3>
-            <p className="text-sm text-[var(--toss-gray-3)] font-bold mb-8 leading-relaxed">
+            <p className="text-sm text-[var(--toss-gray-3)] font-bold mb-4 leading-relaxed">
               근로기준법에 따른 연차 산정 방식을 선택해 주세요.<br />
-              현재 설정: <span className="text-[var(--toss-blue)] font-semibold underline underline-offset-4">{leaveConfig}</span>
+              현재 설정: <span className="text-[var(--accent)] font-semibold underline underline-offset-4">{leaveConfig}</span>
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <button
                 type="button"
                 onClick={() => handleApplyLeaveConfig('입사일 기준')}
-                className={`px-8 py-6 rounded-[16px] text-xs font-semibold transition-all ${leaveConfig === '입사일 기준'
-                  ? 'bg-[var(--foreground)] text-white shadow-2xl scale-105'
-                  : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] border border-[var(--toss-border)] hover:bg-[var(--toss-card)] hover:shadow-lg'
+                className={`px-5 py-4 rounded-[var(--radius-lg)] text-xs font-semibold transition-all ${leaveConfig === '입사일 기준'
+                  ? 'bg-[var(--foreground)] text-white shadow-sm scale-105'
+                  : 'bg-[var(--muted)] text-[var(--toss-gray-3)] border border-[var(--border)] hover:bg-[var(--card)] hover:shadow-sm'
                   }`}
               >
                 <p className="text-lg mb-2">📅</p>
@@ -355,9 +355,9 @@ export default function LeaveManagement({
               <button
                 type="button"
                 onClick={() => handleApplyLeaveConfig('회계연도 기준')}
-                className={`px-8 py-6 rounded-[16px] text-xs font-semibold transition-all ${leaveConfig === '회계연도 기준'
-                  ? 'bg-[var(--foreground)] text-white shadow-2xl scale-105'
-                  : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] border border-[var(--toss-border)] hover:bg-[var(--toss-card)] hover:shadow-lg'
+                className={`px-5 py-4 rounded-[var(--radius-lg)] text-xs font-semibold transition-all ${leaveConfig === '회계연도 기준'
+                  ? 'bg-[var(--foreground)] text-white shadow-sm scale-105'
+                  : 'bg-[var(--muted)] text-[var(--toss-gray-3)] border border-[var(--border)] hover:bg-[var(--card)] hover:shadow-sm'
                   }`}
               >
                 <p className="text-lg mb-2">🏢</p>
@@ -365,14 +365,14 @@ export default function LeaveManagement({
                 <p className="text-[11px] mt-2 font-normal opacity-60">매년 1월 1일 일괄 산정 (정산 필요)</p>
               </button>
             </div>
-            <div className="mt-6">
-              <button type="button" onClick={runAnnualLeaveAutoGrant} disabled={loading} className="w-full py-4 bg-[var(--toss-blue)] text-white font-semibold rounded-[12px] text-sm hover:opacity-90 disabled:opacity-50">
+            <div className="mt-4">
+              <button type="button" onClick={runAnnualLeaveAutoGrant} disabled={loading} className="w-full py-4 bg-[var(--accent)] text-white font-semibold rounded-[var(--radius-md)] text-sm hover:opacity-90 disabled:opacity-50">
                 {loading ? '처리 중...' : '📅 입사일 기준 연차 자동 부여 실행'}
               </button>
             </div>
-            <div className="mt-10 p-6 bg-[var(--toss-blue-light)] rounded-[12px] text-left">
-              <h4 className="text-[11px] font-semibold text-[var(--toss-blue)] mb-2">💡 연차 산정 기준 안내</h4>
-              <p className="text-[11px] text-[var(--toss-blue)] font-bold leading-relaxed">
+            <div className="mt-10 p-4 bg-[var(--toss-blue-light)] rounded-[var(--radius-md)] text-left">
+              <h4 className="text-[11px] font-semibold text-[var(--accent)] mb-2">💡 연차 산정 기준 안내</h4>
+              <p className="text-[11px] text-[var(--accent)] font-bold leading-relaxed">
                 - 입사일 기준: 근로자별 입사일에 맞춰 연차가 발생하여 관리가 정확합니다.<br />
                 - 회계연도 기준: 전 직원의 연차를 특정 일자(예: 1월 1일)에 맞춰 일괄 관리하여 행정 편의성이 높습니다. (단, 퇴사 시 입사일 기준보다 불리할 경우 정산 의무 발생)
               </p>
@@ -388,8 +388,8 @@ export default function LeaveManagement({
       {/* 승인 대기 상세 모달 */}
       {showPendingModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[100] flex items-center justify-center p-4" onClick={() => setShowPendingModal(false)}>
-          <div className="bg-[var(--toss-card)] w-full max-w-2xl rounded-[32px] overflow-hidden shadow-2xl flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
-            <div className="p-8 border-b border-[var(--toss-border)] flex justify-between items-center bg-white">
+          <div className="bg-[var(--card)] w-full max-w-2xl rounded-2xl overflow-hidden shadow-sm flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-[var(--border)] flex justify-between items-center bg-[var(--card)]">
               <div>
                 <h3 className="text-lg font-bold text-[var(--foreground)]">휴가 승인 대기 명단</h3>
                 <p className="text-xs text-[var(--toss-gray-3)] font-bold mt-1">총 {leaves.filter(l => l.status === '대기').length}건의 신규 요청이 있습니다.</p>
@@ -397,14 +397,14 @@ export default function LeaveManagement({
               <button type="button" onClick={() => setShowPendingModal(false)} className="text-[var(--toss-gray-3)] hover:text-red-500 text-2xl font-bold p-2 transition-colors">×</button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-4 bg-[var(--toss-gray-1)]/30 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto p-4 md:p-4 space-y-4 bg-[var(--muted)]/30 custom-scrollbar">
               {leaves.filter(l => l.status === '대기').length === 0 ? (
                 <div className="py-20 text-center text-[var(--toss-gray-3)] font-bold text-sm">대기 중인 요청이 없습니다.</div>
               ) : (
                 leaves.filter(l => l.status === '대기').map(l => {
                   const staff = staffList.find((s: any) => s.id === l.staff_id) || (l as any).staff_members;
                   return (
-                    <div key={l.id} className="bg-white p-6 rounded-[24px] border border-[var(--toss-border)] shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:shadow-md transition-all">
+                    <div key={l.id} className="bg-[var(--card)] p-4 rounded-[var(--radius-xl)] border border-[var(--border)] shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:shadow-md transition-all">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-sm font-bold text-[var(--foreground)]">{staff?.name}</span>
@@ -429,7 +429,7 @@ export default function LeaveManagement({
                         <button
                           type="button"
                           onClick={() => handleStatusUpdate(l.id, '승인')}
-                          className="flex-1 md:flex-none px-6 py-2.5 bg-[var(--toss-blue)] text-white rounded-xl text-[11px] font-bold shadow-lg shadow-blue-500/20 hover:scale-[0.98] active:scale-95 transition-all"
+                          className="flex-1 md:flex-none px-4 py-2.5 bg-[var(--accent)] text-white rounded-xl text-[11px] font-bold shadow-sm shadow-blue-500/20 hover:scale-[0.98] active:scale-95 transition-all"
                         >
                           승인하기
                         </button>
@@ -440,8 +440,8 @@ export default function LeaveManagement({
               )}
             </div>
 
-            <div className="p-6 bg-white border-t border-[var(--toss-border)] text-center">
-              <button type="button" onClick={() => setShowPendingModal(false)} className="px-8 py-3 bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] rounded-xl text-[11px] font-bold hover:bg-[var(--toss-gray-2)] transition-all">닫기</button>
+            <div className="p-4 bg-[var(--card)] border-t border-[var(--border)] text-center">
+              <button type="button" onClick={() => setShowPendingModal(false)} className="px-5 py-3 bg-[var(--muted)] text-[var(--toss-gray-4)] rounded-xl text-[11px] font-bold hover:bg-[var(--toss-gray-2)] transition-all">닫기</button>
             </div>
           </div>
         </div>

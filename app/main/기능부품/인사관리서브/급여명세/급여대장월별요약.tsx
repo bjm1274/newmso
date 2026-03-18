@@ -29,12 +29,12 @@ export default function PayrollMonthlySummary({ selectedCo }: any) {
   const totalDeduction = records.reduce((s, r) => s + (Number(r.total_deduction) || 0), 0);
 
   return (
-    <div className="bg-[var(--toss-card)] rounded-[12px] border border-[var(--toss-border)] p-4 shadow-sm">
-      <div className="pb-3 border-b border-[var(--toss-border)] mb-3">
+    <div className="bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)] p-4 shadow-sm">
+      <div className="pb-3 border-b border-[var(--border)] mb-3">
         <h3 className="text-sm font-semibold text-[var(--foreground)]">월별 급여 요약</h3>
       </div>
       <div className="flex items-center gap-2 mb-4">
-        <input type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="h-9 px-3 border border-[var(--toss-border)] rounded-md text-sm font-medium w-full" />
+        <input type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="h-9 px-3 border border-[var(--border)] rounded-md text-sm font-medium w-full" />
       </div>
       {loading ? (
         <p className="text-xs text-[var(--toss-gray-3)]">로딩 중...</p>
@@ -52,9 +52,9 @@ export default function PayrollMonthlySummary({ selectedCo }: any) {
             <span className="font-medium text-[var(--toss-gray-3)]">공제 합계</span>
             <span className="font-medium text-red-600">-{totalDeduction.toLocaleString()}원</span>
           </div>
-          <div className="flex justify-between text-sm pt-2 border-t border-[var(--toss-border)]">
+          <div className="flex justify-between text-sm pt-2 border-t border-[var(--border)]">
             <span className="font-medium text-[var(--toss-gray-4)]">실지급 총액</span>
-            <span className="font-semibold text-[var(--toss-blue)]">₩{totalNet.toLocaleString()}</span>
+            <span className="font-semibold text-[var(--accent)]">₩{totalNet.toLocaleString()}</span>
           </div>
         </div>
       )}

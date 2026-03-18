@@ -393,7 +393,7 @@ export default function InventoryTransfer({
   };
 
   return (
-    <div className="p-4 md:p-8 space-y-5" data-testid="inventory-transfer-view">
+    <div className="p-4 space-y-4" data-testid="inventory-transfer-view">
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div>
           <h2 className="text-base font-bold text-[var(--foreground)]">부서간 재고 이관</h2>
@@ -405,18 +405,18 @@ export default function InventoryTransfer({
             resetForm();
             setActiveTab('request');
           }}
-          className="px-4 py-2 bg-[var(--toss-blue)] text-white rounded-[10px] text-sm font-bold shadow-sm hover:opacity-90"
+          className="px-4 py-2 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-sm font-bold shadow-sm hover:opacity-90"
         >
           + 새 이관 요청
         </button>
       </div>
 
-      <div className="flex gap-1 bg-[var(--toss-gray-1)] rounded-[12px] p-1 w-fit">
+      <div className="flex gap-1 bg-[var(--muted)] rounded-[var(--radius-md)] p-1 w-fit">
         {[{ key: 'request', label: '이관 신청' }, { key: 'history', label: '이관 이력' }].map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key as 'request' | 'history')}
-            className={`px-4 py-1.5 rounded-[10px] text-xs font-bold transition-all ${activeTab === tab.key ? 'bg-[var(--toss-card)] text-[var(--foreground)] shadow-sm' : 'text-[var(--toss-gray-3)]'}`}
+            className={`px-4 py-1.5 rounded-[var(--radius-md)] text-xs font-bold transition-all ${activeTab === tab.key ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm' : 'text-[var(--toss-gray-3)]'}`}
           >
             {tab.label}
           </button>
@@ -424,7 +424,7 @@ export default function InventoryTransfer({
       </div>
 
       {activeTab === 'request' && (
-        <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] p-5 shadow-sm space-y-4">
+        <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-4 shadow-sm space-y-4">
           <p className="text-sm font-bold text-[var(--foreground)]">이관 신청서 작성</p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -434,7 +434,7 @@ export default function InventoryTransfer({
                 data-testid="inventory-transfer-item-select"
                 value={form.item_id}
                 onChange={(event) => setForm((prev) => ({ ...prev, item_id: event.target.value }))}
-                className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm bg-[var(--toss-card)] outline-none"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none"
               >
                 <option value="">물품 선택</option>
                 {inventory.map((item) => (
@@ -460,14 +460,14 @@ export default function InventoryTransfer({
                     quantity: event.target.value === '' ? 0 : Number(event.target.value),
                   }))
                 }
-                className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm bg-[var(--toss-card)] outline-none"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none"
               />
               {selectedItem && (
                 <p className="text-[10px] text-[var(--toss-gray-3)] mt-0.5">현재 재고: {maxQty}개</p>
               )}
             </div>
 
-            <div className="md:col-span-2 rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)]/60 p-3">
+            <div className="md:col-span-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)]/60 p-3">
               <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] mb-2">출발 위치</p>
               <p data-testid="inventory-transfer-source-location" className="text-sm font-bold text-[var(--foreground)]">
                 {selectedItem ? `${sourceCompany || '회사 미지정'} ${sourceDept || '부서 미지정'}` : '물품을 선택하면 현재 위치가 표시됩니다.'}
@@ -480,7 +480,7 @@ export default function InventoryTransfer({
                 data-testid="inventory-transfer-to-company-select"
                 value={form.to_company}
                 onChange={(event) => setForm((prev) => ({ ...prev, to_company: event.target.value }))}
-                className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm bg-[var(--toss-card)] outline-none"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none"
               >
                 <option value="">선택</option>
                 {companyOptions.map((company) => (
@@ -499,7 +499,7 @@ export default function InventoryTransfer({
                 list="inventory-transfer-departments"
                 onChange={(event) => setForm((prev) => ({ ...prev, to_dept: event.target.value }))}
                 placeholder="예: 원무팀"
-                className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm bg-[var(--toss-card)] outline-none"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none"
               />
               <datalist id="inventory-transfer-departments">
                 {destinationDepartments.map((department) => (
@@ -515,7 +515,7 @@ export default function InventoryTransfer({
                 value={form.reason}
                 onChange={(event) => setForm((prev) => ({ ...prev, reason: event.target.value }))}
                 placeholder="예: 부서 재배치"
-                className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm bg-[var(--toss-card)] outline-none"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none"
               />
             </div>
           </div>
@@ -523,7 +523,7 @@ export default function InventoryTransfer({
           {selectedItem && (
             <div
               data-testid="inventory-transfer-preview"
-              className="rounded-[14px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)]/70 p-4"
+              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)]/70 p-3"
             >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
@@ -557,7 +557,7 @@ export default function InventoryTransfer({
             data-testid="inventory-transfer-submit"
             onClick={handleTransfer}
             disabled={saving}
-            className="px-6 py-2.5 bg-[var(--toss-blue)] text-white rounded-[12px] text-sm font-bold disabled:opacity-50 hover:opacity-90"
+            className="px-4 py-2 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-sm font-bold disabled:opacity-50 hover:opacity-90"
           >
             {saving ? '처리 중...' : '이관 실행'}
           </button>
@@ -567,9 +567,9 @@ export default function InventoryTransfer({
       {activeTab === 'history' && (
         <div data-testid="inventory-transfer-history" className="space-y-2">
           {transfers.length === 0 ? (
-            <div className="text-center py-16 text-[var(--toss-gray-3)] font-bold text-sm">이관 이력이 없습니다.</div>
+            <div className="text-center py-10 text-[var(--toss-gray-3)] font-bold text-sm">이관 이력이 없습니다.</div>
           ) : transfers.map((transfer) => (
-            <div key={transfer.id} className="flex items-center justify-between p-3 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[12px]">
+            <div key={transfer.id} className="flex items-center justify-between p-3 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)]">
               <div>
                 <p className="text-sm font-bold text-[var(--foreground)]">{transfer.item_name}</p>
                 <p className="text-[10px] text-[var(--toss-gray-3)]">
@@ -578,7 +578,7 @@ export default function InventoryTransfer({
                 {transfer.reason && <p className="text-[10px] text-[var(--toss-gray-3)]">사유: {transfer.reason}</p>}
               </div>
               <div className="text-right">
-                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-green-100 text-green-700">{transfer.status || '완료'}</span>
+                <span className="px-2 py-0.5 rounded-[var(--radius-md)] text-[9px] font-bold bg-green-100 text-green-700">{transfer.status || '완료'}</span>
                 <p className="text-[9px] text-[var(--toss-gray-3)] mt-0.5">{transfer.created_at?.slice(0, 10)}</p>
               </div>
             </div>

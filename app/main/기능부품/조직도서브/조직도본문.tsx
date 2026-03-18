@@ -85,7 +85,7 @@ export default function MainContent({
       )}
 
       {mainMenu === '채팅' && (
-        <div className="z-20 min-h-0 flex-1 overflow-hidden bg-[var(--toss-card)]">
+        <div className="z-20 min-h-0 flex-1 overflow-hidden bg-[var(--card)]">
           <ChatView
             user={user}
             onRefresh={onRefresh}
@@ -188,7 +188,7 @@ export default function MainContent({
 
       {annualLeaveNotice && (
         <div className="fixed bottom-28 left-4 right-4 z-[9998] animate-in slide-in-from-bottom-10 md:bottom-10 md:left-auto md:right-10">
-          <div className="w-full space-y-4 rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-6 shadow-[0_4px_20px_rgba(0,0,0,0.08)] md:w-80 md:p-8">
+          <div className="w-full space-y-4 rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-[0_4px_20px_rgba(0,0,0,0.08)] md:w-80 md:p-5">
             <div className="flex items-start justify-between">
               <h3 className="text-lg font-bold tracking-tight text-[var(--foreground)]">연차 사용 촉진 알림</h3>
               <button
@@ -199,7 +199,7 @@ export default function MainContent({
                 ×
               </button>
             </div>
-            <div className="rounded-[12px] border border-[#FFE4A0] bg-[#FFF8E6] p-4">
+            <div className="rounded-[var(--radius-md)] border border-[#FFE4A0] bg-[#FFF8E6] p-4">
               <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[#F59E0B]">법적 준수 안내</p>
               <p className="text-xs font-medium leading-relaxed text-[var(--toss-gray-4)]">
                 {user?.name}님의 현재 잔여 연차는 <span className="font-bold text-[#F59E0B]">{annualLeaveNotice.remaining}일</span> 입니다.
@@ -209,7 +209,7 @@ export default function MainContent({
             <button
               type="button"
               onClick={() => setAnnualLeaveNotice(null)}
-              className="w-full rounded-[12px] bg-[var(--toss-blue)] py-4 text-[13px] font-semibold text-white transition-all hover:bg-[var(--toss-blue)]"
+              className="w-full rounded-[var(--radius-md)] bg-[var(--accent)] py-4 text-[13px] font-semibold text-white transition-all hover:bg-[var(--accent)]"
             >
               확인했습니다
             </button>

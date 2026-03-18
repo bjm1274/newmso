@@ -131,7 +131,7 @@ export default function UnpaidAllowanceAlert({ staffs, selectedCo, user }: Props
   const fmt = (n: number) => n.toLocaleString('ko-KR');
 
   return (
-    <div className="p-4 md:p-6 space-y-5 max-w-4xl mx-auto">
+    <div className="p-4 md:p-4 space-y-5 max-w-4xl mx-auto">
       <div>
         <h2 className="text-lg font-bold text-[var(--foreground)]">장기 미지급 수당 알림</h2>
       </div>
@@ -139,14 +139,14 @@ export default function UnpaidAllowanceAlert({ staffs, selectedCo, user }: Props
       {loading ? (
         <div className="text-center py-10 text-sm text-[var(--toss-gray-3)]">분석 중...</div>
       ) : alerts.length === 0 ? (
-        <div className="text-center py-12 bg-[var(--toss-card)] rounded-[12px] border border-[var(--toss-border)]">
+        <div className="text-center py-8 bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)]">
           <div className="text-4xl mb-3">✅</div>
           <p className="text-sm font-bold text-[var(--toss-gray-4)]">미지급 수당이 감지되지 않았습니다.</p>
         </div>
       ) : (
         <div className="space-y-3">
           {alerts.map((item, i) => (
-            <div key={i} className={`p-4 rounded-[12px] border ${severityColor(item.severity)} flex flex-col sm:flex-row sm:items-center gap-3`}>
+            <div key={i} className={`p-4 rounded-[var(--radius-md)] border ${severityColor(item.severity)} flex flex-col sm:flex-row sm:items-center gap-3`}>
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-sm font-bold">{item.staff.name}</span>
@@ -158,7 +158,7 @@ export default function UnpaidAllowanceAlert({ staffs, selectedCo, user }: Props
               <button
                 onClick={() => handleApply(item)}
                 disabled={submitting === `${item.staff.id}_${item.type}`}
-                className="px-4 py-2 bg-[var(--toss-blue)] text-white text-xs font-bold rounded-[8px] hover:opacity-90 disabled:opacity-50 shrink-0"
+                className="px-4 py-2 bg-[var(--accent)] text-white text-xs font-bold rounded-[var(--radius-md)] hover:opacity-90 disabled:opacity-50 shrink-0"
               >
                 {submitting === `${item.staff.id}_${item.type}` ? '처리중...' : '결재 상신'}
               </button>

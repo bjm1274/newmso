@@ -963,6 +963,91 @@ test("regular payroll settlement can select a staff member and finalize the mont
   await page.getByTestId("salary-settlement-finalize-button").click();
 
   await saveRequest;
+  await expect(page.getByTestId("salary-settlement-complete-step")).toBeVisible();
+});
+
+test("regular payroll settlement does not complete when payroll save fails", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    window.confirm = () => true;
+  });
+
+  const payrollStaff = {
+    id: "payroll-staff-fail-1",
+    employee_no: "PAY-FAIL-001",
+    name: "급여저장실패직원",
+    company: fakeUser.company,
+    company_id: fakeUser.company_id,
+    department: fakeUser.department,
+    position: "사원",
+    base_salary: 3200000,
+    meal_allowance: 200000,
+    night_duty_allowance: 0,
+    vehicle_allowance: 0,
+    childcare_allowance: 0,
+    research_allowance: 0,
+    other_taxfree: 0,
+    overtime_allowance: 0,
+    night_work_allowance: 0,
+    holiday_work_allowance: 0,
+    annual_leave_pay: 0,
+    permissions: {},
+  };
+
+  await mockSupabase(page, {
+    staffMembers: [payrollStaff],
+    attendances: [],
+    payrollRecords: [],
+  });
+  await seedSession(page, {
+    user: {
+      ...fakeUser,
+      company: payrollStaff.company,
+      department: payrollStaff.department,
+    },
+    localStorage: {
+      erp_last_menu: "인사관리",
+      erp_last_subview: "급여",
+      erp_hr_tab: "급여",
+      erp_hr_workspace: "근태 및 급여",
+    },
+  });
+
+  await page.route("**/rest/v1/payroll_records*", async (route) => {
+    if (route.request().method() === "POST") {
+      await route.fulfill({
+        status: 500,
+        contentType: "application/json",
+        body: JSON.stringify({ message: "save failed" }),
+      });
+      return;
+    }
+    await route.fallback();
+  });
+
+  await page.goto(
+    `/main?${new URLSearchParams({ open_menu: "인사관리" }).toString()}`,
+  );
+
+  await expect(page.getByTestId("payroll-view")).toBeVisible();
+  await page.getByTestId("hr-company-select").selectOption(fakeUser.company);
+  await page.getByTestId("payroll-tab-급여정산").click();
+  await expect(page.getByTestId("run-payroll-wizard")).toBeVisible();
+  await page.getByTestId("run-payroll-regular-button").click();
+  await expect(page.getByTestId("salary-settlement-view")).toBeVisible();
+  await page.getByTestId(`salary-settlement-staff-${payrollStaff.id}`).click();
+  await page.getByTestId("salary-settlement-next-button").click();
+  await expect(
+    page.getByTestId(`salary-settlement-card-${payrollStaff.id}`),
+  ).toBeVisible();
+
+  await page.getByTestId("salary-settlement-finalize-button").click();
+
+  await expect(
+    page.getByTestId(`salary-settlement-card-${payrollStaff.id}`),
+  ).toBeVisible();
+  await expect(page.getByTestId("salary-settlement-complete-step")).toHaveCount(0);
 });
 
 test("inventory stock-out flow updates stock through the modal", async ({

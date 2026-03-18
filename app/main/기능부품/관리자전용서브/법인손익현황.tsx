@@ -130,7 +130,7 @@ export default function CompanyPnL({ staffs, selectedCo, user }: Props) {
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-5 max-w-5xl mx-auto" data-testid="admin-analysis-pnl">
+    <div className="p-4 md:p-4 space-y-4 max-w-5xl mx-auto" data-testid="admin-analysis-pnl">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)]">법인별 손익 현황</h2>
@@ -139,7 +139,7 @@ export default function CompanyPnL({ staffs, selectedCo, user }: Props) {
           type="month"
           value={yearMonth}
           onChange={e => setYearMonth(e.target.value)}
-          className="p-2 rounded-[8px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-bold"
+          className="p-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-sm font-bold"
         />
       </div>
 
@@ -154,10 +154,10 @@ export default function CompanyPnL({ staffs, selectedCo, user }: Props) {
               const changeRate = prevLabor > 0 ? ((s.laborCost - prevLabor) / prevLabor * 100).toFixed(1) : null;
               const manualCost = s.expenses ? (s.expenses.rent + s.expenses.materials + s.expenses.utilities + s.expenses.others) : 0;
               return (
-                <div key={s.company} className="bg-[var(--toss-card)] rounded-[12px] border border-[var(--toss-border)] p-4">
+                <div key={s.company} className="bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)] p-4">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-bold text-[var(--foreground)]">{s.company}</h3>
-                    <button onClick={() => handleOpenExpenseModal(s.company)} className="px-2 py-1 text-[10px] font-bold bg-[var(--toss-blue)]/10 text-[var(--toss-blue)] rounded-[6px] hover:bg-[var(--toss-blue)]/20">비용 입력</button>
+                    <button onClick={() => handleOpenExpenseModal(s.company)} className="px-2 py-1 text-[10px] font-bold bg-[var(--accent)]/10 text-[var(--accent)] rounded-md hover:bg-[var(--accent)]/20">비용 입력</button>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-center mb-3">
                     <div>
@@ -182,9 +182,9 @@ export default function CompanyPnL({ staffs, selectedCo, user }: Props) {
                       <p className="text-sm font-bold">{fmt(manualCost)}원</p>
                     </div>
                   </div>
-                  <div className="border-t border-[var(--toss-border)] pt-2 flex justify-between items-center">
+                  <div className="border-t border-[var(--border)] pt-2 flex justify-between items-center">
                     <p className="text-[10px] font-bold text-[var(--toss-gray-4)]">총 비용 합계</p>
-                    <p className="text-sm font-bold text-[var(--toss-blue)]">{fmt(s.totalCost)}원</p>
+                    <p className="text-sm font-bold text-[var(--accent)]">{fmt(s.totalCost)}원</p>
                   </div>
                 </div>
               );
@@ -193,14 +193,14 @@ export default function CompanyPnL({ staffs, selectedCo, user }: Props) {
 
           {/* 비교 바 차트 */}
           {stats.length > 0 && (
-            <div className="bg-[var(--toss-card)] rounded-[12px] border border-[var(--toss-border)] p-4">
+            <div className="bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)] p-4">
               <h3 className="text-sm font-bold text-[var(--foreground)] mb-4">법인 비교 (총 비용)</h3>
               {stats.map(s => (
                 <div key={s.company} className="flex items-center gap-3 mb-2">
                   <span className="text-[11px] font-bold text-[var(--toss-gray-4)] w-32 shrink-0 truncate">{s.company}</span>
-                  <div className="flex-1 bg-[var(--toss-gray-1)] rounded-full h-5 overflow-hidden">
+                  <div className="flex-1 bg-[var(--muted)] rounded-full h-5 overflow-hidden">
                     <div
-                      className="h-full bg-[var(--toss-blue)] rounded-full flex items-center px-2 transition-all"
+                      className="h-full bg-[var(--accent)] rounded-[var(--radius-md)] flex items-center px-2 transition-all"
                       style={{ width: `${(s.totalCost / maxTotal) * 100}%` }}
                     />
                   </div>
@@ -215,7 +215,7 @@ export default function CompanyPnL({ staffs, selectedCo, user }: Props) {
       {/* 비용 입력 모달 */}
       {expenseModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setExpenseModal(null)}>
-          <div className="bg-[var(--toss-card)] rounded-[16px] p-6 max-w-sm w-full mx-4 shadow-xl" onClick={e => e.stopPropagation()}>
+          <div className="bg-[var(--card)] rounded-[var(--radius-lg)] p-4 max-w-sm w-full mx-4 shadow-sm" onClick={e => e.stopPropagation()}>
             <h3 className="text-sm font-bold text-[var(--foreground)] mb-4">{expenseModal} 비용 입력 ({yearMonth})</h3>
             {[
               { key: 'rent', label: '임대료' },
@@ -229,15 +229,15 @@ export default function CompanyPnL({ staffs, selectedCo, user }: Props) {
                   type="number"
                   value={(expenseForm as any)[key] || ''}
                   onChange={e => setExpenseForm(f => ({ ...f, [key]: Number(e.target.value) }))}
-                  className="w-full p-2 text-xs border border-[var(--toss-border)] rounded-[8px] bg-[var(--toss-gray-1)] text-right"
+                  className="w-full p-2 text-xs border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--muted)] text-right"
                   placeholder="0"
                   min={0}
                 />
               </div>
             ))}
             <div className="flex gap-2 mt-4">
-              <button onClick={() => setExpenseModal(null)} className="flex-1 py-2 text-xs font-bold border border-[var(--toss-border)] rounded-[8px]">취소</button>
-              <button onClick={handleSaveExpense} disabled={saving} className="flex-1 py-2 text-xs font-bold bg-[var(--toss-blue)] text-white rounded-[8px] disabled:opacity-50">
+              <button onClick={() => setExpenseModal(null)} className="flex-1 py-2 text-xs font-bold border border-[var(--border)] rounded-[var(--radius-md)]">취소</button>
+              <button onClick={handleSaveExpense} disabled={saving} className="flex-1 py-2 text-xs font-bold bg-[var(--accent)] text-white rounded-[var(--radius-md)] disabled:opacity-50">
                 {saving ? '저장 중...' : '저장'}
               </button>
             </div>

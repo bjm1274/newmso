@@ -167,7 +167,7 @@ function getBandBadgeClass(band: ShiftBand) {
   if (band === 'D') return 'bg-sky-100 text-sky-700 border-sky-200';
   if (band === 'E') return 'bg-amber-100 text-amber-700 border-amber-200';
   if (band === 'N') return 'bg-violet-100 text-violet-700 border-violet-200';
-  if (band === 'NONE') return 'bg-slate-100 text-slate-600 border-slate-200';
+  if (band === 'NONE') return 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)] border-[var(--border)]';
   return 'bg-emerald-100 text-emerald-700 border-emerald-200';
 }
 
@@ -429,20 +429,20 @@ export default function WorkStatus({ user }: { user?: any }) {
 
   return (
     <div className="space-y-5" data-testid="work-status-view">
-      <section className="rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4 shadow-sm">
+      <section className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h3 className="text-lg font-bold text-[var(--foreground)]">근무현황</h3>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--toss-blue)]">
+            <span className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--accent)]">
               선택일 {formatDisplayDate(selectedDate)}
             </span>
             <button
               type="button"
               onClick={() => setSelectedDate(new Date())}
               data-testid="work-status-today"
-              className="rounded-full border border-[var(--toss-border)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-3)] transition hover:border-[var(--toss-blue)] hover:text-[var(--toss-blue)]"
+              className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-3)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
             >
               오늘로
             </button>
@@ -451,24 +451,24 @@ export default function WorkStatus({ user }: { user?: any }) {
 
         <div className="mt-4 grid gap-3 lg:grid-cols-3">
           {activeStaffs.length === 0 ? (
-            <div className="lg:col-span-3 rounded-[18px] border border-dashed border-[var(--toss-border)] bg-[var(--page-bg)] px-4 py-8 text-center text-sm text-[var(--toss-gray-3)]">
+            <div className="lg:col-span-3 rounded-[var(--radius-xl)] border border-dashed border-[var(--border)] bg-[var(--page-bg)] px-4 py-5 text-center text-sm text-[var(--toss-gray-3)]">
               오늘 출근해서 현재 근무중인 직원이 없습니다.
             </div>
           ) : (
             activeStaffs.map((group) => (
               <div
                 key={group.shiftId}
-                className="rounded-[18px] border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-emerald-100/70 p-4 shadow-sm"
+                className="rounded-[var(--radius-xl)] border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-emerald-100/70 p-4 shadow-sm"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black ${getBandBadgeClass(group.band)}`}>
+                    <div className={`inline-flex rounded-[var(--radius-md)] border px-2.5 py-1 text-[10px] font-black ${getBandBadgeClass(group.band)}`}>
                       현재 근무중 · {getBandLabel(group.band)}
                     </div>
                     <h4 className="mt-2 text-base font-bold text-[var(--foreground)]">{group.shiftName}</h4>
                     <p className="mt-1 text-[12px] font-medium text-[var(--toss-gray-3)]">{group.timeRange}</p>
                   </div>
-                  <span className="rounded-full bg-emerald-500 px-2.5 py-1 text-[11px] font-black text-white shadow-sm">
+                  <span className="rounded-[var(--radius-md)] bg-emerald-500 px-2.5 py-1 text-[11px] font-black text-white shadow-sm">
                     {group.items.length}명
                   </span>
                 </div>
@@ -476,7 +476,7 @@ export default function WorkStatus({ user }: { user?: any }) {
                   {group.items.map(({ staff, attendance }) => (
                     <div
                       key={staff.id}
-                      className="rounded-[14px] border border-white/80 bg-white/90 px-3 py-2 shadow-sm"
+                      className="rounded-[var(--radius-lg)] border border-white/80 bg-[var(--card)]/90 px-3 py-2 shadow-sm"
                     >
                       <p className="text-[12px] font-bold text-[var(--foreground)]">{staff.name || '이름 없음'}</p>
                       <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
@@ -491,7 +491,7 @@ export default function WorkStatus({ user }: { user?: any }) {
         </div>
       </section>
 
-      <section className="rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4 shadow-sm">
+      <section className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h4 className="text-base font-bold text-[var(--foreground)]">월간 캘린더</h4>
@@ -501,25 +501,25 @@ export default function WorkStatus({ user }: { user?: any }) {
               type="button"
               onClick={() => setSelectedDate((prev) => addMonths(prev, -1))}
               data-testid="work-status-prev-month"
-              className="rounded-full border border-[var(--toss-border)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-3)] transition hover:border-[var(--toss-blue)] hover:text-[var(--toss-blue)]"
+              className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-3)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
             >
               이전달
             </button>
-            <span className="rounded-full bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--toss-blue)]">
+            <span className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--accent)]">
               {formatMonthLabel(selectedDate)}
             </span>
             <button
               type="button"
               onClick={() => setSelectedDate((prev) => addMonths(prev, 1))}
               data-testid="work-status-next-month"
-              className="rounded-full border border-[var(--toss-border)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-3)] transition hover:border-[var(--toss-blue)] hover:text-[var(--toss-blue)]"
+              className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-3)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
             >
               다음달
             </button>
           </div>
         </div>
 
-        <div className="mt-4 rounded-[18px] border border-[var(--toss-border)] bg-[var(--page-bg)] p-3">
+        <div className="mt-4 rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--page-bg)] p-3">
           <div className="mb-2 grid grid-cols-7 gap-1">
             {WEEKDAY_LABELS.map((label) => (
               <div key={label} className="py-1 text-center text-[10px] font-bold text-[var(--toss-gray-3)]">
@@ -530,7 +530,7 @@ export default function WorkStatus({ user }: { user?: any }) {
           <div className="grid grid-cols-7 gap-1">
             {getMonthGrid(selectedDate).map((cell, index) => {
               if (!cell) {
-                return <div key={`empty-${index}`} className="min-h-[86px] rounded-[12px] border border-transparent" />;
+                return <div key={`empty-${index}`} className="min-h-[86px] rounded-[var(--radius-md)] border border-transparent" />;
               }
 
               const dayKey = toDateKey(cell);
@@ -548,17 +548,17 @@ export default function WorkStatus({ user }: { user?: any }) {
                     setSelectedDate(cell);
                     setIsDetailModalOpen(true);
                   }}
-                  className={`min-h-[86px] rounded-[12px] border px-2 py-2 text-left transition ${
+                  className={`min-h-[86px] rounded-[var(--radius-md)] border px-2 py-2 text-left transition ${
                     isSelected
-                      ? 'border-[var(--toss-blue)] bg-[var(--toss-blue-light)]/70 shadow-sm'
-                      : 'border-[var(--toss-border)] bg-[var(--toss-card)] hover:border-[var(--toss-blue)]/40 hover:bg-[var(--toss-blue-light)]/30'
+                      ? 'border-[var(--accent)] bg-[var(--toss-blue-light)]/70 shadow-sm'
+                      : 'border-[var(--border)] bg-[var(--card)] hover:border-[var(--accent)]/40 hover:bg-[var(--toss-blue-light)]/30'
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <span className={`text-[11px] font-black ${isToday ? 'text-emerald-600' : 'text-[var(--foreground)]'}`}>
                       {cell.getDate()}
                     </span>
-                    <span className="rounded-full bg-[var(--toss-gray-1)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--toss-gray-3)]">
+                    <span className="rounded-[var(--radius-md)] bg-[var(--muted)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--toss-gray-3)]">
                       {totalStaff}명
                     </span>
                   </div>
@@ -575,27 +575,27 @@ export default function WorkStatus({ user }: { user?: any }) {
       </section>
 
       {isDetailModalOpen ? (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/45 px-4 py-6" data-testid="work-status-detail-modal" onClick={() => setIsDetailModalOpen(false)}>
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/45 px-4 py-4" data-testid="work-status-detail-modal" onClick={() => setIsDetailModalOpen(false)}>
           <div
-            className="max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-[24px] border border-[var(--toss-border)] bg-[var(--toss-card)] shadow-2xl"
+            className="max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] shadow-sm"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="flex flex-col gap-3 border-b border-[var(--toss-border)] px-5 py-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="flex flex-col gap-3 border-b border-[var(--border)] px-5 py-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <h4 className="text-lg font-bold text-[var(--foreground)]">선택일 전체 근무자 상세</h4>
                 <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">{formatDisplayDate(selectedDate)}</p>
               </div>
               <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold">
-                <span className="rounded-full bg-sky-100 px-2.5 py-1 text-sky-700">Day {selectedDateRows.counts.D}명</span>
-                <span className="rounded-full bg-amber-100 px-2.5 py-1 text-amber-700">Evening {selectedDateRows.counts.E}명</span>
-                <span className="rounded-full bg-violet-100 px-2.5 py-1 text-violet-700">Night {selectedDateRows.counts.N}명</span>
-                <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-700">기타 {selectedDateRows.counts.OTHER}명</span>
-                <span className="rounded-full bg-[var(--toss-gray-1)] px-2.5 py-1 text-[var(--toss-gray-3)]">총 {selectedDateRows.counts.total}명</span>
+                <span className="rounded-[var(--radius-md)] bg-sky-100 px-2.5 py-1 text-sky-700">Day {selectedDateRows.counts.D}명</span>
+                <span className="rounded-[var(--radius-md)] bg-amber-100 px-2.5 py-1 text-amber-700">Evening {selectedDateRows.counts.E}명</span>
+                <span className="rounded-[var(--radius-md)] bg-violet-100 px-2.5 py-1 text-violet-700">Night {selectedDateRows.counts.N}명</span>
+                <span className="rounded-[var(--radius-md)] bg-emerald-100 px-2.5 py-1 text-emerald-700">기타 {selectedDateRows.counts.OTHER}명</span>
+                <span className="rounded-[var(--radius-md)] bg-[var(--muted)] px-2.5 py-1 text-[var(--toss-gray-3)]">총 {selectedDateRows.counts.total}명</span>
                 <button
                   type="button"
                   onClick={() => setIsDetailModalOpen(false)}
                   data-testid="work-status-detail-close"
-                  className="rounded-full border border-[var(--toss-border)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-3)] transition hover:border-[var(--toss-blue)] hover:text-[var(--toss-blue)]"
+                  className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-3)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
                 >
                   닫기
                 </button>
@@ -604,32 +604,32 @@ export default function WorkStatus({ user }: { user?: any }) {
 
             <div className="max-h-[calc(90vh-92px)] overflow-y-auto p-5">
               {!selectedDateRows.hasExplicitAssignments ? (
-                <div className="mb-4 rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] font-medium text-amber-700">
+                <div className="mb-4 rounded-[var(--radius-lg)] border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] font-medium text-amber-700">
                   선택일의 실제 배정표가 없어 기본 근무형태 기준으로 보여주고 있습니다.
                 </div>
               ) : null}
 
               <div className="grid gap-3 xl:grid-cols-2">
                 {loading ? (
-                  <div className="xl:col-span-2 rounded-[18px] border border-dashed border-[var(--toss-border)] bg-[var(--page-bg)] px-4 py-10 text-center text-sm text-[var(--toss-gray-3)]">
+                  <div className="xl:col-span-2 rounded-[var(--radius-xl)] border border-dashed border-[var(--border)] bg-[var(--page-bg)] px-4 py-10 text-center text-sm text-[var(--toss-gray-3)]">
                     근무현황을 불러오는 중입니다.
                   </div>
                 ) : selectedDateRows.rows.length === 0 ? (
-                  <div className="xl:col-span-2 rounded-[18px] border border-dashed border-[var(--toss-border)] bg-[var(--page-bg)] px-4 py-10 text-center text-sm text-[var(--toss-gray-3)]">
+                  <div className="xl:col-span-2 rounded-[var(--radius-xl)] border border-dashed border-[var(--border)] bg-[var(--page-bg)] px-4 py-10 text-center text-sm text-[var(--toss-gray-3)]">
                     선택한 날짜의 근무 배치가 없습니다.
                   </div>
                 ) : (
                   selectedDateRows.rows.map((row) => (
-                    <div key={row.shiftId} className="rounded-[18px] border border-[var(--toss-border)] bg-[var(--page-bg)] p-4 shadow-sm">
+                    <div key={row.shiftId} className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--page-bg)] p-4 shadow-sm">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <div className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black ${getBandBadgeClass(row.band)}`}>
+                          <div className={`inline-flex rounded-[var(--radius-md)] border px-2.5 py-1 text-[10px] font-black ${getBandBadgeClass(row.band)}`}>
                             {getBandLabel(row.band)}
                           </div>
                           <h5 className="mt-2 text-base font-bold text-[var(--foreground)]">{row.shiftName}</h5>
                           <p className="mt-1 text-[12px] font-medium text-[var(--toss-gray-3)]">{row.timeRange}</p>
                         </div>
-                        <span className="rounded-full bg-[var(--toss-blue-light)] px-2.5 py-1 text-[11px] font-black text-[var(--toss-blue)]">
+                        <span className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-2.5 py-1 text-[11px] font-black text-[var(--accent)]">
                           {row.staffs.length}명
                         </span>
                       </div>
@@ -640,16 +640,16 @@ export default function WorkStatus({ user }: { user?: any }) {
                           return (
                             <div
                               key={staff.id}
-                              className={`rounded-[14px] border px-3 py-2 shadow-sm ${
+                              className={`rounded-[var(--radius-lg)] border px-3 py-2 shadow-sm ${
                                 isActiveNow
                                   ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                                  : 'border-[var(--toss-border)] bg-[var(--toss-card)] text-[var(--foreground)]'
+                                  : 'border-[var(--border)] bg-[var(--card)] text-[var(--foreground)]'
                               }`}
                             >
                               <div className="flex items-center gap-2">
                                 <p className="text-[12px] font-bold">{staff.name || '이름 없음'}</p>
                                 {isActiveNow ? (
-                                  <span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-black text-white">
+                                  <span className="rounded-[var(--radius-md)] bg-emerald-500 px-2 py-0.5 text-[10px] font-black text-white">
                                     근무중
                                   </span>
                                 ) : null}

@@ -60,7 +60,7 @@ export default function OrdinaryWageCalculator({ staffs, selectedCo, user }: Pro
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-4xl mx-auto">
+    <div className="p-4 md:p-4 space-y-4 max-w-4xl mx-auto">
       <div>
         <h2 className="text-lg font-bold text-[var(--foreground)]">통상임금 자동 계산기</h2>
       </div>
@@ -80,7 +80,7 @@ export default function OrdinaryWageCalculator({ staffs, selectedCo, user }: Pro
               setFamilyAllowance(s.family_allowance || 0);
             }
           }}
-          className="w-full p-2.5 rounded-[10px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-bold"
+          className="w-full p-2.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-sm font-bold"
         >
           <option value="">-- 직원을 선택하세요 --</option>
           {filtered.map((s: any) => (
@@ -105,7 +105,7 @@ export default function OrdinaryWageCalculator({ staffs, selectedCo, user }: Pro
               type="number"
               value={value || ''}
               onChange={e => setter(Number(e.target.value))}
-              className="w-full p-2 rounded-[8px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-bold text-right"
+              className="w-full p-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-sm font-bold text-right"
               placeholder="0"
               min={0}
             />
@@ -114,7 +114,7 @@ export default function OrdinaryWageCalculator({ staffs, selectedCo, user }: Pro
       </div>
 
       {/* 슬라이더 입력 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-[var(--toss-gray-1)] rounded-[12px]">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-[var(--muted)] rounded-[var(--radius-md)]">
         <h3 className="col-span-full text-sm font-bold text-[var(--foreground)]">법정수당 계산 입력</h3>
         {[
           { label: '연장근무 시간', value: overtimeHours, setter: setOvertimeHours, max: 100 },
@@ -125,7 +125,7 @@ export default function OrdinaryWageCalculator({ staffs, selectedCo, user }: Pro
           <div key={label}>
             <div className="flex justify-between items-center mb-1">
               <label className="text-[11px] font-bold text-[var(--toss-gray-4)]">{label}</label>
-              <span className="text-[11px] font-bold text-[var(--toss-blue)]">{value}</span>
+              <span className="text-[11px] font-bold text-[var(--accent)]">{value}</span>
             </div>
             <input
               type="range"
@@ -133,36 +133,36 @@ export default function OrdinaryWageCalculator({ staffs, selectedCo, user }: Pro
               max={max}
               value={value}
               onChange={e => setter(Number(e.target.value))}
-              className="w-full accent-[var(--toss-blue)]"
+              className="w-full accent-[var(--accent)]"
             />
           </div>
         ))}
       </div>
 
       {/* 계산 결과 표 */}
-      <div className="bg-[var(--toss-card)] rounded-[12px] border border-[var(--toss-border)] overflow-hidden">
-        <div className="p-4 border-b border-[var(--toss-border)] bg-[var(--toss-blue)]/5">
-          <h3 className="text-sm font-bold text-[var(--toss-blue)]">계산 결과</h3>
+      <div className="bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)] overflow-hidden">
+        <div className="p-4 border-b border-[var(--border)] bg-[var(--accent)]/5">
+          <h3 className="text-sm font-bold text-[var(--accent)]">계산 결과</h3>
         </div>
         <table className="w-full">
           <tbody>
-            <tr className="border-b border-[var(--toss-border)]">
+            <tr className="border-b border-[var(--border)]">
               <td className="p-3 text-xs font-bold text-[var(--toss-gray-4)]">월 통상임금 합계</td>
               <td className="p-3 text-sm font-bold text-right text-[var(--foreground)]">{fmt(ordinaryWage)} 원</td>
             </tr>
-            <tr className="border-b border-[var(--toss-border)] bg-[var(--toss-blue)]/5">
-              <td className="p-3 text-xs font-bold text-[var(--toss-blue)]">시간급 통상임금</td>
-              <td className="p-3 text-sm font-bold text-right text-[var(--toss-blue)]">{fmt(hourlyWage)} 원/시간</td>
+            <tr className="border-b border-[var(--border)] bg-[var(--accent)]/5">
+              <td className="p-3 text-xs font-bold text-[var(--accent)]">시간급 통상임금</td>
+              <td className="p-3 text-sm font-bold text-right text-[var(--accent)]">{fmt(hourlyWage)} 원/시간</td>
             </tr>
-            <tr className="border-b border-[var(--toss-border)]">
+            <tr className="border-b border-[var(--border)]">
               <td className="p-3 text-xs font-bold text-[var(--toss-gray-4)]">연장수당 (×1.5 × {overtimeHours}시간)</td>
               <td className="p-3 text-sm font-bold text-right text-[var(--foreground)]">{fmt(overtimePay)} 원</td>
             </tr>
-            <tr className="border-b border-[var(--toss-border)]">
+            <tr className="border-b border-[var(--border)]">
               <td className="p-3 text-xs font-bold text-[var(--toss-gray-4)]">야간수당 (×0.5 × {nightHours}시간)</td>
               <td className="p-3 text-sm font-bold text-right text-[var(--foreground)]">{fmt(nightPay)} 원</td>
             </tr>
-            <tr className="border-b border-[var(--toss-border)]">
+            <tr className="border-b border-[var(--border)]">
               <td className="p-3 text-xs font-bold text-[var(--toss-gray-4)]">휴일수당 (×1.5 × {holidayHours}시간)</td>
               <td className="p-3 text-sm font-bold text-right text-[var(--foreground)]">{fmt(holidayPay)} 원</td>
             </tr>
@@ -176,7 +176,7 @@ export default function OrdinaryWageCalculator({ staffs, selectedCo, user }: Pro
 
       <button
         onClick={handleCsvDownload}
-        className="px-5 py-2.5 bg-[var(--toss-blue)] text-white text-xs font-bold rounded-[10px] hover:opacity-90 transition-all"
+        className="px-5 py-2.5 bg-[var(--accent)] text-white text-xs font-bold rounded-[var(--radius-md)] hover:opacity-90 transition-all"
       >
         CSV 다운로드
       </button>

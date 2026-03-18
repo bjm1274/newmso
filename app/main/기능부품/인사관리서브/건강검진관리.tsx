@@ -54,35 +54,35 @@ export default function HealthCheckupManagement({ staffs = [], selectedCo }: any
 
     return (
         <div className="flex flex-col h-full animate-in fade-in duration-300">
-            <header className="p-6 md:p-8 border-b border-[var(--toss-border)] bg-[var(--toss-card)] shrink-0">
+            <header className="p-4 md:p-5 border-b border-[var(--border)] bg-[var(--card)] shrink-0">
                 <div className="flex justify-between items-center">
                     <div>
-                        <h2 className="text-xl font-bold text-[var(--foreground)] tracking-tight">🩺 건강검진 관리 <span className="text-sm text-[var(--toss-blue)] ml-2">[{selectedCo}]</span></h2>
+                        <h2 className="text-xl font-bold text-[var(--foreground)] tracking-tight">🩺 건강검진 관리 <span className="text-sm text-[var(--accent)] ml-2">[{selectedCo}]</span></h2>
                         <p className="text-[11px] text-[var(--toss-gray-3)] font-bold mt-1">법정 의무 건강검진 일정 관리 및 이력 추적</p>
                     </div>
                     <div className="flex items-center gap-2">
                         {checkupDue.length > 0 && <span className="px-3 py-1.5 bg-red-100 text-red-700 text-[11px] font-bold rounded-xl">🚨 미수검 {checkupDue.length}명</span>}
-                        <button onClick={() => setShowForm(!showForm)} className="px-5 py-2.5 bg-[var(--toss-blue)] text-white text-[11px] font-bold rounded-xl shadow-md hover:opacity-90 transition-all">{showForm ? '취소' : '+ 검진 등록'}</button>
+                        <button onClick={() => setShowForm(!showForm)} className="px-5 py-2.5 bg-[var(--accent)] text-white text-[11px] font-bold rounded-xl shadow-md hover:opacity-90 transition-all">{showForm ? '취소' : '+ 검진 등록'}</button>
                     </div>
                 </div>
             </header>
-            <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 custom-scrollbar bg-[var(--page-bg)]">
+            <div className="flex-1 overflow-y-auto p-4 md:p-5 space-y-4 custom-scrollbar bg-[var(--page-bg)]">
                 {showForm && (
-                    <form onSubmit={handleSubmit} className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-2xl p-6 shadow-sm space-y-4 animate-in slide-in-from-top-4">
+                    <form onSubmit={handleSubmit} className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-sm space-y-4 animate-in slide-in-from-top-4">
                         <h3 className="text-sm font-bold text-[var(--foreground)]">검진 일정 등록</h3>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <select value={form.staff_id} onChange={e => setForm({ ...form, staff_id: e.target.value })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" required>
+                            <select value={form.staff_id} onChange={e => setForm({ ...form, staff_id: e.target.value })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" required>
                                 <option value="">직원 선택</option>
                                 {filtered.map((s: any) => <option key={s.id} value={s.id}>{s.name} ({s.department || '미배정'})</option>)}
                             </select>
-                            <select value={form.checkup_type} onChange={e => setForm({ ...form, checkup_type: e.target.value })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none">
+                            <select value={form.checkup_type} onChange={e => setForm({ ...form, checkup_type: e.target.value })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none">
                                 {CHECKUP_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                             </select>
-                            <SmartDatePicker value={form.scheduled_date} onChange={val => setForm({ ...form, scheduled_date: val })} inputClassName="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" />
-                            <input type="text" value={form.hospital} onChange={e => setForm({ ...form, hospital: e.target.value })} placeholder="검진 병원명" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)]" />
-                            <input type="text" value={form.memo} onChange={e => setForm({ ...form, memo: e.target.value })} placeholder="비고" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)] md:col-span-2" />
+                            <SmartDatePicker value={form.scheduled_date} onChange={val => setForm({ ...form, scheduled_date: val })} inputClassName="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" />
+                            <input type="text" value={form.hospital} onChange={e => setForm({ ...form, hospital: e.target.value })} placeholder="검진 병원명" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)]" />
+                            <input type="text" value={form.memo} onChange={e => setForm({ ...form, memo: e.target.value })} placeholder="비고" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)] md:col-span-2" />
                         </div>
-                        <div className="flex justify-end"><button type="submit" className="px-6 py-2.5 bg-[var(--toss-blue)] text-white text-[11px] font-bold rounded-xl shadow-md">등록</button></div>
+                        <div className="flex justify-end"><button type="submit" className="px-4 py-2.5 bg-[var(--accent)] text-white text-[11px] font-bold rounded-xl shadow-md">등록</button></div>
                     </form>
                 )}
                 {checkupDue.length > 0 && (
@@ -90,17 +90,17 @@ export default function HealthCheckupManagement({ staffs = [], selectedCo }: any
                         <h3 className="text-[11px] font-bold text-red-800 mb-3">🚨 검진 미수검 대상자 (1년 내 기록 없음)</h3>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                             {checkupDue.slice(0, 12).map((s: any) => (
-                                <div key={s.id} className="flex items-center justify-between bg-white p-3 rounded-xl border border-red-100">
+                                <div key={s.id} className="flex items-center justify-between bg-[var(--card)] p-3 rounded-xl border border-red-100">
                                     <div><p className="text-[11px] font-bold">{s.name}</p><p className="text-[9px] text-[var(--toss-gray-3)]">{s.department || '미배정'}</p></div>
-                                    <button onClick={() => { setForm({ ...form, staff_id: s.id }); setShowForm(true); }} className="px-2.5 py-1 bg-[var(--toss-blue)] text-white text-[9px] font-bold rounded-lg">등록</button>
+                                    <button onClick={() => { setForm({ ...form, staff_id: s.id }); setShowForm(true); }} className="px-2.5 py-1 bg-[var(--accent)] text-white text-[9px] font-bold rounded-lg">등록</button>
                                 </div>
                             ))}
                         </div>
                     </div>
                 )}
-                <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-2xl overflow-hidden shadow-sm">
+                <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
                     <table className="w-full text-[11px]">
-                        <thead><tr className="bg-[var(--toss-gray-1)] border-b border-[var(--toss-border)]">
+                        <thead><tr className="bg-[var(--muted)] border-b border-[var(--border)]">
                             <th className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">직원</th>
                             <th className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">종류</th>
                             <th className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">예정일</th>
@@ -109,8 +109,8 @@ export default function HealthCheckupManagement({ staffs = [], selectedCo }: any
                             <th className="px-4 py-3 text-center font-bold text-[var(--toss-gray-4)]">액션</th>
                         </tr></thead>
                         <tbody>
-                            {filteredRecords.length === 0 ? <tr><td colSpan={6} className="px-4 py-16 text-center text-[var(--toss-gray-3)] font-bold">검진 이력이 없습니다</td></tr> : filteredRecords.map((r: any) => (
-                                <tr key={r.id} className="border-b border-[var(--toss-border)] hover:bg-[var(--toss-gray-1)]/50">
+                            {filteredRecords.length === 0 ? <tr><td colSpan={6} className="px-4 py-10 text-center text-[var(--toss-gray-3)] font-bold">검진 이력이 없습니다</td></tr> : filteredRecords.map((r: any) => (
+                                <tr key={r.id} className="border-b border-[var(--border)] hover:bg-[var(--muted)]/50">
                                     <td className="px-4 py-3 font-bold text-[var(--foreground)]">{r.staff_name}<br /><span className="text-[9px] text-[var(--toss-gray-3)]">{r.department}</span></td>
                                     <td className="px-4 py-3">{r.checkup_type}</td>
                                     <td className="px-4 py-3 text-[var(--toss-gray-4)]">{r.scheduled_date}</td>

@@ -104,11 +104,11 @@ export default function NotificationAutomation({ user }: any) {
   }, [enabled, payrollDay, user?.id]);
 
   return (
-    <div className="bg-[var(--toss-card)] p-8 border border-[var(--toss-border)] rounded-[12px] shadow-xl max-w-xl space-y-6">
+    <div className="bg-[var(--card)] p-4 border border-[var(--border)] rounded-[var(--radius-md)] shadow-sm max-w-xl space-y-3">
       <div>
-        <h3 className="text-xl font-semibold text-[var(--foreground)] mb-2">알림 자동화</h3>
+        <h3 className="text-base font-semibold text-[var(--foreground)] mb-2">알림 자동화</h3>
       </div>
-      <div className="space-y-4">
+      <div className="space-y-3">
         <label className="flex items-center gap-3">
           <input
             type="checkbox"
@@ -130,10 +130,10 @@ export default function NotificationAutomation({ user }: any) {
             onChange={e =>
               setPayrollDay(parseInt(e.target.value, 10) || 25)
             }
-            className="w-full p-4 mt-1 rounded-[16px] border font-bold"
+            className="w-full p-2 mt-1 rounded-[var(--radius-md)] border font-bold"
           />
         </div>
-        <div className="rounded-[12px] bg-[var(--page-bg)] border border-[var(--toss-border)] p-4 text-[11px] text-[var(--toss-gray-4)] space-y-1">
+        <div className="rounded-[var(--radius-md)] bg-[var(--page-bg)] border border-[var(--border)] p-4 text-[11px] text-[var(--toss-gray-4)] space-y-1">
           <p className="font-bold text-[var(--foreground)] mb-1">연차 촉진 법적 기준</p>
           <p>- 기준: 연차휴가가 속한 연도의 종료일(12월 31일) 기준</p>
           <p>- 1차 촉진: 종료 6개월 전 일괄 안내 (예: 6월 말 기준)</p>

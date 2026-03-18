@@ -36,8 +36,8 @@ export default function SharedCalendar({ user }: any) {
   const days = Array.from({ length: firstDay + lastDay }, (_, i) => i < firstDay ? null : i - firstDay + 1);
 
   return (
-    <div className="bg-white p-6 border border-[var(--toss-border)] rounded-[12px] shadow-xl">
-      <div className="flex justify-between items-center mb-6">
+    <div className="bg-[var(--card)] p-4 border border-[var(--border)] rounded-[var(--radius-md)] shadow-sm">
+      <div className="flex justify-between items-center mb-4">
         <h3 className="text-xl font-semibold text-[var(--foreground)]">공유 캘린더</h3>
         <SmartMonthPicker value={yearMonth} onChange={setYearMonth} />
       </div>
@@ -48,10 +48,10 @@ export default function SharedCalendar({ user }: any) {
           const dateStr = `${yearMonth}-${String(d).padStart(2, '0')}`;
           const dayEvents = events.filter(e => e.date === dateStr);
           return (
-            <div key={i} className="min-h-[60px] p-1 border border-gray-50 rounded-[12px]">
+            <div key={i} className="min-h-[60px] p-1 border border-[var(--border-subtle)] rounded-[var(--radius-md)]">
               <p className="text-xs font-bold text-[var(--toss-gray-4)]">{d}</p>
               {dayEvents.slice(0, 2).map((e, j) => (
-                <p key={j} className="text-[11px] font-bold truncate bg-blue-50 text-[var(--toss-blue)] rounded px-0.5 mt-0.5">{e.title}</p>
+                <p key={j} className="text-[11px] font-bold truncate bg-blue-50 text-[var(--accent)] rounded px-0.5 mt-0.5">{e.title}</p>
               ))}
             </div>
           );
