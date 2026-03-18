@@ -71,7 +71,7 @@ export default function TaxFreeLimitChecker({ staffs, selectedCo, user }: Props)
   const fmt = (n: number) => n.toLocaleString('ko-KR');
 
   return (
-    <div className="p-4 md:p-6 space-y-5 max-w-5xl mx-auto">
+    <div className="p-4 md:p-4 space-y-5 max-w-5xl mx-auto">
       <div>
         <h2 className="text-lg font-bold text-[var(--foreground)]">비과세 한도 초과 경고</h2>
       </div>
@@ -83,7 +83,7 @@ export default function TaxFreeLimitChecker({ staffs, selectedCo, user }: Props)
             type="month"
             value={yearMonth}
             onChange={e => setYearMonth(e.target.value)}
-            className="p-2 rounded-[8px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-bold"
+            className="p-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-sm font-bold"
           />
         </div>
         <label className="flex items-center gap-2 cursor-pointer mt-4">
@@ -91,7 +91,7 @@ export default function TaxFreeLimitChecker({ staffs, selectedCo, user }: Props)
             type="checkbox"
             checked={onlyExceeded}
             onChange={e => setOnlyExceeded(e.target.checked)}
-            className="accent-[var(--toss-blue)]"
+            className="accent-[var(--accent)]"
           />
           <span className="text-xs font-bold text-[var(--toss-gray-4)]">초과자만 보기</span>
         </label>
@@ -100,7 +100,7 @@ export default function TaxFreeLimitChecker({ staffs, selectedCo, user }: Props)
       {/* 비과세 한도 안내 */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
         {Object.entries(TAX_FREE_LIMITS).map(([key, { label, limit }]) => (
-          <div key={key} className="p-2.5 bg-[var(--toss-gray-1)] rounded-[8px]">
+          <div key={key} className="p-2.5 bg-[var(--muted)] rounded-[var(--radius-md)]">
             <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">{label}</p>
             <p className="text-xs font-bold text-[var(--foreground)]">월 {fmt(limit)}원</p>
           </div>
@@ -108,31 +108,31 @@ export default function TaxFreeLimitChecker({ staffs, selectedCo, user }: Props)
       </div>
 
       {loading ? (
-        <div className="text-center py-8 text-sm text-[var(--toss-gray-3)]">로딩 중...</div>
+        <div className="text-center py-5 text-sm text-[var(--toss-gray-3)]">로딩 중...</div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-xs border-collapse">
             <thead>
-              <tr className="bg-[var(--toss-gray-1)]">
-                <th className="p-2 text-left font-bold text-[var(--toss-gray-4)] border border-[var(--toss-border)]">직원명</th>
+              <tr className="bg-[var(--muted)]">
+                <th className="p-2 text-left font-bold text-[var(--toss-gray-4)] border border-[var(--border)]">직원명</th>
                 {Object.values(TAX_FREE_LIMITS).map(({ label }) => (
-                  <th key={label} className="p-2 text-center font-bold text-[var(--toss-gray-4)] border border-[var(--toss-border)] whitespace-nowrap">{label}</th>
+                  <th key={label} className="p-2 text-center font-bold text-[var(--toss-gray-4)] border border-[var(--border)] whitespace-nowrap">{label}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-6 text-center text-[var(--toss-gray-3)]">데이터가 없습니다.</td>
+                  <td colSpan={7} className="p-4 text-center text-[var(--toss-gray-3)]">데이터가 없습니다.</td>
                 </tr>
               ) : displayRows.map(({ staff, amounts }) => (
-                <tr key={staff.id} className="hover:bg-[var(--toss-gray-1)]/50">
-                  <td className="p-2 font-bold border border-[var(--toss-border)]">{staff.name}</td>
+                <tr key={staff.id} className="hover:bg-[var(--muted)]/50">
+                  <td className="p-2 font-bold border border-[var(--border)]">{staff.name}</td>
                   {Object.entries(TAX_FREE_LIMITS).map(([key, { limit }]) => {
                     const val = (amounts as any)[key] || 0;
                     const over = val > limit;
                     return (
-                      <td key={key} className={`p-2 text-right border border-[var(--toss-border)] ${over ? 'bg-red-50 text-red-600 font-bold' : 'text-[var(--foreground)]'}`}>
+                      <td key={key} className={`p-2 text-right border border-[var(--border)] ${over ? 'bg-red-50 text-red-600 font-bold' : 'text-[var(--foreground)]'}`}>
                         <div>{fmt(val)}</div>
                         {over && <div className="text-[9px] text-red-500">초과 {fmt(val - limit)}원</div>}
                       </td>

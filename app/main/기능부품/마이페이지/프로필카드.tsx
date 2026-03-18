@@ -465,14 +465,14 @@ export default function MyProfileCard({
     }
   };
 
-  if (!user) return <div className="p-10">로딩 중...</div>;
+  if (!user) return <div className="p-5">로딩 중...</div>;
 
   const actionButtons = (
     <>
       <button
         type="button"
         onClick={() => { if (showSecret) applyShowSecret(false); else verifyPasswordAndRun(() => applyShowSecret(true)); }}
-        className="rounded-full border border-transparent bg-[var(--toss-gray-1)] px-3 py-1.5 text-[11px] font-bold text-[var(--toss-gray-3)] transition-all hover:border-[var(--toss-blue-light)] hover:text-[var(--toss-blue)]"
+        className="rounded-[var(--radius-md)] border border-transparent bg-[var(--muted)] px-3 py-1.5 text-[11px] font-bold text-[var(--toss-gray-3)] transition-all hover:border-[var(--toss-blue-light)] hover:text-[var(--accent)]"
       >
         {showSecret ? '민감 정보 숨기기' : '보안 정보 보기'}
       </button>
@@ -480,9 +480,9 @@ export default function MyProfileCard({
         type="button"
         onClick={() => { if (isEditing) applyIsEditing(false); else verifyPasswordAndRun(() => applyIsEditing(true)); }}
         data-testid="mypage-profile-edit-toggle"
-        className={`rounded-full border px-3 py-1.5 text-[11px] font-bold transition-all ${isEditing
+        className={`rounded-[var(--radius-md)] border px-3 py-1.5 text-[11px] font-bold transition-all ${isEditing
           ? 'bg-red-50 text-red-500 border-red-100 hover:bg-red-100'
-          : 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)] border-[var(--toss-blue-light)] hover:bg-[var(--toss-blue-light)]'
+          : 'bg-[var(--toss-blue-light)] text-[var(--accent)] border-[var(--toss-blue-light)] hover:bg-[var(--toss-blue-light)]'
           }`}
       >
         {isEditing ? '수정 취소' : '내 정보 수정'}
@@ -491,13 +491,13 @@ export default function MyProfileCard({
   );
 
   return (
-    <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-[16px] p-3 sm:p-4 lg:p-5 flex flex-col">
+    <div className="bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-[var(--radius-lg)] p-3 sm:p-4 lg:p-5 flex flex-col">
 
       {/* 프로필 헤더 */}
       {!hideHeader ? (
-        <div className="flex flex-row items-center sm:items-start gap-3 sm:gap-4 pb-3 sm:pb-4 border-b border-[var(--toss-border)] shrink-0">
+        <div className="flex flex-row items-center sm:items-start gap-3 sm:gap-4 pb-3 sm:pb-4 border-b border-[var(--border)] shrink-0">
           <div className="relative group shrink-0">
-            <div className="w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-full bg-[var(--toss-gray-1)] flex items-center justify-center overflow-hidden border-2 sm:border-4 border-[var(--toss-card)] shadow-sm">
+            <div className="w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-full bg-[var(--muted)] flex items-center justify-center overflow-hidden border-2 sm:border-4 border-[var(--card)] shadow-sm">
               {avatarUrl ? (
                 <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
               ) : (
@@ -506,7 +506,7 @@ export default function MyProfileCard({
             </div>
             {user?.id ? (
               <>
-                <label className="absolute bottom-1 right-1 w-10 h-10 bg-[var(--toss-blue)] text-white rounded-full flex items-center justify-center cursor-pointer hover:opacity-90 transition-all shadow-sm z-10" htmlFor="profiles-upload">
+                <label className="absolute bottom-1 right-1 w-10 h-10 bg-[var(--accent)] text-white rounded-full flex items-center justify-center cursor-pointer hover:opacity-90 transition-all shadow-sm z-10" htmlFor="profiles-upload">
                   {uploading ? '⏳' : '📷'}
                 </label>
                 <input
@@ -529,7 +529,7 @@ export default function MyProfileCard({
                 <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-[var(--foreground)] tracking-tight">
                   {user.name} {user.position}
                 </h2>
-                <p className="text-sm sm:text-base lg:text-lg font-bold text-[var(--toss-blue)] underline decoration-[var(--toss-blue-light)] underline-offset-4">
+                <p className="text-sm sm:text-base lg:text-lg font-bold text-[var(--accent)] underline decoration-[var(--toss-blue-light)] underline-offset-4">
                   {user.department} 소속
                 </p>
               </div>
@@ -552,7 +552,7 @@ export default function MyProfileCard({
             disabled={uploading}
           />
           {!hideActionBar ? (
-            <div className="mb-3 flex flex-wrap items-center justify-end gap-2 border-b border-[var(--toss-border)] pb-3">
+            <div className="mb-3 flex flex-wrap items-center justify-end gap-2 border-b border-[var(--border)] pb-3">
               {actionButtons}
             </div>
           ) : null}
@@ -564,7 +564,7 @@ export default function MyProfileCard({
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-4 lg:gap-5">
           {/* 인사 관리 정보 */}
           <div className="space-y-3">
-            <h3 className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest border-l-4 border-[var(--toss-blue)] pl-3 mb-1">
+            <h3 className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest border-l-4 border-[var(--accent)] pl-3 mb-1">
               인사 관리 정보
             </h3>
             <div className="grid grid-cols-1 min-[520px]:grid-cols-2 xl:grid-cols-3 gap-x-4 gap-y-3">
@@ -609,7 +609,7 @@ export default function MyProfileCard({
                           setEditForm((f) => ({ ...f, bank_name: e.target.value }))
                         }
                         placeholder="은행명"
-                        className="w-full px-3 py-2.5 rounded-[16px] border border-[var(--toss-border)] text-[13px] font-semibold text-[var(--foreground)] bg-[var(--input-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)]"
+                        className="w-full px-3 py-2.5 rounded-[var(--radius-lg)] border border-[var(--border)] text-[13px] font-semibold text-[var(--foreground)] bg-[var(--input-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)]"
                       />
                       <input
                         type="text"
@@ -619,7 +619,7 @@ export default function MyProfileCard({
                           setEditForm((f) => ({ ...f, bank_account: e.target.value }))
                         }
                         placeholder="계좌번호"
-                        className="w-full px-3 py-2.5 rounded-[16px] border border-[var(--toss-border)] text-[13px] font-semibold text-[var(--foreground)] bg-[var(--input-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)]"
+                        className="w-full px-3 py-2.5 rounded-[var(--radius-lg)] border border-[var(--border)] text-[13px] font-semibold text-[var(--foreground)] bg-[var(--input-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)]"
                       />
                     </div>
                   </div>
@@ -677,13 +677,13 @@ export default function MyProfileCard({
       </div>
 
       {/* 로그아웃 버튼 */}
-      <div className="mt-3 flex shrink-0 flex-col-reverse gap-2.5 border-t border-[var(--toss-border)] pt-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mt-3 flex shrink-0 flex-col-reverse gap-2.5 border-t border-[var(--border)] pt-3 sm:flex-row sm:items-center sm:justify-between">
         {isEditing && (
           <button
             type="button"
             onClick={handleSaveProfile}
             data-testid="mypage-profile-save"
-            className="w-full sm:w-auto px-5 py-2.5 rounded-[16px] bg-emerald-500 text-white text-[11px] sm:text-[12px] font-semibold hover:bg-emerald-600 transition-all shadow-sm flex items-center justify-center gap-2"
+            className="w-full sm:w-auto px-5 py-2.5 rounded-[var(--radius-lg)] bg-emerald-500 text-white text-[11px] sm:text-[12px] font-semibold hover:bg-emerald-600 transition-all shadow-sm flex items-center justify-center gap-2"
           >
             <span className="text-sm">💾</span>
             <span className="tracking-tight">내 정보 저장</span>
@@ -691,7 +691,7 @@ export default function MyProfileCard({
         )}
         <button
           onClick={handleLogout}
-          className="w-full sm:w-auto py-2.5 rounded-[16px] bg-[var(--toss-blue)] text-white text-[11px] sm:text-[12px] font-semibold hover:bg-[var(--toss-blue)] transition-all shadow-sm flex items-center justify-center gap-2"
+          className="w-full sm:w-auto py-2.5 rounded-[var(--radius-lg)] bg-[var(--accent)] text-white text-[11px] sm:text-[12px] font-semibold hover:bg-[var(--accent)] transition-all shadow-sm flex items-center justify-center gap-2"
         >
           <span className="text-sm">🚪</span>
           <span className="tracking-tight">시스템 안전 로그아웃</span>
@@ -722,7 +722,7 @@ function EditableItem({ label, value, onChange, placeholder, testId }: any) {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full px-3 py-2.5 rounded-[16px] border border-[var(--toss-border)] text-[14px] font-semibold text-[var(--foreground)] bg-[var(--input-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)]"
+        className="w-full px-3 py-2.5 rounded-[var(--radius-lg)] border border-[var(--border)] text-[14px] font-semibold text-[var(--foreground)] bg-[var(--input-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)]"
       />
     </div>
   );
@@ -801,14 +801,14 @@ function LeaveAndCommuteSummary({ user, onOpenApproval }: any) {
 
   if (!summary) {
     return (
-      <div className="bg-[var(--toss-gray-1)] border border-[var(--toss-border)] rounded-[16px] p-3.5 sm:p-4 text-[12px] text-[var(--toss-gray-3)] font-semibold">
+      <div className="bg-[var(--muted)] border border-[var(--border)] rounded-[var(--radius-lg)] p-3.5 sm:p-4 text-[12px] text-[var(--toss-gray-3)] font-semibold">
         근태·연차 정보를 불러오는 중입니다...
       </div>
     );
   }
 
   return (
-    <div className="bg-[var(--toss-gray-1)] border border-[var(--toss-border)] rounded-[16px] p-3.5 sm:p-4 space-y-3 text-[12px]">
+    <div className="bg-[var(--muted)] border border-[var(--border)] rounded-[var(--radius-lg)] p-3.5 sm:p-4 space-y-3 text-[12px]">
       <div className="flex justify-between items-end">
         <div>
           <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1.5">
@@ -823,13 +823,13 @@ function LeaveAndCommuteSummary({ user, onOpenApproval }: any) {
         </div>
         <button
           onClick={() => onOpenApproval?.({ type: '휴가신청' })}
-          className="px-3 py-1.5 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-[8px] text-[11px] font-bold hover:bg-emerald-100 transition-colors"
+          className="px-3 py-1.5 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-[var(--radius-md)] text-[11px] font-bold hover:bg-emerald-100 transition-colors"
         >
           🏖️ 연차 신청
         </button>
       </div>
 
-      <div className="border-t border-[var(--toss-border)] pt-3 space-y-1.5">
+      <div className="border-t border-[var(--border)] pt-3 space-y-1.5">
         <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">
           최근 지각
         </p>
@@ -846,7 +846,7 @@ function LeaveAndCommuteSummary({ user, onOpenApproval }: any) {
         )}
       </div>
 
-      <div className="border-t border-[var(--toss-border)] pt-3 space-y-1.5">
+      <div className="border-t border-[var(--border)] pt-3 space-y-1.5">
         <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">
           최근 추가근무
         </p>

@@ -12,8 +12,8 @@ export default function EducationStatus({ selectedCo, summary, onOpenRoster }: E
   const focusItems = summary.focusItems.length > 0 ? summary.focusItems : [{ name: '집중 관리 항목 없음', count: 0 }];
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div className="bg-white border border-[var(--toss-border)] p-6 shadow-sm flex flex-col justify-between">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="bg-[var(--card)] border border-[var(--border)] p-4 shadow-sm flex flex-col justify-between">
         <div>
           <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase mb-1 tracking-widest">평균 이수율</p>
           <h4 className="text-2xl font-semibold text-[var(--foreground)]">{selectedCo}</h4>
@@ -22,10 +22,10 @@ export default function EducationStatus({ selectedCo, summary, onOpenRoster }: E
           </p>
         </div>
         <div className="mt-4 flex items-end gap-2">
-          <span className="text-4xl font-semibold text-[var(--toss-blue)]">{summary.completionRate}%</span>
-          <div className="flex-1 h-2 bg-[var(--toss-gray-1)] mb-2">
+          <span className="text-4xl font-semibold text-[var(--accent)]">{summary.completionRate}%</span>
+          <div className="flex-1 h-2 bg-[var(--muted)] mb-2">
             <div
-              className="h-full bg-[var(--toss-blue)] transition-all duration-1000"
+              className="h-full bg-[var(--accent)] transition-all duration-1000"
               style={{ width: `${summary.completionRate}%` }}
             />
           </div>
@@ -35,7 +35,7 @@ export default function EducationStatus({ selectedCo, summary, onOpenRoster }: E
         </p>
       </div>
 
-      <div className={`bg-white border p-6 shadow-sm transition-all ${summary.urgentStaffCount > 0 ? 'border-red-200 bg-red-50/30' : 'border-[var(--toss-border)]'}`}>
+      <div className={`bg-[var(--card)] border p-4 shadow-sm transition-all ${summary.urgentStaffCount > 0 ? 'border-red-200 bg-red-50/30' : 'border-[var(--border)]'}`}>
         <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase mb-1 tracking-widest">미이수 인원</p>
         <div className="flex items-center justify-between mt-4 gap-4">
           <div>
@@ -52,7 +52,7 @@ export default function EducationStatus({ selectedCo, summary, onOpenRoster }: E
           <button
             type="button"
             onClick={onOpenRoster}
-            className="text-[11px] font-semibold text-[var(--toss-blue)] border border-blue-100 px-3 py-1.5 bg-white hover:bg-blue-50 transition-all shadow-sm"
+            className="text-[11px] font-semibold text-[var(--accent)] border border-blue-100 px-3 py-1.5 bg-[var(--card)] hover:bg-blue-50 transition-all shadow-sm"
           >
             전체 명단 확인
           </button>
@@ -62,11 +62,11 @@ export default function EducationStatus({ selectedCo, summary, onOpenRoster }: E
         </p>
       </div>
 
-      <div className="bg-[#232933] p-6 shadow-xl flex flex-col">
+      <div className="bg-[#232933] p-4 shadow-sm flex flex-col">
         <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase mb-4 tracking-widest">집중 관리 교육</p>
         <div className="flex flex-wrap gap-2">
           {focusItems.map((item) => (
-            <span key={item.name} className="px-2 py-1 bg-white/10 text-white text-[11px] font-semibold border border-white/10">
+            <span key={item.name} className="px-2 py-1 bg-[var(--card)]/10 text-white text-[11px] font-semibold border border-white/10">
               {item.count > 0 ? `${item.name} ${item.count}명` : item.name}
             </span>
           ))}

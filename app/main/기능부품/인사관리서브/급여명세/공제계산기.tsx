@@ -17,7 +17,7 @@ export default function DeductionCalculator({ grossSalary: initialGross }: { gro
   ];
 
   return (
-    <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] p-4 rounded-[12px] shadow-sm">
+    <div className="bg-[var(--card)] border border-[var(--border)] p-4 rounded-[var(--radius-md)] shadow-sm">
       <h2 className="text-sm font-semibold text-[var(--foreground)] mb-3 flex items-center gap-2">
         <span className="w-1 h-4 bg-red-500 rounded" /> 법정 공제 계산기 (2026)
       </h2>
@@ -28,12 +28,12 @@ export default function DeductionCalculator({ grossSalary: initialGross }: { gro
           value={inputSalary}
           onChange={(e) => setInputSalary(e.target.value)}
           placeholder="총급여 입력"
-          className="w-full h-9 px-3 border border-[var(--toss-border)] rounded-md text-sm font-medium"
+          className="w-full h-9 px-3 border border-[var(--border)] rounded-md text-sm font-medium"
         />
       </div>
       <div className="grid grid-cols-2 gap-2">
         {taxRates.map((t, i) => (
-          <div key={i} className="p-3 border border-[var(--toss-border)] bg-[var(--page-bg)] rounded-[12px]">
+          <div key={i} className="p-3 border border-[var(--border)] bg-[var(--page-bg)] rounded-[var(--radius-md)]">
             <p className="text-xs font-medium text-[var(--toss-gray-3)]">{t.name}</p>
             <p className="text-sm font-semibold text-[var(--foreground)]">
               {result && t.key in result
@@ -44,9 +44,9 @@ export default function DeductionCalculator({ grossSalary: initialGross }: { gro
         ))}
       </div>
       {result && (
-        <div className="mt-3 p-3 bg-[var(--tab-bg)] border border-[var(--toss-border)] rounded-[12px]">
+        <div className="mt-3 p-3 bg-[var(--tab-bg)] border border-[var(--border)] rounded-[var(--radius-md)]">
           <p className="text-xs font-medium text-[var(--toss-gray-3)]">실급여</p>
-          <p className="text-base font-bold text-[var(--toss-blue)]">{result.netSalary.toLocaleString()}원</p>
+          <p className="text-base font-bold text-[var(--accent)]">{result.netSalary.toLocaleString()}원</p>
         </div>
       )}
     </div>

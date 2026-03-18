@@ -129,7 +129,7 @@ export default function IntegratedReport({ staffs = [] }: { staffs: any[] }) {
   ];
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300" data-testid="admin-analysis-report">
+    <div className="space-y-4 animate-in fade-in duration-300" data-testid="admin-analysis-report">
       {/* 헤더 */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
@@ -138,13 +138,13 @@ export default function IntegratedReport({ staffs = [] }: { staffs: any[] }) {
         <div className="flex items-center gap-2 print:hidden">
           <button
             onClick={handleExcelDownload}
-            className="px-4 py-2 rounded-[10px] bg-[#217346] text-white text-sm font-bold hover:opacity-90 transition-opacity flex items-center gap-1.5"
+            className="px-4 py-2 rounded-[var(--radius-md)] bg-[#217346] text-white text-sm font-bold hover:opacity-90 transition-opacity flex items-center gap-1.5"
           >
             <span>Excel 다운로드</span>
           </button>
           <button
             onClick={handlePdfDownload}
-            className="px-4 py-2 rounded-[10px] bg-[var(--toss-gray-2,#6B7684)] text-white text-sm font-bold hover:opacity-90 transition-opacity"
+            className="px-4 py-2 rounded-[var(--radius-md)] bg-[var(--toss-gray-2,#6B7684)] text-white text-sm font-bold hover:opacity-90 transition-opacity"
           >
             PDF 다운로드
           </button>
@@ -152,13 +152,13 @@ export default function IntegratedReport({ staffs = [] }: { staffs: any[] }) {
       </div>
 
       {/* 탭 */}
-      <div className="flex gap-1 bg-[var(--toss-gray-1)] p-1 rounded-[12px] w-fit print:hidden">
+      <div className="flex gap-1 bg-[var(--muted)] p-1 rounded-[var(--radius-md)] w-fit print:hidden">
         {tabs.map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2 rounded-[10px] text-sm font-bold transition-all ${activeTab === tab.id
-              ? 'bg-white text-[var(--toss-blue)] shadow-sm'
+            className={`px-4 py-2 rounded-[var(--radius-md)] text-sm font-bold transition-all ${activeTab === tab.id
+              ? 'bg-[var(--card)] text-[var(--accent)] shadow-sm'
               : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'
               }`}
           >
@@ -173,12 +173,12 @@ export default function IntegratedReport({ staffs = [] }: { staffs: any[] }) {
           {/* 요약 카드 */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              { label: '전체 인원', value: `${staffs.length}명`, color: 'text-[var(--toss-blue)]' },
+              { label: '전체 인원', value: `${staffs.length}명`, color: 'text-[var(--accent)]' },
               { label: '정규직', value: `${totalRegular}명`, color: 'text-[#34C759]' },
               { label: '계약직', value: `${totalContract}명`, color: 'text-[#FF9500]' },
               { label: '부서 수', value: `${hrChartData.length}개`, color: 'text-[var(--foreground)]' },
             ].map(card => (
-              <div key={card.label} className="bg-[var(--toss-card)] rounded-[16px] p-4 border border-[var(--toss-border)] shadow-sm">
+              <div key={card.label} className="bg-[var(--card)] rounded-[var(--radius-lg)] p-4 border border-[var(--border)] shadow-sm">
                 <div className="text-xs text-[var(--toss-gray-3)] font-bold mb-1">{card.label}</div>
                 <div className={`text-xl font-bold ${card.color}`}>{card.value}</div>
               </div>
@@ -188,19 +188,19 @@ export default function IntegratedReport({ staffs = [] }: { staffs: any[] }) {
           {/* 차트 영역 */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* 부서별 인원 바 차트 */}
-            <div className="bg-[var(--toss-card)] rounded-[16px] p-5 border border-[var(--toss-border)] shadow-sm">
-              <h3 className="text-sm font-bold text-[var(--foreground)] mb-4">부서별 인원</h3>
+            <div className="bg-[var(--card)] rounded-[var(--radius-lg)] p-4 border border-[var(--border)] shadow-sm">
+              <h3 className="text-sm font-bold text-[var(--foreground)] mb-3">부서별 인원</h3>
               {hrChartData.length === 0 ? (
                 <div className="py-10 text-center text-sm text-[var(--toss-gray-3)]">데이터가 없습니다.</div>
               ) : (
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={hrChartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--toss-border)" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                     <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--toss-gray-3)' }} />
                     <YAxis tick={{ fontSize: 11, fill: 'var(--toss-gray-3)' }} />
                     <Tooltip
                       formatter={(value: any) => [`${value || 0}명`]}
-                      contentStyle={{ borderRadius: '10px', border: '1px solid var(--toss-border)', background: 'var(--toss-card)' }}
+                      contentStyle={{ borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--card)' }}
                     />
                     <Bar dataKey="regular" name="정규직" stackId="a" fill="#4F8EF7" radius={[0, 0, 0, 0]} />
                     <Bar dataKey="contract" name="계약직" stackId="a" fill="#FF9500" radius={[4, 4, 0, 0]} />
@@ -210,8 +210,8 @@ export default function IntegratedReport({ staffs = [] }: { staffs: any[] }) {
             </div>
 
             {/* 고용형태 파이 차트 */}
-            <div className="bg-[var(--toss-card)] rounded-[16px] p-5 border border-[var(--toss-border)] shadow-sm">
-              <h3 className="text-sm font-bold text-[var(--foreground)] mb-4">고용형태 비율</h3>
+            <div className="bg-[var(--card)] rounded-[var(--radius-lg)] p-4 border border-[var(--border)] shadow-sm">
+              <h3 className="text-sm font-bold text-[var(--foreground)] mb-3">고용형태 비율</h3>
               {employmentPieData.length === 0 ? (
                 <div className="py-10 text-center text-sm text-[var(--toss-gray-3)]">데이터가 없습니다.</div>
               ) : (
@@ -234,7 +234,7 @@ export default function IntegratedReport({ staffs = [] }: { staffs: any[] }) {
                     </Pie>
                     <Tooltip
                       formatter={(value: any) => [`${value || 0}명`]}
-                      contentStyle={{ borderRadius: '10px', border: '1px solid var(--toss-border)', background: 'var(--toss-card)' }}
+                      contentStyle={{ borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--card)' }}
                     />
                     <Legend />
                   </PieChart>
@@ -244,29 +244,29 @@ export default function IntegratedReport({ staffs = [] }: { staffs: any[] }) {
           </div>
 
           {/* 부서별 상세 테이블 */}
-          <div className="bg-[var(--toss-card)] rounded-[16px] border border-[var(--toss-border)] shadow-sm overflow-hidden">
-            <div className="px-5 py-3 border-b border-[var(--toss-border)]">
+          <div className="bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm overflow-hidden">
+            <div className="px-5 py-3 border-b border-[var(--border)]">
               <span className="text-sm font-bold text-[var(--foreground)]">부서별 상세</span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-[var(--toss-gray-1)]">
-                    <th className="text-left px-5 py-2.5 text-xs font-bold text-[var(--toss-gray-3)]">부서</th>
-                    <th className="text-right px-5 py-2.5 text-xs font-bold text-[var(--toss-gray-3)]">총인원</th>
-                    <th className="text-right px-5 py-2.5 text-xs font-bold text-[var(--toss-gray-3)]">정규직</th>
-                    <th className="text-right px-5 py-2.5 text-xs font-bold text-[var(--toss-gray-3)]">계약직</th>
-                    <th className="text-right px-5 py-2.5 text-xs font-bold text-[var(--toss-gray-3)]">비율</th>
+                  <tr className="bg-[var(--muted)]">
+                    <th className="text-left px-4 py-2 text-xs font-bold text-[var(--toss-gray-3)]">부서</th>
+                    <th className="text-right px-4 py-2 text-xs font-bold text-[var(--toss-gray-3)]">총인원</th>
+                    <th className="text-right px-4 py-2 text-xs font-bold text-[var(--toss-gray-3)]">정규직</th>
+                    <th className="text-right px-4 py-2 text-xs font-bold text-[var(--toss-gray-3)]">계약직</th>
+                    <th className="text-right px-4 py-2 text-xs font-bold text-[var(--toss-gray-3)]">비율</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[var(--toss-border)]">
+                <tbody className="divide-y divide-[var(--border)]">
                   {hrChartData.map(row => (
-                    <tr key={row.name} className="hover:bg-[var(--toss-gray-1)]/50 transition-colors">
-                      <td className="px-5 py-3 font-bold text-[var(--foreground)]">{row.name}</td>
-                      <td className="px-5 py-3 text-right font-bold text-[var(--toss-blue)]">{row.value}</td>
-                      <td className="px-5 py-3 text-right text-[var(--foreground)]">{row.regular}</td>
-                      <td className="px-5 py-3 text-right text-[var(--foreground)]">{row.contract}</td>
-                      <td className="px-5 py-3 text-right text-[var(--toss-gray-3)]">
+                    <tr key={row.name} className="hover:bg-[var(--muted)]/50 transition-colors">
+                      <td className="px-4 py-2 font-bold text-[var(--foreground)]">{row.name}</td>
+                      <td className="px-4 py-2 text-right font-bold text-[var(--accent)]">{row.value}</td>
+                      <td className="px-4 py-2 text-right text-[var(--foreground)]">{row.regular}</td>
+                      <td className="px-4 py-2 text-right text-[var(--foreground)]">{row.contract}</td>
+                      <td className="px-4 py-2 text-right text-[var(--toss-gray-3)]">
                         {row.value > 0 ? `정규 ${(row.regular / row.value * 100).toFixed(0)}%` : '-'}
                       </td>
                     </tr>
@@ -284,11 +284,11 @@ export default function IntegratedReport({ staffs = [] }: { staffs: any[] }) {
           {/* 요약 카드 */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {[
-              { label: '전체 인건비 합계', value: `${totalSalary.toLocaleString()}원`, color: 'text-[var(--toss-blue)]' },
+              { label: '전체 인건비 합계', value: `${totalSalary.toLocaleString()}원`, color: 'text-[var(--accent)]' },
               { label: '1인 평균 급여', value: staffs.length > 0 ? `${Math.round(totalSalary / staffs.length).toLocaleString()}원` : '-', color: 'text-[var(--foreground)]' },
               { label: '급여 데이터 인원', value: `${staffs.filter((s: any) => s.base_salary > 0).length}명`, color: 'text-[#34C759]' },
             ].map(card => (
-              <div key={card.label} className="bg-[var(--toss-card)] rounded-[16px] p-4 border border-[var(--toss-border)] shadow-sm">
+              <div key={card.label} className="bg-[var(--card)] rounded-[var(--radius-lg)] p-4 border border-[var(--border)] shadow-sm">
                 <div className="text-xs text-[var(--toss-gray-3)] font-bold mb-1">{card.label}</div>
                 <div className={`text-xl font-bold ${card.color}`}>{card.value}</div>
               </div>
@@ -296,19 +296,19 @@ export default function IntegratedReport({ staffs = [] }: { staffs: any[] }) {
           </div>
 
           {/* 부서별 인건비 바 차트 */}
-          <div className="bg-[var(--toss-card)] rounded-[16px] p-5 border border-[var(--toss-border)] shadow-sm">
-            <h3 className="text-sm font-bold text-[var(--foreground)] mb-4">부서별 인건비</h3>
+          <div className="bg-[var(--card)] rounded-[var(--radius-lg)] p-4 border border-[var(--border)] shadow-sm">
+            <h3 className="text-sm font-bold text-[var(--foreground)] mb-3">부서별 인건비</h3>
             {salaryChartData.length === 0 ? (
               <div className="py-10 text-center text-sm text-[var(--toss-gray-3)]">데이터가 없습니다.</div>
             ) : (
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={salaryChartData} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--toss-border)" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis dataKey="dept" tick={{ fontSize: 12, fill: 'var(--toss-gray-3)' }} />
                   <YAxis tickFormatter={(v: number) => `${(v / 10000).toFixed(0)}만`} tick={{ fontSize: 11, fill: 'var(--toss-gray-3)' }} />
                   <Tooltip
                     formatter={(value: any) => [`${(value || 0).toLocaleString()}원`, '인건비']}
-                    contentStyle={{ borderRadius: '10px', border: '1px solid var(--toss-border)', background: 'var(--toss-card)' }}
+                    contentStyle={{ borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--card)' }}
                   />
                   <Bar dataKey="total" name="인건비" fill="#4F8EF7" radius={[6, 6, 0, 0]} />
                 </BarChart>
@@ -317,27 +317,27 @@ export default function IntegratedReport({ staffs = [] }: { staffs: any[] }) {
           </div>
 
           {/* 부서별 급여 테이블 */}
-          <div className="bg-[var(--toss-card)] rounded-[16px] border border-[var(--toss-border)] shadow-sm overflow-hidden">
-            <div className="px-5 py-3 border-b border-[var(--toss-border)]">
+          <div className="bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm overflow-hidden">
+            <div className="px-5 py-3 border-b border-[var(--border)]">
               <span className="text-sm font-bold text-[var(--foreground)]">부서별 급여 상세</span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-[var(--toss-gray-1)]">
-                    <th className="text-left px-5 py-2.5 text-xs font-bold text-[var(--toss-gray-3)]">부서</th>
-                    <th className="text-right px-5 py-2.5 text-xs font-bold text-[var(--toss-gray-3)]">인건비 합계</th>
-                    <th className="text-right px-5 py-2.5 text-xs font-bold text-[var(--toss-gray-3)]">비율</th>
+                  <tr className="bg-[var(--muted)]">
+                    <th className="text-left px-4 py-2 text-xs font-bold text-[var(--toss-gray-3)]">부서</th>
+                    <th className="text-right px-4 py-2 text-xs font-bold text-[var(--toss-gray-3)]">인건비 합계</th>
+                    <th className="text-right px-4 py-2 text-xs font-bold text-[var(--toss-gray-3)]">비율</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[var(--toss-border)]">
+                <tbody className="divide-y divide-[var(--border)]">
                   {salaryChartData
                     .sort((a, b) => b.total - a.total)
                     .map(row => (
-                      <tr key={row.dept} className="hover:bg-[var(--toss-gray-1)]/50 transition-colors">
-                        <td className="px-5 py-3 font-bold text-[var(--foreground)]">{row.dept}</td>
-                        <td className="px-5 py-3 text-right font-bold text-[var(--toss-blue)]">{row.total.toLocaleString()}원</td>
-                        <td className="px-5 py-3 text-right text-[var(--toss-gray-3)]">
+                      <tr key={row.dept} className="hover:bg-[var(--muted)]/50 transition-colors">
+                        <td className="px-4 py-2 font-bold text-[var(--foreground)]">{row.dept}</td>
+                        <td className="px-4 py-2 text-right font-bold text-[var(--accent)]">{row.total.toLocaleString()}원</td>
+                        <td className="px-4 py-2 text-right text-[var(--toss-gray-3)]">
                           {totalSalary > 0 ? `${(row.total / totalSalary * 100).toFixed(1)}%` : '-'}
                         </td>
                       </tr>
@@ -359,7 +359,7 @@ export default function IntegratedReport({ staffs = [] }: { staffs: any[] }) {
               {/* 요약 카드 */}
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {[
-                  { label: '전체 품목 수', value: `${inventory.length}개`, color: 'text-[var(--toss-blue)]' },
+                  { label: '전체 품목 수', value: `${inventory.length}개`, color: 'text-[var(--accent)]' },
                   { label: '카테고리 수', value: `${inventoryChartData.length}개`, color: 'text-[var(--foreground)]' },
                   {
                     label: '총 재고 금액',
@@ -367,7 +367,7 @@ export default function IntegratedReport({ staffs = [] }: { staffs: any[] }) {
                     color: 'text-[#34C759]'
                   },
                 ].map(card => (
-                  <div key={card.label} className="bg-[var(--toss-card)] rounded-[16px] p-4 border border-[var(--toss-border)] shadow-sm">
+                  <div key={card.label} className="bg-[var(--card)] rounded-[var(--radius-lg)] p-4 border border-[var(--border)] shadow-sm">
                     <div className="text-xs text-[var(--toss-gray-3)] font-bold mb-1">{card.label}</div>
                     <div className={`text-xl font-bold ${card.color}`}>{card.value}</div>
                   </div>
@@ -376,8 +376,8 @@ export default function IntegratedReport({ staffs = [] }: { staffs: any[] }) {
 
               {/* 카테고리별 파이 차트 */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-[var(--toss-card)] rounded-[16px] p-5 border border-[var(--toss-border)] shadow-sm">
-                  <h3 className="text-sm font-bold text-[var(--foreground)] mb-4">카테고리별 품목 수</h3>
+                <div className="bg-[var(--card)] rounded-[var(--radius-lg)] p-4 border border-[var(--border)] shadow-sm">
+                  <h3 className="text-sm font-bold text-[var(--foreground)] mb-3">카테고리별 품목 수</h3>
                   {inventoryChartData.length === 0 ? (
                     <div className="py-10 text-center text-sm text-[var(--toss-gray-3)]">데이터가 없습니다.</div>
                   ) : (
@@ -398,7 +398,7 @@ export default function IntegratedReport({ staffs = [] }: { staffs: any[] }) {
                         </Pie>
                         <Tooltip
                           formatter={(value: any) => [`${value || 0}개`]}
-                          contentStyle={{ borderRadius: '10px', border: '1px solid var(--toss-border)', background: 'var(--toss-card)' }}
+                          contentStyle={{ borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--card)' }}
                         />
                         <Legend />
                       </PieChart>
@@ -407,19 +407,19 @@ export default function IntegratedReport({ staffs = [] }: { staffs: any[] }) {
                 </div>
 
                 {/* 카테고리별 금액 바 차트 */}
-                <div className="bg-[var(--toss-card)] rounded-[16px] p-5 border border-[var(--toss-border)] shadow-sm">
-                  <h3 className="text-sm font-bold text-[var(--foreground)] mb-4">카테고리별 재고 금액</h3>
+                <div className="bg-[var(--card)] rounded-[var(--radius-lg)] p-4 border border-[var(--border)] shadow-sm">
+                  <h3 className="text-sm font-bold text-[var(--foreground)] mb-3">카테고리별 재고 금액</h3>
                   {inventoryChartData.length === 0 ? (
                     <div className="py-10 text-center text-sm text-[var(--toss-gray-3)]">데이터가 없습니다.</div>
                   ) : (
                     <ResponsiveContainer width="100%" height={220}>
                       <BarChart data={inventoryChartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--toss-border)" />
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                         <XAxis dataKey="category" tick={{ fontSize: 11, fill: 'var(--toss-gray-3)' }} />
                         <YAxis tickFormatter={(v: number) => `${(v / 10000).toFixed(0)}만`} tick={{ fontSize: 11, fill: 'var(--toss-gray-3)' }} />
                         <Tooltip
                           formatter={(value: any) => [`${(value || 0).toLocaleString()}원`, '재고 금액']}
-                          contentStyle={{ borderRadius: '10px', border: '1px solid var(--toss-border)', background: 'var(--toss-card)' }}
+                          contentStyle={{ borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--card)' }}
                         />
                         <Bar dataKey="totalAmount" name="재고 금액" fill="#34C759" radius={[6, 6, 0, 0]} />
                       </BarChart>
@@ -429,30 +429,30 @@ export default function IntegratedReport({ staffs = [] }: { staffs: any[] }) {
               </div>
 
               {/* 카테고리별 테이블 */}
-              <div className="bg-[var(--toss-card)] rounded-[16px] border border-[var(--toss-border)] shadow-sm overflow-hidden">
-                <div className="px-5 py-3 border-b border-[var(--toss-border)]">
+              <div className="bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm overflow-hidden">
+                <div className="px-5 py-3 border-b border-[var(--border)]">
                   <span className="text-sm font-bold text-[var(--foreground)]">카테고리별 재고 상세</span>
                 </div>
                 {inventoryChartData.length === 0 ? (
-                  <div className="py-12 text-center text-sm text-[var(--toss-gray-3)]">재고 데이터가 없습니다.</div>
+                  <div className="py-8 text-center text-sm text-[var(--toss-gray-3)]">재고 데이터가 없습니다.</div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="bg-[var(--toss-gray-1)]">
-                          <th className="text-left px-5 py-2.5 text-xs font-bold text-[var(--toss-gray-3)]">카테고리</th>
-                          <th className="text-right px-5 py-2.5 text-xs font-bold text-[var(--toss-gray-3)]">품목 수</th>
-                          <th className="text-right px-5 py-2.5 text-xs font-bold text-[var(--toss-gray-3)]">총 금액</th>
+                        <tr className="bg-[var(--muted)]">
+                          <th className="text-left px-4 py-2 text-xs font-bold text-[var(--toss-gray-3)]">카테고리</th>
+                          <th className="text-right px-4 py-2 text-xs font-bold text-[var(--toss-gray-3)]">품목 수</th>
+                          <th className="text-right px-4 py-2 text-xs font-bold text-[var(--toss-gray-3)]">총 금액</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-[var(--toss-border)]">
+                      <tbody className="divide-y divide-[var(--border)]">
                         {inventoryChartData
                           .sort((a, b) => b.totalAmount - a.totalAmount)
                           .map(row => (
-                            <tr key={row.category} className="hover:bg-[var(--toss-gray-1)]/50 transition-colors">
-                              <td className="px-5 py-3 font-bold text-[var(--foreground)]">{row.category}</td>
-                              <td className="px-5 py-3 text-right text-[var(--foreground)]">{row.count}개</td>
-                              <td className="px-5 py-3 text-right font-bold text-[#34C759]">{row.totalAmount.toLocaleString()}원</td>
+                            <tr key={row.category} className="hover:bg-[var(--muted)]/50 transition-colors">
+                              <td className="px-4 py-2 font-bold text-[var(--foreground)]">{row.category}</td>
+                              <td className="px-4 py-2 text-right text-[var(--foreground)]">{row.count}개</td>
+                              <td className="px-4 py-2 text-right font-bold text-[#34C759]">{row.totalAmount.toLocaleString()}원</td>
                             </tr>
                           ))}
                       </tbody>

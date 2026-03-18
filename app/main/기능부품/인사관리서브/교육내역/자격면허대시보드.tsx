@@ -188,10 +188,10 @@ export default function LicenseTracking({ staffs, selectedCo }: any) {
   };
 
   return (
-    <div className="space-y-6 animate-in slide-in-from-bottom-5">
+    <div className="space-y-4 animate-in slide-in-from-bottom-5">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h3 className="text-sm font-black text-slate-800">자격 및 면허 갱신 대상 트래커</h3>
+          <h3 className="text-sm font-black text-[var(--foreground)]">자격 및 면허 갱신 대상 트래커</h3>
         </div>
 
         <div className="flex gap-2 flex-wrap">
@@ -200,61 +200,61 @@ export default function LicenseTracking({ staffs, selectedCo }: any) {
             placeholder="이름/자격명 검색..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="px-4 py-2 bg-white rounded-xl text-xs font-bold border border-slate-200 outline-none focus:ring-2 focus:ring-primary/20 w-48"
+            className="px-4 py-2 bg-[var(--card)] rounded-xl text-xs font-bold border border-[var(--border)] outline-none focus:ring-2 focus:ring-primary/20 w-48"
           />
           <button
             type="button"
             onClick={handleCsvDownload}
-            className="px-4 py-2 bg-white text-primary text-xs font-black rounded-xl border border-slate-200 shadow-sm hover:bg-slate-50 transition-colors"
+            className="px-4 py-2 bg-[var(--card)] text-primary text-xs font-black rounded-xl border border-[var(--border)] shadow-sm hover:bg-[var(--tab-bg)] transition-colors"
           >
             엑셀 다운로드
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm flex items-center justify-between">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+        <div className="bg-[var(--card)] p-4 rounded-2xl border border-[var(--border)]/60 shadow-sm flex items-center justify-between">
           <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">총 등록 자격증</p>
-            <p className="text-2xl font-black text-slate-800">{realLicenses.length}건</p>
+            <p className="text-[10px] font-black text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">총 등록 자격증</p>
+            <p className="text-2xl font-black text-[var(--foreground)]">{realLicenses.length}건</p>
           </div>
-          <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-xs font-black text-slate-500">면허</div>
+          <div className="w-12 h-12 rounded-full bg-[var(--tab-bg)] flex items-center justify-center text-xs font-black text-[var(--toss-gray-4)]">면허</div>
         </div>
-        <div className="bg-danger/5 p-6 rounded-2xl border border-danger/10 shadow-sm flex items-center justify-between">
+        <div className="bg-danger/5 p-4 rounded-2xl border border-danger/10 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-[10px] font-black text-danger/60 uppercase tracking-widest mb-1">갱신 필요</p>
             <p className="text-2xl font-black text-danger">{urgentCount}건</p>
           </div>
           <div className="w-12 h-12 rounded-full bg-danger/10 flex items-center justify-center text-xs font-black text-danger">확인</div>
         </div>
-        <div className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm flex items-center justify-between">
+        <div className="bg-[var(--card)] p-4 rounded-2xl border border-[var(--border)]/60 shadow-sm flex items-center justify-between">
           <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">정상 유지중</p>
-            <p className="text-2xl font-black text-slate-800">{normalCount}건</p>
+            <p className="text-[10px] font-black text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">정상 유지중</p>
+            <p className="text-2xl font-black text-[var(--foreground)]">{normalCount}건</p>
           </div>
-          <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-xs font-black text-slate-500">정상</div>
+          <div className="w-12 h-12 rounded-full bg-[var(--tab-bg)] flex items-center justify-center text-xs font-black text-[var(--toss-gray-4)]">정상</div>
         </div>
-        <div className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm flex items-center justify-between">
+        <div className="bg-[var(--card)] p-4 rounded-2xl border border-[var(--border)]/60 shadow-sm flex items-center justify-between">
           <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">만료일 미등록</p>
-            <p className="text-2xl font-black text-slate-800">{missingExpiryCount}건</p>
+            <p className="text-[10px] font-black text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">만료일 미등록</p>
+            <p className="text-2xl font-black text-[var(--foreground)]">{missingExpiryCount}건</p>
           </div>
-          <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-xs font-black text-slate-500">보완</div>
+          <div className="w-12 h-12 rounded-full bg-[var(--tab-bg)] flex items-center justify-center text-xs font-black text-[var(--toss-gray-4)]">보완</div>
         </div>
       </div>
 
-      <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm overflow-hidden">
+      <div className="bg-[var(--card)] rounded-2xl border border-[var(--border)]/60 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left min-w-[980px]">
-            <thead className="bg-slate-50 border-b border-slate-200/60">
+            <thead className="bg-[var(--tab-bg)] border-b border-[var(--border)]/60">
               <tr>
-                <th className="p-4 text-[11px] font-black text-slate-500 uppercase tracking-widest">직원 정보</th>
-                <th className="p-4 text-[11px] font-black text-slate-500 uppercase tracking-widest">자격/면허명</th>
-                <th className="p-4 text-[11px] font-black text-slate-500 uppercase tracking-widest">자격 번호</th>
-                <th className="p-4 text-[11px] font-black text-slate-500 uppercase tracking-widest">발급기관</th>
-                <th className="p-4 text-[11px] font-black text-slate-500 uppercase tracking-widest">만료(갱신) 예정일</th>
-                <th className="p-4 text-[11px] font-black text-slate-500 uppercase tracking-widest text-center">상태</th>
-                <th className="p-4 text-[11px] font-black text-slate-500 uppercase tracking-widest text-right">관리</th>
+                <th className="p-4 text-[11px] font-black text-[var(--toss-gray-4)] uppercase tracking-widest">직원 정보</th>
+                <th className="p-4 text-[11px] font-black text-[var(--toss-gray-4)] uppercase tracking-widest">자격/면허명</th>
+                <th className="p-4 text-[11px] font-black text-[var(--toss-gray-4)] uppercase tracking-widest">자격 번호</th>
+                <th className="p-4 text-[11px] font-black text-[var(--toss-gray-4)] uppercase tracking-widest">발급기관</th>
+                <th className="p-4 text-[11px] font-black text-[var(--toss-gray-4)] uppercase tracking-widest">만료(갱신) 예정일</th>
+                <th className="p-4 text-[11px] font-black text-[var(--toss-gray-4)] uppercase tracking-widest text-center">상태</th>
+                <th className="p-4 text-[11px] font-black text-[var(--toss-gray-4)] uppercase tracking-widest text-right">관리</th>
               </tr>
             </thead>
             <tbody>
@@ -266,21 +266,21 @@ export default function LicenseTracking({ staffs, selectedCo }: any) {
                       ? 'bg-orange-50 text-orange-600'
                       : item.statusTone === 'danger'
                         ? 'bg-red-50 text-red-600 animate-pulse'
-                        : 'bg-slate-100 text-slate-500';
+                        : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]';
 
                 return (
-                  <tr key={item.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors">
+                  <tr key={item.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--tab-bg)]/50 transition-colors">
                     <td className="p-4">
-                      <p className="text-xs font-black text-slate-800">{item.staff?.name}</p>
-                      <p className="text-[10px] font-bold text-slate-400">
+                      <p className="text-xs font-black text-[var(--foreground)]">{item.staff?.name}</p>
+                      <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">
                         {item.staff?.company} | {getStaffDepartment(item.staff)}
                         {getStaffPosition(item.staff) ? ` | ${getStaffPosition(item.staff)}` : ''}
                       </p>
                     </td>
-                    <td className="p-4 text-xs font-bold text-slate-700">{item.license_name || '-'}</td>
-                    <td className="p-4 text-[11px] font-mono text-slate-500 font-bold">{item.license_number || '-'}</td>
-                    <td className="p-4 text-xs font-bold text-slate-700">{item.issuing_body || '-'}</td>
-                    <td className="p-4 text-xs font-bold text-slate-700">
+                    <td className="p-4 text-xs font-bold text-[var(--toss-gray-5)]">{item.license_name || '-'}</td>
+                    <td className="p-4 text-[11px] font-mono text-[var(--toss-gray-4)] font-bold">{item.license_number || '-'}</td>
+                    <td className="p-4 text-xs font-bold text-[var(--toss-gray-5)]">{item.issuing_body || '-'}</td>
+                    <td className="p-4 text-xs font-bold text-[var(--toss-gray-5)]">
                       {item.expiry_date || '-'}
                       {item.daysLeft !== null && (
                         <span className={`ml-2 text-[10px] font-black ${item.daysLeft < 0 ? 'text-red-500' : item.daysLeft <= 30 ? 'text-orange-500' : 'text-green-600'}`}>
@@ -318,7 +318,7 @@ export default function LicenseTracking({ staffs, selectedCo }: any) {
               })}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="p-10 text-center text-xs font-bold text-slate-400">데이터가 없습니다.</td>
+                  <td colSpan={7} className="p-5 text-center text-xs font-bold text-[var(--toss-gray-3)]">데이터가 없습니다.</td>
                 </tr>
               )}
             </tbody>

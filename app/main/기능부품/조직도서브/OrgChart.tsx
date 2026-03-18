@@ -71,15 +71,15 @@ export default function OrgChart({ user, staffs, depts, selectedCo, setSelectedC
       '팀장': 'bg-[var(--toss-blue-light)] text-blue-700',
       '과장': 'bg-green-100 text-green-700',
       '대리': 'bg-purple-100 text-purple-700',
-      '사원': 'bg-[var(--toss-gray-1)] text-[var(--foreground)]',
+      '사원': 'bg-[var(--muted)] text-[var(--foreground)]',
     };
-    return colors[position] || 'bg-[var(--toss-gray-1)] text-[var(--foreground)]';
+    return colors[position] || 'bg-[var(--muted)] text-[var(--foreground)]';
   };
 
   return (
-    <div className="flex flex-1 flex-col overflow-x-hidden bg-white">
+    <div className="flex flex-1 flex-col overflow-x-hidden bg-[var(--card)]">
       {/* 헤더 */}
-      <div className="p-6 border-b border-[var(--toss-border)]">
+      <div className="p-4 border-b border-[var(--border)]">
         <h2 className="text-2xl font-semibold text-[var(--foreground)] mb-4">🏢 조직도</h2>
         
         {/* 검색 */}
@@ -89,7 +89,7 @@ export default function OrgChart({ user, staffs, depts, selectedCo, setSelectedC
             placeholder="직원명, 직급, 부서로 검색..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-4 py-2 border border-[var(--toss-border)] rounded-[12px] focus:outline-none focus:border-[var(--toss-blue)]"
+            className="w-full px-4 py-2 border border-[var(--border)] rounded-[var(--radius-md)] focus:outline-none focus:border-[var(--accent)]"
           />
           {searchTerm && (
             <button
@@ -106,7 +106,7 @@ export default function OrgChart({ user, staffs, depts, selectedCo, setSelectedC
       <div className="flex-1 overflow-y-auto">
         {searchTerm ? (
           // 검색 결과
-          <div className="p-6">
+          <div className="p-4">
             <h3 className="font-semibold text-[var(--foreground)] mb-4">
               검색 결과: {filteredStaffs.length}명
             </h3>
@@ -115,10 +115,10 @@ export default function OrgChart({ user, staffs, depts, selectedCo, setSelectedC
                 <div
                   key={staff.id}
                   onClick={() => setSelectedStaff(staff)}
-                  className={`p-4 rounded-[12px] border-2 cursor-pointer transition-all ${
+                  className={`p-4 rounded-[var(--radius-md)] border-2 cursor-pointer transition-all ${
                     selectedStaff?.id === staff.id
                       ? 'border-blue-600 bg-blue-50'
-                      : 'border-[var(--toss-border)] hover:border-[var(--toss-border)]'
+                      : 'border-[var(--border)] hover:border-[var(--border)]'
                   }`}
                 >
                   <div className="flex items-center gap-3">
@@ -141,13 +141,13 @@ export default function OrgChart({ user, staffs, depts, selectedCo, setSelectedC
           </div>
         ) : (
           // 조직도 구조
-          <div className="p-6">
+          <div className="p-4">
             {normalizedDepts.map((dept: any) => (
-              <div key={dept.id} className="mb-6">
+              <div key={dept.id} className="mb-4">
                 {/* 부서 헤더 */}
                 <div
                   onClick={() => toggleDept(dept.id)}
-                  className="flex items-center gap-2 cursor-pointer mb-3 p-3 rounded-[12px] hover:bg-[var(--toss-gray-1)] transition-all"
+                  className="flex items-center gap-2 cursor-pointer mb-3 p-3 rounded-[var(--radius-md)] hover:bg-[var(--muted)] transition-all"
                 >
                   <span className={`text-lg transition-transform ${expandedDepts.includes(dept.id) ? 'rotate-90' : ''}`}>
                     ▶
@@ -160,15 +160,15 @@ export default function OrgChart({ user, staffs, depts, selectedCo, setSelectedC
 
                 {/* 부서 직원 목록 */}
                 {expandedDepts.includes(dept.id) && (
-                  <div className="ml-6 space-y-2 border-l-2 border-[var(--toss-border)] pl-4">
+                  <div className="ml-6 space-y-2 border-l-2 border-[var(--border)] pl-4">
                     {getDeptStaffs(dept).map((staff: any) => (
                       <div
                         key={staff.id}
                         onClick={() => setSelectedStaff(staff)}
-                        className={`p-3 rounded-[12px] border-2 cursor-pointer transition-all ${
+                        className={`p-3 rounded-[var(--radius-md)] border-2 cursor-pointer transition-all ${
                           selectedStaff?.id === staff.id
                             ? 'border-blue-600 bg-blue-50'
-                            : 'border-[var(--toss-border)] hover:border-[var(--toss-border)]'
+                            : 'border-[var(--border)] hover:border-[var(--border)]'
                         }`}
                       >
                         <div className="flex items-center gap-3">
@@ -195,7 +195,7 @@ export default function OrgChart({ user, staffs, depts, selectedCo, setSelectedC
 
       {/* 상세 정보 패널 */}
       {selectedStaff && (
-        <div className="border-t border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-6">
+        <div className="border-t border-[var(--border)] bg-[var(--muted)] p-4">
           <div className="flex items-start gap-4">
             <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold text-2xl">
               {selectedStaff.name?.charAt(0)}

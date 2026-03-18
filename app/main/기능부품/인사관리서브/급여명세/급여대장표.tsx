@@ -36,7 +36,7 @@ export default function PayrollTable({ staffs = [], payrollRecords = [], yearMon
           .print\\:hidden { display: none !important; }
         }
       `}</style>
-      <div className="flex flex-col bg-[var(--toss-card)] px-4 py-3 rounded-[12px] border border-[var(--toss-border)] shadow-sm print:hidden">
+      <div className="flex flex-col bg-[var(--card)] px-4 py-3 rounded-[var(--radius-md)] border border-[var(--border)] shadow-sm print:hidden">
         <div className="flex items-center justify-between pb-3">
           <div className="flex items-center gap-3">
             <input type="checkbox" checked={isAllChecked} onChange={toggleAll} className="w-4 h-4 accent-blue-600 rounded cursor-pointer" />
@@ -44,16 +44,16 @@ export default function PayrollTable({ staffs = [], payrollRecords = [], yearMon
           </div>
           <button
             onClick={onSendAll}
-            className="px-3 py-1.5 bg-[var(--toss-blue)] text-white text-[10px] font-black rounded-lg hover:scale-105 transition-all shadow-sm flex items-center gap-1.5"
+            className="px-3 py-1.5 bg-[var(--accent)] text-white text-[10px] font-black rounded-lg hover:scale-105 transition-all shadow-sm flex items-center gap-1.5"
             title="정산 완료된 모든 직원에게 명세서 알림 발송"
           >
             🚀 전체 전송
           </button>
         </div>
-        <div className="flex justify-between items-center pt-3 border-t border-[var(--toss-border)]">
+        <div className="flex justify-between items-center pt-3 border-t border-[var(--border)]">
           <div className="flex items-center gap-3">
-            <span className="text-sm font-black text-slate-800">직원 목록</span>
-            <span className="px-2 py-0.5 bg-blue-100 text-[var(--toss-blue)] text-[10px] font-black rounded-full">
+            <span className="text-sm font-black text-[var(--foreground)]">직원 목록</span>
+            <span className="px-2 py-0.5 bg-blue-100 text-[var(--accent)] text-[10px] font-black rounded-[var(--radius-md)]">
               {staffs.length}명
             </span>
           </div>
@@ -62,17 +62,17 @@ export default function PayrollTable({ staffs = [], payrollRecords = [], yearMon
       </div>
 
       {/* PC: 메인 급여 테이블 §5 */}
-      <div className="hidden md:block bg-[var(--toss-card)] rounded-[12px] border border-[var(--toss-border)] shadow-sm overflow-hidden flex-1 flex flex-col min-h-[500px]">
+      <div className="hidden md:block bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)] shadow-sm overflow-hidden flex-1 flex flex-col min-h-[500px]">
         <div className="overflow-y-auto flex-1 custom-scrollbar">
           <table className="w-full text-left border-collapse min-w-[300px]">
             <thead>
               <tr className="bg-[var(--tab-bg)] text-xs font-semibold text-[var(--toss-gray-4)] sticky top-0 z-10 shadow-sm">
-                <th className="px-3 py-3 w-10 text-center border-b border-[var(--toss-border)]">선택</th>
-                <th className="px-3 py-3 border-b border-[var(--toss-border)]">직원 정보</th>
-                <th className="px-3 py-3 text-right w-24 border-b border-[var(--toss-border)]">차인지급</th>
+                <th className="px-3 py-3 w-10 text-center border-b border-[var(--border)]">선택</th>
+                <th className="px-3 py-3 border-b border-[var(--border)]">직원 정보</th>
+                <th className="px-3 py-3 text-right w-24 border-b border-[var(--border)]">차인지급</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[var(--toss-border)]">
+            <tbody className="divide-y divide-[var(--border)]">
               {staffs.map((s: any) => {
                 const rec = getRecord(s.id);
                 const net = rec?.net_pay ?? 0;
@@ -82,14 +82,14 @@ export default function PayrollTable({ staffs = [], payrollRecords = [], yearMon
                   <tr
                     key={s.id}
                     onClick={() => onSelect(s.id)}
-                    className={`cursor-pointer transition-colors ${checkedIds.includes(s.id) ? 'bg-[var(--toss-blue-light)]/70' : 'hover:bg-[var(--toss-gray-1)]'}`}
+                    className={`cursor-pointer transition-colors ${checkedIds.includes(s.id) ? 'bg-[var(--toss-blue-light)]/70' : 'hover:bg-[var(--muted)]'}`}
                   >
                     <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                       <input type="checkbox" checked={checkedIds.includes(s.id)} onChange={() => toggleOne(s.id)} className="w-4 h-4 accent-blue-600 rounded" />
                     </td>
                     <td className="px-3 py-3">
                       <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-[10px] bg-[var(--tab-bg)] flex items-center justify-center text-xs font-bold text-[var(--toss-blue)] shrink-0">
+                        <div className="w-8 h-8 rounded-[var(--radius-md)] bg-[var(--tab-bg)] flex items-center justify-center text-xs font-bold text-[var(--accent)] shrink-0">
                           {(s.name || '?')[0]}
                         </div>
                         <div>
@@ -99,7 +99,7 @@ export default function PayrollTable({ staffs = [], payrollRecords = [], yearMon
                       </div>
                     </td>
                     <td className="px-3 py-3 text-right">
-                      <p className="text-[13px] font-bold text-[var(--toss-blue)]">{(net || 0).toLocaleString()}</p>
+                      <p className="text-[13px] font-bold text-[var(--accent)]">{(net || 0).toLocaleString()}</p>
                       <span className={`inline-block px-1.5 py-0.5 text-[9px] font-bold rounded ${!rec ? 'bg-amber-50 text-amber-600' : isAdvance ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'}`}>
                         {slipLabel}
                       </span>
@@ -110,10 +110,10 @@ export default function PayrollTable({ staffs = [], payrollRecords = [], yearMon
             </tbody>
           </table>
         </div>
-        <div className="bg-[var(--toss-gray-1)] border-t border-[var(--toss-border)] p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+        <div className="bg-[var(--muted)] border-t border-[var(--border)] p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
           <div className="flex justify-between items-center text-[11px] font-bold text-[var(--foreground)]">
             <span>총 지급액 합계</span>
-            <span className="text-[13px] text-[var(--toss-blue)] font-black">₩ {sumNet.toLocaleString()}</span>
+            <span className="text-[13px] text-[var(--accent)] font-black">₩ {sumNet.toLocaleString()}</span>
           </div>
         </div>
       </div>
@@ -130,11 +130,11 @@ export default function PayrollTable({ staffs = [], payrollRecords = [], yearMon
             <div
               key={s.id}
               onClick={() => onSelect(s.id)}
-              className={`bg-[var(--toss-card)] p-4 rounded-[12px] border transition-all active:scale-[0.99] ${isChecked ? 'border-[var(--toss-blue)] ring-1 ring-[var(--toss-blue)]/30' : 'border-[var(--toss-border)]'}`}
+              className={`bg-[var(--card)] p-4 rounded-[var(--radius-md)] border transition-all active:scale-[0.99] ${isChecked ? 'border-[var(--accent)] ring-1 ring-[var(--accent)]/30' : 'border-[var(--border)]'}`}
             >
               <div className="flex justify-between items-start mb-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-[12px] bg-[var(--tab-bg)] flex items-center justify-center text-sm font-semibold text-[var(--toss-blue)]">{(s.name || '?')[0]}</div>
+                  <div className="w-10 h-10 rounded-[var(--radius-md)] bg-[var(--tab-bg)] flex items-center justify-center text-sm font-semibold text-[var(--accent)]">{(s.name || '?')[0]}</div>
                   <div>
                     <h4 className="text-sm font-medium text-[var(--foreground)]">{s.name}</h4>
                     <p className="text-xs text-[var(--toss-gray-3)]">{s.company} · {s.position}</p>
@@ -144,11 +144,11 @@ export default function PayrollTable({ staffs = [], payrollRecords = [], yearMon
                   <input type="checkbox" checked={isChecked} onChange={() => toggleOne(s.id)} className="w-4 h-4 accent-blue-600 rounded" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2 pt-3 border-t border-[var(--toss-border)] text-xs">
+              <div className="grid grid-cols-2 gap-2 pt-3 border-t border-[var(--border)] text-xs">
                 <div><p className="text-[11px] text-[var(--toss-gray-3)] mb-0.5">지급(비과세)</p><p className="font-medium text-[var(--foreground)]">{(rec?.total_taxfree ?? 0).toLocaleString()}</p></div>
                 <div><p className="text-[11px] text-[var(--toss-gray-3)] mb-0.5">지급(과세)</p><p className="font-medium text-[var(--foreground)]">{(rec?.total_taxable ?? 0).toLocaleString()}</p></div>
                 <div><p className="text-[11px] text-[var(--toss-gray-3)] mb-0.5">공제</p><p className="font-medium text-red-600">{(rec?.total_deduction ?? 0).toLocaleString()}</p></div>
-                <div><p className="text-[11px] text-[var(--toss-gray-3)] mb-0.5">차인지급액</p><p className="font-semibold text-[var(--toss-blue)]">{net.toLocaleString()}</p></div>
+                <div><p className="text-[11px] text-[var(--toss-gray-3)] mb-0.5">차인지급액</p><p className="font-semibold text-[var(--accent)]">{net.toLocaleString()}</p></div>
               </div>
               <div className="mt-3 flex justify-between items-center">
                 <span className={`px-2 py-0.5 text-xs font-medium rounded ${!rec ? 'bg-amber-100 text-amber-800' : isAdvance ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-700'}`}>{slipLabel}</span>

@@ -61,9 +61,9 @@ const TYPE_CFG: Record<string, { icon: string; bg: string; progress: string; acc
   board: { icon: '📌', bg: 'bg-pink-500', progress: 'bg-pink-400', accent: 'border-pink-400' },
   인사: { icon: '👥', bg: 'bg-cyan-600', progress: 'bg-cyan-400', accent: 'border-cyan-400' },
   education: { icon: '📚', bg: 'bg-purple-500', progress: 'bg-purple-400', accent: 'border-purple-400' },
-  notification: { icon: '🔔', bg: 'bg-slate-500', progress: 'bg-slate-400', accent: 'border-slate-400' },
+  notification: { icon: '🔔', bg: 'bg-[var(--toss-gray-4)]', progress: 'bg-[var(--toss-gray-3)]', accent: 'border-[var(--border)]' },
 };
-const DEFAULT_CFG = { icon: '🔔', bg: 'bg-slate-500', progress: 'bg-slate-400', accent: 'border-slate-400' };
+const DEFAULT_CFG = { icon: '🔔', bg: 'bg-[var(--toss-gray-4)]', progress: 'bg-[var(--toss-gray-3)]', accent: 'border-[var(--border)]' };
 const getTypeCfg = (type: string) => TYPE_CFG[type] || DEFAULT_CFG;
 
 function getInitials(name: string) {
@@ -276,8 +276,8 @@ function ToastCard({ notif, onClose, onAction }: { notif: ToastItem; onClose: (i
   return (
     <div
       data-testid={`notification-toast-${notif.id}`}
-      className={`relative group flex items-start gap-3 p-3.5 rounded-2xl shadow-2xl border border-white/10 dark:border-white/5 overflow-hidden cursor-pointer select-none
-        bg-white/97 dark:bg-gray-900/97 backdrop-blur-md
+      className={`relative group flex items-start gap-3 p-3.5 rounded-2xl shadow-sm border border-white/10 dark:border-white/5 overflow-hidden cursor-pointer select-none
+        bg-[var(--card)]/97 dark:bg-gray-900/97 backdrop-blur-md
         ${notif.exiting ? 'animate-slide-out-right-toast' : 'animate-slide-in-right-toast'}
         hover:scale-[1.015] active:scale-[0.99] transition-transform`}
       style={{ width: 320 }}
@@ -290,10 +290,10 @@ function ToastCard({ notif, onClose, onAction }: { notif: ToastItem; onClose: (i
       {/* 내용 */}
       <div className="flex-1 min-w-0 pr-5">
         <div className="flex items-baseline gap-2">
-          <p className="text-[13px] font-bold text-gray-900 dark:text-white leading-tight truncate flex-1">{notif.title}</p>
-          <span className="text-[10px] text-gray-400 dark:text-gray-500 whitespace-nowrap shrink-0">{timeAgo(notif.createdAt)}</span>
+          <p className="text-[13px] font-bold text-[var(--foreground)] dark:text-white leading-tight truncate flex-1">{notif.title}</p>
+          <span className="text-[10px] text-[var(--toss-gray-3)] dark:text-[var(--toss-gray-4)] whitespace-nowrap shrink-0">{timeAgo(notif.createdAt)}</span>
         </div>
-        {notif.body && <p className="text-[11.5px] text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2 leading-snug">{notif.body}</p>}
+        {notif.body && <p className="text-[11.5px] text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)] mt-0.5 line-clamp-2 leading-snug">{notif.body}</p>}
         {(isChat || isApproval || isInventory) && (
           <button type="button" onClick={e => { e.stopPropagation(); onAction(notif); }}
             className={`mt-1.5 text-[10.5px] font-bold px-2 py-0.5 rounded-full border transition-all bg-transparent
@@ -308,9 +308,9 @@ function ToastCard({ notif, onClose, onAction }: { notif: ToastItem; onClose: (i
       </div>
       {/* 닫기 */}
       <button type="button" onClick={e => { e.stopPropagation(); onClose(notif.id); }}
-        className="absolute top-2.5 right-2.5 w-5 h-5 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all text-xs">✕</button>
+        className="absolute top-2.5 right-2.5 w-5 h-5 flex items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-5)] hover:bg-[var(--tab-bg)] dark:hover:bg-gray-700 transition-all text-xs">✕</button>
       {/* 7초 진행바 */}
-      <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-gray-100 dark:bg-gray-800 rounded-b-2xl overflow-hidden">
+      <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-[var(--tab-bg)] dark:bg-gray-800 rounded-b-2xl overflow-hidden">
         <div className={`h-full animate-progress-7s ${cfg.progress}`} style={{ transformOrigin: 'left center' }} />
       </div>
     </div>

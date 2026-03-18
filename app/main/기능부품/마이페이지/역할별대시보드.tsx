@@ -162,9 +162,9 @@ function AdminActionCard({
   onValueClick?: () => void;
 }) {
   return (
-    <div className="flex h-[128px] w-full items-center rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-card)] px-3 py-2.5 text-left sm:w-[calc(50%-0.375rem)] xl:w-[164px]">
+    <div className="flex h-[128px] w-full items-center rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-left sm:w-[calc(50%-0.375rem)] xl:w-[164px]">
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-white/85 text-base shadow-sm ring-1 ring-black/5">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-[var(--card)]/85 text-base shadow-sm ring-1 ring-black/5">
           {icon}
         </div>
         <div className="min-w-0 flex-1">
@@ -175,7 +175,7 @@ function AdminActionCard({
             <button
               type="button"
               onClick={onValueClick}
-              className="mt-1.5 text-left text-xl font-black text-[var(--toss-blue)] transition hover:opacity-80 focus:outline-none"
+              className="mt-1.5 text-left text-xl font-black text-[var(--accent)] transition hover:opacity-80 focus:outline-none"
             >
               {value}
             </button>
@@ -203,36 +203,36 @@ function UserDashboard({
 }) {
   return (
     <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-      <div className="rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4">
+      <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4">
         <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">오늘 출근</p>
         <p className="text-lg font-bold text-[var(--foreground)]">{formatTime(todayAttendance.in)}</p>
         {todayAttendance.out ? <p className="text-[11px] text-[var(--toss-gray-3)]">퇴근 {formatTime(todayAttendance.out)}</p> : null}
       </div>
 
-      <div className="rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4">
+      <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4">
         <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">연차 잔여</p>
-        <p className="text-lg font-bold text-[var(--toss-blue)]">{annualLeave?.remaining ?? '-'}일</p>
+        <p className="text-lg font-bold text-[var(--accent)]">{annualLeave?.remaining ?? '-'}일</p>
         {annualLeave ? <p className="text-[11px] text-[var(--toss-gray-3)]">총 {annualLeave.total}일</p> : null}
       </div>
 
       <button
         type="button"
-        className="rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4 text-left transition-all hover:bg-[var(--toss-blue-light)]/30"
+        className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 text-left transition-all hover:bg-[var(--toss-blue-light)]/30"
         onClick={() => setMainMenu?.('전자결재')}
       >
         <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">결재 대기</p>
         <p className={`text-lg font-bold ${pendingApprovals > 0 ? 'text-orange-500' : 'text-[var(--foreground)]'}`}>{pendingApprovals}건</p>
-        <p className="text-[11px] text-[var(--toss-blue)]">바로가기</p>
+        <p className="text-[11px] text-[var(--accent)]">바로가기</p>
       </button>
 
       <button
         type="button"
-        className="rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4 text-left transition-all hover:bg-[var(--toss-blue-light)]/30"
+        className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 text-left transition-all hover:bg-[var(--toss-blue-light)]/30"
         onClick={() => setMainMenu?.('채팅')}
       >
         <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">채팅</p>
         <p className="text-lg font-bold text-[var(--foreground)]">열기</p>
-        <p className="text-[11px] text-[var(--toss-blue)]">바로가기</p>
+        <p className="text-[11px] text-[var(--accent)]">바로가기</p>
       </button>
     </div>
   );
@@ -257,7 +257,7 @@ function ManagerDashboard({
 }) {
   return (
     <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-      <div className="rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4">
+      <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4">
         <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">팀 인원</p>
         <p className="text-lg font-bold text-[var(--foreground)]">{teamCount}명</p>
         <p className="text-[11px] text-[var(--toss-gray-3)]">{department || '-'}</p>
@@ -265,35 +265,35 @@ function ManagerDashboard({
 
       <button
         type="button"
-        className={`rounded-[16px] border p-4 text-left transition-all ${
+        className={`rounded-[var(--radius-lg)] border p-4 text-left transition-all ${
           pendingApprovals > 0
             ? 'border-orange-200 bg-orange-50 hover:bg-orange-100'
-            : 'border-[var(--toss-border)] bg-[var(--toss-card)] hover:bg-[var(--toss-gray-1)]'
+            : 'border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]'
         }`}
         onClick={() => setMainMenu?.('전자결재')}
       >
         <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">결재 대기</p>
         <p className={`text-lg font-bold ${pendingApprovals > 0 ? 'text-orange-600' : 'text-[var(--foreground)]'}`}>{pendingApprovals}건</p>
-        <p className="text-[11px] text-[var(--toss-blue)]">바로가기</p>
+        <p className="text-[11px] text-[var(--accent)]">바로가기</p>
       </button>
 
-      <div className="rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4">
+      <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4">
         <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">오늘 출근</p>
         <p className="text-lg font-bold text-[var(--foreground)]">{formatTime(todayAttendance.in)}</p>
       </div>
 
       <button
         type="button"
-        className={`rounded-[16px] border p-4 text-left transition-all ${
+        className={`rounded-[var(--radius-lg)] border p-4 text-left transition-all ${
           lowStockCount > 0
             ? 'border-red-200 bg-red-50 hover:bg-red-100'
-            : 'border-[var(--toss-border)] bg-[var(--toss-card)] hover:bg-[var(--toss-gray-1)]'
+            : 'border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]'
         }`}
         onClick={() => setMainMenu?.('재고관리')}
       >
         <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">재고 부족</p>
         <p className={`text-lg font-bold ${lowStockCount > 0 ? 'text-red-600' : 'text-[var(--foreground)]'}`}>{lowStockCount}건</p>
-        <p className="text-[11px] text-[var(--toss-blue)]">바로가기</p>
+        <p className="text-[11px] text-[var(--accent)]">바로가기</p>
       </button>
     </div>
   );

@@ -273,31 +273,31 @@ export default function ContractSignatureModal({ contract, user, templateText, o
 
     return (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-            <div className="bg-[var(--toss-card)] w-full max-w-2xl border-2 border-[var(--toss-border)] radius-toss-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="bg-[var(--card)] w-full max-w-2xl border-2 border-[var(--border)] radius-toss-xl shadow-sm overflow-hidden flex flex-col max-h-[90vh]">
 
-                <div className="p-5 border-b border-[var(--toss-border)] flex items-center justify-between bg-slate-50 shrink-0">
+                <div className="p-4 border-b border-[var(--border)] flex items-center justify-between bg-[var(--tab-bg)] shrink-0">
                     <div>
-                        <span className="px-2.5 py-1 text-[10px] font-bold text-blue-700 bg-blue-100 rounded-full mb-1 inline-block">전자서명 진행 중</span>
+                        <span className="px-2.5 py-1 text-[10px] font-bold text-blue-700 bg-blue-100 rounded-[var(--radius-md)] mb-1 inline-block">전자서명 진행 중</span>
                         <h2 className="text-xl font-bold tracking-tight text-[var(--foreground)]">{contract?.contract_type || '표준근로계약서'}</h2>
                     </div>
                     <button onClick={onClose} className="p-2 text-[var(--toss-gray-4)] hover:text-red-500 transition-colors">✕</button>
                 </div>
 
-                <div className="flex bg-slate-100 h-1.5 shrink-0">
+                <div className="flex bg-[var(--tab-bg)] h-1.5 shrink-0">
                     <div className="bg-blue-600 transition-all duration-300" style={{ width: `${(step / 4) * 100}%` }} />
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar bg-[var(--page-bg)]">
+                <div className="flex-1 overflow-y-auto p-4 md:p-4 custom-scrollbar bg-[var(--page-bg)]">
 
                     {step === 1 && (
-                        <div className="space-y-6 animate-in slide-in-from-right-4">
-                            <div className="text-center mb-6">
+                        <div className="space-y-4 animate-in slide-in-from-right-4">
+                            <div className="text-center mb-4">
                                 <span className="text-4xl block mb-2">📄</span>
                                 <h3 className="text-lg font-bold text-[var(--foreground)]">계약서 내용을 꼼꼼히 확인해 주세요</h3>
                                 <p className="text-xs text-[var(--toss-gray-4)] font-bold mt-1">하단으로 끝까지 스크롤하여 모든 내용을 확인해야 합니다.</p>
                             </div>
 
-                            <div className="bg-white p-6 md:p-10 border border-slate-200 max-h-[55vh] overflow-y-auto custom-scrollbar shadow-inner rounded-2xl" style={{ fontFamily: 'Noto Sans KR, sans-serif' }}>
+                            <div className="bg-[var(--card)] p-4 md:p-5 border border-[var(--border)] max-h-[55vh] overflow-y-auto custom-scrollbar shadow-inner rounded-2xl" style={{ fontFamily: 'Noto Sans KR, sans-serif' }}>
                                 {(() => {
                                     let raw = localTemplateText;
                                     // ASCII 표 장식 제거 (단, 임금 구성항목 등 주요 라벨은 보존)
@@ -312,7 +312,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                                         matches.push({ index: mm.index, full: mm[0], num: mm[1], title: mm[2] });
                                     }
 
-                                    if (matches.length === 0) return <p className="text-[14px] text-slate-800 whitespace-pre-wrap leading-relaxed">{raw}</p>;
+                                    if (matches.length === 0) return <p className="text-[14px] text-[var(--foreground)] whitespace-pre-wrap leading-relaxed">{raw}</p>;
 
                                     return matches.map((sec, si) => {
                                         const start = sec.index + sec.full.length;
@@ -321,12 +321,12 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                                         const lines = body.split('\n').filter(l => l.trim());
 
                                         return (
-                                            <div key={si} className="mb-8 last:mb-0">
-                                                <h4 className="text-[15px] font-black text-slate-900 mb-3 flex items-center gap-2.5">
+                                            <div key={si} className="mb-4 last:mb-0">
+                                                <h4 className="text-[15px] font-black text-[var(--foreground)] mb-3 flex items-center gap-2.5">
                                                     <span className="w-2 h-2 bg-blue-600 rounded-full shrink-0" />
                                                     제{sec.num}조 [{sec.title}]
                                                 </h4>
-                                                <div className="pl-4 border-l-2 border-slate-100 space-y-2">
+                                                <div className="pl-4 border-l-2 border-[var(--border-subtle)] space-y-2">
                                                     {lines.map((line, li) => {
                                                         const t = line.trim();
                                                         if (t.startsWith('[') && t.endsWith(']')) {
@@ -336,15 +336,15 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                                                             return (
                                                                 <div key={li} className="flex gap-2 mt-1">
                                                                     <span className="text-blue-600 font-black text-[13px] shrink-0">{t[0]}</span>
-                                                                    <span className="text-[13.5px] text-slate-700 leading-[1.8]">{t.slice(1).trim()}</span>
+                                                                    <span className="text-[13.5px] text-[var(--toss-gray-5)] leading-[1.8]">{t.slice(1).trim()}</span>
                                                                 </div>
                                                             );
                                                         }
                                                         if (t.startsWith('-') || t.startsWith('·') || t.startsWith('•')) {
                                                             return (
                                                                 <div key={li} className="flex gap-2 pl-5 mt-0.5">
-                                                                    <span className="text-slate-400 shrink-0">•</span>
-                                                                    <span className="text-[13px] text-slate-600 leading-[1.8]">{t.replace(/^[-·•]\s*/, '')}</span>
+                                                                    <span className="text-[var(--toss-gray-3)] shrink-0">•</span>
+                                                                    <span className="text-[13px] text-[var(--toss-gray-4)] leading-[1.8]">{t.replace(/^[-·•]\s*/, '')}</span>
                                                                 </div>
                                                             );
                                                         }
@@ -352,13 +352,13 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                                                         if (/^(기본급|식대|직책수당|기타수당|비과세)\s+/.test(t)) {
                                                             const parts = t.split(/\s{2,}/);
                                                             return (
-                                                                <div key={li} className="flex justify-between py-1.5 border-b border-slate-50 px-1 hover:bg-slate-50 transition-colors">
-                                                                    <span className="text-[13px] font-semibold text-slate-600">{parts[0]}</span>
-                                                                    <span className="text-[13px] font-black text-slate-900">{parts[1] || ''}</span>
+                                                                <div key={li} className="flex justify-between py-1.5 border-b border-slate-50 px-1 hover:bg-[var(--tab-bg)] transition-colors">
+                                                                    <span className="text-[13px] font-semibold text-[var(--toss-gray-4)]">{parts[0]}</span>
+                                                                    <span className="text-[13px] font-black text-[var(--foreground)]">{parts[1] || ''}</span>
                                                                 </div>
                                                             );
                                                         }
-                                                        return <p key={li} className="text-[13.5px] text-slate-700 leading-[1.8]">{t}</p>;
+                                                        return <p key={li} className="text-[13.5px] text-[var(--toss-gray-5)] leading-[1.8]">{t}</p>;
                                                     })}
                                                 </div>
                                             </div>
@@ -371,7 +371,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                     )}
 
                     {step === 2 && (
-                        <div className="space-y-6 animate-in slide-in-from-right-4">
+                        <div className="space-y-4 animate-in slide-in-from-right-4">
                             <div className="text-center mb-4">
                                 <span className="text-3xl block mb-2">✅</span>
                                 <h3 className="text-lg font-bold text-[var(--foreground)]">주요 계약 조항 확인 및 동의</h3>
@@ -383,7 +383,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                                         key={item.id}
                                         className={`flex items-start gap-3 p-3.5 rounded-xl border-2 transition-all cursor-pointer ${agreements[item.id]
                                             ? 'bg-blue-50 border-blue-500 shadow-sm'
-                                            : 'bg-white border-slate-100 hover:border-slate-200'
+                                            : 'bg-[var(--card)] border-[var(--border-subtle)] hover:border-[var(--border)]'
                                             }`}
                                     >
                                         <div className="pt-0.5">
@@ -391,14 +391,14 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                                                 type="checkbox"
                                                 checked={!!agreements[item.id]}
                                                 onChange={(e) => setAgreements({ ...agreements, [item.id]: e.target.checked })}
-                                                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                                className="w-4 h-4 rounded border-[var(--border)] text-blue-600 focus:ring-blue-500"
                                             />
                                         </div>
                                         <div>
-                                            <p className={`text-[12px] font-black ${agreements[item.id] ? 'text-blue-700' : 'text-slate-800'}`}>
+                                            <p className={`text-[12px] font-black ${agreements[item.id] ? 'text-blue-700' : 'text-[var(--foreground)]'}`}>
                                                 {item.title}
                                             </p>
-                                            <p className="text-[10px] font-medium text-slate-500 mt-0.5 leading-relaxed">
+                                            <p className="text-[10px] font-medium text-[var(--toss-gray-4)] mt-0.5 leading-relaxed">
                                                 {item.desc}
                                             </p>
                                         </div>
@@ -409,13 +409,13 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                     )}
 
                     {step === 3 && (
-                        <div className="space-y-6 animate-in slide-in-from-right-4">
+                        <div className="space-y-4 animate-in slide-in-from-right-4">
                             <div className="text-center mb-4">
                                 <span className="text-3xl block mb-2">📜</span>
                                 <h2 className="text-lg font-black tracking-widest underline underline-offset-4">비 밀 유 지 서 약 서</h2>
                             </div>
 
-                            <div className="bg-slate-50 border border-slate-200 p-6 rounded-xl font-serif text-[11px] leading-[1.8] text-slate-900 overflow-y-auto max-h-[300px] custom-scrollbar">
+                            <div className="bg-[var(--tab-bg)] border border-[var(--border)] p-4 rounded-xl font-serif text-[11px] leading-[1.8] text-[var(--foreground)] overflow-y-auto max-h-[300px] custom-scrollbar">
                                 <p className="mb-4 font-bold">본인은 회사의 영업비밀을 보호하고 정당한 권익을 지킬 것을 서약합니다.</p>
                                 <div className="space-y-4">
                                     <p><b>1. 비밀유지 범위:</b> 환자정보, 경영 전략, 기술 노하우 등</p>
@@ -431,14 +431,14 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                     )}
 
                     {step === 4 && (
-                        <div className="space-y-6 animate-in slide-in-from-right-4">
+                        <div className="space-y-4 animate-in slide-in-from-right-4">
                             <div className="text-center mb-4">
                                 <span className="text-3xl block mb-2">✍️</span>
                                 <h3 className="text-lg font-bold text-[var(--foreground)]">최종 전자서명</h3>
                                 <p className="text-[10px] text-[var(--toss-gray-4)] font-bold mt-1">본인의 성함을 정자로 기재해 주세요.</p>
                             </div>
 
-                            <div className="bg-white border-2 border-[var(--toss-blue)] rounded-2xl p-2 relative shadow-inner overflow-hidden">
+                            <div className="bg-[var(--card)] border-2 border-[var(--accent)] rounded-2xl p-2 relative shadow-inner overflow-hidden">
                                 <SignatureCanvas
                                     ref={sigCanvas}
                                     penColor="#1e293b"
@@ -446,14 +446,14 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                                     onEnd={() => setIsSigEmpty(false)}
                                 />
                                 {isSigEmpty && (
-                                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center flex-col opacity-20 text-slate-400 gap-1">
+                                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center flex-col opacity-20 text-[var(--toss-gray-3)] gap-1">
                                         <span className="text-[10px] font-black tracking-[.2em] uppercase">Sign Here</span>
                                     </div>
                                 )}
                             </div>
 
                             <div className="flex justify-start">
-                                <button type="button" onClick={handleClearSignature} className="text-[11px] font-bold text-slate-400 hover:text-slate-600 transition-colors">
+                                <button type="button" onClick={handleClearSignature} className="text-[11px] font-bold text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] transition-colors">
                                     다시 쓰기
                                 </button>
                             </div>
@@ -466,19 +466,19 @@ export default function ContractSignatureModal({ contract, user, templateText, o
 
                 </div>
 
-                <div className="p-4 md:p-6 border-t border-[var(--toss-border)] bg-white flex gap-3 shrink-0">
+                <div className="p-4 md:p-4 border-t border-[var(--border)] bg-[var(--card)] flex gap-3 shrink-0">
                     {step > 1 && (
-                        <button onClick={() => setStep(s => s - 1)} className="px-5 py-3.5 rounded-xl bg-slate-100 text-slate-600 font-bold text-[12px] hover:bg-slate-200">
+                        <button onClick={() => setStep(s => s - 1)} className="px-5 py-3.5 rounded-xl bg-[var(--tab-bg)] text-[var(--toss-gray-4)] font-bold text-[12px] hover:bg-[var(--tab-bg)]">
                             이전
                         </button>
                     )}
 
                     {step < 4 ? (
-                        <button onClick={handleNext} className="flex-1 px-5 py-3.5 rounded-xl bg-[var(--toss-blue)] text-white font-black text-[13px] shadow-md hover:bg-blue-600 transition-all flex items-center justify-center gap-2">
+                        <button onClick={handleNext} className="flex-1 px-5 py-3.5 rounded-xl bg-[var(--accent)] text-white font-black text-[13px] shadow-md hover:bg-blue-600 transition-all flex items-center justify-center gap-2">
                             확인 및 다음 단계 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
                         </button>
                     ) : (
-                        <button onClick={handleSubmit} disabled={isSigEmpty || isGenerating} className={`flex-1 px-5 py-3.5 rounded-xl text-white font-black text-[13px] shadow-lg transition-all flex items-center justify-center gap-2 ${isSigEmpty || isGenerating ? 'bg-slate-300 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98]'}`}>
+                        <button onClick={handleSubmit} disabled={isSigEmpty || isGenerating} className={`flex-1 px-5 py-3.5 rounded-xl text-white font-black text-[13px] shadow-sm transition-all flex items-center justify-center gap-2 ${isSigEmpty || isGenerating ? 'bg-slate-300 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98]'}`}>
                             {isGenerating ? '서류 생성 중...' : '최종 서명 및 저장'}
                         </button>
                     )}

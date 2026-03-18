@@ -47,23 +47,23 @@ export default function WagePeakCalculator({ staffs = [], selectedCo, user }: { 
   const totalOriginal = peakTargets.reduce((sum, s) => sum + s.base, 0);
 
   return (
-    <div className="p-4 md:p-8 space-y-5">
+    <div className="p-4 md:p-4 space-y-5">
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div>
           <h2 className="text-base font-bold text-[var(--foreground)]">임금피크제 자동 계산</h2>
         </div>
-        <button onClick={() => setShowSettings(v => !v)} className="px-3 py-1.5 bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] rounded-[10px] text-xs font-bold">
+        <button onClick={() => setShowSettings(v => !v)} className="px-3 py-1.5 bg-[var(--muted)] text-[var(--toss-gray-4)] rounded-[var(--radius-md)] text-xs font-bold">
           {showSettings ? '설정 닫기' : '요율 설정'}
         </button>
       </div>
 
       {/* 설정 패널 */}
       {showSettings && (
-        <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] p-5 space-y-3">
+        <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-4 space-y-3">
           <div className="flex items-center gap-3">
             <label className="text-xs font-bold text-[var(--foreground)] whitespace-nowrap">피크 시작 나이</label>
             <input type="number" value={peakAge} min={50} max={65} onChange={e => setPeakAge(Number(e.target.value))}
-              className="w-24 px-3 py-1.5 border border-[var(--toss-border)] rounded-[10px] text-sm bg-[var(--toss-card)] outline-none" />
+              className="w-24 px-3 py-1.5 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none" />
             <span className="text-xs text-[var(--toss-gray-3)]">세 이후 임금피크 적용</span>
           </div>
           <div className="space-y-2">
@@ -73,7 +73,7 @@ export default function WagePeakCalculator({ staffs = [], selectedCo, user }: { 
                 <span className="text-xs text-[var(--toss-gray-3)] w-20">{s.ageFrom}~{s.ageTo}세</span>
                 <input type="number" value={Math.round(s.rate * 100)} min={50} max={100}
                   onChange={e => setSteps(prev => prev.map((st, idx) => idx === i ? { ...st, rate: Number(e.target.value) / 100 } : st))}
-                  className="w-20 px-2 py-1 border border-[var(--toss-border)] rounded-[8px] text-sm bg-[var(--toss-card)] outline-none" />
+                  className="w-20 px-2 py-1 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none" />
                 <span className="text-xs text-[var(--toss-gray-3)]">%</span>
               </div>
             ))}
@@ -88,7 +88,7 @@ export default function WagePeakCalculator({ staffs = [], selectedCo, user }: { 
           { label: '월 총 감액', value: totalReduction.toLocaleString() + '원', color: 'text-red-500' },
           { label: '감액 전 합계', value: totalOriginal.toLocaleString() + '원', color: 'text-[var(--toss-gray-3)]' },
         ].map(c => (
-          <div key={c.label} className="p-3 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[14px] text-center">
+          <div key={c.label} className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] text-center">
             <p className={`text-base font-bold ${c.color}`}>{c.value}</p>
             <p className="text-[9px] text-[var(--toss-gray-3)] mt-0.5">{c.label}</p>
           </div>
@@ -101,7 +101,7 @@ export default function WagePeakCalculator({ staffs = [], selectedCo, user }: { 
           <p className="text-[11px] font-bold text-[var(--toss-gray-3)] mb-2">임금피크 적용 직원 ({peakAge}세 이상)</p>
           <div className="space-y-2">
             {peakTargets.map(s => (
-              <div key={s.id} className="flex items-center justify-between p-4 bg-orange-50 border border-orange-200 rounded-[14px]">
+              <div key={s.id} className="flex items-center justify-between p-4 bg-orange-50 border border-orange-200 rounded-[var(--radius-lg)]">
                 <div>
                   <p className="text-sm font-bold text-[var(--foreground)]">{s.name} <span className="text-xs text-orange-600">({s.age}세)</span></p>
                   <p className="text-[10px] text-[var(--toss-gray-3)]">{s.position} · {s.department}</p>
@@ -120,19 +120,19 @@ export default function WagePeakCalculator({ staffs = [], selectedCo, user }: { 
       {/* 전체 직원 테이블 */}
       <div>
         <p className="text-[11px] font-bold text-[var(--toss-gray-3)] mb-2">전체 직원 현황</p>
-        <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] overflow-hidden shadow-sm">
+        <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left" style={{ minWidth: '600px' }}>
-              <thead className="bg-[var(--toss-gray-1)]/60 border-b border-[var(--toss-border)]">
+              <thead className="bg-[var(--muted)]/60 border-b border-[var(--border)]">
                 <tr>
                   {['성명', '나이', '직위', '기본급', '적용 비율', '적용 후 급여', '월 감액'].map(h => (
                     <th key={h} className="px-3 py-2.5 text-[10px] font-semibold text-[var(--toss-gray-3)]">{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[var(--toss-border)]">
+              <tbody className="divide-y divide-[var(--border)]">
                 {enriched.map(s => (
-                  <tr key={s.id} className={`${s.isPeakTarget ? 'bg-orange-50/50' : 'hover:bg-[var(--toss-gray-1)]/30'}`}>
+                  <tr key={s.id} className={`${s.isPeakTarget ? 'bg-orange-50/50' : 'hover:bg-[var(--muted)]/30'}`}>
                     <td className="px-3 py-2 text-xs font-bold text-[var(--foreground)]">{s.name}</td>
                     <td className="px-3 py-2 text-xs">{s.age > 0 ? s.age + '세' : '-'}</td>
                     <td className="px-3 py-2 text-xs text-[var(--toss-gray-3)]">{s.position}</td>

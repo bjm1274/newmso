@@ -486,10 +486,10 @@ export default function ShiftManagement({ selectedCo }: any) {
   const showContractSettings = needsExtendedContractSettings(newShift);
 
   return (
-    <div className="p-8 space-y-8 animate-in fade-in duration-500" data-testid="shift-management">
+    <div className="p-5 space-y-5 animate-in fade-in duration-500" data-testid="shift-management">
       <header className="flex justify-between items-center">
         <div>
-          <h2 className="text-lg font-bold text-[var(--foreground)] tracking-tight">근무 형태 관리 <span className="text-sm text-[var(--toss-blue)]">[{selectedCo}]</span></h2>
+          <h2 className="text-lg font-bold text-[var(--foreground)] tracking-tight">근무 형태 관리 <span className="text-sm text-[var(--accent)]">[{selectedCo}]</span></h2>
         </div>
         <button
           type="button"
@@ -498,7 +498,7 @@ export default function ShiftManagement({ selectedCo }: any) {
             setNewShift(createEmptyShiftState(selectedCo));
             setShowAddModal(true);
           }}
-          className="px-8 py-4 bg-[var(--toss-blue)] text-white text-sm font-bold rounded-[14px] shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all flex items-center gap-2"
+          className="px-5 py-4 bg-[var(--accent)] text-white text-sm font-bold rounded-[var(--radius-lg)] shadow-sm hover:shadow-sm transform hover:scale-[1.02] transition-all flex items-center gap-2"
           data-testid="shift-create-button"
         >
           <span className="text-lg">＋</span> 신규 근무 형태 생성
@@ -507,9 +507,9 @@ export default function ShiftManagement({ selectedCo }: any) {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-3">
         {shifts.map((shift) => (
-          <div key={shift.id} className="bg-[var(--toss-card)] border-2 border-[var(--toss-border)] p-3 hover:border-[var(--toss-blue)] transition-all group relative rounded-2xl">
+          <div key={shift.id} className="bg-[var(--card)] border-2 border-[var(--border)] p-3 hover:border-[var(--accent)] transition-all group relative rounded-2xl">
             <div className="flex justify-between items-start mb-2">
-              <span className="px-1.5 py-0.5 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] text-[9px] font-semibold uppercase rounded-md">{shift.company_name || '-'}</span>
+              <span className="px-1.5 py-0.5 bg-[var(--toss-blue-light)] text-[var(--accent)] text-[9px] font-semibold uppercase rounded-md">{shift.company_name || '-'}</span>
               <div className="flex items-center gap-2 text-xs font-bold">
                 <button
                   onClick={() => {
@@ -534,7 +534,7 @@ export default function ShiftManagement({ selectedCo }: any) {
                     }, shift.work_day_mode || resolveWorkDayMode(shift)));
                     setShowAddModal(true);
                   }}
-                  className="px-2 py-1 rounded-full bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] hover:opacity-90"
+                  className="px-2 py-1 rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--toss-gray-4)] hover:opacity-90"
                 >
                   수정
                 </button>
@@ -543,7 +543,7 @@ export default function ShiftManagement({ selectedCo }: any) {
             </div>
             <h3 className="text-sm font-bold text-[var(--foreground)] mb-0.5 truncate" title={shift.name}>{shift.name}</h3>
             <p className="text-[10px] text-[var(--toss-gray-3)] font-bold mb-3 truncate" title={shift.description || '설명 없음'}>{shift.description || '설명 없음'}</p>
-            <div className="flex items-center gap-2 pt-2 border-t border-[var(--toss-border)]">
+            <div className="flex items-center gap-2 pt-2 border-t border-[var(--border)]">
               <div>
                 <p className="text-[9px] font-semibold text-[var(--toss-gray-3)] uppercase">출근</p>
                 <p className="text-xs font-bold text-[var(--foreground)]">{shift.start_time}</p>
@@ -564,33 +564,33 @@ export default function ShiftManagement({ selectedCo }: any) {
             </div>
             {(shift.shift_type || shift.weekly_work_days || shift.is_weekend_work || shift.is_shift || hasShiftContractMeta(shift)) && (
               <div className="mt-2 text-[9px] font-bold text-white flex flex-wrap gap-1">
-                {shift.is_shift && <span className="px-1.5 py-0.5 rounded-full bg-indigo-600 border border-indigo-700 shadow-sm">교대</span>}
-                {shift.shift_type && <span className="px-1.5 py-0.5 rounded-full bg-slate-700 border border-slate-800 shadow-sm">{shift.shift_type}</span>}
+                {shift.is_shift && <span className="px-1.5 py-0.5 rounded-[var(--radius-md)] bg-indigo-600 border border-indigo-700 shadow-sm">교대</span>}
+                {shift.shift_type && <span className="px-1.5 py-0.5 rounded-[var(--radius-md)] bg-slate-700 border border-slate-800 shadow-sm">{shift.shift_type}</span>}
                 {shift.weekly_work_days && (
-                  <span className="px-1.5 py-0.5 rounded-full bg-slate-700 border border-slate-800 shadow-sm">
+                  <span className="px-1.5 py-0.5 rounded-[var(--radius-md)] bg-slate-700 border border-slate-800 shadow-sm">
                     {formatWorkDayMode(shift.work_day_mode || resolveWorkDayMode(shift))}
                   </span>
                 )}
-                <span className="px-1.5 py-0.5 rounded-full bg-slate-700 border border-slate-800 shadow-sm">
+                <span className="px-1.5 py-0.5 rounded-[var(--radius-md)] bg-slate-700 border border-slate-800 shadow-sm">
                   주 {calculateWeeklyWorkHours(shift)}시간
                 </span>
                 {shift.is_weekend_work && (
-                  <span className="px-1.5 py-0.5 rounded-full bg-slate-700 border border-slate-800 shadow-sm">
+                  <span className="px-1.5 py-0.5 rounded-[var(--radius-md)] bg-slate-700 border border-slate-800 shadow-sm">
                     주말
                   </span>
                 )}
                 {shift.monthly_night_days ? (
-                  <span className="px-1.5 py-0.5 rounded-full bg-purple-700 border border-purple-800 shadow-sm">
+                  <span className="px-1.5 py-0.5 rounded-[var(--radius-md)] bg-purple-700 border border-purple-800 shadow-sm">
                     나이트 {shift.monthly_night_days}일
                   </span>
                 ) : null}
                 {shift.additional_work_hours ? (
-                  <span className="px-1.5 py-0.5 rounded-full bg-orange-600 border border-orange-700 shadow-sm">
+                  <span className="px-1.5 py-0.5 rounded-[var(--radius-md)] bg-orange-600 border border-orange-700 shadow-sm">
                     추가근무 {shift.additional_work_hours}시간
                   </span>
                 ) : null}
                 {shift.extra_contract_allowance ? (
-                  <span className="px-1.5 py-0.5 rounded-full bg-emerald-700 border border-emerald-800 shadow-sm">
+                  <span className="px-1.5 py-0.5 rounded-[var(--radius-md)] bg-emerald-700 border border-emerald-800 shadow-sm">
                     약정 {shift.extra_contract_allowance.toLocaleString()}원
                   </span>
                 ) : null}
@@ -599,7 +599,7 @@ export default function ShiftManagement({ selectedCo }: any) {
           </div>
         ))}
         {shifts.length === 0 && (
-          <div className="col-span-full py-20 text-center border-2 border-dashed border-[var(--toss-border)]">
+          <div className="col-span-full py-20 text-center border-2 border-dashed border-[var(--border)]">
             <p className="text-[var(--toss-gray-3)] font-semibold italic">등록된 근무 형태가 없습니다.</p>
           </div>
         )}
@@ -607,23 +607,23 @@ export default function ShiftManagement({ selectedCo }: any) {
 
       {showAddModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
-          <div className="bg-[var(--toss-card)] w-full max-w-md p-6 md:p-10 border-2 border-[var(--toss-border)] shadow-2xl space-y-6 radius-toss-xl max-h-[90vh] overflow-y-auto custom-scrollbar" data-testid="shift-modal">
-            <h3 className="page-title border-b-2 border-[var(--toss-border)] pb-2">
+          <div className="bg-[var(--card)] w-full max-w-md p-4 md:p-5 border-2 border-[var(--border)] shadow-sm space-y-4 radius-toss-xl max-h-[90vh] overflow-y-auto custom-scrollbar" data-testid="shift-modal">
+            <h3 className="page-title border-b-2 border-[var(--border)] pb-2">
               {editingShiftId ? '근무 형태 수정' : '근무 형태 생성'}
             </h3>
             <div className="space-y-4">
               <div>
                 <label className="caption uppercase block mb-1">명칭 (예: 3교대-데이, 나이트전담)</label>
-                <input type="text" value={newShift.name} onChange={e => setNewShift({ ...newShift, name: e.target.value })} className="w-full p-3 bg-[var(--input-bg)] border border-[var(--toss-border)] font-semibold text-xs outline-none focus:border-[var(--foreground)] radius-toss" placeholder="근무 형태 이름을 입력하세요" data-testid="shift-name-input" />
+                <input type="text" value={newShift.name} onChange={e => setNewShift({ ...newShift, name: e.target.value })} className="w-full p-3 bg-[var(--input-bg)] border border-[var(--border)] font-semibold text-xs outline-none focus:border-[var(--foreground)] radius-toss" placeholder="근무 형태 이름을 입력하세요" data-testid="shift-name-input" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="caption uppercase block mb-1">출근 시간</label>
-                  <input type="time" value={newShift.start_time} onChange={e => setNewShift({ ...newShift, start_time: e.target.value })} className="w-full p-3 bg-[var(--input-bg)] border border-[var(--toss-border)] font-semibold text-xs radius-toss" />
+                  <input type="time" value={newShift.start_time} onChange={e => setNewShift({ ...newShift, start_time: e.target.value })} className="w-full p-3 bg-[var(--input-bg)] border border-[var(--border)] font-semibold text-xs radius-toss" />
                 </div>
                 <div>
                   <label className="caption uppercase block mb-1">퇴근 시간</label>
-                  <input type="time" value={newShift.end_time} onChange={e => setNewShift({ ...newShift, end_time: e.target.value })} className="w-full p-3 bg-[var(--input-bg)] border border-[var(--toss-border)] font-semibold text-xs radius-toss" />
+                  <input type="time" value={newShift.end_time} onChange={e => setNewShift({ ...newShift, end_time: e.target.value })} className="w-full p-3 bg-[var(--input-bg)] border border-[var(--border)] font-semibold text-xs radius-toss" />
                 </div>
               </div>
               <div>
@@ -632,7 +632,7 @@ export default function ShiftManagement({ selectedCo }: any) {
                   <select
                     value={newShift.company_name}
                     onChange={e => setNewShift({ ...newShift, company_name: e.target.value })}
-                    className="w-full p-3 bg-[var(--input-bg)] border border-[var(--toss-border)] font-semibold text-xs radius-toss"
+                    className="w-full p-3 bg-[var(--input-bg)] border border-[var(--border)] font-semibold text-xs radius-toss"
                     data-testid="shift-company-select"
                   >
                     <option value="">사업체 선택</option>
@@ -641,8 +641,8 @@ export default function ShiftManagement({ selectedCo }: any) {
                     ))}
                   </select>
                 ) : (
-                  <div className="p-3 bg-[var(--toss-gray-1)] rounded-xl border border-[var(--toss-border)] space-y-2">
-                    <label className="flex items-center gap-2 pb-2 border-b border-[var(--toss-border)] mb-2 cursor-pointer">
+                  <div className="p-3 bg-[var(--muted)] rounded-xl border border-[var(--border)] space-y-2">
+                    <label className="flex items-center gap-2 pb-2 border-b border-[var(--border)] mb-2 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={companyOptions.length > 0 && newShift.selectedCompanies.length === companyOptions.length}
@@ -653,14 +653,14 @@ export default function ShiftManagement({ selectedCo }: any) {
                             setNewShift({ ...newShift, company_name: '', selectedCompanies: [] });
                           }
                         }}
-                        className="w-4 h-4 text-[var(--toss-blue)]"
+                        className="w-4 h-4 text-[var(--accent)]"
                         data-testid="shift-company-all"
                       />
-                      <span className="text-[11px] font-bold text-[var(--toss-blue)]">전체 선택</span>
+                      <span className="text-[11px] font-bold text-[var(--accent)]">전체 선택</span>
                     </label>
                     <div className="grid grid-cols-1 gap-2">
                       {companyOptions.map(co => (
-                        <label key={co} className="flex items-center gap-2 cursor-pointer hover:bg-white p-1 rounded-md transition-colors">
+                        <label key={co} className="flex items-center gap-2 cursor-pointer hover:bg-[var(--card)] p-1 rounded-md transition-colors">
                           <input
                             type="checkbox"
                             checked={newShift.selectedCompanies.includes(co)}
@@ -670,7 +670,7 @@ export default function ShiftManagement({ selectedCo }: any) {
                                 : newShift.selectedCompanies.filter(c => c !== co);
                               setNewShift({ ...newShift, company_name: next[0] || '', selectedCompanies: next });
                             }}
-                            className="w-4 h-4 text-[var(--toss-blue)]"
+                            className="w-4 h-4 text-[var(--accent)]"
                             data-testid={`shift-company-${co}`}
                           />
                           <span className="text-xs font-semibold text-[var(--foreground)]">{co}</span>
@@ -687,7 +687,7 @@ export default function ShiftManagement({ selectedCo }: any) {
               </div>
               <div>
                 <label className="caption uppercase block mb-1">설명</label>
-                <textarea value={newShift.description} onChange={e => setNewShift({ ...newShift, description: e.target.value })} className="w-full p-3 bg-[var(--input-bg)] border border-[var(--toss-border)] font-semibold text-xs h-20 radius-toss" placeholder="근무 형태에 대한 설명을 입력하세요" />
+                <textarea value={newShift.description} onChange={e => setNewShift({ ...newShift, description: e.target.value })} className="w-full p-3 bg-[var(--input-bg)] border border-[var(--border)] font-semibold text-xs h-20 radius-toss" placeholder="근무 형태에 대한 설명을 입력하세요" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -696,7 +696,7 @@ export default function ShiftManagement({ selectedCo }: any) {
                     type="time"
                     value={newShift.break_start_time}
                     onChange={e => setNewShift({ ...newShift, break_start_time: e.target.value })}
-                    className="w-full p-3 bg-[var(--input-bg)] border border-[var(--toss-border)] font-semibold text-xs radius-toss"
+                    className="w-full p-3 bg-[var(--input-bg)] border border-[var(--border)] font-semibold text-xs radius-toss"
                   />
                 </div>
                 <div>
@@ -705,7 +705,7 @@ export default function ShiftManagement({ selectedCo }: any) {
                     type="time"
                     value={newShift.break_end_time}
                     onChange={e => setNewShift({ ...newShift, break_end_time: e.target.value })}
-                    className="w-full p-3 bg-[var(--input-bg)] border border-[var(--toss-border)] font-semibold text-xs radius-toss"
+                    className="w-full p-3 bg-[var(--input-bg)] border border-[var(--border)] font-semibold text-xs radius-toss"
                   />
                 </div>
               </div>
@@ -719,7 +719,7 @@ export default function ShiftManagement({ selectedCo }: any) {
                         applyWorkDayMode({ ...prev, shift_type: e.target.value }, prev.work_day_mode || 'weekdays')
                       )
                     }
-                    className="w-full p-3 bg-[var(--input-bg)] border border-[var(--toss-border)] font-semibold text-xs radius-toss"
+                    className="w-full p-3 bg-[var(--input-bg)] border border-[var(--border)] font-semibold text-xs radius-toss"
                   >
                     <option value="">선택</option>
                     {allPatterns.map(p => (
@@ -727,11 +727,11 @@ export default function ShiftManagement({ selectedCo }: any) {
                     ))}
                   </select>
                   {!showPatternInput ? (
-                    <button type="button" onClick={() => setShowPatternInput(true)} className="mt-1.5 text-[10px] font-bold text-[var(--toss-blue)] hover:underline">+ 패턴 직접 추가</button>
+                    <button type="button" onClick={() => setShowPatternInput(true)} className="mt-1.5 text-[10px] font-bold text-[var(--accent)] hover:underline">+ 패턴 직접 추가</button>
                   ) : (
                     <div className="flex items-center gap-1 mt-1.5">
-                      <input type="text" value={newPatternName} onChange={e => setNewPatternName(e.target.value)} onKeyDown={e => e.key === 'Enter' && addCustomPattern()} placeholder="새 패턴명" className="flex-1 px-2 py-1.5 text-[10px] font-bold border border-[var(--toss-border)] rounded-lg bg-[var(--input-bg)] text-[var(--foreground)] outline-none" autoFocus />
-                      <button type="button" onClick={addCustomPattern} className="px-2 py-1.5 bg-[var(--toss-blue)] text-white text-[10px] font-bold rounded-lg">추가</button>
+                      <input type="text" value={newPatternName} onChange={e => setNewPatternName(e.target.value)} onKeyDown={e => e.key === 'Enter' && addCustomPattern()} placeholder="새 패턴명" className="flex-1 px-2 py-1.5 text-[10px] font-bold border border-[var(--border)] rounded-lg bg-[var(--input-bg)] text-[var(--foreground)] outline-none" autoFocus />
+                      <button type="button" onClick={addCustomPattern} className="px-2 py-1.5 bg-[var(--accent)] text-white text-[10px] font-bold rounded-lg">추가</button>
                       <button type="button" onClick={() => { setShowPatternInput(false); setNewPatternName(''); }} className="px-2 py-1.5 text-[10px] font-bold text-[var(--toss-gray-3)]">취소</button>
                     </div>
                   )}
@@ -752,7 +752,7 @@ export default function ShiftManagement({ selectedCo }: any) {
                             type="button"
                             onClick={() => setNewShift((prev) => applyWorkDayMode(prev, option.value))}
                             disabled={locked}
-                            className={`rounded-xl border px-3 py-3 text-left transition-all ${selected ? 'border-[var(--toss-blue)] bg-[var(--toss-blue-light)]/70 ring-1 ring-[var(--toss-blue)]/20' : 'border-[var(--toss-border)] bg-white'} ${locked ? 'cursor-not-allowed opacity-40' : 'hover:border-[var(--toss-blue)]/50'}`}
+                            className={`rounded-xl border px-3 py-3 text-left transition-all ${selected ? 'border-[var(--accent)] bg-[var(--toss-blue-light)]/70 ring-1 ring-[var(--accent)]/20' : 'border-[var(--border)] bg-[var(--card)]'} ${locked ? 'cursor-not-allowed opacity-40' : 'hover:border-[var(--accent)]/50'}`}
                             data-testid={`shift-workday-mode-${option.value}`}
                           >
                             <p className="text-[11px] font-bold text-[var(--foreground)]">{option.label}</p>
@@ -765,7 +765,7 @@ export default function ShiftManagement({ selectedCo }: any) {
                       현재 설정: {formatWorkDayMode(newShift.work_day_mode || 'weekdays')} · 주 {newShift.weekly_work_days}일
                     </p>
                     {isThreeShiftPattern(newShift.shift_type) && (
-                      <p className="text-[10px] font-semibold text-[var(--toss-blue)]">
+                      <p className="text-[10px] font-semibold text-[var(--accent)]">
                         3교대 유형은 자동으로 월~일 전체 근무 기준으로 고정됩니다.
                       </p>
                     )}
@@ -773,13 +773,13 @@ export default function ShiftManagement({ selectedCo }: any) {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-4">
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">근무 조건 분석</p>
                     <p className="mt-1 text-[12px] font-semibold text-[var(--foreground)]">예상 주간 근로시간 {estimatedWeeklyHours}시간</p>
                   </div>
-                  <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${showContractSettings ? 'bg-orange-100 text-orange-700' : 'bg-zinc-200 text-zinc-600'}`}>
+                  <span className={`rounded-[var(--radius-md)] px-3 py-1 text-[10px] font-bold ${showContractSettings ? 'bg-orange-100 text-orange-700' : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]'}`}>
                     {showContractSettings ? '추가 약정 대상' : '일반 근무'}
                   </span>
                 </div>
@@ -804,7 +804,7 @@ export default function ShiftManagement({ selectedCo }: any) {
                         min={0}
                         value={newShift.monthly_night_days}
                         onChange={e => setNewShift({ ...newShift, monthly_night_days: Number(e.target.value) || 0 })}
-                        className="w-full p-3 bg-white border border-orange-200 font-semibold text-xs radius-toss"
+                        className="w-full p-3 bg-[var(--card)] border border-orange-200 font-semibold text-xs radius-toss"
                       />
                     </label>
                     <label className="flex flex-col gap-1">
@@ -815,7 +815,7 @@ export default function ShiftManagement({ selectedCo }: any) {
                         step={0.5}
                         value={newShift.additional_work_hours}
                         onChange={e => setNewShift({ ...newShift, additional_work_hours: Number(e.target.value) || 0 })}
-                        className="w-full p-3 bg-white border border-orange-200 font-semibold text-xs radius-toss"
+                        className="w-full p-3 bg-[var(--card)] border border-orange-200 font-semibold text-xs radius-toss"
                       />
                     </label>
                     <label className="flex flex-col gap-1">
@@ -826,7 +826,7 @@ export default function ShiftManagement({ selectedCo }: any) {
                         step={10000}
                         value={newShift.extra_contract_allowance}
                         onChange={e => setNewShift({ ...newShift, extra_contract_allowance: Number(e.target.value) || 0 })}
-                        className="w-full p-3 bg-white border border-orange-200 font-semibold text-xs radius-toss"
+                        className="w-full p-3 bg-[var(--card)] border border-orange-200 font-semibold text-xs radius-toss"
                       />
                     </label>
                   </div>
@@ -839,7 +839,7 @@ export default function ShiftManagement({ selectedCo }: any) {
                     type="checkbox"
                     checked={newShift.is_shift || false}
                     onChange={e => setNewShift({ ...newShift, is_shift: e.target.checked })}
-                    className="mt-0.5 w-4 h-4 text-indigo-600 bg-white border-indigo-300 rounded focus:ring-indigo-500"
+                    className="mt-0.5 w-4 h-4 text-indigo-600 bg-[var(--card)] border-indigo-300 rounded focus:ring-indigo-500"
                   />
                   <div>
                     <span className="text-xs font-bold text-indigo-900 dark:text-indigo-400 block mb-0.5">교대 근무 전용 스케줄 여부</span>

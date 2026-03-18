@@ -8,20 +8,20 @@ export default function AllowanceManager() {
   ];
 
   return (
-    <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] p-4 rounded-[12px] shadow-sm">
-      <div className="pb-2 border-b border-[var(--toss-border)] mb-3">
+    <div className="bg-[var(--card)] border border-[var(--border)] p-4 rounded-[var(--radius-md)] shadow-sm">
+      <div className="pb-2 border-b border-[var(--border)] mb-3">
         <h2 className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-2">
-          <span className="w-1 h-4 bg-[var(--toss-blue)] rounded" /> 수당 항목 설정
+          <span className="w-1 h-4 bg-[var(--accent)] rounded" /> 수당 항목 설정
         </h2>
       </div>
       <div className="space-y-2">
         {allowanceTypes.map((a, i) => (
-          <div key={i} className="flex justify-between items-center p-3 bg-[var(--page-bg)] rounded-[12px] border border-[var(--toss-border)]">
+          <div key={i} className="flex justify-between items-center p-3 bg-[var(--page-bg)] rounded-[var(--radius-md)] border border-[var(--border)]">
             <div>
               <p className="text-sm font-semibold text-[var(--foreground)]">{a.name}</p>
               <p className="text-xs text-[var(--toss-gray-3)]">{a.type}</p>
             </div>
-            <span className="text-xs font-medium text-[var(--toss-blue)]">{a.limit}</span>
+            <span className="text-xs font-medium text-[var(--accent)]">{a.limit}</span>
           </div>
         ))}
       </div>

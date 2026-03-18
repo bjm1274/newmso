@@ -116,32 +116,32 @@ export default function ExcelBulkUpload({ onRefresh }: any) {
   const isEcount = mode === 'inventory_ecount';
 
   return (
-    <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[12px] p-8 shadow-sm max-w-2xl">
-      <h3 className="text-xl font-bold text-[var(--foreground)] mb-2">엑셀 일괄 등록</h3>
-      <p className="text-xs text-[var(--toss-gray-3)] font-bold mb-6">
+    <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] p-4 shadow-sm max-w-2xl">
+      <h3 className="text-base font-bold text-[var(--foreground)] mb-2">엑셀 일괄 등록</h3>
+      <p className="text-xs text-[var(--toss-gray-3)] font-bold mb-3">
         {mode === 'staff' && ''}
         {mode === 'inventory' && ''}
         {isEcount && ''}
       </p>
-      <div className="flex flex-wrap gap-2 mb-4">
-        <button onClick={() => setMode('staff')} className={`px-4 py-2 rounded-[12px] text-xs font-bold ${mode === 'staff' ? 'bg-[var(--toss-blue)] text-white' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'}`}>직원</button>
-        <button onClick={() => setMode('inventory')} className={`px-4 py-2 rounded-[12px] text-xs font-bold ${mode === 'inventory' ? 'bg-[var(--toss-blue)] text-white' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'}`}>재고</button>
-        <button onClick={() => setMode('inventory_ecount')} className={`px-4 py-2 rounded-[12px] text-xs font-bold ${mode === 'inventory_ecount' ? 'bg-teal-600 text-white' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'}`}>재고 리스트 (이카운트)</button>
+      <div className="flex flex-wrap gap-2 mb-3">
+        <button onClick={() => setMode('staff')} className={`px-4 py-2 rounded-[var(--radius-md)] text-xs font-bold ${mode === 'staff' ? 'bg-[var(--accent)] text-white' : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'}`}>직원</button>
+        <button onClick={() => setMode('inventory')} className={`px-4 py-2 rounded-[var(--radius-md)] text-xs font-bold ${mode === 'inventory' ? 'bg-[var(--accent)] text-white' : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'}`}>재고</button>
+        <button onClick={() => setMode('inventory_ecount')} className={`px-4 py-2 rounded-[var(--radius-md)] text-xs font-bold ${mode === 'inventory_ecount' ? 'bg-teal-600 text-white' : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'}`}>재고 리스트 (이카운트)</button>
       </div>
       {isEcount && (
-        <div className="mb-4 p-3 bg-teal-50 border border-teal-100 rounded-[12px] text-[11px] text-teal-800">
+        <div className="mb-4 p-3 bg-teal-50 border border-teal-100 rounded-[var(--radius-md)] text-[11px] text-teal-800">
           <div className="flex items-center gap-2">
             <label className="font-bold text-[var(--toss-gray-4)]">엑셀에 회사가 없을 때 기본 회사:</label>
-            <input type="text" value={defaultCompany} onChange={e => setDefaultCompany(e.target.value)} className="border border-[var(--toss-border)] rounded-[12px] px-2 py-1 w-40 text-sm" placeholder="박철홍정형외과" />
+            <input type="text" value={defaultCompany} onChange={e => setDefaultCompany(e.target.value)} className="border border-[var(--border)] rounded-[var(--radius-md)] px-2 py-1 w-40 text-sm" placeholder="박철홍정형외과" />
           </div>
         </div>
       )}
       <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} className="hidden" />
-      <button onClick={() => fileRef.current?.click()} disabled={loading} className="w-full py-4 bg-[var(--toss-blue)] text-white font-bold rounded-[12px] text-sm hover:bg-[var(--toss-blue)] disabled:opacity-50">
+      <button onClick={() => fileRef.current?.click()} disabled={loading} className="w-full py-2 bg-[var(--accent)] text-white font-bold rounded-[var(--radius-md)] text-sm hover:bg-[var(--accent)] disabled:opacity-50">
         {loading ? '처리 중...' : '📁 엑셀 파일 선택'}
       </button>
       {preview.length > 0 && (
-        <div className="mt-4 p-4 bg-[var(--toss-gray-1)] rounded-[12px] text-[11px] overflow-x-auto">
+        <div className="mt-4 p-4 bg-[var(--muted)] rounded-[var(--radius-md)] text-[11px] overflow-x-auto">
           <p className="font-bold mb-2">미리보기 (상위 10건)</p>
           <pre>{JSON.stringify(preview, null, 2).slice(0, 500)}...</pre>
         </div>

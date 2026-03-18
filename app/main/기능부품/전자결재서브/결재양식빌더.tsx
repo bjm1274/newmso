@@ -117,28 +117,28 @@ export default function ApprovalFormBuilder({ user }: Props) {
 
   const renderPreviewField = (field: FormField) => {
     switch (field.type) {
-      case 'text': return <input type="text" placeholder={field.placeholder || field.label} className="w-full p-2 border border-[var(--toss-border)] rounded-[8px] text-sm bg-[var(--toss-gray-1)]" disabled />;
-      case 'number': return <input type="number" placeholder={field.placeholder} className="w-full p-2 border border-[var(--toss-border)] rounded-[8px] text-sm bg-[var(--toss-gray-1)]" disabled />;
-      case 'date': return <input type="date" className="w-full p-2 border border-[var(--toss-border)] rounded-[8px] text-sm bg-[var(--toss-gray-1)]" disabled />;
-      case 'select': return <select className="w-full p-2 border border-[var(--toss-border)] rounded-[8px] text-sm bg-[var(--toss-gray-1)]" disabled><option>-- 선택 --</option>{field.options.map(o => <option key={o}>{o}</option>)}</select>;
+      case 'text': return <input type="text" placeholder={field.placeholder || field.label} className="w-full p-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--muted)]" disabled />;
+      case 'number': return <input type="number" placeholder={field.placeholder} className="w-full p-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--muted)]" disabled />;
+      case 'date': return <input type="date" className="w-full p-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--muted)]" disabled />;
+      case 'select': return <select className="w-full p-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--muted)]" disabled><option>-- 선택 --</option>{field.options.map(o => <option key={o}>{o}</option>)}</select>;
       case 'checkbox': return <input type="checkbox" className="w-4 h-4" disabled />;
-      case 'textarea': return <textarea className="w-full p-2 border border-[var(--toss-border)] rounded-[8px] text-sm h-24 bg-[var(--toss-gray-1)]" placeholder={field.placeholder} disabled />;
+      case 'textarea': return <textarea className="w-full p-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm h-24 bg-[var(--muted)]" placeholder={field.placeholder} disabled />;
       case 'file': return <input type="file" className="w-full text-sm" disabled />;
-      case 'signature': return <div className="w-full h-20 border-2 border-dashed border-[var(--toss-border)] rounded-[8px] flex items-center justify-center text-xs text-[var(--toss-gray-3)]">서명란</div>;
+      case 'signature': return <div className="w-full h-20 border-2 border-dashed border-[var(--border)] rounded-[var(--radius-md)] flex items-center justify-center text-xs text-[var(--toss-gray-3)]">서명란</div>;
       default: return null;
     }
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-5 max-w-3xl mx-auto">
+    <div className="p-4 space-y-4 max-w-3xl mx-auto">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)]">결재 양식 빌더</h2>
-          <p className="text-xs text-[var(--toss-gray-3)] mt-1">커스텀 결재 양식을 직접 만들어 저장합니다.</p>
+          <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">커스텀 결재 양식을 직접 만들어 저장합니다.</p>
         </div>
         <div className="flex gap-2">
           {(['빌더', '목록'] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)} className={`px-3 py-1.5 text-xs font-bold rounded-[8px] ${tab === t ? 'bg-[var(--toss-blue)] text-white' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'}`}>{t}</button>
+            <button key={t} onClick={() => setTab(t)} className={`px-3 py-1.5 text-xs font-bold rounded-[var(--radius-md)] ${tab === t ? 'bg-[var(--accent)] text-white' : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'}`}>{t}</button>
           ))}
         </div>
       </div>
@@ -149,15 +149,15 @@ export default function ApprovalFormBuilder({ user }: Props) {
             value={formName}
             onChange={e => setFormName(e.target.value)}
             placeholder="양식 이름 입력"
-            className="w-full p-3 rounded-[10px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-bold"
+            className="w-full p-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-sm font-bold"
           />
 
           {/* 필드 추가 버튼 */}
           <div>
-            <p className="text-xs font-bold text-[var(--toss-gray-4)] mb-2">필드 추가</p>
+            <p className="text-xs font-bold text-[var(--toss-gray-4)] mb-1.5">필드 추가</p>
             <div className="flex flex-wrap gap-2">
               {FIELD_TYPES.map(({ type, label }) => (
-                <button key={type} onClick={() => addField(type)} className="px-3 py-1.5 text-xs font-bold bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] rounded-[8px] hover:bg-[var(--toss-blue)] hover:text-white transition-all">
+                <button key={type} onClick={() => addField(type)} className="px-3 py-1.5 text-xs font-bold bg-[var(--muted)] text-[var(--toss-gray-4)] rounded-[var(--radius-md)] hover:bg-[var(--accent)] hover:text-white transition-all">
                   + {label}
                 </button>
               ))}
@@ -168,32 +168,32 @@ export default function ApprovalFormBuilder({ user }: Props) {
           {fields.length > 0 && (
             <div className="space-y-3">
               {fields.map((field, idx) => (
-                <div key={field.id} className="p-3 bg-[var(--toss-card)] rounded-[10px] border border-[var(--toss-border)]">
+                <div key={field.id} className="p-3 bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)]">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-[10px] font-bold px-2 py-0.5 bg-[var(--toss-blue)]/10 text-[var(--toss-blue)] rounded">{FIELD_TYPES.find(f => f.type === field.type)?.label}</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 bg-[var(--accent)]/10 text-[var(--accent)] rounded">{FIELD_TYPES.find(f => f.type === field.type)?.label}</span>
                     <div className="flex gap-1 ml-auto">
-                      <button onClick={() => moveField(field.id, 'up')} disabled={idx === 0} className="text-xs px-2 py-0.5 bg-[var(--toss-gray-1)] rounded disabled:opacity-30">▲</button>
-                      <button onClick={() => moveField(field.id, 'down')} disabled={idx === fields.length - 1} className="text-xs px-2 py-0.5 bg-[var(--toss-gray-1)] rounded disabled:opacity-30">▼</button>
+                      <button onClick={() => moveField(field.id, 'up')} disabled={idx === 0} className="text-xs px-2 py-0.5 bg-[var(--muted)] rounded disabled:opacity-30">▲</button>
+                      <button onClick={() => moveField(field.id, 'down')} disabled={idx === fields.length - 1} className="text-xs px-2 py-0.5 bg-[var(--muted)] rounded disabled:opacity-30">▼</button>
                       <button onClick={() => removeField(field.id)} className="text-xs px-2 py-0.5 bg-red-50 text-red-500 rounded hover:bg-red-100">삭제</button>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label className="text-[10px] text-[var(--toss-gray-3)]">라벨</label>
-                      <input value={field.label} onChange={e => updateField(field.id, { label: e.target.value })} className="w-full p-1.5 text-xs border border-[var(--toss-border)] rounded-[6px] bg-[var(--toss-gray-1)]" />
+                      <input value={field.label} onChange={e => updateField(field.id, { label: e.target.value })} className="w-full p-1.5 text-xs border border-[var(--border)] rounded-md bg-[var(--muted)]" />
                     </div>
                     <div>
                       <label className="text-[10px] text-[var(--toss-gray-3)]">Placeholder</label>
-                      <input value={field.placeholder} onChange={e => updateField(field.id, { placeholder: e.target.value })} className="w-full p-1.5 text-xs border border-[var(--toss-border)] rounded-[6px] bg-[var(--toss-gray-1)]" />
+                      <input value={field.placeholder} onChange={e => updateField(field.id, { placeholder: e.target.value })} className="w-full p-1.5 text-xs border border-[var(--border)] rounded-md bg-[var(--muted)]" />
                     </div>
                     {field.type === 'select' && (
                       <div className="col-span-2">
                         <label className="text-[10px] text-[var(--toss-gray-3)]">옵션 (쉼표 구분)</label>
-                        <input value={field.options.join(',')} onChange={e => updateField(field.id, { options: e.target.value.split(',') })} className="w-full p-1.5 text-xs border border-[var(--toss-border)] rounded-[6px] bg-[var(--toss-gray-1)]" />
+                        <input value={field.options.join(',')} onChange={e => updateField(field.id, { options: e.target.value.split(',') })} className="w-full p-1.5 text-xs border border-[var(--border)] rounded-md bg-[var(--muted)]" />
                       </div>
                     )}
                     <label className="flex items-center gap-2 col-span-2 cursor-pointer">
-                      <input type="checkbox" checked={field.required} onChange={e => updateField(field.id, { required: e.target.checked })} className="accent-[var(--toss-blue)]" />
+                      <input type="checkbox" checked={field.required} onChange={e => updateField(field.id, { required: e.target.checked })} className="accent-[var(--accent)]" />
                       <span className="text-[11px] font-bold text-[var(--toss-gray-4)]">필수 항목</span>
                     </label>
                   </div>
@@ -203,8 +203,8 @@ export default function ApprovalFormBuilder({ user }: Props) {
           )}
 
           <div className="flex gap-2">
-            <button onClick={() => setPreviewOpen(true)} disabled={fields.length === 0} className="px-4 py-2 bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] text-xs font-bold rounded-[8px] hover:bg-[var(--toss-gray-2)] disabled:opacity-40">미리보기</button>
-            <button onClick={handleSave} disabled={saving} className="flex-1 py-2 bg-[var(--toss-blue)] text-white text-xs font-bold rounded-[8px] hover:opacity-90 disabled:opacity-50">
+            <button onClick={() => setPreviewOpen(true)} disabled={fields.length === 0} className="px-4 py-2 bg-[var(--muted)] text-[var(--toss-gray-4)] text-xs font-bold rounded-[var(--radius-md)] hover:bg-[var(--toss-gray-2)] disabled:opacity-40">미리보기</button>
+            <button onClick={handleSave} disabled={saving} className="flex-1 py-2 bg-[var(--accent)] text-white text-xs font-bold rounded-[var(--radius-md)] hover:opacity-90 disabled:opacity-50">
               {saving ? '저장 중...' : '저장'}
             </button>
           </div>
@@ -212,8 +212,8 @@ export default function ApprovalFormBuilder({ user }: Props) {
           {/* 미리보기 모달 */}
           {previewOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setPreviewOpen(false)}>
-              <div className="bg-[var(--toss-card)] rounded-[16px] p-6 max-w-md w-full mx-4 shadow-xl max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-                <div className="flex items-center justify-between mb-4">
+              <div className="bg-[var(--card)] rounded-[var(--radius-lg)] p-4 max-w-md w-full mx-4 shadow-sm max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-bold">{formName || '양식 미리보기'}</h3>
                   <button onClick={() => setPreviewOpen(false)} className="text-[var(--toss-gray-3)] hover:text-[var(--foreground)]">✕</button>
                 </div>
@@ -233,18 +233,18 @@ export default function ApprovalFormBuilder({ user }: Props) {
         </>
       ) : (
         <div className="space-y-3">
-          {loading ? <div className="text-center py-8 text-sm text-[var(--toss-gray-3)]">로딩 중...</div> :
+          {loading ? <div className="text-center py-5 text-sm text-[var(--toss-gray-3)]">로딩 중...</div> :
           savedForms.length === 0 ? (
-            <div className="text-center py-12 border border-dashed border-[var(--toss-border)] rounded-[12px]">
+            <div className="text-center py-8 border border-dashed border-[var(--border)] rounded-[var(--radius-md)]">
               <p className="text-sm text-[var(--toss-gray-3)]">저장된 양식이 없습니다.</p>
             </div>
           ) : savedForms.map(form => (
-            <div key={form.id} className="flex items-center justify-between p-3 bg-[var(--toss-card)] rounded-[10px] border border-[var(--toss-border)]">
+            <div key={form.id} className="flex items-center justify-between p-3 bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)]">
               <div>
                 <p className="text-sm font-bold text-[var(--foreground)]">{form.name}</p>
                 <p className="text-[11px] text-[var(--toss-gray-3)]">필드 {(form.fields || []).length}개 · {new Date(form.created_at).toLocaleDateString('ko-KR')}</p>
               </div>
-              <button onClick={() => handleDelete(form.id)} className="px-3 py-1.5 text-xs font-bold text-red-500 bg-red-50 rounded-[8px] hover:bg-red-100">삭제</button>
+              <button onClick={() => handleDelete(form.id)} className="px-3 py-1.5 text-xs font-bold text-red-500 bg-red-50 rounded-[var(--radius-md)] hover:bg-red-100">삭제</button>
             </div>
           ))}
         </div>

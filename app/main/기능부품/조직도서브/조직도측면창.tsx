@@ -201,43 +201,45 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
 
   return (
     <>
+      {/* 데스크탑 사이드바 */}
       <aside
-        className="sticky top-0 z-[240] hidden h-[100dvh] w-[72px] shrink-0 flex-col items-center border-r border-[var(--toss-border)] bg-[var(--toss-card)] py-4 shadow-sm md:flex"
+        className="sticky top-0 z-[240] hidden h-[100dvh] w-[var(--sidebar-width)] shrink-0 flex-col items-center border-r border-[var(--border)] bg-[var(--sidebar-bg)] py-3 md:flex"
         data-testid="desktop-sidebar"
       >
-        <div className="mb-3 flex w-full shrink-0 flex-col items-center px-2">
+        <div className="mb-2 flex w-full shrink-0 flex-col items-center px-1.5">
           {user && <NotificationCenter user={user} />}
         </div>
 
-        <div className="no-scrollbar flex w-full flex-1 flex-col space-y-1 overflow-y-auto px-2">
+        <div className="no-scrollbar flex w-full flex-1 flex-col gap-0.5 overflow-y-auto px-1.5">
           {visibleMenus.map((menu) => (
             <button
               key={menu.id}
               type="button"
               data-testid={menu.testId}
               onClick={() => handleMenuClick(menu.id)}
-              className={`flex w-full flex-col items-center justify-center rounded-[12px] py-2.5 transition-all ${
+              className={`flex w-full flex-col items-center justify-center rounded-[var(--radius-md)] py-2 transition-all ${
                 mainMenu === menu.id
-                  ? 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)]'
-                  : 'text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)] hover:text-[var(--foreground)]'
+                  ? 'bg-[var(--toss-blue-light)] text-[var(--accent)]'
+                  : 'text-[var(--toss-gray-3)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
               }`}
             >
-              <span className="relative text-[18px] leading-none">
+              <span className="relative text-[17px] leading-none">
                 {menu.icon}
                 {menu.id === '채팅' && chatUnreadCount > 0 && (
-                  <span className="absolute -top-2 -right-3 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow-sm">
+                  <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-[16px] px-1 rounded-[var(--radius-md)] bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
                     {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
                   </span>
                 )}
               </span>
-              <span className="mt-1 text-[11px] font-medium">{menu.label}</span>
+              <span className="mt-1 text-[10px] font-semibold">{menu.label}</span>
             </button>
           ))}
         </div>
       </aside>
 
+      {/* 모바일 하단 탭바 */}
       <nav
-        className="safe-area-pb no-scrollbar fixed bottom-0 left-0 right-0 z-[100] flex items-center gap-1 overflow-x-auto border-t border-[var(--toss-border)] bg-[var(--toss-card)] px-2 py-1 shadow-[0_-2px_8px_rgba(0,0,0,0.04)] md:hidden"
+        className="safe-area-pb no-scrollbar fixed bottom-0 left-0 right-0 z-[100] flex items-center gap-0.5 overflow-x-auto border-t border-[var(--border)] bg-[var(--card)] px-1.5 py-1 shadow-[0_-1px_0_var(--border)] md:hidden"
         data-testid="mobile-tabbar"
       >
         {visibleMenus.map((menu) => (
@@ -246,23 +248,23 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
             type="button"
             data-testid={`${menu.testId}-mobile`}
             onClick={() => handleMenuClick(menu.id)}
-            className={`flex min-h-[50px] min-w-[70px] flex-none touch-manipulation flex-col items-center justify-center rounded-[12px] px-3 py-1.5 transition-all ${
-              mainMenu === menu.id ? 'text-[var(--toss-blue)]' : 'text-[var(--toss-gray-3)]'
+            className={`flex min-h-[48px] flex-1 touch-manipulation flex-col items-center justify-center rounded-[var(--radius-md)] px-2 py-1.5 transition-all ${
+              mainMenu === menu.id ? 'text-[var(--accent)]' : 'text-[var(--toss-gray-3)]'
             }`}
           >
-            <span className="relative text-[16px] leading-none">
+            <span className="relative text-[15px] leading-none">
               {menu.icon}
               {menu.id === '채팅' && chatUnreadCount > 0 && (
-                <span className="absolute -top-2 -right-3 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow-sm">
+                <span className="absolute -top-1.5 -right-2.5 min-w-[15px] h-[15px] px-0.5 rounded-[var(--radius-md)] bg-red-500 text-white text-[8px] font-bold flex items-center justify-center">
                   {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
                 </span>
               )}
             </span>
-            <span className="mt-1 w-full truncate text-center text-[10px] font-bold">{menu.label}</span>
+            <span className="mt-0.5 w-full truncate text-center text-[9.5px] font-bold">{menu.label}</span>
           </button>
         ))}
         {user && (
-          <div className="flex min-h-[50px] flex-none translate-y-[-2px] flex-col items-center justify-center px-2 py-1.5">
+          <div className="flex min-h-[48px] flex-none flex-col items-center justify-center px-2">
             <NotificationCenter user={user} />
           </div>
         )}

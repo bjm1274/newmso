@@ -113,7 +113,7 @@ export default function InventoryDemandForecast({ user, inventory, selectedCo }:
   const fmt = (n: number) => Math.round(n).toLocaleString('ko-KR');
 
   return (
-    <div className="p-4 md:p-6 space-y-5 max-w-5xl mx-auto">
+    <div className="p-4 md:p-4 space-y-4 max-w-5xl mx-auto">
       <div>
         <h2 className="text-lg font-bold text-[var(--foreground)]">재고 수요 예측</h2>
         <p className="text-xs text-[var(--toss-gray-3)] mt-1">최근 90일 출고 이력 기반 품목별 소진일수 예측</p>
@@ -122,7 +122,7 @@ export default function InventoryDemandForecast({ user, inventory, selectedCo }:
       <div className="flex flex-wrap gap-3 items-center">
         <div className="flex gap-2">
           {(['전체', '긴급', '주의'] as const).map(f => (
-            <button key={f} onClick={() => setFilterStatus(f)} className={`px-3 py-1.5 text-xs font-bold rounded-[8px] ${filterStatus === f ? 'bg-[var(--toss-blue)] text-white' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'}`}>{f}</button>
+            <button key={f} onClick={() => setFilterStatus(f)} className={`px-3 py-1.5 text-xs font-bold rounded-[var(--radius-md)] ${filterStatus === f ? 'bg-[var(--accent)] text-white' : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'}`}>{f}</button>
           ))}
         </div>
         <div className="flex items-center gap-2">
@@ -133,7 +133,7 @@ export default function InventoryDemandForecast({ user, inventory, selectedCo }:
             onChange={e => setSafetyDays(Number(e.target.value))}
             min={1}
             max={30}
-            className="w-16 p-1.5 text-xs font-bold border border-[var(--toss-border)] rounded-[6px] bg-[var(--toss-card)] text-center"
+            className="w-16 p-1.5 text-xs font-bold border border-[var(--border)] rounded-md bg-[var(--card)] text-center"
           />
           <span className="text-xs text-[var(--toss-gray-3)]">일</span>
         </div>
@@ -142,7 +142,7 @@ export default function InventoryDemandForecast({ user, inventory, selectedCo }:
       {loading ? (
         <div className="text-center py-10 text-sm text-[var(--toss-gray-3)]">분석 중...</div>
       ) : displayData.length === 0 ? (
-        <div className="text-center py-12 bg-[var(--toss-card)] rounded-[12px] border border-[var(--toss-border)]">
+        <div className="text-center py-8 bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)]">
           <p className="text-sm font-bold text-[var(--toss-gray-4)]">표시할 품목이 없습니다.</p>
         </div>
       ) : (
@@ -150,7 +150,7 @@ export default function InventoryDemandForecast({ user, inventory, selectedCo }:
           {displayData.map((fc, i) => {
             const maxUsage = Math.max(...fc.recentUsage, 1);
             return (
-              <div key={i} className={`p-4 rounded-[12px] border ${statusColor(fc.status)}`}>
+              <div key={i} className={`p-4 rounded-[var(--radius-md)] border ${statusColor(fc.status)}`}>
                 <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
                   <div>
                     <p className="text-sm font-bold text-[var(--foreground)]">{getItemName(fc.item)}</p>
@@ -159,19 +159,19 @@ export default function InventoryDemandForecast({ user, inventory, selectedCo }:
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusColor(fc.status)}`}>{fc.status}</span>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 text-center">
-                  <div className="bg-white/60 rounded-[8px] p-2">
+                  <div className="bg-[var(--card)]/60 rounded-[var(--radius-md)] p-2">
                     <p className="text-[10px] text-[var(--toss-gray-3)]">현재 재고</p>
                     <p className="text-sm font-bold">{fmt(getItemQuantity(fc.item))}</p>
                   </div>
-                  <div className="bg-white/60 rounded-[8px] p-2">
+                  <div className="bg-[var(--card)]/60 rounded-[var(--radius-md)] p-2">
                     <p className="text-[10px] text-[var(--toss-gray-3)]">일평균 소비</p>
                     <p className="text-sm font-bold">{fc.avgDailyUsage.toFixed(2)}</p>
                   </div>
-                  <div className="bg-white/60 rounded-[8px] p-2">
+                  <div className="bg-[var(--card)]/60 rounded-[var(--radius-md)] p-2">
                     <p className="text-[10px] text-[var(--toss-gray-3)]">예상 소진일</p>
                     <p className={`text-sm font-bold ${fc.daysLeft < 7 ? 'text-red-600' : ''}`}>{fc.daysLeft >= 9999 ? '∞' : `${fc.daysLeft}일`}</p>
                   </div>
-                  <div className="bg-white/60 rounded-[8px] p-2">
+                  <div className="bg-[var(--card)]/60 rounded-[var(--radius-md)] p-2">
                     <p className="text-[10px] text-[var(--toss-gray-3)]">발주 권장량</p>
                     <p className="text-sm font-bold">{fmt(fc.orderQty)}</p>
                   </div>
@@ -180,7 +180,7 @@ export default function InventoryDemandForecast({ user, inventory, selectedCo }:
                 <div className="flex items-end gap-1 h-10 mb-3">
                   {fc.recentUsage.map((u, wi) => (
                     <div key={wi} className="flex flex-col items-center flex-1">
-                      <div className="w-full rounded-t-[2px] bg-[var(--toss-blue)]/40" style={{ height: `${(u / maxUsage) * 100}%`, minHeight: u > 0 ? '2px' : '0' }} />
+                      <div className="w-full rounded-t-[2px] bg-[var(--accent)]/40" style={{ height: `${(u / maxUsage) * 100}%`, minHeight: u > 0 ? '2px' : '0' }} />
                     </div>
                   ))}
                 </div>
@@ -189,7 +189,7 @@ export default function InventoryDemandForecast({ user, inventory, selectedCo }:
                   <button
                     onClick={() => handleAutoOrder(fc)}
                     disabled={ordering === String(fc.item.id)}
-                    className="w-full py-1.5 text-xs font-bold bg-[var(--toss-blue)] text-white rounded-[8px] hover:opacity-90 disabled:opacity-50"
+                    className="w-full py-1.5 text-xs font-bold bg-[var(--accent)] text-white rounded-[var(--radius-md)] hover:opacity-90 disabled:opacity-50"
                   >
                     {ordering === String(fc.item.id) ? '신청 중...' : '자동발주 신청'}
                   </button>

@@ -85,12 +85,12 @@ export default function SalarySimulator() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col lg:flex-row gap-5">
+      <div className="flex flex-col lg:flex-row gap-3">
         {/* 입력 패널 */}
         <div className="flex-1 space-y-4">
-          <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] p-5 shadow-sm">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-4 shadow-sm">
             <h3 className="text-sm font-bold text-[var(--foreground)] mb-4 flex items-center gap-2">
-              <span className="w-1 h-4 bg-[var(--toss-blue)] rounded" /> 기본급 설정
+              <span className="w-1 h-4 bg-[var(--accent)] rounded" /> 기본급 설정
             </h3>
             <div className="space-y-3">
               <div>
@@ -100,7 +100,7 @@ export default function SalarySimulator() {
                   step={10000}
                   value={baseSalary}
                   onChange={e => setBaseSalary(Number(e.target.value) || 0)}
-                  className="w-full px-4 py-3 border border-[var(--toss-border)] rounded-[12px] text-sm font-bold bg-[var(--toss-card)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)]"
+                  className="w-full px-4 py-3 border border-[var(--border)] rounded-[var(--radius-md)] text-sm font-bold bg-[var(--card)] outline-none focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)]"
                 />
                 <p className="text-[10px] text-[var(--toss-gray-3)] mt-1">연환산: {fmt(baseSalary * 12)}원</p>
               </div>
@@ -112,14 +112,14 @@ export default function SalarySimulator() {
                   max={10}
                   value={dependents}
                   onChange={e => setDependents(Number(e.target.value) || 0)}
-                  className="w-full px-4 py-3 border border-[var(--toss-border)] rounded-[12px] text-sm font-bold bg-[var(--toss-card)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20"
+                  className="w-full px-4 py-3 border border-[var(--border)] rounded-[var(--radius-md)] text-sm font-bold bg-[var(--card)] outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
                 />
                 <p className="text-[10px] text-[var(--toss-gray-3)] mt-1">1인당 소득세 12,500원 추가 공제</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] p-5 shadow-sm">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-4 shadow-sm">
             <h3 className="text-sm font-bold text-[var(--foreground)] mb-4 flex items-center gap-2">
               <span className="w-1 h-4 bg-emerald-500 rounded" /> 수당 항목
             </h3>
@@ -136,7 +136,7 @@ export default function SalarySimulator() {
                     min={0}
                     value={allowances[a.key]}
                     onChange={e => setAllowances(prev => ({ ...prev, [a.key]: Number(e.target.value) || 0 }))}
-                    className="flex-1 px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm font-bold bg-[var(--toss-card)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20 text-right"
+                    className="flex-1 px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm font-bold bg-[var(--card)] outline-none focus:ring-2 focus:ring-[var(--accent)]/20 text-right"
                   />
                   <span className="text-[10px] text-[var(--toss-gray-3)] w-8">원</span>
                 </div>
@@ -147,7 +147,7 @@ export default function SalarySimulator() {
 
         {/* 결과 패널 */}
         <div className="lg:w-80 space-y-4">
-          <div className="bg-gradient-to-br from-[var(--toss-blue)] to-blue-600 rounded-[18px] p-6 text-white shadow-lg">
+          <div className="bg-gradient-to-br from-[var(--accent)] to-blue-600 rounded-[var(--radius-xl)] p-4 text-white shadow-sm">
             <p className="text-xs font-semibold opacity-80 mb-1">실수령액</p>
             <p className="text-3xl font-bold mb-1">{fmt(calc.net)}원</p>
             <p className="text-xs opacity-70">총급여 {fmt(calc.gross)}원 · 공제 {fmt(calc.totalDeduction)}원</p>
@@ -163,7 +163,7 @@ export default function SalarySimulator() {
             </div>
           </div>
 
-          <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] p-5 shadow-sm">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-4 shadow-sm">
             <h4 className="text-xs font-bold text-[var(--toss-gray-3)] uppercase mb-3">공제 항목 상세</h4>
             <div className="space-y-1.5">
               {[
@@ -179,7 +179,7 @@ export default function SalarySimulator() {
                   <span className="font-semibold text-[var(--foreground)]">{fmt(d.val)}원</span>
                 </div>
               ))}
-              <div className="pt-2 border-t border-[var(--toss-border)] flex justify-between items-center">
+              <div className="pt-2 border-t border-[var(--border)] flex justify-between items-center">
                 <span className="text-xs font-bold text-[var(--toss-gray-4)]">총 공제</span>
                 <span className="text-sm font-bold text-red-500">{fmt(calc.totalDeduction)}원</span>
               </div>
@@ -187,12 +187,12 @@ export default function SalarySimulator() {
           </div>
 
           {/* 비교 모드 */}
-          <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] p-5 shadow-sm">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-4 shadow-sm">
             <div className="flex items-center justify-between mb-3">
               <h4 className="text-xs font-bold text-[var(--toss-gray-3)] uppercase">연봉 비교</h4>
               <button
                 onClick={() => setCompareMode(v => !v)}
-                className={`text-[10px] px-3 py-1 rounded-full font-bold transition-colors ${compareMode ? 'bg-[var(--toss-blue)] text-white' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'}`}
+                className={`text-[10px] px-3 py-1 rounded-full font-bold transition-colors ${compareMode ? 'bg-[var(--accent)] text-white' : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'}`}
               >
                 {compareMode ? 'ON' : 'OFF'}
               </button>
@@ -206,11 +206,11 @@ export default function SalarySimulator() {
                     step={10000}
                     value={compareBase}
                     onChange={e => setCompareBase(Number(e.target.value) || 0)}
-                    className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm font-bold bg-[var(--toss-card)] outline-none"
+                    className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm font-bold bg-[var(--card)] outline-none"
                   />
                 </div>
                 {calcCompare && (
-                  <div className="space-y-1 pt-2 border-t border-[var(--toss-border)]">
+                  <div className="space-y-1 pt-2 border-t border-[var(--border)]">
                     <div className="flex justify-between text-xs">
                       <span className="text-[var(--toss-gray-3)]">비교 실수령</span>
                       <span className="font-bold text-emerald-600">{fmt(calcCompare.net)}원</span>

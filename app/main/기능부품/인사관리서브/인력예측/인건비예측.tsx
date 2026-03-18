@@ -29,7 +29,7 @@ export default function LaborCostSimulation({ staffs, selectedCo }: any) {
   const grandTotal = filtered.reduce((s: number, st: any) => s + (Number(st.base_salary) || 0), 0);
 
   return (
-    <div className="bg-white border border-[var(--toss-border)] rounded-[12px] p-6 shadow-sm">
+    <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] p-4 shadow-sm">
       <h3 className="text-sm font-semibold text-[var(--foreground)] mb-4">💰 인건비 예측 (부서·직급별)</h3>
       <div className="space-y-4">
         <div>
@@ -54,9 +54,9 @@ export default function LaborCostSimulation({ staffs, selectedCo }: any) {
             ))}
           </div>
         </div>
-        <div className="pt-3 border-t border-[var(--toss-border)] flex justify-between">
+        <div className="pt-3 border-t border-[var(--border)] flex justify-between">
           <span className="text-xs font-semibold text-[var(--toss-gray-4)]">월 인건비 합계</span>
-          <span className="text-sm font-semibold text-[var(--toss-blue)]">₩{grandTotal.toLocaleString()}</span>
+          <span className="text-sm font-semibold text-[var(--accent)]">₩{grandTotal.toLocaleString()}</span>
         </div>
       </div>
     </div>

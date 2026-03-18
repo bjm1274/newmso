@@ -14,28 +14,28 @@ export default function SeveranceCalculator() {
   const amount = calculateSeverancePay(avgWage, workDays);
 
   return (
-    <div className="bg-[var(--toss-card)] p-5 border border-[var(--toss-border)] rounded-[12px] shadow-sm max-w-md">
-      <div className="pb-3 border-b border-[var(--toss-border)] mb-4">
+    <div className="bg-[var(--card)] p-4 border border-[var(--border)] rounded-[var(--radius-md)] shadow-sm max-w-md">
+      <div className="pb-3 border-b border-[var(--border)] mb-4">
         <h3 className="text-lg font-bold text-[var(--foreground)]">퇴직금 계산기</h3>
         <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">근로기준법 · 1일평균임금 × 30 × (재직일/365)</p>
       </div>
       <div className="space-y-4">
         <div className="space-y-1">
           <label className="text-xs font-medium text-[var(--toss-gray-4)]">월 평균임금 (원)</label>
-          <input type="number" value={avgWage} onChange={e => setAvgWage(parseInt(e.target.value, 10) || 0)} className="w-full h-10 px-3 rounded-md border border-[var(--toss-border)] text-sm font-medium" />
+          <input type="number" value={avgWage} onChange={e => setAvgWage(parseInt(e.target.value, 10) || 0)} className="w-full h-10 px-3 rounded-md border border-[var(--border)] text-sm font-medium" />
         </div>
         <div className="space-y-1">
-          <SmartDatePicker value={joinDate} onChange={val => setJoinDate(val)} className="w-full h-10 px-3 rounded-md border border-[var(--toss-border)] text-sm font-medium bg-white" />
+          <SmartDatePicker value={joinDate} onChange={val => setJoinDate(val)} className="w-full h-10 px-3 rounded-md border border-[var(--border)] text-sm font-medium bg-[var(--card)]" />
         </div>
         <div className="space-y-1">
-          <SmartDatePicker value={retireDate} onChange={val => setRetireDate(val)} className="w-full h-10 px-3 rounded-md border border-[var(--toss-border)] text-sm font-medium bg-white" />
+          <SmartDatePicker value={retireDate} onChange={val => setRetireDate(val)} className="w-full h-10 px-3 rounded-md border border-[var(--border)] text-sm font-medium bg-[var(--card)]" />
         </div>
       </div>
-      <div className="mt-5 p-4 bg-[var(--tab-bg)] rounded-[12px] border border-[var(--toss-border)]">
+      <div className="mt-5 p-4 bg-[var(--tab-bg)] rounded-[var(--radius-md)] border border-[var(--border)]">
         <p className="text-xs font-medium text-[var(--toss-gray-3)]">재직기간</p>
         <p className="text-base font-semibold text-[var(--foreground)]">{formatWorkPeriod(workDays)}</p>
         <p className="text-xs font-medium text-[var(--toss-gray-3)] mt-3">예상 퇴직금</p>
-        <p className="text-xl font-bold text-[var(--toss-blue)]">₩{amount.toLocaleString()}</p>
+        <p className="text-xl font-bold text-[var(--accent)]">₩{amount.toLocaleString()}</p>
       </div>
     </div>
   );

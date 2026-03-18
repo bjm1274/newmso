@@ -22,21 +22,21 @@ export default function AdminForms({ staffs, formType, setExtraData }: any) {
   const hospitalDepts = ['진료부', '병동팀', '수술팀', '외래팀', '검사팀', '총무팀', '원무팀', '관리팀', '영양팀'];
 
   return (
-    <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-3xl overflow-hidden shadow-sm animate-in fade-in duration-300">
-      <div className="p-4 md:p-6 bg-[var(--toss-blue-light)]/30 border-b border-[var(--toss-border)]">
+    <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm animate-in fade-in duration-300">
+      <div className="p-4 md:p-4 bg-[var(--toss-blue-light)]/30 border-b border-[var(--border)]">
         <h4 className="text-sm font-bold text-[var(--foreground)]">{formType} 양식</h4>
         <p className="text-[11px] font-semibold text-[var(--toss-gray-4)] mt-1">사내 행정 결재 전용 표준 양식</p>
       </div>
-      <div className="p-4 md:p-6 space-y-6 bg-gray-50/30">
+      <div className="p-4 md:p-4 space-y-4 bg-[var(--tab-bg)]/30">
 
         {/* 🎖️ 1. 인사명령: 관리자 전용 발령 시스템 */}
         {formType === '인사명령' && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-6">
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-[11px] font-semibold text-purple-600 ml-1 uppercase">발령 구분</label>
                 <select
-                  className="w-full p-4 rounded-[12px] border font-semibold text-xs bg-white outline-none shadow-sm focus:ring-2 focus:ring-purple-200 border-none"
+                  className="w-full p-4 rounded-[var(--radius-md)] border font-semibold text-xs bg-[var(--card)] outline-none shadow-sm focus:ring-2 focus:ring-purple-200 border-none"
                   onChange={e => setExtraData((p: any) => ({ ...p, orderCategory: e.target.value }))}
                 >
                   <option value="">발령 구분 선택</option>
@@ -52,16 +52,16 @@ export default function AdminForms({ staffs, formType, setExtraData }: any) {
                 <SmartDatePicker
                   value={localExecutionDate}
                   onChange={val => { setLocalExecutionDate(val); setExtraData((p: any) => ({ ...p, executionDate: val })); }}
-                  inputClassName="w-full h-[46px] px-4 rounded-[12px] bg-white font-semibold text-xs"
+                  inputClassName="w-full h-[46px] px-4 rounded-[var(--radius-md)] bg-[var(--card)] font-semibold text-xs"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-white rounded-[16px] border border-purple-50 shadow-inner">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-[var(--card)] rounded-[var(--radius-lg)] border border-purple-50 shadow-inner">
               <div className="space-y-2">
                 <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] block ml-1">발령 대상자 선택</label>
                 <select
-                  className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[16px] text-xs font-bold outline-none border-none focus:ring-2 focus:ring-purple-100"
+                  className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-lg)] text-xs font-bold outline-none border-none focus:ring-2 focus:ring-purple-100"
                   onChange={e => setExtraData((p: any) => ({ ...p, orderTargetId: e.target.value }))}
                 >
                   <option value="">직원을 선택하세요</option>
@@ -74,7 +74,7 @@ export default function AdminForms({ staffs, formType, setExtraData }: any) {
                 <label className="text-[11px] font-semibold text-blue-500 block ml-1">변경(발령) 직급/부서</label>
                 <div className="flex gap-2">
                   <select
-                    className="flex-1 p-4 bg-blue-50/50 rounded-[16px] text-xs font-semibold text-[var(--toss-blue)] outline-none border-none focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+                    className="flex-1 p-4 bg-blue-50/50 rounded-[var(--radius-lg)] text-xs font-semibold text-[var(--accent)] outline-none border-none focus:ring-2 focus:ring-[var(--accent)]/30"
                     onChange={e => setExtraData((p: any) => ({ ...p, newPosition: e.target.value }))}
                   >
                     <option value="">직급 선택</option>
@@ -87,7 +87,7 @@ export default function AdminForms({ staffs, formType, setExtraData }: any) {
                     <option>사원</option>
                   </select>
                   <select
-                    className="flex-1 p-4 bg-blue-50/50 rounded-[16px] text-xs font-semibold text-[var(--toss-blue)] outline-none border-none focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+                    className="flex-1 p-4 bg-blue-50/50 rounded-[var(--radius-lg)] text-xs font-semibold text-[var(--accent)] outline-none border-none focus:ring-2 focus:ring-[var(--accent)]/30"
                     onChange={e => setExtraData((p: any) => ({ ...p, targetDept: e.target.value }))}
                   >
                     <option value="">부서 선택</option>
@@ -101,13 +101,13 @@ export default function AdminForms({ staffs, formType, setExtraData }: any) {
 
         {/* 📝 2. 업무협조: 부서 간 요청 서식 */}
         {formType === '업무협조' && (
-          <div className="grid grid-cols-2 gap-6 animate-in slide-in-from-top-2">
+          <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2">
             <div className="space-y-2">
               <label className="text-[11px] font-semibold text-blue-500 ml-1">수신 부서</label>
               <input
                 type="text"
                 placeholder="예: 원무과, 간호부"
-                className="w-full p-4 rounded-[12px] border bg-white font-bold text-xs outline-none shadow-sm focus:ring-2 focus:ring-[var(--toss-blue)]/30 border-none"
+                className="w-full p-4 rounded-[var(--radius-md)] border bg-[var(--card)] font-bold text-xs outline-none shadow-sm focus:ring-2 focus:ring-[var(--accent)]/30 border-none"
                 onChange={e => setExtraData((p: any) => ({ ...p, targetDept: e.target.value }))}
               />
             </div>
@@ -116,7 +116,7 @@ export default function AdminForms({ staffs, formType, setExtraData }: any) {
               <SmartDatePicker
                 value=""
                 onChange={val => setExtraData((p: any) => ({ ...p, deadlineDate: val }))}
-                className="w-full h-[46px] px-4 rounded-[12px] bg-white font-bold text-xs"
+                className="w-full h-[46px] px-4 rounded-[var(--radius-md)] bg-[var(--card)] font-bold text-xs"
               />
             </div>
           </div>
@@ -124,13 +124,13 @@ export default function AdminForms({ staffs, formType, setExtraData }: any) {
 
         {/* 🗣️ 3. 회의록: 병원 내 위원회 및 회의 서식 */}
         {formType === '회의록' && (
-          <div className="grid grid-cols-2 gap-6 animate-in slide-in-from-top-2">
+          <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2">
             <div className="space-y-2">
               <label className="text-[11px] font-semibold text-green-600 ml-1">회의 장소</label>
               <input
                 type="text"
                 placeholder="예: 대회의실, 원장실"
-                className="w-full p-4 rounded-[12px] border bg-white font-bold text-xs shadow-sm outline-none border-none focus:ring-2 focus:ring-green-100"
+                className="w-full p-4 rounded-[var(--radius-md)] border bg-[var(--card)] font-bold text-xs shadow-sm outline-none border-none focus:ring-2 focus:ring-green-100"
                 onChange={e => setExtraData((p: any) => ({ ...p, location: e.target.value }))}
               />
             </div>
@@ -139,7 +139,7 @@ export default function AdminForms({ staffs, formType, setExtraData }: any) {
               <input
                 type="text"
                 placeholder="참석자 성함 나열"
-                className="w-full p-4 rounded-[12px] border bg-white font-bold text-xs shadow-sm outline-none border-none focus:ring-2 focus:ring-green-100"
+                className="w-full p-4 rounded-[var(--radius-md)] border bg-[var(--card)] font-bold text-xs shadow-sm outline-none border-none focus:ring-2 focus:ring-green-100"
                 onChange={e => setExtraData((p: any) => ({ ...p, attendees: e.target.value }))}
               />
             </div>
@@ -148,11 +148,11 @@ export default function AdminForms({ staffs, formType, setExtraData }: any) {
 
         {/* 📊 4. 업무보고: 주간/월간 실적 보고 서식 */}
         {formType === '업무보고' && (
-          <div className="grid grid-cols-2 gap-6 animate-in slide-in-from-top-2">
+          <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2">
             <div className="space-y-2">
               <label className="text-[11px] font-semibold text-orange-500 ml-1">보고 주기</label>
               <select
-                className="w-full p-4 rounded-[12px] border bg-white font-semibold text-xs outline-none shadow-sm border-none focus:ring-2 focus:ring-orange-100"
+                className="w-full p-4 rounded-[var(--radius-md)] border bg-[var(--card)] font-semibold text-xs outline-none shadow-sm border-none focus:ring-2 focus:ring-orange-100"
                 onChange={e => setExtraData((p: any) => ({ ...p, reportCycle: e.target.value }))}
               >
                 <option>주간 업무보고</option>
@@ -165,7 +165,7 @@ export default function AdminForms({ staffs, formType, setExtraData }: any) {
               <input
                 type="text"
                 placeholder="해당 프로젝트명"
-                className="w-full p-4 rounded-[12px] border bg-white font-bold text-xs shadow-sm outline-none border-none focus:ring-2 focus:ring-orange-100"
+                className="w-full p-4 rounded-[var(--radius-md)] border bg-[var(--card)] font-bold text-xs shadow-sm outline-none border-none focus:ring-2 focus:ring-orange-100"
               />
             </div>
           </div>
@@ -176,7 +176,7 @@ export default function AdminForms({ staffs, formType, setExtraData }: any) {
           <div className="grid grid-cols-1 animate-in slide-in-from-top-2">
             <div className="space-y-2">
               <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] ml-1">기안 성격</label>
-              <select className="w-full p-4 rounded-[12px] border bg-white font-semibold text-xs outline-none shadow-sm border-none focus:ring-2 focus:ring-[var(--toss-border)]">
+              <select className="w-full p-4 rounded-[var(--radius-md)] border bg-[var(--card)] font-semibold text-xs outline-none shadow-sm border-none focus:ring-2 focus:ring-[var(--border)]">
                 <option>일반 품의</option>
                 <option>예산 집행</option>
                 <option>제도 변경</option>
@@ -187,7 +187,7 @@ export default function AdminForms({ staffs, formType, setExtraData }: any) {
         )}
 
       </div>
-      <div className="p-4 bg-white border-t border-[var(--toss-border)] text-center">
+      <div className="p-4 bg-[var(--card)] border-t border-[var(--border)] text-center">
         <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">
           {formType} 전용 가이드 프레임이 적용되었습니다.<br />
           하단 본문 영역에 상세 내용을 자유롭게 작성하세요. ✨

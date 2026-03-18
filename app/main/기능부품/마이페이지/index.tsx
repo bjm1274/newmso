@@ -381,10 +381,10 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
     }
   };
 
-  if (!user) return <div className="p-10 text-center font-bold">사용자 정보 로딩 중...</div>;
+  if (!user) return <div className="p-5 text-center font-bold">사용자 정보 로딩 중...</div>;
 
   return (
-    <div className="relative h-full min-h-0 flex flex-col overflow-x-hidden app-page px-2.5 py-2.5 md:rounded-[3rem] md:px-4 md:py-3">
+    <div className="relative h-full min-h-0 flex flex-col overflow-x-hidden app-page px-3 py-2.5 md:px-4 md:py-3">
 
       {/* 전자 서명 전용 신규 모달 */}
       {pendingContract && (
@@ -396,19 +396,19 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
         />
       )}
 
-      {/* 상단 로고 및 헤더 */}
-      <div className="mb-3 flex flex-col gap-2.5 shrink-0">
-        <div className="flex flex-col gap-2.5 xl:flex-row xl:items-center xl:justify-between">
+      {/* 상단 헤더 */}
+      <div className="mb-2.5 flex flex-col gap-2 shrink-0">
+        <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
           <div className="min-w-0 flex-1 text-left">
-            <div className="mb-1 flex flex-wrap items-center gap-2">
-              <AppLogo size={40} />
-              <h1 className="page-header-title text-2xl font-semibold tracking-tight">
-                반갑습니다, {user.name}님 👋
+            <div className="flex flex-wrap items-center gap-2">
+              <AppLogo size={32} />
+              <h1 className="page-header-title">
+                반갑습니다, {user.name}님
               </h1>
             </div>
           </div>
 
-          <div className="flex w-full justify-around rounded-2xl border border-[var(--toss-border)] bg-[var(--toss-card)] p-0.5 shadow-sm xl:w-auto xl:justify-start">
+          <div className="no-scrollbar flex w-full overflow-x-auto gap-0.5 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-0.5 xl:w-auto">
             <TabButton
               isActive={activeTab === 'profile'}
               onClick={() => setActiveTab('profile')}
@@ -447,7 +447,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
             <button
               type="button"
               onClick={() => setShowFavPicker((v) => !v)}
-              className="rounded-full border border-dashed border-[var(--toss-border)] px-3 py-1.5 text-[11px] font-semibold whitespace-nowrap text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]"
+              className="rounded-[var(--radius-md)] border border-dashed border-[var(--border)] px-3 py-1.5 text-[11px] font-semibold whitespace-nowrap text-[var(--toss-gray-3)] hover:bg-[var(--muted)]"
             >
               + 즐겨찾기 추가
             </button>
@@ -481,7 +481,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
               <select
                 value={pendingFav}
                 onChange={(e) => setPendingFav(e.target.value as FavoriteId | '')}
-                className="px-3 py-1.5 rounded-full text-[11px] font-semibold border border-[var(--toss-border)] bg-[var(--toss-card)]"
+                className="px-3 py-1.5 rounded-[var(--radius-md)] text-[11px] font-semibold border border-[var(--border)] bg-[var(--card)]"
               >
                 <option value="">항목 선택</option>
                 {FAVORITE_OPTIONS.filter(o => !favorites.includes(o.id)).map((o) => (
@@ -493,7 +493,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
               <button
                 type="button"
                 onClick={handleAddFavorite}
-                className="px-3 py-1.5 rounded-full text-[11px] font-semibold bg-[var(--foreground)] text-white hover:opacity-90"
+                className="px-3 py-1.5 rounded-[var(--radius-md)] text-[11px] font-semibold bg-[var(--foreground)] text-white hover:opacity-90"
               >
                 추가
               </button>
@@ -587,10 +587,10 @@ function ProfileHeaderSummary({
   onToggleEdit: () => void;
 }) {
   return (
-    <section className="h-[128px] w-full rounded-[22px] border border-[var(--toss-border)] bg-[var(--toss-card)] px-4 py-3 shadow-sm xl:max-w-[340px]">
+    <section className="h-[128px] w-full rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 shadow-sm xl:max-w-[340px]">
       <div className="flex h-full items-center justify-between gap-3">
         <div className="relative shrink-0">
-          <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-[var(--toss-border)] bg-[var(--toss-gray-1)] shadow-sm">
+          <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-[var(--border)] bg-[var(--muted)] shadow-sm">
             {user.avatarUrl ? (
               <img src={user.avatarUrl} alt="프로필 사진" className="h-full w-full object-cover" />
             ) : (
@@ -600,7 +600,7 @@ function ProfileHeaderSummary({
           {user.id ? (
             <label
               htmlFor="profiles-upload"
-              className="absolute -bottom-1 -right-1 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-[var(--toss-blue)] text-[13px] text-white shadow-sm transition-all hover:opacity-90"
+              className="absolute -bottom-1 -right-1 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-[var(--accent)] text-[13px] text-white shadow-sm transition-all hover:opacity-90"
               title="프로필 사진 등록"
             >
               📷
@@ -611,7 +611,7 @@ function ProfileHeaderSummary({
           <p className="text-[28px] font-bold tracking-tight leading-tight text-[var(--foreground)] break-keep">
             {user.name} {user.position}
           </p>
-          <p className="mt-2 truncate text-sm font-bold text-[var(--toss-blue)]">
+          <p className="mt-2 truncate text-sm font-bold text-[var(--accent)]">
             {user.department || '소속 정보 없음'}
           </p>
         </div>
@@ -619,7 +619,7 @@ function ProfileHeaderSummary({
           <button
             type="button"
             onClick={onToggleSecret}
-            className="rounded-full border border-transparent bg-[var(--toss-gray-1)] px-3 py-1.5 text-[10px] font-bold text-[var(--toss-gray-3)] transition-all hover:border-[var(--toss-blue-light)] hover:text-[var(--toss-blue)]"
+            className="rounded-[var(--radius-md)] border border-transparent bg-[var(--muted)] px-3 py-1.5 text-[10px] font-bold text-[var(--toss-gray-3)] transition-all hover:border-[var(--toss-blue-light)] hover:text-[var(--accent)]"
           >
             {showSecret ? '민감 정보 숨기기' : '보안 정보 보기'}
           </button>
@@ -627,10 +627,10 @@ function ProfileHeaderSummary({
             type="button"
             onClick={onToggleEdit}
             data-testid="mypage-profile-edit-toggle"
-            className={`rounded-full border px-3 py-1.5 text-[10px] font-bold transition-all ${
+            className={`rounded-[var(--radius-md)] border px-3 py-1.5 text-[10px] font-bold transition-all ${
               isEditing
                 ? 'bg-red-50 text-red-500 border-red-100 hover:bg-red-100'
-                : 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)] border-[var(--toss-blue-light)] hover:bg-[var(--toss-blue-light)]'
+                : 'bg-[var(--toss-blue-light)] text-[var(--accent)] border-[var(--toss-blue-light)] hover:bg-[var(--toss-blue-light)]'
             }`}
           >
             {isEditing ? '수정 취소' : '내 정보 수정'}
@@ -687,7 +687,7 @@ function PayrollAndCertificatesHub({
 
   return (
     <div className="space-y-4 p-3 md:p-4">
-      <section className="rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4 shadow-sm">
+      <section className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
         <div className="flex flex-col gap-3">
           <div>
             <h2 className="text-xl font-bold tracking-tight text-[var(--foreground)]">급여·증명서</h2>
@@ -697,17 +697,17 @@ function PayrollAndCertificatesHub({
               type="button"
               aria-label="월별 정산 카드"
               onClick={() => onChangeView('salary')}
-              className={`rounded-[20px] border px-5 py-4 text-left transition-all ${
+              className={`rounded-[var(--radius-xl)] border px-5 py-4 text-left transition-all ${
                 activeView === 'salary'
-                  ? 'border-[var(--toss-blue)] bg-[var(--toss-blue-light)]/60 shadow-sm'
-                  : 'border-[var(--toss-border)] bg-white hover:bg-[var(--toss-gray-1)]'
+                  ? 'border-[var(--accent)] bg-[var(--toss-blue-light)]/60 shadow-sm'
+                  : 'border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]'
               }`}
             >
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">급여명세서</p>
                 </div>
-                <span className="rounded-full bg-white px-3 py-1 text-sm font-black text-[var(--toss-blue)] shadow-sm">
+                <span className="rounded-[var(--radius-md)] bg-[var(--card)] px-3 py-1 text-sm font-black text-[var(--accent)] shadow-sm">
                   {summary.salaryCount}건
                 </span>
               </div>
@@ -716,10 +716,10 @@ function PayrollAndCertificatesHub({
               type="button"
               aria-label="발급 문서 카드"
               onClick={() => onChangeView('certificates')}
-              className={`rounded-[20px] border px-5 py-4 text-left transition-all ${
+              className={`rounded-[var(--radius-xl)] border px-5 py-4 text-left transition-all ${
                 activeView === 'certificates'
-                  ? 'border-[var(--toss-blue)] bg-[var(--toss-blue-light)]/60 shadow-sm'
-                  : 'border-[var(--toss-border)] bg-white hover:bg-[var(--toss-gray-1)]'
+                  ? 'border-[var(--accent)] bg-[var(--toss-blue-light)]/60 shadow-sm'
+                  : 'border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]'
               }`}
             >
               <div className="flex items-center justify-between gap-3">
@@ -727,7 +727,7 @@ function PayrollAndCertificatesHub({
                   <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">발급된 증명서</p>
                   <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">발급 완료 및 승인 문서 확인</p>
                 </div>
-                <span className="rounded-full bg-white px-3 py-1 text-sm font-black text-[var(--toss-blue)] shadow-sm">
+                <span className="rounded-[var(--radius-md)] bg-[var(--card)] px-3 py-1 text-sm font-black text-[var(--accent)] shadow-sm">
                   {summary.certificateCount}건
                 </span>
               </div>
@@ -754,11 +754,11 @@ function TabButton({ isActive, onClick, label, icon, ariaLabel }: any) {
     <button
       onClick={onClick}
       {...(ariaLabel ? { 'aria-label': ariaLabel } : {})}
-      className={`flex flex-col md:flex-row items-center gap-1 md:gap-2 px-1.5 md:px-5 py-2 md:py-2.5 rounded-xl md:rounded-full text-[10px] md:text-sm font-bold transition-all duration-200 whitespace-nowrap
-        ${isActive ? 'bg-[var(--toss-blue)] text-white shadow-md' : 'bg-transparent text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]'}
+      className={`flex flex-col md:flex-row items-center gap-0.5 md:gap-1.5 px-2 md:px-4 py-1.5 md:py-2 rounded-[var(--radius-md)] text-[10px] md:text-[12px] font-semibold transition-all whitespace-nowrap
+        ${isActive ? 'bg-[var(--accent)] text-white' : 'text-[var(--toss-gray-4)] hover:bg-[var(--tab-bg)] hover:text-[var(--foreground)]'}
       `}
     >
-      <span className="text-sm md:text-base">{icon}</span>
+      <span className="text-[12px] md:text-[13px]">{icon}</span>
       <span>{label}</span>
     </button>
   );
@@ -768,8 +768,8 @@ function QuickFavoriteButton({ label, icon, onClick, active, onRemove }: any) {
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-all
-        ${active ? 'bg-[var(--toss-blue)] text-white border-[var(--toss-blue)] shadow-sm' : 'bg-[var(--toss-card)] text-[var(--toss-gray-4)] border-[var(--toss-border)] hover:bg-[var(--toss-gray-1)]'}
+      className={`flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-md)] text-[11px] font-semibold border transition-all
+        ${active ? 'bg-[var(--accent)] text-white border-[var(--accent)]' : 'bg-[var(--card)] text-[var(--toss-gray-4)] border-[var(--border)] hover:bg-[var(--tab-bg)]'}
       `}
     >
       <span>{icon}</span>

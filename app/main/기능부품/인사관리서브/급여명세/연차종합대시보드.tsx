@@ -80,13 +80,13 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
   }, [filteredStaffs, currentUser]);
 
   return (
-    <div className="border border-[var(--toss-border)] p-4 bg-[var(--toss-card)] rounded-[12px] shadow-sm">
-      <div className="flex items-center justify-between mb-4 pb-3 border-b border-[var(--toss-border)]">
+    <div className="border border-[var(--border)] p-4 bg-[var(--card)] rounded-[var(--radius-md)] shadow-sm">
+      <div className="flex items-center justify-between mb-4 pb-3 border-b border-[var(--border)]">
         <h3 className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-2">
           연차 종합 대시보드
-          {selectedCo !== '전체' && <span className="px-2 py-0.5 bg-blue-50 text-[var(--toss-blue)] text-[10px] rounded-full">{selectedCo}</span>}
+          {selectedCo !== '전체' && <span className="px-2 py-0.5 bg-blue-50 text-[var(--accent)] text-[10px] rounded-[var(--radius-md)]">{selectedCo}</span>}
         </h3>
-        <div className="flex gap-0.5 bg-[var(--tab-bg)] rounded-[12px] p-0.5">
+        <div className="flex gap-0.5 bg-[var(--tab-bg)] rounded-[var(--radius-md)] p-0.5">
           <button
             type="button"
             onClick={() => setViewMode('dept')}
@@ -110,11 +110,11 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
       <div className="grid grid-cols-4 gap-2 mb-4">
         {[
           { label: '인원', val: filteredStaffs.length, unit: '명', color: 'text-[var(--foreground)]' },
-          { label: '총 연차', val: filteredStaffs.reduce((acc: number, s: any) => acc + (s.annual_leave_total ?? 0), 0), unit: '일', color: 'text-[var(--toss-blue)]' },
+          { label: '총 연차', val: filteredStaffs.reduce((acc: number, s: any) => acc + (s.annual_leave_total ?? 0), 0), unit: '일', color: 'text-[var(--accent)]' },
           { label: '사용', val: filteredStaffs.reduce((acc: number, s: any) => acc + (s.annual_leave_used ?? 0), 0), unit: '일', color: 'text-amber-600' },
           { label: '잔여', val: filteredStaffs.reduce((acc: number, s: any) => acc + Math.max(0, (s.annual_leave_total ?? 0) - (s.annual_leave_used ?? 0)), 0), unit: '일', color: 'text-emerald-600' },
         ].map((stat, i) => (
-          <div key={i} className="bg-[var(--toss-gray-1)]/50 p-2.5 rounded-[12px] border border-[var(--toss-border)] text-center">
+          <div key={i} className="bg-[var(--muted)]/50 p-2.5 rounded-[var(--radius-md)] border border-[var(--border)] text-center">
             <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mb-0.5">{stat.label}</p>
             <p className={`text-sm font-bold ${stat.color}`}>{stat.val}{stat.unit}</p>
           </div>
@@ -124,7 +124,7 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
       {viewMode === 'dept' ? (
         <div className="space-y-3">
           {byDept.map((x) => (
-            <div key={x.dept} className="p-3 bg-[var(--page-bg)] rounded-[12px] border border-[var(--toss-border)]">
+            <div key={x.dept} className="p-3 bg-[var(--page-bg)] rounded-[var(--radius-md)] border border-[var(--border)]">
               <p className="text-sm font-semibold text-[var(--foreground)] mb-2">{x.dept}</p>
               <div className="grid grid-cols-3 gap-2 text-xs">
                 <div>
@@ -140,7 +140,7 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
                   <span className="font-semibold text-emerald-600">{x.remain}일</span>
                 </div>
               </div>
-              <div className="mt-2 h-1.5 bg-[var(--toss-gray-1)] rounded-full overflow-hidden">
+              <div className="mt-2 h-1.5 bg-[var(--muted)] rounded-full overflow-hidden">
                 <div
                   className="h-full bg-emerald-500 rounded-full"
                   style={{ width: `${x.total ? (x.remain / x.total) * 100 : 0}%` }}
@@ -158,7 +158,7 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
             return (
               <div
                 key={s.id}
-                className="p-4 bg-[var(--page-bg)] rounded-[12px] border border-[var(--toss-border)] flex flex-col gap-3"
+                className="p-4 bg-[var(--page-bg)] rounded-[var(--radius-md)] border border-[var(--border)] flex flex-col gap-3"
               >
                 <div className="flex items-center justify-between text-xs">
                   <div>
@@ -168,7 +168,7 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
                         ({s.department || '미지정'})
                       </span>
                       {selectedCo === '전체' && (
-                        <span className="px-1.5 py-0.5 bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] text-[9px] rounded-md font-bold">
+                        <span className="px-1.5 py-0.5 bg-[var(--muted)] text-[var(--toss-gray-3)] text-[9px] rounded-md font-bold">
                           {s.company}
                         </span>
                       )}
@@ -177,7 +177,7 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
                       총 {total}일 · 사용 {used}일 · <span className="text-[var(--foreground)]">잔여 <span className="font-semibold text-emerald-600">{remain}일</span></span>
                     </p>
                   </div>
-                  <div className="w-24 h-1.5 bg-[var(--toss-gray-1)] rounded-full overflow-hidden shrink-0">
+                  <div className="w-24 h-1.5 bg-[var(--muted)] rounded-full overflow-hidden shrink-0">
                     <div
                       className="h-full bg-emerald-500 rounded-full transition-all"
                       style={{ width: `${total ? (remain / total) * 100 : 0}%` }}
@@ -188,19 +188,19 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
                 {/* 연차 사용 계획서 작성 모달 */}
                 {showPlanModal && (
                   <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-4">
-                    <div className="w-full max-w-md bg-[var(--toss-card)] rounded-[16px] shadow-2xl overflow-hidden border border-[var(--toss-border)] animate-in fade-in slide-in-from-bottom-4">
-                      <div className="p-6 border-b border-[var(--toss-border)]">
+                    <div className="w-full max-w-md bg-[var(--card)] rounded-[var(--radius-lg)] shadow-sm overflow-hidden border border-[var(--border)] animate-in fade-in slide-in-from-bottom-4">
+                      <div className="p-4 border-b border-[var(--border)]">
                         <h3 className="text-lg font-bold text-[var(--foreground)] tracking-tight">연차 사용 계획서 제출</h3>
                         <p className="text-xs text-red-500 font-semibold mt-1">잔여 연차 {remain}일에 대한 사용 계획을 등록합니다.</p>
                       </div>
-                      <div className="p-6 space-y-4">
+                      <div className="p-4 space-y-4">
                         <div className="flex flex-col gap-2">
                           <label className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-widest">사용 목표 일정 (월/일)</label>
                           <textarea
                             value={planDates}
                             onChange={(e) => setPlanDates(e.target.value)}
                             placeholder="예: \n8월 15일, 16일 (2일)\n9월 추석 연휴 전후 (3일)\n11월 개인일정 (남은 일수)"
-                            className="w-full h-24 p-3 text-sm font-medium border border-[var(--toss-border)] rounded-[12px] bg-[var(--page-bg)] focus:ring-2 focus:ring-[var(--toss-blue)] focus:border-transparent outline-none resize-none"
+                            className="w-full h-24 p-3 text-sm font-medium border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--page-bg)] focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none resize-none"
                           />
                         </div>
                         <div className="flex flex-col gap-2">
@@ -210,15 +210,15 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
                             value={planReason}
                             onChange={(e) => setPlanReason(e.target.value)}
                             placeholder="업무 인수 인계 등 특이사항 기재"
-                            className="w-full p-3 text-sm font-medium border border-[var(--toss-border)] rounded-[12px] bg-[var(--page-bg)] focus:ring-2 focus:ring-[var(--toss-blue)] focus:border-transparent outline-none"
+                            className="w-full p-3 text-sm font-medium border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--page-bg)] focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent outline-none"
                           />
                         </div>
                       </div>
-                      <div className="p-4 bg-[var(--page-bg)] border-t border-[var(--toss-border)] flex justify-end gap-2">
+                      <div className="p-4 bg-[var(--page-bg)] border-t border-[var(--border)] flex justify-end gap-2">
                         <button
                           type="button"
                           onClick={() => setShowPlanModal(false)}
-                          className="px-4 py-2 rounded-[8px] border border-[var(--toss-border)] text-xs font-bold text-[var(--toss-gray-4)] hover:bg-[var(--toss-gray-1)]"
+                          className="px-4 py-2 rounded-[var(--radius-md)] border border-[var(--border)] text-xs font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
                         >
                           취소
                         </button>
@@ -226,7 +226,7 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
                           type="button"
                           onClick={() => submitLeavePlan(s, remain)}
                           disabled={submitting}
-                          className="px-4 py-2 rounded-[8px] bg-[var(--toss-blue)] text-white text-xs font-bold hover:opacity-90 disabled:opacity-50"
+                          className="px-4 py-2 rounded-[var(--radius-md)] bg-[var(--accent)] text-white text-xs font-bold hover:opacity-90 disabled:opacity-50"
                         >
                           {submitting ? '제출 중...' : '계획서 제출 (전자결재)'}
                         </button>
@@ -237,7 +237,7 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
 
                 {/* 연차 촉진 알림 연동 배너 (개인별 뷰에서 잔여 연차가 있을 때) */}
                 {remain > 0 && s.id && currentUser?.id === s.id && (
-                  <div className="px-4 py-3 bg-red-50/50 border-t border-red-100 flex items-center justify-between text-xs mt-3 rounded-[12px]">
+                  <div className="px-4 py-3 bg-red-50/50 border-t border-red-100 flex items-center justify-between text-xs mt-3 rounded-[var(--radius-md)]">
                     <div>
                       <span className="font-semibold text-red-600">🚨 연차 사용 촉진 안내</span>
                       <p className="text-[11px] text-red-500 font-medium mt-0.5">미사용 연차 {remain}일에 대해 연차사용계획서를 의무 제출해야 합니다.</p>

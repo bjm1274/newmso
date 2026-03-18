@@ -168,16 +168,16 @@ export default function ScanModule({ user, inventory, fetchInventory }: ScanModu
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="bg-white p-6 md:p-10 border border-[var(--toss-border)] shadow-xl rounded-[2.5rem]">
-        <div className="mb-6">
-          <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tight">
+    <div className="space-y-4 animate-in fade-in duration-500">
+      <div className="bg-[var(--card)] p-4 border border-[var(--border)] shadow-sm rounded-[var(--radius-lg)]">
+        <div className="mb-3">
+          <h2 className="text-base font-bold text-[var(--foreground)]">
             의료기기 QR·바코드 스캔 입고
           </h2>
         </div>
 
         {/* 스캐너 입력 영역 */}
-        <div className="mb-6 p-4 bg-[var(--toss-gray-1)] rounded-[12px] border border-dashed border-[var(--toss-border)]">
+        <div className="mb-3 p-3 bg-[var(--muted)] rounded-[var(--radius-md)] border border-dashed border-[var(--border)]">
           <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] mb-2 block">
             스캐너 입력창
           </label>
@@ -192,7 +192,7 @@ export default function ScanModule({ user, inventory, fetchInventory }: ScanModu
               }
             }}
             placeholder="의료기기 QR/바코드를 스캔하거나 수동으로 코드를 입력 후 Enter..."
-            className="w-full px-4 py-3 rounded-[16px] border border-[var(--toss-border)] bg-white text-sm font-mono tracking-wide focus:ring-2 focus:ring-[var(--toss-blue)]/30 focus:border-blue-400 outline-none"
+            className="w-full px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-sm font-mono tracking-wide focus:ring-2 focus:ring-[var(--accent)]/30 focus:border-blue-400 outline-none"
           />
           <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
             입력창이 항상 선택된 상태여야 스캐너 인식이 정상 동작합니다.
@@ -200,7 +200,7 @@ export default function ScanModule({ user, inventory, fetchInventory }: ScanModu
         </div>
 
         {/* 스캔 목록 */}
-        <div className="bg-white rounded-[12px] border border-[var(--toss-border)] shadow-inner p-4 md:p-5">
+        <div className="bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)] p-4">
           <div className="flex justify-between items-center mb-3">
             <h3 className="text-sm font-semibold text-[var(--foreground)]">스캔된 의료기기 목록</h3>
             <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">
@@ -209,7 +209,7 @@ export default function ScanModule({ user, inventory, fetchInventory }: ScanModu
           </div>
 
           {scannedItems.length === 0 ? (
-            <div className="py-8 text-center text-xs text-[var(--toss-gray-3)] font-bold">
+            <div className="py-5 text-center text-xs text-[var(--toss-gray-3)] font-bold">
               아직 스캔된 품목이 없습니다. 스캐너로 의료기기를 찍어주세요.
             </div>
           ) : (
@@ -217,11 +217,11 @@ export default function ScanModule({ user, inventory, fetchInventory }: ScanModu
               {scannedItems.map(item => (
                 <div
                   key={item.id}
-                  className="flex flex-col md:flex-row md:items-center gap-2 bg-[var(--toss-gray-1)] rounded-[16px] px-3 py-2 border border-[var(--toss-border)]"
+                  className="flex flex-col md:flex-row md:items-center gap-2 bg-[var(--muted)] rounded-[var(--radius-lg)] px-3 py-2 border border-[var(--border)]"
                 >
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-semibold text-[var(--toss-blue)]">
+                      <span className="text-[11px] font-semibold text-[var(--accent)]">
                         {item.company}
                       </span>
                       <span className="text-xs font-semibold text-[var(--foreground)]">
@@ -230,19 +230,19 @@ export default function ScanModule({ user, inventory, fetchInventory }: ScanModu
                     </div>
                     <div className="flex flex-wrap gap-1 mt-1">
                       {item.barcode && (
-                        <span className="px-2 py-0.5 rounded-full bg-white text-[11px] font-mono text-[var(--toss-gray-3)] border border-[var(--toss-border)]">
+                        <span className="px-2 py-0.5 rounded-[var(--radius-md)] bg-[var(--card)] text-[11px] font-mono text-[var(--toss-gray-3)] border border-[var(--border)]">
                           BAR: {item.barcode}
                         </span>
                       )}
                       {item.udi_code && (
-                        <span className="px-2 py-0.5 rounded-full bg-white text-[11px] font-mono text-purple-500 border border-purple-100">
+                        <span className="px-2 py-0.5 rounded-[var(--radius-md)] bg-[var(--card)] text-[11px] font-mono text-purple-500 border border-purple-100">
                           UDI: {item.udi_code}
                         </span>
                       )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="flex items-center bg-white rounded-full border border-[var(--toss-border)] px-2">
+                    <div className="flex items-center bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)] px-2">
                       <button
                         type="button"
                         onClick={() => handleChangeQty(item.id, -1)}
@@ -264,7 +264,7 @@ export default function ScanModule({ user, inventory, fetchInventory }: ScanModu
                     <button
                       type="button"
                       onClick={() => handleRemoveItem(item.id)}
-                      className="text-[11px] font-semibold text-red-500 px-2 py-1 rounded-[12px] hover:bg-red-50"
+                      className="text-[11px] font-semibold text-red-500 px-2 py-1 rounded-[var(--radius-md)] hover:bg-red-50"
                     >
                       삭제
                     </button>
@@ -278,7 +278,7 @@ export default function ScanModule({ user, inventory, fetchInventory }: ScanModu
             type="button"
             onClick={handleConfirmScan}
             disabled={loading || scannedItems.length === 0}
-            className="mt-5 w-full py-4 bg-[var(--toss-blue)] text-white rounded-[12px] font-semibold text-sm shadow-lg hover:bg-blue-700 disabled:opacity-50 disabled:hover:bg-[var(--toss-blue)]"
+            className="mt-4 w-full py-2 bg-[var(--accent)] text-white rounded-[var(--radius-md)] font-semibold text-sm shadow-sm hover:bg-blue-700 disabled:opacity-50 disabled:hover:bg-[var(--accent)]"
           >
             {loading ? '입고 처리 중...' : '✅ 스캔된 의료기기 입고 확정하기'}
           </button>

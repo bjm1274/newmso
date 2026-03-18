@@ -286,31 +286,31 @@ function SectionTabBar({
 }) {
   return (
     <div
-      className="border-b border-[var(--toss-border)] bg-[var(--toss-card)] px-3 py-3 md:px-4"
+      className="border-b border-[var(--border)] bg-[var(--card)] px-3 py-2 md:px-4"
       data-testid={testIdPrefix ? `${testIdPrefix}-bar` : undefined}
     >
       {title || description ? (
-        <div className="mb-2">
-          {title ? <h3 className="text-sm font-bold text-[var(--foreground)]">{title}</h3> : null}
+        <div className="mb-1.5">
+          {title ? <h3 className="text-[13px] font-bold text-[var(--foreground)]">{title}</h3> : null}
           {description ? (
-            <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{description}</p>
+            <p className="mt-0.5 text-[11px] text-[var(--toss-gray-3)]">{description}</p>
           ) : null}
         </div>
       ) : null}
-      <div className="no-scrollbar flex gap-1.5 overflow-x-auto">
+      <div className="no-scrollbar flex gap-1 overflow-x-auto">
         {tabs.map((tab, index) => (
           <button
             key={tab.id}
             type="button"
             onClick={() => onChange(tab.id)}
             data-testid={testIdPrefix ? `${testIdPrefix}-${index}` : undefined}
-            className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-[11px] font-bold transition-all ${
+            className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[var(--radius-md)] px-3 py-1.5 text-[11px] font-semibold transition-all ${
               activeTab === tab.id
-                ? 'bg-[var(--toss-blue)] text-white shadow-md'
-                : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-blue-light)] hover:text-[var(--foreground)]'
+                ? 'bg-[var(--accent)] text-white'
+                : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-blue-light)] hover:text-[var(--foreground)]'
             }`}
           >
-            <span className="shrink-0">{tab.icon}</span>
+            <span className="shrink-0 text-[11px]">{tab.icon}</span>
             <span className="whitespace-nowrap break-keep">{tab.label}</span>
           </button>
         ))}
@@ -499,7 +499,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
 
   if (!hasAccess || visibleHrTabs.length === 0) {
     return (
-      <div className="flex h-full flex-col items-center justify-center bg-[var(--toss-gray-1)] p-6">
+      <div className="flex h-full flex-col items-center justify-center bg-[var(--muted)] p-4">
         <div className="mb-4 text-5xl">🔒</div>
         <h2 className="text-lg font-semibold text-[var(--foreground)]">인사관리 접근 권한이 없습니다.</h2>
         <p className="mt-2 text-sm font-bold text-[var(--toss-gray-4)]">
@@ -511,41 +511,43 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
 
   return (
     <div className="app-page flex h-full min-h-0 flex-col overflow-x-hidden md:flex-row">
-      <aside className="flex h-auto w-full shrink-0 flex-col overflow-hidden border-b border-[var(--toss-border)] bg-[var(--toss-card)] md:sticky md:top-0 md:self-start md:h-[100dvh] md:max-h-[100dvh] md:w-44 md:border-b-0 md:border-r">
-        <div className="shrink-0 border-b border-[var(--toss-border)] p-1.5 md:p-2.5">
-          <p className="px-1 pb-2 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-4)]">업무 공간</p>
-          <div className="no-scrollbar flex gap-1 overflow-x-auto md:flex-col md:overflow-visible">
+      <aside className="flex h-auto w-full shrink-0 flex-col overflow-hidden border-b border-[var(--border)] bg-[var(--card)] md:sticky md:top-0 md:self-start md:h-[100dvh] md:max-h-[100dvh] md:w-[var(--submenu-width)] md:border-b-0 md:border-r">
+        {/* 워크스페이스 탭 */}
+        <div className="shrink-0 border-b border-[var(--border)] px-2 py-2">
+          <p className="px-1 pb-1 text-[9px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">업무 공간</p>
+          <div className="no-scrollbar flex gap-0.5 overflow-x-auto md:flex-col md:overflow-visible">
             {availableWorkspaces.map((workspace) => (
               <button
                 key={workspace.id}
                 type="button"
                 onClick={() => handleWorkspaceChange(workspace.id)}
                 data-testid={`hr-workspace-${workspace.id}`}
-                className={`flex min-w-max shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-[12px] px-3 py-2 text-[11px] font-bold transition-all md:w-full md:justify-start ${
+                className={`flex min-w-max shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-[var(--radius-md)] px-2.5 py-1.5 text-[11px] font-semibold transition-all md:w-full md:justify-start ${
                   activeWorkspace === workspace.id
-                    ? 'bg-[var(--foreground)] text-white shadow-md'
-                    : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-blue-light)] hover:text-[var(--foreground)]'
+                    ? 'bg-[var(--foreground)] text-white'
+                    : 'text-[var(--toss-gray-4)] hover:bg-[var(--tab-bg)] hover:text-[var(--foreground)]'
                 }`}
               >
-                <span className="shrink-0 text-[13px]">{workspace.icon}</span>
+                <span className="shrink-0 text-[12px]">{workspace.icon}</span>
                 <span className="truncate whitespace-nowrap break-keep">{workspace.label}</span>
               </button>
             ))}
           </div>
         </div>
 
-        <div className="no-scrollbar flex min-h-0 flex-row gap-1 overflow-x-auto p-1.5 md:flex-1 md:flex-col md:overflow-y-auto md:p-2.5">
-          <div className="flex gap-1 md:hidden">
+        {/* 탭 메뉴 */}
+        <div className="no-scrollbar flex min-h-0 flex-row gap-0.5 overflow-x-auto px-2 py-2 md:flex-1 md:flex-col md:overflow-y-auto">
+          <div className="flex gap-0.5 md:hidden">
             {workspaceTabs.map(({ id, label, icon }) => (
               <button
                 key={id}
                 type="button"
                 onClick={() => handleMenuSelect(id)}
                 data-testid={`hr-menu-${id}`}
-                className={`flex-none whitespace-nowrap rounded-[10px] px-3 py-2 text-[11px] font-bold transition-all ${
+                className={`flex-none whitespace-nowrap rounded-[var(--radius-md)] px-3 py-1.5 text-[11px] font-semibold transition-all ${
                   activeMenu === id
-                    ? 'bg-[var(--toss-blue)] text-white shadow-md'
-                    : 'text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)] hover:text-[var(--foreground)]'
+                    ? 'bg-[var(--accent)] text-white'
+                    : 'text-[var(--toss-gray-4)] hover:bg-[var(--tab-bg)] hover:text-[var(--foreground)]'
                 }`}
               >
                 {icon} {label}
@@ -553,15 +555,15 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
             ))}
           </div>
 
-          <div className="hidden md:flex md:flex-col gap-0.5">
+          <div className="hidden md:flex md:flex-col gap-0">
             {activeWorkspaceConfig.groups.map((group, index) => {
               const groupTabs = workspaceTabs.filter((tab) => tab.group === group);
               if (groupTabs.length === 0) return null;
 
               return (
-                <div key={group} className={index > 0 ? 'mt-1.5 border-t border-[var(--toss-border)] pt-1.5' : ''}>
-                  <p className="px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">
-                    {HR_GROUP_LABELS[group]}
+                <div key={group} className={index > 0 ? 'mt-2 border-t border-[var(--border)] pt-2' : ''}>
+                  <p className="px-2.5 pt-0.5 pb-1 text-[9px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">
+                    {HR_GROUP_LABELS[group]?.replace(/^[^\s]+ /, '')}
                   </p>
                   {groupTabs.map(({ id, label, icon }) => (
                     <button
@@ -569,13 +571,13 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
                       type="button"
                       onClick={() => handleMenuSelect(id)}
                       data-testid={`hr-menu-${id}`}
-                      className={`flex w-full items-center gap-2 rounded-[10px] px-2.5 py-2 text-left text-[11px] font-bold transition-all ${
+                      className={`flex w-full items-center gap-1.5 rounded-[var(--radius-md)] px-2.5 py-1.5 text-left text-[11px] font-semibold transition-all ${
                         activeMenu === id
-                          ? 'bg-[var(--toss-blue)] text-white shadow-md'
-                          : 'text-[var(--toss-gray-4)] hover:bg-[var(--toss-gray-1)] hover:text-[var(--foreground)]'
+                          ? 'bg-[var(--accent)] text-white'
+                          : 'text-[var(--toss-gray-4)] hover:bg-[var(--tab-bg)] hover:text-[var(--foreground)]'
                       }`}
                     >
-                      <span className="shrink-0 text-[13px]">{icon}</span>
+                      <span className="shrink-0 text-[11px] opacity-80">{icon}</span>
                       <span className="truncate">{label}</span>
                     </button>
                   ))}
@@ -585,17 +587,18 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
           </div>
         </div>
 
-        <div className="shrink-0 border-t border-[var(--toss-border)] bg-[var(--toss-card)] p-1.5 shadow-[0_-10px_24px_rgba(15,23,42,0.04)] md:sticky md:bottom-0 md:z-10 md:p-2.5">
-          <div className="grid grid-cols-1 gap-2">
-            <div className="flex items-center gap-2 rounded-[16px] border border-[var(--toss-border)] bg-white px-3 py-2 shadow-sm">
-              <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-black text-emerald-700">
+        {/* 필터 */}
+        <div className="shrink-0 border-t border-[var(--border)] bg-[var(--card)] px-2 py-2 md:sticky md:bottom-0 md:z-10">
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--tab-bg)] px-2.5 py-1.5">
+              <span className="shrink-0 text-[9px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wide">
                 사업체
               </span>
               <select
                 data-testid="hr-company-select"
                 value={선택사업체}
                 onChange={(event) => 사업체설정(event.target.value)}
-                className="w-full bg-transparent text-[12px] font-bold text-[var(--foreground)] outline-none"
+                className="w-full bg-transparent text-[11px] font-semibold text-[var(--foreground)] outline-none"
               >
                 {사업체목록.map((회사명) => (
                   <option key={회사명} value={회사명}>
@@ -604,15 +607,15 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
                 ))}
               </select>
             </div>
-            <div className="flex items-center gap-2 rounded-[16px] border border-[var(--toss-border)] bg-white px-3 py-2 shadow-sm">
-              <span className="shrink-0 rounded-full bg-[var(--toss-blue-light)] px-2 py-1 text-[10px] font-black text-[var(--toss-blue)]">
-                직원상태
+            <div className="flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--tab-bg)] px-2.5 py-1.5">
+              <span className="shrink-0 text-[9px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wide">
+                상태
               </span>
               <select
                 data-testid="hr-status-select"
                 value={직원상태필터}
                 onChange={(event) => 직원상태필터설정(event.target.value as StaffStatus)}
-                className="w-full bg-transparent text-[12px] font-bold text-[var(--foreground)] outline-none"
+                className="w-full bg-transparent text-[11px] font-semibold text-[var(--foreground)] outline-none"
               >
                 <option value="재직">재직자</option>
                 <option value="퇴사">퇴사자</option>
@@ -647,13 +650,13 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
           {activeMenu === '포상/징계' && <RewardDisciplineManagement staffs={인사직원목록} selectedCo={선택사업체} user={user} />}
 
           {activeMenu === '교육' && (
-            <div className="p-3 md:p-6">
+            <div className="p-3 md:p-4">
               <EducationMain staffs={인사직원목록} selectedCo={선택사업체} />
             </div>
           )}
 
           {activeMenu === '오프보딩' && (
-            <div className="p-3 md:p-6">
+            <div className="p-3 md:p-4">
               <OffboardingView staffs={인사직원목록} selectedCo={선택사업체} onRefresh={onRefresh} />
             </div>
           )}
@@ -740,16 +743,16 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
               <div className="min-h-0 flex-1 overflow-y-auto">
                 {급여내부탭 === '기본' && <PayrollMain staffs={인사직원목록} selectedCo={선택사업체} onRefresh={onRefresh} />}
                 {급여내부탭 === '원천징수파일' && (
-                    <div className="p-3 md:p-6">
+                    <div className="p-3 md:p-4">
                     <TaxFileGenerator staffs={인사직원목록} selectedCo={선택사업체} />
                   </div>
                 )}
                 {급여내부탭 === '4대보험' && (
-                  <div className="grid gap-4 p-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:p-6">
-                    <div className="rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4 shadow-sm">
+                  <div className="grid gap-4 p-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:p-4">
+                    <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
                       <InsuranceManagement staffs={인사직원목록} selectedCo={선택사업체} />
                     </div>
-                    <div className="rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4 shadow-sm">
+                    <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
                       <InsuranceEDI staffs={인사직원목록} selectedCo={선택사업체} user={user} />
                     </div>
                   </div>
@@ -763,7 +766,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
           {activeMenu === '의료기기점검' && <MedicalDeviceInspection selectedCo={선택사업체} user={user} />}
 
           {activeMenu === '비품대여' && (
-            <div className="p-3 md:p-6">
+            <div className="p-3 md:p-4">
               <AssetLoanManager staffs={인사직원목록} selectedCo={선택사업체} />
             </div>
           )}
@@ -784,7 +787,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
                   <ContractMain staffs={인사직원목록} selectedCo={선택사업체} onRefresh={onRefresh} />
                 )}
                 {계약내부탭 === '계약서생성기' && (
-                    <div className="p-3 md:p-6">
+                    <div className="p-3 md:p-4">
                     <ContractAutoGenerator staffs={인사직원목록} selectedCo={선택사업체} user={user} />
                   </div>
                 )}
@@ -797,19 +800,19 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
             )}
 
           {activeMenu === '증명서' && (
-            <div className="p-3 md:p-6">
+            <div className="p-3 md:p-4">
               <CertificateGenerator staffs={인사직원목록} selectedCo={선택사업체} />
             </div>
           )}
 
           {activeMenu === '서류제출' && (
-            <div className="p-3 md:p-6">
+            <div className="p-3 md:p-4">
               <DocumentScanner user={user} staffs={인사직원목록} selectedCo={선택사업체} />
             </div>
           )}
 
           {activeMenu === '캘린더' && (
-            <div className="flex flex-col gap-4 p-3 md:flex-row md:p-6">
+            <div className="flex flex-col gap-4 p-3 md:flex-row md:p-4">
               <div className="flex-1">
                 <SharedCalendarView user={user} />
               </div>

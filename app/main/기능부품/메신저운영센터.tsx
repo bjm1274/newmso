@@ -405,43 +405,43 @@ export default function MessengerOperationsCenter({
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/45 p-4" onClick={onClose}>
       <div
-        className="max-h-[90vh] w-full max-w-6xl overflow-y-auto rounded-[28px] bg-[var(--toss-card)] p-6 shadow-2xl custom-scrollbar"
+        className="max-h-[90vh] w-full max-w-6xl overflow-y-auto rounded-2xl bg-[var(--card)] p-4 shadow-sm custom-scrollbar"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-[var(--toss-border)] pb-5">
+        <div className="flex items-start justify-between gap-4 border-b border-[var(--border)] pb-5">
           <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.24em] text-[var(--toss-blue)]">Messenger Ops</p>
+            <p className="text-[11px] font-black uppercase tracking-[0.24em] text-[var(--accent)]">Messenger Ops</p>
             <h2 className="mt-2 text-xl font-bold text-[var(--foreground)]">메신저 운영센터</h2>
             <p className="mt-2 text-[12px] text-[var(--toss-gray-3)]">
               읽음 SLA, 중요공지 확인, 공지 읽음률, 근무 상태, 파일 버전, 대용량 드라이브 링크를 한 화면에서 관리합니다.
             </p>
           </div>
-          <button onClick={onClose} className="rounded-full bg-[var(--toss-gray-1)] px-3 py-2 text-sm font-bold text-[var(--toss-gray-4)]">
+          <button onClick={onClose} className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2 text-sm font-bold text-[var(--toss-gray-4)]">
             닫기
           </button>
         </div>
 
         {loading ? (
-          <div className="py-16 text-center text-sm font-semibold text-[var(--toss-gray-3)]">운영 데이터를 불러오는 중입니다.</div>
+          <div className="py-10 text-center text-sm font-semibold text-[var(--toss-gray-3)]">운영 데이터를 불러오는 중입니다.</div>
         ) : (
-          <div className="mt-6 space-y-6">
+          <div className="mt-4 space-y-4">
             <div className="grid gap-3 md:grid-cols-5">
               {[
                 { label: 'SLA 초과', value: `${stats.overdue}건`, tone: 'text-red-600' },
-                { label: '평균 읽음률', value: `${stats.averageReadRate}%`, tone: 'text-[var(--toss-blue)]' },
+                { label: '평균 읽음률', value: `${stats.averageReadRate}%`, tone: 'text-[var(--accent)]' },
                 { label: '중요 공지', value: `${stats.importantCount}건`, tone: 'text-orange-600' },
                 { label: '근무중', value: `${stats.busyStaff}명`, tone: 'text-emerald-600' },
-                { label: '부재중', value: `${stats.awayStaff}명`, tone: 'text-zinc-500' },
+                { label: '부재중', value: `${stats.awayStaff}명`, tone: 'text-[var(--toss-gray-4)]' },
               ].map((card) => (
-                <div key={card.label} className="rounded-[20px] bg-[var(--toss-gray-1)] p-4">
+                <div key={card.label} className="rounded-[var(--radius-xl)] bg-[var(--muted)] p-4">
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--toss-gray-3)]">{card.label}</p>
                   <p className={`mt-2 text-2xl font-bold ${card.tone}`}>{card.value}</p>
                 </div>
               ))}
             </div>
 
-            <div className="grid gap-6 xl:grid-cols-[1.35fr_0.9fr]">
-              <div className="rounded-[24px] border border-[var(--toss-border)] p-5">
+            <div className="grid gap-4 xl:grid-cols-[1.35fr_0.9fr]">
+              <div className="rounded-[var(--radius-xl)] border border-[var(--border)] p-5">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <h3 className="text-base font-bold text-[var(--foreground)]">공지 읽음률 리포트 / 읽음 SLA</h3>
@@ -450,17 +450,17 @@ export default function MessengerOperationsCenter({
                 </div>
                 <div className="mt-4 space-y-3">
                   {noticeRows.length === 0 ? (
-                    <div className="rounded-[18px] bg-[var(--toss-gray-1)] p-5 text-sm font-semibold text-[var(--toss-gray-3)]">
+                    <div className="rounded-[var(--radius-xl)] bg-[var(--muted)] p-5 text-sm font-semibold text-[var(--toss-gray-3)]">
                       공지메시지 채널에 분석할 메시지가 없습니다.
                     </div>
                   ) : (
                     noticeRows.slice(0, 12).map((row) => (
-                      <div key={row.id} className="rounded-[18px] bg-[var(--toss-gray-1)] p-4">
+                      <div key={row.id} className="rounded-[var(--radius-xl)] bg-[var(--muted)] p-4">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
-                              {row.isImportant && <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-600">중요공지</span>}
-                              {row.isOverSla && <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-600">SLA 초과</span>}
+                              {row.isImportant && <span className="rounded-[var(--radius-md)] bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-600">중요공지</span>}
+                              {row.isOverSla && <span className="rounded-[var(--radius-md)] bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-600">SLA 초과</span>}
                               <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">{formatDateLabel(row.created_at)}</span>
                             </div>
                             <p className="mt-2 line-clamp-2 text-sm font-semibold text-[var(--foreground)]">{row.content}</p>
@@ -470,8 +470,8 @@ export default function MessengerOperationsCenter({
                             <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">{row.readers.length}/{activeStaffs.length} 확인</p>
                           </div>
                         </div>
-                        <div className="mt-3 h-2 overflow-hidden rounded-full bg-white">
-                          <div className="h-full rounded-full bg-[var(--toss-blue)]" style={{ width: `${row.readRate}%` }} />
+                        <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--card)]">
+                          <div className="h-full rounded-full bg-[var(--accent)]" style={{ width: `${row.readRate}%` }} />
                         </div>
                         <div className="mt-3 flex flex-wrap gap-2">
                           {!row.isImportant && (
@@ -479,7 +479,7 @@ export default function MessengerOperationsCenter({
                               type="button"
                               onClick={() => markAsImportant(row)}
                               disabled={busyId === row.id}
-                              className="rounded-[12px] border border-orange-200 bg-orange-50 px-3 py-2 text-[11px] font-bold text-orange-600 disabled:opacity-50"
+                              className="rounded-[var(--radius-md)] border border-orange-200 bg-orange-50 px-3 py-2 text-[11px] font-bold text-orange-600 disabled:opacity-50"
                             >
                               중요공지 지정
                             </button>
@@ -488,11 +488,11 @@ export default function MessengerOperationsCenter({
                             type="button"
                             onClick={() => sendReminder(row)}
                             disabled={busyId === row.id}
-                            className="rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2 text-[11px] font-bold text-[var(--foreground)] disabled:opacity-50"
+                            className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[11px] font-bold text-[var(--foreground)] disabled:opacity-50"
                           >
                             미확인자 리마인드
                           </button>
-                          <span className="rounded-[12px] bg-white px-3 py-2 text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                          <span className="rounded-[var(--radius-md)] bg-[var(--card)] px-3 py-2 text-[11px] font-semibold text-[var(--toss-gray-3)]">
                             게시 후 {row.hoursAgo}시간 경과
                           </span>
                         </div>
@@ -501,23 +501,23 @@ export default function MessengerOperationsCenter({
                   )}
                 </div>
               </div>
-              <div className="space-y-6">
-                <div className="rounded-[24px] border border-[var(--toss-border)] p-5">
+              <div className="space-y-4">
+                <div className="rounded-[var(--radius-xl)] border border-[var(--border)] p-5">
                   <h3 className="text-base font-bold text-[var(--foreground)]">부재중/근무중 상태 자동 연동</h3>
                   <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">오늘 출근 기록과 당일 근무표를 기준으로 메신저 운영 상태를 자동 산출합니다.</p>
                   <div className="mt-4 space-y-2">
                     {presenceRows.slice(0, 12).map((row) => (
-                      <div key={row.staff.id} className="flex items-center justify-between rounded-[16px] bg-[var(--toss-gray-1)] px-4 py-3">
+                      <div key={row.staff.id} className="flex items-center justify-between rounded-[var(--radius-lg)] bg-[var(--muted)] px-4 py-3">
                         <div>
                           <p className="text-sm font-bold text-[var(--foreground)]">{row.staff.name}</p>
                           <p className="text-[11px] text-[var(--toss-gray-3)]">{row.staff.department} · {row.staff.position}</p>
                         </div>
                         <span
-                          className={`rounded-full px-3 py-1 text-[11px] font-bold ${
+                          className={`rounded-[var(--radius-md)] px-3 py-1 text-[11px] font-bold ${
                             row.status === '근무중'
                               ? 'bg-emerald-100 text-emerald-600'
                               : row.status === '부재중'
-                                ? 'bg-zinc-200 text-zinc-600'
+                                ? 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]'
                                 : 'bg-blue-100 text-blue-600'
                           }`}
                         >
@@ -528,23 +528,23 @@ export default function MessengerOperationsCenter({
                   </div>
                 </div>
 
-                <div className="rounded-[24px] border border-[var(--toss-border)] p-5">
+                <div className="rounded-[var(--radius-xl)] border border-[var(--border)] p-5">
                   <h3 className="text-base font-bold text-[var(--foreground)]">파일 버전 관리</h3>
                   <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">현재 채팅방 첨부파일을 묶어서 동일 문서의 버전 증가를 빠르게 확인합니다.</p>
                   <div className="mt-4 space-y-2">
                     {fileGroups.length === 0 ? (
-                      <div className="rounded-[16px] bg-[var(--toss-gray-1)] p-4 text-sm font-semibold text-[var(--toss-gray-3)]">
+                      <div className="rounded-[var(--radius-lg)] bg-[var(--muted)] p-4 text-sm font-semibold text-[var(--toss-gray-3)]">
                         현재 채팅방에 분석할 첨부파일이 없습니다.
                       </div>
                     ) : (
                       fileGroups.slice(0, 8).map((group) => (
-                        <div key={group.key} className="rounded-[16px] bg-[var(--toss-gray-1)] px-4 py-3">
+                        <div key={group.key} className="rounded-[var(--radius-lg)] bg-[var(--muted)] px-4 py-3">
                           <div className="flex items-center justify-between gap-3">
                             <div className="min-w-0">
                               <p className="truncate text-sm font-bold text-[var(--foreground)]">{group.name}</p>
                               <p className="text-[11px] text-[var(--toss-gray-3)]">{formatDateLabel(group.latest.created_at)} 최신 업로드</p>
                             </div>
-                            <span className="rounded-full bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--toss-blue)]">
+                            <span className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--accent)]">
                               {group.versions}개 버전
                             </span>
                           </div>
@@ -553,7 +553,7 @@ export default function MessengerOperationsCenter({
                               href={group.latest.file_url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2 text-[11px] font-bold text-[var(--foreground)]"
+                              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[11px] font-bold text-[var(--foreground)]"
                             >
                               최신본 열기
                             </a>
@@ -566,7 +566,7 @@ export default function MessengerOperationsCenter({
               </div>
             </div>
 
-            <div className="rounded-[24px] border border-[var(--toss-border)] p-5">
+            <div className="rounded-[var(--radius-xl)] border border-[var(--border)] p-5">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-base font-bold text-[var(--foreground)]">대용량 드라이브 연동</h3>
@@ -578,20 +578,20 @@ export default function MessengerOperationsCenter({
                     value={newDriveName}
                     onChange={(event) => setNewDriveName(event.target.value)}
                     placeholder="링크명"
-                    className="rounded-[12px] border border-[var(--toss-border)] px-3 py-2 text-sm font-semibold outline-none"
+                    className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-semibold outline-none"
                   />
                   <input
                     type="url"
                     value={newDriveUrl}
                     onChange={(event) => setNewDriveUrl(event.target.value)}
                     placeholder="https://..."
-                    className="min-w-[280px] rounded-[12px] border border-[var(--toss-border)] px-3 py-2 text-sm font-semibold outline-none"
+                    className="min-w-[280px] rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-semibold outline-none"
                   />
                   <button
                     type="button"
                     onClick={addDriveLink}
                     disabled={busyId === 'drive-add'}
-                    className="rounded-[12px] bg-[var(--toss-blue)] px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+                    className="rounded-[var(--radius-md)] bg-[var(--accent)] px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
                   >
                     추가
                   </button>
@@ -600,7 +600,7 @@ export default function MessengerOperationsCenter({
 
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 {driveLinks.map((link) => (
-                  <div key={link.id} className="rounded-[18px] bg-[var(--toss-gray-1)] p-4">
+                  <div key={link.id} className="rounded-[var(--radius-xl)] bg-[var(--muted)] p-4">
                     <input
                       type="text"
                       value={link.name}
@@ -620,7 +620,7 @@ export default function MessengerOperationsCenter({
                         href={link.url || '#'}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2 text-[11px] font-bold text-[var(--foreground)]"
+                        className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[11px] font-bold text-[var(--foreground)]"
                       >
                         열기
                       </a>
@@ -628,7 +628,7 @@ export default function MessengerOperationsCenter({
                         type="button"
                         onClick={() => removeDriveLink(link.id)}
                         disabled={busyId === link.id}
-                        className="rounded-[12px] border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-bold text-red-600"
+                        className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-bold text-red-600"
                       >
                         삭제
                       </button>

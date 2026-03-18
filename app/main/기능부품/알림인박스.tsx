@@ -25,9 +25,9 @@ const TYPE_CFG: Record<string, { icon: string; bg: string; text: string; border:
   board: { icon: '📌', bg: 'bg-pink-50 dark:bg-pink-950/30', text: 'text-pink-600', border: 'border-pink-300' },
   인사: { icon: '👥', bg: 'bg-cyan-50 dark:bg-cyan-950/30', text: 'text-cyan-700', border: 'border-cyan-300' },
   education: { icon: '📚', bg: 'bg-purple-50 dark:bg-purple-950/30', text: 'text-purple-600', border: 'border-purple-300' },
-  notification: { icon: '🔔', bg: 'bg-slate-50 dark:bg-slate-800/30', text: 'text-slate-600', border: 'border-slate-300' },
+  notification: { icon: '🔔', bg: 'bg-[var(--tab-bg)] dark:bg-slate-800/30', text: 'text-[var(--toss-gray-4)]', border: 'border-[var(--border)]' },
 };
-const DEFAULT_CFG = { icon: '🔔', bg: 'bg-slate-50 dark:bg-slate-800/30', text: 'text-slate-600', border: 'border-slate-300' };
+const DEFAULT_CFG = { icon: '🔔', bg: 'bg-[var(--tab-bg)] dark:bg-slate-800/30', text: 'text-[var(--toss-gray-4)]', border: 'border-[var(--border)]' };
 const getTypeCfg = (t: string) => TYPE_CFG[t] || DEFAULT_CFG;
 
 // 날짜 그룹 분류
@@ -66,8 +66,8 @@ const NOTIF_TYPES_FOR_SETTINGS = [
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <button type="button" onClick={() => onChange(!checked)} aria-checked={checked} role="switch"
-      className={`relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none ${checked ? 'bg-[var(--toss-blue)]' : 'bg-gray-300 dark:bg-gray-600'}`}>
-      <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${checked ? 'translate-x-5' : 'translate-x-0'}`} />
+      className={`relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none ${checked ? 'bg-[var(--accent)]' : 'bg-gray-300 dark:bg-gray-600'}`}>
+      <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-[var(--card)] rounded-full shadow transition-transform duration-200 ${checked ? 'translate-x-5' : 'translate-x-0'}`} />
     </button>
   );
 }
@@ -89,13 +89,13 @@ function SettingsTab() {
   };
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
+    <div className="space-y-4 p-4 md:p-4">
       {/* 기본 설정 */}
-      <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-2xl overflow-hidden">
-        <div className="px-5 py-3 border-b border-[var(--toss-border)] bg-[var(--toss-gray-1)]/50">
+      <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden">
+        <div className="px-5 py-3 border-b border-[var(--border)] bg-[var(--muted)]/50">
           <h3 className="text-[11px] font-black text-[var(--toss-gray-3)] uppercase tracking-wider">기본 설정</h3>
         </div>
-        <div className="divide-y divide-[var(--toss-border)]">
+        <div className="divide-y divide-[var(--border)]">
           {[
             { key: 'sound', label: '알림음', desc: '소리로 새 알림 알리기', icon: '🔊' },
             { key: 'vibration', label: '진동', desc: '진동으로 새 알림 알리기', icon: '📳' },
@@ -115,8 +115,8 @@ function SettingsTab() {
       </div>
 
       {/* 방해금지 */}
-      <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-2xl overflow-hidden">
-        <div className="px-5 py-3 border-b border-[var(--toss-border)] bg-[var(--toss-gray-1)]/50">
+      <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden">
+        <div className="px-5 py-3 border-b border-[var(--border)] bg-[var(--muted)]/50">
           <h3 className="text-[11px] font-black text-[var(--toss-gray-3)] uppercase tracking-wider">방해금지 모드</h3>
         </div>
         <div className="px-5 py-4 space-y-4">
@@ -135,13 +135,13 @@ function SettingsTab() {
               <div className="flex-1">
                 <label className="text-xs font-medium text-[var(--toss-gray-3)] block mb-1">시작</label>
                 <input type="time" value={settings.dndFrom} onChange={e => update({ dndFrom: e.target.value })}
-                  className="w-full h-9 px-3 bg-[var(--toss-gray-1)] border border-[var(--toss-border)] rounded-xl text-sm font-medium text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30" />
+                  className="w-full h-9 px-3 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm font-medium text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30" />
               </div>
               <span className="text-[var(--toss-gray-3)] mt-5 text-sm">~</span>
               <div className="flex-1">
                 <label className="text-xs font-medium text-[var(--toss-gray-3)] block mb-1">종료</label>
                 <input type="time" value={settings.dndTo} onChange={e => update({ dndTo: e.target.value })}
-                  className="w-full h-9 px-3 bg-[var(--toss-gray-1)] border border-[var(--toss-border)] rounded-xl text-sm font-medium text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30" />
+                  className="w-full h-9 px-3 bg-[var(--muted)] border border-[var(--border)] rounded-xl text-sm font-medium text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30" />
               </div>
             </div>
           )}
@@ -149,11 +149,11 @@ function SettingsTab() {
       </div>
 
       {/* 알림 타입별 설정 */}
-      <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-2xl overflow-hidden">
-        <div className="px-5 py-3 border-b border-[var(--toss-border)] bg-[var(--toss-gray-1)]/50">
+      <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden">
+        <div className="px-5 py-3 border-b border-[var(--border)] bg-[var(--muted)]/50">
           <h3 className="text-[11px] font-black text-[var(--toss-gray-3)] uppercase tracking-wider">알림 유형별 설정</h3>
         </div>
-        <div className="divide-y divide-[var(--toss-border)]">
+        <div className="divide-y divide-[var(--border)]">
           {NOTIF_TYPES_FOR_SETTINGS.map(t => (
             <div key={t.id} className="flex items-center justify-between px-5 py-3.5">
               <div className="flex items-center gap-3">
@@ -251,7 +251,7 @@ export default function NotificationInbox({ user, onRefresh }: any) {
   return (
     <div className="flex flex-col h-full overflow-hidden bg-[var(--background)]">
       {/* 헤더 */}
-      <header className="px-5 pt-6 pb-0 shrink-0 bg-[var(--toss-card)] border-b border-[var(--toss-border)]">
+      <header className="px-5 pt-6 pb-0 shrink-0 bg-[var(--card)] border-b border-[var(--border)]">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-xl font-bold text-[var(--foreground)] tracking-tight">알림</h2>
@@ -259,7 +259,7 @@ export default function NotificationInbox({ user, onRefresh }: any) {
           </div>
           <div className="flex items-center gap-3">
             {unreadCount > 0 && activeInnerTab === 'list' && (
-              <button onClick={markAllAsRead} className="text-xs font-bold text-[var(--toss-blue)] hover:underline">전체 읽음</button>
+              <button onClick={markAllAsRead} className="text-xs font-bold text-[var(--accent)] hover:underline">전체 읽음</button>
             )}
           </div>
         </div>
@@ -269,7 +269,7 @@ export default function NotificationInbox({ user, onRefresh }: any) {
           {([{ id: 'list', label: '알림 목록' }, { id: 'settings', label: '⚙️ 설정' }] as const).map(t => (
             <button key={t.id} type="button" onClick={() => setActiveInnerTab(t.id)}
               className={`px-4 py-2 text-xs font-bold rounded-t-xl border-b-2 transition-all ${activeInnerTab === t.id
-                ? 'border-[var(--toss-blue)] text-[var(--toss-blue)]'
+                ? 'border-[var(--accent)] text-[var(--accent)]'
                 : 'border-transparent text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'}`}>
               {t.label}
             </button>
@@ -282,18 +282,18 @@ export default function NotificationInbox({ user, onRefresh }: any) {
       ) : (
         <>
           {/* 타입 탭 가로 스크롤 */}
-          <div className="flex items-center gap-1.5 px-4 py-2.5 bg-[var(--toss-card)] border-b border-[var(--toss-border)] overflow-x-auto no-scrollbar shrink-0">
+          <div className="flex items-center gap-1.5 px-4 py-2.5 bg-[var(--card)] border-b border-[var(--border)] overflow-x-auto no-scrollbar shrink-0">
             {TABS.map(tab => {
               const badge = tabBadge(tab.types as string[] | null);
               return (
                 <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all shrink-0 ${activeTab === tab.id
-                    ? 'bg-[var(--toss-blue)] text-white shadow-sm'
-                    : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] hover:bg-[var(--toss-border)]'}`}>
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] text-xs font-bold whitespace-nowrap transition-all shrink-0 ${activeTab === tab.id
+                    ? 'bg-[var(--accent)] text-white shadow-sm'
+                    : 'bg-[var(--muted)] text-[var(--toss-gray-3)] hover:bg-[var(--border)]'}`}>
                   <span>{tab.icon}</span>
                   <span>{tab.label}</span>
                   {badge > 0 && (
-                    <span className={`text-[9px] font-black px-1 py-0 rounded-full ${activeTab === tab.id ? 'bg-white/30 text-white' : 'bg-red-500 text-white'}`}>{badge}</span>
+                    <span className={`text-[9px] font-black px-1 py-0 rounded-[var(--radius-md)] ${activeTab === tab.id ? 'bg-[var(--card)]/30 text-white' : 'bg-red-500 text-white'}`}>{badge}</span>
                   )}
                 </button>
               );
@@ -304,7 +304,7 @@ export default function NotificationInbox({ user, onRefresh }: any) {
           <main className="flex-1 overflow-y-auto custom-scrollbar">
             {loading ? (
               <div className="flex flex-col items-center justify-center py-20 gap-3">
-                <div className="w-8 h-8 border-2 border-[var(--toss-blue-light)] border-t-[var(--toss-blue)] rounded-full animate-spin" />
+                <div className="w-8 h-8 border-2 border-[var(--toss-blue-light)] border-t-[var(--accent)] rounded-full animate-spin" />
                 <p className="text-xs text-[var(--toss-gray-3)] font-medium">알림을 불러오는 중...</p>
               </div>
             ) : !user?.id ? (
@@ -319,23 +319,23 @@ export default function NotificationInbox({ user, onRefresh }: any) {
                 {GROUP_ORDER.filter(g => grouped[g]?.length).map(group => (
                   <div key={group}>
                     {/* 날짜 그룹 헤더 */}
-                    <div className="sticky top-0 px-5 py-2 bg-[var(--background)]/90 backdrop-blur-sm z-10 border-b border-[var(--toss-border)]/50">
+                    <div className="sticky top-0 px-5 py-2 bg-[var(--background)]/90 backdrop-blur-sm z-10 border-b border-[var(--border)]/50">
                       <span className="text-[10px] font-black text-[var(--toss-gray-3)] uppercase tracking-wider">{group}</span>
                     </div>
 
                     {/* 알림 아이템 */}
-                    <div className="divide-y divide-[var(--toss-border)]/50">
+                    <div className="divide-y divide-[var(--border)]/50">
                       {grouped[group].map(n => {
                         const cfg = getTypeCfg(n.type);
                         return (
                           <div
                             key={n.id}
                             onClick={() => handleClick(n)}
-                            className={`relative flex items-start gap-3.5 px-5 py-4 cursor-pointer transition-colors hover:bg-[var(--toss-gray-1)] group
+                            className={`relative flex items-start gap-3.5 px-5 py-4 cursor-pointer transition-colors hover:bg-[var(--muted)] group
                               ${!n.read_at ? `border-l-4 ${cfg.border} bg-opacity-30` : 'opacity-75'}`}
                           >
                             {/* 타입 아이콘 */}
-                            <div className={`w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center text-xl ${n.read_at ? 'bg-[var(--toss-gray-1)]' : cfg.bg}`}>
+                            <div className={`w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center text-xl ${n.read_at ? 'bg-[var(--muted)]' : cfg.bg}`}>
                               {cfg.icon}
                             </div>
 
@@ -354,12 +354,12 @@ export default function NotificationInbox({ user, onRefresh }: any) {
 
                             {/* 안읽음 점 */}
                             {!n.read_at && (
-                              <span className="absolute right-5 top-1/2 -translate-y-1/2 w-2 h-2 bg-[var(--toss-blue)] rounded-full" />
+                              <span className="absolute right-5 top-1/2 -translate-y-1/2 w-2 h-2 bg-[var(--accent)] rounded-full" />
                             )}
 
                             {/* 삭제 버튼 (hover 시 표시) */}
                             <button type="button" onClick={e => deleteNotif(n.id, e)}
-                              className="absolute right-5 top-3.5 w-6 h-6 flex items-center justify-center rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100 text-xs"
+                              className="absolute right-5 top-3.5 w-6 h-6 flex items-center justify-center rounded-full text-[var(--toss-gray-3)] hover:text-red-500 hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100 text-xs"
                               aria-label="삭제">✕</button>
                           </div>
                         );

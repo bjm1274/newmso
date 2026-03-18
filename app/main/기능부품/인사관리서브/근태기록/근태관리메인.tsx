@@ -133,21 +133,21 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
 
   return (
     <div className="flex flex-col h-full bg-[var(--page-bg)] animate-in fade-in duration-500">
-      <header className="px-8 pt-8 pb-4 border-b border-[var(--toss-border)] bg-white dark:bg-zinc-900 shrink-0 shadow-sm z-10 sticky top-0">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+      <header className="px-4 pt-4 pb-3 border-b border-[var(--border)] bg-[var(--card)] shrink-0 shadow-sm z-10 sticky top-0">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
           <div className="flex-1 w-full">
-            <div className="flex items-center gap-3 mb-6 block w-full">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-md shrink-0">
+            <div className="flex items-center gap-3 mb-4 block w-full">
+              <div className="w-10 h-10 rounded-xl bg-[var(--accent)] flex items-center justify-center text-white font-bold text-lg shadow-sm shrink-0">
                 🕒
               </div>
               <div>
                 <h2 className="text-xl font-bold text-foreground">
-                  전문 근태 통합 관리 <span className="ml-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[10px] font-bold border border-blue-100">{selectedCo}</span>
+                  전문 근태 통합 관리 <span className="ml-1 px-2 py-0.5 rounded-[var(--radius-md)] bg-blue-50 text-blue-600 text-[10px] font-bold border border-blue-100">{selectedCo}</span>
                 </h2>
               </div>
             </div>
 
-            <div className="flex items-center gap-1 bg-zinc-100/80 dark:bg-zinc-800/80 p-1 rounded-[14px] w-fit border border-zinc-200/50 dark:border-zinc-700/50 overflow-x-auto custom-scrollbar">
+            <div className="flex items-center gap-1 bg-[var(--tab-bg)]/80 dark:bg-zinc-800/80 p-1 rounded-[var(--radius-lg)] w-fit border border-[var(--border)]/50 dark:border-zinc-700/50 overflow-x-auto custom-scrollbar">
               {[
                 { id: 'dashboard', label: '대시보드', icon: '📊' },
                 { id: 'daily', label: '일별 현황', icon: '📋' },
@@ -158,9 +158,9 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                 <button
                   key={mode.id}
                   onClick={() => setViewMode(mode.id as any)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-[10px] text-[11px] font-bold transition-all whitespace-nowrap ${viewMode === mode.id
-                    ? 'bg-white dark:bg-zinc-700 text-foreground shadow-sm ring-1 ring-zinc-900/5 dark:ring-white/10'
-                    : 'text-zinc-500 hover:text-foreground hover:bg-white/50 dark:hover:bg-zinc-700/50'
+                  className={`flex items-center gap-2 px-4 py-2 rounded-[var(--radius-md)] text-[11px] font-bold transition-all whitespace-nowrap ${viewMode === mode.id
+                    ? 'bg-[var(--card)] dark:bg-zinc-700 text-foreground shadow-sm ring-1 ring-zinc-900/5 dark:ring-white/10'
+                    : 'text-[var(--toss-gray-4)] hover:text-foreground hover:bg-[var(--card)]/50 dark:hover:bg-zinc-700/50'
                     }`}
                 >
                   <span className="text-sm">{mode.icon}</span>
@@ -174,15 +174,15 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
             <button
               type="button"
               onClick={() => setBulkEditOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-[12px] text-[11px] font-bold bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 shadow-sm hover:border-blue-400 hover:text-blue-600 transition-colors whitespace-nowrap focus:outline-none"
+              className="flex items-center gap-2 px-4 py-2 rounded-[var(--radius-md)] text-[11px] font-bold bg-[var(--card)] dark:bg-zinc-800 text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)] border border-[var(--border)] dark:border-zinc-700 shadow-sm hover:border-blue-400 hover:text-blue-600 transition-colors whitespace-nowrap focus:outline-none"
             >
               <span className="text-sm">⚡</span> 상태 일괄 수정
             </button>
 
-            <div className="flex items-center bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-[12px] p-1 shadow-sm shrink-0 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent transition-all">
+            <div className="flex items-center bg-[var(--card)] dark:bg-zinc-800 border border-[var(--border)] dark:border-zinc-700 rounded-[var(--radius-md)] p-1 shadow-sm shrink-0 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent transition-all">
               {viewMode === 'daily' ? (
                 <>
-                  <div className="px-3 bg-zinc-50 dark:bg-zinc-900/50 rounded-lg py-1.5 border border-zinc-100 dark:border-zinc-800 text-[10px] font-bold text-zinc-400">DATE</div>
+                  <div className="px-3 bg-[var(--tab-bg)] dark:bg-zinc-900/50 rounded-lg py-1.5 border border-[var(--border-subtle)] dark:border-zinc-800 text-[10px] font-bold text-[var(--toss-gray-3)]">DATE</div>
                   <SmartDatePicker
                     value={selectedDate}
                     onChange={(val) => setSelectedDate(val)}
@@ -191,7 +191,7 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                 </>
               ) : (
                 <>
-                  <div className="px-3 bg-zinc-50 dark:bg-zinc-900/50 rounded-lg py-1.5 border border-zinc-100 dark:border-zinc-800 text-[10px] font-bold text-zinc-400">MONTH</div>
+                  <div className="px-3 bg-[var(--tab-bg)] dark:bg-zinc-900/50 rounded-lg py-1.5 border border-[var(--border-subtle)] dark:border-zinc-800 text-[10px] font-bold text-[var(--toss-gray-3)]">MONTH</div>
                   <SmartMonthPicker
                     value={selectedMonth}
                     onChange={(val) => setSelectedMonth(val)}
@@ -204,20 +204,20 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
         </div>
       </header>
 
-      <main className="flex-1 p-8 overflow-auto custom-scrollbar bg-[var(--toss-gray-1)]/20">
+      <main className="flex-1 p-4 overflow-auto custom-scrollbar bg-[var(--muted)]/20">
         {viewMode === 'daily' && (
           <div className="max-w-6xl mx-auto space-y-4">
-            <h3 className="text-lg font-bold text-foreground mb-4">일별 출퇴근 현황 <span className="text-zinc-500 text-sm font-medium ml-2">{selectedDate}</span></h3>
-            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl overflow-hidden shadow-sm">
+            <h3 className="text-lg font-bold text-foreground mb-4">일별 출퇴근 현황 <span className="text-[var(--toss-gray-4)] text-sm font-medium ml-2">{selectedDate}</span></h3>
+            <div className="bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border)] dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm">
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
-                  <thead className="bg-zinc-50 dark:bg-zinc-900/50 border-b border-zinc-200 dark:border-zinc-800">
+                  <thead className="bg-[var(--tab-bg)] dark:bg-zinc-900/50 border-b border-[var(--border)] dark:border-zinc-800">
                     <tr>
-                      <th className="px-6 py-4 text-[11px] font-bold text-zinc-500 uppercase tracking-wider">직원 정보</th>
-                      <th className="px-6 py-4 text-[11px] font-bold text-zinc-500 uppercase tracking-wider">상태</th>
-                      <th className="px-6 py-4 text-[11px] font-bold text-zinc-500 uppercase tracking-wider">출퇴근 시간</th>
-                      <th className="px-6 py-4 text-[11px] font-bold text-zinc-500 uppercase tracking-wider">근무 시간</th>
-                      <th className="px-6 py-4 text-[11px] font-bold text-zinc-500 uppercase tracking-wider">비고</th>
+                      <th className="px-4 py-4 text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">직원 정보</th>
+                      <th className="px-4 py-4 text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">상태</th>
+                      <th className="px-4 py-4 text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">출퇴근 시간</th>
+                      <th className="px-4 py-4 text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">근무 시간</th>
+                      <th className="px-4 py-4 text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">비고</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
@@ -235,47 +235,47 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                         early_leave: { label: '조퇴', color: 'text-amber-700 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/30 ring-amber-200' },
                         sick_leave: { label: '병가', color: 'text-purple-700 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-900/30 ring-purple-200' },
                         annual_leave: { label: '연차', color: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/30 ring-blue-200' },
-                        holiday: { label: '휴일', color: 'text-zinc-600 dark:text-zinc-400', bg: 'bg-zinc-100 dark:bg-zinc-800 ring-zinc-200' },
+                        holiday: { label: '휴일', color: 'text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)]', bg: 'bg-[var(--tab-bg)] dark:bg-zinc-800 ring-zinc-200' },
                         half_leave: { label: '반차', color: 'text-cyan-700 dark:text-cyan-400', bg: 'bg-cyan-50 dark:bg-cyan-900/30 ring-cyan-200' }
                       };
 
                       const statusObj = statusMap[att?.status || 'present'] || statusMap.present;
 
                       return (
-                        <tr key={s.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors group cursor-default">
-                          <td className="px-6 py-4">
+                        <tr key={s.id} className="hover:bg-[var(--tab-bg)]/50 dark:hover:bg-zinc-800/30 transition-colors group cursor-default">
+                          <td className="px-4 py-4">
                             <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 font-bold text-xs ring-1 ring-zinc-200 dark:ring-zinc-700">
+                              <div className="w-10 h-10 rounded-full bg-[var(--tab-bg)] dark:bg-zinc-800 flex items-center justify-center text-[var(--toss-gray-4)] font-bold text-xs ring-1 ring-zinc-200 dark:ring-zinc-700">
                                 {s.name[0]}
                               </div>
                               <div className="flex flex-col">
                                 <span className="font-bold text-sm text-foreground">{s.name}</span>
-                                <span className="text-[11px] text-zinc-500 font-medium mt-0.5">{s.department} · {s.position}</span>
+                                <span className="text-[11px] text-[var(--toss-gray-4)] font-medium mt-0.5">{s.department} · {s.position}</span>
                               </div>
                             </div>
                           </td>
-                          <td className="px-6 py-4">
+                          <td className="px-4 py-4">
                             <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold ring-1 ring-inset ${statusObj.color} ${statusObj.bg}`}>
                               <span className={`w-1 h-1 rounded-full mr-1.5 ${statusObj.bg.replace('ring-', 'bg-').split(' ')[0]}`} style={{ filter: 'brightness(0.8)' }}></span>
                               {statusObj.label}
                             </span>
                           </td>
-                          <td className="px-6 py-4">
+                          <td className="px-4 py-4">
                             <div className="flex flex-col gap-1">
                               <div className="flex items-center gap-2">
-                                <span className="text-[10px] text-zinc-400 uppercase w-4">IN</span>
+                                <span className="text-[10px] text-[var(--toss-gray-3)] uppercase w-4">IN</span>
                                 <span className="font-mono font-bold text-sm text-foreground">{checkIn}</span>
                               </div>
                               <div className="flex items-center gap-2">
-                                <span className="text-[10px] text-zinc-400 uppercase w-4">OUT</span>
-                                <span className="font-mono font-bold text-sm text-zinc-500">{checkOut}</span>
+                                <span className="text-[10px] text-[var(--toss-gray-3)] uppercase w-4">OUT</span>
+                                <span className="font-mono font-bold text-sm text-[var(--toss-gray-4)]">{checkOut}</span>
                               </div>
                             </div>
                           </td>
-                          <td className="px-6 py-4 font-mono font-bold text-blue-600 dark:text-blue-500 text-sm">
+                          <td className="px-4 py-4 font-mono font-bold text-blue-600 dark:text-blue-500 text-sm">
                             {workHrs}
                           </td>
-                          <td className="px-6 py-4 text-xs font-medium text-zinc-500">
+                          <td className="px-4 py-4 text-xs font-medium text-[var(--toss-gray-4)]">
                             {att?.notes || <span className="opacity-30">-</span>}
                           </td>
                         </tr>
@@ -289,8 +289,8 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
         )}
 
         {viewMode === 'schedule' && (
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl overflow-hidden shadow-sm flex flex-col min-h-[calc(100dvh-200px)]">
-            <div className="p-5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-col gap-5 shrink-0">
+          <div className="bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border)] dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm flex flex-col min-h-[calc(100dvh-200px)]">
+            <div className="p-4 border-b border-[var(--border)] dark:border-zinc-800 bg-[var(--tab-bg)]/50 dark:bg-zinc-900/50 flex flex-col gap-3 shrink-0">
               <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
                 <div>
                   <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
@@ -322,12 +322,12 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                 </button>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 bg-white dark:bg-zinc-800 p-2 rounded-2xl border border-zinc-200 dark:border-zinc-700 shadow-sm w-fit">
-                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mx-3">Toolbox</span>
-                <div className="w-px h-6 bg-zinc-200 dark:bg-zinc-700 mr-2"></div>
+              <div className="flex flex-wrap items-center gap-2 bg-[var(--card)] dark:bg-zinc-800 p-2 rounded-2xl border border-[var(--border)] dark:border-zinc-700 shadow-sm w-fit">
+                <span className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider mx-3">Toolbox</span>
+                <div className="w-px h-6 bg-[var(--tab-bg)] dark:bg-zinc-700 mr-2"></div>
                 {workShifts.map((sh: any) => {
                   const isActive = activeTool === sh.id;
-                  let colorClass = 'bg-zinc-50 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800';
+                  let colorClass = 'bg-[var(--tab-bg)] dark:bg-zinc-900 text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)] border-[var(--border)] dark:border-zinc-700 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800';
                   if (sh.name.includes('Day') || sh.name.includes('데이') || sh.name === 'D') colorClass = 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/40';
                   if (sh.name.includes('Evening') || sh.name.includes('이브') || sh.name === 'E') colorClass = 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800/50 hover:bg-orange-100 dark:hover:bg-orange-900/40';
                   if (sh.name.includes('Night') || sh.name.includes('나이트') || sh.name === 'N') colorClass = 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800/50 hover:bg-blue-100 dark:hover:bg-blue-900/40';
@@ -337,17 +337,17 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                     <button
                       key={sh.id}
                       onClick={() => setActiveTool(isActive ? null : sh.id)}
-                      className={`px-4 py-2 rounded-[10px] text-[11px] font-bold transition-all border ${isActive ? 'ring-2 ring-offset-2 ring-blue-500 scale-105 shadow-md ' + colorClass : colorClass}`}
+                      className={`px-4 py-2 rounded-[var(--radius-md)] text-[11px] font-bold transition-all border ${isActive ? 'ring-2 ring-offset-2 ring-blue-500 scale-105 shadow-md ' + colorClass : colorClass}`}
                     >
                       {sh.name}
                     </button>
                   );
                 })}
-                <div className="w-px h-6 bg-zinc-200 dark:bg-zinc-700 mx-1"></div>
+                <div className="w-px h-6 bg-[var(--tab-bg)] dark:bg-zinc-700 mx-1"></div>
                 <button
                   type="button"
                   onClick={() => setActiveTool(activeTool === 'eraser' ? null : 'eraser')}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-[10px] text-[11px] font-bold transition-all border ${activeTool === 'eraser' ? 'bg-red-500 border-red-500 text-white ring-2 ring-offset-2 ring-red-500 scale-105 shadow-md' : 'bg-white dark:bg-zinc-800 text-red-500 border-red-200 dark:border-red-900/50 hover:bg-red-50 dark:hover:bg-red-900/20'}`}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-md)] text-[11px] font-bold transition-all border ${activeTool === 'eraser' ? 'bg-red-500 border-red-500 text-white ring-2 ring-offset-2 ring-red-500 scale-105 shadow-md' : 'bg-[var(--card)] dark:bg-zinc-800 text-red-500 border-red-200 dark:border-red-900/50 hover:bg-red-50 dark:hover:bg-red-900/20'}`}
                 >
                   <span className="text-sm">🧹</span> 지우개
                 </button>
@@ -356,15 +356,15 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
 
             <div className="overflow-x-auto flex-1 custom-scrollbar pb-4 relative">
               <table className="w-full text-left border-collapse min-w-[800px]">
-                <thead className="bg-zinc-50 dark:bg-zinc-900/80 text-[11px] font-bold text-zinc-500 uppercase tracking-wider sticky top-0 z-20 shadow-sm border-b border-zinc-200 dark:border-zinc-800">
+                <thead className="bg-[var(--tab-bg)] dark:bg-zinc-900/80 text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider sticky top-0 z-20 shadow-sm border-b border-[var(--border)] dark:border-zinc-800">
                   <tr>
-                    <th className="px-6 py-4 sticky left-0 bg-zinc-50 dark:bg-zinc-900 z-30 border-r border-zinc-200 dark:border-zinc-800 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">직원명</th>
+                    <th className="px-4 py-4 sticky left-0 bg-[var(--tab-bg)] dark:bg-zinc-900 z-30 border-r border-[var(--border)] dark:border-zinc-800 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">직원명</th>
                     {daysArray.map((d) => {
                       const dStr = `${selectedMonth}-${String(d).padStart(2, '0')}`;
                       const dayOfWeek = new Date(dStr).getDay();
                       const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
                       return (
-                        <th key={d} className={`px-2 py-4 text-center border-r border-zinc-200 dark:border-zinc-800 min-w-[44px] ${isWeekend ? 'text-red-400 dark:text-red-500' : ''}`}>
+                        <th key={d} className={`px-2 py-4 text-center border-r border-[var(--border)] dark:border-zinc-800 min-w-[44px] ${isWeekend ? 'text-red-400 dark:text-red-500' : ''}`}>
                           <div className="flex flex-col items-center">
                             <span>{d}</span>
                             <span className="text-[9px] font-medium opacity-60 mt-0.5">{['일', '월', '화', '수', '목', '금', '토'][dayOfWeek]}</span>
@@ -376,11 +376,11 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                 </thead>
                 <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
                   {filtered.map((s: any) => (
-                    <tr key={s.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 group">
-                      <td className="px-6 py-3 sticky left-0 bg-white dark:bg-zinc-900 group-hover:bg-zinc-50 dark:group-hover:bg-zinc-800/80 z-10 border-r border-zinc-200 dark:border-zinc-800 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] transition-colors">
+                    <tr key={s.id} className="hover:bg-[var(--tab-bg)]/50 dark:hover:bg-zinc-800/30 group">
+                      <td className="px-4 py-3 sticky left-0 bg-[var(--card)] dark:bg-zinc-900 group-hover:bg-[var(--tab-bg)] dark:group-hover:bg-zinc-800/80 z-10 border-r border-[var(--border)] dark:border-zinc-800 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] transition-colors">
                         <div className="flex flex-col">
                           <span className="font-bold text-sm text-foreground whitespace-nowrap">{s.name}</span>
-                          <span className="text-[10px] text-zinc-500 font-medium">{s.department}</span>
+                          <span className="text-[10px] text-[var(--toss-gray-4)] font-medium">{s.department}</span>
                         </div>
                       </td>
                       {daysArray.map((d) => {
@@ -390,18 +390,18 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                         const shiftObj = workShifts.find(w => w.id === value);
                         const isWeekend = new Date(dStr).getDay() === 0 || new Date(dStr).getDay() === 6;
 
-                        let cellColor = isWeekend ? 'bg-red-50/30 dark:bg-red-900/5 hover:bg-zinc-50 dark:hover:bg-zinc-800/50' : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50';
+                        let cellColor = isWeekend ? 'bg-red-50/30 dark:bg-red-900/5 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800/50' : 'hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800/50';
                         if (shiftObj) {
                           if (shiftObj.name.includes('Day') || shiftObj.name.includes('데이') || shiftObj.name === 'D') cellColor = 'bg-emerald-100/50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 font-bold';
                           else if (shiftObj.name.includes('Evening') || shiftObj.name.includes('이브') || shiftObj.name === 'E') cellColor = 'bg-orange-100/50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 font-bold';
                           else if (shiftObj.name.includes('Night') || shiftObj.name.includes('나이트') || shiftObj.name === 'N') cellColor = 'bg-blue-100/50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-bold';
                           else if (shiftObj.name.includes('Off') || shiftObj.name.includes('오프') || shiftObj.name === 'O') cellColor = 'bg-rose-100/50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 font-bold';
-                          else cellColor = 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 font-bold';
+                          else cellColor = 'bg-[var(--tab-bg)] dark:bg-zinc-800 text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)] font-bold';
                         }
                         return (
                           <td
                             key={d}
-                            className={`p-1 border-r border-zinc-200 dark:border-zinc-800 min-w-[44px] cursor-pointer select-none transition-colors border-b-0 border-t-0 active:bg-blue-50 dark:active:bg-blue-900/20 active:ring-inset active:ring-2 active:ring-blue-400 ${cellColor}`}
+                            className={`p-1 border-r border-[var(--border)] dark:border-zinc-800 min-w-[44px] cursor-pointer select-none transition-colors border-b-0 border-t-0 active:bg-blue-50 dark:active:bg-blue-900/20 active:ring-inset active:ring-2 active:ring-blue-400 ${cellColor}`}
                             onMouseDown={() => {
                               if (activeTool === 'eraser') setAssignment(s.id, dStr, null);
                               else if (activeTool) setAssignment(s.id, dStr, activeTool);
@@ -414,7 +414,7 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                             }}
                           >
                             <div className="w-full h-8 flex items-center justify-center text-[11px] rounded transition-all">
-                              {shiftObj ? (shiftObj.name.replace('근무', '').slice(0, 3)) : <span className="opacity-0 group-hover:opacity-20 text-[9px] text-zinc-400 font-black">+</span>}
+                              {shiftObj ? (shiftObj.name.replace('근무', '').slice(0, 3)) : <span className="opacity-0 group-hover:opacity-20 text-[9px] text-[var(--toss-gray-3)] font-black">+</span>}
                             </div>
                           </td>
                         );
@@ -428,12 +428,12 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
         )}
 
         {viewMode === 'monthly' && (
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl overflow-hidden shadow-sm">
+          <div className="bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border)] dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm">
             <div className="overflow-x-auto custom-scrollbar">
               <table className="w-full text-left border-collapse min-w-[800px]">
-                <thead className="bg-zinc-50 dark:bg-zinc-900/80 border-b border-zinc-200 dark:border-zinc-800 text-[11px] font-bold text-zinc-500 uppercase tracking-wider">
+                <thead className="bg-[var(--tab-bg)] dark:bg-zinc-900/80 border-b border-[var(--border)] dark:border-zinc-800 text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">
                   <tr>
-                    <th className="px-6 py-4 sticky left-0 bg-zinc-50 dark:bg-zinc-900/90 z-10 border-r border-zinc-200 dark:border-zinc-800 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">직원명</th>
+                    <th className="px-4 py-4 sticky left-0 bg-[var(--tab-bg)] dark:bg-zinc-900/90 z-10 border-r border-[var(--border)] dark:border-zinc-800 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">직원명</th>
                     {daysArray.map((d) => {
                       const dStr = `${selectedMonth}-${String(d).padStart(2, '0')}`;
                       const dayOfWeek = new Date(dStr).getDay();
@@ -441,7 +441,7 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                       return (
                         <th
                           key={d}
-                          className={`px-2 py-4 text-center border-r border-zinc-200 dark:border-zinc-800 min-w-[44px] ${isWeekend ? 'text-red-400 dark:text-red-500' : ''}`}
+                          className={`px-2 py-4 text-center border-r border-[var(--border)] dark:border-zinc-800 min-w-[44px] ${isWeekend ? 'text-red-400 dark:text-red-500' : ''}`}
                         >
                           <div className="flex flex-col items-center">
                             <span>{d}</span>
@@ -450,18 +450,18 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                         </th>
                       );
                     })}
-                    <th className="px-6 py-4 text-center text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/10">출근</th>
+                    <th className="px-4 py-4 text-center text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/10">출근</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
                   {filtered.map((s: any) => {
                     let workDays = 0;
                     return (
-                      <tr key={s.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors group">
-                        <td className="px-6 py-3 sticky left-0 bg-white dark:bg-zinc-900 group-hover:bg-zinc-50 dark:group-hover:bg-zinc-800/80 z-10 border-r border-zinc-200 dark:border-zinc-800 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] transition-colors">
+                      <tr key={s.id} className="hover:bg-[var(--tab-bg)]/50 dark:hover:bg-zinc-800/30 transition-colors group">
+                        <td className="px-4 py-3 sticky left-0 bg-[var(--card)] dark:bg-zinc-900 group-hover:bg-[var(--tab-bg)] dark:group-hover:bg-zinc-800/80 z-10 border-r border-[var(--border)] dark:border-zinc-800 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] transition-colors">
                           <div className="flex flex-col">
                             <span className="font-bold text-sm text-foreground whitespace-nowrap">{s.name}</span>
-                            <span className="text-[10px] text-zinc-500 font-medium">{s.department}</span>
+                            <span className="text-[10px] text-[var(--toss-gray-4)] font-medium">{s.department}</span>
                           </div>
                         </td>
                         {daysArray.map((d) => {
@@ -472,7 +472,7 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                           const status = att?.status || (isWeekend ? 'holiday' : '');
 
                           let label = '';
-                          let cellClass = 'text-zinc-300 dark:text-zinc-600';
+                          let cellClass = 'text-[var(--toss-gray-3)] dark:text-[var(--toss-gray-4)]';
 
                           if (status === 'annual_leave' || status === 'sick_leave') {
                             label = status === 'annual_leave' ? '연' : '병';
@@ -498,7 +498,7 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                           return (
                             <td
                               key={d}
-                              className="p-1 border-r border-zinc-200 dark:border-zinc-800 text-center align-middle"
+                              className="p-1 border-r border-[var(--border)] dark:border-zinc-800 text-center align-middle"
                             >
                               <div className={`w-8 h-8 mx-auto flex items-center justify-center rounded-lg text-[11px] font-bold ${cellClass}`}>
                                 {label}
@@ -506,7 +506,7 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                             </td>
                           );
                         })}
-                        <td className="px-6 py-3 text-center bg-blue-50/30 dark:bg-blue-900/10 font-bold text-blue-600 dark:text-blue-400 text-sm">
+                        <td className="px-4 py-3 text-center bg-blue-50/30 dark:bg-blue-900/10 font-bold text-blue-600 dark:text-blue-400 text-sm">
                           {workDays}
                         </td>
                       </tr>
@@ -519,23 +519,23 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
         )}
 
         {viewMode === 'dashboard' && (
-          <div className="space-y-6 max-w-6xl mx-auto">
+          <div className="space-y-4 max-w-6xl mx-auto">
             {/* AI Attendance Alert Widget */}
             {stats.atRiskStaff && stats.atRiskStaff.length > 0 && (
-              <div className="bg-rose-50 border border-rose-200 rounded-3xl p-6 shadow-sm flex items-start gap-4">
+              <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 shadow-sm flex items-start gap-4">
                 <div className="text-4xl">🚨</div>
                 <div className="flex-1">
                   <h4 className="text-sm font-black text-rose-800 flex items-center gap-2">
                     AI 근태 경고 알림 (Attendance Alert)
-                    <span className="px-2 py-0.5 bg-rose-200 text-rose-700 rounded-full text-[10px] animate-pulse">주의 요망</span>
+                    <span className="px-2 py-0.5 bg-rose-200 text-rose-700 rounded-[var(--radius-md)] text-[10px] animate-pulse">주의 요망</span>
                   </h4>
                   <p className="text-xs text-rose-600 mt-1 font-medium pb-4 border-b border-rose-200/50 mb-4">
                     누적 지각(3회 이상) 또는 결근(2회 이상)이 발생하여 즉시 면담이 필요한 직원이 발견되었습니다.
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {stats.atRiskStaff.map((risk: any, idx: number) => (
-                      <div key={idx} className="bg-white border border-rose-200 px-3 py-2 rounded-xl text-xs flex items-center gap-3">
-                        <span className="font-bold text-slate-800">{risk.name} <span className="text-[10px] text-slate-400 font-medium">({risk.dept})</span></span>
+                      <div key={idx} className="bg-[var(--card)] border border-rose-200 px-3 py-2 rounded-xl text-xs flex items-center gap-3">
+                        <span className="font-bold text-[var(--foreground)]">{risk.name} <span className="text-[10px] text-[var(--toss-gray-3)] font-medium">({risk.dept})</span></span>
                         <div className="flex gap-2">
                           {risk.lates > 0 && <span className="text-orange-600 font-bold">지각 {risk.lates}회</span>}
                           {risk.absents > 0 && <span className="text-rose-600 font-bold">결근 {risk.absents}회</span>}
@@ -550,38 +550,38 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
               </div>
             )}
 
-            <h3 className="text-lg font-bold text-foreground mb-4 mt-8">근태 요약 <span className="text-zinc-500 text-sm font-medium ml-2">{selectedMonth} 기준</span></h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 md:p-8 shadow-sm relative overflow-hidden group hover:border-blue-300 dark:hover:border-blue-700 transition-colors">
-                <div className="absolute top-0 right-0 p-6 text-4xl opacity-10 group-hover:scale-110 transition-transform">🎯</div>
-                <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-2">출근율</p>
+            <h3 className="text-lg font-bold text-foreground mb-4 mt-5">근태 요약 <span className="text-[var(--toss-gray-4)] text-sm font-medium ml-2">{selectedMonth} 기준</span></h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-4">
+              <div className="bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border)] dark:border-zinc-800 rounded-2xl p-4 md:p-4 shadow-sm relative overflow-hidden group hover:border-blue-300 dark:hover:border-blue-700 transition-colors">
+                <div className="absolute top-0 right-0 p-4 text-4xl opacity-10 group-hover:scale-110 transition-transform">🎯</div>
+                <p className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2">출근율</p>
                 <div className="flex items-end gap-2">
                   <p className="text-4xl md:text-5xl font-black text-blue-600 dark:text-blue-500">{stats.rate}</p>
                   <span className="text-xl font-bold text-blue-600/50 mb-1">%</span>
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 md:p-8 shadow-sm relative overflow-hidden group hover:border-emerald-300 dark:hover:border-emerald-700 transition-colors">
-                <div className="absolute top-0 right-0 p-6 text-4xl opacity-10 group-hover:scale-110 transition-transform">✅</div>
-                <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-2">정상 출근</p>
+              <div className="bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border)] dark:border-zinc-800 rounded-2xl p-4 md:p-4 shadow-sm relative overflow-hidden group hover:border-emerald-300 dark:hover:border-emerald-700 transition-colors">
+                <div className="absolute top-0 right-0 p-4 text-4xl opacity-10 group-hover:scale-110 transition-transform">✅</div>
+                <p className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2">정상 출근</p>
                 <div className="flex items-end gap-2">
                   <p className="text-4xl md:text-5xl font-black text-emerald-600 dark:text-emerald-500">{stats.present}</p>
                   <span className="text-xl font-bold text-emerald-600/50 mb-1">건</span>
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 md:p-8 shadow-sm relative overflow-hidden group hover:border-orange-300 dark:hover:border-orange-700 transition-colors">
-                <div className="absolute top-0 right-0 p-6 text-4xl opacity-10 group-hover:scale-110 transition-transform">⏰</div>
-                <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-2">지각</p>
+              <div className="bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border)] dark:border-zinc-800 rounded-2xl p-4 md:p-4 shadow-sm relative overflow-hidden group hover:border-orange-300 dark:hover:border-orange-700 transition-colors">
+                <div className="absolute top-0 right-0 p-4 text-4xl opacity-10 group-hover:scale-110 transition-transform">⏰</div>
+                <p className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2">지각</p>
                 <div className="flex items-end gap-2">
                   <p className="text-4xl md:text-5xl font-black text-orange-500">{stats.late}</p>
                   <span className="text-xl font-bold text-orange-500/50 mb-1">건</span>
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 md:p-8 shadow-sm relative overflow-hidden group hover:border-rose-300 dark:hover:border-rose-700 transition-colors">
-                <div className="absolute top-0 right-0 p-6 text-4xl opacity-10 group-hover:scale-110 transition-transform">🏃‍♂️</div>
-                <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-2">조퇴 / 결근</p>
+              <div className="bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border)] dark:border-zinc-800 rounded-2xl p-4 md:p-4 shadow-sm relative overflow-hidden group hover:border-rose-300 dark:hover:border-rose-700 transition-colors">
+                <div className="absolute top-0 right-0 p-4 text-4xl opacity-10 group-hover:scale-110 transition-transform">🏃‍♂️</div>
+                <p className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2">조퇴 / 결근</p>
                 <div className="flex items-end gap-2">
                   <p className="text-4xl md:text-5xl font-black text-rose-500">{stats.earlyLeave + stats.absent}</p>
                   <span className="text-xl font-bold text-rose-500/50 mb-1">건</span>
@@ -589,12 +589,12 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
               </div>
             </div>
 
-            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8 shadow-sm">
-              <div className="flex items-center justify-between mb-8">
+            <div className="bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border)] dark:border-zinc-800 rounded-2xl p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
                 <h3 className="text-base font-bold text-foreground">근무 상태 지표</h3>
-                <span className="text-xs font-bold text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-3 py-1 rounded-full">총 {stats.total}건</span>
+                <span className="text-xs font-bold text-[var(--toss-gray-3)] bg-[var(--tab-bg)] dark:bg-zinc-800 px-3 py-1 rounded-[var(--radius-md)]">총 {stats.total}건</span>
               </div>
-              <div className="space-y-6">
+              <div className="space-y-4">
                 {[
                   { label: '정상 출근', count: stats.present, color: 'bg-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
                   { label: '지각', count: stats.late, color: 'bg-orange-500', bg: 'bg-orange-50 dark:bg-orange-900/20' },
@@ -607,14 +607,14 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                       <div className="flex justify-between items-end mb-2">
                         <div className="flex items-center gap-2">
                           <span className={`w-2 h-2 rounded-full ${stat.color}`}></span>
-                          <span className="text-sm font-bold text-zinc-600 dark:text-zinc-300">{stat.label}</span>
+                          <span className="text-sm font-bold text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)]">{stat.label}</span>
                         </div>
                         <div className="flex items-center gap-3">
-                          <span className="text-xs font-bold text-zinc-400">{stat.count}건</span>
+                          <span className="text-xs font-bold text-[var(--toss-gray-3)]">{stat.count}건</span>
                           <span className="text-lg font-black text-foreground w-12 text-right">{percent}%</span>
                         </div>
                       </div>
-                      <div className="h-4 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden relative">
+                      <div className="h-4 bg-[var(--tab-bg)] dark:bg-zinc-800 rounded-full overflow-hidden relative">
                         <div
                           className={`h-full ${stat.color} transition-all duration-1000 ease-out`}
                           style={{ width: `${percent}%` }}
@@ -631,18 +631,18 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
         {/* 출퇴근 상태 일괄 수정 모달 */}
         {bulkEditOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl max-w-md w-full p-8 space-y-6 transform transition-all">
+            <div className="bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border)] dark:border-zinc-800 rounded-2xl shadow-sm max-w-md w-full p-4 space-y-4 transform transition-all">
               <div className="flex justify-between items-center mb-2">
                 <h3 className="text-xl font-bold text-foreground flex items-center gap-2">
                   <span className="text-2xl">⚡</span> 상태 일괄 수정
                 </h3>
-                <button onClick={() => setBulkEditOpen(false)} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors">
+                <button onClick={() => setBulkEditOpen(false)} className="text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] dark:hover:text-zinc-200 transition-colors">
                   <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
               </div>
               <div className="space-y-5">
                 <div>
-                  <p className="text-[11px] font-bold text-zinc-500 uppercase flex items-center gap-1.5 mb-2"><span className="text-sm">🗓️</span> 적용 기간</p>
+                  <p className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase flex items-center gap-1.5 mb-2"><span className="text-sm">🗓️</span> 적용 기간</p>
                   <div className="grid grid-cols-2 gap-2">
                     {[
                       { id: 'day', label: '하루 단위' },
@@ -654,7 +654,7 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                         key={o.id}
                         type="button"
                         onClick={() => setBulkRangeType(o.id as any)}
-                        className={`px-3 py-2.5 rounded-xl text-xs font-bold transition-all border ${bulkRangeType === o.id ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 ring-1 ring-blue-500' : 'bg-transparent text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800'
+                        className={`px-3 py-2.5 rounded-xl text-xs font-bold transition-all border ${bulkRangeType === o.id ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 ring-1 ring-blue-500' : 'bg-transparent text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)] border-[var(--border)] dark:border-zinc-700 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800'
                           }`}
                       >
                         {o.label}
@@ -665,7 +665,7 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
 
                 <div className="flex gap-3">
                   <div className="flex-1">
-                    <p className="text-[11px] font-bold text-zinc-500 uppercase mb-1.5 ml-1">시작일</p>
+                    <p className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase mb-1.5 ml-1">시작일</p>
                     <SmartDatePicker
                       value={bulkStartDate}
                       onChange={(val) => {
@@ -676,27 +676,27 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                           setBulkEndDate(d.toISOString().slice(0, 10));
                         }
                       }}
-                      className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 px-4 py-3 rounded-xl text-sm font-bold text-foreground outline-none transition-shadow"
+                      className="w-full bg-[var(--tab-bg)] dark:bg-zinc-800/50 border border-[var(--border)] dark:border-zinc-700 px-4 py-3 rounded-xl text-sm font-bold text-foreground outline-none transition-shadow"
                     />
                   </div>
                   {(bulkRangeType === 'custom' || bulkRangeType === 'week') && (
                     <div className="flex-1">
-                      <p className="text-[11px] font-bold text-zinc-500 uppercase mb-1.5 ml-1">종료일</p>
+                      <p className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase mb-1.5 ml-1">종료일</p>
                       <SmartDatePicker
                         value={bulkEndDate}
                         onChange={(val) => setBulkEndDate(val)}
-                        className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 px-4 py-3 rounded-xl text-sm font-bold text-foreground outline-none transition-shadow"
+                        className="w-full bg-[var(--tab-bg)] dark:bg-zinc-800/50 border border-[var(--border)] dark:border-zinc-700 px-4 py-3 rounded-xl text-sm font-bold text-foreground outline-none transition-shadow"
                       />
                     </div>
                   )}
                 </div>
 
                 <div className="pt-2">
-                  <p className="text-[11px] font-bold text-zinc-500 uppercase flex items-center gap-1.5 mb-2"><span className="text-sm">📌</span> 변경할 상태</p>
+                  <p className="text-[11px] font-bold text-[var(--toss-gray-4)] uppercase flex items-center gap-1.5 mb-2"><span className="text-sm">📌</span> 변경할 상태</p>
                   <select
                     value={bulkStatus}
                     onChange={(e) => setBulkStatus(e.target.value)}
-                    className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none cursor-pointer transition-shadow"
+                    className="w-full bg-[var(--tab-bg)] dark:bg-zinc-800/50 border border-[var(--border)] dark:border-zinc-700 rounded-xl px-4 py-3 text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none cursor-pointer transition-shadow"
                   >
                     <option value="present">🟢 정상 출근</option>
                     <option value="late">🟠 지각</option>
@@ -710,11 +710,11 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                 </div>
               </div>
 
-              <div className="flex gap-3 justify-end pt-4 border-t border-zinc-100 dark:border-zinc-800">
+              <div className="flex gap-3 justify-end pt-4 border-t border-[var(--border-subtle)] dark:border-zinc-800">
                 <button
                   type="button"
                   onClick={() => setBulkEditOpen(false)}
-                  className="px-6 py-3 rounded-xl text-sm font-bold border border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800 focus:outline-none transition-colors"
+                  className="px-4 py-3 rounded-xl text-sm font-bold border border-[var(--border)] dark:border-zinc-700 text-[var(--toss-gray-4)] hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 focus:outline-none transition-colors"
                 >
                   취소
                 </button>
@@ -766,7 +766,7 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                     }
                   }}
                   disabled={bulkSaving}
-                  className="px-6 py-3 rounded-xl text-sm font-bold bg-blue-600 text-white shadow-md shadow-blue-500/20 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 transition-all flex items-center justify-center min-w-[120px]"
+                  className="px-4 py-3 rounded-xl text-sm font-bold bg-blue-600 text-white shadow-md shadow-blue-500/20 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 transition-all flex items-center justify-center min-w-[120px]"
                 >
                   {bulkSaving ? (
                     <span className="flex items-center gap-2"><svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> 처리 중...</span>
@@ -778,10 +778,10 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
         )}
 
         {viewMode === 'calendar' && (
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8 shadow-sm">
+          <div className="bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border)] dark:border-zinc-800 rounded-2xl p-4 shadow-sm">
             <div className="grid grid-cols-7 gap-4">
               {['일', '월', '화', '수', '목', '금', '토'].map((day, idx) => (
-                <div key={day} className={`text-center text-[12px] font-bold uppercase pb-3 mb-2 border-b border-zinc-100 dark:border-zinc-800 ${idx === 0 ? 'text-rose-500' : idx === 6 ? 'text-blue-500' : 'text-zinc-500'}`}>{day}</div>
+                <div key={day} className={`text-center text-[12px] font-bold uppercase pb-3 mb-2 border-b border-[var(--border-subtle)] dark:border-zinc-800 ${idx === 0 ? 'text-rose-500' : idx === 6 ? 'text-blue-500' : 'text-[var(--toss-gray-4)]'}`}>{day}</div>
               ))}
               {Array.from({ length: 35 }).map((_, i) => {
                 const day = i - 1; // 데모용 날짜 오프셋
@@ -789,7 +789,7 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                 const isSunday = i % 7 === 0;
 
                 return (
-                  <div key={i} className={`min-h-[130px] p-3 border rounded-2xl transition-all ${isCurrentMonth ? 'bg-white dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-600 cursor-pointer' : 'bg-zinc-50/50 dark:bg-zinc-900/30 border-transparent opacity-40'}`}>
+                  <div key={i} className={`min-h-[130px] p-3 border rounded-2xl transition-all ${isCurrentMonth ? 'bg-[var(--card)] dark:bg-zinc-800/50 border-[var(--border)] dark:border-zinc-700 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-600 cursor-pointer' : 'bg-[var(--tab-bg)]/50 dark:bg-zinc-900/30 border-transparent opacity-40'}`}>
                     {isCurrentMonth && (
                       <div className="flex flex-col h-full">
                         <span className={`text-sm font-bold flex justify-between items-center ${isSunday ? 'text-rose-500' : 'text-foreground'}`}>

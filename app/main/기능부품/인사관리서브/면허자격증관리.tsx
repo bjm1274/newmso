@@ -94,13 +94,13 @@ export default function LicenseManager({ staffs = [], selectedCo, user }: { staf
   };
 
   return (
-    <div className="p-4 md:p-8 space-y-5">
+    <div className="p-4 md:p-5 space-y-5">
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div>
           <h2 className="text-base font-bold text-[var(--foreground)]">면허·자격증 관리</h2>
           <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">직원별 면허·자격증 만료일을 추적합니다.</p>
         </div>
-        <button onClick={openAdd} className="px-4 py-2 bg-[var(--toss-blue)] text-white rounded-[10px] text-sm font-bold shadow-sm hover:opacity-90">+ 등록</button>
+        <button onClick={openAdd} className="px-4 py-2 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-sm font-bold shadow-sm hover:opacity-90">+ 등록</button>
       </div>
 
       {/* 요약 카드 */}
@@ -110,7 +110,7 @@ export default function LicenseManager({ staffs = [], selectedCo, user }: { staf
           { label: '만료 임박 (60일)', value: expiringCount, color: 'bg-orange-50 text-orange-700 border-orange-200' },
           { label: '만료됨', value: expiredCount, color: 'bg-red-50 text-red-600 border-red-200' },
         ].map(c => (
-          <div key={c.label} className={`p-3 rounded-[14px] border ${c.color} text-center`}>
+          <div key={c.label} className={`p-3 rounded-[var(--radius-lg)] border ${c.color} text-center`}>
             <p className="text-xl font-bold">{c.value}</p>
             <p className="text-[10px] font-semibold mt-0.5">{c.label}</p>
           </div>
@@ -121,9 +121,9 @@ export default function LicenseManager({ staffs = [], selectedCo, user }: { staf
       <div className="flex flex-wrap gap-2 items-center">
         {(['전체', '유효', '만료 임박', '만료'] as const).map(f => (
           <button key={f} onClick={() => setFilterStatus(f)}
-            className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${filterStatus === f ? 'bg-[var(--toss-blue)] text-white' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'}`}>{f}</button>
+            className={`px-3 py-1.5 rounded-[var(--radius-md)] text-xs font-bold transition-all ${filterStatus === f ? 'bg-[var(--accent)] text-white' : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'}`}>{f}</button>
         ))}
-        <select value={filterStaff} onChange={e => setFilterStaff(e.target.value)} className="px-3 py-1.5 border border-[var(--toss-border)] rounded-[10px] text-xs bg-[var(--toss-card)] outline-none">
+        <select value={filterStaff} onChange={e => setFilterStaff(e.target.value)} className="px-3 py-1.5 border border-[var(--border)] rounded-[var(--radius-md)] text-xs bg-[var(--card)] outline-none">
           <option value="">전체 직원</option>
           {filteredStaffs.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
@@ -131,13 +131,13 @@ export default function LicenseManager({ staffs = [], selectedCo, user }: { staf
 
       {/* 목록 */}
       {filtered.length === 0 ? (
-        <div className="text-center py-16 text-[var(--toss-gray-3)] font-bold text-sm">등록된 면허·자격증이 없습니다.</div>
+        <div className="text-center py-10 text-[var(--toss-gray-3)] font-bold text-sm">등록된 면허·자격증이 없습니다.</div>
       ) : (
         <div className="space-y-2">
           {filtered.map(l => {
             const daysLeft = getDaysLeft(l.expiry_date);
             return (
-              <div key={l.id} className="flex items-center justify-between p-4 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[14px] shadow-sm hover:shadow-md transition-shadow">
+              <div key={l.id} className="flex items-center justify-between p-4 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] shadow-sm hover:shadow-md transition-shadow">
                 <div className="flex items-center gap-3">
                   <div className={`w-2 h-12 rounded-full ${l.status === 'expired' ? 'bg-red-400' : l.status === 'expiring' ? 'bg-orange-400' : 'bg-green-400'}`} />
                   <div>
@@ -161,8 +161,8 @@ export default function LicenseManager({ staffs = [], selectedCo, user }: { staf
                   </div>
                 </div>
                 <div className="flex gap-1.5">
-                  <button onClick={() => openEdit(l)} className="px-2 py-1 text-[10px] bg-blue-50 text-blue-600 font-bold rounded-[6px] hover:bg-blue-100">편집</button>
-                  <button onClick={() => handleDelete(l.id)} className="px-2 py-1 text-[10px] bg-red-50 text-red-500 font-bold rounded-[6px] hover:bg-red-100">삭제</button>
+                  <button onClick={() => openEdit(l)} className="px-2 py-1 text-[10px] bg-blue-50 text-blue-600 font-bold rounded-md hover:bg-blue-100">편집</button>
+                  <button onClick={() => handleDelete(l.id)} className="px-2 py-1 text-[10px] bg-red-50 text-red-500 font-bold rounded-md hover:bg-red-100">삭제</button>
                 </div>
               </div>
             );
@@ -172,12 +172,12 @@ export default function LicenseManager({ staffs = [], selectedCo, user }: { staf
 
       {showModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
-          <div className="bg-[var(--toss-card)] rounded-[20px] shadow-2xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
+          <div className="bg-[var(--card)] rounded-[var(--radius-xl)] shadow-sm w-full max-w-sm p-4" onClick={e => e.stopPropagation()}>
             <h3 className="text-base font-bold text-[var(--foreground)] mb-4">{editId ? '면허·자격증 편집' : '면허·자격증 등록'}</h3>
             <div className="space-y-3">
               <div>
                 <label className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">직원 *</label>
-                <select value={form.staff_id} onChange={e => setForm(f => ({ ...f, staff_id: e.target.value }))} className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm bg-[var(--toss-card)] outline-none">
+                <select value={form.staff_id} onChange={e => setForm(f => ({ ...f, staff_id: e.target.value }))} className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none">
                   {filteredStaffs.map(s => <option key={s.id} value={s.id}>{s.name} ({s.position})</option>)}
                 </select>
               </div>
@@ -192,13 +192,13 @@ export default function LicenseManager({ staffs = [], selectedCo, user }: { staf
                 <div key={key}>
                   <label className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">{label}</label>
                   <input type={type} value={(form as any)[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-                    placeholder={placeholder} className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm bg-[var(--toss-card)] outline-none" />
+                    placeholder={placeholder} className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none" />
                 </div>
               ))}
             </div>
-            <div className="flex gap-2 mt-5">
-              <button onClick={() => setShowModal(false)} className="flex-1 py-3 rounded-[12px] bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] font-semibold text-sm">취소</button>
-              <button onClick={handleSave} disabled={saving} className="flex-1 py-3 rounded-[12px] bg-[var(--toss-blue)] text-white font-semibold text-sm disabled:opacity-50">{saving ? '저장 중...' : '저장'}</button>
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => setShowModal(false)} className="flex-1 py-2 rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--toss-gray-4)] font-semibold text-sm">취소</button>
+              <button onClick={handleSave} disabled={saving} className="flex-1 py-2 rounded-[var(--radius-md)] bg-[var(--accent)] text-white font-semibold text-sm disabled:opacity-50">{saving ? '저장 중...' : '저장'}</button>
             </div>
           </div>
         </div>

@@ -127,26 +127,26 @@ export default function DocumentScanner({ user, staffs, selectedCo = '전체' }:
     };
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-500">
-            <div className="flex justify-between items-end border-b border-[var(--toss-border)] pb-4">
+        <div className="space-y-4 animate-in fade-in duration-500">
+            <div className="flex justify-between items-end border-b border-[var(--border)] pb-3">
                 <div>
-                    <h2 className="text-xl md:text-2xl font-bold text-[var(--foreground)] tracking-tight">스마트 서류 제출</h2>
+                    <h2 className="text-base font-bold text-[var(--foreground)] tracking-tight">스마트 서류 제출</h2>
                 </div>
                 {isAdmin && (
                     <div className="flex gap-2">
-                        <button onClick={() => setActiveTab('내제출')} className={`rounded-xl px-4 py-2 text-xs font-bold transition-colors ${activeTab === '내제출' ? 'bg-[var(--toss-blue)] text-white' : 'bg-[var(--toss-gray-1)] text-[var(--foreground)] hover:bg-[var(--toss-gray-2)]'}`}>내 서류</button>
-                        <button onClick={() => setActiveTab('관리자현황')} className={`rounded-xl px-4 py-2 text-xs font-bold transition-colors ${activeTab === '관리자현황' ? 'bg-[var(--toss-blue)] text-white' : 'bg-[var(--toss-gray-1)] text-[var(--foreground)] hover:bg-[var(--toss-gray-2)]'}`}>전사 수집 현황</button>
+                        <button onClick={() => setActiveTab('내제출')} className={`rounded-[var(--radius-md)] px-3 py-1.5 text-xs font-bold transition-colors ${activeTab === '내제출' ? 'bg-[var(--accent)] text-white' : 'bg-[var(--muted)] text-[var(--foreground)] hover:bg-[var(--toss-gray-2)]'}`}>내 서류</button>
+                        <button onClick={() => setActiveTab('관리자현황')} className={`rounded-[var(--radius-md)] px-3 py-1.5 text-xs font-bold transition-colors ${activeTab === '관리자현황' ? 'bg-[var(--accent)] text-white' : 'bg-[var(--muted)] text-[var(--foreground)] hover:bg-[var(--toss-gray-2)]'}`}>전사 수집 현황</button>
                     </div>
                 )}
             </div>
 
             {activeTab === '내제출' && (
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-                    <div className="col-span-2 md:col-span-4 lg:col-span-5 xl:col-span-6 bg-blue-50/50 p-4 rounded-2xl border border-blue-100 flex items-center gap-4">
+                    <div className="col-span-2 md:col-span-4 lg:col-span-5 xl:col-span-6 bg-blue-50/50 p-3 rounded-[var(--radius-md)] border border-blue-100 flex items-center gap-3">
                         <div className="text-2xl">📸</div>
                         <div>
                             <h3 className="text-xs font-black text-blue-600">스마트 스캔 기능이 활성화되었습니다.</h3>
-                            <p className="text-[10px] font-medium text-slate-500 mt-0.5">
+                            <p className="text-[10px] font-medium text-[var(--toss-gray-4)] mt-0.5">
                                 신분증은 가로형 가이드에, A4 서류는 세로형 가이드에 맞춰 촬영해 주세요.
                             </p>
                         </div>
@@ -155,7 +155,7 @@ export default function DocumentScanner({ user, staffs, selectedCo = '전체' }:
                     {REQUIRED_DOCS.map(doc => {
                         const existingDoc = myDocs.find(d => d.category === doc.id);
                         return (
-                            <div key={doc.id} className={`border p-3.5 rounded-2xl shadow-sm transition-all relative group h-full flex flex-col justify-between ${existingDoc ? 'border-emerald-100 bg-emerald-50/20' : 'border-slate-100 bg-white hover:border-blue-400'}`}>
+                            <div key={doc.id} className={`border p-3.5 rounded-2xl shadow-sm transition-all relative group h-full flex flex-col justify-between ${existingDoc ? 'border-emerald-100 bg-emerald-50/20' : 'border-[var(--border-subtle)] bg-[var(--card)] hover:border-blue-400'}`}>
                                 <div>
                                     <div className="flex justify-between items-start">
                                         <h4 className="pr-4 text-[11px] font-black leading-tight text-[var(--foreground)]">{doc.label}</h4>
@@ -163,7 +163,7 @@ export default function DocumentScanner({ user, staffs, selectedCo = '전체' }:
                                             <span className="text-emerald-500 text-[10px] font-black">✓</span>
                                         )}
                                     </div>
-                                    <span className={`inline-block mt-1 rounded px-1.5 py-0.5 text-[8px] font-black ${existingDoc ? 'bg-emerald-100/50 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-5)]'}`}>
+                                    <span className={`inline-block mt-1 rounded px-1.5 py-0.5 text-[8px] font-black ${existingDoc ? 'bg-emerald-100/50 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-[var(--muted)] text-[var(--toss-gray-5)]'}`}>
                                         {existingDoc ? '제출 완료' : '미제출'}
                                     </span>
                                 </div>
@@ -171,8 +171,8 @@ export default function DocumentScanner({ user, staffs, selectedCo = '전체' }:
                                 <div className="mt-3 flex gap-1.5">
                                     {existingDoc ? (
                                         <>
-                                            <button onClick={() => window.open(existingDoc.file_url, '_blank')} className="flex-1 rounded-lg bg-[var(--toss-gray-1)] py-1.5 text-[10px] font-black text-[var(--foreground)] transition-colors hover:bg-[var(--toss-gray-2)]">보기</button>
-                                            <button onClick={() => setScanningDoc(doc)} className="rounded-lg border border-[var(--toss-border)] bg-[var(--toss-card)] px-2 py-1.5 text-[10px] text-[var(--toss-gray-5)] transition-colors hover:text-[var(--toss-blue)]" title="재촬영">📷</button>
+                                            <button onClick={() => window.open(existingDoc.file_url, '_blank')} className="flex-1 rounded-lg bg-[var(--muted)] py-1.5 text-[10px] font-black text-[var(--foreground)] transition-colors hover:bg-[var(--toss-gray-2)]">보기</button>
+                                            <button onClick={() => setScanningDoc(doc)} className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-2 py-1.5 text-[10px] text-[var(--toss-gray-5)] transition-colors hover:text-[var(--accent)]" title="재촬영">📷</button>
                                         </>
                                     ) : (
                                         <div className="flex w-full gap-1">
@@ -187,7 +187,7 @@ export default function DocumentScanner({ user, staffs, selectedCo = '전체' }:
                                                     setUploadingDocId(doc.id);
                                                     fileInputRef.current?.click();
                                                 }}
-                                                className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-[var(--toss-gray-1)] py-2 text-[9px] font-black text-[var(--foreground)] transition-colors hover:bg-[var(--toss-gray-2)]"
+                                                className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-[var(--muted)] py-2 text-[9px] font-black text-[var(--foreground)] transition-colors hover:bg-[var(--toss-gray-2)]"
                                             >
                                                 📁 파일
                                             </button>
@@ -225,11 +225,11 @@ export default function DocumentScanner({ user, staffs, selectedCo = '전체' }:
             )}
 
             {activeTab === '관리자현황' && isAdmin && (
-                <div className="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden min-h-[500px]">
-                    <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm overflow-hidden min-h-[500px]">
+                    <div className="p-3 border-b border-[var(--border-subtle)] flex justify-between items-center bg-[var(--tab-bg)]">
                         <div>
-                            <h3 className="text-sm font-black text-slate-800">서류 누락자 현황판 (Compliance Board)</h3>
-                            <p className="text-[10px] text-slate-400 font-bold mt-0.5">입사 1주일 경과 미제출자는 빨간색으로 표시됩니다.</p>
+                            <h3 className="text-sm font-bold text-[var(--foreground)]">서류 누락자 현황판 (Compliance Board)</h3>
+                            <p className="text-[10px] text-[var(--toss-gray-3)] font-bold mt-0.5">입사 1주일 경과 미제출자는 빨간색으로 표시됩니다.</p>
                         </div>
                         <div className="flex gap-2">
                             <button
@@ -254,12 +254,12 @@ export default function DocumentScanner({ user, staffs, selectedCo = '전체' }:
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-[11px]">
-                            <thead className="bg-slate-50/50">
-                                <tr className="border-b border-slate-100 text-slate-500 uppercase tracking-widest font-black">
-                                    <th className="px-6 py-4 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">성명</th>
-                                    <th className="px-6 py-4">부서 / 회사</th>
+                            <thead className="bg-[var(--tab-bg)]/50">
+                                <tr className="border-b border-[var(--border-subtle)] text-[var(--toss-gray-4)] uppercase tracking-widest font-black">
+                                    <th className="px-4 py-3 text-left text-[11px] font-black text-[var(--toss-gray-3)] uppercase tracking-widest">성명</th>
+                                    <th className="px-4 py-3">부서 / 회사</th>
                                     {REQUIRED_DOCS.map(doc => (
-                                        <th key={doc.id} className="px-1 py-3 text-center text-[9px] font-black text-slate-400 min-w-[75px] max-w-[75px] break-keep whitespace-normal leading-tight align-middle border-x border-slate-100/50">{doc.label}</th>
+                                        <th key={doc.id} className="px-1 py-3 text-center text-[9px] font-black text-[var(--toss-gray-3)] min-w-[75px] max-w-[75px] break-keep whitespace-normal leading-tight align-middle border-x border-[var(--border-subtle)]/50">{doc.label}</th>
                                     ))}
                                 </tr>
                             </thead>
@@ -272,19 +272,19 @@ export default function DocumentScanner({ user, staffs, selectedCo = '전체' }:
                                     const isLazy = joinDate < weekAgo && staffDocs.length < REQUIRED_DOCS.length;
 
                                     return (
-                                        <tr key={s.id} className={`hover:bg-slate-50 transition-colors ${isLazy ? 'bg-rose-50/30' : ''}`}>
-                                            <td className="px-6 py-4 font-black flex items-center gap-2 text-slate-800">
-                                                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[8px] ${isLazy ? 'bg-rose-100 text-rose-600' : 'bg-slate-200'}`}>{s.name[0]}</div>
+                                        <tr key={s.id} className={`hover:bg-[var(--tab-bg)] transition-colors ${isLazy ? 'bg-rose-50/30' : ''}`}>
+                                            <td className="px-4 py-3 font-black flex items-center gap-2 text-[var(--foreground)]">
+                                                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[8px] ${isLazy ? 'bg-rose-100 text-rose-600' : 'bg-[var(--tab-bg)]'}`}>{s.name[0]}</div>
                                                 <div>
                                                     <p>{s.name}</p>
-                                                    <p className="text-[9px] font-medium text-slate-400">입사일: {s.join_date}</p>
+                                                    <p className="text-[9px] font-medium text-[var(--toss-gray-3)]">입사일: {s.join_date}</p>
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4 font-bold text-slate-500">{s.department} <br /> <span className="text-[9px] font-medium">{s.company}</span></td>
+                                            <td className="px-4 py-3 font-bold text-[var(--toss-gray-4)]">{s.department} <br /> <span className="text-[9px] font-medium">{s.company}</span></td>
                                             {REQUIRED_DOCS.map(doc => {
                                                 const sub = staffDocs.find(d => d.category === doc.id);
                                                 return (
-                                                    <td key={doc.id} className="px-1 py-4 text-center border-x border-slate-100/50">
+                                                    <td key={doc.id} className="px-1 py-4 text-center border-x border-[var(--border-subtle)]/50">
                                                         {sub ? (
                                                             <div className="flex flex-col items-center gap-1 group/item">
                                                                 <span className="text-emerald-500 font-extrabold text-sm">✓</span>
@@ -293,7 +293,7 @@ export default function DocumentScanner({ user, staffs, selectedCo = '전체' }:
                                                                     className="text-[8px] text-blue-500 font-bold hover:underline opacity-0 group-hover/item:opacity-100 transition-opacity"
                                                                 >열람</button>
                                                             </div>
-                                                        ) : <span className={`${isLazy ? 'text-rose-400 font-black' : 'text-slate-200'}`}>✕</span>}
+                                                        ) : <span className={`${isLazy ? 'text-rose-400 font-black' : 'text-[var(--toss-gray-3)]'}`}>✕</span>}
                                                     </td>
                                                 );
                                             })}
@@ -375,17 +375,17 @@ function CameraScanner({ doc, onCapture, onClose }: any) {
         <div className="fixed inset-0 z-[300] bg-black md:bg-black/90 flex flex-col items-center justify-center animate-in fade-in">
             <div className="absolute top-6 left-6 z-10 flex flex-col gap-1">
                 <h3 className="text-white font-bold">{doc.label} 스캔</h3>
-                <span className="text-[10px] text-blue-400 font-black px-2 py-0.5 bg-blue-500/10 rounded-full w-fit">
+                <span className="text-[10px] text-blue-400 font-black px-2 py-0.5 bg-blue-500/10 rounded-[var(--radius-md)] w-fit">
                     현재 {capturedBlobs.length}페이지 수집됨
                 </span>
             </div>
             <button onClick={onClose} className="absolute top-6 right-6 text-white text-2xl z-10">✕</button>
 
-            <div className="relative w-full max-w-lg aspect-[3/4] md:aspect-[4/5] bg-black overflow-hidden md:rounded-[40px] shadow-2xl">
+            <div className="relative w-full max-w-lg aspect-[3/4] md:aspect-[4/5] bg-black overflow-hidden md:rounded-2xl shadow-sm">
                 {!currentPreview ? (
                     <>
                         <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none p-8">
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none p-5">
                             {isIDCard ? (
                                 <div className="w-full aspect-[1.58/1] border-2 border-dashed border-white/50 rounded-xl relative">
                                     <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-blue-500 rounded-tl-lg" />
@@ -410,26 +410,26 @@ function CameraScanner({ doc, onCapture, onClose }: any) {
 
             <canvas ref={canvasRef} className="hidden" />
 
-            <div className="absolute bottom-10 left-0 right-0 flex flex-col items-center gap-6">
+            <div className="absolute bottom-10 left-0 right-0 flex flex-col items-center gap-4">
                 {!currentPreview ? (
-                    <div className="flex flex-col items-center gap-6">
-                        <button onClick={takePhoto} disabled={isLoading} className="w-20 h-20 bg-white rounded-full border-8 border-slate-700/50 flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl">
-                            <div className="w-12 h-12 bg-white rounded-full border-2 border-slate-200" />
+                    <div className="flex flex-col items-center gap-4">
+                        <button onClick={takePhoto} disabled={isLoading} className="w-20 h-20 bg-[var(--card)] rounded-full border-8 border-slate-700/50 flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-sm">
+                            <div className="w-12 h-12 bg-[var(--card)] rounded-full border-2 border-[var(--border)]" />
                         </button>
                         {capturedBlobs.length > 0 && (
-                            <button onClick={handleFinalConfirm} className="px-12 py-4 bg-emerald-600 text-white rounded-2xl font-bold shadow-lg animate-bounce">
+                            <button onClick={handleFinalConfirm} className="px-12 py-4 bg-emerald-600 text-white rounded-2xl font-bold shadow-sm animate-bounce">
                                 총 {capturedBlobs.length}페이지 제출하기
                             </button>
                         )}
                     </div>
                 ) : (
-                    <div className="flex flex-col items-center gap-8">
+                    <div className="flex flex-col items-center gap-3">
                         <div className="text-center">
                             <p className="text-white text-sm font-bold">방금 촬영한 페이지가 선명한가요?</p>
                         </div>
                         <div className="flex items-center gap-4">
-                            <button onClick={() => setCurrentPreview(null)} className="px-6 py-4 bg-slate-800 text-white rounded-2xl font-bold">다시 촬영</button>
-                            <button onClick={addCurrentPage} className="px-8 py-4 bg-blue-600 text-white rounded-2xl font-bold">
+                            <button onClick={() => setCurrentPreview(null)} className="px-4 py-4 bg-slate-800 text-white rounded-2xl font-bold">다시 촬영</button>
+                            <button onClick={addCurrentPage} className="px-5 py-4 bg-blue-600 text-white rounded-2xl font-bold">
                                 {capturedBlobs.length === 0 ? "첫 페이지로 사용" : "다음 페이지 추가하기"}
                             </button>
                         </div>

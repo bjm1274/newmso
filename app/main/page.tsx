@@ -22,16 +22,9 @@ import MainContent from './기능부품/조직도서브/조직도본문';
 import NotificationSystem from './기능부품/알림시스템';
 import ChatAlertBanner from './기능부품/채팅알림배너';
 import PermissionPromptModal from './기능부품/권한요청모달';
-type ERPData = {
-  staffs: any[];
-  depts: any[];
-  posts: any[];
-  tasks: any[];
-  surgeries: any[];
-  mris: any[];
-};
+import type { ErpUser, ERPData, StaffMember } from '@/types';
 
-function canAccessAdminSubMenu(user: any, subMenuId: string) {
+function canAccessAdminSubMenu(user: ErpUser | null, subMenuId: string) {
   if (!canAccessMainMenu(user, '관리자')) {
     return false;
   }
@@ -59,7 +52,7 @@ function MainPageFallback() {
     <div className="min-h-screen flex flex-col items-center justify-center bg-[var(--background)] p-6 text-center">
       <div className="relative w-20 h-20 mb-8">
         <div className="absolute inset-0 border-4 border-[var(--toss-blue-light)] rounded-full" />
-        <div className="absolute inset-0 border-4 border-[var(--toss-blue)] rounded-full border-t-transparent animate-spin" />
+        <div className="absolute inset-0 border-4 border-[var(--accent)] rounded-full border-t-transparent animate-spin" />
       </div>
       <h2 className="text-xl font-bold text-[var(--foreground)] mb-2">SY INC. 통합 시스템</h2>
       <p className="text-xs font-medium text-[var(--toss-gray-3)] animate-pulse">접속 중...</p>
@@ -70,7 +63,7 @@ function MainPageFallback() {
 function MainPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<ErpUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [companies, setCompanies] = useState<{ id: string; name: string; type: string }[]>([]);
   const [selectedCompanyId, setSelectedCompanyIdState] = useState<string | null>(null);
@@ -132,7 +125,7 @@ function MainPageContent() {
     [companies, isMsoUser]
   );
 
-  const handleOpenApproval = useCallback((intent?: any) => {
+  const handleOpenApproval = useCallback((intent?: Record<string, unknown>) => {
     setMainMenu('전자결재');
     if (!intent) return;
 
@@ -145,7 +138,7 @@ function MainPageContent() {
   }, []);
 
   const resolveLegacyNavigation = useCallback(
-    (menuId?: string | null, subViewId?: string | null, candidateUser?: any) => {
+    (menuId?: string | null, subViewId?: string | null, candidateUser?: ErpUser | null) => {
       const canOpenAdmin =
         candidateUser?.company === 'SY INC.' ||
         candidateUser?.permissions?.mso === true ||
@@ -184,7 +177,7 @@ function MainPageContent() {
     }
   }, []);
 
-  const persistClientUser = useCallback((nextUser: any) => {
+  const persistClientUser = useCallback((nextUser: ErpUser | null) => {
     if (!nextUser) return;
 
     const safeUser = { ...nextUser };
@@ -206,14 +199,14 @@ function MainPageContent() {
     if (typeof window === 'undefined') return;
 
     const handleProfileUpdated = (event: Event) => {
-      const customEvent = event as CustomEvent<{ user?: any }>;
+      const customEvent = event as CustomEvent<{ user?: ErpUser }>;
       const nextUser = normalizeProfileUser(customEvent.detail?.user);
       if (!nextUser?.id) return;
 
       persistClientUser(nextUser);
       setData((prev) => ({
         ...prev,
-        staffs: prev.staffs.map((staff: any) =>
+        staffs: prev.staffs.map((staff: StaffMember) =>
           staff?.id === nextUser.id
             ? normalizeProfileUser({
                 ...staff,
@@ -332,7 +325,7 @@ function MainPageContent() {
                 console.error('companies 조회 오류:', error);
                 return;
               }
-              const sorted = (list || []).sort((a: any, b: any) => {
+              const sorted = (list || []).sort((a: { id: string; name: string; type: string }, b: { id: string; name: string; type: string }) => {
                 const order = ['박철홍정형외과', '수연의원', 'SY INC.'];
                 const ia = order.indexOf(a.name);
                 const ib = order.indexOf(b.name);
@@ -390,7 +383,10 @@ function MainPageContent() {
         delete safeNextUser.password;
         delete safeNextUser.passwd;
 
-        const normalizedNextUser = normalizeProfileUser(safeNextUser);
+        const normalizedNextUser = normalizeProfileUser<ErpUser>({
+          ...user,
+          ...safeNextUser,
+        });
         if (hasUserPayloadChanged(user, normalizedNextUser)) {
           persistClientUser(normalizedNextUser);
         }
@@ -551,7 +547,7 @@ function MainPageContent() {
     }
   }, [mainMenu, subView, selectedCo, user]);
 
-  const fetchERPData = async (currentUser?: any, companyIdFilter?: string | null) => {
+  const fetchERPData = async (currentUser?: ErpUser | null, companyIdFilter?: string | null) => {
     setLoading(true);
     const u = currentUser ?? user;
     try {
@@ -596,7 +592,7 @@ function MainPageContent() {
       );
 
       const normalizedStaffData = Array.isArray(staffData)
-        ? staffData.map((staff: any) => normalizeProfileUser(staff))
+        ? staffData.map((staff: StaffMember) => normalizeProfileUser(staff))
         : [];
 
       const { data: postData } = await withMissingColumnFallback(
@@ -620,7 +616,7 @@ function MainPageContent() {
 
       // 현재 사용자의 변경된 정보(팀/부서 등)가 있으면 세션 동기화
       if (normalizedStaffData.length > 0 && u?.id) {
-        const updatedSelf = normalizedStaffData.find((s: any) => s.id === u.id);
+        const updatedSelf = normalizedStaffData.find((s: StaffMember) => s.id === u.id);
         if (updatedSelf) {
           const safeSelf = { ...updatedSelf };
           delete safeSelf.password;
@@ -632,9 +628,9 @@ function MainPageContent() {
         }
       }
 
-      const uniqueDepts = Array.from(new Set(normalizedStaffData.map((s: any) => String(s.department || '').trim())))
-        .filter(Boolean)
-        .map((name) => ({ id: name, name }));
+      const uniqueDepts = Array.from(
+        new Set(normalizedStaffData.map((s: StaffMember) => String(s.department || '').trim()))
+      ).filter(Boolean);
 
       setData({
         staffs: normalizedStaffData,
@@ -718,7 +714,7 @@ function MainPageContent() {
       <div className="min-h-screen flex flex-col items-center justify-center bg-[var(--background)] p-6 text-center">
         <div className="relative w-20 h-20 mb-8">
           <div className="absolute inset-0 border-4 border-[var(--toss-blue-light)] rounded-full"></div>
-          <div className="absolute inset-0 border-4 border-[var(--toss-blue)] rounded-full border-t-transparent animate-spin"></div>
+          <div className="absolute inset-0 border-4 border-[var(--accent)] rounded-full border-t-transparent animate-spin"></div>
         </div>
         <h2 className="text-xl font-bold text-[var(--foreground)] mb-2">SY INC. 통합 시스템</h2>
         <p className="text-xs font-medium text-[var(--toss-gray-3)] animate-pulse">접속 중...</p>
@@ -746,28 +742,28 @@ function MainPageContent() {
       />
 
       {currentSubMenus.length > 0 && (
-        <aside className="flex w-full shrink-0 flex-row overflow-x-auto border-b border-[var(--toss-border)] bg-[var(--toss-card)] p-2 no-scrollbar md:sticky md:top-0 md:max-h-[100dvh] md:w-44 md:flex-col md:space-y-1 md:overflow-x-visible md:overflow-y-auto md:border-r md:border-b-0 md:px-3 md:py-4">
+        <aside className="no-scrollbar flex w-full shrink-0 flex-row overflow-x-auto border-b border-[var(--border)] bg-[var(--card)] px-2 py-1.5 md:sticky md:top-0 md:max-h-[100dvh] md:w-[var(--submenu-width)] md:flex-col md:overflow-x-visible md:overflow-y-auto md:border-r md:border-b-0 md:px-2 md:py-3">
           {(() => {
             if (mainMenu === '관리자' || mainMenu === '재고관리') {
               const groups = Array.from(new Set(currentSubMenus.map(s => s.group))).filter(Boolean);
 
               return groups.map(groupName => (
-                  <div key={groupName!} className="flex flex-row md:flex-col space-x-1 md:space-x-0 md:space-y-1 mb-0 md:mb-4 shrink-0">
-                  <div className="hidden md:block px-3 py-1.5 text-[10px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider">
-                    {subgroupLabels[groupName!] || groupName}
+                <div key={groupName!} className="flex flex-row md:flex-col gap-0.5 mb-0 md:mb-3 shrink-0">
+                  <div className="hidden md:block px-2.5 pt-1 pb-0.5 text-[9px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">
+                    {(subgroupLabels[groupName!] || groupName)?.replace(/^[^\s]+ /, '')}
                   </div>
                   {currentSubMenus.filter(s => s.group === groupName).map(sub => (
                     <button
                       key={sub.id}
                       onClick={() => setSubView(sub.id)}
                       data-testid={buildSubMenuTestId(mainMenu, sub.id)}
-                      className={`flex-none md:w-full text-center md:text-left px-4 md:px-3 py-2 md:py-2.5 text-[11px] font-bold rounded-[12px] transition-all whitespace-nowrap md:flex md:items-center md:gap-2 ${subView === sub.id
-                        ? 'bg-[var(--foreground)] text-white shadow-md'
-                        : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
-                        }`}
+                      className={`flex-none md:w-full text-center md:text-left px-3 md:px-2.5 py-1.5 text-[11px] font-semibold rounded-[var(--radius-md)] transition-all whitespace-nowrap md:flex md:items-center md:gap-1.5 ${subView === sub.id
+                        ? 'bg-[var(--foreground)] text-white'
+                        : 'text-[var(--toss-gray-4)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
+                      }`}
                     >
-                      <span className="hidden md:inline text-[13px] shrink-0">{sub.icon || '•'}</span>
-                      <span>{sub.label}</span>
+                      <span className="hidden md:inline text-[12px] shrink-0 opacity-80">{sub.icon || '·'}</span>
+                      <span className="truncate">{sub.label}</span>
                     </button>
                   ))}
                 </div>
@@ -779,13 +775,13 @@ function MainPageContent() {
                 key={sub.id}
                 onClick={() => setSubView(sub.id)}
                 data-testid={buildSubMenuTestId(mainMenu, sub.id)}
-                className={`flex-none md:w-full text-center md:text-left px-4 md:px-3 py-2 md:py-2.5 text-[11px] font-bold rounded-[12px] transition-all whitespace-nowrap md:flex md:items-center md:gap-2 ${subView === sub.id
-                  ? 'bg-[var(--toss-blue)] text-white shadow-md'
-                  : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
-                  }`}
+                className={`flex-none md:w-full text-center md:text-left px-3 md:px-2.5 py-1.5 text-[11px] font-semibold rounded-[var(--radius-md)] transition-all whitespace-nowrap md:flex md:items-center md:gap-1.5 ${subView === sub.id
+                  ? 'bg-[var(--accent)] text-white'
+                  : 'text-[var(--toss-gray-4)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
+                }`}
               >
-                <span className="hidden md:inline text-[13px] shrink-0">{sub.icon || '•'}</span>
-                <span>{sub.label}</span>
+                <span className="hidden md:inline text-[12px] shrink-0 opacity-80">{sub.icon || '·'}</span>
+                <span className="truncate">{sub.label}</span>
               </button>
             ));
           })()}
@@ -822,7 +818,7 @@ function MainPageContent() {
             className="absolute inset-0 bg-[var(--toss-card)]/60 z-40 flex items-center justify-center"
             data-testid="main-loading-overlay"
           >
-            <div className="w-10 h-10 border-2 border-[var(--toss-blue)] rounded-full border-t-transparent animate-spin" />
+            <div className="w-10 h-10 border-2 border-[var(--accent)] rounded-full border-t-transparent animate-spin" />
           </div>
         )}
         <MainContent

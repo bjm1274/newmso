@@ -214,7 +214,7 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
     return (
       <div
         ref={printRef}
-        className="relative mx-auto w-full max-w-[780px] overflow-hidden bg-white px-8 py-8 shadow-[0_20px_80px_rgba(15,23,42,0.08)]"
+        className="relative mx-auto w-full max-w-[780px] overflow-hidden bg-[var(--card)] px-5 py-5 shadow-[0_20px_80px_rgba(15,23,42,0.08)]"
         style={{
           border: `1px solid ${borderColor}`,
           minHeight: '980px',
@@ -232,7 +232,7 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
         <div className="relative z-10 flex h-full flex-col">
           <div className="flex items-start gap-4">
             <div
-              className="flex h-[72px] w-[72px] items-center justify-center rounded-[16px] bg-white"
+              className="flex h-[72px] w-[72px] items-center justify-center rounded-[var(--radius-lg)] bg-[var(--card)]"
               style={{ border: `1px solid ${borderColor}` }}
             >
               <img src="/logo.png" alt="" className="h-11 w-11 object-contain" />
@@ -247,7 +247,7 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
           <div className="mt-5 grid gap-3 md:grid-cols-[86px_1fr]">
             <div>
               <div
-                className="overflow-hidden rounded-[4px] bg-white"
+                className="overflow-hidden rounded bg-[var(--card)]"
                 style={{ border: `1px solid ${borderColor}` }}
               >
                 <div className="aspect-[3/4] overflow-hidden bg-[#eef2f6]" style={{ backgroundColor: profilePhotoUrl ? undefined : surface }}>
@@ -278,7 +278,7 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
             </div>
           </div>
 
-          <div className="mt-6 text-center">
+          <div className="mt-4 text-center">
             <p className="text-[14px] font-semibold leading-relaxed text-[var(--foreground)]">
               {closingText}
             </p>
@@ -288,7 +288,7 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
           </div>
 
           <div
-            className="mt-5 overflow-hidden bg-white"
+            className="mt-5 overflow-hidden bg-[var(--card)]"
             style={{
               borderTop: `2px solid ${primaryColor}`,
               borderBottom: `2px solid ${primaryColor}`,
@@ -341,7 +341,7 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
   };
 
   return (
-    <div className="app-page space-y-8 p-4 md:p-10">
+    <div className="app-page space-y-5 p-4 md:p-5">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">증명서 발급 센터</h2>
@@ -353,16 +353,16 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
           <button
             type="button"
             onClick={() => setShowHistory(true)}
-            className="rounded-[14px] border border-[var(--toss-border)] bg-white px-4 py-2.5 text-[12px] font-semibold text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]"
+            className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 py-2.5 text-[12px] font-semibold text-[var(--foreground)] hover:bg-[var(--muted)]"
           >
             발급 이력 조회
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[360px_1fr]">
-        <div className="space-y-6">
-          <div className="rounded-[24px] border border-[var(--toss-border)] bg-white p-6 shadow-sm">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[360px_1fr]">
+        <div className="space-y-4">
+          <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
             <div className="space-y-4">
               <label className="block">
                 <span className="mb-1 block text-[11px] font-black uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">
@@ -371,7 +371,7 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
                 <select
                   value={selectedStaff?.id || ''}
                   onChange={(event) => setSelectedStaff(filteredStaffs.find((staff: any) => staff.id === event.target.value) || null)}
-                  className="w-full rounded-[14px] border border-[var(--toss-border)] px-3 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20"
+                  className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] px-3 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
                 >
                   <option value="">직원 선택</option>
                   {filteredStaffs.map((staff: any) => (
@@ -390,13 +390,13 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
                   type="text"
                   value={purpose}
                   onChange={(event) => setPurpose(event.target.value)}
-                  className="w-full rounded-[14px] border border-[var(--toss-border)] px-3 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20"
+                  className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] px-3 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
                   placeholder="예: 금융기관 제출용"
                 />
               </label>
             </div>
 
-            <div className="mt-6">
+            <div className="mt-4">
               <p className="mb-3 text-[11px] font-black uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">
                 3. 증명서 종류
               </p>
@@ -408,10 +408,10 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
                       key={item.id}
                       type="button"
                       onClick={() => setCertType(item.id)}
-                      className={`rounded-[14px] border px-4 py-3 text-left transition-all ${
+                      className={`rounded-[var(--radius-lg)] border px-4 py-3 text-left transition-all ${
                         active
                           ? 'border-transparent text-white shadow-md'
-                          : 'border-[var(--toss-border)] bg-[var(--toss-gray-1)]/60 text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'
+                          : 'border-[var(--border)] bg-[var(--muted)]/60 text-[var(--foreground)] hover:bg-[var(--muted)]'
                       }`}
                       style={active ? { backgroundColor: primaryColor } : undefined}
                     >
@@ -428,7 +428,7 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
             <button
               type="button"
               onClick={handleIssue}
-              className="mt-6 w-full rounded-[16px] px-5 py-4 text-sm font-bold text-white shadow-lg"
+              className="mt-4 w-full rounded-[var(--radius-lg)] px-5 py-4 text-sm font-bold text-white shadow-sm"
               style={{ backgroundColor: primaryColor }}
             >
               증명서 발급 및 인쇄
@@ -436,7 +436,7 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
           </div>
 
           <div
-            className="rounded-[20px] p-5"
+            className="rounded-[var(--radius-xl)] p-5"
             style={{ backgroundColor: surface, border: `1px solid ${borderColor}` }}
           >
             <p className="text-[11px] font-black uppercase tracking-[0.18em]" style={{ color: primaryColor }}>
@@ -448,11 +448,11 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
           </div>
         </div>
 
-        <div className="rounded-[28px] border border-[var(--toss-border)] bg-white p-6 shadow-sm md:p-10">
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm md:p-5">
           {selectedStaff ? renderCertificatePaper() : false ? (
             <div
               ref={printRef}
-              className="relative mx-auto w-full max-w-[720px] overflow-hidden rounded-[28px] p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)] md:p-10"
+              className="relative mx-auto w-full max-w-[720px] overflow-hidden rounded-2xl p-4 shadow-[0_20px_80px_rgba(15,23,42,0.08)] md:p-5"
               style={{
                 border: `1px solid ${borderColor}`,
                 background: `linear-gradient(180deg, #ffffff 0%, ${alphaColor(primaryColor, 0.035)} 100%)`,
@@ -480,14 +480,14 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
 
               <div className="relative z-10">
               <div
-                className="rounded-[24px] border px-6 py-6 text-white shadow-[0_18px_40px_rgba(15,23,42,0.12)]"
+                className="rounded-[var(--radius-xl)] border px-4 py-4 text-white shadow-[0_18px_40px_rgba(15,23,42,0.12)]"
                 style={{
                   background: `linear-gradient(135deg, ${primaryColor}, ${alphaColor(primaryColor, 0.82)})`,
                   borderColor: alphaColor(primaryColor, 0.22),
                 }}
               >
                 <div className="flex items-center gap-4">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-[18px] bg-white/95 shadow-sm">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-[var(--radius-xl)] bg-[var(--card)]/95 shadow-sm">
                     <img src="/logo.png" alt="" className="h-12 w-12 object-contain" />
                   </div>
                   <div>
@@ -502,7 +502,7 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
               </div>
 
               <div
-                className="mt-6 flex items-center justify-between rounded-[18px] border px-5 py-4 shadow-sm"
+                className="mt-4 flex items-center justify-between rounded-[var(--radius-xl)] border px-5 py-4 shadow-sm"
                 style={{
                   backgroundColor: alphaColor(primaryColor, 0.075),
                   borderColor: alphaColor(primaryColor, 0.15),
@@ -518,12 +518,12 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
                 </div>
               </div>
 
-              <div className="mt-8 grid gap-6 md:grid-cols-[140px_1fr]">
+              <div className="mt-5 grid gap-4 md:grid-cols-[140px_1fr]">
                 <div
-                  className="rounded-[24px] bg-white/95 p-4 shadow-[0_10px_30px_rgba(15,23,42,0.04)]"
+                  className="rounded-[var(--radius-xl)] bg-[var(--card)]/95 p-4 shadow-[0_10px_30px_rgba(15,23,42,0.04)]"
                   style={{ border: `1px solid ${borderColor}` }}
                 >
-                  <div className="aspect-[3/4] overflow-hidden rounded-[18px]" style={{ backgroundColor: surface }}>
+                  <div className="aspect-[3/4] overflow-hidden rounded-[var(--radius-xl)]" style={{ backgroundColor: surface }}>
                     {profilePhotoUrl ? (
                       <img src={profilePhotoUrl} alt={selectedStaff?.name || '직원 사진'} className="h-full w-full object-cover" />
                     ) : (
@@ -536,7 +536,7 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
                 </div>
 
                 <div
-                  className="rounded-[24px] bg-white/95 p-6 shadow-[0_10px_30px_rgba(15,23,42,0.04)]"
+                  className="rounded-[var(--radius-xl)] bg-[var(--card)]/95 p-4 shadow-[0_10px_30px_rgba(15,23,42,0.04)]"
                   style={{ border: `1px solid ${borderColor}` }}
                 >
                   {identityRows.map(([label, value], index) => (
@@ -554,7 +554,7 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
               </div>
 
               <div
-                className="mt-8 rounded-[20px] border p-6 text-center"
+                className="mt-5 rounded-[var(--radius-xl)] border p-4 text-center"
                 style={{
                   background: `linear-gradient(135deg, ${alphaColor(primaryColor, 0.12)}, rgba(255,255,255,0.88))`,
                   borderColor: alphaColor(primaryColor, 0.18),
@@ -571,7 +571,7 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
               </div>
 
               <div
-                className="mt-8 rounded-[24px] bg-white/95 p-6 shadow-[0_10px_30px_rgba(15,23,42,0.04)]"
+                className="mt-5 rounded-[var(--radius-xl)] bg-[var(--card)]/95 p-4 shadow-[0_10px_30px_rgba(15,23,42,0.04)]"
                 style={{ border: `1px solid ${borderColor}` }}
               >
                 {certificateRows.map(([label, value], index) => (
@@ -590,7 +590,7 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
               {design.showSignArea && (
                 <div className="mt-10 flex justify-center border-t pt-6" style={{ borderColor }}>
                   <div
-                    className="flex items-end gap-5 rounded-[20px] border bg-white/90 px-6 py-4 shadow-sm"
+                    className="flex items-end gap-3 rounded-[var(--radius-xl)] border bg-[var(--card)]/90 px-4 py-4 shadow-sm"
                     style={{ borderColor: alphaColor(primaryColor, 0.18) }}
                   >
                     <div className="text-center">
@@ -620,7 +620,7 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
               </div>
             </div>
           ) : (
-            <div className="flex min-h-[720px] flex-col items-center justify-center rounded-[24px] bg-[var(--toss-gray-1)]/50 text-center">
+            <div className="flex min-h-[720px] flex-col items-center justify-center rounded-[var(--radius-xl)] bg-[var(--muted)]/50 text-center">
               <p className="text-5xl opacity-20">문서</p>
               <p className="mt-4 text-sm font-semibold text-[var(--foreground)]">직원을 선택하면 미리보기가 표시됩니다.</p>
             </div>
@@ -631,7 +631,7 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
       {showHistory && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-4" onClick={() => setShowHistory(false)}>
           <div
-            className="max-h-[80vh] w-full max-w-3xl overflow-y-auto rounded-[20px] bg-white p-6 shadow-2xl"
+            className="max-h-[80vh] w-full max-w-3xl overflow-y-auto rounded-[var(--radius-xl)] bg-[var(--card)] p-4 shadow-sm"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-center justify-between">
@@ -639,7 +639,7 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
               <button
                 type="button"
                 onClick={() => setShowHistory(false)}
-                className="rounded-[12px] border border-[var(--toss-border)] px-3 py-2 text-[12px] font-semibold text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]"
+                className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-[12px] font-semibold text-[var(--foreground)] hover:bg-[var(--muted)]"
               >
                 닫기
               </button>
@@ -647,14 +647,14 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
 
             <div className="mt-4 space-y-2">
               {historyList.length === 0 ? (
-                <div className="rounded-[16px] border border-[var(--toss-border)] p-6 text-center text-sm text-[var(--toss-gray-3)]">
+                <div className="rounded-[var(--radius-lg)] border border-[var(--border)] p-4 text-center text-sm text-[var(--toss-gray-3)]">
                   조회된 발급 이력이 없습니다.
                 </div>
               ) : (
                 historyList.map((row) => (
                   <div
                     key={row.id}
-                    className="flex flex-col gap-2 rounded-[16px] border border-[var(--toss-border)] px-4 py-3 md:flex-row md:items-center md:justify-between"
+                    className="flex flex-col gap-2 rounded-[var(--radius-lg)] border border-[var(--border)] px-4 py-3 md:flex-row md:items-center md:justify-between"
                   >
                     <div>
                       <p className="text-sm font-bold text-[var(--foreground)]">

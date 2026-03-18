@@ -204,15 +204,15 @@ export default function SealManager({ user, selectedCo }: Props) {
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-5 max-w-4xl mx-auto">
+    <div className="p-4 space-y-4 max-w-4xl mx-auto">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)]">법인 직인 이미지 관리</h2>
-          <p className="text-xs text-[var(--toss-gray-3)] mt-1">결재 완료된 문서에 자동 삽입됩니다.</p>
+          <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">결재 완료된 문서에 자동 삽입됩니다.</p>
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="px-4 py-2 bg-[var(--toss-blue)] text-white text-xs font-bold rounded-[8px] hover:opacity-90"
+          className="px-4 py-2 bg-[var(--accent)] text-white text-xs font-bold rounded-[var(--radius-md)] hover:opacity-90"
         >
           직인 등록
         </button>
@@ -220,15 +220,15 @@ export default function SealManager({ user, selectedCo }: Props) {
 
       {/* 등록 폼 */}
       {showForm && (
-        <div className="p-4 bg-[var(--toss-card)] rounded-[12px] border border-[var(--toss-border)] space-y-3">
+        <div className="p-4 bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)] space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-[11px] font-bold text-[var(--toss-gray-4)] block mb-1">법인명</label>
-              <input value={company} onChange={e => setCompany(e.target.value)} placeholder="법인명 입력" className="w-full p-2 border border-[var(--toss-border)] rounded-[8px] text-sm bg-[var(--toss-gray-1)]" />
+              <input value={company} onChange={e => setCompany(e.target.value)} placeholder="법인명 입력" className="w-full p-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--muted)]" />
             </div>
             <div>
               <label className="text-[11px] font-bold text-[var(--toss-gray-4)] block mb-1">직인 유형</label>
-              <select value={sealType} onChange={e => setSealType(e.target.value)} className="w-full p-2 border border-[var(--toss-border)] rounded-[8px] text-sm bg-[var(--toss-gray-1)]">
+              <select value={sealType} onChange={e => setSealType(e.target.value)} className="w-full p-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--muted)]">
                 {SEAL_TYPES.map(t => <option key={t}>{t}</option>)}
               </select>
             </div>
@@ -236,12 +236,12 @@ export default function SealManager({ user, selectedCo }: Props) {
           <div>
             <label className="text-[11px] font-bold text-[var(--toss-gray-4)] block mb-1">직인 이미지 (PNG, 투명 배경 권장)</label>
             <input ref={fileRef} type="file" accept="image/png,image/jpeg" onChange={handleFileChange} className="hidden" />
-            <button onClick={() => fileRef.current?.click()} className="px-3 py-2 bg-[var(--toss-gray-1)] text-xs font-bold rounded-[8px] border border-[var(--toss-border)] hover:bg-[var(--toss-gray-2)]">파일 선택</button>
-            {imagePreview && <img src={imagePreview} alt="직인 미리보기" className="mt-2 h-20 border border-[var(--toss-border)] rounded-[8px] p-1" />}
+            <button onClick={() => fileRef.current?.click()} className="px-3 py-2 bg-[var(--muted)] text-xs font-bold rounded-[var(--radius-md)] border border-[var(--border)] hover:bg-[var(--toss-gray-2)]">파일 선택</button>
+            {imagePreview && <img src={imagePreview} alt="직인 미리보기" className="mt-2 h-20 border border-[var(--border)] rounded-[var(--radius-md)] p-1" />}
           </div>
           <div className="flex gap-2">
-            <button onClick={() => setShowForm(false)} className="px-4 py-2 text-xs font-bold border border-[var(--toss-border)] rounded-[8px] hover:bg-[var(--toss-gray-1)]">취소</button>
-            <button onClick={handleSave} disabled={saving} className="flex-1 py-2 text-xs font-bold bg-[var(--toss-blue)] text-white rounded-[8px] hover:opacity-90 disabled:opacity-50">
+            <button onClick={() => setShowForm(false)} className="px-4 py-2 text-xs font-bold border border-[var(--border)] rounded-[var(--radius-md)] hover:bg-[var(--muted)]">취소</button>
+            <button onClick={handleSave} disabled={saving} className="flex-1 py-2 text-xs font-bold bg-[var(--accent)] text-white rounded-[var(--radius-md)] hover:opacity-90 disabled:opacity-50">
               {saving ? '저장 중...' : '저장'}
             </button>
           </div>
@@ -250,30 +250,30 @@ export default function SealManager({ user, selectedCo }: Props) {
 
       {/* 직인 목록 */}
       {loading ? (
-        <div className="text-center py-8 text-sm text-[var(--toss-gray-3)]">로딩 중...</div>
+        <div className="text-center py-5 text-sm text-[var(--toss-gray-3)]">로딩 중...</div>
       ) : seals.length === 0 ? (
-        <div className="text-center py-12 border border-dashed border-[var(--toss-border)] rounded-[12px]">
+        <div className="text-center py-8 border border-dashed border-[var(--border)] rounded-[var(--radius-md)]">
           <p className="text-sm text-[var(--toss-gray-3)]">등록된 직인이 없습니다.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {seals.map(seal => (
-            <div key={seal.id} className={`p-4 rounded-[12px] border ${seal.is_active ? 'border-[var(--toss-border)]' : 'border-[var(--toss-border)] opacity-60'} bg-[var(--toss-card)]`}>
+            <div key={seal.id} className={`p-4 rounded-[var(--radius-md)] border ${seal.is_active ? 'border-[var(--border)]' : 'border-[var(--border)] opacity-60'} bg-[var(--card)]`}>
               <div className="flex items-start gap-3">
                 {seal.image_url ? (
-                  <img src={seal.image_url} alt={seal.type} className="w-16 h-16 object-contain border border-[var(--toss-border)] rounded-[8px] p-1 cursor-pointer" onClick={() => setPreviewSeal(seal)} />
+                  <img src={seal.image_url} alt={seal.type} className="w-16 h-16 object-contain border border-[var(--border)] rounded-[var(--radius-md)] p-1 cursor-pointer" onClick={() => setPreviewSeal(seal)} />
                 ) : (
-                  <div className="w-16 h-16 bg-[var(--toss-gray-1)] rounded-[8px] flex items-center justify-center text-2xl">🔏</div>
+                  <div className="w-16 h-16 bg-[var(--muted)] rounded-[var(--radius-md)] flex items-center justify-center text-2xl">🔏</div>
                 )}
                 <div className="flex-1">
                   <p className="text-sm font-bold text-[var(--foreground)]">{seal.company}</p>
                   <p className="text-[11px] text-[var(--toss-gray-4)]">{seal.type}</p>
                   <p className="text-[10px] text-[var(--toss-gray-3)] mt-0.5">{new Date(seal.created_at).toLocaleDateString('ko-KR')}</p>
                   <div className="flex gap-2 mt-2">
-                    <button onClick={() => handleToggleActive(seal)} className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${seal.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                    <button onClick={() => handleToggleActive(seal)} className={`text-[10px] font-bold px-2 py-0.5 rounded-[var(--radius-md)] ${seal.is_active ? 'bg-green-100 text-green-700' : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]'}`}>
                       {seal.is_active ? '활성' : '비활성'}
                     </button>
-                    <button onClick={() => handleDelete(seal.id)} className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-500">삭제</button>
+                    <button onClick={() => handleDelete(seal.id)} className="text-[10px] font-bold px-2 py-0.5 rounded-[var(--radius-md)] bg-red-50 text-red-500">삭제</button>
                   </div>
                 </div>
               </div>
@@ -285,22 +285,22 @@ export default function SealManager({ user, selectedCo }: Props) {
       {/* 직인 미리보기 모달 (A4 배경 오버레이) */}
       {previewSeal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setPreviewSeal(null)}>
-          <div className="relative bg-white shadow-2xl rounded-[4px] overflow-hidden" style={{ width: 420, height: 594 }} onClick={e => e.stopPropagation()}>
-            <div className="p-8">
-              <div className="border-b-2 border-gray-800 pb-4 mb-6">
-                <h4 className="text-lg font-bold text-center text-gray-800">결재 문서</h4>
+          <div className="relative bg-[var(--card)] shadow-sm rounded overflow-hidden" style={{ width: 420, height: 594 }} onClick={e => e.stopPropagation()}>
+            <div className="p-5">
+              <div className="border-b-2 border-gray-800 pb-4 mb-4">
+                <h4 className="text-lg font-bold text-center text-[var(--foreground)]">결재 문서</h4>
               </div>
-              <div className="h-80 bg-gray-50 border border-gray-200 rounded p-4 text-sm text-gray-500 flex items-center justify-center">문서 내용 영역</div>
+              <div className="h-80 bg-[var(--tab-bg)] border border-[var(--border)] rounded p-4 text-sm text-[var(--toss-gray-4)] flex items-center justify-center">문서 내용 영역</div>
               <div className="flex justify-end mt-4">
                 <div className="relative">
-                  <div className="w-20 h-20 border-2 border-gray-300 flex items-center justify-center">
+                  <div className="w-20 h-20 border-2 border-[var(--border)] flex items-center justify-center">
                     <img src={previewSeal.image_url} alt="직인" className="w-full h-full object-contain opacity-70" />
                   </div>
-                  <p className="text-[10px] text-center text-gray-400 mt-1">{previewSeal.company} {previewSeal.type}</p>
+                  <p className="text-[10px] text-center text-[var(--toss-gray-3)] mt-1">{previewSeal.company} {previewSeal.type}</p>
                 </div>
               </div>
             </div>
-            <button onClick={() => setPreviewSeal(null)} className="absolute top-2 right-2 text-gray-400 hover:text-gray-700 text-xl font-bold">✕</button>
+            <button onClick={() => setPreviewSeal(null)} className="absolute top-2 right-2 text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-5)] text-xl font-bold">✕</button>
           </div>
         </div>
       )}

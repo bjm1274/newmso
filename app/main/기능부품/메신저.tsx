@@ -2298,16 +2298,16 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   }, [deleteMessage]);
 
   return (
-    <div data-testid="chat-view" className="flex flex-1 min-h-0 overflow-hidden relative font-sans h-full bg-[var(--background)] md:h-[100dvh] md:max-h-[100dvh] md:bg-[var(--toss-card)]">
-      <aside className={`${selectedRoomId ? 'hidden md:flex' : 'flex'} w-full md:w-80 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 flex-col shrink-0 z-50 transition-all`}>
-        <div className="p-4 md:p-6 space-y-4 flex flex-col min-h-0">
-          <div className="flex gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl glass">
+    <div data-testid="chat-view" className="flex flex-1 min-h-0 overflow-hidden relative font-sans h-full bg-[var(--background)] md:h-[100dvh] md:max-h-[100dvh] md:bg-[var(--card)]">
+      <aside className={`${selectedRoomId ? 'hidden md:flex' : 'flex'} w-full md:w-80 border-r border-[var(--border)] dark:border-zinc-800 bg-[var(--card)] dark:bg-zinc-950 flex-col shrink-0 z-50 transition-all`}>
+        <div className="p-4 md:p-4 space-y-4 flex flex-col min-h-0">
+          <div className="flex gap-1 bg-[var(--tab-bg)] dark:bg-zinc-800 p-1 rounded-xl glass">
             <button
               data-testid="chat-tab-chat"
               onClick={() => setViewMode('chat')}
               className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all ${viewMode === 'chat'
-                ? 'bg-white dark:bg-zinc-700 text-foreground shadow-premium'
-                : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+                ? 'bg-[var(--card)] dark:bg-zinc-700 text-foreground shadow-premium'
+                : 'text-[var(--toss-gray-4)] hover:text-[var(--toss-gray-5)] dark:hover:text-[var(--toss-gray-3)]'
                 }`}
             >
               채팅
@@ -2316,8 +2316,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
               data-testid="chat-tab-org"
               onClick={() => setViewMode('org')}
               className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all ${viewMode === 'org'
-                ? 'bg-white dark:bg-zinc-700 text-foreground shadow-premium'
-                : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+                ? 'bg-[var(--card)] dark:bg-zinc-700 text-foreground shadow-premium'
+                : 'text-[var(--toss-gray-4)] hover:text-[var(--toss-gray-5)] dark:hover:text-[var(--toss-gray-3)]'
                 }`}
             >
               조직도
@@ -2325,7 +2325,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           </div>
 
           <div className="flex items-center justify-between px-1">
-            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest leading-none">
+            <span className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest leading-none">
               {viewMode === 'chat' ? '최근 대화' : '조직도'}
             </span>
             {viewMode === 'chat' && (
@@ -2334,7 +2334,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 type="button"
                 data-testid="chat-open-group-modal"
                 onClick={() => setShowGroupModal(true)}
-                className="text-[12px] text-zinc-400 hover:text-emerald-500 transition-colors p-1 flex items-center justify-center shrink-0"
+                className="text-[12px] text-[var(--toss-gray-3)] hover:text-emerald-500 transition-colors p-1 flex items-center justify-center shrink-0"
                 title="새 그룹 채팅방 만들기"
               >
                 +
@@ -2342,7 +2342,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
               <button
                 data-testid="chat-open-global-search"
                 onClick={() => setShowGlobalSearch(true)}
-                className="text-[12px] text-zinc-400 hover:text-blue-500 transition-colors p-1 flex items-center justify-center shrink-0"
+                className="text-[12px] text-[var(--toss-gray-3)] hover:text-blue-500 transition-colors p-1 flex items-center justify-center shrink-0"
                 title="채팅 내용 전체 검색"
               >
                 검색
@@ -2356,7 +2356,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           {viewMode === 'chat' ? (
             <>
               <div className="flex items-center justify-between px-1 pb-2">
-                <span className="text-[10px] font-medium text-zinc-400">
+                <span className="text-[10px] font-medium text-[var(--toss-gray-3)]">
                   {showHiddenRooms ? '숨김 대화 포함' : '숨김 대화 제외'}
                 </span>
                 <button
@@ -2394,14 +2394,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       onClick={() => setRoom(room.id)}
                       className={`group p-3.5 rounded-xl cursor-pointer transition-all flex items-center justify-between gap-3 border relative overflow-hidden ${isSelected
                         ? 'bg-zinc-800 border-zinc-700 shadow-sm'
-                        : 'bg-white dark:bg-zinc-900 border-transparent hover:border-zinc-200 dark:hover:border-zinc-800'
+                        : 'bg-[var(--card)] dark:bg-zinc-900 border-transparent hover:border-[var(--border)] dark:hover:border-zinc-800'
                         }`}
                     >
                       {isSelected && (
                         <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500"></div>
                       )}
                       <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className={`relative w-8 h-8 rounded-lg flex items-center justify-center text-sm ${isNoticeChannel ? 'bg-blue-100 text-blue-600' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500'}`}>
+                        <div className={`relative w-8 h-8 rounded-lg flex items-center justify-center text-sm ${isNoticeChannel ? 'bg-blue-100 text-blue-600' : 'bg-[var(--tab-bg)] dark:bg-zinc-800 text-[var(--toss-gray-4)]'}`}>
                           {isNoticeChannel ? '📢' : '💬'}
                           {!isNoticeChannel && isPeerOnline && (
                             <span className="absolute -right-0.5 -bottom-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border border-white dark:border-zinc-900" />
@@ -2409,17 +2409,17 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                         </div>                        <div className="flex flex-col min-w-0">
                           <div className="flex items-center gap-1.5 min-w-0">
                             {unread > 0 && (
-                              <span className="shrink-0 min-w-[18px] h-[18px] px-1.5 inline-flex items-center justify-center rounded-full bg-blue-600 text-white text-[9px] font-bold shadow-soft">
+                              <span className="shrink-0 min-w-[18px] h-[18px] px-1.5 inline-flex items-center justify-center rounded-[var(--radius-md)] bg-blue-600 text-white text-[9px] font-bold shadow-soft">
                                 {unread > 99 ? '99+' : unread}
                               </span>
                             )}
-                            <p className={`text-[12px] font-bold truncate ${isSelected ? 'text-white' : 'text-zinc-600 dark:text-zinc-300'}`}>
+                            <p className={`text-[12px] font-bold truncate ${isSelected ? 'text-white' : 'text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)]'}`}>
                               {label}
                             </p>
                             {isPinned && <span className="text-[9px] font-bold text-amber-400">PIN</span>}
-                            {isHidden && <span className="text-[9px] font-bold text-zinc-400">HIDE</span>}
+                            {isHidden && <span className="text-[9px] font-bold text-[var(--toss-gray-3)]">HIDE</span>}
                           </div>
-                          <p className="text-[10px] text-zinc-400 font-medium truncate">
+                          <p className="text-[10px] text-[var(--toss-gray-3)] font-medium truncate">
                             {preview}
                           </p>
                         </div>
@@ -2434,7 +2434,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                 event.stopPropagation();
                                 updateRoomPreference(room.id, { pinned: !isPinned });
                               }}
-                              className={`px-1.5 py-1 rounded-md text-[9px] font-bold ${isSelected ? 'text-white/80 hover:bg-white/10' : 'text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
+                              className={`px-1.5 py-1 rounded-md text-[9px] font-bold ${isSelected ? 'text-white/80 hover:bg-[var(--card)]/10' : 'text-[var(--toss-gray-3)] hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800'}`}
                               title={isPinned ? '고정 해제' : '상단 고정'}
                             >
                               {isPinned ? '해제' : '고정'}
@@ -2446,7 +2446,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                 event.stopPropagation();
                                 updateRoomPreference(room.id, { hidden: !isHidden });
                               }}
-                              className={`px-1.5 py-1 rounded-md text-[9px] font-bold ${isSelected ? 'text-white/80 hover:bg-white/10' : 'text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
+                              className={`px-1.5 py-1 rounded-md text-[9px] font-bold ${isSelected ? 'text-white/80 hover:bg-[var(--card)]/10' : 'text-[var(--toss-gray-3)] hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800'}`}
                               title={isHidden ? '숨김 해제' : '대화 숨김'}
                             >
                               {isHidden ? '표시' : '숨김'}
@@ -2459,28 +2459,28 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 })}
             </>
           ) : (
-            <div data-testid="chat-org-list" className="space-y-6">
+            <div data-testid="chat-org-list" className="space-y-4">
               {Object.entries(groupedStaffs).map(([company, depts]) => (
                 <div key={company} className="space-y-4">
                   <div className="flex items-center gap-2 px-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                    <h3 className="text-[11px] font-black text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">{company}</h3>
-                    <div className="flex-1 h-[1px] bg-zinc-100 dark:bg-zinc-800/50"></div>
+                    <h3 className="text-[11px] font-black text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)] uppercase tracking-wider">{company}</h3>
+                    <div className="flex-1 h-[1px] bg-[var(--tab-bg)] dark:bg-zinc-800/50"></div>
                   </div>
                   <div className="space-y-5 pl-1">
                     {Object.entries(depts).map(([dept, members]) => (
                       <div key={dept} className="space-y-2">
-                        <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 ml-1">{dept}</p>
+                        <p className="text-[10px] font-bold text-[var(--toss-gray-3)] dark:text-[var(--toss-gray-4)] ml-1">{dept}</p>
                         <div className="space-y-1">
                           {members.map((s: any) => (
-                            <div key={s.id} className="flex items-center gap-3 p-2.5 bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800/50 rounded-xl hover:border-blue-400/50 dark:hover:border-blue-500/50 cursor-pointer transition-all group">
-                              <div className="w-8 h-8 bg-zinc-100 dark:bg-zinc-800 rounded-lg flex items-center justify-center text-xs font-bold text-zinc-400 overflow-hidden shrink-0">
+                            <div key={s.id} className="flex items-center gap-3 p-2.5 bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border-subtle)] dark:border-zinc-800/50 rounded-xl hover:border-blue-400/50 dark:hover:border-blue-500/50 cursor-pointer transition-all group">
+                              <div className="w-8 h-8 bg-[var(--tab-bg)] dark:bg-zinc-800 rounded-lg flex items-center justify-center text-xs font-bold text-[var(--toss-gray-3)] overflow-hidden shrink-0">
                                 {s.photo_url ? <img src={s.photo_url} alt={s.name} className="w-full h-full object-cover" /> : s.name[0]}
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-1.5">
                                   <p className="text-xs font-bold text-foreground truncate">{s.name}</p>
-                                  <span className="text-[10px] font-medium text-zinc-400">{s.position}</span>
+                                  <span className="text-[10px] font-medium text-[var(--toss-gray-3)]">{s.position}</span>
                                 </div>
                               </div>
                               <button
@@ -2505,19 +2505,19 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         </div>
       </aside>
 
-      <main className={`${!selectedRoomId ? 'hidden md:flex' : 'flex'} flex-1 min-h-0 flex-col overflow-hidden bg-[var(--toss-gray-1)] relative`}>
+      <main className={`${!selectedRoomId ? 'hidden md:flex' : 'flex'} flex-1 min-h-0 flex-col overflow-hidden bg-[var(--muted)] relative`}>
         {selectedRoomId && selectedRoom && (
-          <header className="px-6 py-3.5 flex items-center justify-between border-b border-zinc-200/50 dark:border-zinc-800/50 glass glass-border shrink-0 z-40">
+          <header className="px-4 py-3.5 flex items-center justify-between border-b border-[var(--border)]/50 dark:border-zinc-800/50 glass glass-border shrink-0 z-40">
             <div className="flex items-center gap-3 min-w-0">
-              <button onClick={() => setRoom(null)} className="md:hidden text-zinc-400">뒤로</button>
-              <div className="w-9 h-9 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-lg">
+              <button onClick={() => setRoom(null)} className="md:hidden text-[var(--toss-gray-3)]">뒤로</button>
+              <div className="w-9 h-9 rounded-lg bg-[var(--tab-bg)] dark:bg-zinc-800 flex items-center justify-center text-lg">
                 {selectedRoom.id === NOTICE_ROOM_ID ? '📢' : '💬'}
               </div>
               <div className="min-w-0">
                 <h3 className="text-[13px] font-bold text-foreground truncate">
                   {selectedRoomLabel}
                 </h3>
-                <p className="text-[10px] text-zinc-500 font-medium">
+                <p className="text-[10px] text-[var(--toss-gray-4)] font-medium">
                   {typingNoticeText
                     ? typingNoticeText
                     : selectedPeer
@@ -2533,7 +2533,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
               <button
                 data-testid="chat-open-drawer"
                 onClick={() => setShowDrawer(true)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-foreground"
+                className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 text-[var(--toss-gray-4)] hover:text-foreground"
                 title="채팅방 정보 및 참여자 보기"
               >
                 <svg
@@ -2555,14 +2555,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         )}
 
         {selectedRoomId && noticeMessages.length > 0 && (
-          <div className="shrink-0 border-b border-orange-100 bg-orange-50/80 px-4 py-3 md:px-6">
+          <div className="shrink-0 border-b border-orange-100 bg-orange-50/80 px-4 py-3 md:px-4">
             <div className="flex flex-wrap gap-2">
               {noticeMessages.map((pinnedMessage) => (
                 <button
                   key={`pin-${pinnedMessage.id}`}
                   type="button"
                   onClick={() => scrollToMessage(pinnedMessage.id)}
-                  className="min-w-0 max-w-full rounded-[14px] border border-orange-200 bg-white px-3 py-2 text-left shadow-sm transition-colors hover:bg-orange-100"
+                  className="min-w-0 max-w-full rounded-[var(--radius-lg)] border border-orange-200 bg-[var(--card)] px-3 py-2 text-left shadow-sm transition-colors hover:bg-orange-100"
                 >
                   <p className="text-[10px] font-bold text-orange-500">공지 메시지</p>
                   <p className="mt-1 max-w-[280px] truncate text-xs font-semibold text-[var(--foreground)]">
@@ -2577,7 +2577,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         <div
           ref={messageListRef}
           onScroll={updateScrollPositionState}
-          className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6 pb-24 md:pb-6 space-y-3 custom-scrollbar"
+          className="flex-1 min-h-0 overflow-y-auto p-4 md:p-4 pb-24 md:pb-6 space-y-3 custom-scrollbar"
         >
           {!selectedRoomId ? (
             <div className="h-full flex flex-col items-center justify-center text-[var(--toss-gray-3)]">
@@ -2612,9 +2612,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                             data-testid={`chat-poll-vote-${item.id}-${idx}`}
                             key={idx}
                             onClick={() => handleVote(item.id, idx)}
-                            className="w-full flex justify-between items-center px-4 py-2.5 rounded-xl bg-white dark:bg-zinc-800/50 border border-blue-200/50 dark:border-blue-700/30 hover:border-blue-400 dark:hover:border-blue-500 transition-all text-[11px] font-medium group"
+                            className="w-full flex justify-between items-center px-4 py-2.5 rounded-xl bg-[var(--card)] dark:bg-zinc-800/50 border border-blue-200/50 dark:border-blue-700/30 hover:border-blue-400 dark:hover:border-blue-500 transition-all text-[11px] font-medium group"
                           >
-                            <span className="text-zinc-700 dark:text-zinc-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{opt}</span>
+                            <span className="text-[var(--toss-gray-5)] dark:text-[var(--toss-gray-3)] group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{opt}</span>
                             <span className="text-blue-600 font-bold bg-blue-50 dark:bg-blue-900/50 px-2 py-0.5 rounded-md">
                               {votes[idx] || 0}
                               {totalVotes > 0 && <span className="ml-1 opacity-60 font-medium">({Math.round(((votes[idx] || 0) / totalVotes) * 100)}%)</span>}
@@ -2668,14 +2668,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   <div key={msg.id} className="space-y-1">
                     {showDateDivider && (
                       <div className="flex justify-center my-2">
-                        <span className="px-3 py-1 rounded-full bg-[var(--toss-gray-1)] text-[11px] font-bold text-[var(--toss-gray-3)]">
+                        <span className="px-3 py-1 rounded-[var(--radius-md)] bg-[var(--muted)] text-[11px] font-bold text-[var(--toss-gray-3)]">
                           {dateLabel}
                         </span>
                       </div>
                     )}
                     {isSystemInvite ? (
                       <div className="flex justify-center my-2">
-                        <span className="px-3 py-1.5 rounded-full bg-[var(--toss-blue-light)] text-[11px] font-bold text-[var(--toss-blue)]">
+                        <span className="px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] text-[11px] font-bold text-[var(--accent)]">
                           초대 {systemText}
                         </span>
                       </div>
@@ -2695,9 +2695,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                             e.stopPropagation();
                             openMessageActions(msg);
                           }}
-                          className={`group relative ${!msg.content ? 'p-0 bg-transparent shadow-none border-none' : 'px-3 py-2 shadow-sm border'} rounded-[12px] text-[13px] md:text-sm cursor-pointer transition-all max-w-[75%] md:max-w-[70%] ${!msg.content ? '' : isMine
+                          className={`group relative ${!msg.content ? 'p-0 bg-transparent shadow-none border-none' : 'px-3 py-2 shadow-sm border'} rounded-[var(--radius-md)] text-[13px] md:text-sm cursor-pointer transition-all max-w-[75%] md:max-w-[70%] ${!msg.content ? '' : isMine
                             ? 'bg-emerald-600 text-white border-transparent rounded-tr-none'
-                            : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 rounded-tl-none hover:border-emerald-400 text-foreground'
+                            : 'bg-[var(--card)] dark:bg-zinc-800 border-[var(--border)] dark:border-zinc-700 rounded-tl-none hover:border-emerald-400 text-foreground'
                             }`}
                           role="button"
                           tabIndex={0}
@@ -2708,7 +2708,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                             const parent = messages.find((m: any) => m.id === msg.reply_to_id);
                             return parent ? (
                               <div
-                                className={`mb-2 p-2 rounded-[10px] text-[11px] border-l-2 cursor-pointer hover:opacity-80 transition-opacity ${isMine ? 'bg-white/10 border-white/30 text-white' : 'bg-[var(--toss-gray-1)] border-[var(--toss-border)] text-[var(--foreground)]'
+                                className={`mb-2 p-2 rounded-[var(--radius-md)] text-[11px] border-l-2 cursor-pointer hover:opacity-80 transition-opacity ${isMine ? 'bg-[var(--card)]/10 border-white/30 text-white' : 'bg-[var(--muted)] border-[var(--border)] text-[var(--foreground)]'
                                   }`}
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -2731,29 +2731,29 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                     <img
                                       src={msg.file_url}
                                       alt="첨부 이미지"
-                                      className={`max-w-[200px] md:max-w-[240px] max-h-[200px] rounded-[12px] object-cover ${msg.content ? 'border border-[var(--toss-border)]' : 'shadow-sm'}`}
+                                      className={`max-w-[200px] md:max-w-[240px] max-h-[200px] rounded-[var(--radius-md)] object-cover ${msg.content ? 'border border-[var(--border)]' : 'shadow-sm'}`}
                                     />
                                   </a>
-                                  <div className="absolute opacity-0 group-hover:opacity-100 transition-opacity inset-0 flex items-center justify-center bg-black/40 rounded-[12px] gap-2 pointer-events-none">
-                                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(msg.file_url, '_blank') }} className="pointer-events-auto p-1.5 bg-white/20 hover:bg-white/40 rounded-full text-white" title="미리보기">보기</button>
-                                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigator.clipboard.writeText(msg.file_url).then(() => alert('공유 링크를 복사했습니다.')) }} className="pointer-events-auto p-1.5 bg-white/20 hover:bg-white/40 rounded-full text-white" title="공유">공유</button>
-                                    <a href={msg.file_url} download target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="pointer-events-auto p-1.5 bg-white/20 hover:bg-white/40 rounded-full text-white" title="다운로드">저장</a>
+                                  <div className="absolute opacity-0 group-hover:opacity-100 transition-opacity inset-0 flex items-center justify-center bg-black/40 rounded-[var(--radius-md)] gap-2 pointer-events-none">
+                                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(msg.file_url, '_blank') }} className="pointer-events-auto p-1.5 bg-[var(--card)]/20 hover:bg-[var(--card)]/40 rounded-[var(--radius-md)] text-white" title="미리보기">보기</button>
+                                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigator.clipboard.writeText(msg.file_url).then(() => alert('공유 링크를 복사했습니다.')) }} className="pointer-events-auto p-1.5 bg-[var(--card)]/20 hover:bg-[var(--card)]/40 rounded-[var(--radius-md)] text-white" title="공유">공유</button>
+                                    <a href={msg.file_url} download target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="pointer-events-auto p-1.5 bg-[var(--card)]/20 hover:bg-[var(--card)]/40 rounded-full text-white" title="다운로드">저장</a>
                                   </div>
                                 </div>
                               ) : isVideoUrl(msg.file_url) ? (
                                 <div className="block">
-                                  <video controls className={`max-w-[200px] md:max-w-[240px] max-h-[200px] rounded-[12px] bg-black ${msg.content ? 'border border-[var(--toss-border)]' : 'shadow-sm'}`}>
+                                  <video controls className={`max-w-[200px] md:max-w-[240px] max-h-[200px] rounded-[var(--radius-md)] bg-black ${msg.content ? 'border border-[var(--border)]' : 'shadow-sm'}`}>
                                     <source src={msg.file_url} />
                                   </video>
                                 </div>
                               ) : (
-                                <div className={`p-3 rounded-[12px] border ${isMine ? 'bg-white/10 border-white/20 text-white' : 'bg-[var(--toss-gray-0)] border-[var(--toss-border)] text-[var(--foreground)]'} flex items-start gap-3 shadow-sm min-w-[200px]`}>
+                                <div className={`p-3 rounded-[var(--radius-md)] border ${isMine ? 'bg-[var(--card)]/10 border-white/20 text-white' : 'bg-[var(--toss-gray-0)] border-[var(--border)] text-[var(--foreground)]'} flex items-start gap-3 shadow-sm min-w-[200px]`}>
                                   <div className="text-3xl">📎</div>
                                   <div className="flex-1 min-w-0 pt-0.5">
                                     <p className={`font-bold text-[12px] truncate mb-1`}>첨부 파일</p>
                                     <div className="flex items-center gap-1.5 mt-2">
-                                      <button onClick={() => window.open(msg.file_url, '_blank')} className="text-[10px] font-bold text-[var(--toss-blue)] hover:text-blue-600 px-2 py-1 bg-blue-50 dark:bg-blue-900/30 rounded-md">미리보기</button>
-                                      <button onClick={() => { navigator.clipboard.writeText(msg.file_url).then(() => alert('공유 링크를 복사했습니다.')) }} className="text-[10px] font-bold text-zinc-500 hover:text-zinc-600 px-2 py-1 bg-zinc-100 dark:bg-zinc-800 rounded-md">공유</button>
+                                      <button onClick={() => window.open(msg.file_url, '_blank')} className="text-[10px] font-bold text-[var(--accent)] hover:text-blue-600 px-2 py-1 bg-blue-50 dark:bg-blue-900/30 rounded-md">미리보기</button>
+                                      <button onClick={() => { navigator.clipboard.writeText(msg.file_url).then(() => alert('공유 링크를 복사했습니다.')) }} className="text-[10px] font-bold text-[var(--toss-gray-4)] hover:text-[var(--toss-gray-4)] px-2 py-1 bg-[var(--tab-bg)] dark:bg-zinc-800 rounded-md">공유</button>
                                   <a href={msg.file_url} download target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 px-2 py-1 bg-emerald-50 dark:bg-emerald-900/30 rounded-md inline-block">다운로드</a>
                                     </div>
                                   </div>
@@ -2769,7 +2769,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                 ((cnt as number) > 0 ? (
                                   <span
                                     key={emoji}
-                                    className={`px-1.5 py-0.5 rounded text-[11px] ${isMine ? 'bg-white/20' : 'bg-[var(--toss-gray-1)]'
+                                    className={`px-1.5 py-0.5 rounded text-[11px] ${isMine ? 'bg-[var(--card)]/20' : 'bg-[var(--muted)]'
                                       }`}
                                   >
                                     {emoji} {cnt as number}
@@ -2815,7 +2815,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                 e.stopPropagation();
                                 retryFailedMessage(String(msg.id));
                               }}
-                              className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-50 text-red-500 hover:bg-red-100"
+                              className="px-2.5 py-1 rounded-[var(--radius-md)] text-[10px] font-bold bg-red-50 text-red-500 hover:bg-red-100"
                             >
                               재전송
                             </button>
@@ -2828,14 +2828,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                           <button
                             type="button"
                             onClick={() => { startReplyToMessage(msg); }}
-                            className="p-1 px-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-[10px] font-bold text-zinc-400 hover:text-blue-500 transition-colors"
+                            className="p-1 px-2 rounded-lg hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 text-[10px] font-bold text-[var(--toss-gray-3)] hover:text-blue-500 transition-colors"
                           >
                             답장
                           </button>
                           <button
                             type="button"
                             onClick={() => { openMessageActions(msg); }}
-                            className="p-1 px-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-[10px] font-bold text-zinc-400 hover:text-zinc-600 transition-colors"
+                            className="p-1 px-2 rounded-lg hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 text-[10px] font-bold text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] transition-colors"
                           >
                             더보기
                           </button>
@@ -2856,7 +2856,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             <button
               type="button"
               onClick={() => scrollToBottom('smooth')}
-              className="px-3 py-2 rounded-full bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-lg text-[11px] font-bold text-[var(--foreground)]"
+              className="px-3 py-2 rounded-[var(--radius-md)] bg-[var(--card)] border border-[var(--border)] shadow-sm text-[11px] font-bold text-[var(--foreground)]"
             >
               최신 메시지
             </button>
@@ -2864,7 +2864,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         )}
 
         <div
-          className={`absolute left-0 right-0 bottom-0 md:relative p-2 md:p-3 bg-[var(--toss-card)] shrink-0 transition-all z-10 ${isDragging ? 'border-t-2 border-[var(--toss-blue)] border-dashed bg-blue-50 dark:bg-blue-900/20' : 'border-t border-[var(--toss-border)]'}`}
+          className={`absolute left-0 right-0 bottom-0 md:relative p-2 md:p-3 bg-[var(--card)] shrink-0 transition-all z-10 ${isDragging ? 'border-t-2 border-[var(--accent)] border-dashed bg-blue-50 dark:bg-blue-900/20' : 'border-t border-[var(--border)]'}`}
           onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
           onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }}
           onDrop={async (e) => {
@@ -2874,9 +2874,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           }}
         >
           {replyTo && (
-            <div className="mb-3 flex items-center justify-between bg-[var(--toss-blue-light)] p-3 rounded-[16px] border border-[var(--toss-blue-light)] animate-in slide-in-from-bottom-2">
-              <p className="text-[11px] font-bold text-[var(--toss-blue)]">@{replyTo.staff?.name}님에게 답글 작성 중...</p>
-              <button onClick={() => setReplyTo(null)} className="text-[var(--toss-blue)] hover:text-[var(--toss-blue)] font-semibold">닫기</button>
+            <div className="mb-3 flex items-center justify-between bg-[var(--toss-blue-light)] p-3 rounded-[var(--radius-lg)] border border-[var(--toss-blue-light)] animate-in slide-in-from-bottom-2">
+              <p className="text-[11px] font-bold text-[var(--accent)]">@{replyTo.staff?.name}님에게 답글 작성 중...</p>
+              <button onClick={() => setReplyTo(null)} className="text-[var(--accent)] hover:text-[var(--accent)] font-semibold">닫기</button>
             </div>
           )}
 
@@ -2886,16 +2886,16 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             </div>
           )}
 
-          <div className={`flex items-center md:items-end gap-3 p-3 rounded-[16px] border transition-all ${selectedRoomId === NOTICE_ROOM_ID && !canWriteNotice
-            ? 'bg-[var(--toss-gray-1)] border-[var(--toss-border)] opacity-80 pointer-events-none'
-            : 'bg-[var(--toss-gray-1)] border-[var(--toss-border)] focus-within:bg-[var(--toss-card)] focus-within:ring-4 focus-within:ring-[var(--toss-blue)]'
+          <div className={`flex items-center md:items-end gap-3 p-3 rounded-[var(--radius-lg)] border transition-all ${selectedRoomId === NOTICE_ROOM_ID && !canWriteNotice
+            ? 'bg-[var(--muted)] border-[var(--border)] opacity-80 pointer-events-none'
+            : 'bg-[var(--muted)] border-[var(--border)] focus-within:bg-[var(--card)] focus-within:ring-4 focus-within:ring-[var(--accent)]'
             }`}>
             <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.hwp" />
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={fileUploading}
               title="파일 첨부"
-              className="w-8 h-8 flex items-center justify-center text-[var(--toss-gray-3)] hover:text-[var(--toss-blue)] transition-colors disabled:opacity-50"
+              className="w-8 h-8 flex items-center justify-center text-[var(--toss-gray-3)] hover:text-[var(--accent)] transition-colors disabled:opacity-50"
             >
               {fileUploading ? <span className="animate-pulse text-xs">...</span> : '첨부'}
             </button>
@@ -2919,7 +2919,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 }}
               />
               {showMentionList && mentionCandidates.length > 0 && (
-                <div className="absolute left-0 bottom-full mb-1 w-full max-h-48 overflow-y-auto bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[12px] shadow-lg z-20 text-xs">
+                <div className="absolute left-0 bottom-full mb-1 w-full max-h-48 overflow-y-auto bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] shadow-sm z-20 text-xs">
                   {mentionCandidates.map((m: any) => (
                     <button
                       key={m.id}
@@ -2945,27 +2945,27 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 </div>
               )}
             </div>
-            <button data-testid="chat-send-button" onClick={() => handleSendMessage()} className="bg-[var(--toss-blue)] text-white w-8 h-8 rounded-full shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center justify-center text-sm">전송</button>
+            <button data-testid="chat-send-button" onClick={() => handleSendMessage()} className="bg-[var(--accent)] text-white w-8 h-8 rounded-[var(--radius-md)] shadow-sm hover:scale-105 active:scale-95 transition-all flex items-center justify-center text-sm">전송</button>
           </div>
         </div>
 
         {showDrawer && (
           <>
             <div className="absolute inset-0 bg-black/10 z-50 animate-in fade-in duration-200" onClick={() => setShowDrawer(false)} aria-hidden="true" />
-            <div data-testid="chat-room-drawer" className="absolute top-0 right-0 bottom-0 w-full md:w-80 bg-white dark:bg-zinc-900 shadow-2xl z-[60] flex flex-col animate-in slide-in-from-right duration-300 border-l border-[var(--toss-border)]">
-              <div className="p-4 border-b border-[var(--toss-border)] flex items-center justify-between bg-[var(--toss-card)]">
+            <div data-testid="chat-room-drawer" className="absolute top-0 right-0 bottom-0 w-full md:w-80 bg-[var(--card)] dark:bg-zinc-900 shadow-sm z-[60] flex flex-col animate-in slide-in-from-right duration-300 border-l border-[var(--border)]">
+              <div className="p-4 border-b border-[var(--border)] flex items-center justify-between bg-[var(--card)]">
                 <span className="text-sm font-bold">채팅방 정보</span>
-              <button onClick={() => setShowDrawer(false)} className="p-2 text-[var(--toss-gray-3)] hover:text-black dark:hover:text-white rounded-full">닫기</button>
+              <button onClick={() => setShowDrawer(false)} className="p-2 text-[var(--toss-gray-3)] hover:text-black dark:hover:text-white rounded-[var(--radius-md)]">닫기</button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
-                <div className="flex items-center justify-between p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl">
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+                <div className="flex items-center justify-between p-3 bg-[var(--tab-bg)] dark:bg-zinc-800/50 rounded-2xl">
                   <span className="text-sm font-semibold">알림 설정</span>
                   <button
                     onClick={() => setRoomNotifyOn(!roomNotifyOn)}
                     className={`w-12 h-6 rounded-full transition-colors relative ${roomNotifyOn ? 'bg-emerald-500' : 'bg-zinc-300'}`}
                   >
-                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${roomNotifyOn ? 'right-1' : 'left-1'}`} />
+                    <div className={`absolute top-1 w-4 h-4 bg-[var(--card)] rounded-full transition-all ${roomNotifyOn ? 'right-1' : 'left-1'}`} />
                   </button>
                 </div>
 
@@ -2990,11 +2990,11 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 <div className="space-y-3">
                   <div className="flex justify-between items-center px-1">
                 <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider">사진 및 동영상</p>
-                    <button className="text-[10px] font-bold text-[var(--toss-blue)]">전체보기</button>
+                    <button className="text-[10px] font-bold text-[var(--accent)]">전체보기</button>
                   </div>
                   <div className="grid grid-cols-3 gap-1 rounded-2xl overflow-hidden">
                     {messages.filter(m => m.file_kind === 'image' || m.file_kind === 'video').slice(-6).map((m) => (
-                      <div key={m.id} className="aspect-square bg-zinc-100 dark:bg-zinc-800 relative group cursor-pointer">
+                      <div key={m.id} className="aspect-square bg-[var(--tab-bg)] dark:bg-zinc-800 relative group cursor-pointer">
                         {m.file_kind === 'image' ? (
                           <img src={m.file_url} alt="Attached image" className="w-full h-full object-cover" />
                         ) : (
@@ -3003,7 +3003,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       </div>
                     ))}
                     {messages.filter(m => m.file_kind === 'image' || m.file_kind === 'video').length === 0 && (
-                      <div className="col-span-3 py-8 text-center bg-zinc-50 dark:bg-zinc-800/30 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-700">
+                      <div className="col-span-3 py-5 text-center bg-[var(--tab-bg)] dark:bg-zinc-800/30 rounded-2xl border border-dashed border-[var(--border)] dark:border-zinc-700">
                         <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">주고받은 미디어가 없습니다.</p>
                       </div>
                     )}
@@ -3017,14 +3017,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       const urlMatch = m.content.match(/https?:\/\/[^\s]+/);
                       const url = urlMatch ? urlMatch[0] : '';
                       return (
-                        <a key={m.id} href={url} target="_blank" rel="noreferrer" className="block p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-100 dark:border-zinc-800 hover:border-emerald-500 transition-colors">
+                        <a key={m.id} href={url} target="_blank" rel="noreferrer" className="block p-3 bg-[var(--tab-bg)] dark:bg-zinc-800/50 rounded-xl border border-[var(--border-subtle)] dark:border-zinc-800 hover:border-emerald-500 transition-colors">
                           <p className="text-[11px] font-bold truncate text-emerald-600 mb-0.5">{url}</p>
                           <p className="text-[10px] text-[var(--toss-gray-4)] truncate">{m.staff?.name} 쨌 {new Date(m.created_at).toLocaleDateString()}</p>
                         </a>
                       );
                     })}
                     {messages.filter(m => m.content && m.content.includes('http')).length === 0 && (
-                      <div className="py-4 text-center bg-zinc-50 dark:bg-zinc-800/30 rounded-xl border border-zinc-100 dark:border-zinc-800">
+                      <div className="py-4 text-center bg-[var(--tab-bg)] dark:bg-zinc-800/30 rounded-xl border border-[var(--border-subtle)] dark:border-zinc-800">
                         <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">공유된 링크가 없습니다.</p>
                       </div>
                     )}
@@ -3034,7 +3034,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 <div className="space-y-3">
                   <div className="flex justify-between items-center px-1">
                     <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider">참여자 ({selectedRoom?.members?.length || 0})</p>
-              <button data-testid="chat-open-add-member-modal" onClick={() => setShowAddMemberModal(true)} className="w-6 h-6 flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 rounded-full text-zinc-500 hover:text-emerald-500 transition-colors">+</button>
+              <button data-testid="chat-open-add-member-modal" onClick={() => setShowAddMemberModal(true)} className="w-6 h-6 flex items-center justify-center bg-[var(--tab-bg)] dark:bg-zinc-800 rounded-[var(--radius-md)] text-[var(--toss-gray-4)] hover:text-emerald-500 transition-colors">+</button>
                   </div>
                   <div className="space-y-3">
                     {selectedRoom?.members?.map((memberId: string) => {
@@ -3061,9 +3061,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 </div>
               </div>
 
-              <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 border-t border-[var(--toss-border)] flex gap-2">
+              <div className="p-4 bg-[var(--tab-bg)] dark:bg-zinc-800/50 border-t border-[var(--border)] flex gap-2">
             <button onClick={() => { setShowDrawer(false); handleLeaveRoom(); }} className="flex-1 py-3 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-xl text-[11px] font-bold hover:bg-red-100 transition-colors">방 나가기</button>
-                <button onClick={() => { setEditingRoomName(true); setRoomNameDraft(selectedRoom?.name || ''); }} className="flex-1 py-3 bg-[var(--toss-gray-1)] text-foreground rounded-xl text-[11px] font-bold hover:bg-[var(--toss-gray-2)] transition-colors">이름 수정</button>
+                <button onClick={() => { setEditingRoomName(true); setRoomNameDraft(selectedRoom?.name || ''); }} className="flex-1 py-3 bg-[var(--muted)] text-foreground rounded-xl text-[11px] font-bold hover:bg-[var(--toss-gray-2)] transition-colors">이름 수정</button>
               </div>
             </div>
           </>
@@ -3073,42 +3073,42 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           <>
             <div className="absolute inset-0 bg-black/10 z-30 animate-in fade-in duration-200" onClick={() => { setActiveActionMsg(null); setEditingMsg(null); }} aria-hidden="true" />
 
-            <div className="md:hidden absolute left-0 right-0 bottom-0 bg-white dark:bg-zinc-900 rounded-t-[24px] shadow-2xl z-40 flex flex-col animate-in slide-in-from-bottom duration-300 max-h-[85vh] overflow-hidden">
-              <div className="w-12 h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-full mx-auto my-3 shrink-0" />
+            <div className="md:hidden absolute left-0 right-0 bottom-0 bg-[var(--card)] dark:bg-zinc-900 rounded-t-[24px] shadow-sm z-40 flex flex-col animate-in slide-in-from-bottom duration-300 max-h-[85vh] overflow-hidden">
+              <div className="w-12 h-1.5 bg-[var(--tab-bg)] dark:bg-zinc-800 rounded-full mx-auto my-3 shrink-0" />
               <div className="px-4 pb-8 space-y-4 overflow-y-auto">
-                <div className="flex justify-between items-center bg-zinc-100 dark:bg-zinc-800/50 p-2 rounded-[20px] gap-1 px-4">
+                <div className="flex justify-between items-center bg-[var(--tab-bg)] dark:bg-zinc-800/50 p-2 rounded-[var(--radius-xl)] gap-1 px-4">
                   {['👍', '❤️', '👏', '🎉', '🔥', '✅', '👀', '🙏'].map(emoji => (
                     <button key={emoji} onClick={() => { toggleReaction(activeActionMsg.id, emoji); setActiveActionMsg(null); }} className="text-2xl hover:scale-110 transition-transform p-1">{emoji}</button>
                   ))}
                 </div>
                 <div className="space-y-1">
-                  <button onClick={() => { handleAction('task'); setActiveActionMsg(null) }} className="w-full flex items-center gap-4 p-4 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[12px] transition-colors">
+                  <button onClick={() => { handleAction('task'); setActiveActionMsg(null) }} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
                     <span className="text-xl">✅</span>
                     <span className="text-sm font-bold">할 일 추가</span>
                   </button>
-                  <button onClick={() => { if (!activeActionMsg) return; void togglePin(activeActionMsg.id); setActiveActionMsg(null); }} className="w-full flex items-center gap-4 p-4 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[12px] transition-colors">
+                  <button onClick={() => { if (!activeActionMsg) return; void togglePin(activeActionMsg.id); setActiveActionMsg(null); }} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
                     <span className="text-xl">📢</span>
                     <span className="text-sm font-bold">{pinnedIds.includes(String(activeActionMsg.id)) ? '공지 해제' : '공지 등록'}</span>
                   </button>
-                  <button data-testid="chat-message-action-bookmark-mobile" onClick={() => { if (!activeActionMsg) return; void toggleBookmark(activeActionMsg.id); setActiveActionMsg(null); }} className="w-full flex items-center gap-4 p-4 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[12px] transition-colors">
+                  <button data-testid="chat-message-action-bookmark-mobile" onClick={() => { if (!activeActionMsg) return; void toggleBookmark(activeActionMsg.id); setActiveActionMsg(null); }} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
                     <span className="text-xl">🔖</span>
                     <span className="text-sm font-bold">{bookmarkedIds.has(String(activeActionMsg.id)) ? '북마크 해제' : '북마크 등록'}</span>
                   </button>
-                  <button onClick={async () => { await navigator.clipboard?.writeText(activeActionMsg.content || ''); alert('복사했습니다.'); setActiveActionMsg(null); }} className="w-full flex items-center gap-4 p-4 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[12px] transition-colors">
+                  <button onClick={async () => { await navigator.clipboard?.writeText(activeActionMsg.content || ''); alert('복사했습니다.'); setActiveActionMsg(null); }} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
                     <span className="text-xl">📋</span>
                     <span className="text-sm font-bold">복사</span>
                   </button>
                   {activeActionMsg.sender_id === user.id && (
-                    <button onClick={() => { void deleteMessageFromActions(activeActionMsg); }} className="w-full flex items-center gap-4 p-4 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-[12px] transition-colors text-red-500">
+                    <button onClick={() => { void deleteMessageFromActions(activeActionMsg); }} className="w-full flex items-center gap-4 p-4 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-[var(--radius-md)] transition-colors text-red-500">
                       <span className="text-xl">🗑️</span>
                       <span className="text-sm font-bold">삭제</span>
                     </button>
                   )}
-                  <button onClick={() => { startReplyToMessage(activeActionMsg); }} className="w-full flex items-center gap-4 p-4 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[12px] transition-colors">
+                  <button onClick={() => { startReplyToMessage(activeActionMsg); }} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
                     <span className="text-xl">↩️</span>
                     <span className="text-sm font-bold">답장</span>
                   </button>
-                  <button onClick={() => { startForwardMessage(activeActionMsg); }} className="w-full flex items-center gap-4 p-4 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[12px] transition-colors">
+                  <button onClick={() => { startForwardMessage(activeActionMsg); }} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
                     <span className="text-xl">📤</span>
                     <span className="text-sm font-bold">전달</span>
                   </button>
@@ -3116,16 +3116,16 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
               </div>
             </div>
 
-            <div data-testid="chat-message-actions-panel" className="hidden md:flex absolute top-0 right-0 bottom-0 w-80 bg-[var(--toss-card)] border-l border-[var(--toss-border)] shadow-2xl z-40 flex-col animate-in slide-in-from-right duration-300">
-              <div className="p-4 border-b border-[var(--toss-border)] flex items-center justify-between">
+            <div data-testid="chat-message-actions-panel" className="hidden md:flex absolute top-0 right-0 bottom-0 w-80 bg-[var(--card)] border-l border-[var(--border)] shadow-sm z-40 flex-col animate-in slide-in-from-right duration-300">
+              <div className="p-4 border-b border-[var(--border)] flex items-center justify-between">
                 <span className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">메시지 작업</span>
-            <button onClick={() => { setActiveActionMsg(null); setEditingMsg(null) }} className="p-2 text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] rounded-[12px] hover:bg-[var(--toss-gray-1)]">닫기</button>
+            <button onClick={() => { setActiveActionMsg(null); setEditingMsg(null) }} className="p-2 text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] rounded-[var(--radius-md)] hover:bg-[var(--muted)]">닫기</button>
               </div>
               <div className="p-4 space-y-4 overflow-y-auto flex-1">
                 <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">빠른 반응</p>
                 <div className="flex gap-2 flex-wrap">
                   {['👍', '❤️', '👏', '🔥', '🙏'].map(emoji => (
-                    <button key={emoji} onClick={() => { toggleReaction(activeActionMsg.id, emoji); }} className="w-11 h-11 flex items-center justify-center rounded-[12px] bg-[var(--toss-gray-1)] hover:bg-[var(--toss-blue-light)] text-xl transition-colors" title={emoji}>
+                    <button key={emoji} onClick={() => { toggleReaction(activeActionMsg.id, emoji); }} className="w-11 h-11 flex items-center justify-center rounded-[var(--radius-md)] bg-[var(--muted)] hover:bg-[var(--toss-blue-light)] text-xl transition-colors" title={emoji}>
                       {emoji}
                     </button>
                   ))}
@@ -3134,36 +3134,36 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 <div className="space-y-1">
                   <button
                     onClick={() => { startReplyToMessage(activeActionMsg); }}
-                    className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors"
+                    className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors"
                   >
                     답글 달기
                   </button>
                   {activeActionMsg.sender_id === user.id && (
                     <>
-                      <button data-testid="chat-message-action-edit" onClick={() => { startEditMessage(activeActionMsg); }} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">메시지 수정</button>
-                      <button data-testid="chat-message-action-delete" onClick={() => { void deleteMessageFromActions(activeActionMsg); }} className="w-full p-3 text-left hover:bg-red-50 rounded-[12px] text-xs font-semibold text-red-600 transition-colors">메시지 삭제</button>
+                      <button data-testid="chat-message-action-edit" onClick={() => { startEditMessage(activeActionMsg); }} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">메시지 수정</button>
+                      <button data-testid="chat-message-action-delete" onClick={() => { void deleteMessageFromActions(activeActionMsg); }} className="w-full p-3 text-left hover:bg-red-50 rounded-[var(--radius-md)] text-xs font-semibold text-red-600 transition-colors">메시지 삭제</button>
                     </>
                   )}
-                  <button data-testid="chat-message-action-pin" onClick={() => { void togglePin(activeActionMsg.id); setActiveActionMsg(null); }} className={`w-full p-3 text-left rounded-[12px] text-xs font-semibold transition-colors ${pinnedIds.includes(String(activeActionMsg.id)) ? 'hover:bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]' : 'hover:bg-orange-50 text-orange-500'}`}>{pinnedIds.includes(String(activeActionMsg.id)) ? '공지 해제' : '공지로 등록'}</button>
-                  <button onClick={() => { handleAction('task'); setActiveActionMsg(null) }} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">할 일로 등록</button>
+                  <button data-testid="chat-message-action-pin" onClick={() => { void togglePin(activeActionMsg.id); setActiveActionMsg(null); }} className={`w-full p-3 text-left rounded-[var(--radius-md)] text-xs font-semibold transition-colors ${pinnedIds.includes(String(activeActionMsg.id)) ? 'hover:bg-[var(--muted)] text-[var(--toss-gray-3)]' : 'hover:bg-orange-50 text-orange-500'}`}>{pinnedIds.includes(String(activeActionMsg.id)) ? '공지 해제' : '공지로 등록'}</button>
+                  <button onClick={() => { handleAction('task'); setActiveActionMsg(null) }} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">할 일로 등록</button>
                   <button
                     data-testid="chat-message-action-read-status"
                     onClick={() => { openReadStatusPanel(activeActionMsg); }}
-                    className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors"
+                    className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors"
                   >
                     읽음 확인
                   </button>
                   <button
                     data-testid="chat-message-action-forward"
                     onClick={() => { startForwardMessage(activeActionMsg); }}
-                    className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors"
+                    className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors"
                   >
                     다른 채팅방으로 전달
                   </button>
-                  <button data-testid="chat-message-action-thread" onClick={() => { openThreadPanel(activeActionMsg); }} className="w-full p-3 text-left hover:bg-[var(--toss-blue-light)] rounded-[12px] text-xs font-semibold text-[var(--toss-blue)] transition-colors">이 메시지 스레드 보기</button>
-                  <button onClick={async () => { try { const base = `[채팅] ${activeActionMsg.staff?.name || '이름 없음'} (${new Date(activeActionMsg.created_at).toLocaleString('ko-KR')})\n${activeActionMsg.content || ''}${activeActionMsg.file_url ? `\n파일: ${activeActionMsg.file_url}` : ''}`; await navigator.clipboard?.writeText(`[전자결재 메모]\n${base}`); alert('전자결재용으로 복사했습니다.'); } catch { alert('복사 실패'); } setActiveActionMsg(null); }} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">전자결재용 내용 복사</button>
-                  <button onClick={async () => { try { const base = `[채팅] ${activeActionMsg.staff?.name || '이름 없음'} (${new Date(activeActionMsg.created_at).toLocaleString('ko-KR')})\n${activeActionMsg.content || ''}${activeActionMsg.file_url ? `\n파일: ${activeActionMsg.file_url}` : ''}`; await navigator.clipboard?.writeText(`[게시판 메모]\n${base}`); alert('게시판용으로 복사했습니다.'); } catch { alert('복사 실패'); } setActiveActionMsg(null); }} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">게시판용 내용 복사</button>
-                  <button data-testid="chat-message-action-bookmark" onClick={() => { void toggleBookmark(activeActionMsg.id); setActiveActionMsg(null); }} className="w-full p-3 text-left hover:bg-[var(--toss-gray-1)] rounded-[12px] text-xs font-semibold transition-colors">{bookmarkedIds.has(String(activeActionMsg.id)) ? '북마크 해제' : '중요 메시지 북마크'}</button>
+                  <button data-testid="chat-message-action-thread" onClick={() => { openThreadPanel(activeActionMsg); }} className="w-full p-3 text-left hover:bg-[var(--toss-blue-light)] rounded-[var(--radius-md)] text-xs font-semibold text-[var(--accent)] transition-colors">이 메시지 스레드 보기</button>
+                  <button onClick={async () => { try { const base = `[채팅] ${activeActionMsg.staff?.name || '이름 없음'} (${new Date(activeActionMsg.created_at).toLocaleString('ko-KR')})\n${activeActionMsg.content || ''}${activeActionMsg.file_url ? `\n파일: ${activeActionMsg.file_url}` : ''}`; await navigator.clipboard?.writeText(`[전자결재 메모]\n${base}`); alert('전자결재용으로 복사했습니다.'); } catch { alert('복사 실패'); } setActiveActionMsg(null); }} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">전자결재용 내용 복사</button>
+                  <button onClick={async () => { try { const base = `[채팅] ${activeActionMsg.staff?.name || '이름 없음'} (${new Date(activeActionMsg.created_at).toLocaleString('ko-KR')})\n${activeActionMsg.content || ''}${activeActionMsg.file_url ? `\n파일: ${activeActionMsg.file_url}` : ''}`; await navigator.clipboard?.writeText(`[게시판 메모]\n${base}`); alert('게시판용으로 복사했습니다.'); } catch { alert('복사 실패'); } setActiveActionMsg(null); }} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">게시판용 내용 복사</button>
+                  <button data-testid="chat-message-action-bookmark" onClick={() => { void toggleBookmark(activeActionMsg.id); setActiveActionMsg(null); }} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">{bookmarkedIds.has(String(activeActionMsg.id)) ? '북마크 해제' : '중요 메시지 북마크'}</button>
                 </div>
               </div>
             </div>
@@ -3172,12 +3172,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
         {editingMsg && (
           <div className="absolute inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-30" onClick={() => { setEditingMsg(null); setEditContent(''); }}>
-            <div className="bg-[var(--toss-card)] p-6 rounded-[12px] w-80 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="bg-[var(--card)] p-4 rounded-[var(--radius-md)] w-80 shadow-sm" onClick={e => e.stopPropagation()}>
               <p className="text-xs font-semibold text-[var(--toss-gray-3)] mb-2">메시지 수정</p>
-              <input data-testid="chat-message-edit-input" value={editContent} onChange={e => setEditContent(e.target.value)} className="w-full p-3 border rounded-[16px] text-sm mb-4" />
+              <input data-testid="chat-message-edit-input" value={editContent} onChange={e => setEditContent(e.target.value)} className="w-full p-3 border rounded-[var(--radius-lg)] text-sm mb-4" />
               <div className="flex gap-2">
-                <button onClick={() => { setEditingMsg(null); setEditContent(''); }} className="flex-1 py-2 bg-[var(--toss-gray-1)] rounded-[16px] text-xs font-semibold">취소</button>
-            <button data-testid="chat-message-edit-save" onClick={saveEditMessage} className="flex-1 py-2 bg-[var(--toss-blue)] text-white rounded-[16px] text-xs font-semibold">저장</button>
+                <button onClick={() => { setEditingMsg(null); setEditContent(''); }} className="flex-1 py-2 bg-[var(--muted)] rounded-[var(--radius-lg)] text-xs font-semibold">취소</button>
+            <button data-testid="chat-message-edit-save" onClick={saveEditMessage} className="flex-1 py-2 bg-[var(--accent)] text-white rounded-[var(--radius-lg)] text-xs font-semibold">저장</button>
               </div>
             </div>
           </div>
@@ -3185,30 +3185,30 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
         {showGroupModal && (
           <div data-testid="chat-group-modal" className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-[110] p-4" onClick={() => setShowGroupModal(false)}>
-            <div className="bg-[var(--toss-card)] w-full max-w-md rounded-[3rem] p-10 shadow-2xl space-y-8" onClick={e => e.stopPropagation()}>
+            <div className="bg-[var(--card)] w-full max-w-md rounded-2xl p-5 shadow-sm space-y-5" onClick={e => e.stopPropagation()}>
               <h3 className="text-xl font-semibold text-[var(--foreground)] italic">새 그룹 채팅방</h3>
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest ml-1">방 이름</label>
-                  <input value={groupName} onChange={e => setGroupName(e.target.value)} className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]" placeholder="예: 운영팀 공지방" />
+                  <input value={groupName} onChange={e => setGroupName(e.target.value)} className="w-full p-4 bg-[var(--input-bg)] rounded-[var(--radius-md)] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--accent)]" placeholder="예: 운영팀 공지방" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest ml-1">멤버 선택 ({selectedMembers.length}명)</label>
-                  <div className="h-48 overflow-y-auto border border-[var(--toss-border)] rounded-[12px] p-4 space-y-2 custom-scrollbar bg-[var(--toss-gray-1)]/30">
+                  <div className="h-48 overflow-y-auto border border-[var(--border)] rounded-[var(--radius-md)] p-4 space-y-2 custom-scrollbar bg-[var(--muted)]/30">
                     {staffs.filter((s: any) => s.id !== user.id).map((s: any) => (
-                      <label key={s.id} className="flex items-center gap-3 p-3 bg-[var(--toss-card)] rounded-[16px] border border-[var(--toss-border)] cursor-pointer hover:border-[var(--toss-blue)] transition-all">
+                      <label key={s.id} className="flex items-center gap-3 p-3 bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] cursor-pointer hover:border-[var(--accent)] transition-all">
                         <input type="checkbox" checked={selectedMembers.includes(s.id)} onChange={e => {
                           if (e.target.checked) setSelectedMembers([...selectedMembers, s.id]);
                           else setSelectedMembers(selectedMembers.filter(id => id !== s.id));
-                        }} className="w-4 h-4 rounded border-[var(--toss-border)] text-[var(--toss-blue)] focus:ring-[var(--toss-blue)]" />
+                        }} className="w-4 h-4 rounded border-[var(--border)] text-[var(--accent)] focus:ring-[var(--accent)]" />
                         <span className="text-xs font-bold text-[var(--foreground)]">{s.name} ({s.position})</span>
                       </label>
                     ))}
                   </div>
                 </div>
                 <div className="flex gap-3">
-                  <button onClick={() => setShowGroupModal(false)} className="flex-1 py-4 bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] rounded-[12px] font-semibold text-xs">취소</button>
-                  <button onClick={createGroupChat} className="flex-2 py-4 bg-[var(--toss-blue)] text-white rounded-[12px] font-semibold text-xs shadow-lg shadow-[var(--toss-blue)]">채팅방 생성</button>
+                  <button onClick={() => setShowGroupModal(false)} className="flex-1 py-4 bg-[var(--muted)] text-[var(--toss-gray-3)] rounded-[var(--radius-md)] font-semibold text-xs">취소</button>
+                  <button onClick={createGroupChat} className="flex-2 py-4 bg-[var(--accent)] text-white rounded-[var(--radius-md)] font-semibold text-xs shadow-sm shadow-[var(--accent)]">채팅방 생성</button>
                 </div>
               </div>
             </div>
@@ -3218,7 +3218,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
       {showPollModal && (
         <div data-testid="chat-poll-modal" className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4">
-          <div className="bg-[var(--toss-card)] w-full max-w-md rounded-3xl p-6 space-y-4 shadow-2xl border border-[var(--toss-border)]">
+          <div className="bg-[var(--card)] w-full max-w-md rounded-2xl p-4 space-y-4 shadow-sm border border-[var(--border)]">
               <h3 className="text-lg font-semibold text-[var(--foreground)]">새 투표 만들기</h3>
             <p className="text-[11px] text-[var(--toss-gray-3)] font-bold">
               질문과 선택지를 입력해 주세요. 선택지는 항목별로 따로 입력합니다.
@@ -3230,7 +3230,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   data-testid="chat-poll-question"
                   value={pollQuestion}
                   onChange={(e) => setPollQuestion(e.target.value)}
-                  className="w-full mt-1 p-3 bg-[var(--input-bg)] border border-[var(--toss-border)] rounded-[16px] text-xs font-bold outline-none focus:border-[var(--toss-blue)]"
+                  className="w-full mt-1 p-3 bg-[var(--input-bg)] border border-[var(--border)] rounded-[var(--radius-lg)] text-xs font-bold outline-none focus:border-[var(--accent)]"
                   placeholder="예: 이번 주 회의 시간은 언제가 좋을까요?"
                 />
               </div>
@@ -3247,7 +3247,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                           newOpts[idx] = e.target.value;
                           setPollOptions(newOpts);
                         }}
-                        className="flex-1 p-3 bg-[var(--input-bg)] border border-[var(--toss-border)] rounded-[16px] text-xs font-bold outline-none focus:border-[var(--toss-blue)]"
+                        className="flex-1 p-3 bg-[var(--input-bg)] border border-[var(--border)] rounded-[var(--radius-lg)] text-xs font-bold outline-none focus:border-[var(--accent)]"
                         placeholder={`선택지 ${idx + 1}`}
                       />
                       {pollOptions.length > 2 && (
@@ -3264,7 +3264,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   <button
                     type="button"
                     onClick={() => setPollOptions([...pollOptions, ''])}
-                    className="w-full py-3 border-2 border-dashed border-zinc-200 rounded-xl text-xs font-bold text-zinc-500 hover:text-blue-500 hover:border-blue-300"
+                    className="w-full py-3 border-2 border-dashed border-[var(--border)] rounded-xl text-xs font-bold text-[var(--toss-gray-4)] hover:text-blue-500 hover:border-blue-300"
                   >
                     + 항목 추가
                   </button>
@@ -3275,7 +3275,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
               <button
                 type="button"
                 onClick={() => setShowPollModal(false)}
-                className="flex-1 py-3 rounded-[16px] text-[11px] font-semibold text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]"
+                className="flex-1 py-3 rounded-[var(--radius-lg)] text-[11px] font-semibold text-[var(--toss-gray-3)] hover:bg-[var(--muted)]"
               >
                 취소
               </button>
@@ -3283,7 +3283,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 data-testid="chat-poll-submit"
                 type="button"
                 onClick={handleCreatePoll}
-                className="flex-1 py-3 rounded-[16px] text-[11px] font-semibold bg-[var(--toss-blue)] text-white hover:bg-[var(--toss-blue)] shadow-md"
+                className="flex-1 py-3 rounded-[var(--radius-lg)] text-[11px] font-semibold bg-[var(--accent)] text-white hover:bg-[var(--accent)] shadow-md"
               >
                 투표 생성
               </button>
@@ -3294,7 +3294,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
       {showSlashModal && slashCommand && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4" onClick={() => setShowSlashModal(false)}>
-          <div className="bg-[var(--toss-card)] w-full max-w-md rounded-3xl p-6 space-y-4 shadow-2xl border border-[var(--toss-border)]" onClick={e => e.stopPropagation()}>
+          <div className="bg-[var(--card)] w-full max-w-md rounded-2xl p-4 space-y-4 shadow-sm border border-[var(--border)]" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-[var(--foreground)]">
               {slashCommand === 'annual_leave' ? '연차 요청 초안 만들기' : '발주 요청 초안 만들기'}
             </h3>
@@ -3311,7 +3311,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                         type="date"
                         value={slashForm.startDate}
                         onChange={e => setSlashForm((f: any) => ({ ...f, startDate: e.target.value }))}
-                        className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[16px] text-xs"
+                        className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-lg)] text-xs"
                       />
                     </div>
                     <div>
@@ -3320,7 +3320,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                         type="date"
                         value={slashForm.endDate}
                         onChange={e => setSlashForm((f: any) => ({ ...f, endDate: e.target.value }))}
-                        className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[16px] text-xs"
+                        className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-lg)] text-xs"
                       />
                     </div>
                   </div>
@@ -3331,7 +3331,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       value={slashForm.reason}
                       onChange={e => setSlashForm((f: any) => ({ ...f, reason: e.target.value }))}
                       placeholder="예: 개인 일정, 병원 방문"
-                      className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[16px] text-xs"
+                      className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-lg)] text-xs"
                     />
                   </div>
                 </div>
@@ -3339,7 +3339,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   <button
                     type="button"
                     onClick={() => setShowSlashModal(false)}
-                    className="flex-1 py-3 rounded-[16px] text-[11px] font-semibold text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]"
+                    className="flex-1 py-3 rounded-[var(--radius-lg)] text-[11px] font-semibold text-[var(--toss-gray-3)] hover:bg-[var(--muted)]"
                   >
                     취소
                   </button>
@@ -3377,7 +3377,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                         setShowSlashModal(false);
                       }
                     }}
-                    className="flex-1 py-3 rounded-[16px] text-[11px] font-semibold bg-[var(--toss-blue)] text-white hover:bg-[var(--toss-blue)] shadow-md"
+                    className="flex-1 py-3 rounded-[var(--radius-lg)] text-[11px] font-semibold bg-[var(--accent)] text-white hover:bg-[var(--accent)] shadow-md"
                   >
                     전자결재 초안 생성
                   </button>
@@ -3396,7 +3396,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       value={slashForm.itemName}
                       onChange={e => setSlashForm((f: any) => ({ ...f, itemName: e.target.value }))}
                       placeholder="예: A4 용지, 프린터 토너"
-                      className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[16px] text-xs"
+                      className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-lg)] text-xs"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-2">
@@ -3407,7 +3407,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                         min={1}
                         value={slashForm.quantity}
                         onChange={e => setSlashForm((f: any) => ({ ...f, quantity: Number(e.target.value) || 1 }))}
-                        className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[16px] text-xs"
+                        className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-lg)] text-xs"
                       />
                     </div>
                     <div>
@@ -3417,7 +3417,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                         value={slashForm.reason}
                         onChange={e => setSlashForm((f: any) => ({ ...f, reason: e.target.value }))}
                         placeholder="예: 재고 부족, 교체 주기 도래"
-                        className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[16px] text-xs"
+                        className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-lg)] text-xs"
                       />
                     </div>
                   </div>
@@ -3426,7 +3426,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   <button
                     type="button"
                     onClick={() => setShowSlashModal(false)}
-                    className="flex-1 py-3 rounded-[16px] text-[11px] font-semibold text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]"
+                    className="flex-1 py-3 rounded-[var(--radius-lg)] text-[11px] font-semibold text-[var(--toss-gray-3)] hover:bg-[var(--muted)]"
                   >
                     취소
                   </button>
@@ -3465,7 +3465,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                         setShowSlashModal(false);
                       }
                     }}
-                    className="flex-1 py-3 rounded-[16px] text-[11px] font-semibold bg-[var(--toss-blue)] text-white hover:bg-[var(--toss-blue)] shadow-md"
+                    className="flex-1 py-3 rounded-[var(--radius-lg)] text-[11px] font-semibold bg-[var(--accent)] text-white hover:bg-[var(--accent)] shadow-md"
                   >
                     전자결재 초안 생성
                   </button>
@@ -3483,8 +3483,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             onClick={() => setThreadRoot(null)}
             aria-hidden="true"
           />
-          <aside data-testid="chat-thread-panel" className="absolute top-0 right-0 bottom-0 w-80 bg-[var(--toss-card)] border-l border-[var(--toss-border)] shadow-2xl z-50 flex flex-col animate-in slide-in-from-right duration-300">
-            <div className="p-4 border-b border-[var(--toss-border)] flex items-center justify-between">
+          <aside data-testid="chat-thread-panel" className="absolute top-0 right-0 bottom-0 w-80 bg-[var(--card)] border-l border-[var(--border)] shadow-sm z-50 flex flex-col animate-in slide-in-from-right duration-300">
+            <div className="p-4 border-b border-[var(--border)] flex items-center justify-between">
               <div className="min-w-0">
                 <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
                   스레드
@@ -3495,7 +3495,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
               </div>
               <button
                 onClick={() => setThreadRoot(null)}
-                className="p-2 text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] rounded-[12px] hover:bg-[var(--toss-gray-1)]"
+                className="p-2 text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] rounded-[var(--radius-md)] hover:bg-[var(--muted)]"
               >
                 닫기
               </button>
@@ -3513,7 +3513,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   return (
                     <div
                       key={m.id}
-                      className={`border rounded-[12px] p-3 text-[11px] space-y-1 ${isRoot ? 'bg-[var(--toss-blue-light)] border-[var(--toss-blue)]' : 'bg-[var(--toss-gray-1)] border-[var(--toss-border)]'
+                      className={`border rounded-[var(--radius-md)] p-3 text-[11px] space-y-1 ${isRoot ? 'bg-[var(--toss-blue-light)] border-[var(--accent)]' : 'bg-[var(--muted)] border-[var(--border)]'
                         }`}
                     >
                       <div className="flex items-center justify-between gap-2">
@@ -3539,7 +3539,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                           href={m.file_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 px-2 py-1 mt-1 rounded-[12px] bg-[var(--toss-card)] border border-[var(--toss-border)] text-[11px] font-bold text-[var(--toss-blue)] hover:bg-[var(--toss-blue-light)]"
+                          className="inline-flex items-center gap-1 px-2 py-1 mt-1 rounded-[var(--radius-md)] bg-[var(--card)] border border-[var(--border)] text-[11px] font-bold text-[var(--accent)] hover:bg-[var(--toss-blue-light)]"
                         >
                           첨부 파일 열기
                         </a>
@@ -3555,7 +3555,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
       {unreadModalMsg && (
         <div data-testid="chat-read-status-modal" className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4" onClick={() => setUnreadModalMsg(null)}>
-          <div className="bg-[var(--toss-card)] w-full max-w-md rounded-3xl p-6 space-y-4 shadow-2xl border border-[var(--toss-border)]" onClick={e => e.stopPropagation()}>
+          <div className="bg-[var(--card)] w-full max-w-md rounded-2xl p-4 space-y-4 shadow-sm border border-[var(--border)]" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
@@ -3567,16 +3567,16 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
               </div>
               <button
                 onClick={() => setUnreadModalMsg(null)}
-                className="p-2 text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] rounded-[12px] hover:bg-[var(--toss-gray-1)]"
+                className="p-2 text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] rounded-[var(--radius-md)] hover:bg-[var(--muted)]"
               >
                 닫기
               </button>
             </div>
 
-            <div className="border-t border-[var(--toss-border)] pt-3 max-h-[60vh] overflow-y-auto custom-scrollbar space-y-6">
+            <div className="border-t border-[var(--border)] pt-3 max-h-[60vh] overflow-y-auto custom-scrollbar space-y-4">
               {unreadLoading ? (
-                <div className="py-8 flex justify-center">
-                  <div className="w-6 h-6 border-2 border-[var(--toss-border)] border-t-[var(--toss-blue)] rounded-full animate-spin" />
+                <div className="py-5 flex justify-center">
+                  <div className="w-6 h-6 border-2 border-[var(--border)] border-t-[var(--accent)] rounded-full animate-spin" />
                 </div>
               ) : (
                 <>
@@ -3585,17 +3585,17 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       <p className="text-[11px] font-bold text-red-500 uppercase tracking-wider">읽지 않음 ({unreadUsers.length})</p>
                     </div>
                     {unreadUsers.length === 0 ? (
-                      <p className="text-[10px] text-zinc-400 font-bold py-2 px-1">모두 읽었습니다.</p>
+                      <p className="text-[10px] text-[var(--toss-gray-3)] font-bold py-2 px-1">모두 읽었습니다.</p>
                     ) : (
                       <div className="grid grid-cols-1 gap-1">
                         {unreadUsers.map((u: any) => (
-                          <div key={u.id} className="flex items-center gap-3 p-2 rounded-xl bg-zinc-50 dark:bg-zinc-800/30">
-                            <div className="w-7 h-7 rounded-lg bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-[10px] font-bold text-zinc-400 overflow-hidden">
+                          <div key={u.id} className="flex items-center gap-3 p-2 rounded-xl bg-[var(--tab-bg)] dark:bg-zinc-800/30">
+                            <div className="w-7 h-7 rounded-lg bg-[var(--tab-bg)] dark:bg-zinc-700 flex items-center justify-center text-[10px] font-bold text-[var(--toss-gray-3)] overflow-hidden">
                               {u.photo_url ? <img src={u.photo_url} alt={`${u.name}'s profile`} className="w-full h-full object-cover" /> : u.name[0]}
                             </div>
                             <div className="min-w-0 flex-1">
                               <p className="text-[11px] font-bold text-foreground truncate">{u.name}</p>
-                              <p className="text-[9px] font-bold text-zinc-400 truncate">{(u.department || '')} {u.position}</p>
+                              <p className="text-[9px] font-bold text-[var(--toss-gray-3)] truncate">{(u.department || '')} {u.position}</p>
                             </div>
                           </div>
                         ))}
@@ -3608,17 +3608,17 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       <p className="text-[11px] font-bold text-emerald-500 uppercase tracking-wider">읽음 ({readUsers.length})</p>
                     </div>
                     {readUsers.length === 0 ? (
-                      <p className="text-[10px] text-zinc-400 font-bold py-2 px-1">아직 읽은 사람이 없습니다.</p>
+                      <p className="text-[10px] text-[var(--toss-gray-3)] font-bold py-2 px-1">아직 읽은 사람이 없습니다.</p>
                     ) : (
                       <div className="grid grid-cols-1 gap-1">
                         {readUsers.map((u: any) => (
-                          <div key={u.id} className="flex items-center gap-3 p-2 rounded-xl bg-zinc-50 dark:bg-zinc-800/30">
+                          <div key={u.id} className="flex items-center gap-3 p-2 rounded-xl bg-[var(--tab-bg)] dark:bg-zinc-800/30">
                             <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-[10px] font-bold text-emerald-600 overflow-hidden">
                               {u.photo_url ? <img src={u.photo_url} alt={`${u.name}'s profile`} className="w-full h-full object-cover" /> : u.name[0]}
                             </div>
                             <div className="min-w-0 flex-1">
                               <p className="text-[11px] font-bold text-foreground truncate">{u.name}</p>
-                              <p className="text-[9px] font-bold text-zinc-400 truncate">{(u.department || '')} {u.position}</p>
+                              <p className="text-[9px] font-bold text-[var(--toss-gray-3)] truncate">{(u.department || '')} {u.position}</p>
                             </div>
                           </div>
                         ))}
@@ -3634,7 +3634,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
       {showForwardModal && forwardSourceMsg && (
         <div data-testid="chat-forward-modal" className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4" onClick={() => { setShowForwardModal(false); setForwardSourceMsg(null); }}>
-          <div className="bg-[var(--toss-card)] w-full max-w-md rounded-3xl p-6 space-y-4 shadow-2xl border border-[var(--toss-border)]" onClick={e => e.stopPropagation()}>
+          <div className="bg-[var(--card)] w-full max-w-md rounded-2xl p-4 space-y-4 shadow-sm border border-[var(--border)]" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-[var(--foreground)]">다른 채팅방으로 전달</h3>
             <p className="text-[11px] text-[var(--toss-gray-3)] font-bold">
               선택한 메시지를 전달할 채팅방을 선택하세요.
@@ -3671,7 +3671,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                         setForwardSourceMsg(null);
                       }
                     }}
-                    className="w-full flex items-center justify-between px-4 py-3 rounded-[12px] border border-[var(--toss-border)] hover:bg-[var(--toss-blue-light)] text-left text-xs font-bold text-[var(--foreground)]"
+                    className="w-full flex items-center justify-between px-4 py-3 rounded-[var(--radius-md)] border border-[var(--border)] hover:bg-[var(--toss-blue-light)] text-left text-xs font-bold text-[var(--foreground)]"
                   >
                     <span className="truncate">
                       {room.id === NOTICE_ROOM_ID ? '공 ' : '채 '}
@@ -3687,7 +3687,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
               <button
                 type="button"
                 onClick={() => { setShowForwardModal(false); setForwardSourceMsg(null); }}
-                className="flex-1 py-3 rounded-[16px] text-[11px] font-semibold text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]"
+                className="flex-1 py-3 rounded-[var(--radius-lg)] text-[11px] font-semibold text-[var(--toss-gray-3)] hover:bg-[var(--muted)]"
               >
                 닫기
               </button>
@@ -3706,7 +3706,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           }}
         >
           <div
-            className="bg-[var(--toss-card)] w-full max-w-md rounded-3xl p-6 space-y-4 shadow-2xl border border-[var(--toss-border)]"
+            className="bg-[var(--card)] w-full max-w-md rounded-2xl p-4 space-y-4 shadow-sm border border-[var(--border)]"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-lg font-semibold text-[var(--foreground)]">
@@ -3720,7 +3720,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
               type="text"
               value={addMemberSearch}
               onChange={(e) => setAddMemberSearch(e.target.value)}
-              className="w-full px-3 py-2 rounded-[16px] border border-[var(--toss-border)] text-xs font-bold outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+              className="w-full px-3 py-2 rounded-[var(--radius-lg)] border border-[var(--border)] text-xs font-bold outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
               placeholder="이름, 부서, 직급으로 검색"
             />
             <div className="max-h-64 overflow-y-auto custom-scrollbar space-y-1">
@@ -3735,7 +3735,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     <label
                       data-testid={`chat-add-member-option-${s.id}`}
                       key={s.id}
-                      className="flex items-center gap-3 px-3 py-2 rounded-[16px] border border-[var(--toss-border)] hover:bg-[var(--toss-gray-1)] cursor-pointer text-[11px]"
+                      className="flex items-center gap-3 px-3 py-2 rounded-[var(--radius-lg)] border border-[var(--border)] hover:bg-[var(--muted)] cursor-pointer text-[11px]"
                     >
                       <input
                         type="checkbox"
@@ -3777,7 +3777,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   setShowAddMemberModal(false);
                   setAddMemberSelectingIds([]);
                 }}
-                className="flex-1 py-3 rounded-[16px] text-[11px] font-semibold text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]"
+                className="flex-1 py-3 rounded-[var(--radius-lg)] text-[11px] font-semibold text-[var(--toss-gray-3)] hover:bg-[var(--muted)]"
               >
                 취소
               </button>
@@ -3837,7 +3837,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     alert('참여자 추가 중 오류가 발생했습니다.');
                   }
                 }}
-                className="flex-1 py-3 rounded-[16px] text-[11px] font-semibold text-white bg-[var(--toss-blue)] disabled:bg-[var(--toss-gray-3)] hover:bg-[var(--toss-blue)]"
+                className="flex-1 py-3 rounded-[var(--radius-lg)] text-[11px] font-semibold text-white bg-[var(--accent)] disabled:bg-[var(--toss-gray-3)] hover:bg-[var(--accent)]"
               >
                 추가하기
               </button>
@@ -3849,18 +3849,18 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       {showMediaPanel && (
         <>
           <div className="fixed inset-0 bg-black/5 z-[100] md:z-30 animate-in fade-in" onClick={() => setShowMediaPanel(false)} />
-          <aside className="fixed top-0 right-0 bottom-0 w-80 bg-[var(--toss-card)] border-l border-[var(--toss-border)] shadow-2xl z-[101] md:z-40 flex flex-col animate-in slide-in-from-right duration-300">
-            <div className="p-4 border-b border-[var(--toss-border)] flex items-center justify-between">
-              <span className="text-xs font-black text-zinc-500 uppercase tracking-widest">파일/링크 내역</span>
-            <button onClick={() => setShowMediaPanel(false)} className="p-2 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl">닫기</button>
+          <aside className="fixed top-0 right-0 bottom-0 w-80 bg-[var(--card)] border-l border-[var(--border)] shadow-sm z-[101] md:z-40 flex flex-col animate-in slide-in-from-right duration-300">
+            <div className="p-4 border-b border-[var(--border)] flex items-center justify-between">
+              <span className="text-xs font-black text-[var(--toss-gray-4)] uppercase tracking-widest">파일/링크 내역</span>
+            <button onClick={() => setShowMediaPanel(false)} className="p-2 text-[var(--toss-gray-3)] hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-xl">닫기</button>
             </div>
 
-            <div className="flex p-2 gap-1 bg-zinc-50 dark:bg-zinc-900 border-b border-[var(--toss-border)]">
+            <div className="flex p-2 gap-1 bg-[var(--tab-bg)] dark:bg-zinc-900 border-b border-[var(--border)]">
               {(['all', 'image', 'file'] as const).map(f => (
                 <button
                   key={f}
                   onClick={() => setMediaFilter(f)}
-                  className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all ${mediaFilter === f ? 'bg-white dark:bg-zinc-800 text-blue-600 shadow-soft' : 'text-zinc-400 hover:text-zinc-600'}`}
+                  className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all ${mediaFilter === f ? 'bg-[var(--card)] dark:bg-zinc-800 text-blue-600 shadow-soft' : 'text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)]'}`}
                 >
                   {f === 'all' ? '전체' : f === 'image' ? '이미지' : '파일'}
                 </button>
@@ -3869,22 +3869,22 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
             <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
               {filteredMediaMessages.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center opacity-30 text-zinc-400">
+                <div className="h-full flex flex-col items-center justify-center opacity-30 text-[var(--toss-gray-3)]">
                   <span className="text-4xl mb-2">📭</span>
                   <p className="text-[11px] font-bold">내역이 없습니다.</p>
                 </div>
               ) : (
                 filteredMediaMessages.map((m: any) => (
-                  <div key={m.id} className="p-3 bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 rounded-xl hover:border-blue-300 transition-all group">
+                  <div key={m.id} className="p-3 bg-[var(--tab-bg)] dark:bg-zinc-900/50 border border-[var(--border-subtle)] dark:border-zinc-800 rounded-xl hover:border-blue-300 transition-all group">
                     {isImageUrl(m.file_url) ? (
                       <img src={m.file_url} alt="Attached media" className="w-full h-24 object-cover rounded-lg mb-2 cursor-pointer" onClick={() => window.open(m.file_url)} />
                     ) : (
-                      <div className="w-full h-12 bg-zinc-100 dark:bg-zinc-800 rounded-lg mb-2 flex items-center justify-center text-xl">📄</div>
+                      <div className="w-full h-12 bg-[var(--tab-bg)] dark:bg-zinc-800 rounded-lg mb-2 flex items-center justify-center text-xl">📄</div>
                     )}
                     <div className="flex flex-col gap-1 min-w-0">
                       <p className="text-[11px] font-bold text-foreground truncate">{m.content || '내용 없음'}</p>
                       <div className="flex items-center justify-between">
-                        <span className="text-[9px] font-bold text-zinc-400">{new Date(m.created_at).toLocaleDateString()}</span>
+                        <span className="text-[9px] font-bold text-[var(--toss-gray-3)]">{new Date(m.created_at).toLocaleDateString()}</span>
                         <a href={m.file_url} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-blue-600 hover:underline">다운로드</a>
                       </div>
                     </div>
@@ -3897,9 +3897,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       )}
 
       {showGlobalSearch && (
-        <div data-testid="chat-global-search-modal" className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-start md:items-center justify-center p-4 pt-12 md:p-6 animate-in fade-in" onClick={() => setShowGlobalSearch(false)}>
-          <div className="bg-white dark:bg-zinc-900 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh] md:max-h-[85vh] border border-zinc-200 dark:border-zinc-800" onClick={e => e.stopPropagation()}>
-            <div className="p-4 md:p-6 border-b border-zinc-100 dark:border-zinc-800 flex items-center gap-3">
+        <div data-testid="chat-global-search-modal" className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-start md:items-center justify-center p-4 pt-12 md:p-4 animate-in fade-in" onClick={() => setShowGlobalSearch(false)}>
+          <div className="bg-[var(--card)] dark:bg-zinc-900 w-full max-w-2xl rounded-2xl shadow-sm overflow-hidden flex flex-col max-h-[80vh] md:max-h-[85vh] border border-[var(--border)] dark:border-zinc-800" onClick={e => e.stopPropagation()}>
+            <div className="p-4 md:p-4 border-b border-[var(--border-subtle)] dark:border-zinc-800 flex items-center gap-3">
               <span className="text-xl">🔎</span>
               <input
                 data-testid="chat-global-search-input"
@@ -3908,20 +3908,20 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 onChange={e => setGlobalSearchQuery(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleGlobalSearch()}
                 placeholder="전체 채팅방 내용 검색..."
-                className="flex-1 bg-transparent text-foreground text-sm font-bold outline-none placeholder:text-zinc-400"
+                className="flex-1 bg-transparent text-foreground text-sm font-bold outline-none placeholder:text-[var(--toss-gray-3)]"
               />
               <button
                 data-testid="chat-global-search-submit"
                 onClick={handleGlobalSearch}
-                className="px-4 py-2 bg-[var(--toss-blue)] text-white font-bold text-xs rounded-xl shadow-sm hover:opacity-90 transition-opacity whitespace-nowrap"
+                className="px-4 py-2 bg-[var(--accent)] text-white font-bold text-xs rounded-xl shadow-sm hover:opacity-90 transition-opacity whitespace-nowrap"
               >
                 {globalSearchLoading ? '검색중...' : '검색'}
               </button>
-              <button onClick={() => setShowGlobalSearch(false)} className="ml-2 text-zinc-400 hover:text-zinc-600 text-lg font-bold">닫기</button>
+              <button onClick={() => setShowGlobalSearch(false)} className="ml-2 text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] text-lg font-bold">닫기</button>
             </div>
-            <div className="flex-1 overflow-y-auto custom-scrollbar bg-zinc-50 dark:bg-zinc-950 p-4 md:p-6">
+            <div className="flex-1 overflow-y-auto custom-scrollbar bg-[var(--tab-bg)] dark:bg-zinc-950 p-4 md:p-4">
               {!globalSearchLoading && globalSearchResults.length === 0 && globalSearchQuery.trim() && (
-                <div className="h-40 flex flex-col items-center justify-center text-zinc-400">
+                <div className="h-40 flex flex-col items-center justify-center text-[var(--toss-gray-3)]">
                   <span className="text-3xl mb-2">무</span>
                   <p className="text-sm font-bold">검색 결과가 없습니다.</p>
                 </div>
@@ -3941,20 +3941,20 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                         setRoom(msg.room_id);
                         setShowGlobalSearch(false);
                       }}
-                      className="group p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl cursor-pointer hover:border-[var(--toss-blue)] hover:shadow-md transition-all"
+                      className="group p-4 bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border)] dark:border-zinc-800 rounded-2xl cursor-pointer hover:border-[var(--accent)] hover:shadow-md transition-all"
                     >
                       <div className="flex items-center justify-between mb-2 gap-4">
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className="px-2 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 rounded text-[10px] font-bold truncate shrink-0 max-w-[120px]">
+                          <span className="px-2 py-0.5 bg-[var(--tab-bg)] dark:bg-zinc-800 text-[var(--toss-gray-4)] rounded text-[10px] font-bold truncate shrink-0 max-w-[120px]">
                             {roomName}
                           </span>
                           <span className="text-[11px] font-bold text-foreground truncate">{msg.staff?.name || '이름 없음'}</span>
                         </div>
-                        <span className="text-[10px] font-bold text-zinc-400 shrink-0">
+                        <span className="text-[10px] font-bold text-[var(--toss-gray-3)] shrink-0">
                           {new Date(msg.created_at).toLocaleDateString()} {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
-                      <p className="text-[12px] font-semibold text-zinc-700 dark:text-zinc-300 line-clamp-2 leading-relaxed">
+                      <p className="text-[12px] font-semibold text-[var(--toss-gray-5)] dark:text-[var(--toss-gray-3)] line-clamp-2 leading-relaxed">
                         {msg.content || (msg.file_url ? '첨부 파일' : '')}
                       </p>
                     </div>

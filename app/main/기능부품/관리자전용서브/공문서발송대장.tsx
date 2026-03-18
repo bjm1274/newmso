@@ -156,7 +156,7 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
   const unreceivedCount = docs.length - receivedCount;
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className="p-4 md:p-4 space-y-4">
       {/* 헤더 */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -164,7 +164,7 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
         </div>
         <button
           onClick={openAdd}
-          className="px-5 py-2.5 bg-[var(--toss-blue)] text-white text-xs font-bold rounded-xl hover:opacity-90 transition-opacity"
+          className="px-5 py-1.5 bg-[var(--accent)] text-white text-xs font-bold rounded-[var(--radius-md)] hover:opacity-90 transition-opacity"
         >
           + 공문 등록
         </button>
@@ -179,7 +179,7 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
 
       {/* 요약 */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-2xl p-4">
+        <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] p-4">
           <p className="text-xs font-bold text-[var(--toss-gray-3)]">총 발송 건수</p>
           <p className="text-2xl font-extrabold text-[var(--foreground)] mt-1">{docs.length}<span className="text-sm ml-1">건</span></p>
         </div>
@@ -195,8 +195,8 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
 
       {/* 등록/수정 폼 */}
       {showForm && (
-        <div className="bg-blue-50 border border-[var(--toss-blue)]/30 rounded-2xl p-5 space-y-4">
-          <h3 className="text-sm font-bold text-[var(--toss-blue)]">{editingDoc ? '공문 수정' : '공문 등록'}</h3>
+        <div className="bg-blue-50 border border-[var(--accent)]/30 rounded-[var(--radius-md)] p-4 space-y-3">
+          <h3 className="text-sm font-bold text-[var(--accent)]">{editingDoc ? '공문 수정' : '공문 등록'}</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             <div>
               <label className="text-xs font-bold text-[var(--toss-gray-4)] block mb-1">발송일 *</label>
@@ -204,7 +204,7 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
                 type="date"
                 value={form.sent_date ?? ''}
                 onChange={(e) => setForm((p) => ({ ...p, sent_date: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-[var(--toss-border)] rounded-xl bg-white outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+                className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--card)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
               />
             </div>
             <div>
@@ -214,7 +214,7 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
                 value={form.doc_number ?? ''}
                 onChange={(e) => setForm((p) => ({ ...p, doc_number: e.target.value }))}
                 placeholder="예: 행정-2026-001"
-                className="w-full px-3 py-2 text-sm border border-[var(--toss-border)] rounded-xl bg-white outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+                className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--card)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
               />
             </div>
             <div>
@@ -224,7 +224,7 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
                 value={form.recipient ?? ''}
                 onChange={(e) => setForm((p) => ({ ...p, recipient: e.target.value }))}
                 placeholder="예: 보건복지부"
-                className="w-full px-3 py-2 text-sm border border-[var(--toss-border)] rounded-xl bg-white outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+                className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--card)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
               />
             </div>
             <div className="sm:col-span-2">
@@ -234,7 +234,7 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
                 value={form.title ?? ''}
                 onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
                 placeholder="공문서 제목 입력"
-                className="w-full px-3 py-2 text-sm border border-[var(--toss-border)] rounded-xl bg-white outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+                className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--card)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
               />
             </div>
             <div>
@@ -244,7 +244,7 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
                 value={form.manager ?? ''}
                 onChange={(e) => setForm((p) => ({ ...p, manager: e.target.value }))}
                 placeholder="담당자명"
-                className="w-full px-3 py-2 text-sm border border-[var(--toss-border)] rounded-xl bg-white outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+                className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--card)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
               />
             </div>
             <div>
@@ -254,7 +254,7 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
                 value={form.note ?? ''}
                 onChange={(e) => setForm((p) => ({ ...p, note: e.target.value }))}
                 placeholder="추가 메모"
-                className="w-full px-3 py-2 text-sm border border-[var(--toss-border)] rounded-xl bg-white outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+                className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--card)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
               />
             </div>
             <div className="flex items-center gap-3 pt-6">
@@ -270,10 +270,10 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
             </div>
           </div>
           <div className="flex gap-2">
-            <button onClick={handleSave} disabled={saving} className="px-5 py-2.5 bg-[var(--toss-blue)] text-white text-xs font-bold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50">
+            <button onClick={handleSave} disabled={saving} className="px-5 py-1.5 bg-[var(--accent)] text-white text-xs font-bold rounded-[var(--radius-md)] hover:opacity-90 transition-opacity disabled:opacity-50">
               {saving ? '저장 중...' : '저장'}
             </button>
-            <button onClick={() => { setShowForm(false); setEditingDoc(null); }} className="px-5 py-2.5 bg-[var(--toss-gray-1)] text-[var(--foreground)] text-xs font-bold rounded-xl hover:bg-[var(--toss-gray-2)] transition-colors">
+            <button onClick={() => { setShowForm(false); setEditingDoc(null); }} className="px-5 py-1.5 bg-[var(--muted)] text-[var(--foreground)] text-xs font-bold rounded-[var(--radius-md)] hover:bg-[var(--toss-gray-2)] transition-colors">
               취소
             </button>
           </div>
@@ -287,14 +287,14 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
           value={searchKeyword}
           onChange={(e) => setSearchKeyword(e.target.value)}
           placeholder="제목, 수신처, 문서번호, 담당자 검색..."
-          className="px-4 py-2 text-sm border border-[var(--toss-border)] rounded-xl bg-[var(--toss-card)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 w-72"
+          className="px-4 py-2 text-sm border border-[var(--border)] rounded-xl bg-[var(--card)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30 w-72"
         />
         <div className="flex gap-1">
           {(['전체', '확인', '미확인'] as const).map((f) => (
             <button
               key={f}
               onClick={() => setFilterReceived(f)}
-              className={`px-3 py-2 text-xs font-bold rounded-xl transition-all ${filterReceived === f ? 'bg-[var(--toss-blue)] text-white' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'}`}
+              className={`px-3 py-1.5 text-xs font-bold rounded-[var(--radius-md)] transition-all ${filterReceived === f ? 'bg-[var(--accent)] text-white' : 'bg-[var(--muted)] text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'}`}
             >
               {f}
             </button>
@@ -309,30 +309,30 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
       </div>
 
       {/* 발송 대장 테이블 */}
-      <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-2xl overflow-hidden">
+      <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] overflow-hidden">
         {loading ? (
-          <div className="p-10 text-center text-sm text-[var(--toss-gray-3)]">불러오는 중...</div>
+          <div className="p-5 text-center text-sm text-[var(--toss-gray-3)]">불러오는 중...</div>
         ) : displayDocs.length === 0 ? (
-          <div className="p-10 text-center text-sm text-[var(--toss-gray-3)]">공문 발송 기록이 없습니다.</div>
+          <div className="p-5 text-center text-sm text-[var(--toss-gray-3)]">공문 발송 기록이 없습니다.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
-              <thead className="bg-[var(--toss-gray-1)]">
+              <thead className="bg-[var(--muted)]">
                 <tr>
                   {['발송일', '문서번호', '제목', '수신처', '담당자', '수신확인', '비고', ''].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)] whitespace-nowrap">{h}</th>
+                    <th key={h} className="px-4 py-2 text-left font-bold text-[var(--toss-gray-4)] whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[var(--toss-border)]">
+              <tbody className="divide-y divide-[var(--border)]">
                 {displayDocs.map((doc) => (
-                  <tr key={doc.id} className="hover:bg-[var(--toss-gray-1)]/50 transition-colors">
-                    <td className="px-4 py-3 font-bold text-[var(--foreground)] whitespace-nowrap">{doc.sent_date}</td>
-                    <td className="px-4 py-3 text-[var(--toss-gray-4)] whitespace-nowrap">{doc.doc_number || '-'}</td>
-                    <td className="px-4 py-3 font-bold text-[var(--foreground)] max-w-xs truncate">{doc.title}</td>
-                    <td className="px-4 py-3 text-[var(--toss-gray-4)] whitespace-nowrap">{doc.recipient}</td>
-                    <td className="px-4 py-3 text-[var(--toss-gray-4)] whitespace-nowrap">{doc.manager || '-'}</td>
-                    <td className="px-4 py-3">
+                  <tr key={doc.id} className="hover:bg-[var(--muted)]/50 transition-colors">
+                    <td className="px-4 py-2 font-bold text-[var(--foreground)] whitespace-nowrap">{doc.sent_date}</td>
+                    <td className="px-4 py-2 text-[var(--toss-gray-4)] whitespace-nowrap">{doc.doc_number || '-'}</td>
+                    <td className="px-4 py-2 font-bold text-[var(--foreground)] max-w-xs truncate">{doc.title}</td>
+                    <td className="px-4 py-2 text-[var(--toss-gray-4)] whitespace-nowrap">{doc.recipient}</td>
+                    <td className="px-4 py-2 text-[var(--toss-gray-4)] whitespace-nowrap">{doc.manager || '-'}</td>
+                    <td className="px-4 py-2">
                       <button
                         onClick={() => handleToggleReceived(doc)}
                         className={`px-2 py-1 text-[10px] font-extrabold rounded-lg transition-all ${doc.is_received ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-orange-100 text-orange-700 hover:bg-orange-200'}`}
@@ -343,7 +343,7 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
                     <td className="px-4 py-3 text-[var(--toss-gray-3)] max-w-[120px] truncate">{doc.note || '-'}</td>
                     <td className="px-4 py-3">
                       <div className="flex gap-1">
-                        <button onClick={() => openEdit(doc)} className="px-2 py-1 text-[10px] font-bold bg-blue-50 text-[var(--toss-blue)] rounded-lg hover:bg-blue-100 transition-colors">수정</button>
+                        <button onClick={() => openEdit(doc)} className="px-2 py-1 text-[10px] font-bold bg-blue-50 text-[var(--accent)] rounded-lg hover:bg-blue-100 transition-colors">수정</button>
                         <button onClick={() => handleDelete(doc.id!)} className="px-2 py-1 text-[10px] font-bold bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition-colors">삭제</button>
                       </div>
                     </td>

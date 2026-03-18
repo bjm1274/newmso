@@ -124,17 +124,17 @@ export default function SuppliesForm({ setExtraData, initialItems }: any) {
   };
 
   return (
-    <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-3xl overflow-hidden shadow-sm animate-in fade-in duration-300">
-      <div className="p-4 md:p-6 bg-[var(--toss-blue-light)]/50 border-b border-[var(--toss-blue-light)] flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+    <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm animate-in fade-in duration-300">
+      <div className="p-3 bg-[var(--toss-blue-light)]/50 border-b border-[var(--toss-blue-light)] flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="text-[11px] font-semibold text-[var(--toss-blue)] uppercase tracking-widest flex items-center gap-2">
-            <span className="w-2 h-2 bg-[var(--toss-blue)] rounded-full animate-pulse"></span> 실시간 재고
+          <p className="text-[11px] font-semibold text-[var(--accent)] uppercase tracking-widest flex items-center gap-2">
+            <span className="w-2 h-2 bg-[var(--accent)] rounded-full animate-pulse"></span> 실시간 재고
           </p>
           <button
             type="button"
             data-testid="supplies-add-row-button"
             onClick={addItemRow}
-            className="inline-flex items-center justify-center gap-1 rounded-full bg-white px-3 py-1.5 text-[11px] font-bold text-[var(--foreground)] shadow-sm transition-colors hover:bg-[var(--toss-gray-1)]"
+            className="inline-flex items-center justify-center gap-1 rounded-[var(--radius-md)] bg-[var(--card)] px-3 py-1.5 text-[11px] font-bold text-[var(--foreground)] shadow-sm transition-colors hover:bg-[var(--muted)]"
           >
             <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-[var(--foreground)] pb-[1px] text-[11px] leading-none">+</span>
             품목 추가하기
@@ -144,7 +144,7 @@ export default function SuppliesForm({ setExtraData, initialItems }: any) {
             data-testid="supplies-remove-row-button"
             onClick={removeLastItemRow}
             disabled={items.length <= 1}
-            className="inline-flex items-center justify-center rounded-full bg-red-50 px-3 py-1.5 text-[11px] font-bold text-red-500 transition-colors hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center justify-center rounded-[var(--radius-md)] bg-red-50 px-3 py-1.5 text-[11px] font-bold text-red-500 transition-colors hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40"
           >
             품목 제거하기
           </button>
@@ -154,7 +154,7 @@ export default function SuppliesForm({ setExtraData, initialItems }: any) {
           <select
             value={bulkDept}
             onChange={e => setBulkDept(e.target.value)}
-            className="px-3 py-1.5 border-none rounded-[12px] bg-white shadow-sm text-[11px] font-bold text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20"
+            className="px-3 py-1.5 border-none rounded-[var(--radius-md)] bg-[var(--card)] shadow-sm text-[11px] font-bold text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
           >
             <option value="">선택...</option>
             {departments.map(d => (
@@ -165,15 +165,15 @@ export default function SuppliesForm({ setExtraData, initialItems }: any) {
             type="button"
             onClick={applyBulkDept}
             disabled={!bulkDept}
-            className="px-4 py-1.5 rounded-[12px] bg-black text-white text-[11px] font-semibold disabled:opacity-40 transition-opacity"
+            className="px-4 py-1.5 rounded-[var(--radius-md)] bg-black text-white text-[11px] font-semibold disabled:opacity-40 transition-opacity"
           >
             전체 적용
           </button>
         </div>
       </div>
 
-      <div className="bg-gray-50/20 p-2 md:p-3">
-        <div className="overflow-hidden rounded-[20px] border border-[var(--toss-border)] bg-white shadow-sm">
+      <div className="bg-[var(--tab-bg)]/20 p-2 md:p-3">
+        <div className="overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] shadow-sm">
           <table className="w-full max-w-full table-fixed border-collapse">
             <colgroup>
               <col className="w-[42%]" />
@@ -181,8 +181,8 @@ export default function SuppliesForm({ setExtraData, initialItems }: any) {
               <col className="w-[38%]" />
               <col className="w-[12%]" />
             </colgroup>
-            <thead className="bg-[var(--toss-gray-1)]">
-              <tr className="border-b border-[var(--toss-border)]">
+            <thead className="bg-[var(--muted)]">
+              <tr className="border-b border-[var(--border)]">
                 <th className="px-2.5 py-2 text-left text-[11px] font-bold text-[var(--toss-gray-4)]">물품명</th>
                 <th className="px-2.5 py-2 text-left text-[11px] font-bold text-[var(--toss-gray-4)]">수량</th>
                 <th className="px-2.5 py-2 text-left text-[11px] font-bold text-[var(--toss-gray-4)]">용도</th>
@@ -191,7 +191,7 @@ export default function SuppliesForm({ setExtraData, initialItems }: any) {
             </thead>
             <tbody>
               {items.map((item, idx) => (
-                <tr key={idx} className="border-b border-[var(--toss-border)] last:border-b-0">
+                <tr key={idx} className="border-b border-[var(--border)] last:border-b-0">
                   <td className="px-2 py-1.5 align-middle">
                     <div className="relative">
                       <input
@@ -199,21 +199,21 @@ export default function SuppliesForm({ setExtraData, initialItems }: any) {
                         value={item.name}
                         onChange={e => handleSearch(idx, e.target.value)}
                         onFocus={e => handleSearch(idx, e.target.value)}
-                        className={`w-full h-10 rounded-[10px] border-none bg-[var(--toss-gray-1)] px-2.5 pr-20 text-xs font-bold text-[var(--foreground)] outline-none transition-all focus:bg-white focus:ring-2 focus:ring-[var(--toss-blue)]/20 ${item.currentStock !== null ? 'pr-24' : ''}`}
+                        className={`w-full h-10 rounded-[var(--radius-md)] border-none bg-[var(--muted)] px-2.5 pr-20 text-xs font-bold text-[var(--foreground)] outline-none transition-all focus:bg-[var(--card)] focus:ring-2 focus:ring-[var(--accent)]/20 ${item.currentStock !== null ? 'pr-24' : ''}`}
                         placeholder="품목명 입력"
                       />
                       {item.currentStock !== null && (
-                        <span className={`pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${item.currentStock <= 5 ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
+                        <span className={`pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 rounded-[var(--radius-md)] px-1.5 py-0.5 text-[10px] font-bold ${item.currentStock <= 5 ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
                           재고 {item.currentStock}
                         </span>
                       )}
                       {item.suggestions.length > 0 && (
-                        <div className="absolute left-0 top-full z-[100] mt-1 w-full overflow-hidden rounded-[16px] border border-[var(--toss-border)] bg-white shadow-xl">
+                        <div className="absolute left-0 top-full z-[100] mt-1 w-full overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] shadow-sm">
                           {item.suggestions.map((s, si) => (
                             <div
                               key={si}
                               onClick={() => selectItem(idx, s)}
-                              className="flex cursor-pointer items-center justify-between border-b p-3 text-[11px] font-bold transition-colors last:border-none hover:bg-[var(--toss-gray-1)]"
+                              className="flex cursor-pointer items-center justify-between border-b p-3 text-[11px] font-bold transition-colors last:border-none hover:bg-[var(--muted)]"
                             >
                               <span className="text-[var(--foreground)]">{s.name}</span>
                               <span className={`rounded-md px-2 py-0.5 text-[10px] font-semibold ${s.stock <= s.min_stock ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
@@ -232,7 +232,7 @@ export default function SuppliesForm({ setExtraData, initialItems }: any) {
                       min="1"
                       value={item.qty}
                       onChange={e => updateItemField(idx, 'qty', Number(e.target.value))}
-                      className="h-10 w-full rounded-[10px] border-none bg-[var(--toss-blue-light)]/50 px-2 text-center text-xs font-bold text-[var(--toss-blue)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+                      className="h-10 w-full rounded-[var(--radius-md)] border-none bg-[var(--toss-blue-light)]/50 px-2 text-center text-xs font-bold text-[var(--accent)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
                     />
                   </td>
                   <td className="px-2 py-1.5 align-middle">
@@ -240,14 +240,14 @@ export default function SuppliesForm({ setExtraData, initialItems }: any) {
                       data-testid={`supplies-item-purpose-${idx}`}
                       value={item.purpose}
                       onChange={e => updateItemField(idx, 'purpose', e.target.value)}
-                      className="h-10 w-full rounded-[10px] border-none bg-[var(--toss-gray-1)] px-2.5 text-xs font-semibold text-[var(--foreground)] outline-none transition-all focus:bg-white focus:ring-2 focus:ring-[var(--toss-blue)]/20"
+                      className="h-10 w-full rounded-[var(--radius-md)] border-none bg-[var(--muted)] px-2.5 text-xs font-semibold text-[var(--foreground)] outline-none transition-all focus:bg-[var(--card)] focus:ring-2 focus:ring-[var(--accent)]/20"
                       placeholder="용도 입력"
                     />
                   </td>
                   <td className="px-1.5 py-1.5 align-middle">
                     <select
                       data-testid={`supplies-item-dept-${idx}`}
-                      className="h-10 w-full max-w-[78px] rounded-[10px] border-none bg-[var(--toss-gray-1)] px-1.5 text-[10px] font-bold text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20"
+                      className="h-10 w-full max-w-[78px] rounded-[var(--radius-md)] border-none bg-[var(--muted)] px-1.5 text-[10px] font-bold text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
                       value={item.dept}
                       onChange={e => updateItemField(idx, 'dept', e.target.value)}
                     >

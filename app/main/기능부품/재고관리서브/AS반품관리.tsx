@@ -34,14 +34,14 @@ interface ReturnRecord {
 }
 
 const AS_STATUS_COLORS: Record<AsStatus, string> = {
-  접수: 'bg-gray-100 text-gray-600',
+  접수: 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]',
   처리중: 'bg-blue-50 text-blue-600',
   완료: 'bg-green-50 text-green-600',
   반품: 'bg-red-50 text-red-600',
 };
 
 const RETURN_STATUS_COLORS: Record<ReturnStatus, string> = {
-  요청: 'bg-gray-100 text-gray-600',
+  요청: 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]',
   승인: 'bg-blue-50 text-blue-600',
   완료: 'bg-green-50 text-green-600',
 };
@@ -348,30 +348,30 @@ export default function ASReturnManagement({ user }: { user: any }) {
   ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   const TABS: { id: ActiveTab; label: string }[] = [
-    { id: 'as', label: '🔧 AS 접수' },
-    { id: 'return', label: '↩ 반품' },
-    { id: 'history', label: '📋 전체 이력' },
+    { id: 'as', label: 'AS 접수' },
+    { id: 'return', label: '반품' },
+    { id: 'history', label: '전체 이력' },
   ];
 
   return (
     <div className="space-y-4" data-testid="as-return-management-view">
       {/* 요약 카드 */}
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <div className="bg-[var(--toss-card)] p-4 rounded-[14px] border border-[var(--toss-border)] shadow-sm text-center">
+        <div className="bg-[var(--card)] p-3 rounded-[var(--radius-md)] border border-[var(--border)] shadow-sm text-center">
           <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">AS 접수</p>
-          <p className="mt-1 text-xl font-semibold text-[var(--toss-blue)]">{asRecords.filter(r => r.status === '접수').length}</p>
+          <p className="mt-0.5 text-lg font-bold text-[var(--accent)]">{asRecords.filter(r => r.status === '접수').length}</p>
         </div>
-        <div className="bg-[var(--toss-card)] p-4 rounded-[14px] border border-[var(--toss-border)] shadow-sm text-center">
+        <div className="bg-[var(--card)] p-3 rounded-[var(--radius-md)] border border-[var(--border)] shadow-sm text-center">
           <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">AS 처리중</p>
-          <p className="mt-1 text-xl font-semibold text-blue-500">{asRecords.filter(r => r.status === '처리중').length}</p>
+          <p className="mt-0.5 text-lg font-bold text-blue-500">{asRecords.filter(r => r.status === '처리중').length}</p>
         </div>
-        <div className="bg-[var(--toss-card)] p-4 rounded-[14px] border border-[var(--toss-border)] shadow-sm text-center">
+        <div className="bg-[var(--card)] p-3 rounded-[var(--radius-md)] border border-[var(--border)] shadow-sm text-center">
           <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">반품 요청</p>
-          <p className="mt-1 text-xl font-semibold text-orange-500">{returnRecords.filter(r => r.status === '요청').length}</p>
+          <p className="mt-0.5 text-lg font-bold text-orange-500">{returnRecords.filter(r => r.status === '요청').length}</p>
         </div>
-        <div className="bg-[var(--toss-card)] p-4 rounded-[14px] border border-[var(--toss-border)] shadow-sm text-center">
+        <div className="bg-[var(--card)] p-3 rounded-[var(--radius-md)] border border-[var(--border)] shadow-sm text-center">
           <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">전체 이력</p>
-          <p className="mt-1 text-xl font-semibold text-[var(--foreground)]">{historyList.length}</p>
+          <p className="mt-0.5 text-lg font-bold text-[var(--foreground)]">{historyList.length}</p>
         </div>
       </div>
 
@@ -383,9 +383,9 @@ export default function ASReturnManagement({ user }: { user: any }) {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               data-testid={`as-return-tab-${tab.id}`}
-              className={`px-3.5 py-2 rounded-[10px] text-[11px] font-semibold transition-all ${activeTab === tab.id
-                  ? 'bg-[var(--toss-blue)] text-white shadow-sm'
-                  : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-border)]'
+              className={`px-3.5 py-2 rounded-[var(--radius-md)] text-[11px] font-semibold transition-all ${activeTab === tab.id
+                  ? 'bg-[var(--accent)] text-white shadow-sm'
+                  : 'bg-[var(--muted)] text-[var(--toss-gray-4)] hover:bg-[var(--border)]'
                 }`}
             >
               {tab.label}
@@ -396,7 +396,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
           <button
             onClick={() => { setAsForm({ ...DEFAULT_AS_FORM }); setEditingAsId(null); setShowAsModal(true); }}
             data-testid="as-record-add-button"
-            className="px-3.5 py-2 rounded-[10px] bg-[var(--toss-blue)] text-white text-[11px] font-semibold hover:opacity-90 transition-opacity shadow-sm"
+            className="px-3.5 py-2 rounded-[var(--radius-md)] bg-[var(--accent)] text-white text-[11px] font-semibold hover:opacity-90 transition-opacity shadow-sm"
           >
             + AS 등록
           </button>
@@ -405,7 +405,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
           <button
             onClick={() => { setReturnForm({ ...DEFAULT_RETURN_FORM }); setEditingReturnId(null); setShowReturnModal(true); }}
             data-testid="return-record-add-button"
-            className="px-3.5 py-2 rounded-[10px] bg-[var(--toss-blue)] text-white text-[11px] font-semibold hover:opacity-90 transition-opacity shadow-sm"
+            className="px-3.5 py-2 rounded-[var(--radius-md)] bg-[var(--accent)] text-white text-[11px] font-semibold hover:opacity-90 transition-opacity shadow-sm"
           >
             + 반품 등록
           </button>
@@ -414,9 +414,9 @@ export default function ASReturnManagement({ user }: { user: any }) {
 
       {/* AS 접수 탭 */}
       {activeTab === 'as' && (
-        <div className="bg-[var(--toss-card)] rounded-[14px] border border-[var(--toss-border)] shadow-sm overflow-hidden">
+        <div className="bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)] shadow-sm overflow-hidden">
           {asRecords.length === 0 ? (
-            <div className="py-12 text-center text-[var(--toss-gray-3)] font-semibold text-sm">
+            <div className="py-8 text-center text-[var(--toss-gray-3)] font-semibold text-sm">
               <p className="mb-2 text-2xl">🔧</p>
               <p>등록된 AS 접수 내역이 없습니다.</p>
               <p className="text-[11px] mt-1 text-[var(--toss-gray-3)]">우측 상단의 + AS 등록 버튼을 눌러 새 항목을 추가하세요.</p>
@@ -425,7 +425,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
             <div className="overflow-x-auto no-scrollbar">
               <table className="w-full text-left border-collapse min-w-[800px]">
                 <thead>
-                  <tr className="bg-[var(--toss-gray-1)]/50 border-b border-[var(--toss-border)]">
+                  <tr className="bg-[var(--muted)]/50 border-b border-[var(--border)]">
                     <th className="px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">기기명 / 모델</th>
                     <th className="px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">접수일</th>
                     <th className="px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">문제 내용</th>
@@ -434,11 +434,11 @@ export default function ASReturnManagement({ user }: { user: any }) {
                     <th className="px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase text-right">관리</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[var(--toss-border)]">
+                <tbody className="divide-y divide-[var(--border)]">
                   {asRecords.map(record => (
                     <tr key={record.id} className="hover:bg-[var(--toss-blue-light)]/40 transition-all group" data-testid={`as-record-row-${record.id}`}>
                       <td className="px-4 py-3">
-                        <p className="text-xs font-semibold text-[var(--foreground)] group-hover:text-[var(--toss-blue)] transition-colors">{record.device_name}</p>
+                        <p className="text-xs font-semibold text-[var(--foreground)] group-hover:text-[var(--accent)] transition-colors">{record.device_name}</p>
                         {record.model_name && (
                           <p className="text-[11px] text-[var(--toss-gray-3)] mt-0.5">{record.model_name}</p>
                         )}
@@ -471,7 +471,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
                         <button
                           onClick={() => openAsEdit(record)}
                           data-testid={`as-edit-${record.id}`}
-                          className="px-2 py-1 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] text-[11px] font-semibold rounded-md hover:opacity-80"
+                          className="px-2 py-1 bg-[var(--toss-blue-light)] text-[var(--accent)] text-[11px] font-semibold rounded-md hover:opacity-80"
                         >
                           수정
                         </button>
@@ -494,9 +494,9 @@ export default function ASReturnManagement({ user }: { user: any }) {
 
       {/* 반품 탭 */}
       {activeTab === 'return' && (
-        <div className="bg-[var(--toss-card)] rounded-[14px] border border-[var(--toss-border)] shadow-sm overflow-hidden">
+        <div className="bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)] shadow-sm overflow-hidden">
           {returnRecords.length === 0 ? (
-            <div className="py-12 text-center text-[var(--toss-gray-3)] font-semibold text-sm">
+            <div className="py-8 text-center text-[var(--toss-gray-3)] font-semibold text-sm">
               <p className="mb-2 text-2xl">↩</p>
               <p>등록된 반품 내역이 없습니다.</p>
               <p className="text-[11px] mt-1 text-[var(--toss-gray-3)]">우측 상단의 + 반품 등록 버튼을 눌러 새 항목을 추가하세요.</p>
@@ -505,7 +505,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
             <div className="overflow-x-auto no-scrollbar">
               <table className="w-full text-left border-collapse min-w-[700px]">
                 <thead>
-                  <tr className="bg-[var(--toss-gray-1)]/50 border-b border-[var(--toss-border)]">
+                  <tr className="bg-[var(--muted)]/50 border-b border-[var(--border)]">
                     <th className="px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">품목명</th>
                     <th className="px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase text-center">수량</th>
                     <th className="px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">반품사유</th>
@@ -515,11 +515,11 @@ export default function ASReturnManagement({ user }: { user: any }) {
                     <th className="px-4 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase text-right">관리</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[var(--toss-border)]">
+                <tbody className="divide-y divide-[var(--border)]">
                   {returnRecords.map(record => (
                     <tr key={record.id} className="hover:bg-[var(--toss-blue-light)]/40 transition-all group" data-testid={`return-record-row-${record.id}`}>
                       <td className="px-4 py-3">
-                        <p className="text-xs font-semibold text-[var(--foreground)] group-hover:text-[var(--toss-blue)] transition-colors">{record.item_name}</p>
+                        <p className="text-xs font-semibold text-[var(--foreground)] group-hover:text-[var(--accent)] transition-colors">{record.item_name}</p>
                       </td>
                       <td className="px-4 py-3 text-center">
                         <p className="text-xs font-semibold text-[var(--foreground)]">{record.quantity}</p>
@@ -551,7 +551,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
                         <button
                           onClick={() => openReturnEdit(record)}
                           data-testid={`return-edit-${record.id}`}
-                          className="px-2 py-1 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] text-[11px] font-semibold rounded-md hover:opacity-80"
+                          className="px-2 py-1 bg-[var(--toss-blue-light)] text-[var(--accent)] text-[11px] font-semibold rounded-md hover:opacity-80"
                         >
                           수정
                         </button>
@@ -574,14 +574,14 @@ export default function ASReturnManagement({ user }: { user: any }) {
 
       {/* 이력 탭 */}
       {activeTab === 'history' && (
-        <div className="bg-[var(--toss-card)] rounded-[14px] border border-[var(--toss-border)] shadow-sm overflow-hidden">
+        <div className="bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)] shadow-sm overflow-hidden">
           {historyList.length === 0 ? (
-            <div className="py-12 text-center text-[var(--toss-gray-3)] font-semibold text-sm">
+            <div className="py-8 text-center text-[var(--toss-gray-3)] font-semibold text-sm">
               <p className="mb-2 text-2xl">📋</p>
               <p>이력이 없습니다.</p>
             </div>
           ) : (
-            <div className="divide-y divide-[var(--toss-border)]">
+            <div className="divide-y divide-[var(--border)]">
               {historyList.map(item => (
                 <div key={`${item.type}_${item.id}`} className="px-4 py-3.5 flex items-start justify-between gap-4 hover:bg-[var(--toss-blue-light)]/30 transition-all">
                   <div className="flex-1 min-w-0">
@@ -616,15 +616,15 @@ export default function ASReturnManagement({ user }: { user: any }) {
           onClick={closeAsModal}
         >
           <div
-            className="bg-[var(--toss-card)] rounded-[16px] shadow-2xl p-6 w-full max-w-[420px] max-h-[90vh] overflow-y-auto"
+            className="bg-[var(--card)] rounded-[var(--radius-lg)] shadow-sm p-4 w-full max-w-[420px] max-h-[90vh] overflow-y-auto"
             onClick={e => e.stopPropagation()}
             data-testid="as-record-modal"
           >
-            <div className="mb-5 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-[var(--foreground)]">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-[var(--foreground)]">
                 {editingAsId ? 'AS 접수 수정' : 'AS 접수 등록'}
               </h3>
-              <button onClick={closeAsModal} className="p-1.5 hover:bg-[var(--toss-gray-1)] rounded-full text-[var(--toss-gray-3)]">✕</button>
+              <button onClick={closeAsModal} className="p-1.5 hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-[var(--toss-gray-3)]">✕</button>
             </div>
 
             <div className="space-y-3.5">
@@ -636,7 +636,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
                   onChange={e => setAsForm(p => ({ ...p, device_name: e.target.value }))}
                   data-testid="as-field-device-name"
                   placeholder="예: 내시경 세척기"
-                  className="w-full px-3.5 py-2.5 rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)] outline-none"
+                  className="w-full px-3.5 py-2.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)] outline-none"
                 />
               </div>
               <div>
@@ -647,7 +647,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
                   onChange={e => setAsForm(p => ({ ...p, model_name: e.target.value }))}
                   data-testid="as-field-model-name"
                   placeholder="예: OES-V1"
-                  className="w-full px-3.5 py-2.5 rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)] outline-none"
+                  className="w-full px-3.5 py-2.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)] outline-none"
                 />
               </div>
               <div>
@@ -657,7 +657,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
                   value={asForm.received_date}
                   onChange={e => setAsForm(p => ({ ...p, received_date: e.target.value }))}
                   data-testid="as-field-received-date"
-                  className="w-full px-3.5 py-2.5 rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)] outline-none"
+                  className="w-full px-3.5 py-2.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)] outline-none"
                 />
               </div>
               <div>
@@ -668,7 +668,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
                   data-testid="as-field-problem-description"
                   placeholder="증상 및 문제 내용을 입력하세요"
                   rows={3}
-                  className="w-full px-3.5 py-2.5 rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)] outline-none resize-none"
+                  className="w-full px-3.5 py-2.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)] outline-none resize-none"
                 />
               </div>
               <div className="flex gap-3">
@@ -680,7 +680,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
                     onChange={e => setAsForm(p => ({ ...p, company_name: e.target.value }))}
                     data-testid="as-field-company-name"
                     placeholder="업체명"
-                    className="w-full px-4 py-3 rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)] outline-none"
+                    className="w-full px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)] outline-none"
                   />
                 </div>
                 <div className="flex-1">
@@ -691,7 +691,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
                     onChange={e => setAsForm(p => ({ ...p, manager_name: e.target.value }))}
                     data-testid="as-field-manager-name"
                     placeholder="담당자명"
-                    className="w-full px-4 py-3 rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)] outline-none"
+                    className="w-full px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)] outline-none"
                   />
                 </div>
               </div>
@@ -701,7 +701,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
                   value={asForm.status}
                   onChange={e => setAsForm(p => ({ ...p, status: e.target.value as AsStatus }))}
                   data-testid="as-field-status"
-                  className="w-full px-4 py-3 rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)] outline-none"
+                  className="w-full px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)] outline-none"
                 >
                   <option value="접수">접수</option>
                   <option value="처리중">처리중</option>
@@ -711,9 +711,9 @@ export default function ASReturnManagement({ user }: { user: any }) {
               </div>
             </div>
 
-              <div className="mt-5 flex gap-3">
-                <button onClick={closeAsModal} className="flex-1 rounded-[12px] bg-[var(--toss-gray-1)] py-2.5 text-sm font-semibold text-[var(--toss-gray-4)] transition-all hover:bg-[var(--toss-border)]">취소</button>
-                <button onClick={saveAsRecord} data-testid="as-save-button" className="flex-1 rounded-[12px] bg-[var(--toss-blue)] py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 shadow-sm">
+              <div className="mt-4 flex gap-3">
+                <button onClick={closeAsModal} className="flex-1 rounded-[var(--radius-md)] bg-[var(--muted)] py-2.5 text-sm font-semibold text-[var(--toss-gray-4)] transition-all hover:bg-[var(--border)]">취소</button>
+                <button onClick={saveAsRecord} data-testid="as-save-button" className="flex-1 rounded-[var(--radius-md)] bg-[var(--accent)] py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 shadow-sm">
                   {editingAsId ? '수정 완료' : '등록'}
                 </button>
               </div>
@@ -728,15 +728,15 @@ export default function ASReturnManagement({ user }: { user: any }) {
           onClick={closeReturnModal}
         >
           <div
-            className="bg-[var(--toss-card)] rounded-[16px] shadow-2xl p-6 w-full max-w-[420px] max-h-[90vh] overflow-y-auto"
+            className="bg-[var(--card)] rounded-[var(--radius-lg)] shadow-sm p-4 w-full max-w-[420px] max-h-[90vh] overflow-y-auto"
             onClick={e => e.stopPropagation()}
             data-testid="return-record-modal"
           >
-            <div className="mb-5 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-[var(--foreground)]">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-[var(--foreground)]">
                 {editingReturnId ? '반품 수정' : '반품 등록'}
               </h3>
-              <button onClick={closeReturnModal} className="p-1.5 hover:bg-[var(--toss-gray-1)] rounded-full text-[var(--toss-gray-3)]">✕</button>
+              <button onClick={closeReturnModal} className="p-1.5 hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-[var(--toss-gray-3)]">✕</button>
             </div>
 
             <div className="space-y-3.5">
@@ -748,7 +748,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
                     onChange={e => setReturnForm(p => ({ ...p, item_name: e.target.value }))}
                     data-testid="return-field-item-name"
                   placeholder="예: 봉합사 2-0"
-                  className="w-full px-3.5 py-2.5 rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)] outline-none"
+                  className="w-full px-3.5 py-2.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)] outline-none"
                 />
               </div>
               <div>
@@ -759,7 +759,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
                   value={returnForm.quantity}
                     onChange={e => setReturnForm(p => ({ ...p, quantity: Math.max(1, parseInt(e.target.value) || 1) }))}
                     data-testid="return-field-quantity"
-                  className="w-full px-3.5 py-2.5 rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)] outline-none"
+                  className="w-full px-3.5 py-2.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)] outline-none"
                 />
               </div>
               <div>
@@ -770,7 +770,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
                   data-testid="return-field-reason"
                   placeholder="반품 사유를 입력하세요"
                   rows={3}
-                  className="w-full px-3.5 py-2.5 rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)] outline-none resize-none"
+                  className="w-full px-3.5 py-2.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)] outline-none resize-none"
                 />
               </div>
               <div>
@@ -781,7 +781,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
                     onChange={e => setReturnForm(p => ({ ...p, company_name: e.target.value }))}
                     data-testid="return-field-company-name"
                   placeholder="업체명"
-                  className="w-full px-3.5 py-2.5 rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)] outline-none"
+                  className="w-full px-3.5 py-2.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)] outline-none"
                 />
               </div>
               <div>
@@ -791,7 +791,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
                   value={returnForm.return_date}
                   onChange={e => setReturnForm(p => ({ ...p, return_date: e.target.value }))}
                   data-testid="return-field-return-date"
-                  className="w-full px-3.5 py-2.5 rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)] outline-none"
+                  className="w-full px-3.5 py-2.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)] outline-none"
                 />
               </div>
               <div>
@@ -800,7 +800,7 @@ export default function ASReturnManagement({ user }: { user: any }) {
                   value={returnForm.status}
                   onChange={e => setReturnForm(p => ({ ...p, status: e.target.value as ReturnStatus }))}
                   data-testid="return-field-status"
-                  className="w-full px-4 py-3 rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)] outline-none"
+                  className="w-full px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-sm font-semibold focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)] outline-none"
                 >
                   <option value="요청">요청</option>
                   <option value="승인">승인</option>
@@ -809,9 +809,9 @@ export default function ASReturnManagement({ user }: { user: any }) {
               </div>
             </div>
 
-              <div className="mt-5 flex gap-3">
-                <button onClick={closeReturnModal} className="flex-1 rounded-[12px] bg-[var(--toss-gray-1)] py-2.5 text-sm font-semibold text-[var(--toss-gray-4)] transition-all hover:bg-[var(--toss-border)]">취소</button>
-                <button onClick={saveReturnRecord} data-testid="return-save-button" className="flex-1 rounded-[12px] bg-[var(--toss-blue)] py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 shadow-sm">
+              <div className="mt-4 flex gap-3">
+                <button onClick={closeReturnModal} className="flex-1 rounded-[var(--radius-md)] bg-[var(--muted)] py-2.5 text-sm font-semibold text-[var(--toss-gray-4)] transition-all hover:bg-[var(--border)]">취소</button>
+                <button onClick={saveReturnRecord} data-testid="return-save-button" className="flex-1 rounded-[var(--radius-md)] bg-[var(--accent)] py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 shadow-sm">
                   {editingReturnId ? '수정 완료' : '등록'}
                 </button>
               </div>

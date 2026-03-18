@@ -63,7 +63,7 @@ export default function ConsumableStats({ user, selectedCo }: { user: any; selec
   const totalInQty = inLogs.reduce((sum, l) => sum + (l.quantity || 0), 0);
 
   return (
-    <div className="p-4 md:p-8 space-y-5">
+    <div className="p-4 space-y-4">
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div>
           <h2 className="text-base font-bold text-[var(--foreground)]">소모품 사용 통계 대시보드</h2>
@@ -71,7 +71,7 @@ export default function ConsumableStats({ user, selectedCo }: { user: any; selec
         </div>
         <div className="flex gap-2 flex-wrap">
           {(['7일', '30일', '90일', '전체'] as const).map(p => (
-            <button key={p} onClick={() => setPeriod(p)} className={`px-3 py-1.5 rounded-full text-xs font-bold ${period === p ? 'bg-[var(--toss-blue)] text-white' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'}`}>{p}</button>
+            <button key={p} onClick={() => setPeriod(p)} className={`px-3 py-1.5 rounded-[var(--radius-md)] text-xs font-bold ${period === p ? 'bg-[var(--accent)] text-white' : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'}`}>{p}</button>
           ))}
         </div>
       </div>
@@ -79,12 +79,12 @@ export default function ConsumableStats({ user, selectedCo }: { user: any; selec
       {/* 요약 카드 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: '총 출고 건수', value: outLogs.length + '건', color: 'text-[var(--toss-blue)]' },
+          { label: '총 출고 건수', value: outLogs.length + '건', color: 'text-[var(--accent)]' },
           { label: '총 출고 수량', value: totalQty.toLocaleString() + '개', color: 'text-orange-600' },
           { label: '총 입고 수량', value: totalInQty.toLocaleString() + '개', color: 'text-green-600' },
           { label: '관련 품목 수', value: totalItems + '종', color: 'text-purple-600' },
         ].map(c => (
-          <div key={c.label} className="p-3 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[14px] text-center">
+          <div key={c.label} className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] text-center">
             <p className={`text-lg font-bold ${c.color}`}>{c.value}</p>
             <p className="text-[9px] text-[var(--toss-gray-3)] mt-0.5">{c.label}</p>
           </div>
@@ -101,29 +101,29 @@ export default function ConsumableStats({ user, selectedCo }: { user: any; selec
           { key: 'actor', label: '담당자별' },
         ] as const).map(g => (
           <button key={g.key} onClick={() => setGroupBy(g.key)}
-            className={`px-3 py-1.5 rounded-full text-xs font-bold ${groupBy === g.key ? 'bg-[var(--toss-blue)] text-white' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'}`}>{g.label}</button>
+            className={`px-3 py-1.5 rounded-[var(--radius-md)] text-xs font-bold ${groupBy === g.key ? 'bg-[var(--accent)] text-white' : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'}`}>{g.label}</button>
         ))}
       </div>
 
       {loading ? (
-        <div className="text-center py-16 text-[var(--toss-gray-3)] font-bold text-sm">데이터 불러오는 중...</div>
+        <div className="text-center py-10 text-[var(--toss-gray-3)] font-bold text-sm">데이터 불러오는 중...</div>
       ) : grouped.length === 0 ? (
-        <div className="text-center py-16 text-[var(--toss-gray-3)] font-bold text-sm">해당 기간에 출고 데이터가 없습니다.</div>
+        <div className="text-center py-10 text-[var(--toss-gray-3)] font-bold text-sm">해당 기간에 출고 데이터가 없습니다.</div>
       ) : (
         <div className="space-y-2">
           {grouped.slice(0, 30).map((g, i) => (
-            <div key={g.label} className="flex items-center gap-3 p-3 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[12px]">
+            <div key={g.label} className="flex items-center gap-3 p-3 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)]">
               <span className="text-[10px] font-bold text-[var(--toss-gray-3)] w-6 text-center">{i + 1}</span>
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-xs font-bold text-[var(--foreground)]">{g.label}</span>
                   <div className="flex items-center gap-3">
                     <span className="text-[10px] text-[var(--toss-gray-3)]">{g.count}건</span>
-                    <span className="text-sm font-bold text-[var(--toss-blue)]">{g.qty.toLocaleString()}개</span>
+                    <span className="text-sm font-bold text-[var(--accent)]">{g.qty.toLocaleString()}개</span>
                   </div>
                 </div>
-                <div className="w-full h-1.5 bg-[var(--toss-gray-1)] rounded-full overflow-hidden">
-                  <div className="h-full bg-[var(--toss-blue)] rounded-full transition-all" style={{ width: `${Math.min(100, (g.qty / maxQty) * 100)}%` }} />
+                <div className="w-full h-1.5 bg-[var(--muted)] rounded-full overflow-hidden">
+                  <div className="h-full bg-[var(--accent)] rounded-full transition-all" style={{ width: `${Math.min(100, (g.qty / maxQty) * 100)}%` }} />
                 </div>
               </div>
             </div>

@@ -105,11 +105,11 @@ export default function ElectronicSignaturePad({ onSave, onCancel }: Props) {
   ];
 
   return (
-    <div className="p-4 space-y-4 max-w-md mx-auto">
+    <div className="p-4 space-y-3 max-w-md mx-auto">
       <h3 className="text-sm font-bold text-[var(--foreground)]">전자 서명</h3>
 
       {/* 옵션 */}
-      <div className="flex gap-4 flex-wrap">
+      <div className="flex gap-3 flex-wrap">
         <div>
           <p className="text-[10px] font-bold text-[var(--toss-gray-4)] mb-1">색상</p>
           <div className="flex gap-1">
@@ -118,7 +118,7 @@ export default function ElectronicSignaturePad({ onSave, onCancel }: Props) {
                 key={c.value}
                 onClick={() => setColor(c.value)}
                 title={c.label}
-                className={`w-7 h-7 rounded-full border-2 transition-all ${color === c.value ? 'border-[var(--toss-blue)] scale-110' : 'border-transparent'}`}
+                className={`w-7 h-7 rounded-full border-2 transition-all ${color === c.value ? 'border-[var(--accent)] scale-110' : 'border-transparent'}`}
                 style={{ backgroundColor: c.value }}
               />
             ))}
@@ -131,7 +131,7 @@ export default function ElectronicSignaturePad({ onSave, onCancel }: Props) {
               <button
                 key={w.value}
                 onClick={() => setLineWidth(w.value)}
-                className={`px-2 py-1 text-[10px] font-bold rounded-[6px] transition-all ${lineWidth === w.value ? 'bg-[var(--toss-blue)] text-white' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'}`}
+                className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all ${lineWidth === w.value ? 'bg-[var(--accent)] text-white' : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'}`}
               >
                 {w.label}
               </button>
@@ -141,7 +141,7 @@ export default function ElectronicSignaturePad({ onSave, onCancel }: Props) {
       </div>
 
       {/* 캔버스 */}
-      <div className="relative border-2 border-dashed border-[var(--toss-border)] rounded-[12px] overflow-hidden">
+      <div className="relative border-2 border-dashed border-[var(--border)] rounded-[var(--radius-md)] overflow-hidden">
         {!hasSignature && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <p className="text-sm text-[var(--toss-gray-2)] font-bold">여기에 서명하세요</p>
@@ -167,20 +167,20 @@ export default function ElectronicSignaturePad({ onSave, onCancel }: Props) {
       <div className="flex gap-2">
         <button
           onClick={clearCanvas}
-          className="px-4 py-2 text-xs font-bold bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] rounded-[8px] hover:bg-[var(--toss-gray-2)] transition-all"
+          className="px-4 py-2 text-xs font-bold bg-[var(--muted)] text-[var(--toss-gray-4)] rounded-[var(--radius-md)] hover:bg-[var(--toss-gray-2)] transition-all"
         >
           지우기
         </button>
         <button
           onClick={onCancel}
-          className="px-4 py-2 text-xs font-bold border border-[var(--toss-border)] text-[var(--toss-gray-4)] rounded-[8px] hover:bg-[var(--toss-gray-1)] transition-all"
+          className="px-4 py-2 text-xs font-bold border border-[var(--border)] text-[var(--toss-gray-4)] rounded-[var(--radius-md)] hover:bg-[var(--muted)] transition-all"
         >
           취소
         </button>
         <button
           onClick={handleSave}
           disabled={!hasSignature}
-          className="flex-1 py-2 text-xs font-bold bg-[var(--toss-blue)] text-white rounded-[8px] hover:opacity-90 disabled:opacity-40 transition-all"
+          className="flex-1 py-2 text-xs font-bold bg-[var(--accent)] text-white rounded-[var(--radius-md)] hover:opacity-90 disabled:opacity-40 transition-all"
         >
           서명 저장
         </button>

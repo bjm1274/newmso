@@ -334,12 +334,12 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
   return (
     <div className="flex flex-row h-full app-page font-sans overflow-hidden">
       {/* 좌측 세로 탭 - 회사 선택, 관리자 메뉴와 동일 스타일 */}
-      <aside className="flex flex-col gap-1.5 p-3 md:p-4 bg-[var(--toss-card)] border-r border-[var(--toss-border)] shrink-0 w-[72px] md:w-44 overflow-y-auto">
+      <aside className="flex flex-col gap-1.5 p-3 md:p-4 bg-[var(--card)] border-r border-[var(--border)] shrink-0 w-[72px] md:w-44 overflow-y-auto">
         {companies.map(co => (
           <button
             key={co}
             onClick={() => setSelectedCo(co)}
-            className={`w-full px-3 py-2.5 text-[11px] md:text-[11px] font-semibold rounded-[12px] transition-all text-left ${selectedCo === co ? 'bg-[var(--toss-blue)] text-white shadow-md' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]'}`}
+            className={`w-full px-3 py-2.5 text-[11px] md:text-[11px] font-semibold rounded-[var(--radius-md)] transition-all text-left ${selectedCo === co ? 'bg-[var(--accent)] text-white shadow-md' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]'}`}
           >
             {co}
           </button>
@@ -348,13 +348,13 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* 상단 필터 및 검색 */}
-        <div className="p-4 md:p-6 bg-[var(--toss-card)] border-b border-[var(--toss-border)] flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center shrink-0 shadow-sm">
+        <div className="p-4 md:p-4 bg-[var(--card)] border-b border-[var(--border)] flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center shrink-0 shadow-sm">
           <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
             {(selectedCo === '박철홍정형외과' || selectedCo === '수연의원' || selectedCo === 'SY INC.') && allTeamOptions.length > 0 && (
               <select
                 value={selectedTeamFilter}
                 onChange={(e) => setSelectedTeamFilter(e.target.value)}
-                className="px-4 py-2.5 bg-[var(--input-bg)] border border-[var(--toss-border)] rounded-[16px] text-[11px] font-semibold text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+                className="px-4 py-2.5 bg-[var(--input-bg)] border border-[var(--border)] rounded-[var(--radius-lg)] text-[11px] font-semibold text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
               >
                 <option value="">팀 선택 안함 (전체)</option>
                 {allTeamOptions.map(team => (
@@ -368,22 +368,22 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                 placeholder="성함 또는 부서 검색..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full px-5 py-2.5 bg-[var(--input-bg)] border border-[var(--toss-border)] rounded-[16px] text-xs font-bold outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 text-[var(--foreground)]"
+                className="w-full px-5 py-2.5 bg-[var(--input-bg)] border border-[var(--border)] rounded-[var(--radius-lg)] text-xs font-bold outline-none focus:ring-2 focus:ring-[var(--accent)]/30 text-[var(--foreground)]"
               />
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--toss-gray-3)]">🔍</span>
             </div>
             {isAdmin && (
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1.5 p-1 bg-[var(--toss-gray-1)] rounded-xl border border-[var(--toss-border)] mr-2">
+                <div className="flex items-center gap-1.5 p-1 bg-[var(--muted)] rounded-xl border border-[var(--border)] mr-2">
                   <button
                     onClick={() => setViewMode('pyramid')}
-                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${viewMode !== 'canvas' ? 'bg-white text-[var(--toss-blue)] shadow-sm' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'}`}
+                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${viewMode !== 'canvas' ? 'bg-[var(--card)] text-[var(--accent)] shadow-sm' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'}`}
                   >
                     기본
                   </button>
                   <button
                     onClick={() => setViewMode('canvas')}
-                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${viewMode === 'canvas' ? 'bg-white text-[var(--toss-blue)] shadow-sm' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'}`}
+                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${viewMode === 'canvas' ? 'bg-[var(--card)] text-[var(--accent)] shadow-sm' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'}`}
                   >
                     캔버스
                   </button>
@@ -396,7 +396,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                     }
                     setIsEditMode(!isEditMode);
                   }}
-                  className={`px-4 py-2 text-xs font-bold rounded-[16px] transition-all shrink-0 ${isEditMode ? 'bg-[var(--toss-danger)] text-white shadow-md' : 'bg-[var(--input-bg)] text-[var(--foreground)] border border-[var(--toss-border)]'}`}
+                  className={`px-4 py-2 text-xs font-bold rounded-[var(--radius-lg)] transition-all shrink-0 ${isEditMode ? 'bg-[var(--toss-danger)] text-white shadow-md' : 'bg-[var(--input-bg)] text-[var(--foreground)] border border-[var(--border)]'}`}
                 >
                   {isEditMode ? '수정 완료' : '조직도 수정하기'}
                 </button>
@@ -415,7 +415,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
           onDrop={viewMode === 'canvas' ? handleCanvasDrop : undefined}
           className={`flex-1 overflow-auto custom-scrollbar relative bg-[var(--page-bg)] ${isDragging ? 'cursor-grabbing select-none' : 'cursor-grab'}`}
         >
-          <div className={`min-h-full flex flex-col items-center ${viewMode === 'canvas' ? 'p-0 w-[4000px] h-[3000px]' : 'w-full p-6 md:p-16'}`}>
+          <div className={`min-h-full flex flex-col items-center ${viewMode === 'canvas' ? 'p-0 w-[4000px] h-[3000px]' : 'w-full p-4 md:p-16'}`}>
             {viewMode === 'canvas' && viewData && !Array.isArray(viewData) ? (
               /* 🎨 캔버스 모드 - 자유 배치 (부서 단위) */
               <div className="relative w-full h-full bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:24px_24px]">
@@ -430,7 +430,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                     <div
                       draggable={isEditMode}
                       onDragStart={(e) => handleDeptDragStart(e, '대표')}
-                      className={`transition-all ${isEditMode ? 'cursor-move ring-2 ring-blue-400 ring-offset-4 rounded-xl shadow-2xl' : ''}`}
+                      className={`transition-all ${isEditMode ? 'cursor-move ring-2 ring-blue-400 ring-offset-4 rounded-xl shadow-sm' : ''}`}
                     >
                       <StaffCardRow staff={(viewData as any).director} onClick={() => setSelectedMember((viewData as any).director)} onMoveStaff={handleMoveStaff} isEditMode={isEditMode} setDraggedStaff={setDraggedStaff} draggedStaff={draggedStaff} />
                     </div>
@@ -442,14 +442,14 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                   return (
                     <div
                       key={dIdx}
-                      className="absolute z-20 bg-white/70 backdrop-blur-md border border-[var(--toss-border)] rounded-[3rem] p-10 shadow-2xl min-w-[300px]"
+                      className="absolute z-20 bg-[var(--card)]/70 backdrop-blur-md border border-[var(--border)] rounded-2xl p-5 shadow-sm min-w-[300px]"
                       style={{ left: pos.x, top: pos.y }}
                     >
-                      <div className="flex flex-col items-center gap-10">
+                      <div className="flex flex-col items-center gap-5">
                         <div
                           draggable={isEditMode}
                           onDragStart={(e) => handleDeptDragStart(e, dept.deptName)}
-                          className={`bg-[#1E293B] text-white px-12 py-4 rounded-[20px] text-[14px] font-bold shadow-xl whitespace-nowrap mb-4 ${isEditMode ? 'cursor-move hover:scale-105 active:scale-95 transition-transform' : ''}`}
+                          className={`bg-[#1E293B] text-white px-12 py-4 rounded-[var(--radius-xl)] text-[14px] font-bold shadow-sm whitespace-nowrap mb-4 ${isEditMode ? 'cursor-move hover:scale-105 active:scale-95 transition-transform' : ''}`}
                         >
                           {dept.deptName}
                         </div>
@@ -462,9 +462,9 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                           </div>
                         )}
 
-                        <div className="flex gap-10 items-start">
+                        <div className="flex gap-5 items-start">
                           {dept.teams?.map((team: any, tIdx: number) => (
-                            <div key={tIdx} className="flex flex-col gap-6 bg-white/90 p-8 rounded-[2.5rem] border border-dashed border-[var(--toss-border)] min-w-[220px] shadow-sm">
+                            <div key={tIdx} className="flex flex-col gap-4 bg-[var(--card)]/90 p-5 rounded-2xl border border-dashed border-[var(--border)] min-w-[220px] shadow-sm">
                               <p className="text-[12px] font-extrabold text-[var(--toss-gray-3)] text-center tracking-widest uppercase">[{team.teamName}]</p>
                               <div className="flex flex-col gap-4">
                                 {team.members.map((m: any) => (
@@ -492,7 +492,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                 {viewData.map((group: any, gIdx: number) => (
                   <div key={gIdx} className="w-full flex flex-col items-center">
                     {group.companyName && (
-                      <h2 className="text-base md:text-lg font-semibold text-[var(--foreground)] border-b-2 border-[var(--toss-blue)] pb-2 mb-8 md:mb-10 uppercase tracking-tight">
+                      <h2 className="text-base md:text-lg font-semibold text-[var(--foreground)] border-b-2 border-[var(--accent)] pb-2 mb-5 md:mb-10 uppercase tracking-tight">
                         {group.companyName}
                       </h2>
                     )}
@@ -510,8 +510,8 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                               <div key={dIdx} className={`flex flex-col min-w-0 ${dept.deptName === '진료부' ? 'flex-grow-0 min-w-[11rem] max-w-[12rem] items-start' : dept.deptName === '총무부' ? 'flex-grow-0 min-w-0 items-center ml-auto' : 'flex-1 items-center'}`}>
                                 <div className={`flex flex-row items-end gap-2 w-full mb-12 relative z-10 min-h-[88px] ${dept.deptName === '간호부' ? 'justify-start' : 'justify-center'}`}>
                                   <div className="relative shrink-0 self-center">
-                                    <div className="bg-[#1E293B] text-white px-8 py-3 rounded-[12px] text-[11px] font-semibold shadow-xl whitespace-nowrap">{dept.deptName}</div>
-                                    <div className="absolute left-1/2 -bottom-12 w-0.5 h-12 bg-[var(--toss-border)] -translate-x-1/2"></div>
+                                    <div className="bg-[#1E293B] text-white px-5 py-3 rounded-[var(--radius-md)] text-[11px] font-semibold shadow-sm whitespace-nowrap">{dept.deptName}</div>
+                                    <div className="absolute left-1/2 -bottom-12 w-0.5 h-12 bg-[var(--border)] -translate-x-1/2"></div>
                                   </div>
                                   {dept.heads?.length > 0 && (
                                     <div className={`flex gap-1.5 justify-center items-end ${dept.deptName === '간호부' ? 'flex-nowrap shrink-0' : 'flex-wrap'}`}>
@@ -521,11 +521,11 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                                     </div>
                                   )}
                                 </div>
-                                <div className={`flex flex-row gap-6 items-start justify-start w-full pb-2 ${dept.deptName === '총무부' ? 'flex-wrap' : 'overflow-x-auto no-scrollbar'}`}>
+                                <div className={`flex flex-row gap-4 items-start justify-start w-full pb-2 ${dept.deptName === '총무부' ? 'flex-wrap' : 'overflow-x-auto no-scrollbar'}`}>
                                   {dept.teams?.map((team: any, tIdx: number) => (
                                     <div
                                       key={tIdx}
-                                      className={`flex flex-col gap-4 bg-white/40 p-5 rounded-[2.5rem] border border-dashed border-[var(--toss-border)] shrink-0 transition-colors ${isEditMode ? 'hover:border-gray-400 min-h-[100px]' : ''}`}
+                                      className={`flex flex-col gap-4 bg-[var(--card)]/40 p-5 rounded-2xl border border-dashed border-[var(--border)] shrink-0 transition-colors ${isEditMode ? 'hover:border-[var(--border)] min-h-[100px]' : ''}`}
                                       onDragOver={isEditMode ? (e) => e.preventDefault() : undefined}
                                       onDrop={isEditMode ? async (e) => {
                                         e.preventDefault();
@@ -551,12 +551,12 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                             ))}
                           </div>
                         </div>
-                        <div className="md:hidden w-full space-y-8">
+                        <div className="md:hidden w-full space-y-5">
                           {group.director && <StaffCardRow staff={group.director} onClick={() => setSelectedMember(group.director)} onMoveStaff={handleMoveStaff} isEditMode={isEditMode} setDraggedStaff={setDraggedStaff} draggedStaff={draggedStaff} />}
                           {group.departments?.map((dept: any, dIdx: number) => (
                             <div key={dIdx} className="space-y-4">
                               <div className="flex flex-wrap items-center gap-3">
-                                <h3 className="text-xs font-semibold text-[var(--foreground)] border-l-4 border-[var(--toss-blue)] pl-3 py-1 shrink-0">{dept.deptName}</h3>
+                                <h3 className="text-xs font-semibold text-[var(--foreground)] border-l-4 border-[var(--accent)] pl-3 py-1 shrink-0">{dept.deptName}</h3>
                                 {dept.heads?.length > 0 && (
                                   <div className="flex flex-wrap gap-2">
                                     {dept.heads.map((h: any) => (
@@ -580,7 +580,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                         </div>
                       </>
                     ) : (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-6 w-full max-w-7xl">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 w-full max-w-7xl">
                         {group.members?.map((m: any) => (
                           <StaffCardRow key={m.id} staff={m} onClick={() => setSelectedMember(m)} onMoveStaff={handleMoveStaff} isEditMode={isEditMode} setDraggedStaff={setDraggedStaff} draggedStaff={draggedStaff} />
                         ))}
@@ -606,10 +606,10 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                       <div key={dIdx} className={`flex flex-col min-w-0 ${dept.deptName === '진료부' ? 'flex-grow-0 min-w-[11rem] max-w-[12rem] items-start' : dept.deptName === '총무부' ? 'flex-grow-0 min-w-0 items-center ml-auto' : 'flex-1 items-center'}`}>
                         <div className={`flex flex-row items-end gap-2 w-full mb-12 relative z-10 min-h-[88px] ${dept.deptName === '간호부' ? 'justify-start' : 'justify-center'}`}>
                           <div className="relative shrink-0 self-center">
-                            <div className="bg-[#1E293B] text-white px-8 py-3 rounded-[12px] text-[11px] font-semibold shadow-xl whitespace-nowrap">
+                            <div className="bg-[#1E293B] text-white px-5 py-3 rounded-[var(--radius-md)] text-[11px] font-semibold shadow-sm whitespace-nowrap">
                               {dept.deptName}
                             </div>
-                            <div className="absolute left-1/2 -bottom-12 w-0.5 h-12 bg-[var(--toss-border)] -translate-x-1/2"></div>
+                            <div className="absolute left-1/2 -bottom-12 w-0.5 h-12 bg-[var(--border)] -translate-x-1/2"></div>
                           </div>
                           {dept.heads?.length > 0 && (
                             <div className={`flex gap-1.5 justify-center items-end ${dept.deptName === '간호부' ? 'flex-nowrap shrink-0' : 'flex-wrap'}`}>
@@ -620,11 +620,11 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                           )}
                         </div>
 
-                        <div className={`flex flex-row gap-6 items-start justify-start w-full pb-2 ${dept.deptName === '총무부' ? 'flex-wrap' : 'overflow-x-auto no-scrollbar'}`}>
+                        <div className={`flex flex-row gap-4 items-start justify-start w-full pb-2 ${dept.deptName === '총무부' ? 'flex-wrap' : 'overflow-x-auto no-scrollbar'}`}>
                           {dept.teams.map((team: any, tIdx: number) => (
                             <div
                               key={tIdx}
-                              className={`flex flex-col gap-4 bg-white/40 p-5 rounded-[2.5rem] border border-dashed border-[var(--toss-border)] shrink-0 transition-colors ${isEditMode ? 'hover:border-gray-400 min-h-[100px]' : ''}`}
+                              className={`flex flex-col gap-4 bg-[var(--card)]/40 p-5 rounded-2xl border border-dashed border-[var(--border)] shrink-0 transition-colors ${isEditMode ? 'hover:border-[var(--border)] min-h-[100px]' : ''}`}
                               onDragOver={isEditMode ? (e) => e.preventDefault() : undefined}
                               onDrop={isEditMode ? async (e) => {
                                 e.preventDefault();
@@ -652,7 +652,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                 </div>
 
                 {/* 모바일 리스트 뷰 (md 미만) */}
-                <div className="md:hidden w-full space-y-8">
+                <div className="md:hidden w-full space-y-5">
                   {(viewData as any).director && (
                     <div className="flex flex-col items-center">
                       <StaffCardRow staff={(viewData as any).director} onClick={() => setSelectedMember((viewData as any).director)} onMoveStaff={handleMoveStaff} isEditMode={isEditMode} setDraggedStaff={setDraggedStaff} draggedStaff={draggedStaff} />
@@ -661,7 +661,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                   {(viewData as any).departments.map((dept: any, dIdx: number) => (
                     <div key={dIdx} className="space-y-4">
                       <div className="flex flex-wrap items-center gap-3">
-                        <h3 className="text-xs font-semibold text-[var(--foreground)] border-l-4 border-[var(--toss-blue)] pl-3 py-1 shrink-0">{dept.deptName}</h3>
+                        <h3 className="text-xs font-semibold text-[var(--foreground)] border-l-4 border-[var(--accent)] pl-3 py-1 shrink-0">{dept.deptName}</h3>
                         {dept.heads?.length > 0 && (
                           <div className="flex flex-wrap gap-2">
                             {dept.heads.map((h: any) => (
@@ -674,7 +674,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                         {dept.teams.map((t: any, tIdx: number) => (
                           <div
                             key={tIdx}
-                            className={`flex flex-col gap-3 shrink-0 min-w-[140px] rounded-2xl transition-all ${isEditMode ? 'border-2 border-dashed border-transparent hover:border-gray-400 p-2 min-h-[100px]' : ''}`}
+                            className={`flex flex-col gap-3 shrink-0 min-w-[140px] rounded-2xl transition-all ${isEditMode ? 'border-2 border-dashed border-transparent hover:border-[var(--border)] p-2 min-h-[100px]' : ''}`}
                             onDragOver={isEditMode ? (e) => e.preventDefault() : undefined}
                             onDrop={isEditMode ? async (e) => {
                               e.preventDefault();
@@ -711,11 +711,11 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                 {(Array.isArray(viewData) ? viewData : [{ members: (viewData as any).members }]).map((group: any, idx: number) => (
                   <div key={idx} className="mb-12 md:mb-16 last:mb-0">
                     {group.companyName && (
-                      <h3 className="text-sm font-semibold text-[var(--foreground)] border-l-4 border-[var(--foreground)] pl-4 mb-6 md:mb-8 uppercase tracking-tight">
+                      <h3 className="text-sm font-semibold text-[var(--foreground)] border-l-4 border-[var(--foreground)] pl-4 mb-4 md:mb-5 uppercase tracking-tight">
                         {group.companyName}
                       </h3>
                     )}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-6">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
                       {group.members?.map((m: any) => (
                         <StaffCardRow
                           key={m.id}
@@ -738,9 +738,9 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
         {/* 상세 팝업 - 모바일 최적화 */}
         {selectedMember && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[110] flex items-end md:items-center justify-center p-0 md:p-4 animate-in fade-in duration-200" onClick={() => setSelectedMember(null)}>
-            <div className="bg-[var(--toss-card)] w-full max-w-sm rounded-t-[2.5rem] md:rounded-[3rem] p-8 md:p-10 shadow-2xl animate-in slide-in-from-bottom md:zoom-in-95 duration-300" onClick={e => e.stopPropagation()}>
+            <div className="bg-[var(--card)] w-full max-w-sm rounded-t-[2.5rem] md:rounded-2xl p-5 md:p-5 shadow-sm animate-in slide-in-from-bottom md:zoom-in-95 duration-300" onClick={e => e.stopPropagation()}>
               <div className="flex flex-col items-center text-center">
-                <div className="w-24 h-24 md:w-28 md:h-28 bg-[var(--toss-gray-1)] rounded-[16px] md:rounded-[2.5rem] mb-6 flex items-center justify-center text-5xl border-4 border-[var(--toss-card)] shadow-lg overflow-hidden">
+                <div className="w-24 h-24 md:w-28 md:h-28 bg-[var(--muted)] rounded-[var(--radius-lg)] md:rounded-2xl mb-4 flex items-center justify-center text-5xl border-4 border-[var(--card)] shadow-sm overflow-hidden">
                   {(selectedMember.photo_url || selectedMember.avatar_url) ? (
                     <img
                       src={selectedMember.photo_url || selectedMember.avatar_url}
@@ -752,21 +752,21 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                   )}
                 </div>
                 <h4 className="text-xl md:text-2xl font-semibold text-[var(--foreground)] tracking-tight">{selectedMember.name}</h4>
-                <p className="text-[var(--toss-blue)] text-sm font-bold mt-2">{selectedMember.company} · {selectedMember.position}</p>
+                <p className="text-[var(--accent)] text-sm font-bold mt-2">{selectedMember.company} · {selectedMember.position}</p>
 
-                <div className="w-full mt-8 p-6 bg-[var(--toss-gray-1)] rounded-[16px] md:rounded-[16px] border border-[var(--toss-border)] space-y-4">
+                <div className="w-full mt-5 p-4 bg-[var(--muted)] rounded-[var(--radius-lg)] md:rounded-[var(--radius-lg)] border border-[var(--border)] space-y-4">
                   <div className="flex justify-between items-center text-xs">
                     <span className="font-semibold text-[var(--toss-gray-3)]">소속 부서</span>
                     <span className="font-semibold text-[var(--foreground)]">{selectedMember.department || '-'}</span>
                   </div>
                   {(selectedMember.extension || selectedMember.permissions?.extension) && (
-                    <div className="flex justify-between items-center text-xs border-t border-[var(--toss-border)] pt-4">
+                    <div className="flex justify-between items-center text-xs border-t border-[var(--border)] pt-4">
                       <span className="font-semibold text-[var(--toss-gray-3)]">내선번호</span>
                       <span className="font-semibold text-[var(--foreground)]">{selectedMember.extension || selectedMember.permissions?.extension}</span>
                     </div>
                   )}
                 </div>
-                <button onClick={() => setSelectedMember(null)} className="w-full py-4 md:py-5 bg-[#1E293B] text-white rounded-[12px] font-semibold text-xs mt-8 shadow-xl transition-all active:scale-95">닫기</button>
+                <button onClick={() => setSelectedMember(null)} className="w-full py-4 md:py-5 bg-[#1E293B] text-white rounded-[var(--radius-md)] font-semibold text-xs mt-5 shadow-sm transition-all active:scale-95">닫기</button>
               </div>
             </div>
           </div>
@@ -804,15 +804,15 @@ function StaffCardRow({ staff, onClick, isEditMode, setDraggedStaff, draggedStaf
         }
       } : undefined}
       className={`
-        relative flex flex-row items-center gap-3.5 p-2.5 pr-4 bg-[var(--toss-card)] border rounded-[16px] transition-all group min-w-0
-        border-[var(--toss-border)] shadow-sm hover:shadow-lg hover:border-[var(--toss-blue)] hover:-translate-y-0.5
+        relative flex flex-row items-center gap-3.5 p-2.5 pr-4 bg-[var(--card)] border rounded-[var(--radius-lg)] transition-all group min-w-0
+        border-[var(--border)] shadow-sm hover:shadow-sm hover:border-[var(--accent)] hover:-translate-y-0.5
         ${isAdmin ? 'border-l-4 border-l-[var(--toss-danger)]' : ''}
-        ${isEditMode ? 'cursor-grab active:cursor-grabbing hover:bg-zinc-50' : 'cursor-pointer'}
+        ${isEditMode ? 'cursor-grab active:cursor-grabbing hover:bg-[var(--tab-bg)]' : 'cursor-pointer'}
       `}
     >
-      <div className={`w-[42px] h-[42px] shrink-0 rounded-[12px] flex items-center justify-center text-base overflow-hidden ${isAdmin ? 'bg-red-50 text-red-400' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] group-hover:bg-[var(--toss-blue-light)] group-hover:text-[var(--toss-blue)]'}`}>
+      <div className={`w-[42px] h-[42px] shrink-0 rounded-[var(--radius-md)] flex items-center justify-center text-base overflow-hidden ${isAdmin ? 'bg-red-50 text-red-400' : 'bg-[var(--muted)] text-[var(--toss-gray-3)] group-hover:bg-[var(--toss-blue-light)] group-hover:text-[var(--accent)]'}`}>
         {photoUrl ? (
-          <img src={photoUrl} alt={staff.name ?? ''} className="w-full h-full object-cover rounded-[12px]" />
+          <img src={photoUrl} alt={staff.name ?? ''} className="w-full h-full object-cover rounded-[var(--radius-md)]" />
         ) : (
           <span className="text-sm">印</span>
         )}
@@ -826,14 +826,14 @@ function StaffCardRow({ staff, onClick, isEditMode, setDraggedStaff, draggedStaf
           <button
             title="위로 이동"
             onClick={(e) => { e.stopPropagation(); onMoveStaff?.(staff, 'up'); }}
-            className="w-6 h-6 flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 rounded-md hover:bg-[var(--toss-blue)] hover:text-white transition-colors text-[10px]"
+            className="w-6 h-6 flex items-center justify-center bg-[var(--tab-bg)] dark:bg-zinc-800 rounded-md hover:bg-[var(--accent)] hover:text-white transition-colors text-[10px]"
           >
             ▲
           </button>
           <button
             title="아래로 이동"
             onClick={(e) => { e.stopPropagation(); onMoveStaff?.(staff, 'down'); }}
-            className="w-6 h-6 flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 rounded-md hover:bg-[var(--toss-blue)] hover:text-white transition-colors text-[10px]"
+            className="w-6 h-6 flex items-center justify-center bg-[var(--tab-bg)] dark:bg-zinc-800 rounded-md hover:bg-[var(--accent)] hover:text-white transition-colors text-[10px]"
           >
             ▼
           </button>

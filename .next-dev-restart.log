@@ -1,0 +1,37 @@
+
+> newmso@0.1.0 dev
+> next dev
+
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.0.193:3000
+- Environments: .env.local
+
+✓ Starting...
+✓ Ready in 2.2s
+ GET /main 200 in 3.2s (compile: 2.6s, proxy.ts: 85ms, render: 509ms)
+ GET /main 200 in 94ms (compile: 12ms, proxy.ts: 17ms, render: 65ms)
+ GET /api/auth/session 200 in 128ms (compile: 3ms, render: 125ms)
+ GET /api/auth/session 200 in 221ms (compile: 67ms, render: 155ms)
+ POST /api/notifications/push-subscription 200 in 222ms (compile: 30ms, render: 193ms)
+ POST /api/notifications/push-subscription 200 in 239ms (compile: 47ms, render: 192ms)
+ POST /api/notifications/push-subscription 200 in 250ms (compile: 50ms, render: 199ms)
+ POST /api/notifications/push-subscription 200 in 256ms (compile: 36ms, render: 220ms)
+✓ Compiled in 1183ms
+ GET / 200 in 73ms (compile: 37ms, render: 36ms)
+ GET / 200 in 22ms (compile: 3ms, render: 19ms)
+ GET /main?open_menu=%EC%B6%94%EA%B0%80%EA%B8%B0%EB%8A%A5 200 in 202ms (compile: 38ms, proxy.ts: 4ms, render: 160ms)
+⚠ Cross origin request detected from 127.0.0.1 to /_next/* resource. In a future major version of Next.js, you will need to explicitly configure "allowedDevOrigins" in next.config to allow this.
+Read more: https://nextjs.org/docs/app/api-reference/config/next-config-js/allowedDevOrigins
+ GET /main 200 in 25ms (compile: 3ms, proxy.ts: 11ms, render: 11ms)
+ GET /api/auth/session 200 in 709ms (compile: 3ms, render: 705ms)
+ GET /main?open_menu=%EC%B6%94%EA%B0%80%EA%B8%B0%EB%8A%A5 200 in 27ms (compile: 3ms, proxy.ts: 3ms, render: 21ms)
+ GET /main 200 in 23ms (compile: 3ms, proxy.ts: 10ms, render: 10ms)
+ GET /api/auth/session 200 in 178ms (compile: 3ms, render: 175ms)
+ GET / 200 in 24ms (compile: 4ms, render: 20ms)
+ GET /api/auth/session 200 in 170ms (compile: 3ms, render: 167ms)
+ GET /main 200 in 16ms (compile: 3ms, proxy.ts: 3ms, render: 10ms)
+ GET /api/auth/session 200 in 81ms (compile: 2ms, render: 79ms)
+ GET /api/auth/session 200 in 148ms (compile: 2ms, render: 146ms)
+ POST /api/notifications/push-subscription 200 in 179ms (compile: 2ms, render: 177ms)
+ POST /api/notifications/push-subscription 200 in 220ms (compile: 2ms, render: 218ms)

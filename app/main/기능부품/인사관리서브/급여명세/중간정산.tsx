@@ -97,10 +97,15 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
         severance_pay: calc.severance,
       };
 
-      await supabase.from('payroll_records').upsert(record, { onConflict: 'staff_id,year_month' });
+      const { error: payrollSaveError } = await supabase.from('payroll_records').upsert(record, { onConflict: 'staff_id,year_month' });
+      if (payrollSaveError) throw payrollSaveError;
 
       const u = typeof window !== 'undefined' ? (() => { try { return JSON.parse(localStorage.getItem('erp_user') || '{}'); } catch { return {}; } })() : {};
-      await logAudit('중간정산확정', 'payroll', yearMonth, { staff: selectedStaff.name, total: calc.total, severance: calc.severance }, u.id, u.name);
+      try {
+        await logAudit('중간정산확정', 'payroll', yearMonth, { staff: selectedStaff.name, total: calc.total, severance: calc.severance }, u.id, u.name);
+      } catch (auditError) {
+        console.error('interim payroll audit log failed:', auditError);
+      }
 
       alert('중간정산이 저장되었습니다.');
       setSelectedStaff(null);
@@ -114,20 +119,20 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
   };
 
   return (
-    <div className="bg-[var(--toss-card)] p-6 md:p-8 rounded-[12px] border border-[var(--toss-border)] shadow-sm animate-in fade-in duration-300" data-testid="interim-settlement-view">
-      <div className="mb-6 pb-4 border-b border-[var(--toss-border)]">
+    <div className="bg-[var(--card)] p-4 rounded-[var(--radius-md)] border border-[var(--border)] shadow-sm animate-in fade-in duration-300" data-testid="interim-settlement-view">
+      <div className="mb-4 pb-3 border-b border-[var(--border)]">
         <h2 className="text-lg font-bold text-[var(--foreground)]">중간정산</h2>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-4">
           <div className="flex items-center gap-3">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={filterRetirees}
                 onChange={(e) => setFilterRetirees(e.target.checked)}
-                className="w-4 h-4 rounded border-[var(--toss-border)] text-[var(--toss-blue)]"
+                className="w-4 h-4 rounded border-[var(--border)] text-[var(--accent)]"
               />
               <span className="text-xs font-medium text-[var(--toss-gray-4)]">퇴직자만 보기</span>
             </label>
@@ -139,7 +144,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
               data-testid="interim-settlement-staff-select"
               value={selectedStaff?.id ?? ''}
               onChange={(e) => setSelectedStaff(candidates.find((s: any) => String(s.id) === e.target.value) || null)}
-              className="w-full h-10 px-3 bg-[var(--input-bg)] border border-[var(--toss-border)] rounded-md text-sm font-medium focus:ring-2 focus:ring-[var(--toss-blue)] focus:border-[var(--toss-blue)]"
+              className="w-full h-10 px-3 bg-[var(--input-bg)] border border-[var(--border)] rounded-md text-sm font-medium focus:ring-2 focus:ring-[var(--accent)] focus:border-[var(--accent)]"
             >
               <option value="">직원을 선택하세요</option>
               {candidates.map((s: any) => (
@@ -156,11 +161,11 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="text-xs font-medium text-[var(--toss-gray-4)]">정산 기준일</label>
-              <SmartDatePicker value={settlementDate} onChange={val => setSettlementDate(val)} className="w-full h-10 px-3 bg-[var(--input-bg)] border border-[var(--toss-border)] rounded-md text-sm font-medium" />
+              <SmartDatePicker value={settlementDate} onChange={val => setSettlementDate(val)} className="w-full h-10 px-3 bg-[var(--input-bg)] border border-[var(--border)] rounded-md text-sm font-medium" />
             </div>
             <div className="space-y-1">
               <label className="text-xs font-medium text-[var(--toss-gray-4)]">정산 사유</label>
-              <select data-testid="interim-settlement-reason-select" value={reason} onChange={(e) => setReason(e.target.value)} className="w-full h-10 px-3 bg-[var(--input-bg)] border border-[var(--toss-border)] rounded-md text-sm font-medium focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+              <select data-testid="interim-settlement-reason-select" value={reason} onChange={(e) => setReason(e.target.value)} className="w-full h-10 px-3 bg-[var(--input-bg)] border border-[var(--border)] rounded-md text-sm font-medium focus:ring-2 focus:ring-[var(--accent)]/30"
               >
                 <option value="퇴사">중도 퇴사</option>
                 <option value="휴직">휴직 시작</option>
@@ -176,7 +181,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
                   type="checkbox"
                   checked={includeSeverance}
                   onChange={(e) => setIncludeSeverance(e.target.checked)}
-                  className="w-4 h-4 rounded border-[var(--toss-border)] text-[var(--toss-blue)]"
+                  className="w-4 h-4 rounded border-[var(--border)] text-[var(--accent)]"
                 />
                 <span className="text-xs font-medium text-[var(--toss-gray-4)]">퇴직금 포함</span>
               </label>
@@ -184,20 +189,20 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
           )}
         </div>
 
-        <div className="bg-[var(--tab-bg)] p-6 rounded-[12px] border border-[var(--toss-border)] flex flex-col justify-center">
+        <div className="bg-[var(--tab-bg)] p-4 rounded-[var(--radius-md)] border border-[var(--border)] flex flex-col justify-center">
           {result ? (
             <div className="space-y-4">
               <div className="flex justify-between items-end">
                 <div>
                   <p className="text-xs font-medium text-[var(--toss-gray-3)] mb-1">정산 총액 (세전)</p>
-                  <p className="text-2xl font-bold text-[var(--toss-blue)]">{result.total.toLocaleString()}원</p>
+                  <p className="text-xl font-bold text-[var(--accent)]">{result.total.toLocaleString()}원</p>
                 </div>
                 <div className="text-right">
                   <p className="text-xs font-medium text-[var(--toss-gray-3)] mb-1">근무 일수</p>
                   <p className="text-sm font-semibold text-[var(--foreground)]">{result.workedDays} / {result.lastDay}일</p>
                 </div>
               </div>
-              <div className="space-y-1.5 pt-3 border-t border-[var(--toss-border)]">
+              <div className="space-y-1.5 pt-3 border-t border-[var(--border)]">
                 <div className="flex justify-between text-xs font-medium text-[var(--toss-gray-4)]">
                   <span>기본급 (일할)</span>
                   <span>{result.proRatedBase.toLocaleString()}원</span>
@@ -213,12 +218,12 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
                   </div>
                 )}
               </div>
-              <button data-testid="interim-settlement-save-button" onClick={handleConfirm} disabled={loading} className="w-full py-3 bg-[var(--toss-blue)] text-white text-sm font-semibold rounded-[12px] hover:opacity-90 disabled:opacity-50">
+              <button data-testid="interim-settlement-save-button" onClick={handleConfirm} disabled={loading} className="w-full py-3 bg-[var(--accent)] text-white text-sm font-semibold rounded-[var(--radius-md)] hover:opacity-90 disabled:opacity-50">
                 {loading ? '저장 중...' : '저장하기'}
               </button>
             </div>
           ) : (
-            <div className="text-center py-8">
+            <div className="text-center py-5">
               <p className="text-xs font-medium text-[var(--toss-gray-3)]">정산 대상을 선택하면 실시간 계산 결과가 표시됩니다.</p>
             </div>
           )}

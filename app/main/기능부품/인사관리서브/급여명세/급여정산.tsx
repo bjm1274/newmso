@@ -5,6 +5,7 @@ import { calculateAttendanceDeduction } from '@/lib/attendance-deduction';
 import { logAudit } from '@/lib/audit';
 import { fetchTaxFreeSettings, DEFAULT_SETTINGS, type TaxFreeSettings } from '@/lib/use-tax-free-settings';
 import {
+  calculateMonthlyIncomeTax,
   fetchTaxInsuranceRates,
   DEFAULT_TAX_INSURANCE_RATES,
   hasExactIncomeTaxBracket,
@@ -71,23 +72,32 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
     setLoading(true);
     try {
       const staffIds = selectedStaffs.map((s: any) => s.id);
-      const [startDate, endDate] = [`${yearMonth}-01`, `${yearMonth}-31`];
+      const [year, month] = yearMonth.split('-').map((value) => Number(value));
+      const lastDay = new Date(year, month, 0).getDate();
+      const [startDate, endDate] = [`${yearMonth}-01`, `${yearMonth}-${String(lastDay).padStart(2, '0')}`];
 
-      const { data: attendances } = await supabase
+      const { data: attendances, error: attendanceError } = await supabase
         .from('attendances')
         .select('*')
         .in('staff_id', staffIds)
         .gte('work_date', startDate)
         .lte('work_date', endDate);
+      if (attendanceError) throw attendanceError;
 
       const ruleCompany = selectedCo === '전체' ? '전체' : selectedCo;
-      const { data: rule } = await supabase
+      const { data: rule, error: ruleError } = await supabase
         .from('attendance_deduction_rules')
         .select('*')
         .eq('company_name', ruleCompany)
-        .single();
-      const fallback = await supabase.from('attendance_deduction_rules').select('*').eq('company_name', '전체').single();
-      const r = rule || fallback.data;
+        .maybeSingle();
+      if (ruleError) throw ruleError;
+      const { data: fallbackRule, error: fallbackRuleError } = await supabase
+        .from('attendance_deduction_rules')
+        .select('*')
+        .eq('company_name', '전체')
+        .maybeSingle();
+      if (fallbackRuleError) throw fallbackRuleError;
+      const r = rule || fallbackRule;
 
       const initialData: any = {};
       selectedStaffs.forEach((s: any) => {
@@ -114,6 +124,14 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
           attendance_deduction: total,
           attendance_deduction_detail: { ...detail, original_deduction: total },
           custom_deduction: 0,
+          dependent_count:
+            Number(
+              s.dependent_count ??
+              s.permissions?.payroll?.dependent_count ??
+              s.permissions?.tax?.dependent_count ??
+              s.permissions?.dependents ??
+              0
+            ) || 0,
           advance_pay: 0,
         };
       });
@@ -190,8 +208,10 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
       const full_employment = Math.floor(total_taxable * taxInsuranceRates.employment_insurance_rate);
       employment_insurance = isDuruNuriActive ? Math.floor(full_employment * 0.2) : full_employment;
     }
+    const dependentCount = Math.max(0, Number(data.dependent_count) || 0);
+    const dependentTaxCredit = dependentCount * 12500;
     if (data.apply_tax) {
-      income_tax = Math.floor(total_taxable * 0.03);  // 소득세 간이세액표 근사
+      income_tax = Math.max(0, calculateMonthlyIncomeTax(total_taxable, taxInsuranceRates) - dependentTaxCredit);
       local_tax = Math.floor(income_tax * 0.1 / 10) * 10; // 지방소득세 10%, 10원 단위 절사 (국고금관리법 제47조)
     }
     const custom_deduction = Number(data.custom_deduction) || 0;
@@ -204,6 +224,8 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
       income_tax,
       local_tax,
       custom_deduction,
+      dependent_count: dependentCount,
+      dependent_tax_credit: dependentTaxCredit,
       is_duru_nuri: isDuruNuriActive,
       is_medical_benefit: isMedicalBenefit,
       tax_estimated: data.apply_tax && !hasExactIncomeTaxBracket(taxInsuranceRates),
@@ -253,6 +275,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
           extra_allowance: data.extra_allowance,
           overtime_pay: data.overtime_pay,
           bonus: data.bonus,
+          gross_pay: isAdvanceOnly ? advancePay : calc!.total,
           total_taxable: isAdvanceOnly ? 0 : calc!.taxable,
           total_taxfree: isAdvanceOnly ? 0 : calc!.taxfree,
           total_deduction: isAdvanceOnly ? 0 : calc!.deduction,
@@ -261,46 +284,53 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
           attendance_deduction: data.attendance_deduction || 0,
           attendance_deduction_detail: data.attendance_deduction_detail || {},
           advance_pay: advancePay,
+          record_type: 'regular',
           status: '확정'
         };
       });
 
-      await supabase.from('payroll_records').upsert(records, { onConflict: 'staff_id,year_month' });
+      const { error: payrollSaveError } = await supabase.from('payroll_records').upsert(records, { onConflict: 'staff_id,year_month' });
+      if (payrollSaveError) throw payrollSaveError;
       const u = typeof window !== 'undefined' ? (() => { try { return JSON.parse(localStorage.getItem('erp_user') || '{}'); } catch { return {}; } })() : {};
-      await logAudit(
-        '급여수정',
-        'payroll',
-        yearMonth,
-        {
-          count: records.length,
-          total: records.reduce((sum: number, record: any) => sum + (Number(record.net_pay) || 0), 0),
-          year_month: yearMonth,
-          records: records.map((record: any) => {
-            const staff = selectedStaffs.find((candidate: any) => candidate.id === record.staff_id);
-            return {
-              staff_id: record.staff_id,
-              staff_name: staff?.name || '-',
-              employee_no: staff?.employee_no || null,
-              company: staff?.company || '',
-              department: staff?.department || '',
-              base_salary: record.base_salary,
-              total_taxable: record.total_taxable,
-              total_taxfree: record.total_taxfree,
-              total_deduction: record.total_deduction,
-              attendance_deduction: record.attendance_deduction,
-              advance_pay: record.advance_pay,
-              net_pay: record.net_pay,
-            };
-          }),
-        },
-        u.id,
-        u.name
-      );
+      try {
+        await logAudit(
+          '급여수정',
+          'payroll',
+          yearMonth,
+          {
+            count: records.length,
+            total: records.reduce((sum: number, record: any) => sum + (Number(record.net_pay) || 0), 0),
+            year_month: yearMonth,
+            records: records.map((record: any) => {
+              const staff = selectedStaffs.find((candidate: any) => candidate.id === record.staff_id);
+              return {
+                staff_id: record.staff_id,
+                staff_name: staff?.name || '-',
+                employee_no: staff?.employee_no || null,
+                company: staff?.company || '',
+                department: staff?.department || '',
+                base_salary: record.base_salary,
+                total_taxable: record.total_taxable,
+                total_taxfree: record.total_taxfree,
+                total_deduction: record.total_deduction,
+                attendance_deduction: record.attendance_deduction,
+                advance_pay: record.advance_pay,
+                net_pay: record.net_pay,
+              };
+            }),
+          },
+          u.id,
+          u.name
+        );
+      } catch (auditError) {
+        console.error('payroll audit log failed:', auditError);
+      }
 
       alert("급여 정산 및 명세서 생성이 완료되었습니다. 법적 비과세 한도가 자동 적용되었습니다.");
       setStep(3);
       if (onRefresh) onRefresh();
     } catch (err) {
+      console.error('payroll finalize failed:', err);
       alert("정산 처리 중 오류가 발생했습니다.");
     } finally {
       setLoading(false);
@@ -308,30 +338,30 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
   };
 
   return (
-    <div className="bg-[var(--toss-card)] rounded-[12px] border border-[var(--toss-border)] shadow-sm overflow-hidden animate-in fade-in duration-300" data-testid="salary-settlement-view">
-      <div className="bg-[var(--page-bg)] border-b border-[var(--toss-border)] px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)] shadow-sm overflow-hidden animate-in fade-in duration-300" data-testid="salary-settlement-view">
+      <div className="bg-[var(--page-bg)] border-b border-[var(--border)] px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)]">급여 정산</h2>
           <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">법적 비과세 한도 자동 반영</p>
         </div>
-        <div className="flex border border-[var(--toss-border)] rounded-[12px] p-0.5 bg-[var(--toss-card)]">
+        <div className="flex border border-[var(--border)] rounded-[var(--radius-md)] p-0.5 bg-[var(--card)]">
           {[
             { step: 1, label: '대상 선택' },
             { step: 2, label: '수당·공제' },
             { step: 3, label: '완료' },
           ].map(({ step: s, label }) => (
-            <div key={s} className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${step === s ? 'bg-[var(--toss-blue)] text-white' : step > s ? 'text-[var(--toss-blue)]' : 'text-[var(--toss-gray-3)]'}`}>
+            <div key={s} className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${step === s ? 'bg-[var(--accent)] text-white' : step > s ? 'text-[var(--accent)]' : 'text-[var(--toss-gray-3)]'}`}>
               {s}. {label}
             </div>
           ))}
         </div>
       </div>
 
-      <div className="p-6">
+      <div className="p-4">
         {step === 1 && (
           <div className="space-y-5">
             {!hasExactIncomeTaxBracket(taxInsuranceRates) && (
-              <div data-testid="salary-settlement-missing-tax-warning" className="rounded-[12px] border border-amber-200 bg-amber-50 px-4 py-3">
+              <div data-testid="salary-settlement-missing-tax-warning" className="rounded-[var(--radius-md)] border border-amber-200 bg-amber-50 px-4 py-3">
                 <p className="text-sm font-bold text-amber-800">주의: 근로소득세 간이세액표가 설정되지 않았습니다.</p>
                 <p className="mt-1 text-xs font-medium text-amber-700">
                   보험요율은 반영되지만, 소득세는 운영 확정에 사용할 수 없습니다. 정확한 세액표를 먼저 입력해야 합니다.
@@ -341,10 +371,10 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <label className="text-sm text-[var(--toss-gray-4)]">정산 월</label>
-                <input data-testid="salary-settlement-month-input" type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="h-9 px-3 border border-[var(--toss-border)] rounded-md text-sm font-medium" />
+                <input data-testid="salary-settlement-month-input" type="month" value={yearMonth} onChange={e => setYearMonth(e.target.value)} className="h-9 px-3 border border-[var(--border)] rounded-md text-sm font-medium" />
               </div>
               <p className="text-sm text-[var(--toss-gray-3)]">정산 대상을 선택하세요. (근태 자동 반영)</p>
-              <button data-testid="salary-settlement-select-all" onClick={() => setSelectedStaffs(filteredStaffs)} className="text-sm font-medium text-[var(--toss-blue)] hover:underline">전체 선택</button>
+              <button data-testid="salary-settlement-select-all" onClick={() => setSelectedStaffs(filteredStaffs)} className="text-sm font-medium text-[var(--accent)] hover:underline">전체 선택</button>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[380px] overflow-y-auto custom-scrollbar">
               {filteredStaffs.map((s: any) => (
@@ -352,10 +382,10 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
                   key={s.id}
                   data-testid={`salary-settlement-staff-${s.id}`}
                   onClick={() => toggleStaff(s)}
-                  className={`p-4 rounded-[12px] border cursor-pointer transition-colors flex items-center gap-3 ${selectedStaffs.find(ts => ts.id === s.id) ? 'border-[var(--toss-blue)] bg-[var(--toss-blue-light)]/70 ring-1 ring-[var(--toss-blue)]/30' : 'border-[var(--toss-border)] bg-[var(--toss-card)] hover:bg-[var(--toss-gray-1)]'
+                  className={`p-4 rounded-[var(--radius-md)] border cursor-pointer transition-colors flex items-center gap-3 ${selectedStaffs.find(ts => ts.id === s.id) ? 'border-[var(--accent)] bg-[var(--toss-blue-light)]/70 ring-1 ring-[var(--accent)]/30' : 'border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]'
                     }`}
                 >
-                  <div className="w-10 h-10 rounded-[12px] bg-[var(--tab-bg)] flex items-center justify-center text-sm font-semibold text-[var(--toss-blue)]">{s.name[0]}</div>
+                  <div className="w-10 h-10 rounded-[var(--radius-md)] bg-[var(--tab-bg)] flex items-center justify-center text-sm font-semibold text-[var(--accent)]">{s.name[0]}</div>
                   <div>
                     <p className="text-sm font-medium text-[var(--foreground)]">{s.name}</p>
                     <p className="text-xs text-[var(--toss-gray-3)]">기본급 ₩{(s.base_salary || 0).toLocaleString()}</p>
@@ -363,31 +393,31 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
                 </div>
               ))}
             </div>
-            <button data-testid="salary-settlement-next-button" onClick={handleNextStep} disabled={loading} className="w-full py-3.5 bg-[var(--toss-blue)] text-white text-sm font-semibold rounded-[12px] hover:opacity-90 transition-colors disabled:opacity-50">{loading ? '로딩 중...' : '다음: 수당 설정 및 정산'}</button>
+            <button data-testid="salary-settlement-next-button" onClick={handleNextStep} disabled={loading} className="w-full py-3.5 bg-[var(--accent)] text-white text-sm font-semibold rounded-[var(--radius-md)] hover:opacity-90 transition-colors disabled:opacity-50">{loading ? '로딩 중...' : '다음: 수당 설정 및 정산'}</button>
           </div>
         )}
 
         {step === 2 && (
-          <div className="space-y-8">
+          <div className="space-y-5">
             {!hasExactIncomeTaxBracket(taxInsuranceRates) && (
-              <div data-testid="salary-settlement-finalize-block-warning" className="rounded-[12px] border border-red-200 bg-red-50 px-4 py-3">
+              <div data-testid="salary-settlement-finalize-block-warning" className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-4 py-3">
                 <p className="text-sm font-bold text-red-700">급여 확정 차단: 정확한 근로소득세표가 없습니다.</p>
                 <p className="mt-1 text-xs font-medium text-red-600">
                   보험요율은 적용되지만, 소득세는 아직 근사 계산입니다. 세액표가 설정되기 전에는 저장을 막습니다.
                 </p>
               </div>
             )}
-            <div className="max-h-[500px] overflow-y-auto space-y-6 p-2 custom-scrollbar">
+            <div className="max-h-[500px] overflow-y-auto space-y-4 p-2 custom-scrollbar">
               {selectedStaffs.map((s: any) => {
                 const data = settlementData[s.id];
                 const advancePay = Number(data?.advance_pay) || 0;
                 const isAdvanceOnly = advancePay > 0;
                 const res = isAdvanceOnly ? { net: advancePay, taxable: 0, taxfree: 0 } : calculateSalary(s.id);
                 return (
-                  <div key={s.id} data-testid={`salary-settlement-card-${s.id}`} className="p-4 bg-white border border-[var(--toss-border)] rounded-[16px] shadow-sm space-y-4 hover:border-[var(--toss-blue)] transition-all">
-                    <div className="flex justify-between items-center border-b border-[var(--toss-gray-1)] pb-3">
+                  <div key={s.id} data-testid={`salary-settlement-card-${s.id}`} className="p-4 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] shadow-sm space-y-4 hover:border-[var(--accent)] transition-all">
+                    <div className="flex justify-between items-center border-b border-[var(--muted)] pb-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-[var(--toss-blue-light)] flex items-center justify-center text-xs font-bold text-[var(--toss-blue)]">{s.name[0]}</div>
+                        <div className="w-9 h-9 rounded-full bg-[var(--toss-blue-light)] flex items-center justify-center text-xs font-bold text-[var(--accent)]">{s.name[0]}</div>
                         <div>
                           <p className="text-sm font-bold text-[var(--foreground)] leading-none">{s.name}</p>
                           <p className="text-[10px] text-[var(--toss-gray-3)] mt-1">{s.company} · {s.department}</p>
@@ -396,43 +426,66 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
                       </div>
                       <div className="text-right">
                         <p className="text-[10px] text-[var(--toss-gray-3)] font-bold">합계 예상 실지급액</p>
-                        <p className="text-lg font-black text-[var(--toss-blue)]">₩ {res.net.toLocaleString()}</p>
+                        <p className="text-lg font-black text-[var(--accent)]">₩ {res.net.toLocaleString()}</p>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4">
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-[var(--toss-gray-4)] ml-1">과세·기본급</label>
-                        <input type="text" value={Number(data.base_salary).toLocaleString()} readOnly className="w-full h-8 px-3 bg-[var(--toss-gray-1)] border-none rounded-lg text-xs font-bold text-[var(--toss-gray-4)]" />
+                        <input type="text" value={Number(data.base_salary).toLocaleString()} readOnly className="w-full h-8 px-3 bg-[var(--muted)] border-none rounded-lg text-xs font-bold text-[var(--toss-gray-4)]" />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-[var(--toss-blue)] ml-1">수당 합계(고정포함)</label>
-                        <input type="text" value={Number(data.extra_allowance).toLocaleString()} onChange={(e) => updateData(s.id, 'extra_allowance', parseInt(e.target.value.replace(/,/g, '')) || 0)} className="w-full h-8 px-3 border border-[var(--toss-border)] rounded-lg text-xs font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20 outline-none" />
+                        <label className="text-[10px] font-bold text-[var(--accent)] ml-1">수당 합계(고정포함)</label>
+                        <input type="text" value={Number(data.extra_allowance).toLocaleString()} onChange={(e) => updateData(s.id, 'extra_allowance', parseInt(e.target.value.replace(/,/g, '')) || 0)} className="w-full h-8 px-3 border border-[var(--border)] rounded-lg text-xs font-bold focus:ring-2 focus:ring-[var(--accent)]/20 outline-none" />
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-[var(--toss-gray-4)] ml-1">야간/당직 (비과세)</label>
-                        <input type="text" value={Number(data.night_duty_allowance).toLocaleString()} onChange={(e) => updateData(s.id, 'night_duty_allowance', parseInt(e.target.value.replace(/,/g, '')) || 0)} className="w-full h-8 px-3 border border-[var(--toss-border)] rounded-lg text-xs font-bold outline-none" />
+                        <input type="text" value={Number(data.night_duty_allowance).toLocaleString()} onChange={(e) => updateData(s.id, 'night_duty_allowance', parseInt(e.target.value.replace(/,/g, '')) || 0)} className="w-full h-8 px-3 border border-[var(--border)] rounded-lg text-xs font-bold outline-none" />
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-[var(--toss-gray-4)] ml-1">연장/상여</label>
-                        <input type="text" value={(Number(data.overtime_pay) + Number(data.bonus)).toLocaleString()} onChange={(e) => updateData(s.id, 'overtime_pay', parseInt(e.target.value.replace(/,/g, '')) || 0)} className="w-full h-8 px-3 border border-[var(--toss-border)] rounded-lg text-xs font-bold outline-none" />
+                        <input type="text" value={(Number(data.overtime_pay) + Number(data.bonus)).toLocaleString()} onChange={(e) => updateData(s.id, 'overtime_pay', parseInt(e.target.value.replace(/,/g, '')) || 0)} className="w-full h-8 px-3 border border-[var(--border)] rounded-lg text-xs font-bold outline-none" />
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-orange-600 ml-1">근태/기타차감</label>
-                        <input type="text" value={(Number(data.attendance_deduction) + Number(data.custom_deduction)).toLocaleString()} onChange={(e) => updateData(s.id, 'custom_deduction', parseInt(e.target.value.replace(/,/g, '')) || 0)} className="w-full h-8 px-3 border border-orange-200 bg-orange-50/30 rounded-lg text-xs font-bold text-orange-700 outline-none" />
+                        <input type="text" value={Number(data.attendance_deduction).toLocaleString()} readOnly className="w-full h-8 px-3 border border-orange-200 bg-orange-50/30 rounded-lg text-xs font-bold text-orange-700 outline-none" />
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-amber-600 ml-1">선지급(차감)</label>
                         <input type="text" value={Number(data.advance_pay).toLocaleString()} onChange={(e) => updateData(s.id, 'advance_pay', parseInt(e.target.value.replace(/,/g, '')) || 0)} className="w-full h-8 px-3 border border-amber-200 bg-amber-50/30 rounded-lg text-xs font-bold text-amber-700 outline-none" />
                       </div>
-                      <div className="col-span-2 flex items-center justify-between bg-[var(--toss-gray-1)] px-4 py-2 rounded-xl mt-1">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-emerald-700 ml-1">부양가족/인적공제</label>
+                        <input
+                          data-testid={`salary-settlement-dependent-count-${s.id}`}
+                          type="number"
+                          min={0}
+                          max={10}
+                          value={Number(data.dependent_count) || 0}
+                          onChange={(e) => updateData(s.id, 'dependent_count', Math.max(0, parseInt(e.target.value, 10) || 0))}
+                          className="w-full h-8 px-3 border border-emerald-200 bg-emerald-50/30 rounded-lg text-xs font-bold text-emerald-700 outline-none"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-orange-600 ml-1">기타 추가차감</label>
+                        <input
+                          data-testid={`salary-settlement-custom-deduction-${s.id}`}
+                          type="text"
+                          value={Number(data.custom_deduction).toLocaleString()}
+                          onChange={(e) => updateData(s.id, 'custom_deduction', parseInt(e.target.value.replace(/,/g, '')) || 0)}
+                          className="w-full h-8 px-3 border border-orange-200 bg-orange-50/30 rounded-lg text-xs font-bold text-orange-700 outline-none"
+                        />
+                      </div>
+                      <div className="col-span-2 flex items-center justify-between bg-[var(--muted)] px-4 py-2 rounded-xl mt-1">
                         <div className="flex gap-4">
                           <span className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase">과세: ₩{res.taxable.toLocaleString()}</span>
                           <span className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase">비과세: ₩{res.taxfree.toLocaleString()}</span>
+                          <span className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase">자동 근태차감: ₩{Number(data.attendance_deduction || 0).toLocaleString()}</span>
                         </div>
                         <div className="flex gap-2">
                           {data.attendance_deduction > 0 && (
-                            <button onClick={() => updateData(s.id, 'attendance_deduction', 0)} className="text-[9px] font-bold text-emerald-600 bg-white px-2 py-0.5 rounded shadow-sm border border-emerald-100">근태차감 면제</button>
+                            <button onClick={() => updateData(s.id, 'attendance_deduction', 0)} className="text-[9px] font-bold text-emerald-600 bg-[var(--card)] px-2 py-0.5 rounded shadow-sm border border-emerald-100">근태차감 면제</button>
                           )}
                         </div>
                       </div>
@@ -442,8 +495,8 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
               })}
             </div>
             <div className="flex gap-3 pt-2">
-              <button data-testid="salary-settlement-back-button" onClick={() => setStep(1)} className="flex-1 py-3 bg-[var(--toss-card)] border border-[var(--toss-border)] text-[var(--toss-gray-4)] text-sm font-medium rounded-[12px] hover:bg-[var(--toss-gray-1)]">이전</button>
-              <button data-testid="salary-settlement-finalize-button" onClick={handleFinalize} disabled={loading || !hasExactIncomeTaxBracket(taxInsuranceRates)} className="flex-[2] py-3 bg-[var(--toss-blue)] text-white text-sm font-semibold rounded-[12px] hover:opacity-90 disabled:opacity-50">
+              <button data-testid="salary-settlement-back-button" onClick={() => setStep(1)} className="flex-1 py-3 bg-[var(--card)] border border-[var(--border)] text-[var(--toss-gray-4)] text-sm font-medium rounded-[var(--radius-md)] hover:bg-[var(--muted)]">이전</button>
+              <button data-testid="salary-settlement-finalize-button" onClick={handleFinalize} disabled={loading || !hasExactIncomeTaxBracket(taxInsuranceRates)} className="flex-[2] py-3 bg-[var(--accent)] text-white text-sm font-semibold rounded-[var(--radius-md)] hover:opacity-90 disabled:opacity-50">
                 {loading ? '처리 중...' : '저장하기 · 정산 확정'}
               </button>
             </div>
@@ -451,11 +504,11 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
         )}
 
         {step === 3 && (
-          <div className="py-16 text-center space-y-5 animate-in fade-in duration-300">
+          <div data-testid="salary-settlement-complete-step" className="py-10 text-center space-y-5 animate-in fade-in duration-300">
             <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-3xl mx-auto">✓</div>
             <h3 className="text-xl font-bold text-[var(--foreground)]">정산이 완료되었습니다</h3>
             <p className="text-sm text-[var(--toss-gray-3)]">명세서가 생성되었습니다. 대장에서 확인하세요.</p>
-            <button onClick={() => setStep(1)} className="px-6 py-2.5 bg-[var(--toss-blue)] text-white text-sm font-medium rounded-[12px] hover:opacity-90">다시 정산하기</button>
+            <button onClick={() => setStep(1)} className="px-4 py-2.5 bg-[var(--accent)] text-white text-sm font-medium rounded-[var(--radius-md)] hover:opacity-90">다시 정산하기</button>
           </div>
         )}
       </div>

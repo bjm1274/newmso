@@ -24,8 +24,8 @@ export default function LegalStandardsPanel() {
   ];
 
   return (
-    <div className="border border-[var(--toss-border)] p-5 bg-[var(--toss-card)] rounded-[12px] shadow-sm">
-      <div className="pb-3 border-b border-[var(--toss-border)] mb-4">
+    <div className="border border-[var(--border)] p-4 bg-[var(--card)] rounded-[var(--radius-md)] shadow-sm">
+      <div className="pb-3 border-b border-[var(--border)] mb-4">
         <h3 className="text-sm font-semibold text-[var(--foreground)]">법정 기준</h3>
         <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">근로기준법 · 소득세법</p>
       </div>

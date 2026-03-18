@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { dismissDialogs, fakeUser, mockSupabase, seedSession } from './helpers';
+import { buildRoomConfigNoteContent } from '../../lib/handover-notes';
 
 function trackRuntimeErrors(page: Page) {
   const errors: string[] = [];
@@ -151,7 +152,8 @@ test('handover notes can save bed settings and patient handover entries', async 
   await page.getByTestId('handover-new-room-number').fill('101');
   await page.getByTestId('handover-add-room').click();
   await page.getByTestId('handover-room-0-patient-0').fill('김환자');
-  await page.waitForTimeout(700);
+  await page.getByTestId('handover-bed-settings-save').click();
+  await expect(page.getByText('저장됨')).toBeVisible();
   await page.getByTestId('handover-bed-settings-close').click();
 
   await page.getByTestId('handover-scope-patient').click();
@@ -159,12 +161,136 @@ test('handover notes can save bed settings and patient handover entries', async 
   await page.getByTestId('handover-note-content').fill('투약 시간과 활력징후를 다음 근무자에게 인계합니다.');
   await page.getByTestId('handover-note-add').click();
 
-  await expect(page.getByText('투약 시간과 활력징후를 다음 근무자에게 인계합니다.')).toBeVisible();
-  const completeButton = page.locator('[data-testid^="handover-note-complete-"]').first();
-  await completeButton.click();
-  await expect(completeButton).toContainText('완료');
+  await page.getByTestId('handover-scope-patient').click();
+  await page.locator('[data-testid^="handover-patient-open-"]').first().click();
+  const historyModal = page.getByTestId('handover-patient-history-modal');
+  await expect(historyModal.getByText('투약 시간과 활력징후를 다음 근무자에게 인계합니다.')).toBeVisible();
+  const actionSelect = historyModal.locator('[data-testid^="handover-note-action-"]').first();
+  await actionSelect.selectOption('complete');
+  await page.getByTestId('handover-patient-history-close').click();
   await page.getByTestId('extra-back-button').click();
   await expect(page.getByTestId('extra-features-list')).toBeVisible();
+
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('handover notes keep unfinished common items and reset patient notes when room patient changes', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+
+  await prepareExtraFeature(
+    page,
+    {
+      staffMembers: [extraFeaturesUser, targetNurse],
+      handoverNotes: [
+        {
+          id: 'handover-general-1',
+          content: '공통 준비사항 유지',
+          author_id: extraFeaturesUser.id,
+          author_name: extraFeaturesUser.name,
+          shift: 'Day',
+          priority: 'Normal',
+          is_completed: false,
+          created_at: '2026-03-01T08:00:00.000Z',
+          note_scope: 'general',
+          handover_date: '2026-03-01',
+        },
+        {
+          id: 'handover-patient-1',
+          content: '백정민 인계 메모',
+          author_id: extraFeaturesUser.id,
+          author_name: extraFeaturesUser.name,
+          shift: 'Evening',
+          priority: 'High',
+          is_completed: false,
+          created_at: '2026-03-18T11:00:00.000Z',
+          note_scope: 'patient',
+          handover_date: '2026-03-18',
+          patient_name: '백정민',
+          patient_key: '백정민',
+          room_number: '101',
+          room_capacity: 4,
+          bed_number: 1,
+          bed_key: '101-1',
+        },
+        {
+          id: 'handover-room-config-1',
+          content: buildRoomConfigNoteContent(
+            [
+              {
+                id: 'room-101',
+                roomNumber: '101',
+                capacity: 4,
+                beds: [
+                  { bedNumber: 1, patientName: '백정민', admissionDate: '2026-03-01' },
+                  { bedNumber: 2, patientName: '', admissionDate: null },
+                  { bedNumber: 3, patientName: '', admissionDate: null },
+                  { bedNumber: 4, patientName: '', admissionDate: null },
+                ],
+              },
+            ],
+            '2026-03-01',
+          ),
+          author_id: extraFeaturesUser.id,
+          author_name: extraFeaturesUser.name,
+          shift: 'System',
+          priority: 'Normal',
+          is_completed: false,
+          created_at: '2026-03-01T07:00:00.000Z',
+        },
+        {
+          id: 'handover-room-config-2',
+          content: buildRoomConfigNoteContent(
+            [
+              {
+                id: 'room-101',
+                roomNumber: '101',
+                capacity: 4,
+                beds: [
+                  { bedNumber: 1, patientName: '김새환', admissionDate: '2026-03-20' },
+                  { bedNumber: 2, patientName: '', admissionDate: null },
+                  { bedNumber: 3, patientName: '', admissionDate: null },
+                  { bedNumber: 4, patientName: '', admissionDate: null },
+                ],
+              },
+            ],
+            '2026-03-30',
+          ),
+          author_id: extraFeaturesUser.id,
+          author_name: extraFeaturesUser.name,
+          shift: 'System',
+          priority: 'Normal',
+          is_completed: false,
+          created_at: '2026-03-30T07:00:00.000Z',
+        },
+      ],
+    },
+    'extra-card-handover-note'
+  );
+
+  await expect(page.getByTestId('handover-notes-view')).toBeVisible();
+  await page.getByTestId('handover-date-input').fill('2026-03-10');
+  await expect(page.getByText('공통 준비사항 유지')).toBeVisible();
+  await page.getByTestId('handover-scope-patient').click();
+  await expect(page.getByTestId('handover-patient-open-101-1-2026-03-01')).toBeVisible();
+  await expect(page.getByText('백정민 인계 메모')).toBeHidden();
+
+  await page.getByTestId('handover-date-input').fill('2026-03-18');
+  await page.getByTestId('handover-patient-open-101-1-2026-03-01').click();
+  const historyModal = page.getByTestId('handover-patient-history-modal');
+  await expect(historyModal).toBeVisible();
+  await expect(historyModal.getByText('입원 2026. 3. 1.')).toBeVisible();
+  await expect(historyModal.getByText('백정민 인계 메모')).toBeVisible();
+  await page.getByTestId('handover-patient-history-close').click();
+
+  await page.getByTestId('handover-date-input').fill('2026-03-20');
+  await expect(page.getByTestId('handover-patient-open-101-1-2026-03-01')).toBeVisible();
+  await expect(page.getByTestId('handover-patient-open-101-1-2026-03-20')).toBeVisible();
+
+  await page.getByTestId('handover-date-input').fill('2026-03-30');
+  await expect(page.getByTestId('handover-patient-open-101-1-2026-03-20')).toBeVisible();
+  await expect(page.getByText('백정민 인계 메모')).toBeHidden();
+  await page.getByTestId('handover-scope-general').click();
+  await expect(page.getByText('공통 준비사항 유지')).toBeVisible();
 
   expect(runtimeErrors).toEqual([]);
 });

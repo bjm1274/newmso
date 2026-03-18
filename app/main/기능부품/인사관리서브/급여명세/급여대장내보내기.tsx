@@ -1,97 +1,144 @@
 'use client';
-import { useState, useEffect } from 'react';
+
+import { useEffect, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { supabase } from '@/lib/supabase';
 
-export default function PayrollExport({ staffs = [], checkedIds = [], selectedCo, yearMonth: initialYm }: any) {
+export default function PayrollExport({ checkedIds = [], selectedCo, yearMonth: initialYm }: any) {
   const [yearMonth, setYearMonth] = useState(initialYm || new Date().toISOString().slice(0, 7));
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     setYearMonth(initialYm || new Date().toISOString().slice(0, 7));
   }, [initialYm]);
 
   useEffect(() => {
+    let active = true;
+
     (async () => {
       setLoading(true);
-      const { data } = await supabase
+      setErrorMessage('');
+
+      const { data, error } = await supabase
         .from('payroll_records')
-        .select('*, staff_members(name, company, department, bank_name, bank_account, employee_no)')
+        .select('*, staff_members(name, company, department, bank_account, employee_no)')
         .eq('year_month', yearMonth)
-        .not('record_type', 'eq', 'interim');
+        .neq('record_type', 'interim');
+
+      if (!active) return;
+
+      if (error) {
+        console.error('payroll export load failed:', error);
+        setRecords([]);
+        setErrorMessage(`급여대장을 불러오지 못했습니다: ${error.message}`);
+        setLoading(false);
+        return;
+      }
+
       let list = data || [];
       if (selectedCo && selectedCo !== '전체') {
-        list = list.filter((r: any) => r.staff_members?.company === selectedCo);
+        list = list.filter((record: any) => record.staff_members?.company === selectedCo);
       }
       if (checkedIds.length > 0) {
         const idSet = new Set(checkedIds.map((id: any) => String(id)));
-        list = list.filter((r: any) => idSet.has(String(r.staff_id)));
+        list = list.filter((record: any) => idSet.has(String(record.staff_id)));
       }
+
       setRecords(list);
       setLoading(false);
     })();
+
+    return () => {
+      active = false;
+    };
   }, [yearMonth, selectedCo, checkedIds.join(',')]);
 
   const exportExcel = () => {
-    const rows = records.map((r: any) => ({
-      사번: r.staff_members?.employee_no || '',
-      성명: r.staff_members?.name || '',
-      부서: r.staff_members?.department || '',
-      기본급: r.base_salary || 0,
-      식대: r.meal_allowance || 0,
-      차량: r.vehicle_allowance || 0,
-      보육: r.childcare_allowance || 0,
-      연구: r.research_allowance || 0,
-      기타수당: (r.extra_allowance || 0) + (r.overtime_pay || 0) + (r.bonus || 0),
-      과세총액: r.total_taxable || 0,
-      비과세총액: r.total_taxfree || 0,
-      공제합계: r.total_deduction || 0,
-      실지급액: r.net_pay || 0,
-      선지급: r.advance_pay || 0,
-      정산상태: r.status || '',
+    const rows = records.map((record: any) => ({
+      사번: record.staff_members?.employee_no || '',
+      성명: record.staff_members?.name || '',
+      부서: record.staff_members?.department || '',
+      기본급: record.base_salary || 0,
+      식대: record.meal_allowance || 0,
+      차량: record.vehicle_allowance || 0,
+      보육: record.childcare_allowance || 0,
+      연구: record.research_allowance || 0,
+      기타수당: (record.extra_allowance || 0) + (record.overtime_pay || 0) + (record.bonus || 0),
+      과세총액: record.total_taxable || 0,
+      비과세총액: record.total_taxfree || 0,
+      공제합계: record.total_deduction || 0,
+      실지급액: record.net_pay || 0,
+      선지급: record.advance_pay || 0,
+      정산상태: record.status || '',
     }));
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, '급여대장');
-    XLSX.writeFile(wb, `급여대장_${yearMonth}.xlsx`);
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, '급여대장');
+    XLSX.writeFile(workbook, `급여대장_${yearMonth}.xlsx`);
   };
 
   const exportSAM = () => {
-    const header = '데이터구분,거래일자,입금은행코드,입금계좌번호,입금예정금액,입금자명,입금통장메모,예금주주민번호';
+    const header = '데이터구분,거래일자,입금대상코드,입금계좌번호,입금예정금액,입금자명,입금통장메모,예금주주민번호';
     const rows = records
-      .filter((r: any) => r.net_pay > 0 && (r.staff_members?.bank_account || r.bank_account))
-      .map((r: any) => {
-        const acc = r.staff_members?.bank_account || r.bank_account || '';
-        const name = r.staff_members?.name || '';
-        const amt = r.net_pay || 0;
-        return `20,${yearMonth.replace('-', '')}25,110,${acc},${amt},${name},${yearMonth}급여,`;
+      .filter((record: any) => Number(record.net_pay) > 0 && record.staff_members?.bank_account)
+      .map((record: any) => {
+        const account = record.staff_members?.bank_account || '';
+        const name = record.staff_members?.name || '';
+        const amount = Number(record.net_pay) || 0;
+        return `20,${yearMonth.replace('-', '')}25,110,${account},${amount},${name},${yearMonth} 급여,`;
       });
     const csv = [header, ...rows].join('\n');
-    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+    const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `이체_SAM_${yearMonth}.csv`;
-    a.click();
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `이체_SAM_${yearMonth}.csv`;
+    anchor.click();
     URL.revokeObjectURL(url);
   };
 
   return (
-    <div className="flex flex-col gap-4 p-4 bg-[var(--toss-card)] rounded-[12px] border border-[var(--toss-border)] shadow-sm">
-      <div className="pb-2 border-b border-[var(--toss-border)]">
-        <h3 className="text-sm font-semibold text-[var(--foreground)]">대장 내보내기</h3>
-        <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">엑셀 · 이체용 CSV</p>
+    <div className="flex flex-col gap-4 p-4 bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)] shadow-sm">
+      <div className="pb-2 border-b border-[var(--border)]">
+        <h3 className="text-sm font-semibold text-[var(--foreground)]">급여대장 내보내기</h3>
+        <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">엑셀 및 은행 이체 CSV를 내려받습니다.</p>
       </div>
+
       <div className="flex items-center gap-2">
-        <input type="month" value={yearMonth} onChange={(e) => setYearMonth(e.target.value)} className="h-9 px-3 border border-[var(--toss-border)] rounded-md text-sm font-medium flex-1" />
+        <input
+          type="month"
+          value={yearMonth}
+          onChange={(event) => setYearMonth(event.target.value)}
+          className="h-9 px-3 border border-[var(--border)] rounded-md text-sm font-medium flex-1"
+        />
         <span className="text-xs text-[var(--toss-gray-3)] shrink-0">({records.length}건)</span>
       </div>
+
+      {errorMessage && (
+        <div className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-600">
+          {errorMessage}
+        </div>
+      )}
+
       <div className="flex gap-2">
-        <button onClick={exportExcel} disabled={loading || records.length === 0} className="flex-1 py-2.5 bg-[var(--toss-blue)] text-white text-xs font-medium rounded-[12px] hover:opacity-90 disabled:opacity-50">
+        <button
+          type="button"
+          data-testid="payroll-export-excel-button"
+          onClick={exportExcel}
+          disabled={loading || records.length === 0}
+          className="flex-1 py-2.5 bg-[var(--accent)] text-white text-xs font-medium rounded-[var(--radius-md)] hover:opacity-90 disabled:opacity-50"
+        >
           엑셀
         </button>
-        <button onClick={exportSAM} disabled={loading || records.length === 0} className="flex-1 py-2.5 bg-[var(--foreground)] text-white text-xs font-medium rounded-[12px] hover:opacity-90 disabled:opacity-50">
+        <button
+          type="button"
+          data-testid="payroll-export-bank-button"
+          onClick={exportSAM}
+          disabled={loading || records.length === 0}
+          className="flex-1 py-2.5 bg-[var(--foreground)] text-white text-xs font-medium rounded-[var(--radius-md)] hover:opacity-90 disabled:opacity-50"
+        >
           이체 CSV
         </button>
       </div>

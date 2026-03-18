@@ -511,11 +511,11 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
   return (
     <div className="flex flex-col h-full app-page">
-      <header className="p-6 md:p-8 border-b border-[var(--toss-border)] bg-[var(--toss-card)] shrink-0 flex items-center justify-between gap-4">
+      <header className="p-3 md:p-4 border-b border-[var(--border)] bg-[var(--card)] shrink-0 flex items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h2 className="text-lg font-bold text-[var(--foreground)] tracking-tight">
             {보기상태 === '퇴사' ? '퇴사자 현황' : '실시간 구성원 현황'}{' '}
-            <span className="text-sm text-[var(--toss-blue)]">[{선택사업체}]</span>
+            <span className="text-sm text-[var(--accent)]">[{선택사업체}]</span>
           </h2>
           <p className="text-[11px] md:text-xs text-[var(--toss-gray-3)] font-bold">
             {보기상태 === '퇴사'
@@ -527,7 +527,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           {essRequests.length > 0 && (
             <button
               onClick={() => setShowEssModal(true)}
-              className="relative bg-amber-100 text-amber-800 px-4 py-2 text-[11px] font-bold rounded-[12px] hover:bg-amber-200 transition-all shadow-sm ring-1 ring-amber-300"
+              className="relative bg-amber-100 text-amber-800 px-4 py-2 text-[11px] font-bold rounded-[var(--radius-md)] hover:bg-amber-200 transition-all shadow-sm ring-1 ring-amber-300"
             >
               내정보 변경 요청
               <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white flex items-center justify-center rounded-full text-[10px] shadow-sm animate-bounce">
@@ -538,7 +538,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           <button
             type="button"
             onClick={() => onOpenNewStaff && onOpenNewStaff()}
-            className="bg-[var(--toss-blue)] text-white px-5 py-2.5 text-[11px] font-bold rounded-[12px] shadow-md hover:opacity-95 transition-all"
+            className="bg-[var(--accent)] text-white px-5 py-2.5 text-[11px] font-bold rounded-[var(--radius-md)] shadow-md hover:opacity-95 transition-all"
             data-testid="new-staff-button"
           >
             신규 직원 등록
@@ -546,16 +546,16 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
         {false && (
-          <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
           {[
-            { label: 보기상태 === '퇴사' ? '퇴사자 수' : '재직자 수', value: 필터목록.length, tone: 'bg-[var(--toss-card)] border-[var(--toss-border)] text-[var(--foreground)]' },
+            { label: 보기상태 === '퇴사' ? '퇴사자 수' : '재직자 수', value: 필터목록.length, tone: 'bg-[var(--card)] border-[var(--border)] text-[var(--foreground)]' },
             { label: '면허/자격 등록', value: 면허등록인원수, tone: 'bg-amber-50 border-amber-200 text-amber-900' },
             { label: '계약직', value: 계약직인원수, tone: 'bg-blue-50 border-blue-200 text-blue-900' },
             { label: '부서 수', value: 부서수, tone: 'bg-emerald-50 border-emerald-200 text-emerald-900' },
           ].map((card) => (
-            <div key={card.label} className={`rounded-[16px] border p-4 shadow-sm ${card.tone}`}>
+            <div key={card.label} className={`rounded-[var(--radius-lg)] border p-4 shadow-sm ${card.tone}`}>
               <p className="text-[10px] font-bold uppercase tracking-widest opacity-70">{card.label}</p>
               <p className="mt-2 text-2xl font-bold">{card.value}</p>
             </div>
@@ -564,8 +564,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         )}
 
         {선택된직원ID && (
-          <div className="mb-6 space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="mb-4 space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <StaffHistoryTimeline staffId={선택된직원ID} staffName={필터목록.find((s: any) => s.id === 선택된직원ID)?.name || 직원목록.find((s: any) => s.id === 선택된직원ID)?.name || ''} />
               <div className="flex gap-4 flex-wrap">
                 <OnboardingChecklist staffId={String(선택된직원ID)} staffName={필터목록.find((s: any) => s.id === 선택된직원ID)?.name || ''} type="입사" />
@@ -576,29 +576,29 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           </div>
         )}
         {/* PC 버전 테이블 */}
-        <div className="hidden md:block bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] overflow-x-auto shadow-xl">
+        <div className="hidden md:block bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] overflow-x-auto shadow-sm">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-[var(--toss-gray-1)] text-[11px] font-semibold text-[var(--toss-gray-3)] border-b border-[var(--toss-border)] uppercase tracking-widest">
-              <tr><th className="p-6">사번</th><th className="p-6">성명/직함</th><th className="p-6">소속</th><th className="p-6">부서/팀</th><th className="p-6">연락/계정</th><th className="p-6">근무정보</th><th className="p-6">면허/자격</th><th className="p-6">상태</th><th className="p-6 text-right">관리</th></tr>
+            <thead className="bg-[var(--muted)] text-[11px] font-semibold text-[var(--toss-gray-3)] border-b border-[var(--border)] uppercase tracking-widest">
+              <tr><th className="p-4">사번</th><th className="p-4">성명/직함</th><th className="p-4">소속</th><th className="p-4">부서/팀</th><th className="p-4">연락/계정</th><th className="p-4">근무정보</th><th className="p-4">면허/자격</th><th className="p-4">상태</th><th className="p-4 text-right">관리</th></tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {필터목록.map((직원: any) => (
                 <tr key={직원.id} className="hover:bg-[var(--toss-blue-light)]/30 transition-all">
-                  <td className="p-6 font-semibold text-[var(--toss-blue)] text-xs">{직원.employee_no}</td>
-                  <td className="p-6">
+                  <td className="p-4 font-semibold text-[var(--accent)] text-xs">{직원.employee_no}</td>
+                  <td className="p-4">
                     <p className="text-sm font-semibold text-[var(--foreground)]">{직원.name}</p>
                     <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">{직원.position || '-'}</p>
                     <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">{직원.resident_no ? '주민번호 등록' : '주민번호 미등록'}</p>
                   </td>
-                  <td className="p-6 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">{직원.company}</td>
-                  <td className="p-6 text-xs font-bold text-[var(--toss-gray-4)]">{직원.department}</td>
-                  <td className="p-6">
+                  <td className="p-4 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">{직원.company}</td>
+                  <td className="p-4 text-xs font-bold text-[var(--toss-gray-4)]">{직원.department}</td>
+                  <td className="p-4">
                     <p className="text-xs font-bold text-[var(--foreground)]">{직원연락요약(직원)}</p>
                     <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">입사일 {직원.joined_at || 직원.join_date || '-'}</p>
                   </td>
-                  <td className="p-6">
+                  <td className="p-4">
                     <div className="flex flex-col gap-1">
-                      <span className="w-fit px-3 py-1 bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] text-[11px] font-semibold rounded-full">
+                      <span className="w-fit px-3 py-1 bg-[var(--muted)] text-[var(--toss-gray-4)] text-[11px] font-semibold rounded-[var(--radius-md)]">
                         {근무형태목록.find(s => s.id === 직원.shift_id)?.name || '-'}
                       </span>
                       <span className={`w-fit px-3 py-1 text-[10px] font-semibold rounded-full ${직원고용형태(직원) === '계약직' ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'}`}>
@@ -606,32 +606,32 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                       </span>
                     </div>
                   </td>
-                  <td className="p-6">
+                  <td className="p-4">
                     <p className="text-xs font-bold text-[var(--foreground)]">{직원면허요약(직원)}</p>
                     <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">취득일 {직원.permissions?.license_date || '-'}</p>
                   </td>
-                  <td className="p-6">
+                  <td className="p-4">
                     <span className={`px-3 py-1 text-[11px] font-semibold rounded-full ${직원.status === '퇴사' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
                       {직원.status || '재직중'}
                     </span>
                   </td>
-                  <td className="p-6 text-right space-x-2">
+                  <td className="p-4 text-right space-x-2">
                     <button
                       onClick={() => 수정시작(직원)}
-                      className="px-4 py-2 bg-[var(--foreground)] text-white text-[11px] font-semibold rounded-[12px] hover:opacity-90 transition-all"
+                      className="px-4 py-2 bg-[var(--foreground)] text-white text-[11px] font-semibold rounded-[var(--radius-md)] hover:opacity-90 transition-all"
                     >
                       수정
                     </button>
                     <button
                       onClick={() => 직원삭제(직원)}
-                      className="px-3 py-2 bg-red-50 text-red-600 text-[11px] font-semibold rounded-[12px] hover:bg-red-100 transition-all"
+                      className="px-3 py-2 bg-red-50 text-red-600 text-[11px] font-semibold rounded-[var(--radius-md)] hover:bg-red-100 transition-all"
                     >
                       삭제
                     </button>
                     {onOpenDocumentRepoForStaff && (
                       <button
                         onClick={() => onOpenDocumentRepoForStaff(직원)}
-                        className="px-3 py-2 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] text-[11px] font-semibold rounded-[12px] hover:opacity-90 transition-all"
+                        className="px-3 py-2 bg-[var(--toss-blue-light)] text-[var(--accent)] text-[11px] font-semibold rounded-[var(--radius-md)] hover:opacity-90 transition-all"
                       >
                         문서
                       </button>
@@ -646,10 +646,10 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         {/* 모바일 버전 카드 리스트 */}
         <div className="md:hidden grid grid-cols-1 gap-4">
           {필터목록.map((직원: any) => (
-            <div key={직원.id} className="bg-[var(--toss-card)] p-6 rounded-[16px] border border-[var(--toss-border)] shadow-sm flex flex-col gap-4">
+            <div key={직원.id} className="bg-[var(--card)] p-4 rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm flex flex-col gap-4">
               <div className="flex justify-between items-start">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-[var(--toss-blue-light)] rounded-[12px] flex items-center justify-center text-[var(--toss-blue)] font-semibold text-xs">#{직원.employee_no}</div>
+                  <div className="w-12 h-12 bg-[var(--toss-blue-light)] rounded-[var(--radius-md)] flex items-center justify-center text-[var(--accent)] font-semibold text-xs">#{직원.employee_no}</div>
                   <div>
                     <h4 className="text-base font-semibold text-[var(--foreground)]">{직원.name}</h4>
                     <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">{직원.company} · {직원.position} · {직원.joined_at || 직원.join_date}</p>
@@ -657,7 +657,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                 </div>
                 <span className={`px-3 py-1 text-[11px] font-semibold rounded-full ${직원.status === '퇴사' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>{직원.status || '재직중'}</span>
               </div>
-              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-[var(--toss-border)]">
+              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-[var(--border)]">
                 <div>
                   <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">부서</p>
                   <p className="text-xs font-bold text-[var(--foreground)]">{직원.department}</p>
@@ -675,27 +675,27 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                   <p className="text-xs font-bold text-[var(--foreground)]">{직원고용형태(직원)}</p>
                 </div>
               </div>
-              <div className="pt-4 border-t border-[var(--toss-border)]">
+              <div className="pt-4 border-t border-[var(--border)]">
                 <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">면허/자격</p>
                 <p className="text-xs font-bold text-[var(--foreground)] break-words">{직원면허요약(직원)}</p>
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={() => 수정시작(직원)}
-                  className="flex-1 py-3 bg-[var(--toss-gray-1)] text-[var(--foreground)] text-[11px] font-semibold rounded-[12px] hover:opacity-90 transition-all"
+                  className="flex-1 py-3 bg-[var(--muted)] text-[var(--foreground)] text-[11px] font-semibold rounded-[var(--radius-md)] hover:opacity-90 transition-all"
                 >
                   정보 수정하기
                 </button>
                 <button
                   onClick={() => 직원삭제(직원)}
-                  className="px-3 py-3 bg-red-50 text-red-600 text-[11px] font-semibold rounded-[12px] hover:bg-red-100 transition-all"
+                  className="px-3 py-3 bg-red-50 text-red-600 text-[11px] font-semibold rounded-[var(--radius-md)] hover:bg-red-100 transition-all"
                 >
                   삭제
                 </button>
                 {onOpenDocumentRepoForStaff && (
                   <button
                     onClick={() => onOpenDocumentRepoForStaff(직원)}
-                    className="px-3 py-3 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] text-[11px] font-semibold rounded-[12px] hover:opacity-90 transition-all"
+                    className="px-3 py-3 bg-[var(--toss-blue-light)] text-[var(--accent)] text-[11px] font-semibold rounded-[var(--radius-md)] hover:opacity-90 transition-all"
                   >
                     문서
                   </button>
@@ -709,17 +709,17 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       {/* 등록/수정 모달 - 모바일 최적화 */}
       {(창상태 || 편집모드) && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[110] flex items-center justify-center p-4 min-h-screen" onClick={닫기함수}>
-          <div data-testid="new-staff-modal" className="bg-[var(--toss-card)] w-full max-w-5xl rounded-[2rem] md:rounded-[3rem] overflow-hidden shadow-2xl flex flex-col h-[90vh] md:h-[85vh] animate-in slide-in-from-bottom duration-300" onClick={e => e.stopPropagation()}>
+          <div data-testid="new-staff-modal" className="bg-[var(--card)] w-full max-w-5xl rounded-2xl md:rounded-2xl overflow-hidden shadow-sm flex flex-col h-[90vh] md:h-[85vh] animate-in slide-in-from-bottom duration-300" onClick={e => e.stopPropagation()}>
             {/* Header */}
-            <div className="p-8 border-b border-[var(--toss-border)] flex justify-between items-center bg-[var(--toss-card)] shrink-0">
-              <h3 className="text-2xl font-semibold text-[var(--foreground)] tracking-tight">{편집모드 ? '구성원 정보 수정' : '신규 직원 등록'}</h3>
+            <div className="p-4 border-b border-[var(--border)] flex justify-between items-center bg-[var(--card)] shrink-0">
+              <h3 className="text-xl font-semibold text-[var(--foreground)] tracking-tight">{편집모드 ? '구성원 정보 수정' : '신규 직원 등록'}</h3>
               <button onClick={닫기함수} className="text-[var(--toss-gray-3)] hover:text-red-500 text-2xl">✕</button>
             </div>
 
             {/* Content Body */}
-            <div className="p-6 md:p-8 overflow-y-auto overflow-x-hidden flex-1 bg-white relative">
+            <div className="p-4 overflow-y-auto overflow-x-hidden flex-1 bg-[var(--card)] relative">
               {/* 탭 메뉴 */}
-              <div className="flex gap-1 p-1 bg-[var(--toss-gray-1)] rounded-[16px] mb-8 w-fit">
+              <div className="flex gap-1 p-1 bg-[var(--muted)] rounded-[var(--radius-lg)] mb-4 w-fit">
                 {[
                   { id: '기본', label: '인적사항', icon: '👤' },
                   { id: '소속', label: '소속/근무', icon: '🏢' },
@@ -729,8 +729,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                     key={tab.id}
                     data-testid={`new-staff-tab-${tab.id === '기본' ? 'basic' : tab.id === '소속' ? 'affiliation' : 'payroll'}`}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`px-6 py-2.5 rounded-[12px] text-sm font-bold transition-all flex items-center gap-2 ${activeTab === tab.id
-                      ? 'bg-white text-[var(--toss-blue)] shadow-sm'
+                    className={`px-4 py-2 rounded-[var(--radius-md)] text-sm font-bold transition-all flex items-center gap-2 ${activeTab === tab.id
+                      ? 'bg-[var(--card)] text-[var(--accent)] shadow-sm'
                       : 'text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)]'
                       }`}
                   >
@@ -742,16 +742,16 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
               <div className="min-h-[450px]">
                 {activeTab === '기본' && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <div className="space-y-4">
                       <h4 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
-                        <span className="w-1.5 h-4 bg-[var(--toss-blue)] rounded-full" />
+                        <span className="w-1.5 h-4 bg-[var(--accent)] rounded-full" />
                         필수 입력
                       </h4>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">성명 *</label>
-                          <input data-testid="new-staff-name-input" type="text" value={신규직원.성명} onChange={e => 신규직원설정({ ...신규직원, 성명: e.target.value })} className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/30" placeholder="성명을 입력하세요" />
+                          <input data-testid="new-staff-name-input" type="text" value={신규직원.성명} onChange={e => 신규직원설정({ ...신규직원, 성명: e.target.value })} className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-lg)] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--accent)]/30" placeholder="성명을 입력하세요" />
                         </div>
                         <div className="space-y-2">
                           <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">주민번호</label>
@@ -771,7 +771,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                               }
                               신규직원설정({ ...신규직원, 주민번호: formatted });
                             }}
-                            className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+                            className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-lg)] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--accent)]/30"
                             placeholder="000000-0000000"
                           />
                         </div>
@@ -804,34 +804,34 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                             신규직원설정({ ...신규직원, 전화번호: formatted });
                           }}
                           placeholder="010-1234-5678"
-                          className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+                          className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-lg)] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--accent)]/30"
                         />
                       </div>
                       <div className="space-y-2">
                         <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">주소</label>
-                        <input type="text" value={신규직원.주소} onChange={e => 신규직원설정({ ...신규직원, 주소: e.target.value })} className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/30" placeholder="상세 주소 입력" />
+                        <input type="text" value={신규직원.주소} onChange={e => 신규직원설정({ ...신규직원, 주소: e.target.value })} className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-lg)] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--accent)]/30" placeholder="상세 주소 입력" />
                       </div>
                     </div>
 
-                    <div className="space-y-6">
+                    <div className="space-y-4">
                       <h4 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
                         <span className="w-1.5 h-4 bg-amber-400 rounded-full" />
                         부가 정보
                       </h4>
                       <div className="space-y-2">
                         <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">내선번호</label>
-                        <input type="text" value={신규직원.내선번호} onChange={e => 신규직원설정({ ...신규직원, 내선번호: e.target.value })} placeholder="1234" className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/30" />
+                        <input type="text" value={신규직원.내선번호} onChange={e => 신규직원설정({ ...신규직원, 내선번호: e.target.value })} placeholder="1234" className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-lg)] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--accent)]/30" />
                       </div>
-                      <div className="p-5 bg-amber-50 rounded-[24px] border border-amber-100 space-y-4">
+                      <div className="p-5 bg-amber-50 rounded-[var(--radius-xl)] border border-amber-100 space-y-4">
                         <h5 className="text-[11px] font-extrabold text-amber-800 flex items-center gap-1.5">📜 면허/자격 사항</h5>
                         <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-1.5">
                             <label className="text-[10px] font-bold text-amber-700 ml-1">자격 명칭</label>
-                            <input type="text" placeholder="간호사 등" value={신규직원.면허사항} onChange={e => 신규직원설정({ ...신규직원, 면허사항: e.target.value })} className="w-full p-3 bg-white rounded-[12px] border-none outline-none text-xs font-bold text-amber-900 focus:ring-2 focus:ring-amber-300" />
+                            <input type="text" placeholder="간호사 등" value={신규직원.면허사항} onChange={e => 신규직원설정({ ...신규직원, 면허사항: e.target.value })} className="w-full p-3 bg-[var(--card)] rounded-[var(--radius-md)] border-none outline-none text-xs font-bold text-amber-900 focus:ring-2 focus:ring-amber-300" />
                           </div>
                           <div className="space-y-1.5">
                             <label className="text-[10px] font-bold text-amber-700 ml-1">면허 번호</label>
-                            <input type="text" placeholder="번호 입력" value={신규직원.면허번호} onChange={e => 신규직원설정({ ...신규직원, 면허번호: e.target.value })} className="w-full p-3 bg-white rounded-[12px] border-none outline-none text-xs font-bold text-amber-900 focus:ring-2 focus:ring-amber-300" />
+                            <input type="text" placeholder="번호 입력" value={신규직원.면허번호} onChange={e => 신규직원설정({ ...신규직원, 면허번호: e.target.value })} className="w-full p-3 bg-[var(--card)] rounded-[var(--radius-md)] border-none outline-none text-xs font-bold text-amber-900 focus:ring-2 focus:ring-amber-300" />
                           </div>
                         </div>
                         <div className="space-y-1.5">
@@ -839,7 +839,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                           <SmartDatePicker
                             value={신규직원.취득일자}
                             onChange={val => 신규직원설정({ ...신규직원, 취득일자: val })}
-                            inputClassName="w-full p-3 bg-white rounded-[12px] border-none outline-none text-xs font-bold text-amber-900 focus:ring-2 focus:ring-amber-300"
+                            inputClassName="w-full p-3 bg-[var(--card)] rounded-[var(--radius-md)] border-none outline-none text-xs font-bold text-amber-900 focus:ring-2 focus:ring-amber-300"
                           />
                         </div>
                         <div className="space-y-1.5">
@@ -848,7 +848,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                             value={신규직원.면허기타내용}
                             onChange={e => 신규직원설정({ ...신규직원, 면허기타내용: e.target.value })}
                             placeholder="발급기관, 세부 자격 범위, 특이사항 등을 자유롭게 입력"
-                            className="min-h-[88px] w-full resize-none p-3 bg-white rounded-[12px] border-none outline-none text-xs font-bold text-amber-900 focus:ring-2 focus:ring-amber-300"
+                            className="min-h-[88px] w-full resize-none p-3 bg-[var(--card)] rounded-[var(--radius-md)] border-none outline-none text-xs font-bold text-amber-900 focus:ring-2 focus:ring-amber-300"
                           />
                         </div>
                       </div>
@@ -857,8 +857,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                 )}
 
                 {activeTab === '소속' && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <div className="space-y-4">
                       <h4 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
                         <span className="w-1.5 h-4 bg-emerald-500 rounded-full" />
                         소속 및 직책
@@ -866,7 +866,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">사업체</label>
-                          <select value={신규직원.사업체} onChange={e => 신규직원설정({ ...신규직원, 사업체: e.target.value, 팀: 팀목록가져오기(e.target.value)[0] ?? '', 근무형태ID: '' })} className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/30 appearance-none" data-testid="new-staff-company-select">
+                          <select value={신규직원.사업체} onChange={e => 신규직원설정({ ...신규직원, 사업체: e.target.value, 팀: 팀목록가져오기(e.target.value)[0] ?? '', 근무형태ID: '' })} className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-lg)] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--accent)]/30 appearance-none" data-testid="new-staff-company-select">
                             <option value="박철홍정형외과">박철홍정형외과</option>
                             <option value="수연의원">수연의원</option>
                             <option value="SY INC.">SY INC.</option>
@@ -874,7 +874,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                         </div>
                         <div className="space-y-2">
                           <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">부서/팀</label>
-                          <select data-testid="new-staff-team-select" value={신규직원.팀} onChange={e => 신규직원설정({ ...신규직원, 팀: e.target.value })} className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/30 appearance-none">
+                          <select data-testid="new-staff-team-select" value={신규직원.팀} onChange={e => 신규직원설정({ ...신규직원, 팀: e.target.value })} className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-lg)] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--accent)]/30 appearance-none">
                             <option value="">팀 선택 안함</option>
                             {팀목록가져오기(신규직원.사업체).map(팀 => <option key={팀} value={팀}>{팀}</option>)}
                           </select>
@@ -882,7 +882,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                       </div>
                       <div className="space-y-2">
                         <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">직함</label>
-                        <select data-testid="new-staff-position-select" value={신규직원.직함} onChange={e => 신규직원설정({ ...신규직원, 직함: e.target.value })} className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/30 appearance-none">
+                        <select data-testid="new-staff-position-select" value={신규직원.직함} onChange={e => 신규직원설정({ ...신규직원, 직함: e.target.value })} className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-lg)] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--accent)]/30 appearance-none">
                           <option value="">직함 선택</option>
                           {['사원', '주임', '대리', '팀장', '간호과장', '간호부장', '실장', '부장', '진료부장', '총무부장', '이사', '원장', '병원장'].map(pos => (
                             <option key={pos} value={pos}>{pos}</option>
@@ -891,7 +891,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                       </div>
                     </div>
 
-                    <div className="space-y-6">
+                    <div className="space-y-4">
                       <h4 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
                         <span className="w-1.5 h-4 bg-purple-500 rounded-full" />
                         근무 조건
@@ -903,19 +903,19 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                             value={신규직원.입사일}
                             onChange={val => 신규직원설정({ ...신규직원, 입사일: val || '' })}
                             data-testid="new-staff-joined-at-input"
-                            className="w-full p-4 bg-[var(--toss-gray-1)] rounded-[16px] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+                            className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-lg)] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--accent)]/30"
                           />
                         </div>
                         <div className="space-y-2">
                           <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">고용형태</label>
-                          <div className="flex gap-1 p-1 bg-[var(--toss-gray-1)] rounded-[12px]">
+                          <div className="flex gap-1 p-1 bg-[var(--muted)] rounded-[var(--radius-md)]">
                             {['정규직', '계약직'].map(type => (
                               <button
                                 key={type}
                                 type="button"
                                 onClick={() => 신규직원설정({ ...신규직원, 고용형태: type, ...(type === '정규직' ? { 계약종료일: '' } : {}) })}
-                                className={`flex-1 py-2 rounded-[10px] text-xs font-bold transition-all ${신규직원.고용형태 === type
-                                  ? 'bg-white text-[var(--foreground)] shadow-sm'
+                                className={`flex-1 py-2 rounded-[var(--radius-md)] text-xs font-bold transition-all ${신규직원.고용형태 === type
+                                  ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm'
                                   : 'text-[var(--toss-gray-3)]'
                                   }`}
                               >
@@ -930,7 +930,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                           <select
                             value={신규직원.probation_months}
                             onChange={e => 신규직원설정({ ...신규직원, probation_months: Number(e.target.value) })}
-                            className="w-full p-4 bg-blue-50 rounded-[16px] border border-blue-100 outline-none font-bold text-sm focus:ring-2 focus:ring-blue-300 appearance-none"
+                            className="w-full p-4 bg-blue-50 rounded-[var(--radius-lg)] border border-blue-100 outline-none font-bold text-sm focus:ring-2 focus:ring-blue-300 appearance-none"
                           >
                             <option value={0}>수습 없음</option>
                             <option value={1}>1개월</option>
@@ -940,7 +940,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                           </select>
                         </div>
                       </div>
-                      <div className="p-5 bg-purple-50 rounded-[24px] border border-purple-100 space-y-4">
+                      <div className="p-5 bg-purple-50 rounded-[var(--radius-xl)] border border-purple-100 space-y-4">
                         <h5 className="text-[11px] font-extrabold text-purple-800 flex items-center gap-1.5">⏱️ 상세 근로 시간 설정</h5>
                         <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-1.5">
@@ -949,7 +949,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                               type="number"
                               value={신규직원.working_hours_per_week}
                               onChange={e => 신규직원설정({ ...신규직원, working_hours_per_week: parseInt(e.target.value, 10) || 0 })}
-                              className="w-full p-3 bg-white rounded-[12px] border-none outline-none text-xs font-bold text-purple-900 focus:ring-2 focus:ring-purple-300"
+                              className="w-full p-3 bg-[var(--card)] rounded-[var(--radius-md)] border-none outline-none text-xs font-bold text-purple-900 focus:ring-2 focus:ring-purple-300"
                               placeholder="40"
                             />
                             {신규직원.working_hours_per_week < 40 && 신규직원.working_hours_per_week > 0 && (
@@ -964,7 +964,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                               type="number"
                               value={신규직원.working_days_per_week}
                               onChange={e => 신규직원설정({ ...신규직원, working_days_per_week: parseInt(e.target.value, 10) || 0 })}
-                              className="w-full p-3 bg-white rounded-[12px] border-none outline-none text-xs font-bold text-purple-900 focus:ring-2 focus:ring-purple-300"
+                              className="w-full p-3 bg-[var(--card)] rounded-[var(--radius-md)] border-none outline-none text-xs font-bold text-purple-900 focus:ring-2 focus:ring-purple-300"
                               placeholder="5"
                             />
                           </div>
@@ -976,13 +976,13 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                           <SmartDatePicker
                             value={신규직원.계약종료일}
                             onChange={val => 신규직원설정({ ...신규직원, 계약종료일: val || '' })}
-                            className="w-full p-4 bg-orange-50 rounded-[16px] border border-orange-100 outline-none font-bold text-sm focus:ring-2 focus:ring-orange-300"
+                            className="w-full p-4 bg-orange-50 rounded-[var(--radius-lg)] border border-orange-100 outline-none font-bold text-sm focus:ring-2 focus:ring-orange-300"
                           />
                         </div>
                       )}
                       <div className="space-y-2">
                         <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">지정 스케줄 (근무형태)</label>
-                        <select value={신규직원.근무형태ID} onChange={e => 신규직원설정({ ...신규직원, 근무형태ID: e.target.value })} className="w-full p-4 bg-[var(--toss-blue-light)] rounded-[16px] border-none outline-none font-bold text-sm text-[var(--toss-blue)] focus:ring-2 focus:ring-[var(--toss-blue)]/30 appearance-none" data-testid="new-staff-shift-select">
+                        <select value={신규직원.근무형태ID} onChange={e => 신규직원설정({ ...신규직원, 근무형태ID: e.target.value })} className="w-full p-4 bg-[var(--toss-blue-light)] rounded-[var(--radius-lg)] border-none outline-none font-bold text-sm text-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/30 appearance-none" data-testid="new-staff-shift-select">
                           <option value="">근무형태 선택</option>
                           {getVisibleShiftOptions(신규직원.사업체).map((s: any) => (
                             <option key={s.id} value={s.id}>
@@ -996,22 +996,22 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                 )}
 
                 {activeTab === '급여' && (
-                  <div className="flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
                     {/* (과세) 월 급여 및 고정 수당 */}
                     <div className="space-y-4">
                       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                         <h4 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
-                          <span className="w-1.5 h-4 bg-[var(--toss-blue)] rounded-full" />
+                          <span className="w-1.5 h-4 bg-[var(--accent)] rounded-full" />
                           월 급여 및 고정 수당 (과세)
                         </h4>
-                        <div className="grid grid-cols-2 gap-3 rounded-[18px] bg-[var(--toss-blue-light)] px-4 py-3 md:min-w-[320px]">
+                        <div className="grid grid-cols-2 gap-3 rounded-[var(--radius-xl)] bg-[var(--toss-blue-light)] px-4 py-3 md:min-w-[320px]">
                           <div>
                             <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">총 급여</p>
                             <p data-testid="new-staff-total-salary" className="mt-1 text-base font-black text-[var(--foreground)]">{formatWon(totalSalaryAmount)}</p>
                           </div>
-                          <div className="border-l border-[var(--toss-border)] pl-3">
+                          <div className="border-l border-[var(--border)] pl-3">
                             <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">시급</p>
-                            <p data-testid="new-staff-hourly-wage" className="mt-1 text-base font-black text-[var(--toss-blue)]">{formatWon(hourlySalaryAmount)}</p>
+                            <p data-testid="new-staff-hourly-wage" className="mt-1 text-base font-black text-[var(--accent)]">{formatWon(hourlySalaryAmount)}</p>
                           </div>
                           <div className="col-span-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">
                             <span>과세 {formatWon(taxableSalaryTotal)}</span>
@@ -1020,7 +1020,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                           </div>
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 bg-[var(--toss-gray-1)] p-6 rounded-[24px]">
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 bg-[var(--muted)] p-4 rounded-[var(--radius-xl)]">
                         {TAXABLE_SALARY_FIELDS.map(({ key, label }) => {
                           const val = Number(신규직원[key as keyof typeof 신규직원] ?? 0);
                           return (
@@ -1036,7 +1036,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                                   신규직원설정({ ...신규직원, [key]: n });
                                 }}
                                 placeholder="0"
-                                className="w-full p-3 bg-white rounded-[12px] border-none outline-none font-bold text-xs focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+                                className="w-full p-3 bg-[var(--card)] rounded-[var(--radius-md)] border-none outline-none font-bold text-xs focus:ring-2 focus:ring-[var(--accent)]/30"
                               />
                             </div>
                           );
@@ -1050,7 +1050,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                         <span className="w-1.5 h-4 bg-emerald-500 rounded-full" />
                         비과세 수당 항목
                       </h4>
-                      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 bg-[var(--toss-gray-1)] p-6 rounded-[24px]">
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 bg-[var(--muted)] p-4 rounded-[var(--radius-xl)]">
                         {TAXFREE_SALARY_FIELDS.map(({ key, label }) => {
                           const val = Number(신규직원[key as keyof typeof 신규직원] ?? 0);
                           return (
@@ -1066,7 +1066,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                                   신규직원설정({ ...신규직원, [key]: n });
                                 }}
                                 placeholder="0"
-                                className="w-full p-2.5 bg-white rounded-[10px] border-none outline-none font-bold text-[11px] focus:ring-2 focus:ring-emerald-500/30"
+                                className="w-full p-2.5 bg-[var(--card)] rounded-[var(--radius-md)] border-none outline-none font-bold text-[11px] focus:ring-2 focus:ring-emerald-500/30"
                               />
                             </div>
                           );
@@ -1075,20 +1075,20 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                     </div>
 
                     {/* 사회보험 및 복지 (하단) */}
-                    <div className="space-y-4 pt-4 border-t border-[var(--toss-border)]">
+                    <div className="space-y-4 pt-4 border-t border-[var(--border)]">
                       <h4 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
                         <span className="w-1.5 h-4 bg-red-400 rounded-full" />
                         사회보험 및 복지 설정
                       </h4>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="grid grid-cols-2 gap-2 bg-[var(--toss-gray-1)] p-4 rounded-[20px]">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-2 gap-2 bg-[var(--muted)] p-4 rounded-[var(--radius-xl)]">
                           {[
                             { key: 'ins_national', label: '국민연금' },
                             { key: 'ins_health', label: '건강보험' },
                             { key: 'ins_employment', label: '고용보험' },
                             { key: 'ins_injury', label: '산재보험' },
                           ].map((item) => (
-                            <label key={item.key} className="flex items-center gap-3 p-3 bg-white rounded-[12px] shadow-sm cursor-pointer border-2 border-transparent hover:border-[var(--toss-blue-light)] transition-all">
+                            <label key={item.key} className="flex items-center gap-3 p-3 bg-[var(--card)] rounded-[var(--radius-md)] shadow-sm cursor-pointer border-2 border-transparent hover:border-[var(--toss-blue-light)] transition-all">
                               <input
                                 type="checkbox"
                                 checked={신규직원[item.key as keyof typeof 신규직원] as boolean}
@@ -1103,14 +1103,14 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                                   }
                                   신규직원설정({ ...신규직원, [item.key]: e.target.checked });
                                 }}
-                                className="w-4 h-4 rounded text-[var(--toss-blue)]"
+                                className="w-4 h-4 rounded text-[var(--accent)]"
                               />
                               <span className="text-xs font-bold text-[var(--foreground)]">{item.label}</span>
                             </label>
                           ))}
                         </div>
 
-                        <div className="p-4 bg-blue-50 border border-blue-100 rounded-[20px] space-y-3">
+                        <div className="p-4 bg-blue-50 border border-blue-100 rounded-[var(--radius-xl)] space-y-3">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <span className="text-base">💎</span>
@@ -1124,19 +1124,19 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                                 placeholder="0000-00"
                                 value={신규직원.duru_nuri_start}
                                 onChange={val => 신규직원설정({ ...신규직원, duru_nuri_start: val || '' })}
-                                inputClassName="p-2.5 bg-white border border-blue-200 rounded-lg text-[10px] font-bold"
+                                inputClassName="p-2.5 bg-[var(--card)] border border-blue-200 rounded-lg text-[10px] font-bold"
                               />
                               <SmartDatePicker
                                 placeholder="0000-00"
                                 value={신규직원.duru_nuri_end}
                                 onChange={val => 신규직원설정({ ...신규직원, duru_nuri_end: val || '' })}
-                                inputClassName="p-2.5 bg-white border border-blue-200 rounded-lg text-[10px] font-bold"
+                                inputClassName="p-2.5 bg-[var(--card)] border border-blue-200 rounded-lg text-[10px] font-bold"
                               />
                             </div>
                           )}
                         </div>
 
-                        <div className="p-4 bg-emerald-50 rounded-[20px] border border-emerald-100 space-y-3">
+                        <div className="p-4 bg-emerald-50 rounded-[var(--radius-xl)] border border-emerald-100 space-y-3">
                           <label className="flex items-center gap-3 cursor-pointer">
                             <input type="checkbox" checked={신규직원.is_basic_living} onChange={e => {
                               if (e.target.checked && 신규직원.ins_health) {
@@ -1160,9 +1160,9 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
               </div>
 
               {/* 하단 버튼 영역 (Footer) - 스크롤 영역 외부에 고정 */}
-              <div className="px-6 py-5 md:px-8 md:py-6 bg-[var(--page-bg)] border-t border-[var(--toss-border)] flex gap-3 shrink-0">
-                <button onClick={닫기함수} className="flex-1 py-3.5 md:py-4 bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] rounded-[12px] font-semibold text-sm hover:opacity-90 transition-all">취소</button>
-                <button data-testid="new-staff-save-button" onClick={정보저장} className="flex-[2] py-3.5 md:py-4 bg-[var(--toss-blue)] text-white rounded-[12px] font-semibold text-sm shadow-xl hover:scale-[0.99] active:scale-95 transition-all">정보 저장하기</button>
+              <div className="px-4 py-3 bg-[var(--page-bg)] border-t border-[var(--border)] flex gap-3 shrink-0">
+                <button onClick={닫기함수} className="flex-1 py-3.5 md:py-4 bg-[var(--muted)] text-[var(--toss-gray-4)] rounded-[var(--radius-md)] font-semibold text-sm hover:opacity-90 transition-all">취소</button>
+                <button data-testid="new-staff-save-button" onClick={정보저장} className="flex-[2] py-3.5 md:py-4 bg-[var(--accent)] text-white rounded-[var(--radius-md)] font-semibold text-sm shadow-sm hover:scale-[0.99] active:scale-95 transition-all">정보 저장하기</button>
               </div>
             </div>
           </div>
@@ -1172,8 +1172,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       {/* ESS 승인 대기함 모달 */}
       {showEssModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[120] flex items-center justify-center p-4 min-h-screen" onClick={() => setShowEssModal(false)}>
-          <div className="bg-[var(--page-bg)] w-full max-w-3xl rounded-[24px] overflow-hidden shadow-2xl flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
-            <div className="p-6 border-b border-[var(--toss-border)] flex justify-between items-center bg-[var(--toss-card)]">
+          <div className="bg-[var(--page-bg)] w-full max-w-3xl rounded-[var(--radius-xl)] overflow-hidden shadow-sm flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-[var(--border)] flex justify-between items-center bg-[var(--card)]">
               <div>
                 <h3 className="text-lg font-bold text-[var(--foreground)]">내정보 변경 요청 (ESS)</h3>
                 <p className="text-xs text-[var(--toss-gray-3)] mt-1">직원들이 요청한 프로필 변경 사항을 검토하고 승인하세요.</p>
@@ -1181,7 +1181,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
               <button onClick={() => setShowEssModal(false)} className="text-[var(--toss-gray-3)] hover:text-red-500 text-xl font-bold">✕</button>
             </div>
 
-            <div className="p-6 overflow-y-auto flex-1 bg-[var(--toss-gray-1)]">
+            <div className="p-4 overflow-y-auto flex-1 bg-[var(--muted)]">
               {essRequests.length === 0 ? (
                 <div className="py-20 text-center text-[var(--toss-gray-3)] font-medium text-sm">
                   대기 중인 변경 요청이 없습니다.
@@ -1200,10 +1200,10 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                     };
 
                     return (
-                      <div key={req.id} className="bg-[var(--toss-card)] rounded-[16px] border border-[var(--toss-border)] shadow-sm p-5 space-y-4">
-                        <div className="flex justify-between items-center border-b border-[var(--toss-border)] pb-3">
+                      <div key={req.id} className="bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm p-5 space-y-4">
+                        <div className="flex justify-between items-center border-b border-[var(--border)] pb-3">
                           <div className="flex items-center gap-3">
-                            <span className="w-10 h-10 rounded-full bg-[var(--toss-blue-light)] text-[var(--toss-blue)] flex items-center justify-center font-bold">{req.user_name?.[0]}</span>
+                            <span className="w-10 h-10 rounded-full bg-[var(--toss-blue-light)] text-[var(--accent)] flex items-center justify-center font-bold">{req.user_name?.[0]}</span>
                             <div>
                               <p className="font-bold text-[var(--foreground)] text-sm">{req.user_name} <span className="text-xs font-medium text-[var(--toss-gray-3)] ml-1">님의 변경 요청</span></p>
                               <p className="text-[10px] text-[var(--toss-gray-3)]">{new Date(req.created_at).toLocaleString()}</p>
@@ -1216,8 +1216,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                             <p className="text-xs text-[var(--toss-gray-4)] p-2">변경된 실질 항목이 없습니다.</p>
                           ) : (
                             changedKeys.map(k => (
-                              <div key={k} className="p-3 bg-[var(--toss-gray-1)] rounded-[12px] flex flex-col gap-1">
-                                <span className="text-[10px] font-bold text-[var(--toss-blue)] uppercase tracking-wider">{fieldLabels[k] || k}</span>
+                              <div key={k} className="p-3 bg-[var(--muted)] rounded-[var(--radius-md)] flex flex-col gap-1">
+                                <span className="text-[10px] font-bold text-[var(--accent)] uppercase tracking-wider">{fieldLabels[k] || k}</span>
                                 <div className="text-xs font-semibold text-[var(--foreground)] break-words">
                                   <span className="line-through text-[var(--toss-gray-3)] text-[11px] block">{original[k] || '(빈 값)'}</span>
                                   <span className="text-emerald-600 block mt-0.5">→ {changes[k] || '(빈 값)'}</span>
@@ -1228,8 +1228,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                         </div>
 
                         <div className="flex justify-end gap-2 pt-2">
-                          <button onClick={() => handleRejectEss(req)} className="px-5 py-2.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-[12px] font-semibold text-[11px] transition-colors">반려</button>
-                          <button onClick={() => handleApproveEss(req)} className="px-5 py-2.5 bg-emerald-500 text-white hover:bg-emerald-600 rounded-[12px] font-semibold text-[11px] transition-colors shadow-sm">승인하기</button>
+                          <button onClick={() => handleRejectEss(req)} className="px-5 py-2.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-[var(--radius-md)] font-semibold text-[11px] transition-colors">반려</button>
+                          <button onClick={() => handleApproveEss(req)} className="px-5 py-2.5 bg-emerald-500 text-white hover:bg-emerald-600 rounded-[var(--radius-md)] font-semibold text-[11px] transition-colors shadow-sm">승인하기</button>
                         </div>
                       </div>
                     )
@@ -1238,8 +1238,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
               )}
             </div>
             {essRequests.length > 0 && (
-              <div className="bg-[var(--toss-card)] p-4 border-t border-[var(--toss-border)] text-center">
-                <p className="text-xs font-semibold text-[var(--toss-gray-4)]">총 <span className="text-[var(--toss-blue)]">{essRequests.length}건</span>의 리뷰 대기 건이 있습니다.</p>
+              <div className="bg-[var(--card)] p-4 border-t border-[var(--border)] text-center">
+                <p className="text-xs font-semibold text-[var(--toss-gray-4)]">총 <span className="text-[var(--accent)]">{essRequests.length}건</span>의 리뷰 대기 건이 있습니다.</p>
               </div>
             )}
           </div>

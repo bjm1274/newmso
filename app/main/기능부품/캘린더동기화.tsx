@@ -61,17 +61,17 @@ export default function CalendarSync({ yearMonth }: { yearMonth?: string }) {
   };
 
   return (
-    <div className="bg-white p-6 rounded-[12px] border border-[var(--toss-border)] shadow-sm">
+    <div className="bg-[var(--card)] p-4 rounded-[var(--radius-md)] border border-[var(--border)] shadow-sm">
       <h3 className="text-sm font-semibold text-[var(--foreground)] mb-4">캘린더 동기화</h3>
       <div className="flex items-center gap-2 mb-4">
-        <input type="month" value={ym} onChange={(e) => setYm(e.target.value)} className="p-2 border rounded-[12px] text-sm font-bold" />
+        <input type="month" value={ym} onChange={(e) => setYm(e.target.value)} className="p-2 border rounded-[var(--radius-md)] text-sm font-bold" />
         <span className="text-xs text-[var(--toss-gray-3)]">({events.length}건)</span>
       </div>
       <div className="flex flex-col gap-2">
-        <button onClick={exportICS} className="w-full py-3 bg-[var(--toss-blue)] text-white text-xs font-semibold rounded-[16px]">
+        <button onClick={exportICS} className="w-full py-3 bg-[var(--accent)] text-white text-xs font-semibold rounded-[var(--radius-lg)]">
           .ics 파일 다운로드 (구글/아웃룩 가져오기)
         </button>
-        <a href={googleCalendarUrl()} target="_blank" rel="noopener noreferrer" className="w-full py-3 bg-[var(--toss-gray-1)] text-[var(--foreground)] text-xs font-semibold rounded-[16px] text-center">
+        <a href={googleCalendarUrl()} target="_blank" rel="noopener noreferrer" className="w-full py-3 bg-[var(--muted)] text-[var(--foreground)] text-xs font-semibold rounded-[var(--radius-lg)] text-center">
           구글 캘린더에 추가
         </a>
       </div>

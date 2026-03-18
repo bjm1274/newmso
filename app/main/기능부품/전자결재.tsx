@@ -1192,7 +1192,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   if (visibleApprovalViews.length === 0) {
     return (
       <div
-        className="flex h-full flex-col items-center justify-center bg-[var(--toss-gray-1)] p-6 text-center"
+        className="flex h-full flex-col items-center justify-center bg-[var(--muted)] p-4 text-center"
         data-testid="approval-view"
       >
         <div className="mb-4 text-6xl">🔒</div>
@@ -1225,38 +1225,38 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     >
       {/* 상세 메뉴(기안함·결재함·작성하기)는 메인 좌측 사이드바에서 전자결재 호버/클릭 시 플라이아웃으로 선택 */}
       {/* 메인 콘텐츠 */}
-      <main className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden p-4 md:p-10 bg-[var(--page-bg)] custom-scrollbar">
+      <main className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden p-4 md:p-5 bg-[var(--page-bg)] custom-scrollbar">
         {viewMode === '작성하기' ? (
-          <div className="max-w-4xl mx-auto space-y-6 md:space-y-8">
+          <div className="max-w-4xl mx-auto space-y-4 md:space-y-5">
             {/* 임시저장 복구 배너 */}
             {draftBanner && (
-              <div className="flex items-center gap-3 p-4 bg-[var(--toss-card)] border border-[var(--toss-blue)]/30 rounded-[12px] shadow-sm animate-in fade-in duration-300">
+              <div className="flex items-center gap-3 p-4 bg-[var(--card)] border border-[var(--accent)]/30 rounded-[var(--radius-md)] shadow-sm animate-in fade-in duration-300">
                 <span className="text-[13px] font-bold text-[var(--foreground)] flex-1">저장된 임시저장이 있습니다.</span>
                 <button
                   type="button"
                   onClick={loadDraftFromStorage}
-                  className="px-4 py-2 bg-[var(--toss-blue)] text-white rounded-[10px] text-[11px] font-bold hover:opacity-90 transition-all shrink-0"
+                  className="px-4 py-2 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-[11px] font-bold hover:opacity-90 transition-all shrink-0"
                 >
                   불러오기
                 </button>
                 <button
                   type="button"
                   onClick={() => { clearDraftFromStorage(); setDraftBanner(false); }}
-                  className="px-4 py-2 bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] border border-[var(--toss-border)] rounded-[10px] text-[11px] font-bold hover:bg-[var(--toss-gray-2)] transition-all shrink-0"
+                  className="px-4 py-2 bg-[var(--muted)] text-[var(--toss-gray-3)] border border-[var(--border)] rounded-[var(--radius-md)] text-[11px] font-bold hover:bg-[var(--toss-gray-2)] transition-all shrink-0"
                 >
                   무시
                 </button>
               </div>
             )}
-            <div className="bg-[var(--toss-card)] p-6 md:p-10 rounded-[16px] md:rounded-[20px] border border-[var(--toss-border)] shadow-sm space-y-6 md:space-y-8">
-              <div className="bg-[var(--toss-blue-light)] p-4 md:p-5 rounded-[14px] border border-[var(--toss-blue-light)] space-y-3">
+            <div className="bg-[var(--card)] p-4 md:p-4 rounded-[var(--radius-lg)] md:rounded-[var(--radius-xl)] border border-[var(--border)] shadow-sm space-y-4 md:space-y-4">
+              <div className="bg-[var(--toss-blue-light)] p-4 md:p-5 rounded-[var(--radius-lg)] border border-[var(--toss-blue-light)] space-y-3">
                 <div className="flex justify-start md:justify-end">
                   <div className="flex gap-0.5 p-1 app-tab-bar w-full md:w-auto overflow-x-auto no-scrollbar">
                     {['전체', '박철홍정형외과', '수연의원', 'SY INC.'].map(co => (
                       <button
                         key={co}
                         onClick={() => setSelectedCo(co)}
-                        className={`min-h-[44px] touch-manipulation flex-1 md:flex-none px-3 py-1.5 rounded-[12px] text-[11px] font-bold transition-all whitespace-nowrap ${selectedCo === co ? 'bg-[var(--toss-card)] shadow-sm text-[var(--toss-blue)]' : 'text-[var(--toss-gray-3)]'}`}
+                        className={`min-h-[44px] touch-manipulation flex-1 md:flex-none px-3 py-1.5 rounded-[var(--radius-md)] text-[11px] font-bold transition-all whitespace-nowrap ${selectedCo === co ? 'bg-[var(--card)] shadow-sm text-[var(--accent)]' : 'text-[var(--toss-gray-3)]'}`}
                       >
                         {co}
                       </button>
@@ -1269,7 +1269,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                     const s = approverCandidates.find((st: any) => st.id === e.target.value);
                     if (s && !approverLine.find(al => al.id === s.id)) setApproverLine([...approverLine, s]);
                     e.target.value = '';
-                  }} className="min-w-0 p-3 bg-[var(--input-bg)] rounded-[12px] text-xs font-bold border border-[var(--toss-border)] outline-none shadow-sm">
+                  }} className="min-w-0 p-3 bg-[var(--input-bg)] rounded-[var(--radius-md)] text-xs font-bold border border-[var(--border)] outline-none shadow-sm">
                     <option value="">결재자 추가...</option>
                     {approverCandidates.map((s: any) => (
                       <option key={s.id} value={s.id}>{s.name} {s.position || ''} {s.company ? `(${s.company})` : ''}</option>
@@ -1279,25 +1279,25 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                     const s = staffs.find((sf: any) => String(sf.id) === e.target.value);
                     if (s && !ccLine.find(c => c.id === s.id)) setCcLine(prev => [...prev, { id: s.id, name: s.name, position: s.position }]);
                     e.target.value = '';
-                  }} className="min-w-0 p-3 bg-[var(--input-bg)] rounded-[12px] text-xs font-bold border border-[var(--toss-border)] outline-none shadow-sm">
+                  }} className="min-w-0 p-3 bg-[var(--input-bg)] rounded-[var(--radius-md)] text-xs font-bold border border-[var(--border)] outline-none shadow-sm">
                     <option value="">참조자 추가...</option>
                     {staffs.filter((s: any) => !ccLine.find(c => c.id === s.id)).map((s: any) => <option key={s.id} value={s.id}>{s.name} ({s.position})</option>)}
                   </select>
                   <button
                     type="button"
                     onClick={() => { setTemplateNameInput(''); setShowTemplateModal(true); }}
-                    className="px-3 py-3 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[12px] text-[11px] font-bold text-[var(--toss-blue)] hover:bg-[var(--toss-gray-1)] whitespace-nowrap"
+                    className="px-3 py-3 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] text-[11px] font-bold text-[var(--accent)] hover:bg-[var(--muted)] whitespace-nowrap"
                   >
                     💾 템플릿 저장
                   </button>
                   {approverTemplates.length > 0 && (
                     <div className="relative group col-span-3 justify-self-end">
-                      <button type="button" className="w-full sm:w-auto px-4 py-3 bg-[var(--toss-blue)] border border-[var(--toss-blue)] rounded-[12px] text-[11px] font-bold text-white shadow-sm hover:opacity-95">
+                      <button type="button" className="w-full sm:w-auto px-4 py-3 bg-[var(--accent)] border border-[var(--accent)] rounded-[var(--radius-md)] text-[11px] font-bold text-white shadow-sm hover:opacity-95">
                         📂 템플릿 불러오기 ({approverTemplates.length})
                       </button>
-                      <div className="absolute right-0 top-full mt-1 w-56 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[12px] shadow-xl z-50 hidden group-hover:block">
+                      <div className="absolute right-0 top-full mt-1 w-56 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] shadow-sm z-50 hidden group-hover:block">
                         {approverTemplates.map(tpl => (
-                          <div key={tpl.id} className="flex items-center justify-between px-3 py-2 hover:bg-[var(--toss-gray-1)] first:rounded-t-[12px] last:rounded-b-[12px]">
+                          <div key={tpl.id} className="flex items-center justify-between px-3 py-2 hover:bg-[var(--muted)] first:rounded-t-[12px] last:rounded-b-[12px]">
                             <button
                               type="button"
                               onClick={() => setApproverLine(tpl.line)}
@@ -1323,11 +1323,11 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                     </div>
                   )}
                 </div>
-                <div className="flex gap-2 flex-wrap">{approverLine.map((a, i) => <div key={i} className="bg-[var(--toss-card)] px-4 py-2.5 rounded-[12px] border border-[var(--toss-border)] text-[11px] font-bold shadow-sm text-[var(--toss-blue)] flex items-center gap-2">{i + 1}. {a.name} {a.position} <button onClick={() => setApproverLine(approverLine.filter((_, idx) => idx !== i))} className="ml-1 text-[var(--toss-gray-3)] hover:text-red-500">✕</button></div>)}</div>
+                <div className="flex gap-2 flex-wrap">{approverLine.map((a, i) => <div key={i} className="bg-[var(--card)] px-4 py-2.5 rounded-[var(--radius-md)] border border-[var(--border)] text-[11px] font-bold shadow-sm text-[var(--accent)] flex items-center gap-2">{i + 1}. {a.name} {a.position} <button onClick={() => setApproverLine(approverLine.filter((_, idx) => idx !== i))} className="ml-1 text-[var(--toss-gray-3)] hover:text-red-500">✕</button></div>)}</div>
                 {ccLine.length > 0 && (
                   <div className="flex gap-2 flex-wrap">
                     {ccLine.map((c, i) => (
-                      <div key={i} className="bg-yellow-50 border border-yellow-200 px-3 py-1.5 rounded-[10px] text-[11px] font-bold text-yellow-700 flex items-center gap-1.5">
+                      <div key={i} className="bg-yellow-50 border border-yellow-200 px-3 py-1.5 rounded-[var(--radius-md)] text-[11px] font-bold text-yellow-700 flex items-center gap-1.5">
                         CC {c.name} <button onClick={() => setCcLine(prev => prev.filter((_, idx) => idx !== i))} className="text-yellow-400 hover:text-red-500">✕</button>
                       </div>
                     ))}
@@ -1337,9 +1337,9 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
 
               <div>
                 <div className="relative">
-                  <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-5 bg-gradient-to-r from-[var(--toss-card)] to-transparent" />
-                  <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-5 bg-gradient-to-l from-[var(--toss-card)] to-transparent" />
-                  <div className="flex w-full gap-1.5 overflow-x-auto no-scrollbar rounded-[16px] border border-[var(--toss-border)]/70 bg-[var(--toss-gray-1)] p-1.5 scroll-smooth snap-x snap-mandatory">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-5 bg-gradient-to-r from-[var(--card)] to-transparent" />
+                  <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-5 bg-gradient-to-l from-[var(--card)] to-transparent" />
+                  <div className="flex w-full gap-1.5 overflow-x-auto no-scrollbar rounded-[var(--radius-lg)] border border-[var(--border)]/70 bg-[var(--muted)] p-1.5 scroll-smooth snap-x snap-mandatory">
                     {composeFormTabs.map((t, idx) => {
                       const label = BUILTIN_FORM_TYPES.includes(t) ? t : (customFormTypes.find(c => c.slug === t)?.name ?? t);
                       return (
@@ -1348,7 +1348,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                           key={`${t}-${idx}`}
                           data-testid={`approval-form-type-${idx}`}
                           onClick={() => setFormType(normalizeComposeFormType(t))}
-                          className={`snap-start shrink-0 rounded-[12px] px-3 py-2 text-[11px] font-bold leading-tight whitespace-nowrap transition-all cursor-pointer touch-manipulation ${formType === t ? 'bg-[var(--toss-card)] text-[var(--toss-blue)] shadow-sm ring-1 ring-[var(--toss-blue)]/10' : 'text-[var(--toss-gray-3)] hover:bg-white/80 hover:text-[var(--toss-gray-5)]'}`}
+                          className={`snap-start shrink-0 rounded-[var(--radius-md)] px-3 py-2 text-[11px] font-bold leading-tight whitespace-nowrap transition-all cursor-pointer touch-manipulation ${formType === t ? 'bg-[var(--card)] text-[var(--accent)] shadow-sm ring-1 ring-[var(--accent)]/10' : 'text-[var(--toss-gray-3)] hover:bg-[var(--card)]/80 hover:text-[var(--toss-gray-5)]'}`}
                         >
                           {label}
                         </button>
@@ -1359,14 +1359,14 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
               </div>
 
               {formType !== '양식신청' && lastDraftByType[formType] && (
-                <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-100 rounded-[16px]">
+                <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-100 rounded-[var(--radius-lg)]">
                   <span className="text-[11px] font-bold text-amber-700">
                     마지막 상신: {lastDraftByType[formType].title || '(제목 없음)'} · {new Date(lastDraftByType[formType].created_at).toLocaleDateString()}
                   </span>
                   <button
                     type="button"
                     onClick={loadLastDraft}
-                    className="shrink-0 px-4 py-2 rounded-[16px] bg-amber-500 text-white text-[11px] font-semibold hover:bg-amber-600 transition-all"
+                    className="shrink-0 px-4 py-2 rounded-[var(--radius-lg)] bg-amber-500 text-white text-[11px] font-semibold hover:bg-amber-600 transition-all"
                   >
                     이전 기안 불러오기
                   </button>
@@ -1397,25 +1397,25 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
               </div>
 
               {formType !== '양식신청' && (
-                <div className="space-y-6 pt-8 md:pt-10 border-t border-[var(--toss-border)]">
+                <div className="space-y-4 pt-8 md:pt-10 border-t border-[var(--border)]">
                   <input
                     data-testid="approval-title-input"
                     value={formTitle}
                     onChange={e => setFormTitle(e.target.value)}
-                    className="w-full p-4 md:p-5 bg-[var(--toss-gray-1)] rounded-[12px] font-bold outline-none text-lg md:text-xl focus:ring-2 focus:ring-[var(--toss-blue)]/20 border border-[var(--toss-border)] transition-all"
+                    className="w-full p-4 md:p-5 bg-[var(--muted)] rounded-[var(--radius-md)] font-bold outline-none text-lg md:text-xl focus:ring-2 focus:ring-[var(--accent)]/20 border border-[var(--border)] transition-all"
                     placeholder="기안 제목을 입력하세요"
                   />
                   <textarea
                     data-testid="approval-content-input"
                     value={formContent}
                     onChange={e => setFormContent(e.target.value)}
-                    className="w-full h-48 md:h-56 p-6 md:p-8 bg-[var(--toss-gray-1)] rounded-[16px] outline-none text-sm font-bold leading-relaxed border border-[var(--toss-border)] focus:ring-2 focus:ring-[var(--toss-blue)]/20 transition-all"
+                    className="w-full h-48 md:h-56 p-4 md:p-4 bg-[var(--muted)] rounded-[var(--radius-lg)] outline-none text-sm font-bold leading-relaxed border border-[var(--border)] focus:ring-2 focus:ring-[var(--accent)]/20 transition-all"
                     placeholder="상세 사유 및 내용을 입력하세요."
                   />
                   <button
                     data-testid="approval-submit-button"
                     onClick={handleSubmit}
-                    className="w-full py-4 md:py-5 bg-[var(--toss-blue)] text-white rounded-[12px] font-bold text-sm shadow-sm hover:opacity-95 active:scale-[0.99] transition-all"
+                    className="w-full py-4 md:py-5 bg-[var(--accent)] text-white rounded-[var(--radius-md)] font-bold text-sm shadow-sm hover:opacity-95 active:scale-[0.99] transition-all"
                   >
                     결재 상신
                   </button>
@@ -1427,16 +1427,16 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
           <div className="space-y-3">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div className="shrink-0">
-                <h2 className="text-xl font-bold text-[var(--foreground)]">{viewMode} <span className="text-[var(--toss-blue)] ml-2">{listForView.length}건</span></h2>
+                <h2 className="text-xl font-bold text-[var(--foreground)]">{viewMode} <span className="text-[var(--accent)] ml-2">{listForView.length}건</span></h2>
               </div>
 
               <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2 rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-card)] px-3 py-2 shadow-sm lg:flex-nowrap lg:justify-center">
+                <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 shadow-sm lg:flex-nowrap lg:justify-center">
                   <span className="shrink-0 text-xs font-bold text-[var(--foreground)]">기안일</span>
                   <select
                     value={approvalDocumentFilter}
                     onChange={(e) => setApprovalDocumentFilter(e.target.value)}
-                    className="h-10 min-w-[128px] rounded-[10px] border border-[var(--toss-border)] bg-[var(--input-bg)] px-3 text-sm font-semibold text-[var(--foreground)] outline-none focus:border-[var(--toss-blue)]"
+                    className="h-10 min-w-[128px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-sm font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
                     aria-label="문서 종류 선택"
                     data-testid="approval-document-filter"
                   >
@@ -1449,7 +1449,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                     type="date"
                     value={approvalDateFrom}
                     onChange={(e) => setApprovalDateFrom(e.target.value)}
-                    className="h-10 min-w-[138px] rounded-[10px] border border-[var(--toss-border)] bg-[var(--input-bg)] px-3 text-sm font-semibold text-[var(--foreground)] outline-none focus:border-[var(--toss-blue)]"
+                    className="h-10 min-w-[138px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-sm font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
                     aria-label="조회 시작일"
                   />
                   <span className="text-sm font-semibold text-[var(--toss-gray-3)]">~</span>
@@ -1457,7 +1457,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                     type="date"
                     value={approvalDateTo}
                     onChange={(e) => setApprovalDateTo(e.target.value)}
-                    className="h-10 min-w-[138px] rounded-[10px] border border-[var(--toss-border)] bg-[var(--input-bg)] px-3 text-sm font-semibold text-[var(--foreground)] outline-none focus:border-[var(--toss-blue)]"
+                    className="h-10 min-w-[138px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-sm font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
                     aria-label="조회 종료일"
                   />
                   {(approvalDocumentFilter !== ALL_DOCUMENT_FILTER || approvalDateFrom || approvalDateTo) && (
@@ -1468,7 +1468,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                         setApprovalDateFrom('');
                         setApprovalDateTo('');
                       }}
-                      className="h-10 shrink-0 rounded-[10px] border border-[var(--toss-border)] px-3 text-sm font-bold text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]"
+                      className="h-10 shrink-0 rounded-[var(--radius-md)] border border-[var(--border)] px-3 text-sm font-bold text-[var(--toss-gray-3)] hover:bg-[var(--muted)]"
                     >
                       초기화
                     </button>
@@ -1476,7 +1476,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                 </div>
               </div>
 
-              <div className="flex gap-1.5 p-1.5 bg-[var(--toss-gray-1)] rounded-[16px] w-full lg:w-auto overflow-x-auto no-scrollbar shrink-0">
+              <div className="flex gap-1.5 p-1.5 bg-[var(--muted)] rounded-[var(--radius-lg)] w-full lg:w-auto overflow-x-auto no-scrollbar shrink-0">
                 {[
                   { value: '전체' as const, label: '전체' },
                   { value: '대기' as const, label: '대기중' },
@@ -1487,7 +1487,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                     type="button"
                     key={value}
                     onClick={() => setApprovalStatusFilter(value)}
-                    className={`shrink-0 px-4 py-2 rounded-[12px] text-xs font-bold transition-all whitespace-nowrap ${approvalStatusFilter === value ? 'bg-[var(--toss-card)] text-[var(--toss-blue)] shadow-sm' : 'text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)]'}`}
+                    className={`shrink-0 px-4 py-2 rounded-[var(--radius-md)] text-xs font-bold transition-all whitespace-nowrap ${approvalStatusFilter === value ? 'bg-[var(--card)] text-[var(--accent)] shadow-sm' : 'text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)]'}`}
                   >
                     {label}
                   </button>
@@ -1496,7 +1496,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
             </div>
 
             {viewMode === '기안함' && approvalStatusFilter === '대기' && listForView.length > 0 && (
-              <p className="text-xs text-[var(--toss-gray-3)]">대기중인 문서는 결재자가 <strong className="text-[var(--toss-blue)]">결재함</strong>에서 승인·반려합니다. 내가 결재자이면 카드에 버튼이 표시됩니다.</p>
+              <p className="text-xs text-[var(--toss-gray-3)]">대기중인 문서는 결재자가 <strong className="text-[var(--accent)]">결재함</strong>에서 승인·반려합니다. 내가 결재자이면 카드에 버튼이 표시됩니다.</p>
             )}
 
             {dateRangeInvalid && (
@@ -1505,18 +1505,18 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
 
             {/* 결재함 일괄 처리 바 */}
             {viewMode === '결재함' && bulkTargetList.length > 0 && (
-              <div className="flex flex-wrap items-center gap-3 p-4 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[12px] shadow-sm animate-in fade-in duration-200">
+              <div className="flex flex-wrap items-center gap-3 p-4 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] shadow-sm animate-in fade-in duration-200">
                 <label className="flex items-center gap-2 cursor-pointer select-none shrink-0" onClick={(e) => e.stopPropagation()}>
                   <input
                     type="checkbox"
                     checked={allBulkSelected}
                     onChange={toggleSelectAll}
-                    className="w-4 h-4 accent-[var(--toss-blue)] rounded cursor-pointer"
+                    className="w-4 h-4 accent-[var(--accent)] rounded cursor-pointer"
                   />
                   <span className="text-sm font-bold text-[var(--foreground)]">전체 선택</span>
                 </label>
                 {selectedApprovalIds.length > 0 && (
-                  <span className="text-xs font-bold text-[var(--toss-blue)] bg-[var(--toss-blue-light)] px-3 py-1 rounded-full">
+                  <span className="text-xs font-bold text-[var(--accent)] bg-[var(--toss-blue-light)] px-3 py-1 rounded-[var(--radius-md)]">
                     {selectedApprovalIds.length}건 선택됨
                   </span>
                 )}
@@ -1525,7 +1525,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                     type="button"
                     disabled={selectedApprovalIds.length === 0}
                     onClick={handleBulkApprove}
-                    className="px-5 py-2.5 bg-[var(--toss-blue)] text-white rounded-[10px] text-xs font-bold shadow-sm hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    className="px-5 py-2.5 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-xs font-bold shadow-sm hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                   >
                     일괄 승인
                   </button>
@@ -1533,7 +1533,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                     type="button"
                     disabled={selectedApprovalIds.length === 0}
                     onClick={handleBulkReject}
-                    className="px-5 py-2.5 bg-red-50 text-red-600 border border-red-200 rounded-[10px] text-xs font-bold shadow-sm hover:bg-red-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    className="px-5 py-2.5 bg-red-50 text-red-600 border border-red-200 rounded-[var(--radius-md)] text-xs font-bold shadow-sm hover:bg-red-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                   >
                     일괄 반려
                   </button>
@@ -1572,7 +1572,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                       tabIndex={0}
                       onClick={() => setSelectedApprovalId(item.id)}
                       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedApprovalId(item.id); } }}
-                      className={`w-full min-h-[112px] bg-[var(--toss-card)] px-2 py-1.5 border rounded-[10px] shadow-sm flex flex-col justify-between gap-1 group hover:border-[var(--toss-blue)]/30 hover:shadow-md transition-all animate-in fade-in-up cursor-pointer ${isChecked ? 'border-[var(--toss-blue)]/50 bg-[var(--toss-blue-light)]' : 'border-[var(--toss-border)]'}`}
+                      className={`w-full min-h-[112px] bg-[var(--card)] px-2 py-1.5 border rounded-[var(--radius-md)] shadow-sm flex flex-col justify-between gap-1 group hover:border-[var(--accent)]/30 hover:shadow-md transition-all animate-in fade-in-up cursor-pointer ${isChecked ? 'border-[var(--accent)]/50 bg-[var(--toss-blue-light)]' : 'border-[var(--border)]'}`}
                     >
                       <div className="flex gap-1 items-start flex-1 min-w-0">
                         {/* 일괄 처리 체크박스 (결재함 대기 항목에만 표시) */}
@@ -1583,12 +1583,12 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                               checked={isChecked}
                               onChange={() => toggleSelectOne(item.id)}
                               onClick={(e) => e.stopPropagation()}
-                              className="w-4 h-4 accent-[var(--toss-blue)] rounded cursor-pointer"
+                              className="w-4 h-4 accent-[var(--accent)] rounded cursor-pointer"
                             />
                           </div>
                         )}
                         <div
-                          className="w-7 h-7 shrink-0 rounded-[7px] flex items-center justify-center text-[11px] shadow-inner transition-colors"
+                          className="w-7 h-7 shrink-0 rounded-md flex items-center justify-center text-[11px] shadow-inner transition-colors"
                           style={{ backgroundColor: alphaColor(templateDesign.primaryColor, 0.12), color: templateDesign.primaryColor || '#155eef' }}
                         >
                           {item.type === '물품신청' ? '📦' : item.type === '양식신청' ? '📄' : item.type === '인사명령' ? '🎖️' : item.type === '수리요청서' ? '🔧' : '📋'}
@@ -1602,13 +1602,13 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                               {templateMeta.name || item.type}
                             </span>
                             <span className={`px-1.5 py-[2px] rounded-md text-[10px] font-semibold ${item.status === '승인' ? 'bg-green-100 text-green-600' : item.status === '반려' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-500'}`}>{item.status}</span>
-                            <span className="px-1.5 py-[2px] bg-[var(--toss-blue-light)] rounded-md text-[10px] font-semibold text-[var(--toss-blue)]">{item.sender_company}</span>
+                            <span className="px-1.5 py-[2px] bg-[var(--toss-blue-light)] rounded-md text-[10px] font-semibold text-[var(--accent)]">{item.sender_company}</span>
                           </div>
                           <h3 className="font-semibold text-[13px] text-[var(--foreground)] tracking-tight line-clamp-2 leading-[1.35]">{item.title}</h3>
                           <p className="text-[10px] text-[var(--toss-gray-3)] font-medium mt-0.5 line-clamp-2 leading-[1.35]">기안자: {item.sender_name || '사용자'} | {new Date(item.created_at).toLocaleDateString()}{item.doc_number && ` | 문서번호: ${item.doc_number}`}</p>
                           {steps.length > 0 && (
                             <div className="mt-0.5 flex flex-wrap gap-0.5">
-                              <span className="inline-flex items-center px-1.5 py-[2px] rounded-md text-[10px] font-semibold bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)]">결재선 {steps.length}명</span>
+                              <span className="inline-flex items-center px-1.5 py-[2px] rounded-md text-[10px] font-semibold bg-[var(--muted)] text-[var(--toss-gray-3)]">결재선 {steps.length}명</span>
                               {item.status === '승인' ? (
                                 <span className="inline-flex items-center px-1.5 py-[2px] rounded-md text-[10px] font-semibold bg-green-50 text-green-600">최종 승인</span>
                               ) : currentStep ? (
@@ -1626,11 +1626,11 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                           const win = window.open('', '_blank')!;
                           win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>결재문서</title><style>body{font-family:'Malgun Gothic',sans-serif;padding:30px;max-width:800px;margin:0 auto}h1{font-size:20px;text-align:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:20px}.meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;font-size:12px}.meta div{border:1px solid #ccc;padding:8px;border-radius:4px}.content{border:1px solid #ccc;padding:15px;min-height:200px;font-size:13px;line-height:1.6;border-radius:4px}.approval-line{margin-top:20px;display:flex;gap:10px}.sig-box{border:1px solid #ccc;padding:10px;min-width:80px;text-align:center;font-size:11px}@media print{button{display:none}}</style></head><body><h1>결 재 문 서</h1><div class="meta"><div><strong>문서번호:</strong> ${item.doc_number || '-'}</div><div><strong>기안일:</strong> ${new Date(item.created_at).toLocaleDateString('ko-KR')}</div><div><strong>기안자:</strong> ${item.sender_name}</div><div><strong>소속:</strong> ${item.sender_company}</div><div><strong>문서종류:</strong> ${item.type}</div><div><strong>상태:</strong> ${item.status}</div></div><h3 style="font-size:16px;margin-bottom:10px">${item.title}</h3><div class="content">${(item.content || '').replace(/\n/g, '<br>')}</div><div class="approval-line">${(item.approver_line || []).map((id: string, i: number) => `<div class="sig-box">${i + 1}단계<br><br><br>(인)</div>`).join('')}</div><script>window.onload=()=>window.print()</script></body></html>`);
                           win.document.close();
-                        }} className="px-2 py-1 bg-gray-50 text-gray-600 border border-gray-200 rounded-[6px] text-[10px] font-semibold hover:bg-gray-100">PDF</button>
+                        }} className="px-2 py-1 bg-[var(--tab-bg)] text-[var(--toss-gray-4)] border border-[var(--border)] rounded-md text-[10px] font-semibold hover:bg-[var(--muted)]">PDF</button>
                         {(viewMode === '결재함' || (viewMode === '기안함' && item.status === '대기')) && canUserApproveItem(item) && (
                           <>
-                            <button type="button" onClick={() => handleApproveAction(item)} className="px-2 py-1 bg-[var(--toss-blue)] text-white rounded-[6px] text-[10px] font-semibold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all">승인</button>
-                            <button type="button" onClick={() => handleRejectAction(item)} className="px-2 py-1 bg-red-50 text-red-600 border border-red-200 rounded-[6px] text-[10px] font-semibold shadow-sm hover:bg-red-100 active:scale-[0.98] transition-all">반려</button>
+                            <button type="button" onClick={() => handleApproveAction(item)} className="px-2 py-1 bg-[var(--accent)] text-white rounded-md text-[10px] font-semibold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all">승인</button>
+                            <button type="button" onClick={() => handleRejectAction(item)} className="px-2 py-1 bg-red-50 text-red-600 border border-red-200 rounded-md text-[10px] font-semibold shadow-sm hover:bg-red-100 active:scale-[0.98] transition-all">반려</button>
                           </>
                         )}
                       </div>
@@ -1646,7 +1646,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       {/* 자동 저장 메시지 (우하단 고정, 작성하기 뷰에서만) */}
       {viewMode === '작성하기' && autoSaveMsg && (
         <div className="fixed bottom-8 right-6 z-[90] pointer-events-none animate-in fade-in duration-300">
-          <span className="text-[11px] font-bold text-[var(--toss-gray-3)] bg-[var(--toss-card)] border border-[var(--toss-border)] px-3 py-2 rounded-[10px] shadow-sm">
+          <span className="text-[11px] font-bold text-[var(--toss-gray-3)] bg-[var(--card)] border border-[var(--border)] px-3 py-2 rounded-[var(--radius-md)] shadow-sm">
             {autoSaveMsg}
           </span>
         </div>
@@ -1659,7 +1659,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
             setViewMode('작성하기');
             if (typeof onViewChange === 'function') onViewChange('작성하기');
           }}
-          className="md:hidden fixed bottom-24 right-6 w-14 h-14 bg-[var(--toss-blue)] text-white rounded-full shadow-2xl flex items-center justify-center z-[80] active:scale-90 transition-transform animate-in zoom-in duration-300"
+          className="md:hidden fixed bottom-24 right-6 w-14 h-14 bg-[var(--accent)] text-white rounded-full shadow-sm flex items-center justify-center z-[80] active:scale-90 transition-transform animate-in zoom-in duration-300"
           aria-label="기안 작성하기"
         >
           <span className="text-3xl">✍️</span>
@@ -1678,11 +1678,11 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
             onClick={() => setSelectedApprovalId(null)}
           >
             <div
-              className="bg-[var(--toss-card)] rounded-t-[16px] md:rounded-[12px] shadow-xl max-w-lg w-full max-h-[90dvh] overflow-hidden flex flex-col"
+              className="bg-[var(--card)] rounded-t-[16px] md:rounded-[var(--radius-md)] shadow-sm max-w-lg w-full max-h-[90dvh] overflow-hidden flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
               <div
-                className="p-4 md:p-6 border-b flex items-center justify-between"
+                className="p-3 md:p-4 border-b flex items-center justify-between"
                 style={{
                   borderColor: alphaColor(templateDesign.borderColor, 0.9),
                   background: `linear-gradient(135deg, ${alphaColor(templateDesign.primaryColor, 0.12)} 0%, rgba(255,255,255,0) 70%)`,
@@ -1697,22 +1697,22 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                   </span>
                   <p className="mt-2 text-[11px] text-[var(--toss-gray-3)]">{templateDesign.subtitle || '전자결재 승인 문서'}</p>
                 </div>
-                <button type="button" onClick={() => setSelectedApprovalId(null)} className="p-2 rounded-[12px] text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]">✕</button>
+                <button type="button" onClick={() => setSelectedApprovalId(null)} className="p-2 rounded-[var(--radius-md)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)]">✕</button>
               </div>
-              <div className="p-4 md:p-6 overflow-y-auto flex-1">
+              <div className="p-4 md:p-4 overflow-y-auto flex-1">
                 <h3 className="font-bold text-[var(--foreground)] text-lg mb-2">{item.title || '(제목 없음)'}</h3>
                 <p className="text-[11px] text-[var(--toss-gray-3)] mb-4">기안자: {item.sender_name} · {new Date(item.created_at).toLocaleString('ko-KR')}</p>
-                <div className="text-sm text-[var(--toss-gray-4)] whitespace-pre-wrap border-t border-[var(--toss-border)] pt-4">{item.content || '-'}</div>
+                <div className="text-sm text-[var(--toss-gray-4)] whitespace-pre-wrap border-t border-[var(--border)] pt-4">{item.content || '-'}</div>
               </div>
               {item.status === '대기' && (
-                <div className="p-4 md:p-6 border-t border-[var(--toss-border)] safe-area-pb">
+                <div className="p-4 md:p-4 border-t border-[var(--border)] safe-area-pb">
                   {canUserApproveItem(item) ? (
                     <div className="flex gap-3">
-                      <button type="button" onClick={async () => { await handleApproveAction(item); setSelectedApprovalId(null); }} className="flex-1 py-3 bg-[var(--toss-blue)] text-white rounded-[16px] text-sm font-bold">승인</button>
-                      <button type="button" onClick={async () => { await handleRejectAction(item); setSelectedApprovalId(null); }} className="flex-1 py-3 bg-red-50 border border-red-200 text-red-600 rounded-[16px] text-sm font-bold hover:bg-red-100 transition-all">반려</button>
+                      <button type="button" onClick={async () => { await handleApproveAction(item); setSelectedApprovalId(null); }} className="flex-1 py-3 bg-[var(--accent)] text-white rounded-[var(--radius-lg)] text-sm font-bold">승인</button>
+                      <button type="button" onClick={async () => { await handleRejectAction(item); setSelectedApprovalId(null); }} className="flex-1 py-3 bg-red-50 border border-red-200 text-red-600 rounded-[var(--radius-lg)] text-sm font-bold hover:bg-red-100 transition-all">반려</button>
                     </div>
                   ) : (
-                    <p className="text-[11px] text-[var(--toss-gray-3)] text-center py-2">승인·반려는 <strong className="text-[var(--toss-blue)]">결재함</strong>에서 결재자 계정으로만 할 수 있습니다. 왼쪽 메뉴에서 <strong>결재함</strong>을 눌러 주세요.</p>
+                    <p className="text-[11px] text-[var(--toss-gray-3)] text-center py-2">승인·반려는 <strong className="text-[var(--accent)]">결재함</strong>에서 결재자 계정으로만 할 수 있습니다. 왼쪽 메뉴에서 <strong>결재함</strong>을 눌러 주세요.</p>
                   )}
                 </div>
               )}
@@ -1724,7 +1724,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       {/* 결재선 템플릿 저장 모달 */}
       {showTemplateModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4" onClick={() => setShowTemplateModal(false)}>
-          <div className="bg-[var(--toss-card)] rounded-[18px] shadow-2xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+          <div className="bg-[var(--card)] rounded-[var(--radius-xl)] shadow-sm p-4 w-full max-w-sm" onClick={e => e.stopPropagation()}>
             <h3 className="text-base font-bold text-[var(--foreground)] mb-1">결재선 템플릿 저장</h3>
             <p className="text-xs text-[var(--toss-gray-3)] mb-4">
               현재 결재선 ({approverLine.length}명)을 이름을 붙여 저장합니다.
@@ -1734,7 +1734,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
             ) : (
               <div className="flex flex-wrap gap-1.5 mb-4">
                 {approverLine.map((a, i) => (
-                  <span key={i} className="px-2 py-1 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] rounded-full text-[10px] font-semibold">
+                  <span key={i} className="px-2 py-1 bg-[var(--toss-blue-light)] text-[var(--accent)] rounded-[var(--radius-md)] text-[10px] font-semibold">
                     {i + 1}. {a.name}
                   </span>
                 ))}
@@ -1745,11 +1745,11 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
               value={templateNameInput}
               onChange={e => setTemplateNameInput(e.target.value)}
               placeholder="템플릿 이름 (예: 연차 기본, 물품 신청)"
-              className="w-full px-4 py-3 border border-[var(--toss-border)] rounded-[12px] text-sm font-semibold bg-[var(--toss-gray-1)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)] mb-4"
+              className="w-full px-4 py-3 border border-[var(--border)] rounded-[var(--radius-md)] text-sm font-semibold bg-[var(--muted)] outline-none focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)] mb-4"
               onKeyDown={e => { if (e.key === 'Enter' && templateNameInput.trim() && approverLine.length > 0) { const newTpl = { id: Date.now().toString(), name: templateNameInput.trim(), line: approverLine }; const next = [...approverTemplates, newTpl]; setApproverTemplates(next); if (typeof window !== 'undefined' && user?.id) window.localStorage.setItem(`erp_approveline_templates_${user.id}`, JSON.stringify(next)); setShowTemplateModal(false); alert(`"${newTpl.name}" 템플릿이 저장되었습니다.`); } }}
             />
             <div className="flex gap-2">
-              <button onClick={() => setShowTemplateModal(false)} className="flex-1 py-3 rounded-[12px] bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] font-semibold text-sm">취소</button>
+              <button onClick={() => setShowTemplateModal(false)} className="flex-1 py-3 rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--toss-gray-4)] font-semibold text-sm">취소</button>
               <button
                 onClick={() => {
                   if (!templateNameInput.trim()) return alert('템플릿 이름을 입력하세요.');
@@ -1763,7 +1763,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                   setShowTemplateModal(false);
                   alert(`"${newTpl.name}" 템플릿이 저장되었습니다.`);
                 }}
-                className="flex-1 py-3 rounded-[12px] bg-[var(--toss-blue)] text-white font-semibold text-sm"
+                className="flex-1 py-3 rounded-[var(--radius-md)] bg-[var(--accent)] text-white font-semibold text-sm"
               >
                 저장
               </button>

@@ -101,9 +101,9 @@ export default function AccessAuditLog({ user }: Props) {
 
   if (!tableExists) {
     return (
-      <div className="p-6 space-y-4 max-w-3xl mx-auto" data-testid="admin-audit-access">
+      <div className="p-4 space-y-4 max-w-3xl mx-auto" data-testid="admin-audit-access">
         <h2 className="text-lg font-bold text-[var(--foreground)]">접근 권한 감사 로그</h2>
-        <div className="p-6 bg-amber-50 border border-amber-200 rounded-[12px]">
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-[var(--radius-md)]">
           <p className="text-sm font-bold text-amber-700">access_logs 테이블이 없습니다.</p>
           <p className="text-xs text-amber-600 mt-2">아래 SQL을 Supabase SQL Editor에서 실행하여 테이블을 생성하세요:</p>
           <pre className="mt-3 p-3 bg-amber-100 text-xs font-mono text-amber-800 rounded overflow-x-auto whitespace-pre-wrap">{`CREATE TABLE access_logs (
@@ -123,32 +123,32 @@ export default function AccessAuditLog({ user }: Props) {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-5 max-w-5xl mx-auto" data-testid="admin-audit-access">
+    <div className="p-4 md:p-4 space-y-4 max-w-5xl mx-auto" data-testid="admin-audit-access">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)]">접근 권한 감사 로그</h2>
         </div>
-        <button onClick={handleCsvDownload} className="px-4 py-2 bg-[var(--toss-blue)] text-white text-xs font-bold rounded-[8px] hover:opacity-90">CSV 내보내기</button>
+        <button onClick={handleCsvDownload} className="px-4 py-2 bg-[var(--accent)] text-white text-xs font-bold rounded-[var(--radius-md)] hover:opacity-90">CSV 내보내기</button>
       </div>
 
       {/* 필터 */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="p-2 text-xs border border-[var(--toss-border)] rounded-[8px] bg-[var(--toss-card)]" />
-        <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="p-2 text-xs border border-[var(--toss-border)] rounded-[8px] bg-[var(--toss-card)]" />
-        <input placeholder="직원명" value={filterUser} onChange={e => setFilterUser(e.target.value)} className="p-2 text-xs border border-[var(--toss-border)] rounded-[8px] bg-[var(--toss-card)]" />
-        <input placeholder="메뉴명" value={filterMenu} onChange={e => setFilterMenu(e.target.value)} className="p-2 text-xs border border-[var(--toss-border)] rounded-[8px] bg-[var(--toss-card)]" />
-        <input placeholder="액션" value={filterAction} onChange={e => setFilterAction(e.target.value)} className="p-2 text-xs border border-[var(--toss-border)] rounded-[8px] bg-[var(--toss-card)]" />
+        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="p-2 text-xs border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--card)]" />
+        <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="p-2 text-xs border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--card)]" />
+        <input placeholder="직원명" value={filterUser} onChange={e => setFilterUser(e.target.value)} className="p-2 text-xs border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--card)]" />
+        <input placeholder="메뉴명" value={filterMenu} onChange={e => setFilterMenu(e.target.value)} className="p-2 text-xs border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--card)]" />
+        <input placeholder="액션" value={filterAction} onChange={e => setFilterAction(e.target.value)} className="p-2 text-xs border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--card)]" />
       </div>
 
       {/* 메뉴별 통계 */}
       {Object.keys(menuStats).length > 0 && (
-        <div className="bg-[var(--toss-card)] rounded-[12px] border border-[var(--toss-border)] p-4">
+        <div className="bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)] p-4">
           <h3 className="text-xs font-bold text-[var(--foreground)] mb-3">메뉴별 접근 통계</h3>
           {Object.entries(menuStats).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([menu, count]) => (
             <div key={menu} className="flex items-center gap-2 mb-1.5">
               <span className="text-[10px] font-bold text-[var(--toss-gray-4)] w-20 shrink-0 truncate">{menu}</span>
-              <div className="flex-1 bg-[var(--toss-gray-1)] rounded-full h-3 overflow-hidden">
-                <div className="h-full bg-[var(--toss-blue)] rounded-full" style={{ width: `${(count / maxMenuCount) * 100}%` }} />
+              <div className="flex-1 bg-[var(--muted)] rounded-full h-3 overflow-hidden">
+                <div className="h-full bg-[var(--accent)] rounded-full" style={{ width: `${(count / maxMenuCount) * 100}%` }} />
               </div>
               <span className="text-[10px] font-bold text-[var(--toss-gray-4)] w-8 text-right">{count}</span>
             </div>
@@ -158,16 +158,16 @@ export default function AccessAuditLog({ user }: Props) {
 
       {/* 로그 테이블 */}
       {loading ? (
-        <div className="text-center py-8 text-sm text-[var(--toss-gray-3)]">로딩 중...</div>
+        <div className="text-center py-5 text-sm text-[var(--toss-gray-3)]">로딩 중...</div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-12 border border-dashed border-[var(--toss-border)] rounded-[12px]">
+        <div className="text-center py-8 border border-dashed border-[var(--border)] rounded-[var(--radius-md)]">
           <p className="text-sm text-[var(--toss-gray-3)]">로그 데이터가 없습니다.</p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-[12px] border border-[var(--toss-border)]">
+        <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border)]">
           <table className="w-full text-[11px]">
             <thead>
-              <tr className="bg-[var(--toss-gray-1)]">
+              <tr className="bg-[var(--muted)]">
                 <th className="p-2 text-left font-bold text-[var(--toss-gray-4)]">시각</th>
                 <th className="p-2 text-left font-bold text-[var(--toss-gray-4)]">직원명</th>
                 <th className="p-2 text-left font-bold text-[var(--toss-gray-4)]">소속</th>
@@ -180,7 +180,7 @@ export default function AccessAuditLog({ user }: Props) {
               {filtered.map(log => {
                 const suspicious = isSuspicious(log);
                 return (
-                  <tr key={log.id} className={`border-t border-[var(--toss-border)] ${suspicious ? 'bg-red-50' : 'hover:bg-[var(--toss-gray-1)]/50'}`}>
+                  <tr key={log.id} className={`border-t border-[var(--border)] ${suspicious ? 'bg-red-50' : 'hover:bg-[var(--muted)]/50'}`}>
                     <td className={`p-2 font-bold ${suspicious ? 'text-red-600' : ''}`}>
                       {new Date(log.created_at).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
                       {suspicious && <span className="ml-1 text-[9px] bg-red-600 text-white px-1 rounded">새벽</span>}

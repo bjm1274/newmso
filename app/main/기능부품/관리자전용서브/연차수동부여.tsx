@@ -106,10 +106,10 @@ export default function AnnualLeaveManualGrant({
 
   if (!canManage) {
     return (
-      <div className="max-w-5xl rounded-[16px] border border-[var(--toss-border)] bg-white p-8 shadow-xl">
+      <div className="max-w-5xl rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
         <h3 className="mb-2 text-xl font-semibold text-[var(--foreground)]">연차 개수 수동 부여</h3>
         <p className="text-sm text-[var(--toss-gray-3)]">
-          <code className="rounded bg-[var(--toss-gray-1)] px-1.5 py-0.5 font-mono text-[11px]">{SYSTEM_MASTER_ACCOUNT_ID}</code>
+          <code className="rounded bg-[var(--muted)] px-1.5 py-0.5 font-mono text-[11px]">{SYSTEM_MASTER_ACCOUNT_ID}</code>
           {' '}계정만 연차 수동 부여를 저장할 수 있습니다.
         </p>
       </div>
@@ -117,18 +117,18 @@ export default function AnnualLeaveManualGrant({
   }
 
   return (
-    <div className="max-w-5xl rounded-[16px] border border-[var(--toss-border)] bg-white p-8 shadow-xl">
-      <h3 className="mb-2 text-xl font-semibold text-[var(--foreground)]">연차 개수 수동 부여</h3>
-      <p className="mb-6 text-[11px] font-bold text-[var(--toss-gray-3)]">
+    <div className="max-w-5xl rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
+      <h3 className="mb-2 text-base font-semibold text-[var(--foreground)]">연차 개수 수동 부여</h3>
+      <p className="mb-3 text-[11px] font-bold text-[var(--toss-gray-3)]">
         신규입사자 포함 모든 직원의 연차 부여일·사용일을 직접 설정할 수 있습니다. 자동 부여 규칙과 무관하게 반영됩니다.
       </p>
 
-      <div className="mb-6 flex items-center gap-4">
+      <div className="mb-3 flex items-center gap-4">
         <label className="text-[11px] font-semibold uppercase text-[var(--toss-gray-3)]">회사</label>
         <select
           value={companyFilter}
           onChange={(event) => setCompanyFilter(event.target.value)}
-          className="rounded-[16px] border border-[var(--toss-border)] px-4 py-2 text-sm font-bold"
+          className="rounded-[var(--radius-lg)] border border-[var(--border)] px-4 py-2 text-sm font-bold"
         >
           <option value="전체">전체</option>
           {companies.map((company) => (
@@ -141,7 +141,7 @@ export default function AnnualLeaveManualGrant({
 
       {message && (
         <div
-          className={`mb-4 rounded-[16px] p-3 text-sm font-bold ${
+          className={`mb-3 rounded-[var(--radius-lg)] p-3 text-sm font-bold ${
             message.includes('실패') ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'
           }`}
         >
@@ -152,7 +152,7 @@ export default function AnnualLeaveManualGrant({
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-left">
           <thead>
-            <tr className="border-b border-[var(--toss-border)]">
+            <tr className="border-b border-[var(--border)]">
               <th className="pb-3 text-[11px] font-semibold uppercase text-[var(--toss-gray-3)]">이름</th>
               <th className="pb-3 text-[11px] font-semibold uppercase text-[var(--toss-gray-3)]">회사/부서</th>
               <th className="pb-3 text-[11px] font-semibold uppercase text-[var(--toss-gray-3)]">입사일</th>
@@ -163,7 +163,7 @@ export default function AnnualLeaveManualGrant({
           </thead>
           <tbody>
             {filtered.map((staff: any) => (
-              <tr key={staff.id} className="border-b border-[var(--toss-border)]">
+              <tr key={staff.id} className="border-b border-[var(--border)]">
                 <td className="py-3 font-bold text-[var(--foreground)]">{staff.name}</td>
                 <td className="py-3 text-xs text-[var(--toss-gray-3)]">
                   {staff.company} / {staff.department || '-'}
@@ -176,7 +176,7 @@ export default function AnnualLeaveManualGrant({
                     step={0.5}
                     value={getTotal(staff)}
                     onChange={(event) => setTotal(staff.id, Number(event.target.value) || 0)}
-                    className="w-20 rounded-[12px] border border-[var(--toss-border)] p-2 text-sm font-bold"
+                    className="w-20 rounded-[var(--radius-md)] border border-[var(--border)] p-2 text-sm font-bold"
                   />
                 </td>
                 <td className="py-3">
@@ -186,7 +186,7 @@ export default function AnnualLeaveManualGrant({
                     step={0.5}
                     value={getUsed(staff)}
                     onChange={(event) => setUsed(staff.id, Number(event.target.value) || 0)}
-                    className="w-20 rounded-[12px] border border-[var(--toss-border)] p-2 text-sm font-bold"
+                    className="w-20 rounded-[var(--radius-md)] border border-[var(--border)] p-2 text-sm font-bold"
                   />
                 </td>
                 <td className="py-3">
@@ -194,7 +194,7 @@ export default function AnnualLeaveManualGrant({
                     type="button"
                     onClick={() => void handleSaveOne(staff)}
                     disabled={saving}
-                    className="rounded-[12px] bg-[var(--toss-blue)] px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50"
+                    className="rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50"
                   >
                     저장
                   </button>
@@ -206,7 +206,7 @@ export default function AnnualLeaveManualGrant({
       </div>
 
       {filtered.length === 0 && (
-        <p className="py-8 text-center font-bold text-[var(--toss-gray-3)]">표시할 직원이 없습니다.</p>
+        <p className="py-5 text-center font-bold text-[var(--toss-gray-3)]">표시할 직원이 없습니다.</p>
       )}
 
       {filtered.length > 0 && (
@@ -214,7 +214,7 @@ export default function AnnualLeaveManualGrant({
           type="button"
           onClick={() => void handleSaveAll()}
           disabled={saving}
-          className="mt-6 w-full rounded-[12px] bg-teal-600 py-4 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-50"
+          className="mt-4 w-full rounded-[var(--radius-md)] bg-teal-600 py-2 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-50"
         >
           {saving ? '저장 중...' : `위 ${filtered.length}명 일괄 저장`}
         </button>

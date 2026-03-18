@@ -46,13 +46,13 @@ export default function AttendanceDeductionRules({ selectedCo = '전체' }: any)
     setSaving(false);
   };
 
-  if (loading || !rules) return <div className="p-8">로딩 중...</div>;
+  if (loading || !rules) return <div className="p-5">로딩 중...</div>;
 
   return (
-    <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] p-8 shadow-xl max-w-2xl">
-      <h3 className="text-xl font-bold text-[var(--foreground)] mb-2">근태 차감 규칙 설정</h3>
+    <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-4 shadow-sm max-w-2xl">
+      <h3 className="text-base font-bold text-[var(--foreground)] mb-2">근태 차감 규칙 설정</h3>
 
-      <div className="space-y-6">
+      <div className="space-y-4">
         <div>
           <label className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">지각 차감 방식</label>
           <div className="flex gap-4 mt-2">
@@ -67,7 +67,7 @@ export default function AttendanceDeductionRules({ selectedCo = '전체' }: any)
           </div>
           {rules.late_deduction_type === 'fixed' && (
             <div className="mt-2">
-              <input type="number" value={rules.late_deduction_amount || 0} onChange={e => setRules({ ...rules, late_deduction_amount: Number(e.target.value) })} className="w-32 p-3 border rounded-[12px] text-sm font-bold" />
+              <input type="number" value={rules.late_deduction_amount || 0} onChange={e => setRules({ ...rules, late_deduction_amount: Number(e.target.value) })} className="w-32 p-2 border rounded-[var(--radius-md)] text-sm font-bold" />
               <span className="ml-2 text-xs font-bold text-[var(--toss-gray-4)]">원/회</span>
             </div>
           )}
@@ -87,7 +87,7 @@ export default function AttendanceDeductionRules({ selectedCo = '전체' }: any)
           </div>
           {rules.early_leave_deduction_type === 'fixed' && (
             <div className="mt-2">
-              <input type="number" value={rules.early_leave_deduction_amount || 0} onChange={e => setRules({ ...rules, early_leave_deduction_amount: Number(e.target.value) })} className="w-32 p-3 border rounded-[12px] text-sm font-bold" />
+              <input type="number" value={rules.early_leave_deduction_amount || 0} onChange={e => setRules({ ...rules, early_leave_deduction_amount: Number(e.target.value) })} className="w-32 p-2 border rounded-[var(--radius-md)] text-sm font-bold" />
               <span className="ml-2 text-xs font-bold text-[var(--toss-gray-4)]">원/회</span>
             </div>
           )}
@@ -99,7 +99,7 @@ export default function AttendanceDeductionRules({ selectedCo = '전체' }: any)
         </div>
       </div>
 
-      <button onClick={handleSave} disabled={saving} className="mt-8 w-full py-4 bg-[var(--toss-blue)] text-white font-bold rounded-[16px] text-sm hover:bg-[var(--toss-blue)] disabled:opacity-50">
+      <button onClick={handleSave} disabled={saving} className="mt-4 w-full py-2 bg-[var(--accent)] text-white font-bold rounded-[var(--radius-md)] text-sm hover:bg-[var(--accent)] disabled:opacity-50">
         {saving ? '저장 중...' : '규칙 저장'}
       </button>
     </div>

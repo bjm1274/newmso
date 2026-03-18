@@ -101,21 +101,21 @@ export default function DeliveryConfirmation({ user, selectedCo }: { user: any; 
   };
 
   return (
-    <div className="p-4 md:p-8 space-y-5">
+    <div className="p-4 space-y-4">
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div>
           <h2 className="text-base font-bold text-[var(--foreground)]">납품 확인서 자동 생성</h2>
           <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">납품 확인서를 작성하고 인쇄합니다.</p>
         </div>
         <button onClick={() => { setForm(prev => ({ ...prev, doc_number: autoDocNumber(), receiver_company: selectedCo === '전체' ? '' : selectedCo })); setShowForm(v => !v); }}
-          className="px-4 py-2 bg-[var(--toss-blue)] text-white rounded-[10px] text-sm font-bold shadow-sm hover:opacity-90">
+          className="px-4 py-2 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-sm font-bold shadow-sm hover:opacity-90">
           {showForm ? '닫기' : '+ 새 납품확인서'}
         </button>
       </div>
 
       {/* 작성 폼 */}
       {showForm && (
-        <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] p-5 shadow-sm space-y-4">
+        <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-4 shadow-sm space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {[
               { label: '문서번호', key: 'doc_number', placeholder: '자동 생성' },
@@ -130,7 +130,7 @@ export default function DeliveryConfirmation({ user, selectedCo }: { user: any; 
               <div key={key}>
                 <label className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">{label}</label>
                 <input type={type || 'text'} value={(form as any)[key]} onChange={e => setForm(prev => ({ ...prev, [key]: e.target.value }))}
-                  placeholder={placeholder} className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm bg-[var(--toss-card)] outline-none" />
+                  placeholder={placeholder} className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none" />
               </div>
             ))}
           </div>
@@ -139,11 +139,11 @@ export default function DeliveryConfirmation({ user, selectedCo }: { user: any; 
           <div>
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs font-bold text-[var(--foreground)]">품목 목록</p>
-              <button onClick={addItem} className="px-2 py-1 text-[10px] bg-green-50 text-green-700 font-bold rounded-[6px]">+ 품목 추가</button>
+              <button onClick={addItem} className="px-2 py-1 text-[10px] bg-green-50 text-green-700 font-bold rounded-md">+ 품목 추가</button>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left" style={{ minWidth: '600px' }}>
-                <thead className="bg-[var(--toss-gray-1)] border border-[var(--toss-border)]">
+                <thead className="bg-[var(--muted)] border border-[var(--border)]">
                   <tr>
                     {['품목명', '규격', '단위', '수량', '단가', '금액', ''].map(h => (
                       <th key={h} className="px-2 py-2 text-[10px] font-semibold text-[var(--toss-gray-3)]">{h}</th>
@@ -152,19 +152,19 @@ export default function DeliveryConfirmation({ user, selectedCo }: { user: any; 
                 </thead>
                 <tbody>
                   {form.items.map((item, idx) => (
-                    <tr key={idx} className="border-b border-[var(--toss-border)]">
-                      <td className="px-1 py-1"><input value={item.name} onChange={e => updateItem(idx, 'name', e.target.value)} className="w-full px-2 py-1 border border-[var(--toss-border)] rounded text-xs outline-none" /></td>
-                      <td className="px-1 py-1"><input value={item.spec} onChange={e => updateItem(idx, 'spec', e.target.value)} className="w-24 px-2 py-1 border border-[var(--toss-border)] rounded text-xs outline-none" /></td>
-                      <td className="px-1 py-1"><input value={item.unit} onChange={e => updateItem(idx, 'unit', e.target.value)} className="w-14 px-2 py-1 border border-[var(--toss-border)] rounded text-xs outline-none" /></td>
-                      <td className="px-1 py-1"><input type="number" value={item.quantity} onChange={e => updateItem(idx, 'quantity', Number(e.target.value))} className="w-16 px-2 py-1 border border-[var(--toss-border)] rounded text-xs outline-none" /></td>
-                      <td className="px-1 py-1"><input type="number" value={item.unit_price} onChange={e => updateItem(idx, 'unit_price', Number(e.target.value))} className="w-24 px-2 py-1 border border-[var(--toss-border)] rounded text-xs outline-none" /></td>
+                    <tr key={idx} className="border-b border-[var(--border)]">
+                      <td className="px-1 py-1"><input value={item.name} onChange={e => updateItem(idx, 'name', e.target.value)} className="w-full px-2 py-1 border border-[var(--border)] rounded text-xs outline-none" /></td>
+                      <td className="px-1 py-1"><input value={item.spec} onChange={e => updateItem(idx, 'spec', e.target.value)} className="w-24 px-2 py-1 border border-[var(--border)] rounded text-xs outline-none" /></td>
+                      <td className="px-1 py-1"><input value={item.unit} onChange={e => updateItem(idx, 'unit', e.target.value)} className="w-14 px-2 py-1 border border-[var(--border)] rounded text-xs outline-none" /></td>
+                      <td className="px-1 py-1"><input type="number" value={item.quantity} onChange={e => updateItem(idx, 'quantity', Number(e.target.value))} className="w-16 px-2 py-1 border border-[var(--border)] rounded text-xs outline-none" /></td>
+                      <td className="px-1 py-1"><input type="number" value={item.unit_price} onChange={e => updateItem(idx, 'unit_price', Number(e.target.value))} className="w-24 px-2 py-1 border border-[var(--border)] rounded text-xs outline-none" /></td>
                       <td className="px-2 py-1 text-xs font-bold text-right">{item.amount.toLocaleString()}</td>
                       <td className="px-1 py-1"><button onClick={() => removeItem(idx)} className="px-1.5 py-0.5 text-[9px] bg-red-50 text-red-500 rounded">삭제</button></td>
                     </tr>
                   ))}
-                  <tr className="bg-[var(--toss-gray-1)]">
+                  <tr className="bg-[var(--muted)]">
                     <td colSpan={5} className="px-2 py-2 text-xs font-bold text-right">합계</td>
-                    <td className="px-2 py-2 text-sm font-bold text-[var(--toss-blue)]">{totalAmount.toLocaleString()}원</td>
+                    <td className="px-2 py-2 text-sm font-bold text-[var(--accent)]">{totalAmount.toLocaleString()}원</td>
                     <td />
                   </tr>
                 </tbody>
@@ -173,29 +173,29 @@ export default function DeliveryConfirmation({ user, selectedCo }: { user: any; 
           </div>
 
           <div className="flex gap-2">
-            <button onClick={handleSave} disabled={saving} className="px-6 py-2.5 bg-[var(--toss-blue)] text-white rounded-[12px] text-sm font-bold disabled:opacity-50">{saving ? '저장 중...' : '저장'}</button>
-            <button onClick={() => setShowForm(false)} className="px-6 py-2.5 bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] rounded-[12px] text-sm font-bold">취소</button>
+            <button onClick={handleSave} disabled={saving} className="px-4 py-2 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-sm font-bold disabled:opacity-50">{saving ? '저장 중...' : '저장'}</button>
+            <button onClick={() => setShowForm(false)} className="px-4 py-2 bg-[var(--muted)] text-[var(--toss-gray-4)] rounded-[var(--radius-md)] text-sm font-bold">취소</button>
           </div>
         </div>
       )}
 
       {/* 목록 */}
       {deliveries.length === 0 ? (
-        <div className="text-center py-16 text-[var(--toss-gray-3)] font-bold text-sm">납품확인서가 없습니다.</div>
+        <div className="text-center py-10 text-[var(--toss-gray-3)] font-bold text-sm">납품확인서가 없습니다.</div>
       ) : (
         <div className="space-y-2">
           {deliveries.map(d => (
-            <div key={d.id} className="flex items-center justify-between p-4 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[14px] shadow-sm">
+            <div key={d.id} className="flex items-center justify-between p-3 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] shadow-sm">
               <div>
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-bold text-[var(--foreground)]">{d.doc_number}</p>
-                  <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-blue-100 text-blue-700">납품확인서</span>
+                  <span className="px-2 py-0.5 rounded-[var(--radius-md)] text-[9px] font-bold bg-blue-100 text-blue-700">납품확인서</span>
                 </div>
                 <p className="text-[10px] text-[var(--toss-gray-3)]">{d.supplier_name} → {d.receiver_company} · {d.issue_date}</p>
-                <p className="text-[10px] font-bold text-[var(--toss-blue)]">합계: {(d.total_amount || 0).toLocaleString()}원</p>
+                <p className="text-[10px] font-bold text-[var(--accent)]">합계: {(d.total_amount || 0).toLocaleString()}원</p>
               </div>
               <div className="flex gap-1.5">
-                <button onClick={() => printDelivery(d)} className="px-3 py-1.5 text-[10px] bg-green-50 text-green-700 font-bold rounded-[8px] hover:bg-green-100">인쇄</button>
+                <button onClick={() => printDelivery(d)} className="px-3 py-1.5 text-[10px] bg-green-50 text-green-700 font-bold rounded-[var(--radius-md)] hover:bg-green-100">인쇄</button>
               </div>
             </div>
           ))}

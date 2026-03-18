@@ -87,7 +87,7 @@ export default function SmartDatePicker({
             <button
                 type="button"
                 onClick={handleIconClick}
-                className="absolute inset-y-0 right-3 text-[var(--toss-gray-3)] hover:text-[var(--toss-blue)] transition-colors cursor-pointer flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed group-hover:text-[var(--toss-blue)]"
+                className="absolute inset-y-0 right-3 text-[var(--toss-gray-3)] hover:text-[var(--accent)] transition-colors cursor-pointer flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed group-hover:text-[var(--accent)]"
                 tabIndex={-1}
                 disabled={disabled}
             >

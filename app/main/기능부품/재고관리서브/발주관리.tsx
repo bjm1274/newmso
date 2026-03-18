@@ -85,7 +85,7 @@ function getStatusTone(status: string, sourceType: OrderRecord['sourceType']) {
   if (status === '승인') return 'bg-emerald-50 text-emerald-600';
   if (status === '반려') return 'bg-red-50 text-red-600';
   if (sourceType === 'approval') return 'bg-orange-50 text-orange-600';
-  return 'bg-slate-100 text-slate-600';
+  return 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]';
 }
 
 export default function PurchaseOrderManagement({
@@ -250,12 +250,12 @@ export default function PurchaseOrderManagement({
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500" data-testid="purchase-order-management-view">
-      <div className="bg-white p-6 md:p-10 border border-[var(--toss-border)] shadow-xl rounded-[2.5rem]">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+    <div className="space-y-4 animate-in fade-in duration-500" data-testid="purchase-order-management-view">
+      <div className="bg-[var(--card)] p-4 border border-[var(--border)] shadow-sm rounded-[var(--radius-lg)]">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-3">
           <div>
-            <h2 className="text-2xl font-semibold text-[var(--foreground)] tracking-tight">발주 관리</h2>
-            <p className="mt-2 text-sm text-[var(--toss-gray-3)]">
+            <h2 className="text-base font-bold text-[var(--foreground)] tracking-tight">발주 관리</h2>
+            <p className="mt-1 text-xs text-[var(--toss-gray-3)]">
               자동 발주 승인안과 일반 발주서를 한 화면에서 확인할 수 있습니다.
             </p>
           </div>
@@ -263,22 +263,22 @@ export default function PurchaseOrderManagement({
             onClick={handleAutoGeneratePurchaseOrder}
             disabled={loading || lowStockItems.length === 0}
             data-testid="purchase-order-auto-generate"
-            className="w-full md:w-auto px-8 py-4 bg-orange-600 text-white rounded-[12px] text-sm font-semibold shadow-xl shadow-orange-100 hover:scale-[0.98] transition-all disabled:opacity-50"
+            className="w-full md:w-auto px-4 py-2 bg-orange-600 text-white rounded-[var(--radius-md)] text-sm font-semibold shadow-sm shadow-orange-100 hover:scale-[0.98] transition-all disabled:opacity-50"
           >
             부족 품목 자동 발주 생성 ({lowStockItems.length})
           </button>
         </div>
 
         {lowStockItems.length === 0 ? (
-          <div className="text-center py-20 bg-green-50 rounded-[16px] border border-dashed border-green-200">
+          <div className="text-center py-10 bg-green-50 rounded-[var(--radius-md)] border border-dashed border-green-200">
             <p className="text-sm font-semibold text-green-600">현재 모든 품목이 안전재고 이상입니다.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
             {lowStockItems.map((item: any) => (
               <div
                 key={item.id}
-                className="p-6 bg-orange-50 border border-orange-100 rounded-[12px] flex justify-between items-center"
+                className="p-4 bg-orange-50 border border-orange-100 rounded-[var(--radius-md)] flex justify-between items-center"
               >
                 <div>
                   <p className="text-sm font-semibold text-[var(--foreground)]">{getItemName(item)}</p>
@@ -286,7 +286,7 @@ export default function PurchaseOrderManagement({
                     현재 {getItemQuantity(item)}개 / 최소 {getItemMinQuantity(item)}개
                   </p>
                 </div>
-                <span className="px-3 py-1 bg-orange-600 text-white rounded-full text-[11px] font-semibold">
+                <span className="px-3 py-1 bg-orange-600 text-white rounded-[var(--radius-md)] text-[11px] font-semibold">
                   보충 필요
                 </span>
               </div>
@@ -295,25 +295,25 @@ export default function PurchaseOrderManagement({
         )}
       </div>
 
-      <div className="bg-white p-6 md:p-10 border border-[var(--toss-border)] shadow-xl rounded-[2.5rem]">
-        <div className="mb-8 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+      <div className="bg-[var(--card)] p-4 border border-[var(--border)] shadow-sm rounded-[var(--radius-lg)]">
+        <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
           <div>
-            <h3 className="text-xl font-semibold text-[var(--foreground)] tracking-tight">발주 이력 및 상태</h3>
-            <p className="mt-1 text-xs text-[var(--toss-gray-3)]">
+            <h3 className="text-sm font-bold text-[var(--foreground)] tracking-tight">발주 이력 및 상태</h3>
+            <p className="mt-0.5 text-xs text-[var(--toss-gray-3)]">
               물품신청에서 넘어온 자동 발주와 직접 생성한 발주서를 함께 표시합니다.
             </p>
           </div>
-          <span className="rounded-full bg-[var(--toss-gray-1)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-4)]">
+          <span className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-4)]">
             총 {orderRecords.length}건
           </span>
         </div>
 
         {orderRecords.length === 0 ? (
-          <div className="text-center py-20 bg-[var(--toss-gray-1)] rounded-[16px] border border-dashed border-[var(--toss-border)]">
+          <div className="text-center py-10 bg-[var(--muted)] rounded-[var(--radius-md)] border border-dashed border-[var(--border)]">
             <p className="text-sm font-semibold text-[var(--toss-gray-3)]">발주 이력이 없습니다.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-6">
+          <div className="grid grid-cols-1 gap-3">
             {orderRecords.map((order) => {
               const sourceKey = buildSourceKey(order.sourceApprovalId, order.sourceRequestIndex);
               const testId =
@@ -325,46 +325,46 @@ export default function PurchaseOrderManagement({
               return (
                 <div
                   key={`${order.sourceType}-${order.id}`}
-                  className={`p-8 border rounded-[16px] transition-all bg-white ${
+                  className={`p-4 border rounded-[var(--radius-md)] transition-all bg-[var(--card)] ${
                     isHighlighted
-                      ? 'border-[var(--toss-blue)] ring-2 ring-[var(--toss-blue)]/20 shadow-lg'
-                      : 'border-[var(--toss-border)] hover:shadow-lg'
+                      ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]/20 shadow-sm'
+                      : 'border-[var(--border)] hover:shadow-sm'
                   }`}
                   data-testid={testId}
                   data-source-key={sourceKey || ''}
                   data-highlighted={isHighlighted ? 'true' : 'false'}
                 >
-                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between mb-6">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between mb-3">
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-lg font-semibold text-[var(--foreground)]">
+                        <p className="text-sm font-bold text-[var(--foreground)]">
                           {order.sourceType === 'approval' ? '전자결재 연동 발주' : `발주서 #${order.id.slice(0, 8)}`}
                         </p>
                         <span
-                          className={`px-3 py-1 rounded-full text-[11px] font-semibold ${getStatusTone(order.status, order.sourceType)}`}
+                          className={`px-2 py-0.5 rounded-[var(--radius-md)] text-[11px] font-semibold ${getStatusTone(order.status, order.sourceType)}`}
                         >
                           {order.status}
                         </span>
                         {order.sourceType === 'approval' && (
-                          <span className="rounded-full bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--toss-blue)]">
+                          <span className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-2 py-0.5 text-[11px] font-bold text-[var(--accent)]">
                             물품신청 연동
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] text-[var(--toss-gray-3)] font-bold mt-2 uppercase tracking-widest">
+                      <p className="text-[11px] text-[var(--toss-gray-3)] font-bold mt-1 uppercase tracking-widest">
                         {new Date(order.created_at).toLocaleDateString()} | {order.supplier_name || '미정'}
                       </p>
                       {order.requestTitle && (
-                        <p className="mt-2 text-xs font-semibold text-[var(--foreground)]">
+                        <p className="mt-1 text-xs font-semibold text-[var(--foreground)]">
                           원본 문서: {order.requestTitle}
                         </p>
                       )}
                       {order.requesterName && (
-                        <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">요청자: {order.requesterName}</p>
+                        <p className="mt-0.5 text-[11px] text-[var(--toss-gray-3)]">요청자: {order.requesterName}</p>
                       )}
                     </div>
                     {order.sourceType === 'approval' ? (
-                      <div className="rounded-[14px] bg-orange-50 px-4 py-3 text-[11px] font-semibold text-orange-600">
+                      <div className="rounded-[var(--radius-md)] bg-orange-50 px-3 py-2 text-[11px] font-semibold text-orange-600">
                         {order.status === '승인' ? '전자결재 승인 완료' : '전자결재 승인 대기'}
                       </div>
                     ) : (
@@ -372,7 +372,7 @@ export default function PurchaseOrderManagement({
                         <button
                           onClick={() => handleApprovePurchaseOrder(order.id)}
                           data-testid={`purchase-order-approve-${order.id}`}
-                          className="w-full md:w-auto py-4 px-6 bg-green-600 text-white rounded-[16px] font-semibold text-xs shadow-lg hover:scale-[0.98] transition-all"
+                          className="w-full md:w-auto py-2 px-4 bg-green-600 text-white rounded-[var(--radius-md)] font-semibold text-xs shadow-sm hover:scale-[0.98] transition-all"
                         >
                           발주 확인
                         </button>
@@ -380,7 +380,7 @@ export default function PurchaseOrderManagement({
                     )}
                   </div>
 
-                  <div className="bg-[var(--toss-gray-1)] p-6 rounded-[12px] mb-4">
+                  <div className="bg-[var(--muted)] p-3 rounded-[var(--radius-md)] mb-3">
                     <div className="space-y-2">
                       {(order.items || []).map((item: any, idx: number) => (
                         <div
@@ -397,9 +397,9 @@ export default function PurchaseOrderManagement({
                         </div>
                       ))}
                     </div>
-                    <div className="mt-4 pt-4 border-t border-[var(--toss-border)] flex justify-between items-center">
+                    <div className="mt-3 pt-3 border-t border-[var(--border)] flex justify-between items-center">
                       <span className="text-xs font-semibold text-[var(--foreground)]">총 발주액</span>
-                      <span className="text-lg font-semibold text-[var(--toss-blue)]">
+                      <span className="text-base font-bold text-[var(--accent)]">
                         {Number(order.total_amount || 0).toLocaleString('ko-KR')}원
                       </span>
                     </div>

@@ -200,12 +200,12 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
   };
 
   return (
-    <div data-testid="commute-record-view" className="bg-[var(--toss-card)] border border-[var(--toss-border)] shadow-sm rounded-[2.5rem] px-6 py-7 sm:p-8 h-full flex flex-col space-y-7">
+    <div data-testid="commute-record-view" className="bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-2xl px-4 py-5 sm:p-5 h-full flex flex-col space-y-7">
 
       {/* 실시간 상태 카드 */}
-      <div className="flex justify-between items-center bg-[var(--foreground)] px-6 py-6 sm:px-8 sm:py-7 rounded-[16px] text-white shadow-2xl relative overflow-hidden">
+      <div className="flex justify-between items-center bg-[var(--foreground)] px-4 py-4 sm:px-5 sm:py-5 rounded-[var(--radius-lg)] text-white shadow-sm relative overflow-hidden">
         {/* 배경 장식 */}
-        <div className="absolute -right-10 -top-10 w-40 h-40 bg-[var(--toss-card)] opacity-5 rounded-full blur-3xl"></div>
+        <div className="absolute -right-10 -top-10 w-40 h-40 bg-[var(--card)] opacity-5 rounded-full blur-3xl"></div>
 
         <div className="space-y-2 z-10">
           <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight">{currentTime.toLocaleTimeString('ko-KR')}</h2>
@@ -228,7 +228,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
               data-testid="commute-check-in-button"
               onClick={() => handleCommute('in')}
               disabled={isProcessing}
-              className="px-10 py-5 bg-[var(--toss-blue)] hover:opacity-90 rounded-[12px] font-semibold text-lg shadow-lg active:scale-95 transition-all flex flex-col items-center leading-none gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-10 py-5 bg-[var(--accent)] hover:opacity-90 rounded-[var(--radius-md)] font-semibold text-lg shadow-sm active:scale-95 transition-all flex flex-col items-center leading-none gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span>{isProcessing ? '위치 확인 처리 중...' : '출근하기 ☀️'}</span>
               <span className="text-[11px] font-normal opacity-70">GPS 인증 필요</span>
@@ -239,7 +239,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
               data-testid="commute-check-out-button"
               onClick={() => handleCommute('out')}
               disabled={isProcessing}
-              className="px-10 py-5 bg-red-600 hover:bg-red-500 rounded-[12px] font-semibold text-lg shadow-lg active:scale-95 transition-all flex flex-col items-center leading-none gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-10 py-5 bg-red-600 hover:bg-red-500 rounded-[var(--radius-md)] font-semibold text-lg shadow-sm active:scale-95 transition-all flex flex-col items-center leading-none gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span>{isProcessing ? '위치 확인 처리 중...' : '퇴근하기 🌙'}</span>
               <span className="text-[11px] font-normal opacity-70">GPS 인증 필요</span>
@@ -249,7 +249,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
       </div>
 
       {/* 통계 */}
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-3 gap-4">
         <StatItem label="이번 달 근무" value={`${logs.length}일`} />
         <StatItem label="지각" value={`${logs.filter(l => l.status === '지각').length}회`} isWarning />
         <StatItem label="정상 출근" value={`${logs.filter(l => l.status === '정상').length}회`} isSuccess />
@@ -257,12 +257,12 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
 
       {/* 리스트 */}
       <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center mb-4">
           <h3 className="text-xl font-semibold text-[var(--foreground)] tracking-tight">근무 히스토리</h3>
           <div className="flex gap-2">
-            <button onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))} className="p-2 border rounded-full hover:bg-[var(--toss-gray-1)]">◀</button>
+            <button onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))} className="p-2 border rounded-[var(--radius-md)] hover:bg-[var(--muted)]">◀</button>
             <span className="font-semibold px-2">{currentMonth.getFullYear()}. {currentMonth.getMonth() + 1}</span>
-            <button onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))} className="p-2 border rounded-full hover:bg-[var(--toss-gray-1)]">▶</button>
+            <button onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))} className="p-2 border rounded-[var(--radius-md)] hover:bg-[var(--muted)]">▶</button>
           </div>
         </div>
 
@@ -272,11 +272,11 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
             return (
               <div
                 key={log.id}
-                className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-5 bg-[var(--toss-gray-1)] rounded-[12px] border border-transparent hover:border-[var(--toss-border)] transition-all"
+                className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-5 bg-[var(--muted)] rounded-[var(--radius-md)] border border-transparent hover:border-[var(--border)] transition-all"
               >
-                <div className="flex items-center gap-6">
+                <div className="flex items-center gap-4">
                   <div
-                    className={`w-14 h-14 rounded-[12px] flex flex-col items-center justify-center font-semibold ${log.status === '지각' ? 'bg-red-100 text-red-600' : 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)]'
+                    className={`w-14 h-14 rounded-[var(--radius-md)] flex flex-col items-center justify-center font-semibold ${log.status === '지각' ? 'bg-red-100 text-red-600' : 'bg-[var(--toss-blue-light)] text-[var(--accent)]'
                       }`}
                   >
                     <span className="text-[11px] opacity-60">{workDate.getMonth() + 1}월</span>
@@ -289,8 +289,8 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
                     <p className="font-semibold text-[var(--foreground)]">{log.status}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-6 md:gap-10 justify-between md:justify-end w-full">
-                  <div className="flex gap-6">
+                <div className="flex items-center gap-4 md:gap-5 justify-between md:justify-end w-full">
+                  <div className="flex gap-4">
                     <TimeBox label="출근" time={formatTime(log.check_in)} />
                     <TimeBox label="퇴근" time={formatTime(log.check_out)} />
                   </div>
@@ -298,7 +298,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
                     <button
                       type="button"
                       onClick={() => onRequestCorrection(log)}
-                      className="px-3 py-2 rounded-[16px] text-[11px] font-semibold border border-[var(--toss-blue-light)] text-[var(--toss-blue)] bg-[var(--toss-card)] hover:bg-[var(--toss-blue-light)] shrink-0"
+                      className="px-3 py-2 rounded-[var(--radius-lg)] text-[11px] font-semibold border border-[var(--toss-blue-light)] text-[var(--accent)] bg-[var(--card)] hover:bg-[var(--toss-blue-light)] shrink-0"
                     >
                       정정 요청
                     </button>
@@ -315,9 +315,9 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
 
 function StatItem({ label, value, isWarning, isSuccess }: any) {
   return (
-    <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] p-6 rounded-[16px] text-center shadow-sm">
+    <div className="bg-[var(--card)] border border-[var(--border)] p-4 rounded-[var(--radius-lg)] text-center shadow-sm">
       <p className="text-[11px] font-bold text-[var(--toss-gray-3)] mb-2 uppercase">{label}</p>
-      <p className={`text-2xl font-semibold ${isWarning ? 'text-red-500' : isSuccess ? 'text-[var(--toss-blue)]' : 'text-[var(--foreground)]'}`}>{value}</p>
+      <p className={`text-2xl font-semibold ${isWarning ? 'text-red-500' : isSuccess ? 'text-[var(--accent)]' : 'text-[var(--foreground)]'}`}>{value}</p>
     </div>
   );
 }

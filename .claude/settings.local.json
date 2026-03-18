@@ -16,7 +16,11 @@
       "Bash(__NEW_LINE_2fe8fbdb1230d24e__ curl:*)",
       "Bash(grep:*)",
       "Bash(rm:*)",
-      "Bash(npx next build)"
+      "Bash(npx next build)",
+      "Bash(xargs perl:*)",
+      "Bash(while read:*)",
+      "Bash(do perl:*)",
+      "Bash(/dev/null done:*)"
     ]
   }
 }

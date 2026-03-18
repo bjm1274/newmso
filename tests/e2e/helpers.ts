@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page, Route } from '@playwright/test';
+import { DEFAULT_INCOME_TAX_BRACKET } from '../../lib/use-tax-insurance-rates';
 import { SUPABASE_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/supabase-bridge';
 import { createSupabaseAccessToken } from '../../lib/server-supabase-bridge';
 import {
@@ -95,6 +96,8 @@ export const fakeUser = {
 export type MockFixtures = {
   staffMembers?: any[];
   notifications?: any[];
+  emailQueue?: any[];
+  taxReports?: any[];
   chatRooms?: any[];
   messages?: any[];
   pinnedMessages?: any[];
@@ -269,6 +272,8 @@ function buildFixtures(overrides: MockFixtures = {}) {
   return {
     staffMembers: overrides.staffMembers ?? [fakeUser],
     notifications: overrides.notifications ?? [],
+    emailQueue: overrides.emailQueue ?? [],
+    taxReports: overrides.taxReports ?? [],
     chatRooms:
       overrides.chatRooms ??
       [
@@ -385,7 +390,7 @@ function buildFixtures(overrides: MockFixtures = {}) {
           health_insurance_rate: 0.0355,
           long_term_care_rate: 0.0046,
           employment_insurance_rate: 0.009,
-          income_tax_bracket: [{ min: 0, rate: 0.03 }],
+            income_tax_bracket: DEFAULT_INCOME_TAX_BRACKET,
         },
         {
           id: 'tax-rate-default-all',
@@ -395,7 +400,7 @@ function buildFixtures(overrides: MockFixtures = {}) {
           health_insurance_rate: 0.0355,
           long_term_care_rate: 0.0046,
           employment_insurance_rate: 0.009,
-          income_tax_bracket: [{ min: 0, rate: 0.03 }],
+            income_tax_bracket: DEFAULT_INCOME_TAX_BRACKET,
         },
       ],
     systemConfigs:
@@ -546,6 +551,8 @@ export async function dismissDialogs(page: Page) {
 export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
   const fixtures = buildFixtures(overrides);
   let notifications = [...fixtures.notifications];
+  let emailQueue = [...fixtures.emailQueue];
+  let taxReports = [...fixtures.taxReports];
   let staffMembers = [...fixtures.staffMembers];
   let approvals = [...fixtures.approvals];
   let messages = [...fixtures.messages];
@@ -765,6 +772,26 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
       }
 
       return json(route, notifications);
+    }
+
+    if (path.includes('/email_queue')) {
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(emailQueue, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const inserted = payloads.map((payload: any, index: number) => ({
+          id: payload.id || `email-queue-${emailQueue.length + index + 1}`,
+          created_at: payload.created_at || new Date().toISOString(),
+          ...payload,
+        }));
+        emailQueue = [...inserted, ...emailQueue];
+        return json(route, wantsObject ? inserted[0] : inserted);
+      }
+
+      return json(route, emailQueue);
     }
 
     if (path.includes('/system_configs')) {
@@ -1282,6 +1309,13 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
         return json(route, wantsObject ? updated[0] ?? null : updated);
       }
 
+      if (method === 'DELETE') {
+        const deleting = applyQueryFilters(handoverNotes, url);
+        const deletingIds = new Set(deleting.map((row: any) => String(row.id)));
+        handoverNotes = handoverNotes.filter((row: any) => !deletingIds.has(String(row.id)));
+        return json(route, wantsObject ? null : []);
+      }
+
       return json(route, handoverNotes);
     }
 
@@ -1678,6 +1712,36 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
       }
 
       return json(route, payrollRecords);
+    }
+
+    if (path.includes('/tax_reports')) {
+      if (method === 'HEAD') {
+        const count = applyQueryFilters(taxReports, url).length;
+        return route.fulfill({
+          status: 200,
+          headers: {
+            'content-range': `0-0/${count}`,
+          },
+        });
+      }
+
+      if (method === 'GET') {
+        return json(route, firstOrList(applyQueryFilters(taxReports, url), wantsObject));
+      }
+
+      if (method === 'POST') {
+        const body = request.postDataJSON();
+        const payloads = Array.isArray(body) ? body : [body];
+        const inserted = payloads.map((payload: any, index: number) => ({
+          id: payload.id || `tax-report-${taxReports.length + index + 1}`,
+          created_at: payload.created_at || new Date().toISOString(),
+          ...payload,
+        }));
+        taxReports = [...inserted, ...taxReports];
+        return json(route, wantsObject ? inserted[0] : inserted);
+      }
+
+      return json(route, taxReports);
     }
 
     if (path.includes('/inventory_logs')) {

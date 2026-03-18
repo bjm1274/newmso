@@ -133,15 +133,15 @@ export default function InvoiceAutoExtraction({ onRefresh, user }: any) {
     };
 
     return (
-        <div className="bg-[var(--toss-card)] p-6 md:p-8 border border-[var(--toss-border)] shadow-xl rounded-[2.5rem] animate-in fade-in duration-500">
-            <div className="mb-6">
+        <div className="bg-[var(--card)] p-4 md:p-5 border border-[var(--border)] shadow-sm rounded-2xl animate-in fade-in duration-500">
+            <div className="mb-4">
                 <h3 className="text-xl font-bold text-[var(--foreground)] tracking-tight">📄 명세서 추출 자동 입고</h3>
             </div>
 
-            <div className="flex flex-col md:flex-row gap-6">
+            <div className="flex flex-col md:flex-row gap-4">
                 <div className="w-full md:w-1/3 space-y-4 shrink-0">
                     <div
-                        className="border-2 border-dashed border-[var(--toss-border)] rounded-[20px] p-6 text-center hover:bg-[var(--toss-gray-1)] transition-colors cursor-pointer group"
+                        className="border-2 border-dashed border-[var(--border)] rounded-[var(--radius-xl)] p-4 text-center hover:bg-[var(--muted)] transition-colors cursor-pointer group"
                         onClick={() => fileInputRef.current?.click()}
                     >
                         <input
@@ -153,17 +153,17 @@ export default function InvoiceAutoExtraction({ onRefresh, user }: any) {
                         />
                         <div className="flex flex-col items-center justify-center space-y-3">
                             <span className="text-4xl group-hover:scale-110 transition-transform">📤</span>
-                            <p className="text-sm font-bold text-[var(--toss-blue)]">파일 선택 (클릭)</p>
+                            <p className="text-sm font-bold text-[var(--accent)]">파일 선택 (클릭)</p>
                             <p className="text-[10px] font-semibold text-[var(--toss-gray-3)]">JPG, PNG, PDF</p>
                         </div>
                     </div>
 
                     {file && (
-                        <div className="bg-[var(--toss-gray-1)] border border-[var(--toss-border)] rounded-[16px] p-4 flex flex-col items-center gap-3">
+                        <div className="bg-[var(--muted)] border border-[var(--border)] rounded-[var(--radius-lg)] p-4 flex flex-col items-center gap-3">
                             {previewUrl ? (
-                                <img src={previewUrl} alt="preview" className="max-h-48 rounded-[12px] object-contain" />
+                                <img src={previewUrl} alt="preview" className="max-h-48 rounded-[var(--radius-md)] object-contain" />
                             ) : (
-                                <div className="w-20 h-24 bg-[var(--toss-card)] rounded-[8px] flex items-center justify-center shadow-sm">
+                                <div className="w-20 h-24 bg-[var(--card)] rounded-[var(--radius-md)] flex items-center justify-center shadow-sm">
                                     <span className="text-2xl">📄</span>
                                 </div>
                             )}
@@ -172,11 +172,11 @@ export default function InvoiceAutoExtraction({ onRefresh, user }: any) {
                                 <p className="text-[10px] text-[var(--toss-gray-3)] font-semibold mt-0.5">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
                             </div>
                             <div className="flex gap-2 w-full mt-2">
-                                <button onClick={clearFile} className="flex-1 py-2 rounded-xl bg-[var(--page-bg)] border border-[var(--toss-border)] text-xs font-bold text-[var(--toss-gray-4)] hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-colors">지우기</button>
+                                <button onClick={clearFile} className="flex-1 py-2 rounded-xl bg-[var(--page-bg)] border border-[var(--border)] text-xs font-bold text-[var(--toss-gray-4)] hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-colors">지우기</button>
                                 <button
                                     onClick={handleExtract}
                                     disabled={isLoading}
-                                    className="flex-1 py-2 rounded-xl bg-[var(--toss-blue)] text-white text-xs font-bold hover:opacity-90 transition-opacity disabled:opacity-50"
+                                    className="flex-1 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-bold hover:opacity-90 transition-opacity disabled:opacity-50"
                                 >
                                     {isLoading ? '추출 중...' : '데이터 추출'}
                                 </button>
@@ -196,7 +196,7 @@ export default function InvoiceAutoExtraction({ onRefresh, user }: any) {
                                 <button
                                     onClick={handleRegisterAll}
                                     disabled={isLoading}
-                                    className="px-4 py-2 bg-emerald-600 text-white rounded-[12px] text-[11px] font-bold shadow hover:bg-emerald-700 disabled:opacity-50"
+                                    className="px-4 py-2 bg-emerald-600 text-white rounded-[var(--radius-md)] text-[11px] font-bold shadow hover:bg-emerald-700 disabled:opacity-50"
                                 >
                                     위 내역으로 일괄 등록
                                 </button>
@@ -204,21 +204,21 @@ export default function InvoiceAutoExtraction({ onRefresh, user }: any) {
 
                             <div className="max-h-[500px] overflow-y-auto custom-scrollbar pr-2 space-y-4">
                                 {extractedItems.map((item, idx) => (
-                                    <div key={idx} className={`bg-[var(--page-bg)] border ${item.edited ? 'border-[var(--toss-blue)]' : 'border-[var(--toss-border)]'} rounded-[16px] p-4 relative group transition-all`}>
+                                    <div key={idx} className={`bg-[var(--page-bg)] border ${item.edited ? 'border-[var(--accent)]' : 'border-[var(--border)]'} rounded-[var(--radius-lg)] p-4 relative group transition-all`}>
                                         <button
                                             onClick={() => handleDeleteItem(idx)}
-                                            className="absolute top-2 right-2 w-6 h-6 rounded-full bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-100 hover:text-red-500"
+                                            className="absolute top-2 right-2 w-6 h-6 rounded-full bg-[var(--muted)] text-[var(--toss-gray-4)] flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-100 hover:text-red-500"
                                         >
                                             ×
                                         </button>
                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                             <div className="col-span-2">
                                                 <label className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase">품목명 / 제품명 *</label>
-                                                <input value={item.item_name || ''} onChange={(e) => handleItemChange(idx, 'item_name', e.target.value)} className="w-full mt-1 p-2 bg-[var(--input-bg)] rounded-[8px] text-xs font-bold outline-none border border-transparent focus:border-[var(--toss-blue)]/50" />
+                                                <input value={item.item_name || ''} onChange={(e) => handleItemChange(idx, 'item_name', e.target.value)} className="w-full mt-1 p-2 bg-[var(--input-bg)] rounded-[var(--radius-md)] text-xs font-bold outline-none border border-transparent focus:border-[var(--accent)]/50" />
                                             </div>
                                             <div className="col-span-1">
                                                 <label className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase">분류 *</label>
-                                                <select value={item.category || ''} onChange={(e) => handleItemChange(idx, 'category', e.target.value)} className="w-full mt-1 p-2 bg-[var(--input-bg)] rounded-[8px] text-xs font-bold outline-none border border-transparent focus:border-[var(--toss-blue)]/50">
+                                                <select value={item.category || ''} onChange={(e) => handleItemChange(idx, 'category', e.target.value)} className="w-full mt-1 p-2 bg-[var(--input-bg)] rounded-[var(--radius-md)] text-xs font-bold outline-none border border-transparent focus:border-[var(--accent)]/50">
                                                     <option value="의료기기">의료기기</option>
                                                     <option value="소모품">소모품</option>
                                                     <option value="약품">약품</option>
@@ -227,15 +227,15 @@ export default function InvoiceAutoExtraction({ onRefresh, user }: any) {
                                             </div>
                                             <div className="col-span-1">
                                                 <label className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase">수량 *</label>
-                                                <input type="number" value={item.quantity || 0} onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)} className="w-full mt-1 p-2 bg-[var(--input-bg)] rounded-[8px] text-xs font-bold outline-none border border-transparent focus:border-[var(--toss-blue)]/50 text-right" />
+                                                <input type="number" value={item.quantity || 0} onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)} className="w-full mt-1 p-2 bg-[var(--input-bg)] rounded-[var(--radius-md)] text-xs font-bold outline-none border border-transparent focus:border-[var(--accent)]/50 text-right" />
                                             </div>
                                             <div className="col-span-1">
                                                 <label className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase">단가 (원)</label>
-                                                <input type="number" value={item.unit_price || 0} onChange={(e) => handleItemChange(idx, 'unit_price', e.target.value)} className="w-full mt-1 p-2 bg-[var(--input-bg)] rounded-[8px] text-xs font-bold outline-none border border-transparent focus:border-[var(--toss-blue)]/50 text-right" />
+                                                <input type="number" value={item.unit_price || 0} onChange={(e) => handleItemChange(idx, 'unit_price', e.target.value)} className="w-full mt-1 p-2 bg-[var(--input-bg)] rounded-[var(--radius-md)] text-xs font-bold outline-none border border-transparent focus:border-[var(--accent)]/50 text-right" />
                                             </div>
                                             <div className="col-span-1">
                                                 <label className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase">거래처명</label>
-                                                <input value={item.supplier_name || ''} onChange={(e) => handleItemChange(idx, 'supplier_name', e.target.value)} className="w-full mt-1 p-2 bg-[var(--input-bg)] rounded-[8px] text-xs font-bold outline-none border border-transparent focus:border-[var(--toss-blue)]/50" />
+                                                <input value={item.supplier_name || ''} onChange={(e) => handleItemChange(idx, 'supplier_name', e.target.value)} className="w-full mt-1 p-2 bg-[var(--input-bg)] rounded-[var(--radius-md)] text-xs font-bold outline-none border border-transparent focus:border-[var(--accent)]/50" />
                                             </div>
                                             <div className="col-span-1">
                                                 <label className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase">유효/만료일</label>
@@ -243,7 +243,7 @@ export default function InvoiceAutoExtraction({ onRefresh, user }: any) {
                                             </div>
                                             <div className="col-span-1">
                                                 <label className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase">LOT 번호</label>
-                                                <input value={item.lot_number || ''} onChange={(e) => handleItemChange(idx, 'lot_number', e.target.value)} className="w-full mt-1 p-2 bg-[var(--input-bg)] rounded-[8px] text-[11px] font-bold outline-none border border-transparent focus:border-[var(--toss-blue)]/50" />
+                                                <input value={item.lot_number || ''} onChange={(e) => handleItemChange(idx, 'lot_number', e.target.value)} className="w-full mt-1 p-2 bg-[var(--input-bg)] rounded-[var(--radius-md)] text-[11px] font-bold outline-none border border-transparent focus:border-[var(--accent)]/50" />
                                             </div>
                                         </div>
                                     </div>
@@ -251,7 +251,7 @@ export default function InvoiceAutoExtraction({ onRefresh, user }: any) {
                             </div>
                         </div>
                     ) : (
-                        <div className="h-full flex flex-col items-center justify-center p-8 border-2 border-[var(--toss-border)] border-dashed rounded-[24px] bg-[var(--toss-gray-1)]/50">
+                        <div className="h-full flex flex-col items-center justify-center p-5 border-2 border-[var(--border)] border-dashed rounded-[var(--radius-xl)] bg-[var(--muted)]/50">
                             <span className="text-5xl opacity-30 mb-4">🪄</span>
                             <p className="text-sm font-bold text-[var(--toss-gray-4)]">AI 파싱 대기 중</p>
                             <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] mt-2 text-center max-w-xs">

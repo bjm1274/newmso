@@ -96,79 +96,84 @@ export default function LoginPage() {
 
   if (checkingAuth) {
     return (
-      <div className="min-h-screen min-h-[100dvh] bg-[var(--background)] flex flex-col items-center justify-center">
-        <div className="w-8 h-8 border-2 border-[var(--toss-blue)] rounded-full border-t-transparent animate-spin" />
-        <p className="mt-4 text-xs font-medium text-[var(--toss-gray-3)]">로그인 상태 확인 중...</p>
+      <div className="min-h-[100dvh] bg-[var(--page-bg)] flex flex-col items-center justify-center gap-3">
+        <div className="w-7 h-7 border-2 border-[var(--accent)] rounded-full border-t-transparent animate-spin" />
+        <p className="text-xs text-[var(--toss-gray-3)]">로그인 상태 확인 중...</p>
       </div>
     );
   }
 
   return (
     <div
-      className="min-h-screen min-h-[100dvh] bg-[var(--background)] flex flex-col justify-center py-8 px-4 lg:px-8"
+      className="min-h-[100dvh] bg-[var(--page-bg)] flex flex-col justify-center py-10 px-4"
       data-testid="login-page"
     >
-      <div className="sm:mx-auto sm:w-full sm:max-w-sm text-center">
-        <h2 className="text-2xl md:text-3xl font-bold text-[var(--foreground)] tracking-tight">
-          SY INC. 통합 시스템
-        </h2>
-        <p className="mt-2 text-[11px] font-medium text-[var(--toss-gray-3)] uppercase tracking-wider">
-          통합 의료경영지원 시스템
-        </p>
-      </div>
+      <div className="mx-auto w-full max-w-[360px]">
+        {/* 헤더 */}
+        <div className="mb-7 text-center">
+          <h1 className="text-[22px] font-bold text-[var(--foreground)] tracking-tight">
+            SY INC. 통합 시스템
+          </h1>
+          <p className="mt-1.5 text-[11px] text-[var(--toss-gray-3)] uppercase tracking-widest font-medium">
+            Management Service Organization
+          </p>
+        </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-sm">
-        <div className="bg-[var(--toss-card)] py-8 px-6 rounded-[20px] shadow-sm border border-[var(--toss-border)] animate-in slide-in-from-bottom-10 duration-500">
-          <div className="space-y-6" data-testid="login-form">
+        {/* 로그인 카드 */}
+        <div
+          className="bg-[var(--card)] rounded-[14px] border border-[var(--border)] shadow-[var(--shadow-sm)] px-6 py-7 animate-premium-fade"
+          data-testid="login-form"
+        >
+          <div className="space-y-4">
             <div>
-              <label className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-2 ml-1">아이디 (사번 또는 이름)</label>
+              <label className="block text-[11px] font-semibold text-[var(--toss-gray-4)] mb-1.5">아이디</label>
               <input
                 type="text"
                 value={loginId}
                 onChange={(e) => setLoginId(e.target.value)}
                 data-testid="login-id-input"
-                className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] text-sm font-medium outline-none focus:ring-2 ring-[var(--toss-blue)]/30 border border-transparent focus:border-[var(--toss-blue)] transition-all text-[var(--foreground)]"
-                placeholder="사번 또는 이름 (동명이인은 사번 입력)"
+                className="w-full px-3.5 py-2.5 bg-[var(--tab-bg)] rounded-[8px] text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--accent)]/20 border border-transparent focus:border-[var(--accent)] transition-all text-[var(--foreground)] placeholder:text-[var(--toss-gray-3)]"
+                placeholder="사번 또는 이름"
                 onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
               />
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-2 ml-1">비밀번호</label>
+              <label className="block text-[11px] font-semibold text-[var(--toss-gray-4)] mb-1.5">비밀번호</label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 data-testid="login-password-input"
-                className="w-full p-4 bg-[var(--input-bg)] rounded-[12px] text-sm font-medium outline-none focus:ring-2 ring-[var(--toss-blue)]/30 border border-transparent focus:border-[var(--toss-blue)] transition-all text-[var(--foreground)]"
-                placeholder="비밀번호 입력"
+                className="w-full px-3.5 py-2.5 bg-[var(--tab-bg)] rounded-[8px] text-sm font-medium outline-none focus:ring-2 focus:ring-[var(--accent)]/20 border border-transparent focus:border-[var(--accent)] transition-all text-[var(--foreground)] placeholder:text-[var(--toss-gray-3)]"
+                placeholder="비밀번호"
                 onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
               />
             </div>
+
             {error && (
-              <div className="bg-red-50 p-3 rounded-[12px] border border-red-100">
-                <p className="text-red-500 text-[11px] font-semibold flex items-center gap-2"><span>⚠️</span> {error}</p>
+              <div className="bg-[var(--danger-light)] px-3 py-2.5 rounded-[8px] border border-red-100">
+                <p className="text-[var(--danger)] text-xs font-semibold">{error}</p>
               </div>
             )}
+
             <button
               onClick={handleLogin}
               disabled={loading}
               data-testid="login-submit-button"
-              className="w-full py-4 bg-[var(--toss-blue)] text-white rounded-[12px] font-semibold text-[15px] hover:bg-[var(--toss-blue)] active:scale-[0.98] transition-all disabled:opacity-50"
+              className="mt-1 w-full py-2.5 bg-[var(--accent)] text-white rounded-[8px] font-semibold text-sm hover:bg-[var(--accent-hover)] active:scale-[0.99] transition-all disabled:opacity-50"
             >
-              {loading ? '인증 진행 중...' : '로그인'}
+              {loading ? '인증 중...' : '로그인'}
             </button>
-            <p className="mt-4 text-[16px] text-[var(--toss-gray-4)] text-center font-bold tracking-wide">
-              Made by JM
-            </p>
           </div>
-        </div>
 
-        <div className="mt-12 text-center">
-          <p className="text-[10px] text-[var(--toss-gray-3)] font-bold leading-relaxed">
-            © 2026 SY INC. Management Service Organization.
-            <br />본 시스템은 인가된 사용자만 접근 가능합니다.
+          <p className="mt-5 text-center text-[11px] text-[var(--toss-gray-3)]">
+            Made by JM
           </p>
         </div>
+
+        <p className="mt-8 text-center text-[10px] text-[var(--toss-gray-3)] leading-relaxed">
+          © 2026 SY INC. 본 시스템은 인가된 사용자만 접근 가능합니다.
+        </p>
       </div>
     </div>
   );

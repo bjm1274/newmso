@@ -4,6 +4,7 @@ export type HandoverNoteKind = 'note' | 'room_config';
 export type HandoverBedConfig = {
   bedNumber: number;
   patientName: string;
+  admissionDate: string | null;
 };
 
 export type HandoverRoomConfig = {
@@ -143,6 +144,7 @@ function compareRoomNumbers(left: string, right: string) {
 
 function normalizeBeds(value: unknown, capacity: number): HandoverBedConfig[] {
   const patientNames = new Map<number, string>();
+  const admissionDates = new Map<number, string | null>();
 
   if (Array.isArray(value)) {
     value.forEach((item) => {
@@ -150,6 +152,10 @@ function normalizeBeds(value: unknown, capacity: number): HandoverBedConfig[] {
       const bedNumber = normalizeBedNumber(item.bedNumber ?? item.bed_number);
       if (!bedNumber || bedNumber > capacity) return;
       patientNames.set(bedNumber, normalizePatientName(item.patientName ?? item.patient_name));
+      admissionDates.set(
+        bedNumber,
+        normalizeDateKey(item.admissionDate ?? item.admission_date) || null,
+      );
     });
   }
 
@@ -158,6 +164,7 @@ function normalizeBeds(value: unknown, capacity: number): HandoverBedConfig[] {
     return {
       bedNumber,
       patientName: patientNames.get(bedNumber) || '',
+      admissionDate: admissionDates.get(bedNumber) || null,
     };
   });
 }

@@ -120,11 +120,11 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: any) {
     return (
         <div className="flex flex-col h-full animate-in fade-in duration-300" data-testid="payroll-utility-insurance">
             {/* 헤더 */}
-            <header className="p-6 md:p-8 border-b border-[var(--toss-border)] bg-[var(--toss-card)] shrink-0">
+            <header className="p-4 md:p-5 border-b border-[var(--border)] bg-[var(--card)] shrink-0">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
                         <h2 className="text-xl font-bold text-[var(--foreground)] tracking-tight">
-                            🏛️ 4대보험 관리 <span className="text-sm text-[var(--toss-blue)] ml-2">[{selectedCo}]</span>
+                            🏛️ 4대보험 관리 <span className="text-sm text-[var(--accent)] ml-2">[{selectedCo}]</span>
                         </h2>
                     </div>
                     <div className="flex items-center gap-2">
@@ -135,7 +135,7 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: any) {
                         )}
                         <button
                             onClick={() => setShowForm(!showForm)}
-                            className="px-5 py-2.5 bg-[var(--toss-blue)] text-white text-[11px] font-bold rounded-xl shadow-md hover:opacity-90 transition-all"
+                            className="px-5 py-2.5 bg-[var(--accent)] text-white text-[11px] font-bold rounded-xl shadow-md hover:opacity-90 transition-all"
                         >
                             {showForm ? '취소' : '+ 신규 신고'}
                         </button>
@@ -143,11 +143,11 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: any) {
                 </div>
             </header>
 
-            <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 custom-scrollbar bg-[var(--page-bg)]">
+            <div className="flex-1 overflow-y-auto p-4 md:p-5 space-y-4 custom-scrollbar bg-[var(--page-bg)]">
                 {/* 4대보험 현황 요약 카드 */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {summaryCards.map(card => (
-                        <div key={card.name} className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-2xl p-4 shadow-sm">
+                        <div key={card.name} className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-sm">
                             <p className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider mb-2">{card.name}</p>
                             <p className="text-2xl font-black text-[var(--foreground)]">{card.enrolled}<span className="text-sm font-bold text-[var(--toss-gray-3)] ml-1">명</span></p>
                             {card.pending > 0 && (
@@ -159,55 +159,55 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: any) {
 
                 {/* 신규 등록 폼 */}
                 {showForm && (
-                    <form onSubmit={handleSubmit} className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-2xl p-6 shadow-sm space-y-4 animate-in slide-in-from-top-4">
+                    <form onSubmit={handleSubmit} className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-sm space-y-4 animate-in slide-in-from-top-4">
                         <h3 className="text-sm font-bold text-[var(--foreground)]">신규 4대보험 신고 등록</h3>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="flex flex-col gap-1.5">
                                 <label className="text-[10px] font-bold text-[var(--toss-gray-4)]">대상 직원</label>
-                                <select value={form.staff_id} onChange={e => setForm({ ...form, staff_id: e.target.value })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30" required>
+                                <select value={form.staff_id} onChange={e => setForm({ ...form, staff_id: e.target.value })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30" required>
                                     <option value="">직원 선택</option>
                                     {filteredStaffs.map((s: any) => <option key={s.id} value={s.id}>{s.name} ({s.department || '미배정'})</option>)}
                                 </select>
                             </div>
                             <div className="flex flex-col gap-1.5">
                                 <label className="text-[10px] font-bold text-[var(--toss-gray-4)]">신고 유형</label>
-                                <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value as any })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30">
+                                <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value as any })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30">
                                     {ACTION_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                                 </select>
                             </div>
                             <div className="flex flex-col gap-1.5">
                                 <label className="text-[10px] font-bold text-[var(--toss-gray-4)]">보험 종류</label>
-                                <select value={form.insurance_type} onChange={e => setForm({ ...form, insurance_type: e.target.value as any })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30">
+                                <select value={form.insurance_type} onChange={e => setForm({ ...form, insurance_type: e.target.value as any })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30">
                                     {INSURANCE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                                 </select>
                             </div>
                             <div className="flex flex-col gap-1.5">
                                 <label className="text-[10px] font-bold text-[var(--toss-gray-4)]">적용일</label>
-                                <SmartDatePicker value={form.effective_date} onChange={val => setForm({ ...form, effective_date: val })} inputClassName="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" />
+                                <SmartDatePicker value={form.effective_date} onChange={val => setForm({ ...form, effective_date: val })} inputClassName="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" />
                             </div>
                             <div className="flex flex-col gap-1.5">
                                 <label className="text-[10px] font-bold text-[var(--toss-gray-4)]">사유</label>
-                                <input type="text" value={form.reason} onChange={e => setForm({ ...form, reason: e.target.value })} placeholder="입사, 퇴사, 소득변경 등" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 placeholder:text-[var(--toss-gray-3)]" />
+                                <input type="text" value={form.reason} onChange={e => setForm({ ...form, reason: e.target.value })} placeholder="입사, 퇴사, 소득변경 등" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30 placeholder:text-[var(--toss-gray-3)]" />
                             </div>
                             <div className="flex flex-col gap-1.5">
                                 <label className="text-[10px] font-bold text-[var(--toss-gray-4)]">비고</label>
-                                <input type="text" value={form.memo} onChange={e => setForm({ ...form, memo: e.target.value })} placeholder="추가 메모" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 placeholder:text-[var(--toss-gray-3)]" />
+                                <input type="text" value={form.memo} onChange={e => setForm({ ...form, memo: e.target.value })} placeholder="추가 메모" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30 placeholder:text-[var(--toss-gray-3)]" />
                             </div>
                         </div>
                         <div className="flex justify-end pt-2">
-                            <button type="submit" className="px-6 py-2.5 bg-[var(--toss-blue)] text-white text-[11px] font-bold rounded-xl shadow-md hover:opacity-90 transition-all">등록</button>
+                            <button type="submit" className="px-4 py-2.5 bg-[var(--accent)] text-white text-[11px] font-bold rounded-xl shadow-md hover:opacity-90 transition-all">등록</button>
                         </div>
                     </form>
                 )}
 
                 {/* 필터 & 검색 */}
                 <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex gap-1 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-xl p-1">
+                    <div className="flex gap-1 bg-[var(--card)] border border-[var(--border)] rounded-xl p-1">
                         {['전체', ...ACTION_TYPES].map(t => (
-                            <button key={t} onClick={() => setFilter(t)} className={`px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all ${filter === t ? 'bg-[var(--toss-blue)] text-white shadow-sm' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'}`}>{t}</button>
+                            <button key={t} onClick={() => setFilter(t)} className={`px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all ${filter === t ? 'bg-[var(--accent)] text-white shadow-sm' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'}`}>{t}</button>
                         ))}
                     </div>
-                    <div className="flex gap-1 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-xl p-1">
+                    <div className="flex gap-1 bg-[var(--card)] border border-[var(--border)] rounded-xl p-1">
                         {['전체', '미신고', '신고완료', '반려'].map(s => (
                             <button key={s} onClick={() => setStatusFilter(s)} className={`px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all ${statusFilter === s ? 'bg-gray-800 text-white shadow-sm' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'}`}>{s}</button>
                         ))}
@@ -217,16 +217,16 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: any) {
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                         placeholder="이름 또는 보험종류 검색..."
-                        className="ml-auto px-4 py-2 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30 w-48 placeholder:text-[var(--toss-gray-3)]"
+                        className="ml-auto px-4 py-2 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30 w-48 placeholder:text-[var(--toss-gray-3)]"
                     />
                 </div>
 
                 {/* 신고 이력 테이블 */}
-                <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-2xl overflow-hidden shadow-sm">
+                <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
                     <div className="overflow-x-auto">
                         <table className="w-full text-[11px]">
                             <thead>
-                                <tr className="bg-[var(--toss-gray-1)] border-b border-[var(--toss-border)]">
+                                <tr className="bg-[var(--muted)] border-b border-[var(--border)]">
                                     <th className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">직원</th>
                                     <th className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">유형</th>
                                     <th className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">보험</th>
@@ -238,9 +238,9 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: any) {
                             </thead>
                             <tbody>
                                 {filteredRecords.length === 0 ? (
-                                    <tr><td colSpan={7} className="px-4 py-16 text-center text-[var(--toss-gray-3)] font-bold">등록된 신고 이력이 없습니다</td></tr>
+                                    <tr><td colSpan={7} className="px-4 py-10 text-center text-[var(--toss-gray-3)] font-bold">등록된 신고 이력이 없습니다</td></tr>
                                 ) : filteredRecords.map(r => (
-                                    <tr key={r.id} className="border-b border-[var(--toss-border)] hover:bg-[var(--toss-gray-1)]/50 transition-colors">
+                                    <tr key={r.id} className="border-b border-[var(--border)] hover:bg-[var(--muted)]/50 transition-colors">
                                         <td className="px-4 py-3 font-bold text-[var(--foreground)]">
                                             <div>{r.staff_name}</div>
                                             <div className="text-[9px] text-[var(--toss-gray-3)]">{r.company} · {r.department}</div>
@@ -274,7 +274,7 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: any) {
                 </div>
 
                 {/* 자동 감지 영역 */}
-                <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-2xl p-6 shadow-sm">
+                <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-sm">
                     <h3 className="text-sm font-bold text-[var(--foreground)] mb-4">🤖 자동 감지 알림</h3>
                     <div className="space-y-3">
                         {staffs.filter((s: any) => {
@@ -297,7 +297,7 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: any) {
                                         setForm({ ...form, staff_id: s.id, type: '취득', reason: '신규입사' });
                                         setShowForm(true);
                                     }}
-                                    className="px-3 py-1.5 bg-[var(--toss-blue)] text-white text-[10px] font-bold rounded-lg hover:opacity-90 transition-all"
+                                    className="px-3 py-1.5 bg-[var(--accent)] text-white text-[10px] font-bold rounded-lg hover:opacity-90 transition-all"
                                 >
                                     취득 신고
                                 </button>
@@ -333,7 +333,7 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: any) {
                             const diff = (Date.now() - joinDate.getTime()) / (1000 * 60 * 60 * 24);
                             return diff <= 14 && s.status !== '퇴사';
                         }).length === 0 && staffs.filter((s: any) => s.status === '퇴사' && s.resigned_at && (selectedCo === '전체' || s.company === selectedCo)).length === 0 && (
-                                <div className="text-center py-8 text-[var(--toss-gray-3)]">
+                                <div className="text-center py-5 text-[var(--toss-gray-3)]">
                                     <p className="text-3xl mb-2 opacity-30">✅</p>
                                     <p className="text-[11px] font-bold">현재 미처리 건이 없습니다</p>
                                 </div>

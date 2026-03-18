@@ -124,8 +124,8 @@ export default function EducationList({
   };
 
   return (
-    <div className="bg-white border border-[var(--toss-border)] shadow-sm overflow-hidden">
-      <div className="p-6 border-b border-gray-50 bg-[var(--toss-gray-1)]/50 flex justify-between items-center">
+    <div className="bg-[var(--card)] border border-[var(--border)] shadow-sm overflow-hidden">
+      <div className="p-4 border-b border-[var(--border-subtle)] bg-[var(--muted)]/50 flex justify-between items-center">
         <h3 className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
           직원별 교육 이수 내역 ({currentYear}년)
         </h3>
@@ -147,9 +147,9 @@ export default function EducationList({
 
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse min-w-[1000px]">
-          <thead className="bg-white text-[11px] font-semibold text-[var(--toss-gray-3)] border-b border-[var(--toss-border)] uppercase">
+          <thead className="bg-[var(--card)] text-[11px] font-semibold text-[var(--toss-gray-3)] border-b border-[var(--border)] uppercase">
             <tr>
-              <th className="p-4 sticky left-0 bg-white z-10 w-40 border-r border-gray-50">성명 / 소속</th>
+              <th className="p-4 sticky left-0 bg-[var(--card)] z-10 w-40 border-r border-[var(--border-subtle)]">성명 / 소속</th>
               {visibleEducationItems.map((item) => (
                 <th key={item.name} className="p-4 text-center">
                   <div className="flex flex-col items-center gap-1">
@@ -169,7 +169,7 @@ export default function EducationList({
 
               return (
                 <tr key={staff.id} className="hover:bg-gray-25 transition-colors">
-                  <td className="p-4 sticky left-0 bg-white z-10 border-r border-gray-50">
+                  <td className="p-4 sticky left-0 bg-[var(--card)] z-10 border-r border-[var(--border-subtle)]">
                     <div className="flex flex-col">
                       <span className="text-xs font-semibold text-[var(--foreground)]">{staff.name}</span>
                       <span className="text-[11px] text-[var(--toss-gray-3)] font-bold">
@@ -192,7 +192,7 @@ export default function EducationList({
                     if (!isApplicable) {
                       return (
                         <td key={item.name} className="p-4 text-center">
-                          <span className="px-2 py-1 text-[10px] font-semibold border rounded-md bg-slate-50 text-slate-300 border-slate-100 whitespace-nowrap">
+                          <span className="px-2 py-1 text-[10px] font-semibold border rounded-md bg-[var(--tab-bg)] text-[var(--toss-gray-3)] border-[var(--border-subtle)] whitespace-nowrap">
                             해당 없음
                           </span>
                         </td>
@@ -248,7 +248,7 @@ export default function EducationList({
             })}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={visibleEducationItems.length + 1} className="p-10 text-center text-xs font-bold text-slate-400">
+                <td colSpan={visibleEducationItems.length + 1} className="p-5 text-center text-xs font-bold text-[var(--toss-gray-3)]">
                   확인할 직원 교육 데이터가 없습니다.
                 </td>
               </tr>
@@ -259,17 +259,17 @@ export default function EducationList({
 
       {selectedAction && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md bg-[var(--toss-card)] rounded-[16px] shadow-2xl overflow-hidden border border-[var(--toss-border)] animate-in fade-in slide-in-from-bottom-4">
-            <div className="p-6 border-b border-[var(--toss-border)]">
+          <div className="w-full max-w-md bg-[var(--card)] rounded-[var(--radius-lg)] shadow-sm overflow-hidden border border-[var(--border)] animate-in fade-in slide-in-from-bottom-4">
+            <div className="p-4 border-b border-[var(--border)]">
               <h3 className="text-lg font-bold text-[var(--foreground)] tracking-tight">교육 이수 관리</h3>
               <p className="text-xs text-[var(--toss-gray-3)] font-semibold mt-1 uppercase tracking-widest">
                 {selectedAction.staffName} · {selectedAction.eduName}
               </p>
             </div>
-            <div className="p-6 space-y-5">
+            <div className="p-4 space-y-5">
               {!selectedAction.isCompleted ? (
                 <>
-                  <div className="bg-[var(--toss-gray-1)] rounded-[12px] p-4 text-center">
+                  <div className="bg-[var(--muted)] rounded-[var(--radius-md)] p-4 text-center">
                     <p className="text-sm font-bold text-[var(--foreground)]">
                       현재 <span className="text-red-500">미이수</span> 상태입니다.
                     </p>
@@ -283,14 +283,14 @@ export default function EducationList({
                       type="file"
                       accept="image/*,.pdf"
                       onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
-                      className="w-full text-sm font-bold text-[var(--toss-gray-4)] file:mr-3 file:py-2 file:px-4 file:rounded-md file:border-0 file:bg-[var(--toss-blue-light)] file:text-[var(--toss-blue)]"
+                      className="w-full text-sm font-bold text-[var(--toss-gray-4)] file:mr-3 file:py-2 file:px-4 file:rounded-md file:border-0 file:bg-[var(--toss-blue-light)] file:text-[var(--accent)]"
                     />
                   </div>
                 </>
               ) : (
                 <>
-                  <div className="bg-[var(--toss-blue-light)]/50 border border-[var(--toss-blue)]/20 rounded-[12px] p-4 text-center">
-                    <p className="text-sm font-bold text-[var(--toss-blue)]">현재 이수 완료 상태입니다.</p>
+                  <div className="bg-[var(--toss-blue-light)]/50 border border-[var(--accent)]/20 rounded-[var(--radius-md)] p-4 text-center">
+                    <p className="text-sm font-bold text-[var(--accent)]">현재 이수 완료 상태입니다.</p>
                   </div>
                   {selectedAction.certificateUrl && (
                     <div className="mt-4">
@@ -298,7 +298,7 @@ export default function EducationList({
                         href={selectedAction.certificateUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center justify-center gap-2 w-full py-3 bg-[var(--page-bg)] border border-[var(--toss-border)] rounded-[12px] text-sm font-bold text-[var(--foreground)] hover:bg-[var(--toss-gray-1)] transition-colors"
+                        className="flex items-center justify-center gap-2 w-full py-3 bg-[var(--page-bg)] border border-[var(--border)] rounded-[var(--radius-md)] text-sm font-bold text-[var(--foreground)] hover:bg-[var(--muted)] transition-colors"
                       >
                         등록된 이수증 보기
                       </a>
@@ -310,11 +310,11 @@ export default function EducationList({
                 </>
               )}
             </div>
-            <div className="p-4 bg-[var(--page-bg)] border-t border-[var(--toss-border)] flex gap-2 justify-end">
+            <div className="p-4 bg-[var(--page-bg)] border-t border-[var(--border)] flex gap-2 justify-end">
               <button
                 type="button"
                 onClick={() => setSelectedAction(null)}
-                className="px-4 py-2 rounded-[8px] border border-[var(--toss-border)] text-xs font-bold text-[var(--toss-gray-4)] hover:bg-[var(--toss-gray-1)]"
+                className="px-4 py-2 rounded-[var(--radius-md)] border border-[var(--border)] text-xs font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
               >
                 닫기
               </button>
@@ -322,8 +322,8 @@ export default function EducationList({
                 type="button"
                 onClick={handleUpdateStatus}
                 disabled={uploading}
-                className={`px-4 py-2 rounded-[8px] text-xs font-bold text-white transition-opacity disabled:opacity-50 ${
-                  !selectedAction.isCompleted ? 'bg-[var(--toss-blue)]' : 'bg-red-600'
+                className={`px-4 py-2 rounded-[var(--radius-md)] text-xs font-bold text-white transition-opacity disabled:opacity-50 ${
+                  !selectedAction.isCompleted ? 'bg-[var(--accent)]' : 'bg-red-600'
                 }`}
               >
                 {uploading ? '저장 중...' : !selectedAction.isCompleted ? '이수 완료 처리' : '이수 취소'}

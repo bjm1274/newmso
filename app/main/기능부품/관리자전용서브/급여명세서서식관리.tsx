@@ -127,7 +127,7 @@ function PreviewCard({
   if (type === 'certificate') {
     return (
       <div
-        className="relative overflow-hidden rounded-[20px] bg-white p-6 shadow-sm"
+        className="relative overflow-hidden rounded-[var(--radius-xl)] bg-[var(--card)] p-4 shadow-sm"
         style={{
           border: `1px solid ${borderColor}`,
           background: `linear-gradient(180deg, #fbfbfa 0%, #ffffff 20%, ${alphaColor(primaryColor, 0.025)} 100%)`,
@@ -151,12 +151,12 @@ function PreviewCard({
 
         <div className="relative z-10">
           <div className="flex items-end gap-4 border-b pb-5" style={{ borderColor }}>
-            <div className="flex h-[72px] w-[72px] items-center justify-center rounded-[16px] border bg-white shadow-sm" style={{ borderColor }}>
+            <div className="flex h-[72px] w-[72px] items-center justify-center rounded-[var(--radius-lg)] border bg-[var(--card)] shadow-sm" style={{ borderColor }}>
               <img src="/logo.png" alt="" className="h-12 w-12 object-contain" />
             </div>
             <div className="min-w-0 flex-1">
-              {subtitle ? <p className="text-[10px] font-semibold tracking-[0.18em] text-slate-400">{subtitle}</p> : null}
-              <h3 className="mt-1 text-[32px] font-black tracking-tight text-slate-900">{paperTitle}</h3>
+              {subtitle ? <p className="text-[10px] font-semibold tracking-[0.18em] text-[var(--toss-gray-3)]">{subtitle}</p> : null}
+              <h3 className="mt-1 text-[32px] font-black tracking-tight text-[var(--foreground)]">{paperTitle}</h3>
             </div>
           </div>
 
@@ -166,58 +166,58 @@ function PreviewCard({
           />
 
           <div className="mt-5 grid gap-4 md:grid-cols-[110px_1fr]">
-            <div className="rounded-[16px] border bg-white p-3" style={{ borderColor }}>
-              <div className="aspect-[3/4] overflow-hidden rounded-[12px]" style={{ backgroundColor: surface }}>
-                <div className="flex h-full w-full items-center justify-center text-3xl font-black text-slate-300">홍</div>
+            <div className="rounded-[var(--radius-lg)] border bg-[var(--card)] p-3" style={{ borderColor }}>
+              <div className="aspect-[3/4] overflow-hidden rounded-[var(--radius-md)]" style={{ backgroundColor: surface }}>
+                <div className="flex h-full w-full items-center justify-center text-3xl font-black text-[var(--toss-gray-3)]">홍</div>
               </div>
-              <p className="mt-2 text-center text-[11px] font-semibold text-slate-400">사진</p>
+              <p className="mt-2 text-center text-[11px] font-semibold text-[var(--toss-gray-3)]">사진</p>
             </div>
 
-            <div className="rounded-[16px] border bg-white px-4 py-3" style={{ borderColor }}>
+            <div className="rounded-[var(--radius-lg)] border bg-[var(--card)] px-4 py-3" style={{ borderColor }}>
               {paperIdentityRows.map(([label, value], index) => (
                 <div
                   key={label}
                   className={`grid grid-cols-[64px_16px_1fr] items-start gap-2 ${index < paperIdentityRows.length - 1 ? 'border-b pb-2.5' : ''} ${index > 0 ? 'pt-2.5' : ''}`}
                   style={{ borderColor }}
                 >
-                  <span className="text-[12px] font-black text-slate-700">{label}</span>
-                  <span className="text-[12px] font-black text-slate-700">:</span>
-                  <span className="text-[12px] font-semibold text-slate-800">{value}</span>
+                  <span className="text-[12px] font-black text-[var(--toss-gray-5)]">{label}</span>
+                  <span className="text-[12px] font-black text-[var(--toss-gray-5)]">:</span>
+                  <span className="text-[12px] font-semibold text-[var(--foreground)]">{value}</span>
                 </div>
               ))}
             </div>
           </div>
 
           <div className="mt-5 text-center">
-            <p className="text-[13px] font-semibold leading-relaxed text-slate-700">
+            <p className="text-[13px] font-semibold leading-relaxed text-[var(--toss-gray-5)]">
               상기인은 위와 같이 당사에 재직 중임을 증명합니다.
             </p>
-            {footerText ? <p className="mt-2 text-[11px] leading-relaxed text-slate-500">{footerText}</p> : null}
+            {footerText ? <p className="mt-2 text-[11px] leading-relaxed text-[var(--toss-gray-4)]">{footerText}</p> : null}
           </div>
 
-          <div className="mt-5 overflow-hidden rounded-[16px] border bg-white" style={{ borderColor }}>
+          <div className="mt-5 overflow-hidden rounded-[var(--radius-lg)] border bg-[var(--card)]" style={{ borderColor }}>
             {paperDetailRows.map(([label, value], index) => (
               <div
                 key={label}
                 className={`grid grid-cols-[88px_18px_1fr] items-start gap-2 px-4 py-2.5 ${index < paperDetailRows.length - 1 ? 'border-b' : ''}`}
                 style={{ borderColor }}
               >
-                <span className="text-[12px] font-black text-slate-700">{label}</span>
-                <span className="text-[12px] font-black text-slate-700">:</span>
-                <span className="text-[12px] font-semibold text-slate-800">{value}</span>
+                <span className="text-[12px] font-black text-[var(--toss-gray-5)]">{label}</span>
+                <span className="text-[12px] font-black text-[var(--toss-gray-5)]">:</span>
+                <span className="text-[12px] font-semibold text-[var(--foreground)]">{value}</span>
               </div>
             ))}
           </div>
 
           {showSignArea ? (
-            <div className="mt-6 flex justify-center border-t pt-5" style={{ borderColor }}>
+            <div className="mt-4 flex justify-center border-t pt-5" style={{ borderColor }}>
               <div className="flex items-end gap-4">
                 <div className="text-center">
-                  <p className="text-2xl font-black tracking-tight text-slate-900">{companyLabel}</p>
-                  <p className="mt-1 text-[11px] font-semibold text-slate-500">대표자 / 직인</p>
+                  <p className="text-2xl font-black tracking-tight text-[var(--foreground)]">{companyLabel}</p>
+                  <p className="mt-1 text-[11px] font-semibold text-[var(--toss-gray-4)]">대표자 / 직인</p>
                 </div>
                 <div
-                  className="flex h-16 w-16 items-center justify-center rounded-full border-[3px] bg-white text-center text-[10px] font-black shadow-sm"
+                  className="flex h-16 w-16 items-center justify-center rounded-full border-[3px] bg-[var(--card)] text-center text-[10px] font-black shadow-sm"
                   style={{ borderColor: alphaColor(primaryColor, 0.7), color: primaryColor }}
                 >
                   직인
@@ -232,7 +232,7 @@ function PreviewCard({
 
   return (
     <div
-      className="relative overflow-hidden rounded-[20px] bg-white p-6 shadow-sm"
+      className="relative overflow-hidden rounded-[var(--radius-xl)] bg-[var(--card)] p-4 shadow-sm"
       style={{
         border: `1px solid ${borderColor}`,
         background: `linear-gradient(180deg, #ffffff 0%, ${alphaColor(primaryColor, 0.03)} 100%)`,
@@ -243,10 +243,10 @@ function PreviewCard({
         <img src="/logo.png" alt="" className="absolute left-1/2 top-1/2 h-28 w-28 -translate-x-1/2 -translate-y-1/2 object-contain opacity-[0.05] mix-blend-multiply" />
       </div>
       <div
-        className="relative rounded-[16px] p-5 text-white"
+        className="relative rounded-[var(--radius-lg)] p-5 text-white"
         style={{ background: `linear-gradient(135deg, ${primaryColor}, ${alphaColor(primaryColor, 0.8)})` }}
       >
-        <div className="mb-3 inline-flex rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-black tracking-[0.18em] opacity-90">
+        <div className="mb-3 inline-flex rounded-[var(--radius-md)] border border-white/20 bg-[var(--card)]/10 px-3 py-1 text-[10px] font-black tracking-[0.18em] opacity-90">
           기본 문서
         </div>
         <p className="text-[11px] font-black tracking-[0.18em] opacity-80">
@@ -262,18 +262,18 @@ function PreviewCard({
         )}
       </div>
 
-      <div className="mt-5 rounded-[16px] p-5" style={{ backgroundColor: surface }}>
+      <div className="mt-5 rounded-[var(--radius-lg)] p-5" style={{ backgroundColor: surface }}>
         {true ? (
           <div className="space-y-3 text-[12px]">
             <div className="grid grid-cols-3 gap-3">
               {['성명', '부서', '직위'].map((label) => (
                 <div
                   key={label}
-                  className="rounded-[12px] bg-white px-3 py-2.5"
+                  className="rounded-[var(--radius-md)] bg-[var(--card)] px-3 py-2.5"
                   style={{ border: `1px solid ${softLine}` }}
                 >
-                  <p className="text-[10px] font-black uppercase text-slate-400">{label}</p>
-                  <p className="mt-1 font-semibold text-slate-800">예시 데이터</p>
+                  <p className="text-[10px] font-black uppercase text-[var(--toss-gray-3)]">{label}</p>
+                  <p className="mt-1 font-semibold text-[var(--foreground)]">예시 데이터</p>
                 </div>
               ))}
             </div>
@@ -281,18 +281,18 @@ function PreviewCard({
               {['지급 내역', '공제 내역'].map((section) => (
                 <div
                   key={section}
-                  className="rounded-[14px] bg-white p-4"
+                  className="rounded-[var(--radius-lg)] bg-[var(--card)] p-4"
                   style={{ border: `1px solid ${borderColor}` }}
                 >
                   <div className="flex items-center justify-between">
-                    <p className="text-[11px] font-black text-slate-700">{section}</p>
+                    <p className="text-[11px] font-black text-[var(--toss-gray-5)]">{section}</p>
                     <span className="text-[11px] font-bold" style={{ color: primaryColor }}>
                       0원
                     </span>
                   </div>
                   <div className="mt-3 space-y-2">
                     {[1, 2, 3].map((row) => (
-                      <div key={row} className="flex justify-between text-[11px] text-slate-500">
+                      <div key={row} className="flex justify-between text-[11px] text-[var(--toss-gray-4)]">
                         <span>항목 {row}</span>
                         <span>0원</span>
                       </div>
@@ -305,38 +305,38 @@ function PreviewCard({
         ) : (
           <div className="space-y-4">
             <div
-              className="flex items-center justify-between rounded-[16px] border bg-white px-4 py-3 shadow-sm"
+              className="flex items-center justify-between rounded-[var(--radius-lg)] border bg-[var(--card)] px-4 py-3 shadow-sm"
               style={{ borderColor: alphaColor(primaryColor, 0.15), backgroundColor: alphaColor(primaryColor, 0.05) }}
             >
               <div>
-                <p className="text-[10px] font-black tracking-[0.18em] text-slate-400">
+                <p className="text-[10px] font-black tracking-[0.18em] text-[var(--toss-gray-3)]">
                   발급번호
                 </p>
-                <p className="mt-1 text-sm font-bold text-slate-800">CERT-202603-000001</p>
+                <p className="mt-1 text-sm font-bold text-[var(--foreground)]">CERT-202603-000001</p>
               </div>
               <div className="text-right">
-                <p className="text-[10px] font-black tracking-[0.18em] text-slate-400">
+                <p className="text-[10px] font-black tracking-[0.18em] text-[var(--toss-gray-3)]">
                   발급일자
                 </p>
-                <p className="mt-1 text-sm font-semibold text-slate-800">2026년 3월 12일</p>
+                <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">2026년 3월 12일</p>
               </div>
             </div>
 
             <div className="grid gap-4 md:grid-cols-[110px_1fr]">
               <div
-                className="rounded-[18px] bg-white p-3 shadow-sm"
+                className="rounded-[var(--radius-xl)] bg-[var(--card)] p-3 shadow-sm"
                 style={{ border: `1px solid ${borderColor}` }}
               >
-                <div className="aspect-[3/4] overflow-hidden rounded-[14px]" style={{ backgroundColor: surface }}>
-                  <div className="flex h-full w-full items-center justify-center text-3xl font-black text-slate-300">
+                <div className="aspect-[3/4] overflow-hidden rounded-[var(--radius-lg)]" style={{ backgroundColor: surface }}>
+                  <div className="flex h-full w-full items-center justify-center text-3xl font-black text-[var(--toss-gray-3)]">
                     사
                   </div>
                 </div>
-                <p className="mt-2 text-center text-[11px] font-semibold text-slate-400">사진</p>
+                <p className="mt-2 text-center text-[11px] font-semibold text-[var(--toss-gray-3)]">사진</p>
               </div>
 
               <div
-                className="rounded-[18px] bg-white p-4 shadow-sm"
+                className="rounded-[var(--radius-xl)] bg-[var(--card)] p-4 shadow-sm"
                 style={{ border: `1px solid ${borderColor}` }}
               >
                 {certificateIdentityRows.map(([label, value], index) => (
@@ -345,27 +345,27 @@ function PreviewCard({
                     className={`grid grid-cols-[64px_16px_1fr] items-start gap-2 ${index < certificateIdentityRows.length - 1 ? 'border-b pb-2.5' : ''} ${index > 0 ? 'pt-2.5' : ''}`}
                     style={{ borderColor }}
                   >
-                    <span className="text-[12px] font-black text-slate-700">{label}</span>
-                    <span className="text-[12px] font-black text-slate-700">:</span>
-                    <span className="text-[12px] font-semibold text-slate-800">{value}</span>
+                    <span className="text-[12px] font-black text-[var(--toss-gray-5)]">{label}</span>
+                    <span className="text-[12px] font-black text-[var(--toss-gray-5)]">:</span>
+                    <span className="text-[12px] font-semibold text-[var(--foreground)]">{value}</span>
                   </div>
                 ))}
               </div>
             </div>
 
             <div
-              className="rounded-[16px] border p-4 text-center"
+              className="rounded-[var(--radius-lg)] border p-4 text-center"
               style={{
                 borderColor: alphaColor(primaryColor, 0.18),
                 background: `linear-gradient(135deg, ${alphaColor(primaryColor, 0.12)}, rgba(255,255,255,0.88))`,
               }}
             >
-              <p className="text-[13px] font-black text-slate-800">상기인은 다음과 같이 당사에 재직 중임을 증명합니다.</p>
-              {footerText && <p className="mt-2 text-[11px] leading-relaxed text-slate-500">{footerText}</p>}
+              <p className="text-[13px] font-black text-[var(--foreground)]">상기인은 다음과 같이 당사에 재직 중임을 증명합니다.</p>
+              {footerText && <p className="mt-2 text-[11px] leading-relaxed text-[var(--toss-gray-4)]">{footerText}</p>}
             </div>
 
             <div
-              className="rounded-[18px] bg-white p-4 shadow-sm"
+              className="rounded-[var(--radius-xl)] bg-[var(--card)] p-4 shadow-sm"
               style={{ border: `1px solid ${borderColor}` }}
             >
               {certificateRows.map(([label, value], index) => (
@@ -374,9 +374,9 @@ function PreviewCard({
                   className={`grid grid-cols-[76px_16px_1fr] items-start gap-2 ${index < certificateRows.length - 1 ? 'border-b pb-2.5' : ''} ${index > 0 ? 'pt-2.5' : ''}`}
                   style={{ borderColor }}
                 >
-                  <span className="text-[12px] font-black text-slate-700">{label}</span>
-                  <span className="text-[12px] font-black text-slate-700">:</span>
-                  <span className="text-[12px] font-semibold text-slate-800">{value}</span>
+                  <span className="text-[12px] font-black text-[var(--toss-gray-5)]">{label}</span>
+                  <span className="text-[12px] font-black text-[var(--toss-gray-5)]">:</span>
+                  <span className="text-[12px] font-semibold text-[var(--foreground)]">{value}</span>
                 </div>
               ))}
             </div>
@@ -385,7 +385,7 @@ function PreviewCard({
       </div>
 
       {footerText && (
-        <p className="mt-4 text-[11px] font-medium text-slate-500">
+        <p className="mt-4 text-[11px] font-medium text-[var(--toss-gray-4)]">
           {footerText}
         </p>
       )}
@@ -394,15 +394,15 @@ function PreviewCard({
         false ? (
           <div className="mt-5 flex justify-center border-t pt-4" style={{ borderColor }}>
             <div
-              className="flex items-end gap-4 rounded-[18px] border bg-white/90 px-5 py-3 shadow-sm"
+              className="flex items-end gap-4 rounded-[var(--radius-xl)] border bg-[var(--card)]/90 px-5 py-3 shadow-sm"
               style={{ borderColor: alphaColor(primaryColor, 0.18) }}
             >
               <div className="text-center">
-                <p className="text-2xl font-black tracking-tight text-slate-800">{companyLabel}</p>
-                <p className="mt-1 text-[11px] font-semibold text-slate-500">대표자 / 직인</p>
+                <p className="text-2xl font-black tracking-tight text-[var(--foreground)]">{companyLabel}</p>
+                <p className="mt-1 text-[11px] font-semibold text-[var(--toss-gray-4)]">대표자 / 직인</p>
               </div>
               <div
-                className="flex h-16 w-16 items-center justify-center rounded-full border-[3px] bg-white text-center text-[10px] font-black shadow-sm"
+                className="flex h-16 w-16 items-center justify-center rounded-full border-[3px] bg-[var(--card)] text-center text-[10px] font-black shadow-sm"
                 style={{ borderColor: alphaColor(primaryColor, 0.7), color: primaryColor }}
               >
                 직인
@@ -411,7 +411,7 @@ function PreviewCard({
           </div>
         ) : (
           <div
-            className="mt-5 flex justify-end border-t pt-4 text-[11px] font-semibold text-slate-500"
+            className="mt-5 flex justify-end border-t pt-4 text-[11px] font-semibold text-[var(--toss-gray-4)]"
             style={{ borderColor }}
           >
             {companyLabel} 직인 / 담당자 서명
@@ -444,10 +444,10 @@ function DesignFieldRow({
   onReset: () => void;
 }) {
   const inputClassName =
-    'w-full rounded-[14px] border border-[var(--toss-border)] px-3 py-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20';
+    'w-full rounded-[var(--radius-lg)] border border-[var(--border)] px-3 py-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-[var(--accent)]/20';
 
   return (
-    <div className="rounded-[16px] border border-[var(--toss-border)] bg-white p-4 shadow-sm">
+    <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div>
           <p className="text-sm font-bold text-[var(--foreground)]">{label}</p>
@@ -455,10 +455,10 @@ function DesignFieldRow({
         </div>
         <div className="flex items-center gap-2">
           <span
-            className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
+            className={`rounded-[var(--radius-md)] px-2.5 py-1 text-[10px] font-bold ${
               modified
-                ? 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)]'
-                : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'
+                ? 'bg-[var(--toss-blue-light)] text-[var(--accent)]'
+                : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'
             }`}
           >
             {modified ? '수정됨' : '기본값 사용'}
@@ -467,7 +467,7 @@ function DesignFieldRow({
             <button
               type="button"
               onClick={onReset}
-              className="rounded-[10px] border border-[var(--toss-border)] bg-white px-3 py-1.5 text-[11px] font-bold text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]"
+              className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-[11px] font-bold text-[var(--foreground)] hover:bg-[var(--muted)]"
             >
               기준으로 되돌리기
             </button>
@@ -494,7 +494,7 @@ function DesignFieldRow({
         )}
       </div>
 
-      <div className="mt-3 rounded-[12px] bg-[var(--toss-gray-1)]/80 px-3 py-2 text-[11px] text-[var(--toss-gray-3)]">
+      <div className="mt-3 rounded-[var(--radius-md)] bg-[var(--muted)]/80 px-3 py-2 text-[11px] text-[var(--toss-gray-3)]">
         <span className="font-bold text-[var(--foreground)]">기준값</span>
         <span className="ml-2 whitespace-pre-wrap break-all">{baseValue || '(비어 있음)'}</span>
       </div>
@@ -641,8 +641,8 @@ export default function PayrollSlipDesignManager() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-[20px] border border-[var(--toss-border)] bg-white p-6 shadow-sm">
+    <div className="space-y-4">
+      <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
         <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
           <div>
             <h2 className="text-lg font-bold text-[var(--foreground)]">문서 서식 통합 관리</h2>
@@ -655,9 +655,9 @@ export default function PayrollSlipDesignManager() {
           )}
         </div>
 
-        <div className="mt-6 grid gap-4 xl:grid-cols-[320px_1fr]">
+        <div className="mt-4 grid gap-4 xl:grid-cols-[320px_1fr]">
           <div className="space-y-4">
-            <div className="rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)]/70 p-4">
+            <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)]/70 p-4">
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">
                 적용 범위
               </p>
@@ -669,7 +669,7 @@ export default function PayrollSlipDesignManager() {
                   <select
                     value={selectedType}
                     onChange={(event) => setSelectedType(event.target.value as DocumentDesignType)}
-                    className="w-full rounded-[14px] border border-[var(--toss-border)] bg-white px-3 py-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20"
+                    className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
                   >
                     {DOCUMENT_TYPE_OPTIONS.map((option) => (
                       <option key={option.id} value={option.id}>
@@ -686,7 +686,7 @@ export default function PayrollSlipDesignManager() {
                   <select
                     value={selectedCompany}
                     onChange={(event) => setSelectedCompany(event.target.value)}
-                    className="w-full rounded-[14px] border border-[var(--toss-border)] bg-white px-3 py-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20"
+                    className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
                   >
                     <option value={COMPANY_ALL}>전체 기본 디자인</option>
                     {companies.map((company) => (
@@ -698,17 +698,17 @@ export default function PayrollSlipDesignManager() {
                 </label>
               </div>
 
-              <div className="mt-4 rounded-[14px] bg-white px-4 py-3 text-[12px] text-[var(--toss-gray-3)] shadow-sm">
+              <div className="mt-4 rounded-[var(--radius-lg)] bg-[var(--card)] px-4 py-3 text-[12px] text-[var(--toss-gray-3)] shadow-sm">
                 <p className="font-semibold text-[var(--foreground)]">{selectedDocument.label}</p>
                 <p className="mt-1 leading-relaxed">{selectedDocument.helper}</p>
               </div>
             </div>
 
-            <div className="rounded-[16px] border border-[var(--toss-border)] bg-white p-4 shadow-sm">
+            <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">
                 현재 수정 상태
               </p>
-              <div className="mt-3 rounded-[14px] bg-[var(--toss-gray-1)]/70 p-4">
+              <div className="mt-3 rounded-[var(--radius-lg)] bg-[var(--muted)]/70 p-4">
                 <p className="text-sm font-semibold text-[var(--foreground)]">{selectedScopeLabel}</p>
                 <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
                   {selectedCompanyName
@@ -718,14 +718,14 @@ export default function PayrollSlipDesignManager() {
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 {modifiedFieldKeys.length === 0 ? (
-                  <span className="rounded-full bg-[var(--toss-gray-1)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-4)]">
+                  <span className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-4)]">
                     별도 수정 없음
                   </span>
                 ) : (
                   modifiedFieldKeys.map((field) => (
                     <span
                       key={field}
-                      className="rounded-full bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--toss-blue)]"
+                      className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--accent)]"
                     >
                       {TEXT_FIELD_CONFIGS.find((item) => item.field === field)?.label ||
                         '서명 영역'}
@@ -738,7 +738,7 @@ export default function PayrollSlipDesignManager() {
 
           <div className="space-y-4">
             <div className="grid gap-4 xl:grid-cols-2">
-              <div className="rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)]/60 p-4">
+              <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)]/60 p-4">
                 <div className="mb-4">
                   <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">
                     기준 디자인
@@ -750,7 +750,7 @@ export default function PayrollSlipDesignManager() {
                 <PreviewCard type={selectedType} {...referenceDesign} />
               </div>
 
-              <div className="rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)]/60 p-4">
+              <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)]/60 p-4">
                 <div className="mb-4">
                   <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">
                     현재 적용 결과
@@ -763,7 +763,7 @@ export default function PayrollSlipDesignManager() {
               </div>
             </div>
 
-            <div className="rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)]/60 p-4">
+            <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)]/60 p-4">
               <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                 <div>
                   <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">
@@ -776,7 +776,7 @@ export default function PayrollSlipDesignManager() {
                 <button
                   type="button"
                   onClick={handleResetScope}
-                  className="rounded-[12px] border border-[var(--toss-border)] bg-white px-3 py-2 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--toss-gray-1)]"
+                  className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[11px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
                 >
                   이 범위 수정값 전체 초기화
                 </button>
@@ -801,7 +801,7 @@ export default function PayrollSlipDesignManager() {
                   );
                 })}
 
-                <div className="rounded-[16px] border border-[var(--toss-border)] bg-white p-4 shadow-sm">
+                <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
                   <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                     <div>
                       <p className="text-sm font-bold text-[var(--foreground)]">서명 / 직인 영역 표시</p>
@@ -811,10 +811,10 @@ export default function PayrollSlipDesignManager() {
                     </div>
                     <div className="flex items-center gap-2">
                       <span
-                        className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                        className={`rounded-[var(--radius-md)] px-2.5 py-1 text-[10px] font-bold ${
                           hasOwnPatchField(scopePatch, 'showSignArea')
-                            ? 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)]'
-                            : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'
+                            ? 'bg-[var(--toss-blue-light)] text-[var(--accent)]'
+                            : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'
                         }`}
                       >
                         {hasOwnPatchField(scopePatch, 'showSignArea') ? '수정됨' : '기본값 사용'}
@@ -823,7 +823,7 @@ export default function PayrollSlipDesignManager() {
                         <button
                           type="button"
                           onClick={() => resetField('showSignArea')}
-                          className="rounded-[10px] border border-[var(--toss-border)] bg-white px-3 py-1.5 text-[11px] font-bold text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]"
+                          className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-[11px] font-bold text-[var(--foreground)] hover:bg-[var(--muted)]"
                         >
                           기준으로 되돌리기
                         </button>
@@ -831,7 +831,7 @@ export default function PayrollSlipDesignManager() {
                     </div>
                   </div>
 
-                  <label className="mt-4 flex items-center justify-between rounded-[14px] border border-[var(--toss-border)] px-4 py-3">
+                  <label className="mt-4 flex items-center justify-between rounded-[var(--radius-lg)] border border-[var(--border)] px-4 py-3">
                     <span className="text-sm font-semibold text-[var(--foreground)]">
                       하단 서명 / 직인 영역 표시
                     </span>
@@ -839,11 +839,11 @@ export default function PayrollSlipDesignManager() {
                       type="checkbox"
                       checked={resolvedDesign.showSignArea}
                       onChange={(event) => updateField('showSignArea', event.target.checked)}
-                      className="h-4 w-4 rounded border-[var(--toss-border)]"
+                      className="h-4 w-4 rounded border-[var(--border)]"
                     />
                   </label>
 
-                  <div className="mt-3 rounded-[12px] bg-[var(--toss-gray-1)]/80 px-3 py-2 text-[11px] text-[var(--toss-gray-3)]">
+                  <div className="mt-3 rounded-[var(--radius-md)] bg-[var(--muted)]/80 px-3 py-2 text-[11px] text-[var(--toss-gray-3)]">
                     <span className="font-bold text-[var(--foreground)]">기준값</span>
                     <span className="ml-2">{referenceDesign.showSignArea ? '표시' : '숨김'}</span>
                   </div>
@@ -855,7 +855,7 @@ export default function PayrollSlipDesignManager() {
               <button
                 type="button"
                 onClick={handleResetScope}
-                className="rounded-[14px] border border-[var(--toss-border)] bg-white px-5 py-3 text-sm font-semibold text-[var(--foreground)] hover:bg-[var(--toss-gray-1)]"
+                className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-5 py-3 text-sm font-semibold text-[var(--foreground)] hover:bg-[var(--muted)]"
               >
                 이 범위 수정값 지우기
               </button>
@@ -863,7 +863,7 @@ export default function PayrollSlipDesignManager() {
                 type="button"
                 onClick={handleSave}
                 disabled={saving || loading}
-                className="rounded-[14px] bg-[var(--toss-blue)] px-5 py-3 text-sm font-semibold text-white hover:opacity-95 disabled:opacity-60"
+                className="rounded-[var(--radius-lg)] bg-[var(--accent)] px-5 py-3 text-sm font-semibold text-white hover:opacity-95 disabled:opacity-60"
               >
                 {saving ? '저장 중...' : '문서 디자인 저장'}
               </button>

@@ -26,7 +26,7 @@ const LEAVE_TOKEN = 'LEAVE';
 const TRAINING_TOKEN = 'TRAINING';
 
 const SPECIAL_SHIFT_OPTIONS: ShiftOption[] = [
-  { token: OFF_TOKEN, label: '휴무', shortLabel: '휴', color: 'bg-gray-100 text-gray-500', hours: '-' },
+  { token: OFF_TOKEN, label: '휴무', shortLabel: '휴', color: 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]', hours: '-' },
   { token: LEAVE_TOKEN, label: '휴가', shortLabel: '휴가', color: 'bg-green-100 text-green-600', hours: '-' },
   { token: TRAINING_TOKEN, label: '교육', shortLabel: '교육', color: 'bg-yellow-100 text-yellow-700', hours: '-' },
 ];
@@ -80,7 +80,7 @@ function sortWorkShifts(list: WorkShift[]) {
 
 function getShiftColorClass(name: string) {
   const normalized = normalizeShiftName(name);
-  if (normalized.includes('휴무') || normalized.includes('off') || normalized.includes('비번') || normalized.includes('오프')) return 'bg-gray-100 text-gray-500';
+  if (normalized.includes('휴무') || normalized.includes('off') || normalized.includes('비번') || normalized.includes('오프')) return 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]';
   if (normalized.includes('휴가') || normalized.includes('연차')) return 'bg-green-100 text-green-600';
   if (normalized.includes('교육')) return 'bg-yellow-100 text-yellow-700';
   if (normalized.includes('데이') || normalized.includes('day') || normalized.includes('주간') || normalized.includes('상근')) return 'bg-blue-100 text-blue-700';
@@ -111,7 +111,7 @@ function getLegacyShiftInfo(code: string): ShiftOption | null {
     case 'N':
       return { token: code, label: '나이트', shortLabel: 'N', color: 'bg-purple-100 text-purple-700', hours: '-' };
     case 'O':
-      return { token: code, label: '휴무', shortLabel: '휴', color: 'bg-gray-100 text-gray-500', hours: '-' };
+      return { token: code, label: '휴무', shortLabel: '휴', color: 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]', hours: '-' };
     case 'H':
       return { token: code, label: '휴가', shortLabel: '휴가', color: 'bg-green-100 text-green-600', hours: '-' };
     case 'S':
@@ -129,12 +129,12 @@ function resolveShiftInfo(token: string, workShifts: WorkShift[]) {
 
   const shiftId = extractShiftId(token);
   if (!shiftId) {
-    return { token, label: token || '미지정', shortLabel: token || '?', color: 'bg-zinc-100 text-zinc-500', hours: '-' };
+    return { token, label: token || '미지정', shortLabel: token || '?', color: 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]', hours: '-' };
   }
 
   const shift = workShifts.find((item) => item.id === shiftId);
   if (!shift) {
-    return { token, label: '삭제된 근무유형', shortLabel: '?', color: 'bg-zinc-100 text-zinc-500', hours: '-' };
+    return { token, label: '삭제된 근무유형', shortLabel: '?', color: 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]', hours: '-' };
   }
 
   return {
@@ -650,55 +650,55 @@ export default function NurseSchedule({ staffs = [], selectedCo }: { staffs: any
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-4 md:p-6 border-b border-[var(--toss-border)] bg-[var(--toss-card)] flex flex-col gap-3 shrink-0">
+      <div className="p-4 md:p-4 border-b border-[var(--border)] bg-[var(--card)] flex flex-col gap-3 shrink-0">
         <div className="flex flex-col md:flex-row gap-3 items-start md:items-center justify-between">
           <div className="flex items-center gap-3">
-            <button onClick={prevMonth} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] font-bold">‹</button>
+            <button onClick={prevMonth} className="w-8 h-8 flex items-center justify-center rounded-[var(--radius-md)] hover:bg-[var(--muted)] text-[var(--toss-gray-4)] font-bold">‹</button>
             <div>
               <h2 className="text-base font-bold text-[var(--foreground)]">{year}년 {month}월 간호 근무표</h2>
               <p className="text-[11px] text-[var(--toss-gray-3)] mt-1">
                 현재 팀: <span className="font-bold text-[var(--foreground)]">{dept || '-'}</span> · 표시 직원 {visibleStaffs.length}명
               </p>
             </div>
-            <button onClick={nextMonth} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] font-bold">›</button>
+            <button onClick={nextMonth} className="w-8 h-8 flex items-center justify-center rounded-[var(--radius-md)] hover:bg-[var(--muted)] text-[var(--toss-gray-4)] font-bold">›</button>
           </div>
           <div className="flex gap-2 flex-wrap">
-            <select value={dept} onChange={(e) => setDept(e.target.value)} className="px-3 py-1.5 border border-[var(--toss-border)] rounded-[10px] text-xs font-bold bg-[var(--toss-card)] outline-none">
+            <select value={dept} onChange={(e) => setDept(e.target.value)} className="px-3 py-1.5 border border-[var(--border)] rounded-[var(--radius-md)] text-xs font-bold bg-[var(--card)] outline-none">
               {depts.map((item) => <option key={item}>{item}</option>)}
             </select>
-            <button onClick={openWizard} disabled={generating || scopedStaffs.length === 0} className="px-3 py-1.5 bg-purple-500 text-white rounded-[10px] text-xs font-bold disabled:opacity-50">
+            <button onClick={openWizard} disabled={generating || scopedStaffs.length === 0} className="px-3 py-1.5 bg-purple-500 text-white rounded-[var(--radius-md)] text-xs font-bold disabled:opacity-50">
               생성 마법사
             </button>
-            <button onClick={() => setEditMode((value) => !value)} className={`px-3 py-1.5 rounded-[10px] text-xs font-bold ${editMode ? 'bg-orange-500 text-white' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'}`}>
+            <button onClick={() => setEditMode((value) => !value)} className={`px-3 py-1.5 rounded-[var(--radius-md)] text-xs font-bold ${editMode ? 'bg-orange-500 text-white' : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'}`}>
               {editMode ? '편집 중' : '편집'}
             </button>
-            {editMode && <button onClick={saveSchedule} disabled={saving} className="px-3 py-1.5 bg-[var(--toss-blue)] text-white rounded-[10px] text-xs font-bold disabled:opacity-50">{saving ? '저장 중...' : '저장'}</button>}
+            {editMode && <button onClick={saveSchedule} disabled={saving} className="px-3 py-1.5 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-xs font-bold disabled:opacity-50">{saving ? '저장 중...' : '저장'}</button>}
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="rounded-[14px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] p-3">
             <p className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">근무표 범위</p>
-            <p className="mt-2 text-xl font-bold text-[var(--foreground)]">{days}일</p>
+            <p className="mt-1 text-lg font-bold text-[var(--foreground)]">{days}일</p>
           </div>
-          <div className="rounded-[14px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-3">
+          <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] p-3">
             <p className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">팀 인원</p>
-            <p className="mt-2 text-xl font-bold text-[var(--foreground)]">{visibleStaffs.length}명</p>
+            <p className="mt-1 text-lg font-bold text-[var(--foreground)]">{visibleStaffs.length}명</p>
           </div>
-          <div className="rounded-[14px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-3">
+          <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] p-3">
             <p className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">근무유형</p>
-            <p className="mt-2 text-xl font-bold text-[var(--foreground)]">{Math.max(legendOptions.length - SPECIAL_SHIFT_OPTIONS.length, 0)}개</p>
+            <p className="mt-1 text-lg font-bold text-[var(--foreground)]">{Math.max(legendOptions.length - SPECIAL_SHIFT_OPTIONS.length, 0)}개</p>
           </div>
-          <div className="rounded-[14px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-3">
+          <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] p-3">
             <p className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">저장 범위</p>
-            <p className="mt-2 text-sm font-bold text-[var(--foreground)]">{selectedCo === '전체' ? '전체 사업체' : selectedCo}</p>
+            <p className="mt-1 text-sm font-bold text-[var(--foreground)]">{selectedCo === '전체' ? '전체 사업체' : selectedCo}</p>
           </div>
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 px-4 py-2 border-b border-[var(--toss-border)] shrink-0 bg-[var(--toss-card)]">
+      <div className="flex flex-wrap gap-2 px-4 py-2 border-b border-[var(--border)] shrink-0 bg-[var(--card)]">
         {legendOptions.map((option) => (
-          <span key={option.token} className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${option.color}`}>
+          <span key={option.token} className={`px-2 py-0.5 rounded-[var(--radius-md)] text-[9px] font-bold ${option.color}`}>
             {option.shortLabel} {option.label} {option.hours !== '-' ? option.hours : ''}
           </span>
         ))}
@@ -706,24 +706,24 @@ export default function NurseSchedule({ staffs = [], selectedCo }: { staffs: any
 
       {wizardOpen && (
         <div className="fixed inset-0 z-50 bg-black/45 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-[24px] border border-[var(--toss-border)] bg-[var(--toss-card)] shadow-2xl">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--toss-border)] bg-[var(--toss-card)] px-5 py-4">
+          <div className="w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] shadow-sm">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--border)] bg-[var(--card)] px-4 py-3">
               <div>
-                <p className="text-[11px] font-black uppercase tracking-[0.24em] text-[var(--toss-blue)]">Shift Wizard</p>
+                <p className="text-[11px] font-black uppercase tracking-[0.24em] text-[var(--accent)]">Shift Wizard</p>
                 <h3 className="mt-1 text-lg font-bold text-[var(--foreground)]">팀별 간호 근무표 생성 마법사</h3>
                 <p className="mt-1 text-[12px] text-[var(--toss-gray-3)]">팀, 직원, 근무유형, 생성 패턴을 선택해서 월간 근무표를 자동 생성합니다.</p>
               </div>
-              <button onClick={() => setWizardOpen(false)} className="rounded-full p-2 text-[var(--toss-gray-3)] hover:bg-[var(--toss-gray-1)]">✕</button>
+              <button onClick={() => setWizardOpen(false)} className="rounded-[var(--radius-md)] p-2 text-[var(--toss-gray-3)] hover:bg-[var(--muted)]">✕</button>
             </div>
 
-            <div className="grid gap-6 p-5 lg:grid-cols-[1.2fr_1fr]">
+            <div className="grid gap-3 p-4 lg:grid-cols-[1.2fr_1fr]">
               <div className="space-y-5">
-                <div className="rounded-[18px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-4">
+                <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--muted)] p-4">
                   <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[var(--toss-gray-3)]">1. 생성 대상</p>
                   <div className="mt-4 grid gap-3 md:grid-cols-2">
                     <label className="flex flex-col gap-1">
                       <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">팀 선택</span>
-                      <select value={wizardDept} onChange={(e) => setWizardDept(e.target.value)} className="rounded-[14px] border border-[var(--toss-border)] bg-white px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none">
+                      <select value={wizardDept} onChange={(e) => setWizardDept(e.target.value)} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none">
                         {depts.map((item) => (
                           <option key={item} value={item}>
                             {item}
@@ -731,30 +731,30 @@ export default function NurseSchedule({ staffs = [], selectedCo }: { staffs: any
                         ))}
                       </select>
                     </label>
-                    <div className="rounded-[14px] border border-[var(--toss-border)] bg-white px-4 py-3">
+                    <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 py-3">
                       <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">생성 월</p>
                       <p className="mt-2 text-sm font-bold text-[var(--foreground)]">{ym}</p>
                     </div>
                   </div>
 
                   <div className="mt-4 flex gap-2 flex-wrap">
-                    <button type="button" onClick={() => setSelectedStaffIds(wizardTargetStaffs.map((staff: any) => String(staff.id)))} className="px-3 py-1.5 rounded-[10px] bg-[var(--foreground)] text-white text-[11px] font-bold">
+                    <button type="button" onClick={() => setSelectedStaffIds(wizardTargetStaffs.map((staff: any) => String(staff.id)))} className="px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--foreground)] text-white text-[11px] font-bold">
                       전체 선택
                     </button>
-                    <button type="button" onClick={() => setSelectedStaffIds([])} className="px-3 py-1.5 rounded-[10px] bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] text-[11px] font-bold">
+                    <button type="button" onClick={() => setSelectedStaffIds([])} className="px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--toss-gray-4)] text-[11px] font-bold">
                       전체 해제
                     </button>
                   </div>
 
-                  <div className="mt-4 max-h-[260px] overflow-y-auto rounded-[14px] border border-[var(--toss-border)] bg-white">
+                  <div className="mt-4 max-h-[260px] overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)]">
                     {wizardTargetStaffs.length === 0 ? (
-                      <div className="px-4 py-8 text-center text-sm font-bold text-[var(--toss-gray-3)]">선택한 팀에 직원이 없습니다.</div>
+                      <div className="px-4 py-5 text-center text-sm font-bold text-[var(--toss-gray-3)]">선택한 팀에 직원이 없습니다.</div>
                     ) : (
-                      <div className="divide-y divide-[var(--toss-border)]">
+                      <div className="divide-y divide-[var(--border)]">
                         {wizardTargetStaffs.map((staff: any) => {
                           const checked = selectedStaffIds.includes(String(staff.id));
                           return (
-                            <label key={staff.id} className="flex items-center justify-between gap-3 px-4 py-3 cursor-pointer hover:bg-[var(--toss-gray-1)]/60">
+                            <label key={staff.id} className="flex items-center justify-between gap-3 px-4 py-3 cursor-pointer hover:bg-[var(--muted)]/60">
                               <div className="flex items-center gap-3">
                                 <input
                                   type="checkbox"
@@ -780,12 +780,12 @@ export default function NurseSchedule({ staffs = [], selectedCo }: { staffs: any
                   </div>
                 </div>
 
-                <div className="rounded-[18px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-4">
+                <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--muted)] p-4">
                   <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[var(--toss-gray-3)]">2. 생성 방식</p>
                   <div className="mt-4 grid gap-3 md:grid-cols-3">
                     <label className="flex flex-col gap-1">
                       <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">패턴</span>
-                      <select value={wizardPattern} onChange={(e) => setWizardPattern(e.target.value)} className="rounded-[14px] border border-[var(--toss-border)] bg-white px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none">
+                      <select value={wizardPattern} onChange={(e) => setWizardPattern(e.target.value)} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none">
                         {PATTERN_OPTIONS.map((option) => (
                           <option key={option.value} value={option.value}>
                             {option.label}
@@ -795,7 +795,7 @@ export default function NurseSchedule({ staffs = [], selectedCo }: { staffs: any
                     </label>
                     <label className="flex flex-col gap-1">
                       <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">시작 오프셋</span>
-                      <input type="number" min={0} value={wizardStartOffset} onChange={(e) => setWizardStartOffset(Number(e.target.value) || 0)} className="rounded-[14px] border border-[var(--toss-border)] bg-white px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none" />
+                      <input type="number" min={0} value={wizardStartOffset} onChange={(e) => setWizardStartOffset(Number(e.target.value) || 0)} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none" />
                     </label>
                     <label className="flex flex-col gap-1">
                       <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">월간 나이트 횟수</span>
@@ -806,7 +806,7 @@ export default function NurseSchedule({ staffs = [], selectedCo }: { staffs: any
                         value={wizardNightShiftCount}
                         disabled={!isNightPattern(wizardPattern)}
                         onChange={(e) => setWizardNightShiftCount(clampNightShiftCount(Number(e.target.value) || 0, days))}
-                        className="rounded-[14px] border border-[var(--toss-border)] bg-white px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none disabled:bg-[var(--toss-gray-1)] disabled:text-[var(--toss-gray-3)]"
+                        className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none disabled:bg-[var(--muted)] disabled:text-[var(--toss-gray-3)]"
                       />
                     </label>
                   </div>
@@ -818,7 +818,7 @@ export default function NurseSchedule({ staffs = [], selectedCo }: { staffs: any
                   <div className="mt-4 grid gap-3 md:grid-cols-3">
                     <label className="flex flex-col gap-1">
                       <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">주 근무유형</span>
-                      <select value={wizardPrimaryToken} onChange={(e) => setWizardPrimaryToken(e.target.value)} className="rounded-[14px] border border-[var(--toss-border)] bg-white px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none">
+                      <select value={wizardPrimaryToken} onChange={(e) => setWizardPrimaryToken(e.target.value)} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none">
                         <option value="">선택하세요</option>
                         {wizardWorkingShiftOptions.map((option) => (
                           <option key={option.token} value={option.token}>
@@ -829,7 +829,7 @@ export default function NurseSchedule({ staffs = [], selectedCo }: { staffs: any
                     </label>
                     <label className="flex flex-col gap-1">
                       <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">보조 근무유형</span>
-                      <select value={wizardSecondaryToken} onChange={(e) => setWizardSecondaryToken(e.target.value)} className="rounded-[14px] border border-[var(--toss-border)] bg-white px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none">
+                      <select value={wizardSecondaryToken} onChange={(e) => setWizardSecondaryToken(e.target.value)} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none">
                         <option value="">선택하세요</option>
                         {wizardWorkingShiftOptions.map((option) => (
                           <option key={option.token} value={option.token}>
@@ -840,7 +840,7 @@ export default function NurseSchedule({ staffs = [], selectedCo }: { staffs: any
                     </label>
                     <label className="flex flex-col gap-1">
                       <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">야간/3차 근무유형</span>
-                      <select value={wizardTertiaryToken} onChange={(e) => setWizardTertiaryToken(e.target.value)} className="rounded-[14px] border border-[var(--toss-border)] bg-white px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none">
+                      <select value={wizardTertiaryToken} onChange={(e) => setWizardTertiaryToken(e.target.value)} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-3 text-sm font-semibold text-[var(--foreground)] outline-none">
                         <option value="">선택하세요</option>
                         {wizardWorkingShiftOptions.map((option) => (
                           <option key={option.token} value={option.token}>
@@ -854,37 +854,37 @@ export default function NurseSchedule({ staffs = [], selectedCo }: { staffs: any
               </div>
 
               <div className="space-y-5">
-                <div className="rounded-[18px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-4">
+                <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--muted)] p-4">
                   <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[var(--toss-gray-3)]">3. 생성 요약</p>
                   <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                    <div className="rounded-[14px] bg-white p-4">
+                    <div className="rounded-[var(--radius-lg)] bg-[var(--card)] p-4">
                       <p className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">선택 직원</p>
                       <p className="mt-2 text-2xl font-bold text-[var(--foreground)]">{selectedStaffIds.length}명</p>
                     </div>
-                    <div className="rounded-[14px] bg-white p-4">
+                    <div className="rounded-[var(--radius-lg)] bg-[var(--card)] p-4">
                       <p className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">사용 근무유형</p>
                       <p className="mt-2 text-2xl font-bold text-[var(--foreground)]">{wizardWorkingShiftOptions.length}개</p>
                     </div>
-                    <div className="rounded-[14px] bg-white p-4">
+                    <div className="rounded-[var(--radius-lg)] bg-[var(--card)] p-4">
                       <p className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">월간 나이트</p>
                       <p className="mt-2 text-2xl font-bold text-[var(--foreground)]">{isNightPattern(wizardPattern) ? `${wizardNightShiftCount}회` : '미적용'}</p>
                     </div>
                   </div>
 
-                  <div className="mt-4 rounded-[14px] bg-white p-4">
+                  <div className="mt-4 rounded-[var(--radius-lg)] bg-[var(--card)] p-4">
                     <p className="text-[11px] font-bold text-[var(--foreground)]">패턴 설명</p>
                     <p className="mt-2 text-[12px] leading-6 text-[var(--toss-gray-3)]">
                       {PATTERN_OPTIONS.find((option) => option.value === wizardPattern)?.desc || '패턴 설명이 없습니다.'}
                     </p>
                   </div>
 
-                  <div className="mt-4 rounded-[14px] bg-white p-4">
+                  <div className="mt-4 rounded-[var(--radius-lg)] bg-[var(--card)] p-4">
                     <p className="text-[11px] font-bold text-[var(--foreground)]">생성 근무유형 조합</p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {[wizardPrimaryToken, wizardSecondaryToken, wizardTertiaryToken].filter(Boolean).map((token) => {
                         const info = resolveShiftInfo(token, workShifts);
                         return (
-                          <span key={token} className={`px-3 py-1 rounded-full text-[11px] font-bold ${info.color}`}>
+                          <span key={token} className={`px-3 py-1 rounded-[var(--radius-md)] text-[11px] font-bold ${info.color}`}>
                             {info.shortLabel} {info.label}
                           </span>
                         );
@@ -893,12 +893,12 @@ export default function NurseSchedule({ staffs = [], selectedCo }: { staffs: any
                   </div>
                 </div>
 
-                <div className="rounded-[18px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4">
+                <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4">
                   <div className="flex gap-2">
-                    <button onClick={() => setWizardOpen(false)} className="flex-1 px-4 py-3 rounded-[14px] bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] text-sm font-bold">
+                    <button onClick={() => setWizardOpen(false)} className="flex-1 px-4 py-2 rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--toss-gray-4)] text-sm font-bold">
                       취소
                     </button>
-                    <button onClick={applyWizard} disabled={generating || wizardTargetStaffs.length === 0 || wizardWorkingShiftOptions.length === 0} className="flex-[1.3] px-4 py-3 rounded-[14px] bg-[var(--toss-blue)] text-white text-sm font-bold disabled:opacity-50">
+                    <button onClick={applyWizard} disabled={generating || wizardTargetStaffs.length === 0 || wizardWorkingShiftOptions.length === 0} className="flex-[1.3] px-4 py-2 rounded-[var(--radius-md)] bg-[var(--accent)] text-white text-sm font-bold disabled:opacity-50">
                       {generating ? '생성 중...' : '근무표 생성'}
                     </button>
                   </div>
@@ -920,8 +920,8 @@ export default function NurseSchedule({ staffs = [], selectedCo }: { staffs: any
         <div className="flex-1 overflow-auto custom-scrollbar">
           <table className="text-left border-collapse" style={{ minWidth: `${220 + days * 42}px` }}>
             <thead className="sticky top-0 z-20">
-              <tr className="bg-[var(--toss-card)] border-b border-[var(--toss-border)]">
-                <th className="px-3 py-2 text-[10px] font-semibold text-[var(--toss-gray-3)] w-40 sticky left-0 bg-[var(--toss-card)] z-30">이름</th>
+              <tr className="bg-[var(--card)] border-b border-[var(--border)]">
+                <th className="px-3 py-2 text-[10px] font-semibold text-[var(--toss-gray-3)] w-40 sticky left-0 bg-[var(--card)] z-30">이름</th>
                 {Array.from({ length: days }, (_, index) => index + 1).map((day) => {
                   const dayOfWeek = getDayOfWeek(year, month, day);
                   const isSun = dayOfWeek === 0;
@@ -940,10 +940,10 @@ export default function NurseSchedule({ staffs = [], selectedCo }: { staffs: any
                 <th className="px-2 py-2 text-[9px] font-semibold text-[var(--toss-gray-3)] text-center w-10">교육</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[var(--toss-border)]">
+            <tbody className="divide-y divide-[var(--border)]">
               {visibleStaffs.map((staff: any) => (
-                <tr key={staff.id} className="hover:bg-[var(--toss-gray-1)]/30">
-                  <td className="px-3 py-1.5 sticky left-0 bg-[var(--toss-card)] border-r border-[var(--toss-border)] z-10">
+                <tr key={staff.id} className="hover:bg-[var(--muted)]/30">
+                  <td className="px-3 py-1.5 sticky left-0 bg-[var(--card)] border-r border-[var(--border)] z-10">
                     <p className="text-xs font-bold text-[var(--foreground)]">{staff.name}</p>
                     <p className="text-[9px] text-[var(--toss-gray-3)]">{staff.position || '-'} · {staff.company || '-'}</p>
                   </td>
@@ -952,7 +952,7 @@ export default function NurseSchedule({ staffs = [], selectedCo }: { staffs: any
                     const info = resolveShiftInfo(token, workShifts);
                     return (
                       <td key={day} className="p-0.5 text-center">
-                        <button onClick={() => cycleShift(staff, day)} className={`w-9 h-8 rounded-[6px] text-[9px] font-bold transition-all ${info.color} ${editMode ? 'hover:opacity-70 cursor-pointer' : 'cursor-default'}`} title={`${staff.name} ${day}일: ${info.label}${info.hours !== '-' ? ` (${info.hours})` : ''}`}>
+                        <button onClick={() => cycleShift(staff, day)} className={`w-9 h-8 rounded-md text-[9px] font-bold transition-all ${info.color} ${editMode ? 'hover:opacity-70 cursor-pointer' : 'cursor-default'}`} title={`${staff.name} ${day}일: ${info.label}${info.hours !== '-' ? ` (${info.hours})` : ''}`}>
                           {info.shortLabel}
                         </button>
                       </td>
@@ -965,12 +965,12 @@ export default function NurseSchedule({ staffs = [], selectedCo }: { staffs: any
                   ))}
                 </tr>
               ))}
-              <tr className="bg-[var(--toss-gray-1)]/50 border-t-2 border-[var(--toss-border)]">
-                <td className="px-3 py-1.5 sticky left-0 bg-[var(--toss-gray-1)]/80 text-[9px] font-bold text-[var(--toss-gray-3)]">일별 근무/휴무</td>
+              <tr className="bg-[var(--muted)]/50 border-t-2 border-[var(--border)]">
+                <td className="px-3 py-1.5 sticky left-0 bg-[var(--muted)]/80 text-[9px] font-bold text-[var(--toss-gray-3)]">일별 근무/휴무</td>
                 {Array.from({ length: days }, (_, index) => index + 1).map((day) => (
                   <td key={day} className="text-center py-1">
                     <div className="text-[8px] text-blue-600 font-bold">{countByCategory(day, 'WORK')}</div>
-                    <div className="text-[8px] text-zinc-500 font-bold">{countByCategory(day, 'OFF')}</div>
+                    <div className="text-[8px] text-[var(--toss-gray-4)] font-bold">{countByCategory(day, 'OFF')}</div>
                   </td>
                 ))}
                 <td className="text-center text-[10px] font-bold text-[var(--toss-gray-4)]">{totalCategoryCount('WORK')}</td>

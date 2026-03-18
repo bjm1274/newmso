@@ -17,13 +17,13 @@ export default function CertTransferPanel({ staffId, staffName }: { staffId: str
   }, [staffId]);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div className="border border-[var(--toss-border)] p-6 bg-white rounded-[12px]">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="border border-[var(--border)] p-4 bg-[var(--card)] rounded-[var(--radius-md)]">
         <h3 className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-4">교육·자격 현황</h3>
         {certs.length === 0 ? <p className="text-xs text-[var(--toss-gray-3)]">등록된 자격이 없습니다.</p> : (
           <div className="space-y-2">
             {certs.map((x) => (
-              <div key={x.id} className="p-3 bg-[var(--toss-gray-1)] rounded-[12px]">
+              <div key={x.id} className="p-3 bg-[var(--muted)] rounded-[var(--radius-md)]">
                 <p className="text-sm font-bold">{x.name}</p>
                 <p className="text-[11px] text-[var(--toss-gray-3)]">{x.issuer} · {x.issue_date} {x.expiry_date ? `~ ${x.expiry_date}` : ''}</p>
               </div>
@@ -31,12 +31,12 @@ export default function CertTransferPanel({ staffId, staffName }: { staffId: str
           </div>
         )}
       </div>
-      <div className="border border-[var(--toss-border)] p-6 bg-white rounded-[12px]">
+      <div className="border border-[var(--border)] p-4 bg-[var(--card)] rounded-[var(--radius-md)]">
         <h3 className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-4">인사이동 이력</h3>
         {transfers.length === 0 ? <p className="text-xs text-[var(--toss-gray-3)]">이동 이력이 없습니다.</p> : (
           <div className="space-y-2">
             {transfers.map((x) => (
-              <div key={x.id} className="p-3 bg-[var(--toss-gray-1)] rounded-[12px]">
+              <div key={x.id} className="p-3 bg-[var(--muted)] rounded-[var(--radius-md)]">
                 <p className="text-sm font-bold">{x.transfer_type}</p>
                 <p className="text-[11px] text-[var(--toss-gray-3)]">{x.before_value} → {x.after_value} ({x.effective_date})</p>
               </div>
