@@ -30,31 +30,31 @@ export default function TaxFileGenerator({ staffs, selectedCo }: { staffs: any[]
     };
 
     return (
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 shadow-sm animate-in fade-in duration-500" data-testid="payroll-utility-tax-file">
-            <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-lg">
+        <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-4 shadow-sm animate-in fade-in duration-500" data-testid="payroll-utility-tax-file">
+            <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 rounded-[var(--radius-md)] bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-base">
                     📑
                 </div>
                 <div>
-                    <h3 className="text-sm font-bold text-foreground">홈택스/EDI 신고 파일 자동 생성</h3>
+                    <h3 className="text-sm font-bold text-[var(--foreground)]">홈택스/EDI 신고 파일 자동 생성</h3>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-zinc-50 dark:bg-zinc-800/50 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3 bg-[var(--muted)] p-3 rounded-[var(--radius-md)] border border-[var(--border)]">
                 <div>
-                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-2 block">귀속 연월</label>
+                    <label className="text-[10px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider mb-1.5 block">귀속 연월</label>
                     <div className="flex gap-2">
-                        <select value={selectedYear} onChange={e => setSelectedYear(e.target.value)} className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-indigo-500 w-1/2">
+                        <select value={selectedYear} onChange={e => setSelectedYear(e.target.value)} className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] px-3 py-2 text-xs font-bold outline-none w-1/2">
                             {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}년</option>)}
                         </select>
-                        <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-indigo-500 w-1/2">
+                        <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] px-3 py-2 text-xs font-bold outline-none w-1/2">
                             {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map(m => <option key={m} value={m}>{m}월</option>)}
                         </select>
                     </div>
                 </div>
                 <div>
-                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-2 block">다운로드 포맷 (기관양식)</label>
-                    <select value={exportType} onChange={e => setExportType(e.target.value as any)} className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-indigo-500">
+                    <label className="text-[10px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider mb-1.5 block">다운로드 포맷 (기관양식)</label>
+                    <select value={exportType} onChange={e => setExportType(e.target.value as any)} className="w-full bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] px-3 py-2 text-xs font-bold outline-none">
                         <option value="hometax">국세청 홈택스 원천세 전자신고 (TXT)</option>
                         <option value="edi">4대사회보험 EDI 일괄업로드 (TXT)</option>
                         <option value="excel">사내 보고용 통합 급여대장 (Excel)</option>
@@ -62,7 +62,7 @@ export default function TaxFileGenerator({ staffs, selectedCo }: { staffs: any[]
                 </div>
             </div>
 
-            <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 p-4 rounded-2xl mb-6">
+            <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 p-3 rounded-[var(--radius-md)] mb-3">
                 <p className="text-[11px] font-bold text-amber-800 dark:text-amber-500 leading-relaxed flex gap-2">
                     <span className="shrink-0">⚠️</span>
                     <span>
@@ -77,7 +77,7 @@ export default function TaxFileGenerator({ staffs, selectedCo }: { staffs: any[]
                     onClick={handleDownload}
                     disabled={isGenerating}
                     data-testid="payroll-tax-download-button"
-                    className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-2 disabled:opacity-50"
+                    className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-2 disabled:opacity-50"
                 >
                     {isGenerating ? (
                         <>

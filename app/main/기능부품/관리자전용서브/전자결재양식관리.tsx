@@ -937,7 +937,7 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
   };
 
   return (
-    <div className="max-w-6xl space-y-8">
+    <div className="max-w-6xl space-y-5">
       <div className="space-y-2">
         <h2 className="text-xl font-semibold text-[var(--foreground)]">기본양식 관리</h2>
         <p className="text-sm leading-6 text-[var(--toss-gray-3)]">
@@ -945,7 +945,7 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
         </p>
       </div>
 
-      <section ref={designEditorRef} className="rounded-[24px] border border-[var(--toss-border)] bg-white p-6 shadow-sm">
+      <section ref={designEditorRef} className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-base font-semibold text-[var(--foreground)]">기본양식</h3>
@@ -953,7 +953,7 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
               새 양식을 만들 때 기준이 되는 기본양식입니다.
             </p>
           </div>
-          <div className="rounded-full bg-[var(--toss-gray-1)] px-4 py-2 text-xs font-semibold text-[var(--toss-gray-4)]">
+          <div className="rounded-[var(--radius-md)] bg-[var(--muted)] px-4 py-2 text-xs font-semibold text-[var(--toss-gray-4)]">
             총 {builtinTemplates.length}개
           </div>
         </div>
@@ -971,10 +971,10 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
                   setAddBaseSlug(template.slug);
                   handleSelectTemplate(template.slug, template.name);
                 }}
-                className={`rounded-[20px] border p-4 text-left transition-all ${
+                className={`rounded-[var(--radius-xl)] border p-4 text-left transition-all ${
                   isBase || isSelected
                     ? 'border-blue-200 bg-[var(--toss-blue-light)]/70 shadow-sm'
-                    : 'border-[var(--toss-border)] hover:border-blue-100 hover:bg-[var(--toss-gray-1)]/50'
+                    : 'border-[var(--border)] hover:border-blue-100 hover:bg-[var(--muted)]/50'
                 }`}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -982,12 +982,12 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
                     <p className="text-sm font-bold text-[var(--foreground)]">{template.name}</p>
                     <p className="mt-2 text-xs leading-5 text-[var(--toss-gray-3)]">{template.summary}</p>
                   </div>
-                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${isBase ? 'bg-[var(--toss-blue)] text-white' : 'bg-blue-50 text-blue-600'}`}>
+                  <span className={`rounded-[var(--radius-md)] px-2.5 py-1 text-[10px] font-semibold ${isBase ? 'bg-[var(--accent)] text-white' : 'bg-blue-50 text-blue-600'}`}>
                     {isBase ? '추가 기준' : '기본양식'}
                   </span>
                 </div>
                 {isSelected && (
-                  <div className="mt-3 text-[11px] font-semibold text-[var(--toss-blue)]">현재 수정 중</div>
+                  <div className="mt-3 text-[11px] font-semibold text-[var(--accent)]">현재 수정 중</div>
                 )}
               </button>
             );
@@ -995,7 +995,7 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
         </div>
       </section>
 
-      <section className="rounded-[24px] border border-[var(--toss-border)] bg-white p-6 shadow-sm">
+      <section className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-base font-semibold text-[var(--foreground)]">기본양식 기반 양식 추가</h3>
@@ -1003,7 +1003,7 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
               선택한 기본양식을 복제해서 새 결재양식을 만들고, 아래에서 이어서 수정합니다.
             </p>
           </div>
-          <div className="rounded-full bg-blue-50 px-4 py-2 text-xs font-semibold text-blue-700">
+          <div className="rounded-[var(--radius-md)] bg-blue-50 px-4 py-2 text-xs font-semibold text-blue-700">
             현재 기준: {selectedBaseTemplate?.name || '기본양식'}
           </div>
         </div>
@@ -1014,7 +1014,7 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
             <select
               value={addBaseSlug}
               onChange={(e) => setAddBaseSlug(e.target.value)}
-              className="w-full rounded-[16px] border border-[var(--toss-border)] px-3 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-blue-200"
+              className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] px-3 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-blue-200"
             >
               {builtinTemplates.map((template) => (
                 <option key={template.slug} value={template.slug}>
@@ -1034,7 +1034,7 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
                 if (!addSlug) setAddSlug(slugFromName(e.target.value));
               }}
               placeholder="예: 외부출장 신청서"
-              className="w-full rounded-[16px] border border-[var(--toss-border)] px-3 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-blue-200"
+              className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] px-3 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-blue-200"
             />
           </label>
 
@@ -1045,22 +1045,22 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
               value={addSlug}
               onChange={(e) => setAddSlug(e.target.value)}
               placeholder="자동 생성 또는 직접 입력"
-              className="w-full rounded-[16px] border border-[var(--toss-border)] px-3 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-blue-200"
+              className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] px-3 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-blue-200"
             />
           </label>
 
           <button
             type="button"
             onClick={handleAdd}
-            className="rounded-[16px] bg-[var(--toss-blue)] px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700"
+            className="rounded-[var(--radius-lg)] bg-[var(--accent)] px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700"
           >
             기본양식으로 추가
           </button>
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-[24px] border border-[var(--toss-border)] bg-white shadow-sm">
-        <div className="border-b border-[var(--toss-border)] px-6 py-4">
+      <section className="overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] shadow-sm">
+        <div className="border-b border-[var(--border)] px-4 py-4">
           <h3 className="text-base font-semibold text-[var(--foreground)]">기본양식 기반 추가 양식</h3>
           <p className="mt-1 text-sm text-[var(--toss-gray-3)]">
             추가 양식은 모두 기본양식 복제본입니다.
@@ -1068,18 +1068,18 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
         </div>
 
         {loading ? (
-          <div className="p-8 text-center text-sm text-[var(--toss-gray-3)]">양식을 불러오는 중입니다...</div>
+          <div className="p-5 text-center text-sm text-[var(--toss-gray-3)]">양식을 불러오는 중입니다...</div>
         ) : list.length === 0 ? (
-          <div className="p-8 text-center text-sm text-[var(--toss-gray-3)]">
+          <div className="p-5 text-center text-sm text-[var(--toss-gray-3)]">
             아직 추가된 양식이 없습니다. 위에서 기본양식을 선택해 새 양식을 추가해 주세요.
           </div>
         ) : (
-          <ul className="divide-y divide-[var(--toss-border)]">
+          <ul className="divide-y divide-[var(--border)]">
             {list.map((row) => {
               const baseName = builtinTemplates.find((template) => template.slug === row.base_slug)?.name;
 
               return (
-                <li key={row.id} className="px-6 py-4 hover:bg-[var(--toss-gray-1)]/50">
+                <li key={row.id} className="px-4 py-4 hover:bg-[var(--muted)]/50">
                   {editingId === row.id ? (
                     <div className="flex flex-wrap items-end gap-3">
                       <label className="min-w-[180px] flex-[1.2]">
@@ -1087,7 +1087,7 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
                         <input
                           value={editName}
                           onChange={(e) => setEditName(e.target.value)}
-                          className="w-full rounded-[14px] border border-[var(--toss-border)] px-3 py-2 text-sm font-semibold"
+                          className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] px-3 py-2 text-sm font-semibold"
                         />
                       </label>
                       <label className="min-w-[180px] flex-1">
@@ -1095,13 +1095,13 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
                         <input
                           value={editSlug}
                           onChange={(e) => setEditSlug(e.target.value)}
-                          className="w-full rounded-[14px] border border-[var(--toss-border)] px-3 py-2 text-sm font-semibold"
+                          className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] px-3 py-2 text-sm font-semibold"
                         />
                       </label>
-                      <button type="button" onClick={saveEdit} className="rounded-[14px] bg-[var(--toss-blue)] px-4 py-2 text-xs font-bold text-white">
+                      <button type="button" onClick={saveEdit} className="rounded-[var(--radius-lg)] bg-[var(--accent)] px-4 py-2 text-xs font-bold text-white">
                         저장
                       </button>
-                      <button type="button" onClick={() => setEditingId(null)} className="rounded-[14px] bg-[var(--toss-gray-2)] px-4 py-2 text-xs font-bold text-[var(--foreground)]">
+                      <button type="button" onClick={() => setEditingId(null)} className="rounded-[var(--radius-lg)] bg-[var(--toss-gray-2)] px-4 py-2 text-xs font-bold text-[var(--foreground)]">
                         취소
                       </button>
                     </div>
@@ -1112,11 +1112,11 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
                           <span className="text-sm font-bold text-[var(--foreground)]">{row.name}</span>
                           <span className="text-xs text-[var(--toss-gray-3)]">{row.slug}</span>
                           {!row.is_active && (
-                            <span className="rounded-full bg-red-50 px-2 py-1 text-[10px] font-semibold text-red-600">비활성</span>
+                            <span className="rounded-[var(--radius-md)] bg-red-50 px-2 py-1 text-[10px] font-semibold text-red-600">비활성</span>
                           )}
                         </div>
                         <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-[var(--toss-gray-3)]">
-                          <span className="rounded-full bg-[var(--toss-gray-1)] px-2.5 py-1 font-semibold">
+                          <span className="rounded-[var(--radius-md)] bg-[var(--muted)] px-2.5 py-1 font-semibold">
                             {baseName ? `${baseName} 기반` : '기본양식 기반'}
                           </span>
                           <span>디자인은 아래에서 이어서 수정할 수 있습니다.</span>
@@ -1124,16 +1124,16 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
                       </div>
 
                       <div className="flex flex-wrap gap-2">
-                        <button type="button" onClick={() => handleSelectTemplate(row.slug || row.id, row.name)} className="rounded-[14px] bg-[var(--toss-gray-1)] px-3 py-2 text-xs font-bold text-[var(--foreground)] hover:bg-[var(--toss-gray-2)]">
+                        <button type="button" onClick={() => handleSelectTemplate(row.slug || row.id, row.name)} className="rounded-[var(--radius-lg)] bg-[var(--muted)] px-3 py-2 text-xs font-bold text-[var(--foreground)] hover:bg-[var(--toss-gray-2)]">
                           수정 열기
                         </button>
-                        <button type="button" onClick={() => toggleActive(row)} className="rounded-[14px] bg-[var(--toss-gray-1)] px-3 py-2 text-xs font-bold text-[var(--foreground)] hover:bg-[var(--toss-gray-2)]">
+                        <button type="button" onClick={() => toggleActive(row)} className="rounded-[var(--radius-lg)] bg-[var(--muted)] px-3 py-2 text-xs font-bold text-[var(--foreground)] hover:bg-[var(--toss-gray-2)]">
                           {row.is_active === false ? '활성화' : '비활성'}
                         </button>
-                        <button type="button" onClick={() => startEdit(row)} className="rounded-[14px] bg-amber-100 px-3 py-2 text-xs font-bold text-amber-800">
+                        <button type="button" onClick={() => startEdit(row)} className="rounded-[var(--radius-lg)] bg-amber-100 px-3 py-2 text-xs font-bold text-amber-800">
                           이름/코드 수정
                         </button>
-                        <button type="button" onClick={() => handleDelete(row)} className="rounded-[14px] bg-red-50 px-3 py-2 text-xs font-bold text-red-600">
+                        <button type="button" onClick={() => handleDelete(row)} className="rounded-[var(--radius-lg)] bg-red-50 px-3 py-2 text-xs font-bold text-red-600">
                           삭제
                         </button>
                       </div>
@@ -1146,7 +1146,7 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
         )}
       </section>
 
-      <section ref={designEditorRef} className="rounded-[24px] border border-[var(--toss-border)] bg-white p-6 shadow-sm">
+      <section ref={designEditorRef} className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-base font-semibold text-[var(--foreground)]">기본양식 미리보기</h3>
@@ -1157,21 +1157,21 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
           {designLoading && <span className="text-xs font-semibold text-[var(--toss-gray-3)]">기본값 불러오는 중...</span>}
         </div>
 
-        <div className="mt-6 rounded-[28px] border border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-5">
+        <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--muted)] p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-[11px] font-semibold tracking-[0.16em] text-[var(--toss-gray-3)]">기본 문서 미리보기</p>
               <p className="mt-1 text-lg font-bold text-[var(--foreground)]">{selectedName}</p>
               <p className="mt-1 text-sm text-[var(--toss-gray-3)]">{previewSpec.summary}</p>
             </div>
-            <div className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-[var(--toss-gray-4)]">
+            <div className="rounded-[var(--radius-md)] bg-[var(--card)] px-4 py-2 text-xs font-semibold text-[var(--toss-gray-4)]">
               기본값 기준 {previewSourceName}
             </div>
           </div>
 
-          <div className="mt-5 flex min-h-[700px] items-center justify-center rounded-[24px] border border-[var(--toss-border)] bg-[#dde4e8] px-5 py-8">
+          <div className="mt-5 flex min-h-[700px] items-center justify-center rounded-[var(--radius-xl)] border border-[var(--border)] bg-[#dde4e8] px-5 py-5">
             <div
-              className="relative aspect-[210/297] w-full max-w-[430px] overflow-hidden bg-white shadow-[0_28px_70px_rgba(15,23,42,0.14)]"
+              className="relative aspect-[210/297] w-full max-w-[430px] overflow-hidden bg-[var(--card)] shadow-[0_28px_70px_rgba(15,23,42,0.14)]"
               style={{
                 border: `1px solid ${previewDesign.borderColor || '#d5dce4'}`,
                 boxShadow: '0 28px 70px rgba(15,23,42,0.14), 0 0 0 1px rgba(255,255,255,0.85) inset',
@@ -1187,16 +1187,16 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
                 />
               )}
 
-              <div className="relative z-10 flex h-full flex-col px-8 py-7 text-[#1f2937]">
+              <div className="relative z-10 flex h-full flex-col px-5 py-5 text-[#1f2937]">
                 <div className="flex items-start gap-4">
                   <div
-                    className="flex h-[66px] w-[66px] shrink-0 items-center justify-center rounded-[16px] bg-white"
+                    className="flex h-[66px] w-[66px] shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-[var(--card)]"
                     style={{ border: `1px solid ${previewDesign.borderColor || '#d5dce4'}` }}
                   >
                     <img src="/logo.png" alt="" className="h-10 w-10 object-contain" />
                   </div>
                   <div className="min-w-0 flex-1 pt-1">
-                    <h4 className="mt-1 text-[26px] font-black tracking-[-0.04em] text-slate-900">
+                    <h4 className="mt-1 text-[26px] font-black tracking-[-0.04em] text-[var(--foreground)]">
                       {previewDesign.title || previewSourceName}
                     </h4>
                   </div>
@@ -1207,12 +1207,12 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
                 <div className="mt-4 shrink-0 grid grid-cols-[74px_1fr] gap-3">
                   <div>
                     <div
-                      className="overflow-hidden rounded-[4px] bg-[#eef2f6]"
+                      className="overflow-hidden rounded bg-[#eef2f6]"
                       style={{ border: `1px solid ${previewDesign.borderColor || '#d5dce4'}` }}
                     >
-                      <div className="flex aspect-[3/4] items-center justify-center text-[34px] font-black text-slate-300">홍</div>
+                      <div className="flex aspect-[3/4] items-center justify-center text-[34px] font-black text-[var(--toss-gray-3)]">홍</div>
                     </div>
-                    <p className="mt-1 text-center text-[8px] font-medium text-slate-400">사진</p>
+                    <p className="mt-1 text-center text-[8px] font-medium text-[var(--toss-gray-3)]">사진</p>
                   </div>
 
                   <div className="space-y-1 pt-0.5">
@@ -1222,22 +1222,22 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
                         className={`grid grid-cols-[42px_8px_1fr] gap-1.5 ${index < previewIdentityRows.length - 1 ? 'border-b pb-1.5' : ''}`}
                         style={{ borderColor: previewDesign.borderColor || '#d5dce4' }}
                       >
-                        <span className="text-[9px] font-bold text-slate-900">{row.label}</span>
-                        <span className="text-[9px] font-bold text-slate-900">:</span>
-                        <span className="text-[9px] font-medium leading-[1.35] text-slate-700">{row.value}</span>
+                        <span className="text-[9px] font-bold text-[var(--foreground)]">{row.label}</span>
+                        <span className="text-[9px] font-bold text-[var(--foreground)]">:</span>
+                        <span className="text-[9px] font-medium leading-[1.35] text-[var(--toss-gray-5)]">{row.value}</span>
                       </div>
                     ))}
                   </div>
                 </div>
 
                 <div className="mt-4 shrink-0 border-t pt-4 text-center" style={{ borderColor: previewDesign.borderColor || '#d5dce4' }}>
-                  <p className="mx-auto max-w-[290px] text-[11px] leading-[1.75] text-slate-700">
+                  <p className="mx-auto max-w-[290px] text-[11px] leading-[1.75] text-[var(--toss-gray-5)]">
                     {previewStatement}
                   </p>
                 </div>
 
                 <div
-                  className="mt-4 shrink-0 overflow-hidden bg-white"
+                  className="mt-4 shrink-0 overflow-hidden bg-[var(--card)]"
                   style={{ borderTop: `2px solid ${previewDesign.primaryColor || '#2d93a8'}`, borderBottom: `2px solid ${previewDesign.primaryColor || '#2d93a8'}` }}
                 >
                   {previewDetailRows.map((row, index) => (
@@ -1246,26 +1246,26 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
                       className={`grid grid-cols-[74px_10px_1fr] gap-2 px-3 py-2.5 ${index < previewDetailRows.length - 1 ? 'border-b' : ''}`}
                       style={{ borderColor: previewDesign.borderColor || '#d5dce4' }}
                     >
-                      <span className="text-[10px] font-bold text-slate-900">{row.label}</span>
-                      <span className="text-[10px] font-bold text-slate-900">:</span>
-                      <span className="text-[10px] font-medium leading-[1.65] text-slate-700">{row.value}</span>
+                      <span className="text-[10px] font-bold text-[var(--foreground)]">{row.label}</span>
+                      <span className="text-[10px] font-bold text-[var(--foreground)]">:</span>
+                      <span className="text-[10px] font-medium leading-[1.65] text-[var(--toss-gray-5)]">{row.value}</span>
                     </div>
                   ))}
                 </div>
 
                 <div className="mt-4 shrink-0 border-t pt-4 text-center" style={{ borderColor: previewDesign.borderColor || '#d5dce4' }}>
-                  <div className="space-y-1 text-[10px] text-slate-500">
+                  <div className="space-y-1 text-[10px] text-[var(--toss-gray-4)]">
                     <p>{previewDateLabel} 2026년 3월 13일</p>
                     <p>발급번호 {previewDocumentNumber}</p>
                   </div>
                   <div className="mt-4 flex justify-center">
                     <div className="relative inline-flex items-end pr-8">
-                      <p className="text-[24px] font-black tracking-[-0.03em] text-slate-900">
+                      <p className="text-[24px] font-black tracking-[-0.03em] text-[var(--foreground)]">
                         {previewDesign.companyLabel || 'SY INC.'}
                       </p>
                     </div>
                     {previewDesign.showSeal !== false && (
-                      <div className="-ml-5 flex h-[66px] w-[66px] items-center justify-center rounded-full border-[3px] border-double border-[#b42318] bg-white text-center text-[10px] font-black leading-4 text-[#b42318] opacity-80">
+                      <div className="-ml-5 flex h-[66px] w-[66px] items-center justify-center rounded-full border-[3px] border-double border-[#b42318] bg-[var(--card)] text-center text-[10px] font-black leading-4 text-[#b42318] opacity-80">
                         회사
                         <br />
                         직인

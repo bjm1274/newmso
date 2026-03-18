@@ -37,12 +37,12 @@ export default function SeveranceLeaveDashboard({ staffs = [] }: any) {
   });
 
   return (
-    <div className="border border-[var(--toss-border)] p-4 bg-[var(--toss-card)] rounded-[12px] shadow-sm">
-      <div className="pb-2 border-b border-[var(--toss-border)] mb-3">
+    <div className="border border-[var(--border)] p-4 bg-[var(--card)] rounded-[var(--radius-md)] shadow-sm">
+      <div className="pb-2 border-b border-[var(--border)] mb-3">
         <h3 className="text-sm font-semibold text-[var(--foreground)]">예상 퇴직금 · 연차</h3>
       </div>
       <div className="flex items-center gap-2 mb-3">
-        <select value={filterCo} onChange={(e) => setFilterCo(e.target.value)} className="h-9 px-3 border border-[var(--toss-border)] rounded-md text-xs font-medium">
+        <select value={filterCo} onChange={(e) => setFilterCo(e.target.value)} className="h-9 px-3 border border-[var(--border)] rounded-md text-xs font-medium">
           <option value="전체">전체</option>
           {(Array.from(new Set(staffs.map((s: any) => s.company))).filter(Boolean) as string[]).map((c) => (
             <option key={c} value={c}>{c}</option>
@@ -51,7 +51,7 @@ export default function SeveranceLeaveDashboard({ staffs = [] }: any) {
       </div>
       <div className="max-h-[320px] overflow-y-auto space-y-2 custom-scrollbar">
         {items.map((x: any) => (
-          <div key={x.id} className="p-3 bg-[var(--page-bg)] rounded-[12px] border border-[var(--toss-border)]">
+          <div key={x.id} className="p-3 bg-[var(--page-bg)] rounded-[var(--radius-md)] border border-[var(--border)]">
             <div className="flex justify-between items-start mb-1.5">
               <span className="text-sm font-semibold text-[var(--foreground)]">{x.name}</span>
               <span className="text-[11px] text-[var(--toss-gray-3)]">{formatWorkPeriod(x.workDays)}</span>

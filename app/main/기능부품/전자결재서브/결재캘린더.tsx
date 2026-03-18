@@ -65,15 +65,15 @@ export default function ApprovalCalendar({ user }: { user: any }) {
   return (
     <div className="flex flex-col h-full">
       {/* 헤더 */}
-      <div className="p-4 md:p-6 border-b border-[var(--toss-border)] flex flex-col md:flex-row gap-3 items-start md:items-center justify-between shrink-0">
+      <div className="p-3 border-b border-[var(--border)] flex flex-col md:flex-row gap-2 items-start md:items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
-          <button onClick={prevMonth} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] font-bold">‹</button>
+          <button onClick={prevMonth} className="w-8 h-8 flex items-center justify-center rounded-[var(--radius-md)] hover:bg-[var(--muted)] text-[var(--toss-gray-4)] font-bold">‹</button>
           <h2 className="text-base font-bold text-[var(--foreground)]">{year}년 {month}월 결재 캘린더</h2>
-          <button onClick={nextMonth} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] font-bold">›</button>
+          <button onClick={nextMonth} className="w-8 h-8 flex items-center justify-center rounded-[var(--radius-md)] hover:bg-[var(--muted)] text-[var(--toss-gray-4)] font-bold">›</button>
         </div>
         <div className="flex gap-2 flex-wrap">
           {Object.entries(statusCounts).map(([status, count]) => (
-            <span key={status} className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${STATUS_COLORS[status] || 'bg-gray-100 text-gray-500 border-gray-200'}`}>
+            <span key={status} className={`px-2 py-0.5 rounded-[var(--radius-md)] text-[10px] font-bold border ${STATUS_COLORS[status] || 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)] border-[var(--border)]'}`}>
               {status} {count}건
             </span>
           ))}
@@ -102,12 +102,12 @@ export default function ApprovalCalendar({ user }: { user: any }) {
                 <button
                   key={d}
                   onClick={() => setSelectedDay(prev => prev === d ? null : d)}
-                  className={`min-h-[80px] p-1.5 rounded-[10px] text-left border transition-all ${isSelected ? 'border-[var(--toss-blue)] bg-[var(--toss-blue-light)]' : isToday ? 'border-[var(--toss-blue)]/30 bg-[var(--toss-blue-light)]/30' : 'border-[var(--toss-border)] bg-[var(--toss-card)] hover:bg-[var(--toss-gray-1)]'}`}
+                  className={`min-h-[80px] p-1.5 rounded-[var(--radius-md)] text-left border transition-all ${isSelected ? 'border-[var(--accent)] bg-[var(--toss-blue-light)]' : isToday ? 'border-[var(--accent)]/30 bg-[var(--toss-blue-light)]/30' : 'border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]'}`}
                 >
-                  <p className={`text-xs font-bold mb-1 ${isToday ? 'text-[var(--toss-blue)]' : dow === 0 ? 'text-red-500' : dow === 6 ? 'text-blue-500' : 'text-[var(--foreground)]'}`}>{d}</p>
+                  <p className={`text-xs font-bold mb-1 ${isToday ? 'text-[var(--accent)]' : dow === 0 ? 'text-red-500' : dow === 6 ? 'text-blue-500' : 'text-[var(--foreground)]'}`}>{d}</p>
                   <div className="space-y-0.5">
                     {dayApprovals.slice(0, 3).map(a => (
-                      <div key={a.id} className={`px-1 py-0.5 rounded text-[8px] font-bold truncate border ${STATUS_COLORS[a.status] || 'bg-gray-100 text-gray-500 border-gray-200'}`}>
+                      <div key={a.id} className={`px-1 py-0.5 rounded text-[8px] font-bold truncate border ${STATUS_COLORS[a.status] || 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)] border-[var(--border)]'}`}>
                         {a.title}
                       </div>
                     ))}
@@ -121,17 +121,17 @@ export default function ApprovalCalendar({ user }: { user: any }) {
 
         {/* 사이드 패널 */}
         {selectedDay && (
-          <div className="w-full md:w-72 border-t md:border-t-0 md:border-l border-[var(--toss-border)] p-4 overflow-auto shrink-0">
+          <div className="w-full md:w-72 border-t md:border-t-0 md:border-l border-[var(--border)] p-4 overflow-auto shrink-0">
             <p className="text-sm font-bold text-[var(--foreground)] mb-3">{month}월 {selectedDay}일 결재 현황</p>
             {selectedApprovals.length === 0 ? (
-              <p className="text-xs text-[var(--toss-gray-3)] text-center py-8">이 날짜에 결재가 없습니다.</p>
+              <p className="text-xs text-[var(--toss-gray-3)] text-center py-5">이 날짜에 결재가 없습니다.</p>
             ) : (
               <div className="space-y-2">
                 {selectedApprovals.map(a => (
-                  <div key={a.id} className="p-3 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[12px]">
+                  <div key={a.id} className="p-3 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)]">
                     <div className="flex items-start justify-between gap-2 mb-1">
                       <p className="text-xs font-bold text-[var(--foreground)] flex-1">{a.title}</p>
-                      <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold border shrink-0 ${STATUS_COLORS[a.status] || 'bg-gray-100 text-gray-500 border-gray-200'}`}>{a.status}</span>
+                      <span className={`px-1.5 py-0.5 rounded-[var(--radius-md)] text-[9px] font-bold border shrink-0 ${STATUS_COLORS[a.status] || 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)] border-[var(--border)]'}`}>{a.status}</span>
                     </div>
                     <p className="text-[9px] text-[var(--toss-gray-3)]">{a.type} · {a.sender_name}</p>
                     <p className="text-[9px] text-[var(--toss-gray-3)]">{a.created_at?.slice(0, 16)}</p>

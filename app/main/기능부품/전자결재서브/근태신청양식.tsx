@@ -53,25 +53,25 @@ export default function AttendanceForms({
   return (
     <div
       data-testid="approval-attendance-form-view"
-      className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-3xl overflow-hidden shadow-sm animate-in fade-in duration-300"
+      className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm animate-in fade-in duration-300"
     >
       {formType === '연차/휴가' ? (
         <>
-          <div className="border-b border-[var(--toss-border)] bg-[var(--toss-blue-light)]/40 p-4 md:p-6">
+          <div className="border-b border-[var(--border)] bg-[var(--toss-blue-light)]/40 p-3">
             <h4 className="text-sm font-bold text-[var(--foreground)]">연차/휴가 신청</h4>
-            <p className="mt-1 text-[11px] font-semibold text-[var(--toss-gray-4)]">
+            <p className="mt-0.5 text-[11px] font-semibold text-[var(--toss-gray-4)]">
               전자결재 전용 양식입니다.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 items-start gap-4 bg-gray-50/30 p-4 md:grid-cols-3 md:gap-6 md:p-6">
-            <div className="space-y-2">
-              <label className="ml-1 text-[11px] font-bold uppercase text-[var(--toss-blue)]">
+          <div className="grid grid-cols-1 items-start gap-3 bg-[var(--tab-bg)]/30 p-4 md:grid-cols-3 md:gap-3">
+            <div className="space-y-1.5">
+              <label className="ml-1 text-[11px] font-bold uppercase text-[var(--accent)]">
                 휴가 종류
               </label>
               <select
                 data-testid="approval-leave-type-select"
-                className="h-[52px] w-full rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] px-4 text-xs font-bold shadow-sm focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+                className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 text-xs font-bold shadow-sm focus:ring-2 focus:ring-[var(--accent)]/30"
                 onChange={(event) =>
                   setExtraData((prev: any) => ({ ...prev, vType: event.target.value }))
                 }
@@ -82,8 +82,8 @@ export default function AttendanceForms({
               </select>
             </div>
 
-            <div className="space-y-2">
-              <label className="ml-1 text-[11px] font-bold uppercase text-[var(--toss-blue)]">
+            <div className="space-y-1.5">
+              <label className="ml-1 text-[11px] font-bold uppercase text-[var(--accent)]">
                 시작 일자
               </label>
               <SmartDatePicker
@@ -94,12 +94,12 @@ export default function AttendanceForms({
                   setExtraData((prev: any) => ({ ...prev, startDate: value }));
                 }}
                 className="w-full"
-                inputClassName="h-[52px] rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] px-4 text-xs font-bold shadow-sm focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+                inputClassName="h-10 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 text-xs font-bold shadow-sm focus:ring-2 focus:ring-[var(--accent)]/30"
               />
             </div>
 
-            <div className="space-y-2">
-              <label className="ml-1 text-[11px] font-bold uppercase text-[var(--toss-blue)]">
+            <div className="space-y-1.5">
+              <label className="ml-1 text-[11px] font-bold uppercase text-[var(--accent)]">
                 종료 일자
               </label>
               <SmartDatePicker
@@ -110,7 +110,7 @@ export default function AttendanceForms({
                   setExtraData((prev: any) => ({ ...prev, endDate: value }));
                 }}
                 className="w-full"
-                inputClassName="h-[52px] rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] px-4 text-xs font-bold shadow-sm focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+                inputClassName="h-10 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 text-xs font-bold shadow-sm focus:ring-2 focus:ring-[var(--accent)]/30"
               />
             </div>
           </div>
@@ -119,14 +119,14 @@ export default function AttendanceForms({
 
       {formType === '연장근무' ? (
         <>
-          <div className="border-b border-orange-100 bg-orange-50 p-4 md:p-6">
+          <div className="border-b border-orange-100 bg-orange-50 p-3">
             <h4 className="text-sm font-bold text-orange-600">연장근무 내역 선택</h4>
             <p className="mt-1 text-[11px] font-semibold text-orange-500/70">
               근태 기록을 기준으로 초과 근무 내역을 불러옵니다.
             </p>
           </div>
 
-          <div className="grid max-h-60 grid-cols-1 gap-3 overflow-y-auto bg-gray-50/30 p-4 pr-2 custom-scrollbar md:grid-cols-2 md:gap-4 md:p-6">
+          <div className="grid max-h-60 grid-cols-1 gap-2 overflow-y-auto bg-[var(--tab-bg)]/30 p-3 pr-2 custom-scrollbar md:grid-cols-2 md:gap-3">
             {attendanceRows.map((row, index) => {
               const overtimeHours = calculateOT(row);
               if (overtimeHours <= 0) return null;
@@ -145,10 +145,10 @@ export default function AttendanceForms({
                     });
                     setFormTitle(`[추가수당청구] ${row.date} 연장근무 ${overtimeHours}시간`);
                   }}
-                  className={`flex items-center justify-between rounded-[16px] border-2 p-4 text-left transition-all md:p-5 ${
+                  className={`flex items-center justify-between rounded-[var(--radius-lg)] border-2 p-3 text-left transition-all ${
                     selectedDate === row.date
-                      ? 'border-orange-500 bg-[var(--toss-card)] shadow-lg'
-                      : 'border-[var(--toss-border)] bg-[var(--toss-card)]/50 hover:bg-[var(--toss-card)]'
+                      ? 'border-orange-500 bg-[var(--card)] shadow-sm'
+                      : 'border-[var(--border)] bg-[var(--card)]/50 hover:bg-[var(--card)]'
                   }`}
                 >
                   <div>
@@ -159,7 +159,7 @@ export default function AttendanceForms({
                       퇴근: {String(row.check_out || '').slice(11, 16)}
                     </p>
                   </div>
-                  <span className="rounded-[12px] bg-orange-50 px-2 py-1 text-[10px] font-bold text-orange-500 md:text-[11px]">
+                  <span className="rounded-[var(--radius-md)] bg-orange-50 px-2 py-1 text-[10px] font-bold text-orange-500 md:text-[11px]">
                     +{overtimeHours}H
                   </span>
                 </button>

@@ -184,10 +184,10 @@ export default function PopupManager() {
   };
 
   return (
-    <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
-      <div className="bg-white p-10 border border-[var(--toss-border)] shadow-sm space-y-8">
-        <div className="flex justify-between items-center border-b border-gray-50 pb-6">
-          <h3 className="font-semibold text-xl text-[var(--foreground)] tracking-tight">
+    <div className="space-y-4 animate-in slide-in-from-right-4 duration-500">
+      <div className="bg-[var(--card)] p-4 border border-[var(--border)] shadow-sm space-y-4">
+        <div className="flex justify-between items-center border-b border-[var(--border-subtle)] pb-4">
+          <h3 className="font-semibold text-base text-[var(--foreground)] tracking-tight">
             홈페이지 팝업 설정
           </h3>
           <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
@@ -195,13 +195,13 @@ export default function PopupManager() {
           </span>
         </div>
 
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">
               팝업 제목
             </label>
             <input
-              className="w-full p-4 bg-[var(--toss-gray-1)] border border-[var(--toss-border)] text-xs font-bold outline-none"
+              className="w-full p-2 bg-[var(--muted)] border border-[var(--border)] text-xs font-bold outline-none"
               placeholder="예: 박철홍정형외과 설날 진료 안내"
               value={newPopup.title}
               onChange={(e) => setNewPopup({ ...newPopup, title: e.target.value })}
@@ -212,7 +212,7 @@ export default function PopupManager() {
               미디어 타입
             </label>
             <select
-              className="w-full p-4 bg-[var(--toss-gray-1)] border border-[var(--toss-border)] text-xs font-bold outline-none"
+              className="w-full p-2 bg-[var(--muted)] border border-[var(--border)] text-xs font-bold outline-none"
               value={newPopup.media_type}
               onChange={(e) => {
                 setSelectedFile(null);
@@ -248,27 +248,27 @@ export default function PopupManager() {
         <div className="grid grid-cols-2 gap-2 mt-4">
           <button
             onClick={() => setShowPreview(true)}
-            className="w-full py-5 bg-orange-50 text-orange-600 border border-orange-100 text-[11px] font-semibold shadow-sm uppercase tracking-widest"
+            className="w-full py-2.5 bg-orange-50 text-orange-600 border border-orange-100 text-[11px] font-semibold shadow-sm uppercase tracking-widest"
           >
             👁️ 홈페이지 실시간 시뮬레이션
           </button>
           <button
             onClick={handleAddPopup}
             disabled={saving}
-            className="w-full py-5 bg-gray-900 text-white text-[11px] font-semibold shadow-xl uppercase tracking-widest disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full py-2.5 bg-gray-900 text-white text-[11px] font-semibold shadow-sm uppercase tracking-widest disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {saving ? '업로드 중...' : '팝업 즉시 생성'}
           </button>
         </div>
 
-        <div className="border-t border-[var(--toss-border)] pt-8 space-y-4">
+        <div className="border-t border-[var(--border)] pt-4 space-y-4">
           <div className="flex items-center justify-between">
             <h4 className="text-base font-semibold text-[var(--foreground)]">등록된 팝업 목록</h4>
             <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">최신순</span>
           </div>
 
           {popups.length === 0 ? (
-            <div className="border border-dashed border-[var(--toss-border)] bg-[var(--toss-gray-1)] px-6 py-10 text-center text-sm font-semibold text-[var(--toss-gray-3)]">
+            <div className="border border-dashed border-[var(--border)] bg-[var(--muted)] px-4 py-10 text-center text-sm font-semibold text-[var(--toss-gray-3)]">
               등록된 팝업이 없습니다.
             </div>
           ) : (
@@ -276,9 +276,9 @@ export default function PopupManager() {
               {popups.map((popup) => (
                 <div
                   key={popup.id}
-                  className="flex gap-4 border border-[var(--toss-border)] bg-[var(--toss-gray-1)] p-4 shadow-sm"
+                  className="flex gap-4 border border-[var(--border)] bg-[var(--muted)] p-4 shadow-sm"
                 >
-                  <div className="w-28 h-36 shrink-0 overflow-hidden bg-white border border-[var(--toss-border)]">
+                  <div className="w-28 h-36 shrink-0 overflow-hidden bg-[var(--card)] border border-[var(--border)]">
                     {popup.media_type === 'video' ? (
                       <video
                         src={popup.media_url}
@@ -324,7 +324,7 @@ export default function PopupManager() {
                       href={popup.media_url}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex text-[11px] font-semibold text-[var(--toss-blue)] hover:underline"
+                      className="inline-flex text-[11px] font-semibold text-[var(--accent)] hover:underline"
                     >
                       미디어 열기
                     </a>
@@ -342,14 +342,14 @@ export default function PopupManager() {
 
       {showPreview && (
         <div
-          className="fixed inset-0 z-[9999] bg-black/80 flex items-center justify-center p-8 backdrop-blur-sm"
+          className="fixed inset-0 z-[9999] bg-black/80 flex items-center justify-center p-5 backdrop-blur-sm"
           onClick={() => setShowPreview(false)}
         >
           <div
-            className="w-full h-full max-w-6xl bg-white border border-[var(--foreground)] shadow-2xl relative flex flex-col"
+            className="w-full h-full max-w-6xl bg-[var(--card)] border border-[var(--foreground)] shadow-sm relative flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="bg-[var(--toss-gray-1)] p-2 border-b flex justify-between items-center px-4">
+            <div className="bg-[var(--muted)] p-2 border-b flex justify-between items-center px-4">
               <div className="flex gap-1.5">
                 <span className="w-3 h-3 bg-red-400" />
                 <span className="w-3 h-3 bg-yellow-400" />
@@ -365,13 +365,13 @@ export default function PopupManager() {
                 닫기 X
               </button>
             </div>
-            <div className="flex-1 relative bg-[var(--toss-gray-1)] overflow-hidden">
+            <div className="flex-1 relative bg-[var(--muted)] overflow-hidden">
               <iframe
                 src="https://www.pchos.kr"
                 className="w-full h-full border-0 pointer-events-none opacity-40"
               />
               <div
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white shadow-2xl border border-[var(--foreground)] overflow-hidden"
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[var(--card)] shadow-sm border border-[var(--foreground)] overflow-hidden"
                 style={{ width: `${newPopup.width}px`, height: `${newPopup.height}px` }}
               >
                 {newPopup.media_type === 'video' ? (

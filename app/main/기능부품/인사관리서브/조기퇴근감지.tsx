@@ -136,44 +136,44 @@ export default function EarlyLeavingDetection({ staffs, selectedCo, user }: Prop
   const unapprovedCount = records.filter((r) => !r.is_approved).length;
 
   return (
-    <div className="p-4 md:p-6 space-y-6" data-testid="attendance-analysis-early-leaving">
+    <div className="p-4 md:p-4 space-y-4" data-testid="attendance-analysis-early-leaving">
       {/* 헤더 */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-[var(--foreground)]">조기 퇴근 감지</h2>
+          <h2 className="text-base font-bold text-[var(--foreground)]">조기 퇴근 감지</h2>
         </div>
         <input
           type="month"
           value={yearMonth}
           onChange={(e) => setYearMonth(e.target.value)}
-          className="px-3 py-2 text-sm font-bold border border-[var(--toss-border)] rounded-xl bg-[var(--toss-card)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/30"
+          className="px-3 py-1.5 text-sm font-bold border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--card)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
         />
       </div>
 
       {/* 메시지 */}
       {message && (
-        <div className={`px-4 py-3 rounded-xl text-sm font-bold ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+        <div className={`px-3 py-2 rounded-[var(--radius-md)] text-sm font-bold ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
           {message.text}
         </div>
       )}
 
       {/* 요약 */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-2xl p-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] p-3">
           <p className="text-xs font-bold text-[var(--toss-gray-3)]">전체 조기퇴근</p>
-          <p className="text-2xl font-extrabold text-[var(--foreground)] mt-1">{records.length}<span className="text-sm ml-1">건</span></p>
+          <p className="text-xl font-extrabold text-[var(--foreground)] mt-1">{records.length}<span className="text-sm ml-1">건</span></p>
         </div>
-        <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
+        <div className="bg-red-50 border border-red-200 rounded-[var(--radius-md)] p-3">
           <p className="text-xs font-bold text-red-400">미신청 조기퇴근</p>
-          <p className="text-2xl font-extrabold text-red-600 mt-1">{unapprovedCount}<span className="text-sm ml-1">건</span></p>
+          <p className="text-xl font-extrabold text-red-600 mt-1">{unapprovedCount}<span className="text-sm ml-1">건</span></p>
         </div>
-        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
+        <div className="bg-emerald-50 border border-emerald-200 rounded-[var(--radius-md)] p-3">
           <p className="text-xs font-bold text-emerald-500">승인된 조기퇴근</p>
-          <p className="text-2xl font-extrabold text-emerald-600 mt-1">{records.length - unapprovedCount}<span className="text-sm ml-1">건</span></p>
+          <p className="text-xl font-extrabold text-emerald-600 mt-1">{records.length - unapprovedCount}<span className="text-sm ml-1">건</span></p>
         </div>
-        <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-2xl p-4">
+        <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] p-3">
           <p className="text-xs font-bold text-[var(--toss-gray-3)]">해당 인원</p>
-          <p className="text-2xl font-extrabold text-[var(--foreground)] mt-1">{staffStats.length}<span className="text-sm ml-1">명</span></p>
+          <p className="text-xl font-extrabold text-[var(--foreground)] mt-1">{staffStats.length}<span className="text-sm ml-1">명</span></p>
         </div>
       </div>
 
@@ -183,7 +183,7 @@ export default function EarlyLeavingDetection({ staffs, selectedCo, user }: Prop
           <button
             key={mode}
             onClick={() => setViewMode(mode)}
-            className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${viewMode === mode ? 'bg-[var(--toss-blue)] text-white' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'}`}
+            className={`px-3 py-1.5 text-xs font-bold rounded-[var(--radius-md)] transition-all ${viewMode === mode ? 'bg-[var(--accent)] text-white' : 'bg-[var(--muted)] text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'}`}
           >
             {mode === 'list' ? '목록 보기' : '빈도 분석'}
           </button>
@@ -197,14 +197,14 @@ export default function EarlyLeavingDetection({ staffs, selectedCo, user }: Prop
             <select
               value={filterDept}
               onChange={(e) => setFilterDept(e.target.value)}
-              className="px-3 py-2 text-sm border border-[var(--toss-border)] rounded-xl bg-[var(--toss-card)] text-[var(--foreground)] outline-none"
+              className="px-3 py-1.5 text-sm border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--card)] text-[var(--foreground)] outline-none"
             >
               {depts.map((d) => <option key={d} value={d}>{d}</option>)}
             </select>
             <select
               value={filterApproved}
               onChange={(e) => setFilterApproved(e.target.value as any)}
-              className="px-3 py-2 text-sm border border-[var(--toss-border)] rounded-xl bg-[var(--toss-card)] text-[var(--foreground)] outline-none"
+              className="px-3 py-1.5 text-sm border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--card)] text-[var(--foreground)] outline-none"
             >
               <option value="전체">전체</option>
               <option value="미신청">미신청만</option>
@@ -214,24 +214,24 @@ export default function EarlyLeavingDetection({ staffs, selectedCo, user }: Prop
           </div>
 
           {/* 목록 테이블 */}
-          <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-2xl overflow-hidden">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] overflow-hidden">
             {loading ? (
-              <div className="p-10 text-center text-sm text-[var(--toss-gray-3)]">불러오는 중...</div>
+              <div className="p-5 text-center text-sm text-[var(--toss-gray-3)]">불러오는 중...</div>
             ) : displayRecords.length === 0 ? (
-              <div className="p-10 text-center text-sm text-[var(--toss-gray-3)]">조기 퇴근 기록이 없습니다.</div>
+              <div className="p-5 text-center text-sm text-[var(--toss-gray-3)]">조기 퇴근 기록이 없습니다.</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
-                  <thead className="bg-[var(--toss-gray-1)]">
+                  <thead className="bg-[var(--muted)]">
                     <tr>
                       {['날짜', '직원명', '부서', '정상퇴근', '실제퇴근', '조기분', '상태', '비고', ''].map((h) => (
                         <th key={h} className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">{h}</th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[var(--toss-border)]">
+                  <tbody className="divide-y divide-[var(--border)]">
                     {displayRecords.map((rec) => (
-                      <tr key={rec.id} className={`hover:bg-[var(--toss-gray-1)]/50 transition-colors ${!rec.is_approved ? 'bg-red-50/30' : ''}`}>
+                      <tr key={rec.id} className={`hover:bg-[var(--muted)]/50 transition-colors ${!rec.is_approved ? 'bg-red-50/30' : ''}`}>
                         <td className="px-4 py-3 font-bold text-[var(--foreground)]">{rec.work_date}</td>
                         <td className="px-4 py-3 font-bold text-[var(--foreground)]">{rec.staff_name}</td>
                         <td className="px-4 py-3 text-[var(--toss-gray-4)]">{rec.dept || '-'}</td>
@@ -240,15 +240,15 @@ export default function EarlyLeavingDetection({ staffs, selectedCo, user }: Prop
                         <td className="px-4 py-3 font-bold text-orange-600">{rec.early_minutes}분</td>
                         <td className="px-4 py-3">
                           {rec.is_approved ? (
-                            <span className="px-2 py-0.5 text-[10px] font-extrabold bg-emerald-100 text-emerald-700 rounded-lg">승인</span>
+                            <span className="px-2 py-0.5 text-[10px] font-extrabold bg-emerald-100 text-emerald-700 rounded-[var(--radius-md)]">승인</span>
                           ) : (
-                            <span className="px-2 py-0.5 text-[10px] font-extrabold bg-red-100 text-red-700 rounded-lg">미신청</span>
+                            <span className="px-2 py-0.5 text-[10px] font-extrabold bg-red-100 text-red-700 rounded-[var(--radius-md)]">미신청</span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-[var(--toss-gray-3)]">{rec.note || '-'}</td>
                         <td className="px-4 py-3">
                           {!rec.is_approved && (
-                            <button onClick={() => handleApprove(rec.id)} className="px-2 py-1 text-[10px] font-bold bg-blue-50 text-[var(--toss-blue)] rounded-lg hover:bg-blue-100 transition-colors">
+                            <button onClick={() => handleApprove(rec.id)} className="px-2 py-1 text-[10px] font-bold bg-blue-50 text-[var(--accent)] rounded-md hover:bg-blue-100 transition-colors">
                               승인
                             </button>
                           )}
@@ -264,10 +264,10 @@ export default function EarlyLeavingDetection({ staffs, selectedCo, user }: Prop
       )}
 
       {viewMode === 'stats' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           {/* 부서별 분석 */}
-          <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-2xl p-5">
-            <h3 className="text-sm font-bold text-[var(--foreground)] mb-4">부서별 조기퇴근 빈도</h3>
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-4">
+            <h3 className="text-sm font-bold text-[var(--foreground)] mb-3">부서별 조기퇴근 빈도</h3>
             {deptStats.length === 0 ? (
               <p className="text-xs text-[var(--toss-gray-3)]">데이터가 없습니다.</p>
             ) : (
@@ -281,9 +281,9 @@ export default function EarlyLeavingDetection({ staffs, selectedCo, user }: Prop
                         {ds.unapproved > 0 && <span className="text-[10px] font-bold text-red-600">미신청 {ds.unapproved}</span>}
                       </div>
                     </div>
-                    <div className="w-full h-2.5 bg-[var(--toss-gray-1)] rounded-full overflow-hidden">
+                    <div className="w-full h-2.5 bg-[var(--muted)] rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-[var(--toss-blue)] rounded-full transition-all"
+                        className="h-full bg-[var(--accent)] rounded-full transition-all"
                         style={{ width: `${(ds.count / maxDeptCount) * 100}%` }}
                       />
                     </div>
@@ -294,28 +294,28 @@ export default function EarlyLeavingDetection({ staffs, selectedCo, user }: Prop
           </div>
 
           {/* 개인별 통계 */}
-          <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-2xl overflow-hidden">
-            <div className="p-4 border-b border-[var(--toss-border)]">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] overflow-hidden">
+            <div className="px-4 py-3 border-b border-[var(--border)]">
               <h3 className="text-sm font-bold text-[var(--foreground)]">개인별 조기퇴근 통계</h3>
             </div>
             {staffStats.length === 0 ? (
-              <div className="p-8 text-center text-sm text-[var(--toss-gray-3)]">데이터가 없습니다.</div>
+              <div className="p-5 text-center text-sm text-[var(--toss-gray-3)]">데이터가 없습니다.</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
-                  <thead className="bg-[var(--toss-gray-1)]">
+                  <thead className="bg-[var(--muted)]">
                     <tr>
                       {['직원명', '부서', '총횟수', '미신청', '총조기분'].map((h) => (
                         <th key={h} className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">{h}</th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[var(--toss-border)]">
+                  <tbody className="divide-y divide-[var(--border)]">
                     {staffStats.map((ss) => (
-                      <tr key={ss.staff_id} className="hover:bg-[var(--toss-gray-1)]/50 transition-colors">
+                      <tr key={ss.staff_id} className="hover:bg-[var(--muted)]/50 transition-colors">
                         <td className="px-4 py-3 font-bold text-[var(--foreground)]">{ss.staff_name}</td>
                         <td className="px-4 py-3 text-[var(--toss-gray-4)]">{ss.dept}</td>
-                        <td className="px-4 py-3 font-bold text-[var(--toss-blue)]">{ss.total_count}회</td>
+                        <td className="px-4 py-3 font-bold text-[var(--accent)]">{ss.total_count}회</td>
                         <td className="px-4 py-3">
                           {ss.unapproved_count > 0 ? (
                             <span className="font-extrabold text-red-600">{ss.unapproved_count}건</span>

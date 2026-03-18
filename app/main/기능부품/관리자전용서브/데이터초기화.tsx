@@ -94,21 +94,21 @@ export default function DataReseter({ onRefresh }: { onRefresh: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center h-full animate-in fade-in duration-500">
       {!isUnlocked ? (
-        <div className="bg-white p-12 border border-red-100 shadow-2xl text-center space-y-6 max-w-sm w-full">
-          <h3 className="font-semibold text-xl text-red-600 tracking-tight uppercase">시스템 보안 인증</h3>
+        <div className="bg-[var(--card)] p-6 border border-red-100 shadow-sm text-center space-y-4 max-w-sm w-full">
+          <h3 className="font-semibold text-base text-red-600 tracking-tight uppercase">시스템 보안 인증</h3>
           <p className="text-[11px] text-[var(--toss-gray-3)] font-bold tracking-widest uppercase">보안 구역 접근을 위해 암호를 입력하세요</p>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full p-4 bg-[var(--toss-gray-1)] border border-[var(--toss-border)] text-center font-semibold text-2xl outline-none focus:border-red-600"
+            className="w-full p-2 bg-[var(--muted)] border border-[var(--border)] text-center font-semibold text-xl outline-none focus:border-red-600"
             placeholder="••••••"
           />
-          <button onClick={handleUnlock} className="w-full py-4 bg-red-600 text-white text-xs font-semibold shadow-lg">보안 잠금 해제</button>
+          <button onClick={handleUnlock} className="w-full py-2 bg-red-600 text-white text-xs font-semibold shadow-sm">보안 잠금 해제</button>
         </div>
       ) : (
         <div className="w-full max-w-2xl space-y-4">
-          <div className="bg-red-50 p-6 border border-red-100 text-center mb-6">
+          <div className="bg-red-50 p-4 border border-red-100 text-center mb-4">
             <h3 className="text-red-600 font-semibold text-sm mb-1 tracking-tight uppercase">통합 데이터 초기화 관리</h3>
             <p className="text-[11px] text-red-400 font-bold uppercase tracking-widest">항목별 실행 버튼을 누르면 즉시 영구 삭제됩니다.</p>
           </div>
@@ -129,7 +129,7 @@ export default function DataReseter({ onRefresh }: { onRefresh: () => void }) {
             {/* 직원 삭제: 관리자는 항상 제외 */}
             <button
               onClick={() => runReset('staff')}
-              className="p-6 bg-white border-2 border-red-50 hover:border-red-600 hover:bg-red-50 text-left font-semibold text-xs text-red-600 flex justify-between items-center transition-all group"
+              className="p-4 bg-[var(--card)] border-2 border-red-50 hover:border-red-600 hover:bg-red-50 text-left font-semibold text-xs text-red-600 flex justify-between items-center transition-all group"
             >
               <span>👤 관리자 제외 전 직원 계정 및 데이터 삭제</span>
               <span className="text-[11px] font-bold px-2 py-1 bg-red-600 text-white uppercase">관리자 유지</span>
@@ -151,7 +151,7 @@ export default function DataReseter({ onRefresh }: { onRefresh: () => void }) {
 // 공통 버튼 컴포넌트 (각진 디자인)
 function ResetButton({ onClick, label }: { onClick: () => void, label: string }) {
   return (
-    <button onClick={onClick} className="p-5 bg-white border border-[var(--toss-border)] hover:border-red-500 hover:text-red-600 text-left font-semibold text-xs flex justify-between items-center transition-all group">
+    <button onClick={onClick} className="p-3 bg-[var(--card)] border border-[var(--border)] hover:border-red-500 hover:text-red-600 text-left font-semibold text-xs flex justify-between items-center transition-all group">
       <span>{label}</span>
       <span className="text-[11px] opacity-0 group-hover:opacity-100 transition-opacity font-bold uppercase text-red-500">실행하기</span>
     </button>

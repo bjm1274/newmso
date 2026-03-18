@@ -140,7 +140,7 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
   // 실사 전
   if (!sessionStarted && !report) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 gap-6">
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
         <div className="text-5xl">📦</div>
         <div className="text-center">
           <h2 className="text-lg font-bold text-[var(--foreground)] mb-2">재고 실사</h2>
@@ -152,7 +152,7 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
         </div>
         <button
           onClick={startSession}
-          className="px-8 py-4 bg-[var(--toss-blue)] text-white rounded-[14px] font-bold text-sm shadow-md hover:opacity-90 transition-all"
+          className="px-4 py-2 bg-[var(--accent)] text-white rounded-[var(--radius-md)] font-bold text-sm shadow-sm hover:opacity-90 transition-all"
         >
           실사 시작
         </button>
@@ -164,7 +164,7 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
   if (report) {
     return (
       <div className="space-y-4">
-        <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] p-6 shadow-sm">
+        <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-4 shadow-sm">
           <div className="flex items-center gap-3 mb-4">
             <span className="text-2xl">✅</span>
             <div>
@@ -173,11 +173,11 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3 mb-4">
-            <div className="bg-[var(--toss-gray-1)] rounded-[12px] p-3 text-center">
+            <div className="bg-[var(--muted)] rounded-[var(--radius-md)] p-3 text-center">
               <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">실사 품목</p>
-              <p className="text-xl font-bold text-[var(--toss-blue)]">{enteredCount}개</p>
+              <p className="text-xl font-bold text-[var(--accent)]">{enteredCount}개</p>
             </div>
-            <div className="bg-[var(--toss-gray-1)] rounded-[12px] p-3 text-center">
+            <div className="bg-[var(--muted)] rounded-[var(--radius-md)] p-3 text-center">
               <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">수량 차이 조정</p>
               <p className="text-xl font-bold text-orange-500">{report.length}개</p>
             </div>
@@ -188,13 +188,13 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs min-w-[400px]">
                 <thead>
-                  <tr className="border-b border-[var(--toss-border)] text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">
+                  <tr className="border-b border-[var(--border)] text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">
                     <th className="py-2 px-3">품목</th><th className="py-2 px-3 text-center">장부</th><th className="py-2 px-3 text-center">실물</th><th className="py-2 px-3 text-center">차이</th>
                   </tr>
                 </thead>
                 <tbody>
                   {report.map((r, i) => (
-                    <tr key={i} className="border-b border-[var(--toss-border)]">
+                    <tr key={i} className="border-b border-[var(--border)]">
                       <td className="py-2 px-3 font-medium">{r.item_name} <span className="text-[var(--toss-gray-3)]">{r.category}</span></td>
                       <td className="py-2 px-3 text-center">{r.expected}</td>
                       <td className="py-2 px-3 text-center font-bold">{r.actual}</td>
@@ -206,7 +206,7 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
             </div>
           )}
         </div>
-        <button onClick={() => setReport(null)} className="w-full py-3 rounded-[12px] bg-[var(--toss-blue)] text-white font-semibold text-sm">새 실사 시작</button>
+        <button onClick={() => setReport(null)} className="w-full py-2 rounded-[var(--radius-md)] bg-[var(--accent)] text-white font-semibold text-sm">새 실사 시작</button>
       </div>
     );
   }
@@ -215,14 +215,14 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
   return (
     <div className="space-y-4">
       {/* 진행 상황 */}
-      <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[16px] p-4 shadow-sm">
+      <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-4 shadow-sm">
         <div className="flex items-center justify-between mb-2">
           <p className="text-sm font-bold text-[var(--foreground)]">실사 진행 중</p>
-          <p className="text-xs text-[var(--toss-blue)] font-bold">{enteredCount} / {items.length} 입력됨</p>
+          <p className="text-xs text-[var(--accent)] font-bold">{enteredCount} / {items.length} 입력됨</p>
         </div>
-        <div className="w-full h-2 bg-[var(--toss-gray-1)] rounded-full overflow-hidden">
+        <div className="w-full h-2 bg-[var(--muted)] rounded-full overflow-hidden">
           <div
-            className="h-full bg-[var(--toss-blue)] rounded-full transition-all"
+            className="h-full bg-[var(--accent)] rounded-full transition-all"
             style={{ width: items.length > 0 ? `${(enteredCount / items.length) * 100}%` : '0%' }}
           />
         </div>
@@ -240,34 +240,34 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
           placeholder="품목명·분류·회사 검색..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="flex-1 px-4 py-3 rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-bold outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20"
+          className="flex-1 px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-sm font-bold outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
         />
         <button
           onClick={handleComplete}
           disabled={saving}
-          className="px-5 py-3 bg-emerald-600 text-white rounded-[12px] text-sm font-semibold shadow-sm hover:opacity-90 disabled:opacity-50"
+          className="px-4 py-2 bg-emerald-600 text-white rounded-[var(--radius-md)] text-sm font-semibold shadow-sm hover:opacity-90 disabled:opacity-50"
         >
           {saving ? '저장 중...' : '실사 완료'}
         </button>
         <button
           onClick={() => { if (confirm('실사를 중단하시겠습니까? 입력한 내용이 사라집니다.')) { setSessionStarted(false); setItems([]); } }}
-          className="px-4 py-3 bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] rounded-[12px] text-sm font-semibold"
+          className="px-3 py-2 bg-[var(--muted)] text-[var(--toss-gray-4)] rounded-[var(--radius-md)] text-sm font-semibold"
         >
           중단
         </button>
       </div>
 
-      <div className="bg-[var(--toss-card)] rounded-[16px] border border-[var(--toss-border)] shadow-sm overflow-hidden">
+      <div className="bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left min-w-[600px]">
             <thead>
-              <tr className="bg-[var(--toss-gray-1)]/60 border-b border-[var(--toss-border)]">
+              <tr className="bg-[var(--muted)]/60 border-b border-[var(--border)]">
                 {['회사/분류', '품목명', '장부 수량', '실물 수량 입력', '차이'].map(h => (
-                  <th key={h} className="px-4 py-3 text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">{h}</th>
+                  <th key={h} className="px-4 py-2 text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-[var(--toss-border)]">
+            <tbody className="divide-y divide-[var(--border)]">
               {filtered.map(it => {
                 const { quantity: actualNum, error: actualError } = validateInventoryQuantity(it.actual, {
                   label: '실물 수량',
@@ -279,7 +279,7 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
                 return (
                   <tr key={it.id} className={`transition-colors ${hasError ? 'bg-red-50/60' : hasDiff ? 'bg-orange-50/50' : ''}`}>
                     <td className="px-4 py-3">
-                      <p className="text-[10px] font-bold text-[var(--toss-blue)]">{it.company}</p>
+                      <p className="text-[10px] font-bold text-[var(--accent)]">{it.company}</p>
                       <p className="text-[9px] text-[var(--toss-gray-3)]">{it.category}</p>
                     </td>
                     <td className="px-4 py-3 text-xs font-semibold text-[var(--foreground)]">{it.item_name}</td>
@@ -292,7 +292,7 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
                         value={it.actual}
                         onChange={e => setActual(it.id, e.target.value)}
                         placeholder="실물 수량"
-                        className={`w-24 px-3 py-1.5 border rounded-[8px] text-sm font-bold text-center outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20 ${hasError ? 'border-red-400 bg-red-50' : hasDiff ? 'border-orange-400 bg-orange-50' : 'border-[var(--toss-border)] bg-[var(--toss-card)]'}`}
+                        className={`w-24 px-3 py-1.5 border rounded-[var(--radius-md)] text-sm font-bold text-center outline-none focus:ring-2 focus:ring-[var(--accent)]/20 ${hasError ? 'border-red-400 bg-red-50' : hasDiff ? 'border-orange-400 bg-orange-50' : 'border-[var(--border)] bg-[var(--card)]'}`}
                       />
                       {actualError && (
                         <p className="mt-1 text-[10px] font-semibold text-red-500">{actualError}</p>

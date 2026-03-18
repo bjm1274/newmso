@@ -24,20 +24,20 @@ export default function MonthlyCalendar({ calendarData, targetMonth, onCellClick
   const totalWeeks = Math.ceil(lastDay / 7);
 
   return (
-    <div className="flex flex-col h-full bg-white relative">
+    <div className="flex flex-col h-full bg-[var(--card)] relative">
       {/* 상단 컨트롤러: 주차 선택 버튼 */}
-      <div className="p-5 border-b bg-[var(--toss-gray-1)] flex justify-between items-center shrink-0">
-        <div className="flex items-center gap-6">
+      <div className="p-4 border-b bg-[var(--muted)] flex justify-between items-center shrink-0">
+        <div className="flex items-center gap-4">
             <h3 className="font-semibold text-[var(--foreground)] text-lg">🗓️ {targetMonth} 월간 근태 현황</h3>
-            <div className="flex p-1.5 bg-[var(--toss-gray-2)] rounded-[12px] gap-1 shadow-inner">
+            <div className="flex p-1.5 bg-[var(--toss-gray-2)] rounded-[var(--radius-md)] gap-1 shadow-inner">
                 {Array.from({ length: totalWeeks }, (_, i) => i + 1).map(week => {
                     const range = getWeekRange(week);
                     return (
                         <button 
                             key={week}
                             onClick={() => setActiveWeek(week)}
-                            className={`px-5 py-2 rounded-[16px] text-sm font-bold transition-all flex flex-col items-center
-                                ${activeWeek === week ? 'bg-white shadow-md text-[var(--toss-blue)]' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'}`}
+                            className={`px-5 py-2 rounded-[var(--radius-lg)] text-sm font-bold transition-all flex flex-col items-center
+                                ${activeWeek === week ? 'bg-[var(--card)] shadow-md text-[var(--accent)]' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'}`}
                         >
                             <span>{week}주차</span>
                             <span className="text-[11px] opacity-60">{range.start}~{range.end}일</span>
@@ -46,16 +46,16 @@ export default function MonthlyCalendar({ calendarData, targetMonth, onCellClick
                 })}
             </div>
         </div>
-        <div className="text-[11px] text-[var(--toss-gray-3)] font-bold bg-white px-3 py-1.5 rounded-full border shadow-sm">
+        <div className="text-[11px] text-[var(--toss-gray-3)] font-bold bg-[var(--card)] px-3 py-1.5 rounded-[var(--radius-md)] border shadow-sm">
             💡 31일까지 있는 달은 자동으로 5주차가 생성됩니다.
         </div>
       </div>
 
       {/* 7일 단위 근태 테이블 */}
-      <div className="flex-1 overflow-auto bg-white">
+      <div className="flex-1 overflow-auto bg-[var(--card)]">
         <table className="w-full border-collapse table-fixed">
           <thead>
-            <tr className="bg-[var(--toss-gray-1)]/50">
+            <tr className="bg-[var(--muted)]/50">
               <th className="w-32 p-4 border-b border-r font-semibold text-[var(--toss-gray-3)] text-[11px] uppercase tracking-tight">직원명</th>
               {daysArray.map(d => (
                 <th key={d} className="p-3 border-b text-center">
@@ -69,11 +69,11 @@ export default function MonthlyCalendar({ calendarData, targetMonth, onCellClick
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-[var(--toss-border)]">
+          <tbody className="divide-y divide-[var(--border)]">
             {calendarData.map((row: any) => (
               <tr key={row.staff.id} className="hover:bg-blue-50/10 transition-colors group">
                 <td 
-                  className="p-4 font-semibold border-r text-center text-sm cursor-pointer group-hover:text-[var(--toss-blue)] transition-colors bg-white sticky left-0 z-10"
+                  className="p-4 font-semibold border-r text-center text-sm cursor-pointer group-hover:text-[var(--accent)] transition-colors bg-[var(--card)] sticky left-0 z-10"
                   onClick={() => onBulkNormal(row.staff)}
                 >
                   {row.staff.name}
@@ -84,7 +84,7 @@ export default function MonthlyCalendar({ calendarData, targetMonth, onCellClick
                     const dayNum = parseInt(d.date.split('-')[2]);
                     return dayNum >= startDay && dayNum <= endDay;
                 }).map((d: any, i: number) => {
-                  let statusStyle = "bg-white text-[var(--toss-gray-3)] border-[var(--toss-border)]";
+                  let statusStyle = "bg-[var(--card)] text-[var(--toss-gray-3)] border-[var(--border)]";
                   if (d.status === '정상') statusStyle = "bg-green-50 text-green-700 border-green-200";
                   else if (d.status === '지각') statusStyle = "bg-red-50 text-red-600 border-red-200";
                   else if (d.status?.includes('휴가')) statusStyle = "bg-purple-50 text-purple-600 border-purple-200";
@@ -93,7 +93,7 @@ export default function MonthlyCalendar({ calendarData, targetMonth, onCellClick
                     <td key={i} className="p-2 h-28">
                       <div 
                         onClick={(e) => onCellClick(e, d, row.staff)}
-                        className={`w-full h-full rounded-[16px] border flex flex-col items-center justify-center cursor-pointer hover:shadow-lg transition-all p-2 ${statusStyle}`}
+                        className={`w-full h-full rounded-[var(--radius-lg)] border flex flex-col items-center justify-center cursor-pointer hover:shadow-sm transition-all p-2 ${statusStyle}`}
                       >
                         {d.status !== 'none' ? (
                           <>
@@ -111,7 +111,7 @@ export default function MonthlyCalendar({ calendarData, targetMonth, onCellClick
                 
                 {/* 5주차 빈 칸 보정 */}
                 {daysArray.length < 7 && Array.from({ length: 7 - daysArray.length }).map((_, i) => (
-                  <td key={`empty-td-${i}`} className="p-2 bg-[var(--toss-gray-1)]/10"></td>
+                  <td key={`empty-td-${i}`} className="p-2 bg-[var(--muted)]/10"></td>
                 ))}
               </tr>
             ))}

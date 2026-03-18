@@ -137,12 +137,12 @@ export default function ExtraFeatures({
 
   const compactToolbar = (
     <div className="flex items-center gap-2">
-      <div className="inline-flex items-center gap-1 rounded-full border border-[var(--toss-border)] bg-[var(--toss-card)] px-2 py-1 shadow-sm">
+      <div className="inline-flex items-center gap-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 py-1 shadow-sm">
         <span className="text-[10px] font-semibold text-[var(--toss-gray-3)]">모드</span>
         <ThemeToggle compact />
       </div>
       {onSearchSelect ? (
-        <div className="inline-flex items-center rounded-full border border-[var(--toss-border)] bg-[var(--toss-card)] px-1 py-1 shadow-sm">
+        <div className="inline-flex items-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-1 py-1 shadow-sm">
           <GlobalSearch
             user={user}
             staffs={staffs}
@@ -167,14 +167,14 @@ export default function ExtraFeatures({
   const getCardStyle = (id: string) => {
     if (id === '인계노트') return 'bg-red-50 text-red-500 group-hover:bg-red-100';
     if (id === '퇴원심사') return 'bg-purple-50 text-purple-500 group-hover:bg-purple-100';
-    return 'bg-[var(--toss-gray-1)] group-hover:bg-[var(--toss-blue-light)]';
+    return 'bg-[var(--muted)] group-hover:bg-[var(--toss-blue-light)]';
   };
 
   const renderCard = (card: FeatureCard) => (
     <div
       key={card.id}
       data-testid={`extra-card-shell-${getFeatureCardTestId(card)}`}
-      className="relative flex items-center gap-3 rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-3 shadow-sm transition-all hover:border-[var(--toss-blue)]/30 hover:bg-[var(--toss-blue-light)]/50 group"
+      className="relative flex items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm transition-all hover:border-[var(--accent)]/30 hover:bg-[var(--toss-blue-light)]/50 group"
     >
       <button
         type="button"
@@ -182,13 +182,13 @@ export default function ExtraFeatures({
         onClick={() => handleFeatureClick(card.id, card.subView, card.isOrgChart)}
         className="flex min-w-0 flex-1 items-center gap-3 text-left"
       >
-        <div className={`flex h-11 w-11 items-center justify-center rounded-[12px] text-xl transition-colors ${getCardStyle(card.id)}`}>
+        <div className={`flex h-11 w-11 items-center justify-center rounded-[var(--radius-md)] text-xl transition-colors ${getCardStyle(card.id)}`}>
           {card.icon}
         </div>
         <div className="min-w-0 flex-1">
           <h3 className="text-sm font-semibold text-[var(--foreground)]">{card.label}</h3>
         </div>
-        <span className="mr-1 text-[var(--toss-gray-3)] group-hover:text-[var(--toss-blue)]">→</span>
+        <span className="mr-1 text-[var(--toss-gray-3)] group-hover:text-[var(--accent)]">→</span>
       </button>
       <button
         type="button"
@@ -206,10 +206,10 @@ export default function ExtraFeatures({
     return (
       <div data-testid="extra-subview" className="flex-1 overflow-y-auto bg-[var(--page-bg)] p-3 md:p-4 custom-scrollbar">
         <div className="mx-auto w-full max-w-5xl space-y-3">
-          <button data-testid="extra-back-button" type="button" onClick={() => setSubView(null)} className="text-[11px] font-bold text-[var(--toss-blue)] hover:underline">
+          <button data-testid="extra-back-button" type="button" onClick={() => setSubView(null)} className="text-[11px] font-bold text-[var(--accent)] hover:underline">
             ← 목록으로
           </button>
-          <div className="rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4 shadow-sm">
+          <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
             <DepartmentInventoryView user={user || {}} />
           </div>
         </div>
@@ -221,10 +221,10 @@ export default function ExtraFeatures({
     return (
       <div data-testid="extra-subview" className="flex-1 overflow-y-auto bg-[var(--page-bg)] p-3 md:p-4 custom-scrollbar">
         <div className="mx-auto w-full max-w-5xl space-y-3">
-          <button data-testid="extra-back-button" type="button" onClick={() => setSubView(null)} className="text-[11px] font-bold text-[var(--toss-blue)] hover:underline">
+          <button data-testid="extra-back-button" type="button" onClick={() => setSubView(null)} className="text-[11px] font-bold text-[var(--accent)] hover:underline">
             ← 목록으로
           </button>
-          <div className="rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4 shadow-sm">
+          <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
             <WorkStatusView user={user || {}} />
           </div>
         </div>
@@ -236,7 +236,7 @@ export default function ExtraFeatures({
     return (
       <div data-testid="extra-subview" className="flex-1 overflow-y-auto bg-[var(--page-bg)] p-3 md:p-4 custom-scrollbar">
         <div className="mx-auto w-full max-w-5xl space-y-3">
-          <button data-testid="extra-back-button" type="button" onClick={() => setSubView(null)} className="text-[11px] font-bold text-[var(--toss-blue)] hover:underline">
+          <button data-testid="extra-back-button" type="button" onClick={() => setSubView(null)} className="text-[11px] font-bold text-[var(--accent)] hover:underline">
             ← 목록으로
           </button>
           <HandoverNotesView user={user || {}} />
@@ -249,7 +249,7 @@ export default function ExtraFeatures({
     return (
       <div data-testid="extra-subview" className="flex-1 overflow-y-auto bg-[var(--page-bg)] p-3 md:p-4 custom-scrollbar">
         <div className="mx-auto w-full max-w-5xl space-y-3">
-          <button data-testid="extra-back-button" type="button" onClick={() => setSubView(null)} className="text-[11px] font-bold text-[var(--toss-blue)] hover:underline">
+          <button data-testid="extra-back-button" type="button" onClick={() => setSubView(null)} className="text-[11px] font-bold text-[var(--accent)] hover:underline">
             ← 목록으로
           </button>
           <DischargeReviewView user={user || {}} />
@@ -262,7 +262,7 @@ export default function ExtraFeatures({
     return (
       <div data-testid="extra-subview" className="flex-1 overflow-y-auto bg-[var(--page-bg)] p-3 md:p-4 custom-scrollbar">
         <div className="mx-auto w-full max-w-5xl space-y-3">
-          <button data-testid="extra-back-button" type="button" onClick={() => setSubView(null)} className="text-[11px] font-bold text-[var(--toss-blue)] hover:underline">
+          <button data-testid="extra-back-button" type="button" onClick={() => setSubView(null)} className="text-[11px] font-bold text-[var(--accent)] hover:underline">
             ← 목록으로
           </button>
           <ClosingReportView user={user || {}} />
@@ -275,10 +275,10 @@ export default function ExtraFeatures({
     return (
       <div data-testid="extra-subview" className="flex-1 overflow-y-auto bg-[var(--page-bg)] p-3 md:p-4 custom-scrollbar">
         <div className="mx-auto w-full max-w-5xl space-y-3">
-          <button data-testid="extra-back-button" type="button" onClick={() => setSubView(null)} className="text-[11px] font-bold text-[var(--toss-blue)] hover:underline">
+          <button data-testid="extra-back-button" type="button" onClick={() => setSubView(null)} className="text-[11px] font-bold text-[var(--accent)] hover:underline">
             ← 목록으로
           </button>
-          <div className="rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4 shadow-sm">
+          <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
             <StaffEvaluationView user={user || {}} staffs={staffs} />
           </div>
         </div>
@@ -288,7 +288,7 @@ export default function ExtraFeatures({
 
   if (visibleCards.length === 0) {
     return (
-      <div className="flex h-full flex-col items-center justify-center bg-[var(--toss-gray-1)] p-6 text-center">
+      <div className="flex h-full flex-col items-center justify-center bg-[var(--muted)] p-4 text-center">
         <div className="mb-4 text-6xl">🔒</div>
         <h2 className="text-xl font-bold text-[var(--foreground)]">추가기능 접근 권한이 없습니다.</h2>
         <p className="mt-2 text-sm font-semibold text-[var(--toss-gray-3)]">
@@ -327,7 +327,7 @@ export default function ExtraFeatures({
                       key={featureId}
                       type="button"
                       onClick={() => handleFeatureClick(card.id, card.subView, card.isOrgChart)}
-                      className="flex items-center gap-1.5 rounded-full border border-[var(--toss-border)] bg-[var(--toss-card)] px-3 py-1.5 text-[12px] font-medium text-[var(--foreground)] transition-all hover:border-[var(--toss-blue)]/40 hover:bg-[var(--toss-blue-light)]/50"
+                      className="flex items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-[12px] font-medium text-[var(--foreground)] transition-all hover:border-[var(--accent)]/40 hover:bg-[var(--toss-blue-light)]/50"
                     >
                       <span>{card.icon}</span>
                       <span>{card.label}</span>
@@ -350,16 +350,16 @@ export default function ExtraFeatures({
                 href={item.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-3 rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-3 shadow-sm transition-all hover:border-[var(--toss-blue)]/30 hover:bg-[var(--toss-blue-light)]/50 group"
+                className="flex items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm transition-all hover:border-[var(--accent)]/30 hover:bg-[var(--toss-blue-light)]/50 group"
               >
-                <div className="flex h-11 w-11 items-center justify-center rounded-[12px] bg-[var(--toss-gray-1)] text-xl transition-colors group-hover:bg-[var(--toss-blue-light)]">
+                <div className="flex h-11 w-11 items-center justify-center rounded-[var(--radius-md)] bg-[var(--muted)] text-xl transition-colors group-hover:bg-[var(--toss-blue-light)]">
                   {item.icon}
                 </div>
                 <div className="min-w-0 flex-1">
                   <h3 className="text-sm font-semibold text-[var(--foreground)]">{item.label}</h3>
                   <p className="mt-0.5 truncate text-[11px] text-[var(--toss-gray-3)]">{item.url}</p>
                 </div>
-                <span className="text-[var(--toss-gray-3)] group-hover:text-[var(--toss-blue)]">↗</span>
+                <span className="text-[var(--toss-gray-3)] group-hover:text-[var(--accent)]">↗</span>
               </a>
             ))}
           </div>

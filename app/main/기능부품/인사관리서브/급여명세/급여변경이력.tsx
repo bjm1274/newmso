@@ -21,13 +21,13 @@ export default function SalaryChangeHistory({ staffId, staffName }: { staffId?: 
   if (list.length === 0) return null;
 
   return (
-    <div className="border border-[var(--toss-border)] p-4 bg-[var(--toss-card)] rounded-[12px] shadow-sm">
-      <div className="pb-2 border-b border-[var(--toss-border)] mb-3">
+    <div className="border border-[var(--border)] p-4 bg-[var(--card)] rounded-[var(--radius-md)] shadow-sm">
+      <div className="pb-2 border-b border-[var(--border)] mb-3">
         <h3 className="text-sm font-semibold text-[var(--foreground)]">급여 변경 이력</h3>
       </div>
       <div className="space-y-2 max-h-48 overflow-y-auto">
         {list.map((r) => (
-          <div key={r.id} className="flex justify-between items-center py-2 border-b border-[var(--toss-border)] text-xs">
+          <div key={r.id} className="flex justify-between items-center py-2 border-b border-[var(--border)] text-xs">
             <span className="font-medium">{CHANGE_LABELS[r.change_type] || r.change_type}</span>
             <span className="text-[var(--toss-gray-4)]">{(r.before_value || 0).toLocaleString()} → {(r.after_value || 0).toLocaleString()}</span>
             <span className="text-[var(--toss-gray-3)]">{r.effective_date}</span>

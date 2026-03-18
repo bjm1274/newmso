@@ -114,13 +114,13 @@ export default function AnnualLeaveExpiryAlert({ staffs, selectedCo }: Props) {
     if (item.daysLeft <= 0) return 'border-red-300 bg-red-50';
     if (item.daysLeft <= 7) return 'border-red-200 bg-red-50/60';
     if (item.daysLeft <= 30) return 'border-amber-200 bg-amber-50/60';
-    return 'border-[var(--toss-border)] bg-[var(--toss-card)]';
+    return 'border-[var(--border)] bg-[var(--card)]';
   };
 
   return (
-    <div className="mx-auto max-w-4xl space-y-5 p-4 md:p-6" data-testid="attendance-analysis-leave-expiry">
+    <div className="mx-auto max-w-4xl space-y-5 p-4 md:p-4" data-testid="attendance-analysis-leave-expiry">
       <div>
-        <h2 className="text-lg font-bold text-[var(--foreground)]">연차 소멸 예정 알림</h2>
+        <h2 className="text-base font-bold text-[var(--foreground)]">연차 소멸 예정 알림</h2>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -129,10 +129,10 @@ export default function AnnualLeaveExpiryAlert({ staffs, selectedCo }: Props) {
             key={option}
             type="button"
             onClick={() => setFilter(option)}
-            className={`rounded-[8px] px-3 py-1.5 text-xs font-bold transition-all ${
+            className={`rounded-[var(--radius-md)] px-3 py-1.5 text-xs font-bold transition-all ${
               filter === option
-                ? 'bg-[var(--toss-blue)] text-white'
-                : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'
+                ? 'bg-[var(--accent)] text-white'
+                : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'
             }`}
           >
             {option}
@@ -143,13 +143,13 @@ export default function AnnualLeaveExpiryAlert({ staffs, selectedCo }: Props) {
       {loading ? (
         <div className="py-10 text-center text-sm text-[var(--toss-gray-3)]">불러오는 중...</div>
       ) : visibleItems.length === 0 ? (
-        <div className="rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] py-12 text-center">
+        <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] py-8 text-center">
           <p className="text-sm font-bold text-[var(--toss-gray-4)]">조건에 맞는 소멸 예정 연차가 없습니다.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {visibleItems.map((info) => (
-            <div key={info.staff.id} className={`rounded-[12px] border p-4 ${cardColor(info)}`}>
+            <div key={info.staff.id} className={`rounded-[var(--radius-md)] border p-4 ${cardColor(info)}`}>
               <div className="mb-3 flex items-start justify-between gap-2">
                 <div>
                   <p className="text-sm font-bold text-[var(--foreground)]">{info.staff.name}</p>
@@ -157,12 +157,12 @@ export default function AnnualLeaveExpiryAlert({ staffs, selectedCo }: Props) {
                     {info.staff.company} / {info.staff.department}
                   </p>
                 </div>
-                <span className="rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-black text-[var(--foreground)]">
+                <span className="rounded-[var(--radius-md)] bg-[var(--card)]/80 px-2 py-0.5 text-[10px] font-black text-[var(--foreground)]">
                   {info.daysLeft <= 0 ? '소멸' : `D-${info.daysLeft}`}
                 </span>
               </div>
 
-              <div className="mb-4 grid grid-cols-3 gap-2 text-center">
+              <div className="mb-3 grid grid-cols-3 gap-2 text-center">
                 <div>
                   <p className="text-[10px] text-[var(--toss-gray-3)]">잔여</p>
                   <p className="text-sm font-bold">{info.remaining}일</p>
@@ -183,7 +183,7 @@ export default function AnnualLeaveExpiryAlert({ staffs, selectedCo }: Props) {
                 type="button"
                 onClick={() => handleSendAlert(info)}
                 disabled={sendingId === String(info.staff.id)}
-                className="w-full rounded-[8px] bg-[var(--toss-blue)] py-2 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50"
+                className="w-full rounded-[var(--radius-md)] bg-[var(--accent)] py-2 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50"
               >
                 {sendingId === String(info.staff.id) ? '발송 중...' : '알림 발송'}
               </button>

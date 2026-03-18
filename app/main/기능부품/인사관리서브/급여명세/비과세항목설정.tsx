@@ -69,41 +69,41 @@ export default function TaxFreeSettingsPanel({ companyName, onSaved }: { company
 
   if (loading) {
     return (
-      <div className="border border-[var(--toss-border)] p-5 bg-[var(--toss-card)] rounded-[12px]">
+      <div className="border border-[var(--border)] p-4 bg-[var(--card)] rounded-[var(--radius-md)]">
         <p className="text-sm font-medium text-[var(--toss-gray-3)]">로딩 중...</p>
       </div>
     );
   }
 
   return (
-    <div className="border border-[var(--toss-border)] p-5 bg-[var(--toss-card)] rounded-[12px] shadow-sm">
-      <div className="pb-3 border-b border-[var(--toss-border)] mb-4">
+    <div className="border border-[var(--border)] p-4 bg-[var(--card)] rounded-[var(--radius-md)] shadow-sm">
+      <div className="pb-3 border-b border-[var(--border)] mb-4">
         <h3 className="text-sm font-semibold text-[var(--foreground)]">비과세 항목 설정</h3>
         <p className="text-xs text-[var(--toss-gray-3)] mt-0.5">법정 한도 내 회사별 한도 조정 [{co}]</p>
       </div>
       <div className="flex gap-2 mb-4">
-        <select value={year} onChange={(e) => setYear(parseInt(e.target.value))} className="h-9 px-3 border border-[var(--toss-border)] rounded-md text-sm font-medium"
+        <select value={year} onChange={(e) => setYear(parseInt(e.target.value))} className="h-9 px-3 border border-[var(--border)] rounded-md text-sm font-medium"
         >
           {[2025, 2026].map((y) => (
             <option key={y} value={y}>{y}년</option>
           ))}
         </select>
-        <button onClick={resetToLegal} className="px-3 py-2 border border-[var(--toss-border)] rounded-md text-xs font-medium text-[var(--toss-gray-4)] hover:bg-[var(--toss-gray-1)]">
+        <button onClick={resetToLegal} className="px-3 py-2 border border-[var(--border)] rounded-md text-xs font-medium text-[var(--toss-gray-4)] hover:bg-[var(--muted)]">
           법정 기준 초기화
         </button>
       </div>
       <div className="space-y-2 max-h-[320px] overflow-y-auto custom-scrollbar">
         {ITEMS.map(({ key, label, basis }) => (
-          <div key={key} className="flex items-center justify-between gap-4 py-2 border-b border-[var(--toss-border)] last:border-0">
+          <div key={key} className="flex items-center justify-between gap-4 py-2 border-b border-[var(--border)] last:border-0">
             <div>
               <p className="text-xs font-medium text-[var(--foreground)]">{label}</p>
               <p className="text-[11px] text-[var(--toss-gray-3)]">{basis}</p>
             </div>
-            <input type="number" value={settings[key]} onChange={(e) => update(key, parseInt(e.target.value) || 0)} className="w-24 h-9 px-2 border border-[var(--toss-border)] rounded-md text-sm font-medium text-right" />
+            <input type="number" value={settings[key]} onChange={(e) => update(key, parseInt(e.target.value) || 0)} className="w-24 h-9 px-2 border border-[var(--border)] rounded-md text-sm font-medium text-right" />
           </div>
         ))}
       </div>
-      <button onClick={handleSave} disabled={saving} className="w-full mt-4 py-3 bg-[var(--toss-blue)] text-white text-sm font-medium rounded-[12px] hover:opacity-90 disabled:opacity-50">
+      <button onClick={handleSave} disabled={saving} className="w-full mt-4 py-3 bg-[var(--accent)] text-white text-sm font-medium rounded-[var(--radius-md)] hover:opacity-90 disabled:opacity-50">
         {saving ? '저장 중...' : '저장하기'}
       </button>
     </div>

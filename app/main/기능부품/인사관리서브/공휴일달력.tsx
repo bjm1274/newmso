@@ -121,7 +121,7 @@ export default function HolidayCalendar({ staffs, selectedCo, user }: Props) {
   const nextMonth = () => { if (month === 11) { setYear(y => y + 1); setMonth(0); } else setMonth(m => m + 1); };
 
   return (
-    <div className="p-4 md:p-6 space-y-5 max-w-4xl mx-auto">
+    <div className="p-4 md:p-4 space-y-5 max-w-4xl mx-auto">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)]">공휴일 자동 반영 달력</h2>
@@ -129,7 +129,7 @@ export default function HolidayCalendar({ staffs, selectedCo, user }: Props) {
         </div>
         <div className="flex gap-2">
           {(['월별', '연간'] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)} className={`px-3 py-1.5 text-xs font-bold rounded-[8px] ${tab === t ? 'bg-[var(--toss-blue)] text-white' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'}`}>{t}</button>
+            <button key={t} onClick={() => setTab(t)} className={`px-3 py-1.5 text-xs font-bold rounded-[var(--radius-md)] ${tab === t ? 'bg-[var(--accent)] text-white' : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'}`}>{t}</button>
           ))}
         </div>
       </div>
@@ -137,9 +137,9 @@ export default function HolidayCalendar({ staffs, selectedCo, user }: Props) {
       {tab === '월별' ? (
         <>
           <div className="flex items-center gap-3">
-            <button onClick={prevMonth} className="p-2 rounded-full hover:bg-[var(--toss-gray-1)]">◀</button>
+            <button onClick={prevMonth} className="p-2 rounded-[var(--radius-md)] hover:bg-[var(--muted)]">◀</button>
             <h3 className="text-base font-bold text-[var(--foreground)] flex-1 text-center">{year}년 {month + 1}월</h3>
-            <button onClick={nextMonth} className="p-2 rounded-full hover:bg-[var(--toss-gray-1)]">▶</button>
+            <button onClick={nextMonth} className="p-2 rounded-[var(--radius-md)] hover:bg-[var(--muted)]">▶</button>
           </div>
 
           <div className="flex gap-4">
@@ -161,9 +161,9 @@ export default function HolidayCalendar({ staffs, selectedCo, user }: Props) {
                     <div
                       key={i}
                       title={holidayName}
-                      className={`relative min-h-[44px] p-1 rounded-[6px] text-[11px] font-bold text-center
+                      className={`relative min-h-[44px] p-1 rounded-md text-[11px] font-bold text-center
                         ${holidayName ? 'bg-red-50 text-red-600' : isSun ? 'text-red-400' : isSat ? 'text-blue-400' : 'text-[var(--foreground)]'}
-                        ${d === today.getDate() && month === today.getMonth() && year === today.getFullYear() ? 'ring-2 ring-[var(--toss-blue)]' : ''}
+                        ${d === today.getDate() && month === today.getMonth() && year === today.getFullYear() ? 'ring-2 ring-[var(--accent)]' : ''}
                       `}
                     >
                       {d}
@@ -176,11 +176,11 @@ export default function HolidayCalendar({ staffs, selectedCo, user }: Props) {
 
             {/* 사이드바 */}
             <div className="w-44 shrink-0 space-y-3">
-              <div className="p-3 bg-[var(--toss-gray-1)] rounded-[10px]">
+              <div className="p-3 bg-[var(--muted)] rounded-[var(--radius-md)]">
                 <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">근무 가능일</p>
-                <p className="text-xl font-bold text-[var(--toss-blue)]">{workingDays}일</p>
+                <p className="text-xl font-bold text-[var(--accent)]">{workingDays}일</p>
               </div>
-              <div className="p-3 bg-[var(--toss-gray-1)] rounded-[10px]">
+              <div className="p-3 bg-[var(--muted)] rounded-[var(--radius-md)]">
                 <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">공휴일</p>
                 <p className="text-xl font-bold text-red-500">{monthHolidays.length}일</p>
               </div>
@@ -195,7 +195,7 @@ export default function HolidayCalendar({ staffs, selectedCo, user }: Props) {
               <button
                 onClick={handleApplyAttendance}
                 disabled={applying || monthHolidays.length === 0}
-                className="w-full py-2 text-xs font-bold bg-[var(--toss-blue)] text-white rounded-[8px] hover:opacity-90 disabled:opacity-50"
+                className="w-full py-2 text-xs font-bold bg-[var(--accent)] text-white rounded-[var(--radius-md)] hover:opacity-90 disabled:opacity-50"
               >
                 {applying ? '반영 중...' : '근태 반영'}
               </button>
@@ -207,7 +207,7 @@ export default function HolidayCalendar({ staffs, selectedCo, user }: Props) {
           <h3 className="text-sm font-bold text-[var(--foreground)]">{year}년 전체 공휴일 ({yearHolidays.length}건)</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             {yearHolidays.map(([date, name]) => (
-              <div key={date} className="flex items-center gap-3 p-2.5 bg-red-50 rounded-[8px] border border-red-100">
+              <div key={date} className="flex items-center gap-3 p-2.5 bg-red-50 rounded-[var(--radius-md)] border border-red-100">
                 <span className="text-[11px] font-bold text-red-600 shrink-0">{date}</span>
                 <span className="text-[11px] font-bold text-[var(--foreground)]">{name}</span>
               </div>

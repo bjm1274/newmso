@@ -42,29 +42,29 @@ function OrgCard({ node, onEdit, onDelete, onAddChild, depth = 0 }: {
   return (
     <div className="flex flex-col items-center">
       <div className="relative group">
-        <div className={`px-4 py-3 rounded-[14px] text-white shadow-md min-w-[120px] text-center ${node.color || 'bg-blue-500'} cursor-pointer transition-all hover:scale-105`}>
+        <div className={`px-4 py-3 rounded-[var(--radius-lg)] text-white shadow-md min-w-[120px] text-center ${node.color || 'bg-blue-500'} cursor-pointer transition-all hover:scale-105`}>
           <p className="text-xs font-bold leading-tight">{node.name}</p>
           <p className="text-[9px] opacity-80 mt-0.5">{node.position || node.title}</p>
           {node.department && <p className="text-[8px] opacity-70">{node.department}</p>}
         </div>
         <div className="absolute -top-2 -right-2 hidden group-hover:flex gap-1">
-          <button onClick={() => onEdit(node)} className="w-5 h-5 rounded-full bg-white text-blue-600 text-[9px] font-bold shadow border border-blue-200 flex items-center justify-center">✎</button>
-          <button onClick={() => onAddChild(node.id)} className="w-5 h-5 rounded-full bg-white text-green-600 text-[9px] font-bold shadow border border-green-200 flex items-center justify-center">+</button>
-          <button onClick={() => onDelete(node.id)} className="w-5 h-5 rounded-full bg-white text-red-500 text-[9px] font-bold shadow border border-red-200 flex items-center justify-center">×</button>
+          <button onClick={() => onEdit(node)} className="w-5 h-5 rounded-[var(--radius-md)] bg-[var(--card)] text-blue-600 text-[9px] font-bold shadow border border-blue-200 flex items-center justify-center">✎</button>
+          <button onClick={() => onAddChild(node.id)} className="w-5 h-5 rounded-[var(--radius-md)] bg-[var(--card)] text-green-600 text-[9px] font-bold shadow border border-green-200 flex items-center justify-center">+</button>
+          <button onClick={() => onDelete(node.id)} className="w-5 h-5 rounded-[var(--radius-md)] bg-[var(--card)] text-red-500 text-[9px] font-bold shadow border border-red-200 flex items-center justify-center">×</button>
         </div>
         {hasChildren && (
-          <button onClick={() => setExpanded(v => !v)} className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-white border border-[var(--toss-border)] text-[8px] text-[var(--toss-gray-3)] flex items-center justify-center shadow-sm">
+          <button onClick={() => setExpanded(v => !v)} className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-[var(--card)] border border-[var(--border)] text-[8px] text-[var(--toss-gray-3)] flex items-center justify-center shadow-sm">
             {expanded ? '▲' : '▼'}
           </button>
         )}
       </div>
       {hasChildren && expanded && (
         <div className="flex flex-col items-center mt-5">
-          <div className="w-px h-5 bg-[var(--toss-border)]" />
+          <div className="w-px h-5 bg-[var(--border)]" />
           <div className="flex gap-4 items-start">
             {node.children!.map((child, idx) => (
               <div key={child.id} className="flex flex-col items-center">
-                <div className="w-px h-5 bg-[var(--toss-border)]" />
+                <div className="w-px h-5 bg-[var(--border)]" />
                 <OrgCard node={child} onEdit={onEdit} onDelete={onDelete} onAddChild={onAddChild} depth={depth + 1} />
               </div>
             ))}
@@ -176,20 +176,20 @@ export default function OrgChartEditor({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-4 md:p-6 border-b border-[var(--toss-border)] flex flex-col md:flex-row gap-3 items-start md:items-center justify-between shrink-0">
+      <div className="p-4 md:p-4 border-b border-[var(--border)] flex flex-col md:flex-row gap-3 items-start md:items-center justify-between shrink-0">
         <div>
           <h2 className="text-base font-bold text-[var(--foreground)]">조직도 편집기</h2>
           <p className="text-xs text-[var(--toss-gray-3)]">직원 기반 조직 구조를 편집하고 차트로 관리합니다.</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <button onClick={() => setViewMode('chart')} className={`px-3 py-1.5 rounded-[10px] text-xs font-bold ${viewMode === 'chart' ? 'bg-[var(--foreground)] text-white' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'}`}>
+          <button onClick={() => setViewMode('chart')} className={`px-3 py-1.5 rounded-[var(--radius-md)] text-xs font-bold ${viewMode === 'chart' ? 'bg-[var(--foreground)] text-white' : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'}`}>
             차트 보기
           </button>
-          <button onClick={() => setViewMode('list')} className={`px-3 py-1.5 rounded-[10px] text-xs font-bold ${viewMode === 'list' ? 'bg-[var(--foreground)] text-white' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'}`}>
+          <button onClick={() => setViewMode('list')} className={`px-3 py-1.5 rounded-[var(--radius-md)] text-xs font-bold ${viewMode === 'list' ? 'bg-[var(--foreground)] text-white' : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'}`}>
             목록 보기
           </button>
-          <button onClick={importFromStaff} disabled={saving} className="px-3 py-1.5 bg-purple-500 text-white rounded-[10px] text-xs font-bold disabled:opacity-50">직원 자동 구성</button>
-          <button onClick={() => openAdd()} className="px-3 py-1.5 bg-[var(--toss-blue)] text-white rounded-[10px] text-xs font-bold">+ 노드 추가</button>
+          <button onClick={importFromStaff} disabled={saving} className="px-3 py-1.5 bg-purple-500 text-white rounded-[var(--radius-md)] text-xs font-bold disabled:opacity-50">직원 자동 구성</button>
+          <button onClick={() => openAdd()} className="px-3 py-1.5 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-xs font-bold">+ 노드 추가</button>
         </div>
       </div>
 
@@ -199,13 +199,13 @@ export default function OrgChartEditor({
         <div className="flex-1 flex flex-col items-center justify-center gap-4">
           <p className="text-[var(--toss-gray-3)] font-bold text-sm">조직도가 비어있습니다.</p>
           <div className="flex gap-2">
-            <button onClick={() => openAdd()} className="px-4 py-2 bg-[var(--toss-blue)] text-white rounded-[12px] text-sm font-bold">직접 추가</button>
-            <button onClick={importFromStaff} disabled={saving} className="px-4 py-2 bg-purple-500 text-white rounded-[12px] text-sm font-bold disabled:opacity-50">직원으로 자동 생성</button>
+            <button onClick={() => openAdd()} className="px-4 py-2 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-sm font-bold">직접 추가</button>
+            <button onClick={importFromStaff} disabled={saving} className="px-4 py-2 bg-purple-500 text-white rounded-[var(--radius-md)] text-sm font-bold disabled:opacity-50">직원으로 자동 생성</button>
           </div>
         </div>
       ) : viewMode === 'chart' ? (
-        <div className="flex-1 overflow-auto p-8">
-          <div className="flex gap-8 justify-center flex-wrap">
+        <div className="flex-1 overflow-auto p-5">
+          <div className="flex gap-3 justify-center flex-wrap">
             {tree.map(root => (
               <OrgCard key={root.id} node={root} onEdit={openEdit} onDelete={handleDelete} onAddChild={openAdd} />
             ))}
@@ -215,7 +215,7 @@ export default function OrgChartEditor({
         <div className="flex-1 overflow-auto p-4">
           <div className="space-y-2">
             {nodes.map(n => (
-              <div key={n.id} className="flex items-center justify-between p-3 bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[12px]">
+              <div key={n.id} className="flex items-center justify-between p-3 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)]">
                 <div className="flex items-center gap-3">
                   <div className={`w-3 h-3 rounded-full ${n.color}`} />
                   <div>
@@ -224,8 +224,8 @@ export default function OrgChartEditor({
                   </div>
                 </div>
                 <div className="flex gap-1.5">
-                  <button onClick={() => openEdit(n)} className="px-2 py-1 text-[10px] bg-blue-50 text-blue-600 font-bold rounded-[6px]">편집</button>
-                  <button onClick={() => handleDelete(n.id)} className="px-2 py-1 text-[10px] bg-red-50 text-red-500 font-bold rounded-[6px]">삭제</button>
+                  <button onClick={() => openEdit(n)} className="px-2 py-1 text-[10px] bg-blue-50 text-blue-600 font-bold rounded-md">편집</button>
+                  <button onClick={() => handleDelete(n.id)} className="px-2 py-1 text-[10px] bg-red-50 text-red-500 font-bold rounded-md">삭제</button>
                 </div>
               </div>
             ))}
@@ -235,7 +235,7 @@ export default function OrgChartEditor({
 
       {showModal && editNode && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
-          <div className="bg-[var(--toss-card)] rounded-[20px] shadow-2xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
+          <div className="bg-[var(--card)] rounded-[var(--radius-xl)] shadow-sm w-full max-w-sm p-4" onClick={e => e.stopPropagation()}>
             <h3 className="text-base font-bold text-[var(--foreground)] mb-4">{editNode.id ? '노드 편집' : '노드 추가'}</h3>
             <div className="space-y-3">
               {[
@@ -250,7 +250,7 @@ export default function OrgChartEditor({
                     value={(editNode as any)[key] || ''}
                     onChange={e => setEditNode(prev => ({ ...prev, [key]: e.target.value }))}
                     placeholder={placeholder}
-                    className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm bg-[var(--toss-card)] outline-none"
+                    className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none"
                   />
                 </div>
               ))}
@@ -268,7 +268,7 @@ export default function OrgChartEditor({
                 <select
                   value={editNode.parent_id || ''}
                   onChange={e => setEditNode(prev => ({ ...prev, parent_id: e.target.value || null }))}
-                  className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm bg-[var(--toss-card)] outline-none"
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none"
                 >
                   <option value="">최상위 (없음)</option>
                   {nodes.filter(n => n.id !== editNode.id).map(n => (
@@ -277,9 +277,9 @@ export default function OrgChartEditor({
                 </select>
               </div>
             </div>
-            <div className="flex gap-2 mt-5">
-              <button onClick={() => setShowModal(false)} className="flex-1 py-3 rounded-[12px] bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] font-semibold text-sm">취소</button>
-              <button onClick={handleSave} disabled={saving} className="flex-1 py-3 rounded-[12px] bg-[var(--toss-blue)] text-white font-semibold text-sm disabled:opacity-50">{saving ? '저장 중...' : '저장'}</button>
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => setShowModal(false)} className="flex-1 py-2 rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--toss-gray-4)] font-semibold text-sm">취소</button>
+              <button onClick={handleSave} disabled={saving} className="flex-1 py-2 rounded-[var(--radius-md)] bg-[var(--accent)] text-white font-semibold text-sm disabled:opacity-50">{saving ? '저장 중...' : '저장'}</button>
             </div>
           </div>
         </div>

@@ -146,7 +146,7 @@ export default function LatenessPatternAnalysis({ staffs, selectedCo }: Props) {
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5 p-4 md:p-6" data-testid="attendance-analysis-lateness">
+    <div className="mx-auto max-w-5xl space-y-5 p-4 md:p-4" data-testid="attendance-analysis-lateness">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)]">지각 / 조퇴 패턴 분석</h2>
@@ -157,10 +157,10 @@ export default function LatenessPatternAnalysis({ staffs, selectedCo }: Props) {
               key={item}
               type="button"
               onClick={() => setPeriod(item)}
-              className={`rounded-[8px] px-3 py-1.5 text-xs font-bold ${
+              className={`rounded-[var(--radius-md)] px-3 py-1.5 text-xs font-bold ${
                 period === item
-                  ? 'bg-[var(--toss-blue)] text-white'
-                  : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'
+                  ? 'bg-[var(--accent)] text-white'
+                  : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'
               }`}
             >
               {item}
@@ -169,14 +169,14 @@ export default function LatenessPatternAnalysis({ staffs, selectedCo }: Props) {
         </div>
       </div>
 
-      <div className="rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4">
+      <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-4">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-sm font-bold text-[var(--foreground)]">부서별 지각률</h3>
           <button
             type="button"
             onClick={handleSendAlert}
             disabled={sending}
-            className="rounded-[8px] bg-[var(--toss-blue)] px-3 py-1.5 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50"
+            className="rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-1.5 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50"
           >
             {sending ? '발송 중...' : '경고 알림 발송'}
           </button>
@@ -193,7 +193,7 @@ export default function LatenessPatternAnalysis({ staffs, selectedCo }: Props) {
                   <span className="w-24 shrink-0 truncate text-xs font-bold text-[var(--toss-gray-4)]">
                     {department}
                   </span>
-                  <div className="h-3 flex-1 overflow-hidden rounded-full bg-[var(--toss-gray-1)]">
+                  <div className="h-3 flex-1 overflow-hidden rounded-full bg-[var(--muted)]">
                     <div className="h-full rounded-full bg-amber-400" style={{ width: `${rate}%` }} />
                   </div>
                   <span className="w-16 text-right text-xs font-bold text-[var(--toss-gray-4)]">
@@ -207,12 +207,12 @@ export default function LatenessPatternAnalysis({ staffs, selectedCo }: Props) {
       </div>
 
       {loading ? (
-        <div className="py-8 text-center text-sm text-[var(--toss-gray-3)]">분석 중...</div>
+        <div className="py-5 text-center text-sm text-[var(--toss-gray-3)]">분석 중...</div>
       ) : (
-        <div className="overflow-x-auto rounded-[12px] border border-[var(--toss-border)]">
+        <div className="overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border)]">
           <table className="w-full text-xs">
             <thead>
-              <tr className="bg-[var(--toss-gray-1)]">
+              <tr className="bg-[var(--muted)]">
                 <th className="p-2 text-left font-bold text-[var(--toss-gray-4)]">직원명</th>
                 <th className="p-2 text-center font-bold text-[var(--toss-gray-4)]">지각 횟수</th>
                 <th className="p-2 text-center font-bold text-[var(--toss-gray-4)]">조퇴 횟수</th>
@@ -224,19 +224,19 @@ export default function LatenessPatternAnalysis({ staffs, selectedCo }: Props) {
             <tbody>
               {stats.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-6 text-center text-[var(--toss-gray-3)]">
+                  <td colSpan={6} className="p-4 text-center text-[var(--toss-gray-3)]">
                     표시할 데이터가 없습니다.
                   </td>
                 </tr>
               ) : (
                 stats.map((item) => (
-                  <tr key={item.staff.id} className="border-t border-[var(--toss-border)] hover:bg-[var(--toss-gray-1)]/50">
+                  <tr key={item.staff.id} className="border-t border-[var(--border)] hover:bg-[var(--muted)]/50">
                     <td className="p-2 font-bold text-[var(--foreground)]">{item.staff.name}</td>
                     <td className="p-2 text-center font-bold">{item.lateCount}</td>
                     <td className="p-2 text-center">{item.earlyLeaveCount}</td>
                     <td className="p-2 text-center">{item.avgLateMin}분</td>
                     <td className="p-2">
-                      <div className="h-2 overflow-hidden rounded-full bg-[var(--toss-gray-1)]">
+                      <div className="h-2 overflow-hidden rounded-full bg-[var(--muted)]">
                         <div
                           className="h-full rounded-full bg-amber-400"
                           style={{ width: `${Math.min((item.lateCount / maxLateCount) * 100, 100)}%` }}
@@ -244,7 +244,7 @@ export default function LatenessPatternAnalysis({ staffs, selectedCo }: Props) {
                       </div>
                     </td>
                     <td className="p-2 text-center">
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${gradeColor(item.grade)}`}>
+                      <span className={`rounded-[var(--radius-md)] px-2 py-0.5 text-[10px] font-bold ${gradeColor(item.grade)}`}>
                         {item.grade}
                       </span>
                     </td>

@@ -52,7 +52,7 @@ const SmartMonthPicker: React.FC<SmartMonthPickerProps> = ({
             <button
                 type="button"
                 onClick={openPicker}
-                className="absolute right-2 text-zinc-400 hover:text-zinc-600 transition-colors flex items-center justify-center"
+                className="absolute right-2 text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] transition-colors flex items-center justify-center"
                 tabIndex={-1}
                 disabled={disabled}
             >

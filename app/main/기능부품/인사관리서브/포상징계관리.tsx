@@ -44,77 +44,77 @@ export default function RewardDisciplineManagement({ staffs = [], selectedCo, us
 
     return (
         <div className="flex flex-col h-full animate-in fade-in duration-300">
-            <header className="p-6 md:p-8 border-b border-[var(--toss-border)] bg-[var(--toss-card)] shrink-0">
+            <header className="p-4 md:p-5 border-b border-[var(--border)] bg-[var(--card)] shrink-0">
                 <div className="flex justify-between items-center">
                     <div>
-                        <h2 className="text-xl font-bold text-[var(--foreground)] tracking-tight">🏅 포상 · 징계 관리 <span className="text-sm text-[var(--toss-blue)] ml-2">[{selectedCo}]</span></h2>
+                        <h2 className="text-xl font-bold text-[var(--foreground)] tracking-tight">🏅 포상 · 징계 관리 <span className="text-sm text-[var(--accent)] ml-2">[{selectedCo}]</span></h2>
                     </div>
-                    <button onClick={() => setShowForm(!showForm)} className="px-5 py-2.5 bg-[var(--toss-blue)] text-white text-[11px] font-bold rounded-xl shadow-md hover:opacity-90 transition-all">{showForm ? '취소' : '+ 등록'}</button>
+                    <button onClick={() => setShowForm(!showForm)} className="px-5 py-2.5 bg-[var(--accent)] text-white text-[11px] font-bold rounded-xl shadow-md hover:opacity-90 transition-all">{showForm ? '취소' : '+ 등록'}</button>
                 </div>
-                <div className="flex gap-1 mt-4 border-b border-[var(--toss-border)] -mb-8">
+                <div className="flex gap-1 mt-4 border-b border-[var(--border)] -mb-5">
                     {(['포상', '징계', '징계위원회'] as const).map(tab => (
-                        <button key={tab} onClick={() => { setActiveTab(tab); setShowForm(false); }} className={`px-5 py-3 text-[11px] font-bold border-b-2 transition-all ${activeTab === tab ? 'border-[var(--toss-blue)] text-[var(--toss-blue)]' : 'border-transparent text-[var(--toss-gray-3)]'}`}>
+                        <button key={tab} onClick={() => { setActiveTab(tab); setShowForm(false); }} className={`px-5 py-3 text-[11px] font-bold border-b-2 transition-all ${activeTab === tab ? 'border-[var(--accent)] text-[var(--accent)]' : 'border-transparent text-[var(--toss-gray-3)]'}`}>
                             {tab === '포상' ? '🏅 포상 이력' : tab === '징계' ? '⚖️ 징계 이력' : '🏛️ 징계위원회'}
                         </button>
                     ))}
                 </div>
             </header>
-            <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 custom-scrollbar bg-[var(--page-bg)]">
+            <div className="flex-1 overflow-y-auto p-4 md:p-5 space-y-4 custom-scrollbar bg-[var(--page-bg)]">
                 {/* 요약 카드 */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-2xl p-4 shadow-sm">
+                    <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-sm">
                         <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mb-1">전체 포상</p>
                         <p className="text-2xl font-black text-emerald-600">{rewards.length}<span className="text-sm ml-1 font-bold text-[var(--toss-gray-3)]">건</span></p>
                     </div>
-                    <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-2xl p-4 shadow-sm">
+                    <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-sm">
                         <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mb-1">전체 징계</p>
                         <p className="text-2xl font-black text-red-600">{disciplines.length}<span className="text-sm ml-1 font-bold text-[var(--toss-gray-3)]">건</span></p>
                     </div>
-                    <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-2xl p-4 shadow-sm">
+                    <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-sm">
                         <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mb-1">위원회 심의</p>
                         <p className="text-2xl font-black text-[var(--foreground)]">{committees.length}<span className="text-sm ml-1 font-bold text-[var(--toss-gray-3)]">건</span></p>
                     </div>
-                    <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-2xl p-4 shadow-sm">
+                    <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-sm">
                         <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mb-1">포상금 합계</p>
-                        <p className="text-2xl font-black text-[var(--toss-blue)]">{rewards.reduce((s: number, r: any) => s + (r.amount || 0), 0).toLocaleString()}<span className="text-sm ml-1 font-bold text-[var(--toss-gray-3)]">원</span></p>
+                        <p className="text-2xl font-black text-[var(--accent)]">{rewards.reduce((s: number, r: any) => s + (r.amount || 0), 0).toLocaleString()}<span className="text-sm ml-1 font-bold text-[var(--toss-gray-3)]">원</span></p>
                     </div>
                 </div>
 
                 {showForm && activeTab !== '징계위원회' && (
-                    <form onSubmit={handleSubmit} className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-2xl p-6 shadow-sm space-y-4 animate-in slide-in-from-top-4">
+                    <form onSubmit={handleSubmit} className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-sm space-y-4 animate-in slide-in-from-top-4">
                         <h3 className="text-sm font-bold text-[var(--foreground)]">{activeTab === '포상' ? '🏅 포상 등록' : '⚖️ 징계 등록'}</h3>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <select value={form.staff_id} onChange={e => setForm({ ...form, staff_id: e.target.value })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" required>
+                            <select value={form.staff_id} onChange={e => setForm({ ...form, staff_id: e.target.value })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" required>
                                 <option value="">직원 선택</option>
                                 {filtered.map((s: any) => <option key={s.id} value={s.id}>{s.name} ({s.department || '미배정'})</option>)}
                             </select>
-                            <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" required>
+                            <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" required>
                                 <option value="">유형 선택</option>
                                 {(activeTab === '포상' ? REWARD_TYPES : DISCIPLINE_TYPES).map(t => <option key={t} value={t}>{t}</option>)}
                             </select>
-                            <SmartDatePicker value={form.date} onChange={val => setForm({ ...form, date: val })} inputClassName="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" />
-                            <input type="text" value={form.reason} onChange={e => setForm({ ...form, reason: e.target.value })} placeholder="사유" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)]" required />
-                            <textarea value={form.detail} onChange={e => setForm({ ...form, detail: e.target.value })} placeholder="상세 내용" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)] resize-none h-20" />
-                            {activeTab === '포상' && <input type="number" value={form.amount || ''} onChange={e => setForm({ ...form, amount: Number(e.target.value) })} placeholder="포상금(원)" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--toss-border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)]" />}
+                            <SmartDatePicker value={form.date} onChange={val => setForm({ ...form, date: val })} inputClassName="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none" />
+                            <input type="text" value={form.reason} onChange={e => setForm({ ...form, reason: e.target.value })} placeholder="사유" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)]" required />
+                            <textarea value={form.detail} onChange={e => setForm({ ...form, detail: e.target.value })} placeholder="상세 내용" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)] resize-none h-20" />
+                            {activeTab === '포상' && <input type="number" value={form.amount || ''} onChange={e => setForm({ ...form, amount: Number(e.target.value) })} placeholder="포상금(원)" className="px-3 py-2.5 text-[11px] font-bold rounded-xl border border-[var(--border)] bg-[var(--input-bg)] text-[var(--foreground)] outline-none placeholder:text-[var(--toss-gray-3)]" />}
                         </div>
                         {activeTab === '징계' && (
-                            <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-3">
+                            <div className="p-4 bg-[var(--tab-bg)] rounded-xl border border-[var(--border)] space-y-3">
                                 <p className="text-[10px] font-bold text-[var(--toss-gray-4)]">징계위원회 정보 (해당 시)</p>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                    <SmartDatePicker value={form.committee_date} onChange={val => setForm({ ...form, committee_date: val })} inputClassName="px-3 py-2 text-[11px] font-bold rounded-lg border border-gray-200 bg-white outline-none" />
-                                    <input type="text" value={form.committee_members} onChange={e => setForm({ ...form, committee_members: e.target.value })} placeholder="위원 (쉼표 구분)" className="px-3 py-2 text-[11px] font-bold rounded-lg border border-gray-200 bg-white outline-none placeholder:text-[var(--toss-gray-3)]" />
-                                    <input type="text" value={form.committee_result} onChange={e => setForm({ ...form, committee_result: e.target.value })} placeholder="심의 결과" className="px-3 py-2 text-[11px] font-bold rounded-lg border border-gray-200 bg-white outline-none placeholder:text-[var(--toss-gray-3)]" />
+                                    <SmartDatePicker value={form.committee_date} onChange={val => setForm({ ...form, committee_date: val })} inputClassName="px-3 py-2 text-[11px] font-bold rounded-lg border border-[var(--border)] bg-[var(--card)] outline-none" />
+                                    <input type="text" value={form.committee_members} onChange={e => setForm({ ...form, committee_members: e.target.value })} placeholder="위원 (쉼표 구분)" className="px-3 py-2 text-[11px] font-bold rounded-lg border border-[var(--border)] bg-[var(--card)] outline-none placeholder:text-[var(--toss-gray-3)]" />
+                                    <input type="text" value={form.committee_result} onChange={e => setForm({ ...form, committee_result: e.target.value })} placeholder="심의 결과" className="px-3 py-2 text-[11px] font-bold rounded-lg border border-[var(--border)] bg-[var(--card)] outline-none placeholder:text-[var(--toss-gray-3)]" />
                                 </div>
                             </div>
                         )}
-                        <div className="flex justify-end"><button type="submit" className="px-6 py-2.5 bg-[var(--toss-blue)] text-white text-[11px] font-bold rounded-xl shadow-md">등록</button></div>
+                        <div className="flex justify-end"><button type="submit" className="px-4 py-2.5 bg-[var(--accent)] text-white text-[11px] font-bold rounded-xl shadow-md">등록</button></div>
                     </form>
                 )}
 
                 {/* 이력 테이블 */}
-                <div className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-2xl overflow-hidden shadow-sm">
+                <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
                     <table className="w-full text-[11px]">
-                        <thead><tr className="bg-[var(--toss-gray-1)] border-b border-[var(--toss-border)]">
+                        <thead><tr className="bg-[var(--muted)] border-b border-[var(--border)]">
                             <th className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">직원</th>
                             <th className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">유형</th>
                             <th className="px-4 py-3 text-left font-bold text-[var(--toss-gray-4)]">일자</th>
@@ -124,11 +124,11 @@ export default function RewardDisciplineManagement({ staffs = [], selectedCo, us
                         </tr></thead>
                         <tbody>
                             {currentList.length === 0 ? (
-                                <tr><td colSpan={5} className="px-4 py-16 text-center text-[var(--toss-gray-3)] font-bold">
+                                <tr><td colSpan={5} className="px-4 py-10 text-center text-[var(--toss-gray-3)] font-bold">
                                     {activeTab === '포상' ? '포상 이력이 없습니다' : activeTab === '징계' ? '징계 이력이 없습니다' : '징계위원회 심의 기록이 없습니다'}
                                 </td></tr>
                             ) : currentList.map((r: any) => (
-                                <tr key={r.id} className="border-b border-[var(--toss-border)] hover:bg-[var(--toss-gray-1)]/50">
+                                <tr key={r.id} className="border-b border-[var(--border)] hover:bg-[var(--muted)]/50">
                                     <td className="px-4 py-3 font-bold text-[var(--foreground)]">{r.staff_name}<br /><span className="text-[9px] text-[var(--toss-gray-3)]">{r.department}</span></td>
                                     <td className="px-4 py-3"><span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${r.category === '포상' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{r.type}</span></td>
                                     <td className="px-4 py-3 text-[var(--toss-gray-4)]">{r.date}</td>

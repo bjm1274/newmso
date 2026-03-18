@@ -908,7 +908,7 @@ export default function IntegratedInventoryManagement({
   if (!fallbackInventoryView) {
     return (
       <div
-        className="flex h-full flex-col items-center justify-center bg-[var(--toss-gray-1)] p-6 text-center"
+        className="flex h-full flex-col items-center justify-center bg-[var(--muted)] p-4 text-center"
         data-testid="inventory-view"
       >
         <div className="mb-4 text-6xl">🔒</div>
@@ -957,9 +957,9 @@ export default function IntegratedInventoryManagement({
       <InventoryAlertBadge lowCount={lowStockItems.length} expiryCount={expiryImminentItems.length} />
       {/* 상세 메뉴(UDI·명세서 등)는 메인 좌측 사이드바에서 재고관리 호버/클릭 시 플라이아웃으로 선택 */}
       <div className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
-        <main className="flex-1 p-4 md:p-10 bg-[var(--page-bg)] overflow-y-auto custom-scrollbar">
-          <section className="mb-6 md:mb-8">
-            <div className="rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] px-5 py-4 shadow-sm">
+        <main className="flex-1 p-4 md:p-5 bg-[var(--page-bg)] overflow-y-auto custom-scrollbar">
+          <section className="mb-4 md:mb-5">
+            <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] px-5 py-4 shadow-sm">
               <div className="flex flex-col gap-1">
                 <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">재고관리</p>
                 <h2 className="text-2xl font-black tracking-tight text-[var(--foreground)]">{currentViewMeta.title}</h2>
@@ -971,14 +971,14 @@ export default function IntegratedInventoryManagement({
             loading ? (
               <div className="h-full flex items-center justify-center font-bold text-[var(--toss-gray-3)]">데이터 동기화 중...</div>
             ) : (
-              <div className="space-y-6">
-                <div className="rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-5 shadow-sm">
+              <div className="space-y-4">
+                <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
                   <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
                     <div className="flex-1 flex flex-wrap items-center gap-2">
                       <select
                         value={viewCompany}
                         onChange={(e) => setViewCompany(e.target.value)}
-                        className="px-3 py-3 rounded-[12px] border border-[var(--toss-border)] bg-white text-sm font-bold min-w-[140px]"
+                        className="px-3 py-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-sm font-bold min-w-[140px]"
                         title="회사 선택"
                       >
                         <option value="전체">전체 회사</option>
@@ -989,7 +989,7 @@ export default function IntegratedInventoryManagement({
                       <select
                         value={selectedDept}
                         onChange={(e) => setSelectedDept(e.target.value)}
-                        className="px-3 py-3 rounded-[12px] border border-[var(--toss-border)] bg-white text-sm font-bold min-w-[120px]"
+                        className="px-3 py-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-sm font-bold min-w-[120px]"
                         title="부서 선택 (선택한 회사 기준)"
                       >
                         <option value="전체">전체 부서</option>
@@ -1002,7 +1002,7 @@ export default function IntegratedInventoryManagement({
                         placeholder="품목명 · 분류 · LOT · 회사 검색"
                         value={searchKeyword}
                         onChange={(e) => setSearchKeyword(e.target.value)}
-                        className="flex-1 min-w-[160px] max-w-md px-4 py-3 rounded-[12px] border border-[var(--toss-border)] bg-white text-sm font-bold focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)] outline-none"
+                        className="flex-1 min-w-[160px] max-w-md px-4 py-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)] outline-none"
                       />
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -1011,10 +1011,10 @@ export default function IntegratedInventoryManagement({
                           key={filter}
                           type="button"
                           onClick={() => setStatusFilter(filter)}
-                          className={`rounded-full px-3 py-2 text-[11px] font-bold transition-all ${
+                          className={`rounded-[var(--radius-md)] px-3 py-2 text-[11px] font-bold transition-all ${
                             statusFilter === filter
                               ? 'bg-[var(--foreground)] text-white shadow-sm'
-                              : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-blue-light)] hover:text-[var(--foreground)]'
+                              : 'bg-[var(--muted)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-blue-light)] hover:text-[var(--foreground)]'
                           }`}
                         >
                           {filter === '유통기한임박' ? '유통기한 임박' : filter}
@@ -1029,32 +1029,32 @@ export default function IntegratedInventoryManagement({
                           setStatusFilter('전체');
                           setShowExpiryCenter(false);
                         }}
-                        className="px-4 py-3 rounded-[12px] border border-[var(--toss-border)] bg-white text-[11px] font-bold text-[var(--foreground)] transition-all hover:bg-[var(--toss-gray-1)]"
+                        className="px-4 py-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-[11px] font-bold text-[var(--foreground)] transition-all hover:bg-[var(--muted)]"
                       >
                         초기화
                       </button>
                       <button
                         onClick={() => void refreshCurrentInventory()}
-                        className="px-4 py-3 rounded-[12px] bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] text-xs font-semibold hover:bg-[var(--toss-border)] transition-all shrink-0"
+                        className="px-4 py-3 rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--toss-gray-4)] text-xs font-semibold hover:bg-[var(--border)] transition-all shrink-0"
                       >
                         새로고침
                       </button>
                     </div>
                   </div>
 
-                  <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[var(--toss-border)] pt-4">
+                  <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[var(--border)] pt-4">
                     <span className="text-[11px] font-bold text-[var(--toss-gray-3)]">현재 필터</span>
-                    <span className="rounded-full bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--toss-blue)]">
+                    <span className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--accent)]">
                       회사 {viewCompany === '전체' ? '전체' : viewCompany}
                     </span>
-                    <span className="rounded-full bg-[var(--toss-gray-1)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-4)]">
+                    <span className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-4)]">
                       부서 {selectedDept === '전체' ? '전체' : selectedDept}
                     </span>
-                    <span className="rounded-full bg-[var(--toss-gray-1)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-4)]">
+                    <span className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-1 text-[11px] font-bold text-[var(--toss-gray-4)]">
                       상태 {statusFilter === '유통기한임박' ? '유통기한 임박' : statusFilter}
                     </span>
                     {searchKeyword.trim() && (
-                      <span className="rounded-full border border-[var(--toss-border)] bg-white px-3 py-1 text-[11px] font-bold text-[var(--foreground)]">
+                      <span className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1 text-[11px] font-bold text-[var(--foreground)]">
                         검색어 {searchKeyword.trim()}
                       </span>
                     )}
@@ -1062,23 +1062,23 @@ export default function IntegratedInventoryManagement({
                 </div>
                 {isInventoryOpsUser && pendingSupplyApprovals.length > 0 && (
                   <section
-                    className="rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-5 shadow-sm"
+                    className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm"
                     data-testid="inventory-supply-approval-panel"
                   >
-                    <div className="flex flex-col gap-3 border-b border-[var(--toss-border)] pb-4 md:flex-row md:items-center md:justify-between">
+                    <div className="flex flex-col gap-3 border-b border-[var(--border)] pb-4 md:flex-row md:items-center md:justify-between">
                       <div>
                         <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">Approved Supply Requests</p>
                         <h3 className="mt-1 text-lg font-black text-[var(--foreground)]">승인된 물품신청 처리</h3>
                         <p className="mt-1 text-xs text-[var(--toss-gray-3)]">경영지원팀 재고 기준으로 불출 가능 여부를 확인하고, 부족하면 발주로 넘겨주세요.</p>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        <span className="rounded-full bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--toss-blue)]">
+                        <span className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--accent)]">
                           문서 {pendingSupplyApprovalSummary.approval_count}건
                         </span>
-                        <span className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-600">
+                        <span className="rounded-[var(--radius-md)] bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-600">
                           불출 가능 {pendingSupplyApprovalSummary.issue_ready_count}건
                         </span>
-                        <span className="rounded-full bg-orange-50 px-3 py-1 text-[11px] font-bold text-orange-600">
+                        <span className="rounded-[var(--radius-md)] bg-orange-50 px-3 py-1 text-[11px] font-bold text-orange-600">
                           발주 필요 {pendingSupplyApprovalSummary.order_required_count}건
                         </span>
                       </div>
@@ -1095,10 +1095,10 @@ export default function IntegratedInventoryManagement({
                         return (
                           <article
                             key={approval.id}
-                            className={`rounded-[18px] border bg-[var(--page-bg)] p-4 transition-all ${
+                            className={`rounded-[var(--radius-xl)] border bg-[var(--page-bg)] p-4 transition-all ${
                               highlightedSupplyApprovalId === String(approval.id)
-                                ? 'border-[var(--toss-blue)] ring-2 ring-[var(--toss-blue)]/20 shadow-lg'
-                                : 'border-[var(--toss-border)]'
+                                ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]/20 shadow-sm'
+                                : 'border-[var(--border)]'
                             }`}
                             data-testid={`inventory-supply-approval-${approval.id}`}
                             data-supply-approval-id={String(approval.id)}
@@ -1112,10 +1112,10 @@ export default function IntegratedInventoryManagement({
                                 </p>
                               </div>
                               <div className="flex flex-wrap gap-2">
-                                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-600">
+                                <span className="rounded-[var(--radius-md)] bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-600">
                                   불출 가능 {workflowSummary.issue_ready_count}건
                                 </span>
-                                <span className="rounded-full bg-orange-50 px-2.5 py-1 text-[10px] font-bold text-orange-600">
+                                <span className="rounded-[var(--radius-md)] bg-orange-50 px-2.5 py-1 text-[10px] font-bold text-orange-600">
                                   발주 필요 {workflowSummary.order_required_count}건
                                 </span>
                               </div>
@@ -1135,7 +1135,7 @@ export default function IntegratedInventoryManagement({
                                 return (
                                   <div
                                     key={`${approval.id}-${workflowItem.request_index}`}
-                                    className="grid gap-3 rounded-[14px] border border-[var(--toss-border)] bg-white px-4 py-3 lg:grid-cols-[minmax(0,1.7fr)_88px_88px_120px_auto]"
+                                    className="grid gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 lg:grid-cols-[minmax(0,1.7fr)_88px_88px_120px_auto]"
                                     data-testid={`inventory-supply-approval-item-${approval.id}-${workflowItem.request_index}`}
                                   >
                                     <div className="min-w-0">
@@ -1147,24 +1147,24 @@ export default function IntegratedInventoryManagement({
                                         <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">{workflowItem.note}</p>
                                       )}
                                     </div>
-                                    <div className="rounded-[12px] bg-[var(--toss-gray-1)] px-3 py-2 text-center">
+                                    <div className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2 text-center">
                                       <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">요청</p>
                                       <p className="mt-1 text-sm font-bold text-[var(--foreground)]">{workflowItem.qty}</p>
                                     </div>
-                                    <div className="rounded-[12px] bg-[var(--toss-gray-1)] px-3 py-2 text-center">
+                                    <div className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2 text-center">
                                       <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">재고</p>
                                       <p className={`mt-1 text-sm font-bold ${workflowItem.shortage_qty > 0 ? 'text-orange-600' : 'text-emerald-600'}`}>
                                         {workflowItem.available_qty}
                                       </p>
                                     </div>
                                     <div className="flex items-center">
-                                      <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${
+                                      <span className={`rounded-[var(--radius-md)] px-3 py-1 text-[10px] font-bold ${
                                         isIssued
                                           ? 'bg-emerald-50 text-emerald-600'
                                           : isOrdered
                                             ? 'bg-orange-50 text-orange-600'
                                             : workflowItem.recommended_action === 'issue'
-                                              ? 'bg-blue-50 text-[var(--toss-blue)]'
+                                              ? 'bg-blue-50 text-[var(--accent)]'
                                               : 'bg-red-50 text-red-600'
                                       }`}>
                                         {isIssued
@@ -1182,7 +1182,7 @@ export default function IntegratedInventoryManagement({
                                           type="button"
                                           onClick={() => void handleSupplyIssue(approval, workflowItem)}
                                           disabled={isBusy}
-                                          className="rounded-[10px] bg-[var(--toss-blue)] px-3 py-2 text-[11px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                          className="rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-2 text-[11px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
                                           data-testid={`inventory-supply-issue-${approval.id}-${workflowItem.request_index}`}
                                         >
                                           {isBusy ? '처리 중...' : '불출 처리'}
@@ -1193,7 +1193,7 @@ export default function IntegratedInventoryManagement({
                                           type="button"
                                           onClick={() => void handleSupplyOrder(approval, workflowItem)}
                                           disabled={isBusy}
-                                          className="rounded-[10px] bg-orange-600 px-3 py-2 text-[11px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                          className="rounded-[var(--radius-md)] bg-orange-600 px-3 py-2 text-[11px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
                                           data-testid={`inventory-supply-order-${approval.id}-${workflowItem.request_index}`}
                                         >
                                           {isBusy ? '처리 중...' : '발주 처리'}
@@ -1217,10 +1217,10 @@ export default function IntegratedInventoryManagement({
                 )}
                 {isInventoryOpsUser && completedSupplyApprovals.length > 0 && (
                   <section
-                    className="rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-5 shadow-sm"
+                    className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm"
                     data-testid="inventory-supply-history-panel"
                   >
-                    <div className="flex flex-col gap-3 border-b border-[var(--toss-border)] pb-4 md:flex-row md:items-center md:justify-between">
+                    <div className="flex flex-col gap-3 border-b border-[var(--border)] pb-4 md:flex-row md:items-center md:justify-between">
                       <div>
                         <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--toss-gray-3)]">Processed Supply History</p>
                         <h3 className="mt-1 text-lg font-black text-[var(--foreground)]">처리 완료 히스토리</h3>
@@ -1229,13 +1229,13 @@ export default function IntegratedInventoryManagement({
                         </p>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        <span className="rounded-full bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--toss-blue)]">
+                        <span className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-3 py-1 text-[11px] font-bold text-[var(--accent)]">
                           문서 {completedSupplyApprovalSummary.approval_count}건
                         </span>
-                        <span className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-600">
+                        <span className="rounded-[var(--radius-md)] bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-600">
                           불출 완료 {completedSupplyApprovalSummary.issued_count}건
                         </span>
-                        <span className="rounded-full bg-orange-50 px-3 py-1 text-[11px] font-bold text-orange-600">
+                        <span className="rounded-[var(--radius-md)] bg-orange-50 px-3 py-1 text-[11px] font-bold text-orange-600">
                           발주 전환 {completedSupplyApprovalSummary.ordered_count}건
                         </span>
                       </div>
@@ -1256,10 +1256,10 @@ export default function IntegratedInventoryManagement({
                         return (
                           <article
                             key={`history-${approval.id}`}
-                            className={`rounded-[18px] border bg-[var(--page-bg)] p-4 transition-all ${
+                            className={`rounded-[var(--radius-xl)] border bg-[var(--page-bg)] p-4 transition-all ${
                               highlightedSupplyApprovalId === String(approval.id)
-                                ? 'border-[var(--toss-blue)] ring-2 ring-[var(--toss-blue)]/20 shadow-lg'
-                                : 'border-[var(--toss-border)]'
+                                ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]/20 shadow-sm'
+                                : 'border-[var(--border)]'
                             }`}
                             data-testid={`inventory-supply-history-${approval.id}`}
                             data-supply-approval-id={String(approval.id)}
@@ -1285,7 +1285,7 @@ export default function IntegratedInventoryManagement({
                                 return (
                                   <div
                                     key={`history-item-${approval.id}-${workflowItem.request_index}`}
-                                    className="grid gap-3 rounded-[14px] border border-[var(--toss-border)] bg-white px-4 py-3 lg:grid-cols-[minmax(0,1.6fr)_88px_130px_auto]"
+                                    className="grid gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 lg:grid-cols-[minmax(0,1.6fr)_88px_130px_auto]"
                                     data-testid={`inventory-supply-history-item-${approval.id}-${workflowItem.request_index}`}
                                   >
                                     <div className="min-w-0">
@@ -1297,12 +1297,12 @@ export default function IntegratedInventoryManagement({
                                         <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">{workflowItem.note}</p>
                                       )}
                                     </div>
-                                    <div className="rounded-[12px] bg-[var(--toss-gray-1)] px-3 py-2 text-center">
+                                    <div className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2 text-center">
                                       <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">처리수량</p>
                                       <p className="mt-1 text-sm font-bold text-[var(--foreground)]">{workflowItem.qty}</p>
                                     </div>
                                     <div className="flex items-center">
-                                      <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${
+                                      <span className={`rounded-[var(--radius-md)] px-3 py-1 text-[10px] font-bold ${
                                         isIssued ? 'bg-emerald-50 text-emerald-600' : 'bg-orange-50 text-orange-600'
                                       }`}>
                                         {isIssued ? '불출 완료' : '발주 처리'}
@@ -1316,7 +1316,7 @@ export default function IntegratedInventoryManagement({
                                         <button
                                           type="button"
                                           onClick={() => openLinkedSupplyOrder(approval.id, workflowItem.request_index)}
-                                          className="rounded-[10px] bg-[var(--foreground)] px-3 py-2 text-[11px] font-bold text-white"
+                                          className="rounded-[var(--radius-md)] bg-[var(--foreground)] px-3 py-2 text-[11px] font-bold text-white"
                                           data-testid={`inventory-supply-history-open-order-${approval.id}-${workflowItem.request_index}`}
                                         >
                                           발주 보기
@@ -1334,23 +1334,23 @@ export default function IntegratedInventoryManagement({
                   </section>
                 )}
                 <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-                  <div className="bg-[var(--toss-card)] p-4 rounded-[14px] border border-[var(--toss-border)] shadow-sm text-center">
+                  <div className="bg-[var(--card)] p-4 rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm text-center">
                     <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">조회 품목</p>
-                    <p className="mt-1 text-xl font-semibold text-[var(--toss-blue)]">{filteredInventory.length}</p>
+                    <p className="mt-1 text-xl font-semibold text-[var(--accent)]">{filteredInventory.length}</p>
                   </div>
-                  <div className="bg-[var(--toss-card)] p-4 rounded-[14px] border border-[var(--toss-border)] shadow-sm text-center">
+                  <div className="bg-[var(--card)] p-4 rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm text-center">
                     <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">안전재고 미달</p>
                     <p className="mt-1 text-xl font-semibold text-red-600">{lowStockFilteredItems.length}</p>
                   </div>
-                  <div className="bg-[var(--toss-card)] p-4 rounded-[14px] border border-[var(--toss-border)] shadow-sm text-center">
+                  <div className="bg-[var(--card)] p-4 rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm text-center">
                     <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">유효기간 임박</p>
                     <p className="mt-1 text-xl font-semibold text-orange-600">{expiryFilteredItems.length}</p>
                   </div>
-                  <div className="bg-[var(--toss-card)] p-4 rounded-[14px] border border-[var(--toss-border)] shadow-sm text-center">
+                  <div className="bg-[var(--card)] p-4 rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm text-center">
                     <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">총 재고 수량</p>
                     <p className="mt-1 text-xl font-semibold text-[var(--foreground)]">{totalQuantity.toLocaleString('ko-KR')}</p>
                   </div>
-                  <div className="bg-[var(--toss-card)] p-4 rounded-[14px] border border-[var(--toss-border)] shadow-sm text-center">
+                  <div className="bg-[var(--card)] p-4 rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm text-center">
                     <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase">재고 평가 금액</p>
                     <p className="mt-1.5 break-keep text-[13px] font-semibold text-[var(--foreground)]">{formatCurrency(totalInventoryValue)}</p>
                   </div>
@@ -1360,7 +1360,7 @@ export default function IntegratedInventoryManagement({
                   <button
                     type="button"
                     onClick={() => openInventoryView('발주')}
-                    className="rounded-[16px] border border-red-100 bg-red-50 px-4 py-3.5 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm"
+                    className="rounded-[var(--radius-lg)] border border-red-100 bg-red-50 px-4 py-3.5 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm"
                   >
                     <p className="text-[11px] font-bold text-red-500">우선 처리</p>
                     <p className="mt-1.5 text-sm font-bold text-red-700">발주 관리로 이동</p>
@@ -1369,7 +1369,7 @@ export default function IntegratedInventoryManagement({
                   <button
                     type="button"
                     onClick={() => openInventoryView('유통기한')}
-                    className="rounded-[16px] border border-orange-100 bg-orange-50 px-4 py-3.5 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm"
+                    className="rounded-[var(--radius-lg)] border border-orange-100 bg-orange-50 px-4 py-3.5 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm"
                   >
                     <p className="text-[11px] font-bold text-orange-500">품질 점검</p>
                     <p className="mt-1.5 text-sm font-bold text-orange-700">유효기간 센터 열기</p>
@@ -1378,7 +1378,7 @@ export default function IntegratedInventoryManagement({
                   <button
                     type="button"
                     onClick={() => setSearchKeyword('')}
-                    className="rounded-[16px] border border-[var(--toss-border)] bg-[var(--page-bg)] px-4 py-3.5 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm"
+                    className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] px-4 py-3.5 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm"
                   >
                     <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">현황 확인</p>
                     <p className="mt-1.5 text-sm font-bold text-[var(--foreground)]">품절 품목 빠르게 파악</p>
@@ -1387,20 +1387,20 @@ export default function IntegratedInventoryManagement({
                 </div>
 
                 <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_280px]">
-                  <div className="rounded-[18px] border border-[var(--toss-border)] bg-[var(--toss-card)] p-4 shadow-sm">
+                  <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
                     <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                       <div>
                         <h3 className="text-base font-bold text-[var(--foreground)]">우선 확인 품목</h3>
                         <p className="mt-1 text-xs text-[var(--toss-gray-3)]">재고부족과 유통기한 임박 품목을 먼저 확인하세요.</p>
                       </div>
-                      <span className="rounded-full bg-red-50 px-3 py-1 text-[11px] font-bold text-red-600">
+                      <span className="rounded-[var(--radius-md)] bg-red-50 px-3 py-1 text-[11px] font-bold text-red-600">
                         {urgentActionItems.length}건
                       </span>
                     </div>
 
                     <div className="mt-3 grid gap-3 md:grid-cols-2">
                       {urgentActionItems.length === 0 && (
-                        <div className="col-span-full rounded-[14px] border border-dashed border-[var(--toss-border)] px-4 py-6 text-center text-sm text-[var(--toss-gray-3)]">
+                        <div className="col-span-full rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] px-4 py-4 text-center text-sm text-[var(--toss-gray-3)]">
                           긴급 조치가 필요한 품목이 없습니다.
                         </div>
                       )}
@@ -1411,13 +1411,13 @@ export default function IntegratedInventoryManagement({
                         const expiryImminent = isExpirySoon(item, expiryThreshold);
 
                         return (
-                          <article key={item.id} className="rounded-[14px] border border-[var(--toss-border)] bg-[var(--page-bg)] p-3.5">
+                          <article key={item.id} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] p-3.5">
                             <div className="flex items-start justify-between gap-3">
                               <div>
                                 <p className="text-sm font-bold text-[var(--foreground)]">{item.item_name || item.name}</p>
                                 <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{item.company || '-'} · {item.department || '부서 미지정'}</p>
                               </div>
-                              <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                              <span className={`rounded-[var(--radius-md)] px-2.5 py-1 text-[10px] font-bold ${
                                 quantity <= minQuantity ? 'bg-red-50 text-red-600' : 'bg-orange-50 text-orange-600'
                               }`}>
                                 {quantity <= minQuantity ? '재고부족' : '기한임박'}
@@ -1435,7 +1435,7 @@ export default function IntegratedInventoryManagement({
                                   setStockModal({ item, type: 'in', targetCompany: item.company || '전체', targetDept: item.department || '전체' });
                                   setStockAmount(Math.max(1, minQuantity - quantity + 1));
                                 }}
-                                className="flex-1 rounded-[10px] bg-[var(--toss-blue)] px-3 py-1.5 text-[11px] font-bold text-white"
+                                className="flex-1 rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-1.5 text-[11px] font-bold text-white"
                               >
                                 입고
                               </button>
@@ -1443,7 +1443,7 @@ export default function IntegratedInventoryManagement({
                                 <button
                                   type="button"
                                   onClick={() => handleAutoApprovalRequest(item)}
-                                  className="flex-1 rounded-[10px] bg-orange-600 px-3 py-1.5 text-[11px] font-bold text-white"
+                                  className="flex-1 rounded-[var(--radius-md)] bg-orange-600 px-3 py-1.5 text-[11px] font-bold text-white"
                                 >
                                   발주
                                 </button>
@@ -1456,11 +1456,11 @@ export default function IntegratedInventoryManagement({
                   </div>
                 </div>
 
-                <div className="overflow-hidden rounded-[16px] border border-[var(--toss-border)] bg-[var(--toss-card)] shadow-sm">
+                <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] shadow-sm">
                   <div className="overflow-x-auto no-scrollbar">
                     <table className="w-full text-left border-collapse min-w-[1000px]">
                       <thead>
-                        <tr className="bg-[var(--toss-gray-1)]/50 border-b border-[var(--toss-border)]">
+                        <tr className="bg-[var(--muted)]/50 border-b border-[var(--border)]">
                           <th className="px-5 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">회사/분류</th>
                           <th className="px-5 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">품목명/LOT</th>
                           <th className="px-5 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase text-center">현재고</th>
@@ -1470,7 +1470,7 @@ export default function IntegratedInventoryManagement({
                           <th className="px-5 py-3 text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase text-right">관리</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-[var(--toss-border)]">
+                      <tbody className="divide-y divide-[var(--border)]">
                         {filteredInventory.map(item => {
                           const quantity = getItemQuantity(item);
                           const minQuantity = getItemMinQuantity(item);
@@ -1478,13 +1478,13 @@ export default function IntegratedInventoryManagement({
                           return (
                             <tr key={item.id} className="hover:bg-[var(--toss-blue-light)]/50 transition-all group">
                               <td className="px-5 py-3.5">
-                                <p className="text-[11px] font-semibold text-[var(--toss-blue)]">{item.company || '-'}</p>
+                                <p className="text-[11px] font-semibold text-[var(--accent)]">{item.company || '-'}</p>
                                 <p className="text-[8px] font-bold text-[var(--toss-gray-3)]">{item.category || '미분류'}</p>
                               </td>
                               <td className="px-5 py-3.5">
-                                <p className="text-xs font-semibold text-[var(--foreground)] group-hover:text-[var(--toss-blue)] transition-colors">{item.item_name || item.name}</p>
+                                <p className="text-xs font-semibold text-[var(--foreground)] group-hover:text-[var(--accent)] transition-colors">{item.item_name || item.name}</p>
                                 <div className="flex gap-1 mt-0.5">
-                                  {item.lot_number && <span className="text-[7px] font-semibold bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] px-1 py-0.5 rounded">LOT: {item.lot_number}</span>}
+                                  {item.lot_number && <span className="text-[7px] font-semibold bg-[var(--muted)] text-[var(--toss-gray-4)] px-1 py-0.5 rounded">LOT: {item.lot_number}</span>}
                                   {item.is_udi && <span className="text-[7px] font-semibold bg-purple-50 text-purple-500 px-1 py-0.5 rounded uppercase">UDI</span>}
                                 </div>
                               </td>
@@ -1508,8 +1508,8 @@ export default function IntegratedInventoryManagement({
                                 </span>
                               </td>
                               <td data-testid={`inventory-actions-${item.id}`} className="px-5 py-3.5 text-right space-x-1">
-                                <button data-testid={`inventory-stock-in-${item.id}`} onClick={() => { setStockModal({ item, type: 'in', targetCompany: item.company || '전체', targetDept: item.department || '전체' }); setStockAmount(1); }} className="px-2 py-1 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] text-[11px] font-semibold rounded-md hover:bg-[var(--toss-blue-light)]">입고</button>
-                                <button data-testid={`inventory-stock-out-${item.id}`} onClick={() => { setStockModal({ item, type: 'out', targetCompany: item.company || '전체', targetDept: item.department || '전체' }); setStockAmount(1); }} className="px-2 py-1 bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] text-[11px] font-semibold rounded-md hover:bg-[var(--toss-gray-1)]/80">출고</button>
+                                <button data-testid={`inventory-stock-in-${item.id}`} onClick={() => { setStockModal({ item, type: 'in', targetCompany: item.company || '전체', targetDept: item.department || '전체' }); setStockAmount(1); }} className="px-2 py-1 bg-[var(--toss-blue-light)] text-[var(--accent)] text-[11px] font-semibold rounded-md hover:bg-[var(--toss-blue-light)]">입고</button>
+                                <button data-testid={`inventory-stock-out-${item.id}`} onClick={() => { setStockModal({ item, type: 'out', targetCompany: item.company || '전체', targetDept: item.department || '전체' }); setStockAmount(1); }} className="px-2 py-1 bg-[var(--muted)] text-[var(--toss-gray-4)] text-[11px] font-semibold rounded-md hover:bg-[var(--muted)]/80">출고</button>
                                 {quantity <= minQuantity && (
                                   <button data-testid={`inventory-reorder-${item.id}`} onClick={() => handleAutoApprovalRequest(item)} className="px-2 py-1 bg-orange-600 text-white text-[11px] font-semibold rounded-md shadow-sm">발주</button>
                                 )}
@@ -1540,7 +1540,7 @@ export default function IntegratedInventoryManagement({
                 </div>
 
                 {showExpiryCenter && (
-                  <section className="rounded-[20px] border border-orange-100 bg-[var(--toss-card)] p-5 shadow-sm">
+                  <section className="rounded-[var(--radius-xl)] border border-orange-100 bg-[var(--card)] p-5 shadow-sm">
                     <div className="mb-4 flex flex-col gap-3 border-b border-orange-100 pb-4 md:flex-row md:items-center md:justify-between">
                       <div>
                         <h3 className="text-base font-bold text-[var(--foreground)]">유효기간 관리 센터</h3>
@@ -1549,7 +1549,7 @@ export default function IntegratedInventoryManagement({
                       <button
                         type="button"
                         onClick={() => setShowExpiryCenter(false)}
-                        className="rounded-[12px] border border-[var(--toss-border)] bg-white px-4 py-2 text-[11px] font-bold text-[var(--foreground)] transition-all hover:bg-[var(--toss-gray-1)]"
+                        className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 py-2 text-[11px] font-bold text-[var(--foreground)] transition-all hover:bg-[var(--muted)]"
                       >
                         센터 닫기
                       </button>
@@ -1561,25 +1561,25 @@ export default function IntegratedInventoryManagement({
             )
           )}
           {activeView === '이력' && (
-            <section className="rounded-[20px] border border-[var(--toss-border)] bg-[var(--toss-card)] shadow-sm">
-              <div className="flex flex-col gap-3 border-b border-[var(--toss-border)] px-5 py-4 md:flex-row md:items-center md:justify-between">
+            <section className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] shadow-sm">
+              <div className="flex flex-col gap-3 border-b border-[var(--border)] px-5 py-4 md:flex-row md:items-center md:justify-between">
                 <div>
                   <h3 className="text-base font-bold text-[var(--foreground)]">최근 입출고 이력</h3>
                 </div>
                 <button
                   type="button"
                   onClick={() => void fetchLogs()}
-                  className="rounded-[12px] bg-[var(--toss-gray-1)] px-4 py-3 text-[11px] font-bold text-[var(--toss-gray-4)] transition-all hover:bg-[var(--toss-border)]"
+                  className="rounded-[var(--radius-md)] bg-[var(--muted)] px-4 py-3 text-[11px] font-bold text-[var(--toss-gray-4)] transition-all hover:bg-[var(--border)]"
                 >
                   새로고침
                 </button>
               </div>
               <div className="overflow-x-auto no-scrollbar">
                 {logs.length === 0 ? (
-                  <div className="px-6 py-16 text-center text-sm font-semibold text-[var(--toss-gray-3)]">이력이 없습니다.</div>
+                  <div className="px-4 py-10 text-center text-sm font-semibold text-[var(--toss-gray-3)]">이력이 없습니다.</div>
                 ) : (
                   <table className="min-w-[860px] w-full text-left text-xs">
-                    <thead className="bg-[var(--toss-gray-1)]/50 text-[11px] font-semibold uppercase text-[var(--toss-gray-3)]">
+                    <thead className="bg-[var(--muted)]/50 text-[11px] font-semibold uppercase text-[var(--toss-gray-3)]">
                       <tr>
                         <th className="px-4 py-3">일시</th>
                         <th className="px-4 py-3">유형</th>
@@ -1591,13 +1591,13 @@ export default function IntegratedInventoryManagement({
                     </thead>
                     <tbody>
                       {logs.map((log: any) => (
-                        <tr key={log.id} className="border-t border-[var(--toss-border)]">
+                        <tr key={log.id} className="border-t border-[var(--border)]">
                           <td className="px-4 py-3 font-mono text-[11px] text-[var(--toss-gray-4)]">{new Date(log.created_at).toLocaleString('ko-KR')}</td>
                           <td className="px-4 py-3">
-                            <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                            <span className={`rounded-[var(--radius-md)] px-2.5 py-1 text-[10px] font-bold ${
                               (log.change_type || log.type) === '입고'
-                                ? 'bg-[var(--toss-blue-light)] text-[var(--toss-blue)]'
-                                : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'
+                                ? 'bg-[var(--toss-blue-light)] text-[var(--accent)]'
+                                : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'
                             }`}>
                               {log.change_type || log.type || '-'}
                             </span>
@@ -1640,9 +1640,9 @@ export default function IntegratedInventoryManagement({
                 <button
                   type="button"
                   onClick={() => setRegistrationMode('form')}
-                  className={`flex-1 px-4 py-3 rounded-[12px] text-[11px] font-semibold transition-all ${registrationMode === 'form'
-                    ? 'bg-[var(--toss-blue)] text-white shadow-sm'
-                    : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'
+                  className={`flex-1 px-4 py-3 rounded-[var(--radius-md)] text-[11px] font-semibold transition-all ${registrationMode === 'form'
+                    ? 'bg-[var(--accent)] text-white shadow-sm'
+                    : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'
                     }`}
                 >
                   ✏️ 일반 등록
@@ -1650,9 +1650,9 @@ export default function IntegratedInventoryManagement({
                 <button
                   type="button"
                   onClick={() => setRegistrationMode('excel')}
-                  className={`flex-1 px-4 py-3 rounded-[12px] text-[11px] font-semibold transition-all ${registrationMode === 'excel'
+                  className={`flex-1 px-4 py-3 rounded-[var(--radius-md)] text-[11px] font-semibold transition-all ${registrationMode === 'excel'
                     ? 'bg-emerald-600 text-white shadow-md'
-                    : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'
+                    : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'
                     }`}
                 >
                   📊 엑셀 일괄 등록
@@ -1660,9 +1660,9 @@ export default function IntegratedInventoryManagement({
                 <button
                   type="button"
                   onClick={() => setRegistrationMode('auto_extract')}
-                  className={`flex-1 px-4 py-3 rounded-[12px] text-[11px] font-semibold transition-all ${registrationMode === 'auto_extract'
+                  className={`flex-1 px-4 py-3 rounded-[var(--radius-md)] text-[11px] font-semibold transition-all ${registrationMode === 'auto_extract'
                     ? 'bg-purple-600 text-white shadow-md'
-                    : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'
+                    : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'
                     }`}
                 >
                   📄 입고 자동추출 (AI)
@@ -1705,27 +1705,27 @@ export default function IntegratedInventoryManagement({
       {/* 입출고 수량 입력 모달 */}
       {stockModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[110] flex items-center justify-center p-4" onClick={() => setStockModal(null)}>
-          <div data-testid="inventory-stock-modal" className="bg-[var(--toss-card)] rounded-[16px] shadow-2xl p-8 max-w-sm w-full" onClick={e => e.stopPropagation()}>
+          <div data-testid="inventory-stock-modal" className="bg-[var(--card)] rounded-[var(--radius-lg)] shadow-sm p-5 max-w-sm w-full" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-[var(--foreground)] mb-4">{stockModal.type === 'in' ? '입고' : '출고'} 상세 입력</h3>
             <p className="text-xs font-bold text-[var(--toss-gray-3)] mb-2">{stockModal.item.item_name || stockModal.item.name}</p>
             <p className="text-[11px] text-[var(--toss-gray-3)] mb-4">현재고: {stockModal.item.quantity ?? stockModal.item.stock ?? 0}</p>
 
-            <div className="space-y-4 mb-6">
+            <div className="space-y-4 mb-4">
               <div>
                 <label className="text-[11px] font-bold text-[var(--toss-gray-3)] mb-1 block">수량 (개/단위)</label>
-                <input data-testid="inventory-stock-amount-input" type="number" min={1} max={stockModal.type === 'out' ? (stockModal.item.quantity ?? stockModal.item.stock ?? 0) : 99999} value={stockAmount} onChange={e => setStockAmount(Math.max(1, parseInt(e.target.value) || 1))} className="w-full px-4 py-3 rounded-[12px] border border-[var(--toss-border)] text-sm font-semibold" />
+                <input data-testid="inventory-stock-amount-input" type="number" min={1} max={stockModal.type === 'out' ? (stockModal.item.quantity ?? stockModal.item.stock ?? 0) : 99999} value={stockAmount} onChange={e => setStockAmount(Math.max(1, parseInt(e.target.value) || 1))} className="w-full px-4 py-3 rounded-[var(--radius-md)] border border-[var(--border)] text-sm font-semibold" />
               </div>
               <div className="flex gap-2">
                 <div className="flex-1">
                   <label className="text-[11px] font-bold text-[var(--toss-gray-3)] mb-1 block">대상 회사</label>
-                  <select data-testid="inventory-stock-company-select" value={stockModal.targetCompany} onChange={e => setStockModal({ ...stockModal, targetCompany: e.target.value })} className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[12px] text-xs font-bold">
+                  <select data-testid="inventory-stock-company-select" value={stockModal.targetCompany} onChange={e => setStockModal({ ...stockModal, targetCompany: e.target.value })} className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-xs font-bold">
                     <option value="전체">미지정</option>
                     {companiesInInventory.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <div className="flex-1">
                   <label className="text-[11px] font-bold text-[var(--toss-gray-3)] mb-1 block">대상 부서</label>
-                  <select data-testid="inventory-stock-dept-select" value={stockModal.targetDept} onChange={e => setStockModal({ ...stockModal, targetDept: e.target.value })} className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[12px] text-xs font-bold">
+                  <select data-testid="inventory-stock-dept-select" value={stockModal.targetDept} onChange={e => setStockModal({ ...stockModal, targetDept: e.target.value })} className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-xs font-bold">
                     <option value="전체">미지정</option>
                     {departmentsByStockCompany.map(d => <option key={d} value={d}>{d}</option>)}
                   </select>
@@ -1735,8 +1735,8 @@ export default function IntegratedInventoryManagement({
             </div>
 
             <div className="flex gap-2">
-              <button onClick={() => setStockModal(null)} className="flex-1 py-3 rounded-[12px] bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] font-semibold text-sm">취소</button>
-              <button onClick={executeStockUpdate} className="flex-1 py-3 rounded-[12px] bg-[var(--toss-blue)] text-white font-semibold text-sm">확인</button>
+              <button onClick={() => setStockModal(null)} className="flex-1 py-3 rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--toss-gray-4)] font-semibold text-sm">취소</button>
+              <button onClick={executeStockUpdate} className="flex-1 py-3 rounded-[var(--radius-md)] bg-[var(--accent)] text-white font-semibold text-sm">확인</button>
             </div>
           </div>
         </div>

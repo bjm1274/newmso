@@ -144,7 +144,7 @@ export default function IncidentReport({ staffs, selectedCo, user }: Props) {
   const maxTypeCount = Math.max(...Object.values(typeCounts), 1);
 
   return (
-    <div className="p-4 md:p-6 space-y-5 max-w-5xl mx-auto">
+    <div className="p-4 md:p-4 space-y-5 max-w-5xl mx-auto">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)]">사고 보고서 관리</h2>
@@ -152,42 +152,42 @@ export default function IncidentReport({ staffs, selectedCo, user }: Props) {
         </div>
         <div className="flex gap-2">
           {(['목록', '작성', '통계'] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)} className={`px-3 py-1.5 text-xs font-bold rounded-[8px] ${tab === t ? 'bg-[var(--toss-blue)] text-white' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'}`}>{t}</button>
+            <button key={t} onClick={() => setTab(t)} className={`px-3 py-1.5 text-xs font-bold rounded-[var(--radius-md)] ${tab === t ? 'bg-[var(--accent)] text-white' : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'}`}>{t}</button>
           ))}
         </div>
       </div>
 
       {tab === '작성' && (
-        <div className="space-y-4 bg-[var(--toss-card)] p-5 rounded-[12px] border border-[var(--toss-border)]">
+        <div className="space-y-4 bg-[var(--card)] p-5 rounded-[var(--radius-md)] border border-[var(--border)]">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div>
               <label className="text-[10px] font-bold text-[var(--toss-gray-4)]">사고 날짜</label>
-              <input type="date" value={form.incident_date} onChange={e => setForm(f => ({ ...f, incident_date: e.target.value }))} className="w-full p-2 text-xs border border-[var(--toss-border)] rounded-[6px] bg-[var(--toss-gray-1)] mt-1" />
+              <input type="date" value={form.incident_date} onChange={e => setForm(f => ({ ...f, incident_date: e.target.value }))} className="w-full p-2 text-xs border border-[var(--border)] rounded-md bg-[var(--muted)] mt-1" />
             </div>
             <div>
               <label className="text-[10px] font-bold text-[var(--toss-gray-4)]">사고 시간</label>
-              <input type="time" value={form.incident_time} onChange={e => setForm(f => ({ ...f, incident_time: e.target.value }))} className="w-full p-2 text-xs border border-[var(--toss-border)] rounded-[6px] bg-[var(--toss-gray-1)] mt-1" />
+              <input type="time" value={form.incident_time} onChange={e => setForm(f => ({ ...f, incident_time: e.target.value }))} className="w-full p-2 text-xs border border-[var(--border)] rounded-md bg-[var(--muted)] mt-1" />
             </div>
             <div>
               <label className="text-[10px] font-bold text-[var(--toss-gray-4)]">유형</label>
-              <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} className="w-full p-2 text-xs border border-[var(--toss-border)] rounded-[6px] bg-[var(--toss-gray-1)] mt-1">
+              <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} className="w-full p-2 text-xs border border-[var(--border)] rounded-md bg-[var(--muted)] mt-1">
                 {INCIDENT_TYPES.map(t => <option key={t}>{t}</option>)}
               </select>
             </div>
             <div>
               <label className="text-[10px] font-bold text-[var(--toss-gray-4)]">심각도</label>
-              <select value={form.severity} onChange={e => setForm(f => ({ ...f, severity: e.target.value }))} className="w-full p-2 text-xs border border-[var(--toss-border)] rounded-[6px] bg-[var(--toss-gray-1)] mt-1">
+              <select value={form.severity} onChange={e => setForm(f => ({ ...f, severity: e.target.value }))} className="w-full p-2 text-xs border border-[var(--border)] rounded-md bg-[var(--muted)] mt-1">
                 {SEVERITIES.map(s => <option key={s}>{s}</option>)}
               </select>
             </div>
           </div>
           <div>
             <label className="text-[10px] font-bold text-[var(--toss-gray-4)]">사고 장소</label>
-            <input value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} placeholder="예: 3층 처치실" className="w-full p-2 text-xs border border-[var(--toss-border)] rounded-[6px] bg-[var(--toss-gray-1)] mt-1" />
+            <input value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} placeholder="예: 3층 처치실" className="w-full p-2 text-xs border border-[var(--border)] rounded-md bg-[var(--muted)] mt-1" />
           </div>
           <div>
             <label className="text-[10px] font-bold text-[var(--toss-gray-4)]">사고 경위</label>
-            <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={3} placeholder="사고 발생 경위를 상세히 기술하세요" className="w-full p-2 text-xs border border-[var(--toss-border)] rounded-[6px] bg-[var(--toss-gray-1)] mt-1" />
+            <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={3} placeholder="사고 발생 경위를 상세히 기술하세요" className="w-full p-2 text-xs border border-[var(--border)] rounded-md bg-[var(--muted)] mt-1" />
           </div>
           <div>
             <label className="text-[10px] font-bold text-[var(--toss-gray-4)]">관련 직원 (다중 선택)</label>
@@ -198,7 +198,7 @@ export default function IncidentReport({ staffs, selectedCo, user }: Props) {
                   onClick={() => setSelectedPersons(prev =>
                     prev.includes(s.name) ? prev.filter(p => p !== s.name) : [...prev, s.name]
                   )}
-                  className={`px-2 py-1 text-[10px] font-bold rounded-[6px] transition-all ${selectedPersons.includes(s.name) ? 'bg-[var(--toss-blue)] text-white' : 'bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)]'}`}
+                  className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all ${selectedPersons.includes(s.name) ? 'bg-[var(--accent)] text-white' : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'}`}
                 >
                   {s.name}
                 </button>
@@ -216,26 +216,26 @@ export default function IncidentReport({ staffs, selectedCo, user }: Props) {
                 value={(form as any)[key]}
                 onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
                 rows={2}
-                className="w-full p-2 text-xs border border-[var(--toss-border)] rounded-[6px] bg-[var(--toss-gray-1)] mt-1"
+                className="w-full p-2 text-xs border border-[var(--border)] rounded-md bg-[var(--muted)] mt-1"
               />
             </div>
           ))}
-          <button onClick={handleSave} disabled={saving} className="w-full py-2.5 bg-[var(--toss-blue)] text-white text-xs font-bold rounded-[8px] hover:opacity-90 disabled:opacity-50">
+          <button onClick={handleSave} disabled={saving} className="w-full py-2.5 bg-[var(--accent)] text-white text-xs font-bold rounded-[var(--radius-md)] hover:opacity-90 disabled:opacity-50">
             {saving ? '저장 중...' : '보고서 등록'}
           </button>
         </div>
       )}
 
       {tab === '목록' && (
-        loading ? <div className="text-center py-8 text-sm text-[var(--toss-gray-3)]">로딩 중...</div> :
+        loading ? <div className="text-center py-5 text-sm text-[var(--toss-gray-3)]">로딩 중...</div> :
         reports.length === 0 ? (
-          <div className="text-center py-12 border border-dashed border-[var(--toss-border)] rounded-[12px]">
+          <div className="text-center py-8 border border-dashed border-[var(--border)] rounded-[var(--radius-md)]">
             <p className="text-sm text-[var(--toss-gray-3)]">등록된 사고 보고서가 없습니다.</p>
           </div>
         ) : (
           <div className="space-y-3">
             {reports.map(report => (
-              <div key={report.id} className="p-4 bg-[var(--toss-card)] rounded-[12px] border border-[var(--toss-border)]">
+              <div key={report.id} className="p-4 bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)]">
                 <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
                   <div>
                     <div className="flex items-center gap-2">
@@ -248,11 +248,11 @@ export default function IncidentReport({ staffs, selectedCo, user }: Props) {
                     <select
                       value={report.status}
                       onChange={e => report.id && handleStatusChange(report.id, e.target.value)}
-                      className="text-[10px] font-bold p-1 border border-[var(--toss-border)] rounded-[6px] bg-[var(--toss-gray-1)]"
+                      className="text-[10px] font-bold p-1 border border-[var(--border)] rounded-md bg-[var(--muted)]"
                     >
                       {STATUSES.map(s => <option key={s}>{s}</option>)}
                     </select>
-                    <button onClick={() => handlePrint(report)} className="px-2 py-1 text-[10px] font-bold bg-[var(--toss-gray-1)] rounded-[6px] hover:bg-[var(--toss-gray-2)]">PDF 출력</button>
+                    <button onClick={() => handlePrint(report)} className="px-2 py-1 text-[10px] font-bold bg-[var(--muted)] rounded-md hover:bg-[var(--toss-gray-2)]">PDF 출력</button>
                   </div>
                 </div>
                 <p className="text-xs text-[var(--toss-gray-4)] line-clamp-2">{report.description}</p>
@@ -264,20 +264,20 @@ export default function IncidentReport({ staffs, selectedCo, user }: Props) {
       )}
 
       {tab === '통계' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <div className="bg-[var(--toss-card)] rounded-[12px] border border-[var(--toss-border)] p-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)] p-4">
             <h3 className="text-sm font-bold text-[var(--foreground)] mb-3">유형별 건수</h3>
             {Object.entries(typeCounts).map(([type, count]) => (
               <div key={type} className="flex items-center gap-2 mb-1.5">
                 <span className="text-[10px] font-bold text-[var(--toss-gray-4)] w-16 shrink-0">{type}</span>
-                <div className="flex-1 bg-[var(--toss-gray-1)] rounded-full h-3 overflow-hidden">
-                  <div className="h-full bg-[var(--toss-blue)] rounded-full" style={{ width: `${(count / maxTypeCount) * 100}%` }} />
+                <div className="flex-1 bg-[var(--muted)] rounded-full h-3 overflow-hidden">
+                  <div className="h-full bg-[var(--accent)] rounded-full" style={{ width: `${(count / maxTypeCount) * 100}%` }} />
                 </div>
                 <span className="text-[10px] font-bold w-6 text-right">{count}</span>
               </div>
             ))}
           </div>
-          <div className="bg-[var(--toss-card)] rounded-[12px] border border-[var(--toss-border)] p-4">
+          <div className="bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)] p-4">
             <h3 className="text-sm font-bold text-[var(--foreground)] mb-3">심각도별 건수</h3>
             {SEVERITIES.map(s => {
               const count = severityCounts[s] || 0;
@@ -285,7 +285,7 @@ export default function IncidentReport({ staffs, selectedCo, user }: Props) {
               return (
                 <div key={s} className="flex items-center gap-2 mb-1.5">
                   <span className={`text-[10px] font-bold w-12 shrink-0 ${s === '사망' ? 'text-red-700' : s === '중증' ? 'text-red-500' : s === '중등' ? 'text-amber-600' : 'text-green-600'}`}>{s}</span>
-                  <div className="flex-1 bg-[var(--toss-gray-1)] rounded-full h-3 overflow-hidden">
+                  <div className="flex-1 bg-[var(--muted)] rounded-full h-3 overflow-hidden">
                     <div className={`h-full rounded-full ${s === '사망' ? 'bg-red-700' : s === '중증' ? 'bg-red-500' : s === '중등' ? 'bg-amber-400' : 'bg-green-400'}`} style={{ width: `${(count / max) * 100}%` }} />
                   </div>
                   <span className="text-[10px] font-bold w-6 text-right">{count}</span>

@@ -16,7 +16,7 @@ const TYPE_CFG: Record<string, { icon: string; color: string; label: string }> =
   hr: { icon: '👥', color: 'text-cyan-600', label: '인사' },
   인사: { icon: '👥', color: 'text-cyan-600', label: '인사' },
   education: { icon: '📚', color: 'text-purple-500', label: '교육' },
-  default: { icon: '🔔', color: 'text-slate-500', label: '알림' },
+  default: { icon: '🔔', color: 'text-[var(--toss-gray-4)]', label: '알림' },
 };
 
 const getTypeCfg = (type: string) => TYPE_CFG[type] || TYPE_CFG.default;
@@ -199,7 +199,7 @@ export default function NotificationCenter({ user }: { user: any }) {
           if (!isOpen) void fetchNotifications();
           if (!isOpen) sound.playSystem();
         }}
-        className="relative p-2.5 rounded-[14px] hover:bg-[var(--toss-gray-1)] transition-all group touch-manipulation"
+        className="relative p-2.5 rounded-[var(--radius-lg)] hover:bg-[var(--muted)] transition-all group touch-manipulation"
         aria-label="알림"
       >
         <span
@@ -209,7 +209,7 @@ export default function NotificationCenter({ user }: { user: any }) {
           🔔
         </span>
         {unreadCount > 0 && (
-          <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-red-500 text-white text-[9px] font-black rounded-full border-2 border-[var(--toss-card)]">
+          <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-red-500 text-white text-[9px] font-black rounded-[var(--radius-md)] border-2 border-[var(--card)]">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
@@ -217,14 +217,14 @@ export default function NotificationCenter({ user }: { user: any }) {
 
       {isOpen && (
         <div
-          className="absolute bottom-[calc(100%+12px)] right-0 w-[min(20rem,calc(100vw-16px))] max-w-[calc(100vw-16px)] bg-[var(--toss-card)]/95 backdrop-blur-xl border border-[var(--toss-border)] rounded-[20px] shadow-2xl z-[320] overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-bottom-right md:bottom-auto md:top-0 md:left-[calc(100%+12px)] md:right-auto md:w-80 md:max-w-none md:origin-top-left"
+          className="absolute bottom-[calc(100%+12px)] right-0 w-[min(20rem,calc(100vw-16px))] max-w-[calc(100vw-16px)] bg-[var(--card)]/95 backdrop-blur-xl border border-[var(--border)] rounded-[var(--radius-xl)] shadow-sm z-[320] overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-bottom-right md:bottom-auto md:top-0 md:left-[calc(100%+12px)] md:right-auto md:w-80 md:max-w-none md:origin-top-left"
           data-testid="notification-dropdown"
         >
-          <div className="px-4 py-3 border-b border-[var(--toss-border)] flex items-center justify-between">
+          <div className="px-4 py-3 border-b border-[var(--border)] flex items-center justify-between">
             <div className="flex items-center gap-2">
               <h3 className="font-bold text-[13px] text-[var(--foreground)]">알림</h3>
               {unreadCount > 0 && (
-                <span className="bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">
+                <span className="bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-[var(--radius-md)]">
                   {unreadCount}
                 </span>
               )}
@@ -233,7 +233,7 @@ export default function NotificationCenter({ user }: { user: any }) {
               <button
                 type="button"
                 onClick={markAllAsRead}
-                className="text-[11px] font-bold text-[var(--toss-blue)] hover:underline"
+                className="text-[11px] font-bold text-[var(--accent)] hover:underline"
               >
                 모두 읽음
               </button>
@@ -242,7 +242,7 @@ export default function NotificationCenter({ user }: { user: any }) {
 
           <div className="max-h-[380px] overflow-y-auto custom-scrollbar">
             {notifications.length === 0 ? (
-              <div className="py-16 text-center">
+              <div className="py-10 text-center">
                 <p className="text-3xl mb-2 opacity-20">🔕</p>
                 <p className="text-xs text-[var(--toss-gray-3)] font-medium">받은 알림이 없습니다.</p>
               </div>
@@ -250,7 +250,7 @@ export default function NotificationCenter({ user }: { user: any }) {
               <>
                 {unread.length > 0 && (
                   <div>
-                    <div className="px-4 py-1.5 bg-[var(--toss-gray-1)]/60 sticky top-0">
+                    <div className="px-4 py-1.5 bg-[var(--muted)]/60 sticky top-0">
                       <span className="text-[10px] font-black text-[var(--toss-gray-3)] uppercase tracking-wider">
                         새 알림 {unread.length}건
                       </span>
@@ -263,7 +263,7 @@ export default function NotificationCenter({ user }: { user: any }) {
                           type="button"
                           data-testid={`notification-item-${notification.id}`}
                           onClick={() => handleNotiClick(notification)}
-                          className="w-full text-left px-4 py-3 flex gap-3 hover:bg-[var(--toss-gray-1)] transition-colors border-b border-[var(--toss-border)]/50 bg-[var(--toss-blue-light)]/20 last:border-0 group"
+                          className="w-full text-left px-4 py-3 flex gap-3 hover:bg-[var(--muted)] transition-colors border-b border-[var(--border)]/50 bg-[var(--toss-blue-light)]/20 last:border-0 group"
                         >
                           <span className={`text-xl shrink-0 mt-0.5 ${cfg.color}`}>{cfg.icon}</span>
                           <div className="min-w-0 flex-1">
@@ -284,7 +284,7 @@ export default function NotificationCenter({ user }: { user: any }) {
                               </p>
                             )}
                           </div>
-                          <span className="w-2 h-2 bg-[var(--toss-blue)] rounded-full shrink-0 mt-2 animate-pulse" />
+                          <span className="w-2 h-2 bg-[var(--accent)] rounded-full shrink-0 mt-2 animate-pulse" />
                         </button>
                       );
                     })}
@@ -294,7 +294,7 @@ export default function NotificationCenter({ user }: { user: any }) {
                 {read.length > 0 && (
                   <div>
                     {unread.length > 0 && (
-                      <div className="px-4 py-1.5 bg-[var(--toss-gray-1)]/60 sticky top-0">
+                      <div className="px-4 py-1.5 bg-[var(--muted)]/60 sticky top-0">
                         <span className="text-[10px] font-black text-[var(--toss-gray-3)] uppercase tracking-wider">
                           읽은 알림
                         </span>
@@ -308,7 +308,7 @@ export default function NotificationCenter({ user }: { user: any }) {
                           type="button"
                           data-testid={`notification-item-${notification.id}`}
                           onClick={() => handleNotiClick(notification)}
-                          className="w-full text-left px-4 py-3 flex gap-3 hover:bg-[var(--toss-gray-1)] transition-colors border-b border-[var(--toss-border)]/50 opacity-60 last:border-0"
+                          className="w-full text-left px-4 py-3 flex gap-3 hover:bg-[var(--muted)] transition-colors border-b border-[var(--border)]/50 opacity-60 last:border-0"
                         >
                           <span className={`text-lg shrink-0 mt-0.5 ${cfg.color}`}>{cfg.icon}</span>
                           <div className="min-w-0 flex-1">
@@ -338,14 +338,14 @@ export default function NotificationCenter({ user }: { user: any }) {
             )}
           </div>
 
-          <div className="px-4 py-2.5 border-t border-[var(--toss-border)] bg-[var(--toss-gray-1)]/40 flex justify-center">
+          <div className="px-4 py-2.5 border-t border-[var(--border)] bg-[var(--muted)]/40 flex justify-center">
             <button
               type="button"
               onClick={() => {
                 setIsOpen(false);
                 router.push('/main?open_menu=내정보');
               }}
-              className="text-[11px] font-bold text-[var(--toss-blue)] hover:underline"
+              className="text-[11px] font-bold text-[var(--accent)] hover:underline"
             >
               전체 알림 보기
             </button>

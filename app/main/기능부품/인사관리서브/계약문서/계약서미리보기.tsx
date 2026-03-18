@@ -76,7 +76,7 @@ export default function ContractPreview({ staff, contract }: Props) {
 
   if (!staff) {
     return (
-      <div className="bg-white border border-[var(--toss-border)] shadow-sm p-8 flex items-center justify-center h-[800px] text-xs text-[var(--toss-gray-3)]">
+      <div className="bg-white border border-[var(--border)] shadow-sm p-4 flex items-center justify-center h-[800px] text-xs text-[var(--toss-gray-3)]">
         계약 대상자를 왼쪽에서 선택하면 이곳에 근로계약서가 미리보기로 표시됩니다.
       </div>
     );
@@ -242,40 +242,40 @@ export default function ContractPreview({ staff, contract }: Props) {
     const hourlyWage = Math.round(taxableTotal / 209);
 
     return (
-      <div className="mt-4 mb-2 bg-slate-50/80 border border-slate-200 rounded-xl p-4">
+      <div className="mt-4 mb-2 bg-[var(--tab-bg)]/80 border border-[var(--border)] rounded-xl p-4">
         <div className="flex items-center gap-2 mb-3">
           <span className="text-[11px] font-black text-blue-700 bg-blue-50 px-2.5 py-1 rounded-md">임금 구성항목</span>
         </div>
         {/* 테이블 헤더 */}
-        <div className="grid grid-cols-12 gap-1 pb-1.5 border-b-2 border-slate-300 mb-1">
-          <span className="col-span-4 text-[10px] font-bold text-slate-500">구성항목</span>
-          <span className="col-span-3 text-[10px] font-bold text-slate-500 text-right">월 지급액(원)</span>
-          <span className="col-span-2 text-[10px] font-bold text-slate-500 text-center">과세구분</span>
-          <span className="col-span-3 text-[10px] font-bold text-slate-500 text-right">비고</span>
+        <div className="grid grid-cols-12 gap-1 pb-1.5 border-b-2 border-[var(--border)] mb-1">
+          <span className="col-span-4 text-[10px] font-bold text-[var(--toss-gray-4)]">구성항목</span>
+          <span className="col-span-3 text-[10px] font-bold text-[var(--toss-gray-4)] text-right">월 지급액(원)</span>
+          <span className="col-span-2 text-[10px] font-bold text-[var(--toss-gray-4)] text-center">과세구분</span>
+          <span className="col-span-3 text-[10px] font-bold text-[var(--toss-gray-4)] text-right">비고</span>
         </div>
         {/* 항목 줄 */}
         {items.map((item, i) => (
-          <div key={i} className="grid grid-cols-12 gap-1 py-1.5 border-b border-slate-100 last:border-0">
-            <span className="col-span-4 text-[11px] font-semibold text-slate-700">{item.label}</span>
-            <span className="col-span-3 text-[11px] font-black text-slate-800 text-right">{item.amount.toLocaleString()}</span>
+          <div key={i} className="grid grid-cols-12 gap-1 py-1.5 border-b border-[var(--border-subtle)] last:border-0">
+            <span className="col-span-4 text-[11px] font-semibold text-[var(--toss-gray-5)]">{item.label}</span>
+            <span className="col-span-3 text-[11px] font-black text-[var(--foreground)] text-right">{item.amount.toLocaleString()}</span>
             <span className={`col-span-2 text-[10px] font-bold text-center ${item.taxable ? 'text-orange-600' : 'text-emerald-600'}`}>
               {item.taxable ? '과세' : '비과세'}
             </span>
-            <span className="col-span-3 text-[10px] text-slate-400 text-right">{item.note}</span>
+            <span className="col-span-3 text-[10px] text-[var(--toss-gray-3)] text-right">{item.note}</span>
           </div>
         ))}
         {/* 합계 줄 */}
-        <div className="grid grid-cols-12 gap-1 mt-2 pt-2 border-t-2 border-slate-300">
-          <span className="col-span-4 text-[11px] font-black text-slate-900">월 급여 합계</span>
+        <div className="grid grid-cols-12 gap-1 mt-2 pt-2 border-t-2 border-[var(--border)]">
+          <span className="col-span-4 text-[11px] font-black text-[var(--foreground)]">월 급여 합계</span>
           <span className="col-span-3 text-[12px] font-black text-blue-700 text-right">{totalMonthly.toLocaleString()}</span>
-          <span className="col-span-5 text-[10px] text-slate-400 text-right">
+          <span className="col-span-5 text-[10px] text-[var(--toss-gray-3)] text-right">
             과세 {taxableTotal.toLocaleString()} + 비과세 {taxFreeTotal.toLocaleString()}
           </span>
         </div>
         <div className="grid grid-cols-12 gap-1 mt-1">
-          <span className="col-span-4 text-[10px] font-bold text-slate-500">시급 환산 (통상임금)</span>
+          <span className="col-span-4 text-[10px] font-bold text-[var(--toss-gray-4)]">시급 환산 (통상임금)</span>
           <span className="col-span-3 text-[11px] font-black text-emerald-700 text-right">{hourlyWage.toLocaleString()}</span>
-          <span className="col-span-5 text-[10px] text-slate-400 text-right">= 과세합계 ÷ 209시간</span>
+          <span className="col-span-5 text-[10px] text-[var(--toss-gray-3)] text-right">= 과세합계 ÷ 209시간</span>
         </div>
       </div>
     );
@@ -333,7 +333,7 @@ export default function ContractPreview({ staff, contract }: Props) {
         result.push(
           <div key={i} className="flex gap-2 mt-2">
             <span className="text-blue-600 font-black text-[12px] shrink-0 mt-[1px]">{num}</span>
-            <span className="text-[12.5px] text-slate-700 leading-[1.85]">{rest}</span>
+            <span className="text-[12.5px] text-[var(--toss-gray-5)] leading-[1.85]">{rest}</span>
           </div>
         );
         continue;
@@ -344,8 +344,8 @@ export default function ContractPreview({ staff, contract }: Props) {
         const content = trimmed.replace(/^[-·•]\s*/, '');
         result.push(
           <div key={i} className="flex gap-2 pl-5 mt-1">
-            <span className="text-slate-400 shrink-0 mt-[2px]">•</span>
-            <span className="text-[12px] text-slate-600 leading-[1.85]">{content}</span>
+            <span className="text-[var(--toss-gray-3)] shrink-0 mt-[2px]">•</span>
+            <span className="text-[12px] text-[var(--toss-gray-4)] leading-[1.85]">{content}</span>
           </div>
         );
         continue;
@@ -354,7 +354,7 @@ export default function ContractPreview({ staff, contract }: Props) {
       // 일반 텍스트
       const indent = lines[i].match(/^\s*/)?.[0]?.length || 0;
       result.push(
-        <p key={i} className="text-[12.5px] text-slate-700 leading-[1.85]" style={indent > 2 ? { paddingLeft: '1.25rem' } : {}}>
+        <p key={i} className="text-[12.5px] text-[var(--toss-gray-5)] leading-[1.85]" style={indent > 2 ? { paddingLeft: '1.25rem' } : {}}>
           {trimmed}
         </p>
       );
@@ -367,8 +367,8 @@ export default function ContractPreview({ staff, contract }: Props) {
   const sections = parseContractSections(text);
 
   return (
-    <div className="bg-[var(--toss-gray-1)] md:p-8 flex flex-col h-[900px] overflow-y-auto rounded-[32px] border border-[var(--toss-border)] relative custom-scrollbar print:bg-white print:p-0 print:border-none print:h-auto print:overflow-visible">
-      <div className="flex items-center justify-between px-6 py-4 mb-4 bg-white/50 backdrop-blur-md border-b border-[var(--toss-border)] sticky top-0 z-20 print:hidden">
+    <div className="bg-[var(--muted)] md:p-4 flex flex-col h-[900px] overflow-y-auto rounded-2xl border border-[var(--border)] relative custom-scrollbar print:bg-white print:p-0 print:border-none print:h-auto print:overflow-visible">
+      <div className="flex items-center justify-between px-4 py-4 mb-4 bg-white/50 backdrop-blur-md border-b border-[var(--border)] sticky top-0 z-20 print:hidden">
         <div>
           <h1 className="text-sm font-bold text-[var(--foreground)] mt-0.5">{staff.name} 근로계약서</h1>
         </div>
@@ -381,101 +381,101 @@ export default function ContractPreview({ staff, contract }: Props) {
               {contract.status}
             </span>
           )}
-          <button onClick={() => window.print()} className="p-2 rounded-xl bg-white border border-[var(--toss-border)] hover:bg-[var(--toss-gray-1)] transition-colors">
+          <button onClick={() => window.print()} className="p-2 rounded-xl bg-white border border-[var(--border)] hover:bg-[var(--muted)] transition-colors">
             <span className="text-sm">🖨️</span>
           </button>
         </div>
       </div>
 
-      <div className="flex-1 p-4 md:p-12 flex justify-center">
-        <div className="w-full max-w-[720px] bg-white shadow-2xl rounded-sm border border-gray-200 min-h-[960px] flex flex-col p-[40px] md:p-[60px] relative overflow-hidden print:shadow-none print:border-none print:p-0">
+      <div className="flex-1 p-4 md:p-5 flex justify-center">
+        <div className="w-full max-w-[720px] bg-white shadow-sm rounded-sm border border-[var(--border)] min-h-[960px] flex flex-col p-[40px] md:p-[60px] relative overflow-hidden print:shadow-none print:border-none print:p-0">
           {/* Watermark */}
           <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-[0.02] select-none">
             <span className="text-[120px] font-black rotate-[-45deg] text-black">CONFIDENTIAL</span>
           </div>
 
           {loading ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-gray-400 gap-3">
-              <div className="w-8 h-8 border-4 border-[var(--toss-blue)] border-t-transparent rounded-full animate-spin"></div>
+            <div className="flex-1 flex flex-col items-center justify-center text-[var(--toss-gray-3)] gap-3">
+              <div className="w-8 h-8 border-4 border-[var(--accent)] border-t-transparent rounded-full animate-spin"></div>
               <p className="text-xs font-bold">계약서 데이터를 구성 중입니다...</p>
             </div>
           ) : (
             <div className="relative z-10 w-full">
               {/* 계약서 제목 */}
-              <h1 className="text-[26px] font-black text-center mb-14 tracking-[0.2em] text-slate-900" style={{ fontFamily: 'serif' }}>
+              <h1 className="text-[26px] font-black text-center mb-14 tracking-[0.2em] text-[var(--foreground)]" style={{ fontFamily: 'serif' }}>
                 근 로 계 약 서
               </h1>
 
               {/* 상단 정보 테이블: 사용자 / 근로자 */}
-              <div className="grid grid-cols-2 gap-8 mb-10">
+              <div className="grid grid-cols-2 gap-3 mb-10">
                 {/* 사용자(회사) 정보 */}
                 <div className="w-full">
-                  <h3 className="text-[11px] font-black text-slate-800 border-b-2 border-slate-800 pb-1 mb-0">「사용자」</h3>
-                  <div className="grid grid-cols-12 border-l border-gray-300 text-[10.5px]">
-                    <div className="col-span-4 bg-slate-50 border-r border-b border-gray-300 p-2 font-bold text-center text-slate-600">회사명</div>
-                    <div className="col-span-8 border-r border-b border-gray-300 p-2 font-black text-slate-900">{company?.name || staff.company}</div>
+                  <h3 className="text-[11px] font-black text-[var(--foreground)] border-b-2 border-slate-800 pb-1 mb-0">「사용자」</h3>
+                  <div className="grid grid-cols-12 border-l border-[var(--border)] text-[10.5px]">
+                    <div className="col-span-4 bg-[var(--tab-bg)] border-r border-b border-[var(--border)] p-2 font-bold text-center text-[var(--toss-gray-4)]">회사명</div>
+                    <div className="col-span-8 border-r border-b border-[var(--border)] p-2 font-black text-[var(--foreground)]">{company?.name || staff.company}</div>
 
-                    <div className="col-span-4 bg-slate-50 border-r border-b border-gray-300 p-2 font-bold text-center text-slate-600">사업자번호</div>
-                    <div className="col-span-8 border-r border-b border-gray-300 p-2 font-semibold text-slate-700">{company?.business_no || '-'}</div>
+                    <div className="col-span-4 bg-[var(--tab-bg)] border-r border-b border-[var(--border)] p-2 font-bold text-center text-[var(--toss-gray-4)]">사업자번호</div>
+                    <div className="col-span-8 border-r border-b border-[var(--border)] p-2 font-semibold text-[var(--toss-gray-5)]">{company?.business_no || '-'}</div>
 
-                    <div className="col-span-4 bg-slate-50 border-r border-b border-gray-300 p-2 font-bold text-center text-slate-600">주소</div>
-                    <div className="col-span-8 border-r border-b border-gray-300 p-2 font-semibold text-slate-700 leading-tight">{company?.address || '-'}</div>
+                    <div className="col-span-4 bg-[var(--tab-bg)] border-r border-b border-[var(--border)] p-2 font-bold text-center text-[var(--toss-gray-4)]">주소</div>
+                    <div className="col-span-8 border-r border-b border-[var(--border)] p-2 font-semibold text-[var(--toss-gray-5)] leading-tight">{company?.address || '-'}</div>
 
-                    <div className="col-span-4 bg-slate-50 border-r border-b border-gray-300 p-2 font-bold text-center text-slate-600">연락처</div>
-                    <div className="col-span-8 border-r border-b border-gray-300 p-2 font-semibold text-slate-700">{company?.phone || '-'}</div>
+                    <div className="col-span-4 bg-[var(--tab-bg)] border-r border-b border-[var(--border)] p-2 font-bold text-center text-[var(--toss-gray-4)]">연락처</div>
+                    <div className="col-span-8 border-r border-b border-[var(--border)] p-2 font-semibold text-[var(--toss-gray-5)]">{company?.phone || '-'}</div>
                   </div>
                 </div>
 
                 {/* 근로자 정보 */}
                 <div className="w-full">
-                  <h3 className="text-[11px] font-black text-slate-800 border-b-2 border-slate-800 pb-1 mb-0">「근로자」</h3>
-                  <div className="grid grid-cols-12 border-l border-gray-300 text-[10.5px]">
-                    <div className="col-span-4 bg-slate-50 border-r border-b border-gray-300 p-2 font-bold text-center text-slate-600">성명</div>
-                    <div className="col-span-8 border-r border-b border-gray-300 p-2 font-black text-slate-900">{staff.name}</div>
+                  <h3 className="text-[11px] font-black text-[var(--foreground)] border-b-2 border-slate-800 pb-1 mb-0">「근로자」</h3>
+                  <div className="grid grid-cols-12 border-l border-[var(--border)] text-[10.5px]">
+                    <div className="col-span-4 bg-[var(--tab-bg)] border-r border-b border-[var(--border)] p-2 font-bold text-center text-[var(--toss-gray-4)]">성명</div>
+                    <div className="col-span-8 border-r border-b border-[var(--border)] p-2 font-black text-[var(--foreground)]">{staff.name}</div>
 
-                    <div className="col-span-4 bg-slate-50 border-r border-b border-gray-300 p-2 font-bold text-center text-slate-600">생년월일</div>
-                    <div className="col-span-8 border-r border-b border-gray-300 p-2 font-semibold text-slate-700">{staff.resident_no ? staff.resident_no.slice(0, 6) : '-'}</div>
+                    <div className="col-span-4 bg-[var(--tab-bg)] border-r border-b border-[var(--border)] p-2 font-bold text-center text-[var(--toss-gray-4)]">생년월일</div>
+                    <div className="col-span-8 border-r border-b border-[var(--border)] p-2 font-semibold text-[var(--toss-gray-5)]">{staff.resident_no ? staff.resident_no.slice(0, 6) : '-'}</div>
 
-                    <div className="col-span-4 bg-slate-50 border-r border-b border-gray-300 p-2 font-bold text-center text-slate-600">주소</div>
-                    <div className="col-span-8 border-r border-b border-gray-300 p-2 font-semibold text-slate-700 leading-tight">{staff.address || '-'}</div>
+                    <div className="col-span-4 bg-[var(--tab-bg)] border-r border-b border-[var(--border)] p-2 font-bold text-center text-[var(--toss-gray-4)]">주소</div>
+                    <div className="col-span-8 border-r border-b border-[var(--border)] p-2 font-semibold text-[var(--toss-gray-5)] leading-tight">{staff.address || '-'}</div>
 
-                    <div className="col-span-4 bg-slate-50 border-r border-b border-gray-300 p-2 font-bold text-center text-slate-600">연락처</div>
-                    <div className="col-span-8 border-r border-b border-gray-300 p-2 font-semibold text-slate-700">{staff.phone || '-'}</div>
+                    <div className="col-span-4 bg-[var(--tab-bg)] border-r border-b border-[var(--border)] p-2 font-bold text-center text-[var(--toss-gray-4)]">연락처</div>
+                    <div className="col-span-8 border-r border-b border-[var(--border)] p-2 font-semibold text-[var(--toss-gray-5)]">{staff.phone || '-'}</div>
                   </div>
                 </div>
               </div>
 
               {/* 구분선 */}
-              <div className="border-t-2 border-slate-800 mb-8" />
+              <div className="border-t-2 border-slate-800 mb-4" />
 
               {/* 계약 조항 섹션들 */}
-              <div className="space-y-6">
+              <div className="space-y-4">
                 {sections.length > 0 ? sections.map((section, idx) => (
                   <div key={idx}>
-                    <h4 className="text-[13px] font-black text-slate-900 mb-2 flex items-center gap-2">
+                    <h4 className="text-[13px] font-black text-[var(--foreground)] mb-2 flex items-center gap-2">
                       <span className="w-1.5 h-1.5 bg-blue-600 rounded-full shrink-0" />
                       {section.title}
                     </h4>
-                    <div className="pl-4 border-l-2 border-slate-100">
+                    <div className="pl-4 border-l-2 border-[var(--border-subtle)]">
                       {renderSectionBody(section.body)}
                     </div>
                   </div>
                 )) : (
-                  <p className="text-[13px] text-slate-500">설정된 계약서 본문이 없습니다.</p>
+                  <p className="text-[13px] text-[var(--toss-gray-4)]">설정된 계약서 본문이 없습니다.</p>
                 )}
               </div>
 
               {/* 동의 문구 */}
               <div className="mt-10 py-4 text-center">
-                <p className="text-[12px] font-bold text-slate-600 leading-relaxed">
+                <p className="text-[12px] font-bold text-[var(--toss-gray-4)] leading-relaxed">
                   「상기 내용을 충분히 이해하고 이에 동의하여 근로계약을 체결한다.」
                 </p>
               </div>
 
               {/* 하단 서명란 */}
-              <div className="mt-12 pt-8 border-t border-dotted border-gray-300 flex flex-col items-center">
+              <div className="mt-12 pt-8 border-t border-dotted border-[var(--border)] flex flex-col items-center">
                 <div className="mb-10">
-                  <p className="text-[14px] font-bold tracking-[0.3em] text-slate-800">
+                  <p className="text-[14px] font-bold tracking-[0.3em] text-[var(--foreground)]">
                     {new Date().getFullYear()}년 {String(new Date().getMonth() + 1).padStart(2, '0')}월 {String(new Date().getDate()).padStart(2, '0')}일
                   </p>
                 </div>
@@ -483,14 +483,14 @@ export default function ContractPreview({ staff, contract }: Props) {
                 <div className="w-full flex justify-between items-start mt-4">
                   {/* 사업주 (사용자) */}
                   <div className="flex flex-col gap-3 w-1/2">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">「사용자」</span>
+                    <span className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">「사용자」</span>
                     <div className="space-y-1">
-                      <p className="font-bold text-[13px] text-slate-800">{company?.name || staff.company}</p>
+                      <p className="font-bold text-[13px] text-[var(--foreground)]">{company?.name || staff.company}</p>
                       <div className="relative inline-block w-fit">
                         {(() => {
                           const isHosp = (company?.name || staff.company || '').match(/병원|의원|정형외과|내과|소아과|치과/);
                           const title = isHosp ? '대표원장' : '대표이사';
-                          return <p className="font-bold text-[13px] text-slate-800">{title} {company?.ceo_name || '(인)'}</p>;
+                          return <p className="font-bold text-[13px] text-[var(--foreground)]">{title} {company?.ceo_name || '(인)'}</p>;
                         })()}
                         {company?.seal_url ? (
                           <img
@@ -509,12 +509,12 @@ export default function ContractPreview({ staff, contract }: Props) {
                   </div>
 
                   <div className="flex flex-col gap-3 w-1/2 items-end">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">「근로자」</span>
+                    <span className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">「근로자」</span>
                     <div className="space-y-1 text-right">
                       <div className="flex items-center gap-3 justify-end relative h-10">
                         {sig ? (
                           <>
-                            <p className="font-bold text-[13px] text-slate-800">{staff.name} (인)</p>
+                            <p className="font-bold text-[13px] text-[var(--foreground)]">{staff.name} (인)</p>
                             {sig.startsWith('data:image') ? (
                               <img src={sig} alt="signature" className="absolute -top-8 -right-8 h-20 w-auto object-contain mix-blend-multiply" />
                             ) : (
@@ -523,8 +523,8 @@ export default function ContractPreview({ staff, contract }: Props) {
                           </>
                         ) : (
                           <>
-                            <p className="font-bold text-[13px] text-slate-800">{staff.name} (서명)</p>
-                            <div className="absolute -top-2 -right-4 w-24 h-10 border border-dashed border-gray-200 flex items-center justify-center text-[9px] text-gray-300 bg-gray-50/30 rounded-lg">서명 대기</div>
+                            <p className="font-bold text-[13px] text-[var(--foreground)]">{staff.name} (서명)</p>
+                            <div className="absolute -top-2 -right-4 w-24 h-10 border border-dashed border-[var(--border)] flex items-center justify-center text-[9px] text-[var(--toss-gray-3)] bg-[var(--tab-bg)]/30 rounded-lg">서명 대기</div>
                           </>
                         )}
                       </div>
@@ -532,7 +532,7 @@ export default function ContractPreview({ staff, contract }: Props) {
                   </div>
                 </div>
 
-                <div className="mt-16 text-[9px] text-gray-400 text-center w-full border-t border-gray-100 pt-3 print:hidden">
+                <div className="mt-16 text-[9px] text-[var(--toss-gray-3)] text-center w-full border-t border-[var(--border-subtle)] pt-3 print:hidden">
                   본 문서는 SY INC. 인사관리 시스템을 통해 체결된 전자문서입니다.
                 </div>
               </div>

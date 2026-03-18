@@ -12,7 +12,7 @@ function InfoItem({ label, value, highlight = false }: { label: string; value?: 
       <p className="mb-1 text-[10px] font-black uppercase tracking-[0.16em] text-[var(--toss-gray-3)]">
         {label}
       </p>
-      <p className={`text-sm font-bold ${highlight ? 'text-[var(--toss-blue)]' : 'text-[var(--foreground)]'}`}>
+      <p className={`text-sm font-bold ${highlight ? 'text-[var(--accent)]' : 'text-[var(--foreground)]'}`}>
         {value || '-'}
       </p>
     </div>
@@ -35,13 +35,13 @@ function SalaryRow({
   isTaxFree?: boolean;
 }) {
   return (
-    <div className="border-b border-slate-100 py-2.5 last:border-0 print:py-1.5">
+    <div className="border-b border-[var(--border-subtle)] py-2.5 last:border-0 print:py-1.5">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className="text-[13px] font-bold text-[var(--toss-gray-4)]">{label}</span>
           {isTaxFree && (
             <span
-              className="rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wide"
+              className="rounded-[var(--radius-md)] px-2 py-0.5 text-[9px] font-black uppercase tracking-wide"
               style={{ backgroundColor: alphaColor(highlightColor, 0.12), color: highlightColor }}
             >
               Non-Taxable
@@ -184,7 +184,7 @@ export default function SalaryDetail({ record, staff }: any) {
 
   return (
     <div
-      className="relative mx-auto mb-10 w-full max-w-7xl overflow-hidden rounded-[24px] border bg-white shadow-xl print:mb-0 print:max-w-none print:shadow-md"
+      className="relative mx-auto mb-4 w-full max-w-7xl overflow-hidden rounded-[var(--radius-xl)] border bg-[var(--card)] shadow-sm print:mb-0 print:max-w-none print:shadow-sm"
       style={{ background: `linear-gradient(180deg, #ffffff 0%, ${alphaColor(primaryColor, 0.028)} 100%)` }}
     >
       <style>{`
@@ -209,32 +209,32 @@ export default function SalaryDetail({ record, staff }: any) {
         />
       </div>
 
-      <div className="relative overflow-hidden px-8 py-10 text-white print:py-7" style={{ background: headerBackground }}>
-        <div className="absolute -right-12 -top-16 h-52 w-52 rounded-full bg-white/10 blur-3xl" />
-        <div className="absolute left-10 top-8 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.24em] backdrop-blur-sm">
+      <div className="relative overflow-hidden px-4 py-4 text-white print:py-4" style={{ background: headerBackground }}>
+        <div className="absolute -right-12 -top-16 h-52 w-52 rounded-full bg-[var(--card)]/10 blur-3xl" />
+        <div className="absolute left-10 top-8 rounded-[var(--radius-md)] border border-white/15 bg-[var(--card)]/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.24em] backdrop-blur-sm">
           Premium Payroll
         </div>
-        <div className="relative z-10 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+        <div className="relative z-10 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-sm font-black uppercase tracking-[0.24em] opacity-80">{companyLabel}</p>
-            <h2 className="mt-3 text-3xl font-extrabold tracking-tight">{design.title}</h2>
+            <h2 className="mt-3 text-xl font-extrabold tracking-tight">{design.title}</h2>
             <p className="mt-1 text-sm font-medium opacity-90">{design.subtitle}</p>
             <p className="mt-4 text-[13px] font-semibold opacity-90">{monthLabel}</p>
           </div>
-          <div className="rounded-[20px] bg-black/10 px-5 py-4 backdrop-blur-sm">
+          <div className="rounded-[var(--radius-md)] bg-black/10 px-4 py-3 backdrop-blur-sm">
             <p className="text-xs font-black uppercase tracking-[0.2em] opacity-70">
               {isAdvancePay ? 'Advance Pay' : 'Net Pay'}
             </p>
-            <p className="mt-2 text-4xl font-black tracking-tight">
+            <p className="mt-1 text-2xl font-black tracking-tight">
               {(isAdvancePay ? advancePayAmount : calc.net).toLocaleString()}원
             </p>
           </div>
         </div>
       </div>
 
-      <div className="relative z-10 space-y-8 p-8 print:space-y-5 print:px-8 print:py-5">
+      <div className="relative z-10 space-y-4 p-4 print:space-y-4 print:px-4 print:py-4">
         <div
-          className="grid grid-cols-2 gap-6 rounded-[20px] p-6 md:grid-cols-3 lg:grid-cols-6 print:grid-cols-6 print:gap-4 print:p-5"
+          className="grid grid-cols-2 gap-4 rounded-[var(--radius-xl)] p-4 md:grid-cols-3 lg:grid-cols-6 print:grid-cols-6 print:gap-4 print:p-4"
           style={{ backgroundColor: highlightSurface, border: `1px solid ${borderColor}` }}
         >
           <InfoItem label="성명" value={staff?.name} />
@@ -247,19 +247,19 @@ export default function SalaryDetail({ record, staff }: any) {
 
         {isAdvancePay ? (
           <div
-            className="rounded-[20px] bg-amber-50 p-6"
+            className="rounded-[var(--radius-xl)] bg-amber-50 p-4"
             style={{ border: `1px solid ${alphaColor('#d97706', 0.28)}` }}
           >
             <p className="text-sm font-bold text-amber-800">
               이 문서는 가불 지급 내역입니다. 기본급과 공제 항목은 제외하고 지급 금액만 표시합니다.
             </p>
             <div className="mt-4 flex items-center justify-between">
-              <span className="text-sm font-semibold text-slate-700">가불 지급액</span>
-              <span className="text-2xl font-black text-amber-700">{advancePayAmount.toLocaleString()}원</span>
+              <span className="text-sm font-semibold text-[var(--toss-gray-5)]">가불 지급액</span>
+              <span className="text-xl font-black text-amber-700">{advancePayAmount.toLocaleString()}원</span>
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 print:grid-cols-2 print:gap-6">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 print:grid-cols-2 print:gap-4">
             <div className="space-y-4">
               <div className="flex items-end justify-between px-1">
                 <h4 className="text-sm font-black text-[var(--foreground)]">지급내역</h4>
@@ -267,8 +267,8 @@ export default function SalaryDetail({ record, staff }: any) {
                   지급합계 {calc.totalPayment.toLocaleString()}원
                 </span>
               </div>
-              <div className="overflow-hidden rounded-[18px] bg-white" style={{ border: `2px solid ${sectionBorder}` }}>
-                <div className="space-y-3 p-5 print:space-y-2 print:px-5 print:py-4">
+              <div className="overflow-hidden rounded-[var(--radius-xl)] bg-[var(--card)]" style={{ border: `2px solid ${sectionBorder}` }}>
+                <div className="space-y-3 p-4 print:space-y-2 print:px-4 print:py-3">
                   <SalaryRow label="기본급" value={Number(data.base_salary || 0)} note="월 기본 급여" highlightColor={primaryColor} />
                   {Number(data.overtime_pay || 0) > 0 && (
                     <SalaryRow
@@ -319,8 +319,8 @@ export default function SalaryDetail({ record, staff }: any) {
                   공제합계 {calc.totalDeduction.toLocaleString()}원
                 </span>
               </div>
-              <div className="overflow-hidden rounded-[18px] bg-white" style={{ border: `2px solid ${alphaColor('#991b1b', 0.22)}` }}>
-                <div className="space-y-3 p-5 print:space-y-2 print:px-5 print:py-4">
+              <div className="overflow-hidden rounded-[var(--radius-xl)] bg-[var(--card)]" style={{ border: `2px solid ${alphaColor('#991b1b', 0.22)}` }}>
+                <div className="space-y-3 p-4 print:space-y-2 print:px-4 print:py-3">
                   <SalaryRow label="국민연금" value={calc.pension} isDeduction highlightColor={primaryColor} />
                   <SalaryRow label="건강보험" value={calc.health} isDeduction highlightColor={primaryColor} />
                   <SalaryRow label="장기요양보험" value={calc.longTerm} isDeduction highlightColor={primaryColor} />
@@ -337,7 +337,7 @@ export default function SalaryDetail({ record, staff }: any) {
         )}
 
         <div
-          className="rounded-[20px] px-6 py-5 text-white"
+          className="rounded-[var(--radius-xl)] px-4 py-3 text-white"
           style={{ background: `linear-gradient(135deg, ${alphaColor(primaryColor, 0.95)}, ${alphaColor(primaryColor, 0.76)})` }}
         >
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -347,11 +347,11 @@ export default function SalaryDetail({ record, staff }: any) {
                 본 지급 내역은 회사 기준 급여 마감 결과를 반영합니다.
               </p>
             </div>
-            <p className="text-3xl font-black tracking-tight">{calc.net.toLocaleString()}원</p>
+            <p className="text-xl font-black tracking-tight">{calc.net.toLocaleString()}원</p>
           </div>
         </div>
 
-        <div className="flex flex-col gap-5 border-t pt-6 md:flex-row md:items-end md:justify-between" style={{ borderColor }}>
+        <div className="flex flex-col gap-4 border-t pt-4 md:flex-row md:items-end md:justify-between" style={{ borderColor }}>
           <div className="space-y-1">
             {design.footerText && (
               <p className="text-[11px] font-medium leading-relaxed text-[var(--toss-gray-3)]">
@@ -365,14 +365,14 @@ export default function SalaryDetail({ record, staff }: any) {
 
           {design.showSignArea && (
             <div
-              className="flex items-center gap-6 rounded-[20px] border bg-white/90 px-5 py-4 shadow-sm"
+              className="flex items-center gap-4 rounded-[var(--radius-xl)] border bg-[var(--card)] px-4 py-3 shadow-sm"
               style={{ borderColor: alphaColor(primaryColor, 0.16) }}
             >
               <div className="text-right">
                 <p className="text-[10px] font-black uppercase tracking-[0.22em]" style={{ color: primaryColor }}>
                   Verified By
                 </p>
-                <p className="text-3xl font-black tracking-tight text-[var(--foreground)]">{companyLabel}</p>
+                <p className="text-xl font-black tracking-tight text-[var(--foreground)]">{companyLabel}</p>
                 <p className="mt-1 text-[11px] font-semibold text-[var(--toss-gray-3)]">직인 / 담당자 승인</p>
               </div>
               {companySeal ? (

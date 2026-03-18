@@ -84,7 +84,7 @@ export default function SupplierManagement({ user }: { user: any }) {
         onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))}
         placeholder={placeholder}
         data-testid={`supplier-field-${String(k).replace(/_/g, '-')}`}
-        className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm font-medium bg-[var(--toss-card)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)]"
+        className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm font-medium bg-[var(--card)] outline-none focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)]"
       />
     </div>
   );
@@ -100,14 +100,14 @@ export default function SupplierManagement({ user }: { user: any }) {
             value={search}
             onChange={e => setSearch(e.target.value)}
             data-testid="supplier-search-input"
-            className="flex-1 min-w-[200px] px-4 py-3 rounded-[12px] border border-[var(--toss-border)] bg-[var(--toss-card)] text-sm font-bold outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20 focus:border-[var(--toss-blue)]"
+            className="flex-1 min-w-[200px] px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] text-sm font-bold outline-none focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)]"
           />
-          <button onClick={fetchSuppliers} className="px-3 py-3 rounded-[12px] bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] text-xs font-semibold hover:bg-[var(--toss-border)]">🔄</button>
+          <button onClick={fetchSuppliers} className="px-3 py-2 rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--toss-gray-4)] text-xs font-semibold hover:bg-[var(--border)]">🔄</button>
         </div>
         <button
           onClick={openAdd}
           data-testid="supplier-add-button"
-          className="px-5 py-3 bg-[var(--toss-blue)] text-white rounded-[12px] text-sm font-semibold shadow-sm hover:opacity-90 transition-all"
+          className="px-4 py-2 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-sm font-semibold shadow-sm hover:opacity-90 transition-all"
         >
           + 거래처 등록
         </button>
@@ -116,34 +116,34 @@ export default function SupplierManagement({ user }: { user: any }) {
       {/* 요약 카드 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: '전체 거래처', value: suppliers.length, color: 'text-[var(--toss-blue)]' },
+          { label: '전체 거래처', value: suppliers.length, color: 'text-[var(--accent)]' },
           { label: '계약 만료 임박', value: suppliers.filter(isNearExpiry).length, color: 'text-orange-500' },
           { label: '계약 만료', value: suppliers.filter(isExpired).length, color: 'text-red-500' },
           { label: '분류 수', value: new Set(suppliers.map(s => s.category).filter(Boolean)).size, color: 'text-emerald-600' },
         ].map((c, i) => (
-          <div key={i} className="bg-[var(--toss-card)] border border-[var(--toss-border)] rounded-[14px] p-4 text-center shadow-sm">
-            <p className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase mb-1">{c.label}</p>
-            <p className={`text-xl font-bold ${c.color}`}>{c.value}</p>
+          <div key={i} className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] p-3 text-center shadow-sm">
+            <p className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase mb-0.5">{c.label}</p>
+            <p className={`text-lg font-bold ${c.color}`}>{c.value}</p>
           </div>
         ))}
       </div>
 
       {/* 목록 */}
-      <div className="bg-[var(--toss-card)] rounded-[16px] border border-[var(--toss-border)] shadow-sm overflow-hidden">
+      <div className="bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left min-w-[800px]">
             <thead>
-              <tr className="bg-[var(--toss-gray-1)]/60 border-b border-[var(--toss-border)]">
+              <tr className="bg-[var(--muted)]/60 border-b border-[var(--border)]">
                 {['거래처명', '분류', '담당자/연락처', '결제조건', '계약기간', '상태', '관리'].map(h => (
-                  <th key={h} className="px-4 py-3 text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase whitespace-nowrap">{h}</th>
+                  <th key={h} className="px-4 py-2 text-[10px] font-semibold text-[var(--toss-gray-3)] uppercase whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-[var(--toss-border)]">
+            <tbody className="divide-y divide-[var(--border)]">
               {loading ? (
-                <tr><td colSpan={7} className="text-center py-12 text-[var(--toss-gray-3)] font-bold text-sm">데이터 로드 중...</td></tr>
+                <tr><td colSpan={7} className="text-center py-8 text-[var(--toss-gray-3)] font-bold text-sm">데이터 로드 중...</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={7} className="text-center py-12 text-[var(--toss-gray-3)] font-bold text-sm">등록된 거래처가 없습니다.</td></tr>
+                <tr><td colSpan={7} className="text-center py-8 text-[var(--toss-gray-3)] font-bold text-sm">등록된 거래처가 없습니다.</td></tr>
               ) : filtered.map(s => (
                 <tr key={s.id} className="hover:bg-[var(--toss-blue-light)]/30 transition-colors group" data-testid={`supplier-row-${s.id}`}>
                   <td className="px-4 py-3">
@@ -151,7 +151,7 @@ export default function SupplierManagement({ user }: { user: any }) {
                     {s.business_number && <p className="text-[10px] text-[var(--toss-gray-3)]">사업자: {s.business_number}</p>}
                   </td>
                   <td className="px-4 py-3">
-                    <span className="px-2 py-0.5 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] rounded-full text-[10px] font-semibold">{s.category || '-'}</span>
+                    <span className="px-2 py-0.5 bg-[var(--toss-blue-light)] text-[var(--accent)] rounded-[var(--radius-md)] text-[10px] font-semibold">{s.category || '-'}</span>
                   </td>
                   <td className="px-4 py-3">
                     <p className="text-xs font-medium text-[var(--foreground)]">{s.contact_name || '-'}</p>
@@ -164,15 +164,15 @@ export default function SupplierManagement({ user }: { user: any }) {
                   </td>
                   <td className="px-4 py-3">
                     {isExpired(s) ? (
-                      <span className="px-2 py-0.5 bg-red-50 text-red-600 rounded-full text-[10px] font-bold">계약만료</span>
+                      <span className="px-2 py-0.5 bg-red-50 text-red-600 rounded-[var(--radius-md)] text-[10px] font-bold">계약만료</span>
                     ) : isNearExpiry(s) ? (
-                      <span className="px-2 py-0.5 bg-orange-50 text-orange-600 rounded-full text-[10px] font-bold">만료임박</span>
+                      <span className="px-2 py-0.5 bg-orange-50 text-orange-600 rounded-[var(--radius-md)] text-[10px] font-bold">만료임박</span>
                     ) : (
-                      <span className="px-2 py-0.5 bg-green-50 text-green-600 rounded-full text-[10px] font-bold">정상</span>
+                      <span className="px-2 py-0.5 bg-green-50 text-green-600 rounded-[var(--radius-md)] text-[10px] font-bold">정상</span>
                     )}
                   </td>
                   <td className="px-4 py-3 space-x-1">
-                    <button data-testid={`supplier-edit-${s.id}`} onClick={() => openEdit(s)} className="px-2 py-1 bg-[var(--toss-blue-light)] text-[var(--toss-blue)] text-[10px] font-semibold rounded-md">수정</button>
+                    <button data-testid={`supplier-edit-${s.id}`} onClick={() => openEdit(s)} className="px-2 py-1 bg-[var(--toss-blue-light)] text-[var(--accent)] text-[10px] font-semibold rounded-md">수정</button>
                     <button data-testid={`supplier-delete-${s.id}`} onClick={() => handleDelete(s.id, s.name)} className="px-2 py-1 bg-red-50 text-red-500 text-[10px] font-semibold rounded-md">삭제</button>
                   </td>
                 </tr>
@@ -185,12 +185,12 @@ export default function SupplierManagement({ user }: { user: any }) {
       {/* 등록/수정 모달 */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
-          <div className="bg-[var(--toss-card)] rounded-[20px] shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()} data-testid="supplier-modal">
-            <div className="p-6 border-b border-[var(--toss-border)] flex justify-between items-center">
+          <div className="bg-[var(--card)] rounded-[var(--radius-xl)] shadow-sm w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()} data-testid="supplier-modal">
+            <div className="p-4 border-b border-[var(--border)] flex justify-between items-center">
               <h3 className="text-base font-bold text-[var(--foreground)]">{editTarget ? '거래처 수정' : '거래처 등록'}</h3>
-              <button onClick={() => setShowModal(false)} className="p-1.5 hover:bg-[var(--toss-gray-1)] rounded-full text-[var(--toss-gray-3)]">✕</button>
+              <button onClick={() => setShowModal(false)} className="p-1.5 hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-[var(--toss-gray-3)]">✕</button>
             </div>
-            <div className="p-6 space-y-3">
+            <div className="p-4 space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2"><F label="거래처명 *" k="name" placeholder="(주)예시거래처" /></div>
                 <F label="분류" k="category" placeholder="의료기기 / 소모품 / 의약품" />
@@ -209,14 +209,14 @@ export default function SupplierManagement({ user }: { user: any }) {
                     onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
                     rows={3}
                     data-testid="supplier-field-notes"
-                    className="w-full px-3 py-2 border border-[var(--toss-border)] rounded-[10px] text-sm bg-[var(--toss-card)] outline-none focus:ring-2 focus:ring-[var(--toss-blue)]/20 resize-none"
+                    className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-[var(--card)] outline-none focus:ring-2 focus:ring-[var(--accent)]/20 resize-none"
                   />
                 </div>
               </div>
             </div>
-            <div className="p-6 border-t border-[var(--toss-border)] flex gap-3">
-              <button onClick={() => setShowModal(false)} className="flex-1 py-3 rounded-[12px] bg-[var(--toss-gray-1)] text-[var(--toss-gray-4)] font-semibold text-sm">취소</button>
-              <button onClick={handleSave} disabled={saving} data-testid="supplier-save-button" className="flex-1 py-3 rounded-[12px] bg-[var(--toss-blue)] text-white font-semibold text-sm disabled:opacity-50">
+            <div className="p-4 border-t border-[var(--border)] flex gap-3">
+              <button onClick={() => setShowModal(false)} className="flex-1 py-2 rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--toss-gray-4)] font-semibold text-sm">취소</button>
+              <button onClick={handleSave} disabled={saving} data-testid="supplier-save-button" className="flex-1 py-2 rounded-[var(--radius-md)] bg-[var(--accent)] text-white font-semibold text-sm disabled:opacity-50">
                 {saving ? '저장 중...' : '저장'}
               </button>
             </div>
