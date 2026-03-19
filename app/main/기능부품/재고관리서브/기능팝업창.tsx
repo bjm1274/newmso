@@ -1,15 +1,17 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 
 const PRESET_A = { reg_num: '000-00-00000', sangho: '박철홍정형외과', ceo: '박철홍', addr: '전라남도 목포시', phone: '061-000-0000', status: '보건업', type: '정형외과' };
 const PRESET_B = { reg_num: '', sangho: '', ceo: '', addr: '', phone: '', status: '', type: '' };
 
 // [모달 3] 발주서 (기존 유지)
-export function POModal({ isOpen, onClose, inventory }: any) {
+export function POModal({ isOpen, onClose: _onClose, inventory: _inventory }: Record<string, unknown>) {
+  const onClose = _onClose as ((e?: React.SyntheticEvent) => void);
+  const inventory = (_inventory ?? []) as Record<string, unknown>[];
   /* 기존 코드와 동일 */
   if (!isOpen) return null;
-  const lowStockItems = inventory.filter((i: any) => i.quantity < (i.safety_stock * 0.2));
+  const lowStockItems = inventory.filter((i: Record<string, unknown>) => (i.quantity as number) < ((i.safety_stock as number) * 0.2));
   return (
     <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-5" onClick={onClose}>
       <div className="bg-[var(--card)] w-full max-w-2xl rounded-2xl p-5 shadow-sm overflow-y-auto max-h-full" onClick={e => e.stopPropagation()}>
@@ -27,7 +29,9 @@ export function POModal({ isOpen, onClose, inventory }: any) {
 }
 
 // [모달 4] 거래명세서 (자동완성 기능 탑재!)
-export function BillModal({ isOpen, onClose, inventory }: any) {
+export function BillModal({ isOpen, onClose: _onClose, inventory: _inventory }: Record<string, unknown>) {
+  const onClose = _onClose as ((e?: React.SyntheticEvent) => void);
+  const inventory = (_inventory ?? []) as Record<string, unknown>[];
   const [billData, setBillData] = useState({ date: '', supplier: { ...PRESET_B }, receiver: { ...PRESET_A }, items: [] as any[] });
   const [customPresets, setCustomPresets] = useState<any[]>([]);
   const [isRegisterMode, setIsRegisterMode] = useState(false);
@@ -151,11 +155,11 @@ export function BillModal({ isOpen, onClose, inventory }: any) {
                     {/* 자동완성 드롭다운 */}
                     {suggestions.length > 0 && (
                       <div className="absolute top-full left-0 w-full bg-[var(--card)] border border-[var(--border)] shadow-sm z-20 max-h-40 overflow-y-auto text-left">
-                        {suggestions.map((s: any) => (
-                          <div key={s.id} onClick={() => selectItem(i, s)}
+                        {suggestions.map((s: Record<string, unknown>) => (
+                          <div key={s.id as string} onClick={() => selectItem(i, s)}
                             className="p-2 hover:bg-blue-50 cursor-pointer border-b border-[var(--border)] last:border-0">
-                            <div className="font-bold text-xs">{s.name}</div>
-                            <div className="text-[11px] text-[var(--toss-gray-3)]">{s.spec} | ₩{s.price?.toLocaleString()}</div>
+                            <div className="font-bold text-xs">{s.name as string}</div>
+                            <div className="text-[11px] text-[var(--toss-gray-3)]">{s.spec as string} | ₩{(s.price as number)?.toLocaleString()}</div>
                           </div>
                         ))}
                       </div>
@@ -180,7 +184,9 @@ export function BillModal({ isOpen, onClose, inventory }: any) {
 }
 
 // [모달 5] 카메라/스캔 (기존 유지)
-export function ScanModals({ isOpen, onClose, onComplete, mode, inventory }: any) {
+export function ScanModals({ isOpen, onClose: _onClose, onComplete: _onComplete, mode, inventory }: Record<string, unknown>) {
+  const onClose = _onClose as ((e?: React.SyntheticEvent) => void);
+  const onComplete = _onComplete as (items: unknown[]) => void;
   /* 이전 코드와 동일 (생략 없음) */
   const [isScanning, setIsScanning] = useState(false);
   const [scannedItems, setScannedItems] = useState<any[]>([]);
@@ -216,12 +222,16 @@ export function ScanModals({ isOpen, onClose, onComplete, mode, inventory }: any
 }
 
 // [모달 6] UDI 보고 (기존 유지)
-export function UDIModal({ isOpen, onClose, inventory, user, onRefresh }: any) {
+export function UDIModal({ isOpen, onClose: _onClose, inventory: _inventory, user: _rawUser, onRefresh: _onRefresh }: Record<string, unknown>) {
+  const onClose = _onClose as () => void;
+  const onRefresh = _onRefresh as () => void;
+  const inventory = (_inventory ?? []) as Record<string, unknown>[];
+  const user = (_rawUser ?? {}) as Record<string, unknown>;
   /* 기존과 동일, 생략 없이 유지 */
   const [udiItems, setUdiItems] = useState<any[]>([]);
   const [barcodeInput, setBarcodeInput] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
-  const handleScan = (e: any) => { if (e.key === 'Enter') { const f = inventory.find((i: any) => i.barcode === barcodeInput); if (f) setUdiItems(p => [{ ...f, report_qty: 1, lot_number: '', expiration_date: '' }, ...p]); setBarcodeInput(''); } };
+  const handleScan = (e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Enter') { const f = inventory.find((i: Record<string, unknown>) => i.barcode === barcodeInput); if (f) setUdiItems(p => [{ ...f, report_qty: 1, lot_number: '', expiration_date: '' }, ...p]); setBarcodeInput(''); } };
   const submit = async () => { if (!confirm("전송하시겠습니까?")) return; await supabase.from('inventory_logs').insert(udiItems.map(i => ({ item_id: i.id, type: '출고', amount: i.report_qty, worker_id: user.id, lot_number: i.lot_number, expiration_date: i.expiration_date }))); alert("완료"); setUdiItems([]); onRefresh(); onClose(); };
   if (!isOpen) return null;
   return (

@@ -68,7 +68,7 @@ const STAFF_LIST_SELECT =
 export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () => void }) {
   const [staffs, setStaffs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedStaff, setSelectedStaff] = useState<any>(null);
+  const [selectedStaff, setSelectedStaff] = useState<Record<string, unknown> | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [copySourceId, setCopySourceId] = useState<string>('');
@@ -313,7 +313,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
       }));
   }, [staffs]);
 
-  const selectedPermissions = selectedStaff?.permissions || {};
+  const selectedPermissions: Record<string, unknown> = (selectedStaff?.permissions as Record<string, unknown>) || {};
   const permissionStats = useMemo(() => {
     return FEATURE_PERMISSION_GROUPS.map((group) => ({
       id: group.id,
@@ -413,7 +413,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
               <label className="mb-1 block text-[11px] font-bold text-[var(--toss-gray-3)]">적용할 직원</label>
               <select
                 data-testid="staff-permission-copy-target"
-                value={selectedStaff?.id || ''}
+                value={(selectedStaff?.id as string) || ''}
                 onChange={(e) => setSelectedStaff(staffs.find((staff) => staff.id === e.target.value) ?? null)}
                 className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-2.5 py-2 text-[11px] font-bold"
               >
@@ -461,10 +461,10 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
             <div className="max-w-6xl space-y-3">
               <div className="border-b border-[var(--border)] pb-3">
                 <h3 className="text-lg font-semibold text-[var(--foreground)] tracking-tight">
-                  [{selectedStaff.name}] 직원 권한 설정
+                  [{selectedStaff.name as string}] 직원 권한 설정
                 </h3>
                 <p className="mt-1 text-[11px] font-bold text-[var(--accent)]">
-                  사번 {selectedStaff.employee_no} | {selectedStaff.department} {selectedStaff.position}
+                  사번 {selectedStaff.employee_no as string} | {selectedStaff.department as string} {selectedStaff.position as string}
                 </p>
               </div>
 
@@ -474,8 +474,8 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                   <p className="mb-2 text-[13px] font-semibold text-[var(--foreground)]">역할</p>
                   <select
                     data-testid={`staff-role-select`}
-                    value={selectedStaff.role || 'staff'}
-                    onChange={(e) => handleRoleChange(selectedStaff.id, e.target.value)}
+                    value={(selectedStaff.role as string) || 'staff'}
+                    onChange={(e) => handleRoleChange(selectedStaff.id as string, e.target.value)}
                     className={`w-full px-2.5 py-2 border rounded-[var(--radius-md)] text-[11px] font-bold ${
                       selectedStaff.role === 'admin' ? 'border-red-200 text-red-600 bg-red-50' : 'border-[var(--border)]'
                     }`}
@@ -551,14 +551,14 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                         <div className="flex gap-2">
                           <button
                             type="button"
-                            onClick={() => applyGroupPermission(selectedStaff.id, group.items.map((item) => item.key), true)}
+                            onClick={() => applyGroupPermission(selectedStaff.id as string, group.items.map((item) => item.key), true)}
                             className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-2.5 py-1.5 text-[10px] font-bold text-[var(--accent)]"
                           >
                             전체 허용
                           </button>
                           <button
                             type="button"
-                            onClick={() => applyGroupPermission(selectedStaff.id, group.items.map((item) => item.key), false)}
+                            onClick={() => applyGroupPermission(selectedStaff.id as string, group.items.map((item) => item.key), false)}
                             className="rounded-[var(--radius-md)] bg-[var(--muted)] px-2.5 py-1.5 text-[10px] font-bold text-[var(--toss-gray-4)]"
                           >
                             전체 해제
@@ -586,7 +586,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                                 type="button"
                                 data-testid={`staff-permission-toggle-${item.key}`}
                                 aria-pressed={isActive}
-                                onClick={() => togglePermission(selectedStaff.id, item.key)}
+                                onClick={() => togglePermission(selectedStaff.id as string, item.key)}
                                 className={`relative h-[12px] w-[24px] shrink-0 rounded-full transition-all focus:outline-none focus:ring-2 ${getToggleClasses(item.tone, isActive)}` }
                               >
                                 <div

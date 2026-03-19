@@ -173,7 +173,8 @@ function SettingsTab() {
 }
 
 // ─── 메인 컴포넌트 ───
-export default function NotificationInbox({ user, onRefresh }: any) {
+export default function NotificationInbox({ user: _rawUser, onRefresh }: Record<string, unknown>) {
+  const _u = (_rawUser ?? {}) as Record<string, unknown>;
   const router = useRouter();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<string>('all');
@@ -181,22 +182,22 @@ export default function NotificationInbox({ user, onRefresh }: any) {
   const [loading, setLoading] = useState(true);
 
   const fetchNotifications = useCallback(async () => {
-    if (!user?.id) { setLoading(false); return; }
+    if (!_u?.id) { setLoading(false); return; }
     try {
-      const { data } = await supabase.from('notifications').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(200);
+      const { data } = await supabase.from('notifications').select('*').eq('user_id', _u.id as string).order('created_at', { ascending: false }).limit(200);
       setNotifications(data || []);
     } catch { setNotifications([]); } finally { setLoading(false); }
-  }, [user?.id]);
+  }, [_u?.id]);
 
   useEffect(() => {
     setLoading(true);
     fetchNotifications();
-    if (!user?.id) return;
-    const ch = supabase.channel(`inbox-${user.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, () => fetchNotifications())
+    if (!_u?.id) return;
+    const ch = supabase.channel(`inbox-${_u.id as string}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${_u.id as string}` }, () => fetchNotifications())
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [user?.id, fetchNotifications]);
+  }, [_u?.id, fetchNotifications]);
 
   const markAsRead = async (id: string) => {
     await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('id', id);
@@ -204,8 +205,8 @@ export default function NotificationInbox({ user, onRefresh }: any) {
   };
 
   const markAllAsRead = async () => {
-    if (!user?.id) return;
-    await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('user_id', user.id).is('read_at', null);
+    if (!_u?.id) return;
+    await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('user_id', _u.id as string).is('read_at', null);
     setNotifications(prev => prev.map(n => ({ ...n, read_at: n.read_at || new Date().toISOString() })));
   };
 
@@ -307,7 +308,7 @@ export default function NotificationInbox({ user, onRefresh }: any) {
                 <div className="w-8 h-8 border-2 border-[var(--toss-blue-light)] border-t-[var(--accent)] rounded-full animate-spin" />
                 <p className="text-xs text-[var(--toss-gray-3)] font-medium">알림을 불러오는 중...</p>
               </div>
-            ) : !user?.id ? (
+            ) : !_u?.id ? (
               <div className="text-center py-20 text-[var(--toss-gray-3)] text-sm font-medium">직원 계정으로 로그인하면 알림을 확인할 수 있습니다.</div>
             ) : filtered.length === 0 ? (
               <div className="text-center py-20">

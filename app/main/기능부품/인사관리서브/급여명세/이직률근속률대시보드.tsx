@@ -1,9 +1,10 @@
 'use client';
 import { useState } from 'react';
 
-export default function TurnoverDashboard({ staffs = [] }: any) {
-  const total = staffs.length;
-  const resigned = staffs.filter((s: any) => (s.status || '').toLowerCase() === '퇴사').length;
+export default function TurnoverDashboard({ staffs = [] }: Record<string, unknown>) {
+  const _staffs = (staffs as Record<string, unknown>[]) ?? [];
+  const total = _staffs.length;
+  const resigned = _staffs.filter((s: any) => (s.status || '').toLowerCase() === '퇴사').length;
   const active = total - resigned;
   const turnover = total ? ((resigned / total) * 100).toFixed(1) : '0';
 
@@ -11,7 +12,7 @@ export default function TurnoverDashboard({ staffs = [] }: any) {
   // React의 순수성 규칙을 지키면서 계산합니다.
   const [now] = useState(() => Date.now());
 
-  const workDaysList = staffs
+  const workDaysList = _staffs
     .filter((s: any) => (s.status || '재직') !== '퇴사')
     .map((s: any) => {
       const j = s.joined_at || s.join_date;

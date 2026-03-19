@@ -68,7 +68,52 @@ function formatDateLabel(value?: string | null) {
   return date.toLocaleDateString('ko-KR');
 }
 
-export default function SalaryDetail({ record, staff }: any) {
+interface SalaryRecord {
+  company?: string;
+  base_salary?: number;
+  meal_allowance?: number;
+  night_duty_allowance?: number;
+  vehicle_allowance?: number;
+  childcare_allowance?: number;
+  research_allowance?: number;
+  other_taxfree?: number;
+  extra_allowance?: number;
+  overtime_pay?: number;
+  bonus?: number;
+  year_month?: string;
+  deduction_detail?: Record<string, number>;
+  total_taxable?: number;
+  total_taxfree?: number;
+  total_deduction?: number;
+  national_pension?: number;
+  health_insurance?: number;
+  long_term_care?: number;
+  employment_insurance?: number;
+  income_tax?: number;
+  local_tax?: number;
+  net_pay?: number;
+  advance_pay?: number;
+}
+
+interface StaffInfo {
+  company?: string;
+  name?: string;
+  employee_no?: string;
+  id?: string;
+  join_date?: string;
+  joined_at?: string;
+  department?: string;
+  position?: string;
+  base_salary?: number;
+  meal_allowance?: number;
+  night_duty_allowance?: number;
+  vehicle_allowance?: number;
+  childcare_allowance?: number;
+  research_allowance?: number;
+  other_taxfree?: number;
+}
+
+export default function SalaryDetail({ record, staff }: { record?: SalaryRecord; staff?: StaffInfo }) {
   const [companySeal, setCompanySeal] = useState<string | null>(null);
   const [design, setDesign] = useState(() => resolveDocumentDesign(null, 'payroll_slip'));
 

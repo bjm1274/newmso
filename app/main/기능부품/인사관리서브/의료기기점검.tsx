@@ -19,7 +19,7 @@ export default function MedicalDeviceInspection({ selectedCo, user }: { selected
   const [activeTab, setActiveTab] = useState<'devices' | 'history'>('devices');
   const [showDeviceModal, setShowDeviceModal] = useState(false);
   const [showInspectModal, setShowInspectModal] = useState(false);
-  const [selectedDevice, setSelectedDevice] = useState<any>(null);
+  const [selectedDevice, setSelectedDevice] = useState<Record<string, unknown> | null>(null);
   const [editDeviceId, setEditDeviceId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [filterCategory, setFilterCategory] = useState('전체');
@@ -259,7 +259,7 @@ export default function MedicalDeviceInspection({ selectedCo, user }: { selected
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4" onClick={() => setShowInspectModal(false)}>
           <div className="bg-[var(--card)] rounded-[var(--radius-xl)] shadow-sm w-full max-w-sm p-4" onClick={e => e.stopPropagation()}>
             <h3 className="text-base font-bold text-[var(--foreground)] mb-1">점검 기록</h3>
-            <p className="text-xs text-[var(--toss-gray-3)] mb-4">{selectedDevice.name}</p>
+            <p className="text-xs text-[var(--toss-gray-3)] mb-4">{selectedDevice.name as string}</p>
             <div className="space-y-3">
               {[
                 { label: '점검일 *', key: 'inspected_at', type: 'date' },

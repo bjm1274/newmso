@@ -60,8 +60,8 @@ export default function EarlyLeavingDetection({ staffs, selectedCo, user }: Prop
         .order('work_date', { ascending: false });
       if (error) throw error;
       setRecords(data || []);
-    } catch (e: any) {
-      console.warn('조기퇴근 조회 실패:', e.message);
+    } catch (e: unknown) {
+      console.warn('조기퇴근 조회 실패:', ((e as Error)?.message ?? String(e)));
       setRecords([]);
     } finally {
       setLoading(false);
@@ -81,8 +81,8 @@ export default function EarlyLeavingDetection({ staffs, selectedCo, user }: Prop
       if (error) throw error;
       setMessage({ type: 'success', text: '승인 처리되었습니다.' });
       fetchRecords();
-    } catch (e: any) {
-      setMessage({ type: 'error', text: `승인 실패: ${e.message}` });
+    } catch (e: unknown) {
+      setMessage({ type: 'error', text: `승인 실패: ${((e as Error)?.message ?? String(e))}` });
     }
   };
 

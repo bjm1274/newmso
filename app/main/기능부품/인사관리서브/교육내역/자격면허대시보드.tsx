@@ -1,4 +1,5 @@
 'use client';
+import type { StaffMember } from '@/types';
 
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -11,6 +12,23 @@ import {
 } from './education-utils';
 
 const COPY_URL_FIELDS = ['file_url', 'attachment_url', 'copy_url', 'document_url', 'document_file_url', 'license_file_url'];
+
+interface LicenseItem {
+  id: unknown;
+  staff_id?: unknown;
+  staff?: StaffMember;
+  copyUrl?: string | null;
+  statusLabel?: string;
+  statusTone?: string;
+  daysLeft?: number | null;
+  license_name?: unknown;
+  license_number?: unknown;
+  issuing_body?: unknown;
+  issued_date?: unknown;
+  expiry_date?: unknown;
+  memo?: unknown;
+  [key: string]: unknown;
+}
 
 function escapeCsvValue(value: unknown) {
   return `"${String(value ?? '').replace(/"/g, '""')}"`;
@@ -41,13 +59,13 @@ function getLicenseStatus(expiryDate?: string | null) {
   return { label: '정상', tone: 'success', daysLeft: diffDays };
 }
 
-export default function LicenseTracking({ staffs, selectedCo }: any) {
+export default function LicenseTracking({ staffs, selectedCo }: Record<string, unknown>) {
   const [searchTerm, setSearchTerm] = useState('');
   const [licenses, setLicenses] = useState<any[]>([]);
   const [usingFallbackData, setUsingFallbackData] = useState(false);
-  const activeStaffs = useMemo(() => getScopedActiveStaffs(staffs, selectedCo), [staffs, selectedCo]);
+  const activeStaffs = useMemo(() => getScopedActiveStaffs(staffs as any[] | undefined, selectedCo as string | undefined), [staffs, selectedCo]);
   const fallbackLicenses = useMemo(() => buildFallbackLicenseRows(activeStaffs), [activeStaffs]);
-  const staffMap = useMemo(() => new Map(activeStaffs.map((staff: any) => [String(staff.id), staff])), [activeStaffs]);
+  const staffMap = useMemo(() => new Map(activeStaffs.map((staff: StaffMember) => [String(staff.id), staff])), [activeStaffs]);
 
   useEffect(() => {
     let isMounted = true;
@@ -77,7 +95,7 @@ export default function LicenseTracking({ staffs, selectedCo }: any) {
     };
   }, [fallbackLicenses]);
 
-  const realLicenses = useMemo(() => {
+  const realLicenses = useMemo((): LicenseItem[] => {
     return licenses
       .map((license: any) => {
         const staff = staffMap.get(String(license.staff_id));
@@ -92,30 +110,30 @@ export default function LicenseTracking({ staffs, selectedCo }: any) {
           statusLabel: status.label,
           statusTone: status.tone,
           daysLeft: status.daysLeft,
-        };
+        } as LicenseItem;
       })
-      .filter(Boolean)
-      .sort((a: any, b: any) => {
+      .filter((item): item is LicenseItem => item !== null)
+      .sort((a: LicenseItem, b: LicenseItem) => {
         const left = a.daysLeft ?? Number.POSITIVE_INFINITY;
         const right = b.daysLeft ?? Number.POSITIVE_INFINITY;
-        return left - right;
+        return (left as number) - (right as number);
       });
   }, [licenses, staffMap]);
 
-  const filtered = useMemo(() => {
+  const filtered = useMemo((): LicenseItem[] => {
     const keyword = searchTerm.trim();
     if (!keyword) return realLicenses;
 
-    return realLicenses.filter((item: any) =>
+    return realLicenses.filter((item: LicenseItem) =>
       [item.staff?.name, item.license_name, item.license_number, item.issuing_body].some((value) =>
         String(value ?? '').includes(keyword)
       )
     );
   }, [realLicenses, searchTerm]);
 
-  const urgentCount = realLicenses.filter((item: any) => item.statusLabel === '만료됨' || item.statusLabel === '갱신요망(30일내)').length;
-  const normalCount = realLicenses.filter((item: any) => item.statusLabel === '정상').length;
-  const missingExpiryCount = realLicenses.filter((item: any) => item.statusLabel === '만료일 미등록').length;
+  const urgentCount = realLicenses.filter((item: LicenseItem) => item.statusLabel === '만료됨' || item.statusLabel === '갱신요망(30일내)').length;
+  const normalCount = realLicenses.filter((item: LicenseItem) => item.statusLabel === '정상').length;
+  const missingExpiryCount = realLicenses.filter((item: LicenseItem) => item.statusLabel === '만료일 미등록').length;
 
   const handleCsvDownload = () => {
     if (filtered.length === 0) {
@@ -125,7 +143,7 @@ export default function LicenseTracking({ staffs, selectedCo }: any) {
 
     const rows = [
       ['직원명', '회사', '부서', '직함', '자격/면허명', '자격번호', '발급기관', '발급일', '만료일', '상태', '비고'],
-      ...filtered.map((item: any) => [
+      ...filtered.map((item: LicenseItem) => [
         item.staff?.name || '',
         item.staff?.company || '',
         getStaffDepartment(item.staff),
@@ -152,29 +170,30 @@ export default function LicenseTracking({ staffs, selectedCo }: any) {
     URL.revokeObjectURL(url);
   };
 
-  const handleOpenCopy = (item: any) => {
+  const handleOpenCopy = (item: LicenseItem) => {
     if (!item.copyUrl) {
       alert('등록된 사본 파일이 없습니다. 면허·자격증 관리 화면에서 사본 링크를 등록해 주세요.');
       return;
     }
 
-    window.open(item.copyUrl, '_blank', 'noopener,noreferrer');
+    window.open(item.copyUrl as string, '_blank', 'noopener,noreferrer');
   };
 
-  const handleSendNotification = async (item: any) => {
-    if (!confirm(`${item.staff?.name}님에게 ${item.license_name} 갱신 알림을 보낼까요?`)) return;
+  const handleSendNotification = async (item: LicenseItem) => {
+    if (!confirm(`${item.staff?.name}님에게 ${item.license_name as string} 갱신 알림을 보낼까요?`)) return;
 
+    const daysLeft = item.daysLeft ?? null;
     const expireMessage = item.expiry_date
-      ? item.daysLeft !== null && item.daysLeft < 0
-        ? `${Math.abs(item.daysLeft)}일 전에 만료되었습니다.`
-        : `${item.expiry_date} 만료 예정입니다.`
+      ? daysLeft !== null && (daysLeft as number) < 0
+        ? `${Math.abs(daysLeft as number)}일 전에 만료되었습니다.`
+        : `${item.expiry_date as string} 만료 예정입니다.`
       : '만료일이 등록되어 있지 않습니다.';
 
     const { error } = await supabase.from('notifications').insert({
       user_id: item.staff_id,
       type: 'license_expiry',
-      title: `자격면허 갱신 안내 - ${item.license_name}`,
-      body: `${item.license_name} 자격면허를 확인해 주세요. ${expireMessage} 발급기관: ${item.issuing_body || '미등록'}`,
+      title: `자격면허 갱신 안내 - ${item.license_name as string}`,
+      body: `${item.license_name as string} 자격면허를 확인해 주세요. ${expireMessage} 발급기관: ${(item.issuing_body as string) || '미등록'}`,
       read_at: null,
     });
 
@@ -258,7 +277,7 @@ export default function LicenseTracking({ staffs, selectedCo }: any) {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((item: any) => {
+              {filtered.map((item: LicenseItem) => {
                 const statusToneClass =
                   item.statusTone === 'success'
                     ? 'bg-green-50 text-green-700'
@@ -268,29 +287,31 @@ export default function LicenseTracking({ staffs, selectedCo }: any) {
                         ? 'bg-red-50 text-red-600 animate-pulse'
                         : 'bg-[var(--tab-bg)] text-[var(--toss-gray-4)]';
 
+                const daysLeft = item.daysLeft ?? null;
+
                 return (
-                  <tr key={item.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--tab-bg)]/50 transition-colors">
+                  <tr key={item.id as string} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--tab-bg)]/50 transition-colors">
                     <td className="p-4">
-                      <p className="text-xs font-black text-[var(--foreground)]">{item.staff?.name}</p>
+                      <p className="text-xs font-black text-[var(--foreground)]">{item.staff?.name as string}</p>
                       <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">
-                        {item.staff?.company} | {getStaffDepartment(item.staff)}
+                        {item.staff?.company as string} | {getStaffDepartment(item.staff)}
                         {getStaffPosition(item.staff) ? ` | ${getStaffPosition(item.staff)}` : ''}
                       </p>
                     </td>
-                    <td className="p-4 text-xs font-bold text-[var(--toss-gray-5)]">{item.license_name || '-'}</td>
-                    <td className="p-4 text-[11px] font-mono text-[var(--toss-gray-4)] font-bold">{item.license_number || '-'}</td>
-                    <td className="p-4 text-xs font-bold text-[var(--toss-gray-5)]">{item.issuing_body || '-'}</td>
+                    <td className="p-4 text-xs font-bold text-[var(--toss-gray-5)]">{(item.license_name as string) || '-'}</td>
+                    <td className="p-4 text-[11px] font-mono text-[var(--toss-gray-4)] font-bold">{(item.license_number as string) || '-'}</td>
+                    <td className="p-4 text-xs font-bold text-[var(--toss-gray-5)]">{(item.issuing_body as string) || '-'}</td>
                     <td className="p-4 text-xs font-bold text-[var(--toss-gray-5)]">
-                      {item.expiry_date || '-'}
-                      {item.daysLeft !== null && (
-                        <span className={`ml-2 text-[10px] font-black ${item.daysLeft < 0 ? 'text-red-500' : item.daysLeft <= 30 ? 'text-orange-500' : 'text-green-600'}`}>
-                          {item.daysLeft < 0 ? `${Math.abs(item.daysLeft)}일 경과` : `${item.daysLeft}일 남음`}
+                      {(item.expiry_date as string) || '-'}
+                      {daysLeft !== null && (
+                        <span className={`ml-2 text-[10px] font-black ${(daysLeft as number) < 0 ? 'text-red-500' : (daysLeft as number) <= 30 ? 'text-orange-500' : 'text-green-600'}`}>
+                          {(daysLeft as number) < 0 ? `${Math.abs(daysLeft as number)}일 경과` : `${daysLeft as number}일 남음`}
                         </span>
                       )}
                     </td>
                     <td className="p-4 text-center">
                       <span className={`px-3 py-1 rounded-full text-[10px] font-black tracking-widest ${statusToneClass}`}>
-                        {item.statusLabel}
+                        {item.statusLabel as string}
                       </span>
                     </td>
                     <td className="p-4 text-right">

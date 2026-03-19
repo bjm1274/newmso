@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import SmartDatePicker from '../공통/SmartDatePicker';
 
-export default function RepairRequestForm({ setExtraData }: any) {
+export default function RepairRequestForm({ setExtraData }: Record<string, unknown>) {
+  const _setExtraData = setExtraData as React.Dispatch<React.SetStateAction<Record<string, unknown>>>;
   const [localDesiredDate, setLocalDesiredDate] = useState('');
 
   return (
@@ -30,7 +31,7 @@ export default function RepairRequestForm({ setExtraData }: any) {
               placeholder="예: 체외충격기, 접수창구 PC, 복합기"
               className="w-full rounded-[var(--radius-md)] bg-[var(--card)] p-3 text-xs font-bold outline-none shadow-sm focus:ring-2 focus:ring-amber-200"
               onChange={(event) =>
-                setExtraData((prev: any) => ({ ...prev, equipmentName: event.target.value }))
+                _setExtraData((prev: any) => ({ ...prev, equipmentName: event.target.value }))
               }
             />
           </div>
@@ -44,7 +45,7 @@ export default function RepairRequestForm({ setExtraData }: any) {
               placeholder="예: 3층 수술실, 1층 원무과"
               className="w-full rounded-[var(--radius-md)] bg-[var(--card)] p-3 text-xs font-bold outline-none shadow-sm focus:ring-2 focus:ring-amber-200"
               onChange={(event) =>
-                setExtraData((prev: any) => ({ ...prev, location: event.target.value }))
+                _setExtraData((prev: any) => ({ ...prev, location: event.target.value }))
               }
             />
           </div>
@@ -59,7 +60,7 @@ export default function RepairRequestForm({ setExtraData }: any) {
               value={localDesiredDate}
               onChange={(value) => {
                 setLocalDesiredDate(value);
-                setExtraData((prev: any) => ({ ...prev, desiredDate: value }));
+                _setExtraData((prev: any) => ({ ...prev, desiredDate: value }));
               }}
               data-testid="repair-request-desired-date"
               inputClassName="w-full h-10 rounded-[var(--radius-md)] bg-[var(--card)] px-4 text-xs font-bold"
@@ -73,7 +74,7 @@ export default function RepairRequestForm({ setExtraData }: any) {
               data-testid="repair-request-urgency"
               className="w-full rounded-[var(--radius-md)] bg-[var(--card)] p-3 text-xs font-semibold outline-none shadow-sm focus:ring-2 focus:ring-amber-200"
               onChange={(event) =>
-                setExtraData((prev: any) => ({ ...prev, urgency: event.target.value }))
+                _setExtraData((prev: any) => ({ ...prev, urgency: event.target.value }))
               }
             >
               <option value="일반">일반</option>
@@ -92,7 +93,7 @@ export default function RepairRequestForm({ setExtraData }: any) {
             placeholder="고장 증상이나 불편 사항을 자세히 입력해주세요."
             className="h-24 w-full resize-none rounded-[var(--radius-md)] bg-[var(--card)] p-3 text-xs font-bold outline-none shadow-sm focus:ring-2 focus:ring-amber-200"
             onChange={(event) =>
-              setExtraData((prev: any) => ({ ...prev, repairContent: event.target.value }))
+              _setExtraData((prev: any) => ({ ...prev, repairContent: event.target.value }))
             }
           />
         </div>

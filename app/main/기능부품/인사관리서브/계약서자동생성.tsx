@@ -101,8 +101,8 @@ export default function ContractAutoGenerator({ staffs, selectedCo, user }: Prop
       }]);
       if (error) throw error;
       setMessage({ type: 'success', text: '계약서가 저장되었습니다.' });
-    } catch (e: any) {
-      setMessage({ type: 'error', text: `저장 실패: ${e.message}` });
+    } catch (e: unknown) {
+      setMessage({ type: 'error', text: `저장 실패: ${((e as Error)?.message ?? String(e))}` });
     } finally {
       setSaving(false);
     }

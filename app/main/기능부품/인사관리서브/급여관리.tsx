@@ -42,13 +42,25 @@ type Staff = {
   name: string;
   company?: string;
   position?: string;
+  department?: string;
+  employee_no?: string;
+  join_date?: string;
+  joined_at?: string;
+  base_salary?: number;
   base?: number;
+  permissions?: Record<string, unknown>;
 };
 
-export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any) {
+type PayrollMainProps = {
+  staffs?: Staff[];
+  selectedCo?: string;
+  onRefresh?: () => void;
+};
+
+export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: PayrollMainProps) {
   const [activeTab, setActiveTab] = useState('대시보드');
   const [selectedStaffId, setSelectedStaffId] = useState<string | number | null>(null);
-  const [checkedIds, setCheckedIds] = useState<number[]>([]);
+  const [checkedIds, setCheckedIds] = useState<(string | number)[]>([]);
   const [yearMonth, setYearMonth] = useState<string>(() => new Date().toISOString().slice(0, 7));
   const [payrollRecords, setPayrollRecords] = useState<any[]>([]);
   const [payrollAudit, setPayrollAudit] = useState<{ orphanCount: number; officialBracketConfigured: boolean } | null>(null);
@@ -174,7 +186,7 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
         <div className="hidden lg:flex items-center gap-3">
           <div className="px-4 py-2 bg-[var(--toss-blue-light)]/50 rounded-[var(--radius-md)] border border-[var(--accent)]/10">
             <p className="text-[10px] font-bold text-[var(--accent)]/60 text-center leading-tight">선택된 사업체</p>
-            <p className="text-sm font-bold text-[var(--accent)] leading-tight">{selectedCo}</p>
+            <p className="text-sm font-bold text-[var(--accent)] leading-tight">{selectedCo as string}</p>
           </div>
         </div>
       </header>
@@ -219,7 +231,7 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
                   />
                 </div>
                 <div className="xl:col-span-3 space-y-4">
-                  {current && <SalaryDetail staff={current} record={currentRecord || null} />}
+                  {current && <SalaryDetail staff={current as any} record={currentRecord || null} />}
                   <aside className="grid grid-cols-1 gap-4">
                     {current && <SalaryChangeHistory staffId={String(current.id)} staffName={current.name} />}
                   </aside>
@@ -250,7 +262,7 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
             )}
 
             {activeTab === '통합설정' && (
-              <IntegratedHRSettings companyName={selectedCo} />
+              <IntegratedHRSettings companyName={selectedCo ?? ''} />
             )}
             {activeTab === '급여시뮬레이터' && (
               <div className="p-4">
@@ -260,32 +272,32 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
                 <SalarySimulator />
               </div>
             )}
-            {activeTab === '4대보험EDI' && <InsuranceEDI staffs={filtered} selectedCo={selectedCo} user={null} />}
-            {activeTab === '퇴직연금' && <RetirementPensionManager staffs={filtered} selectedCo={selectedCo} user={null} />}
-            {activeTab === '임금피크제' && <WagePeakCalculator staffs={filtered} selectedCo={selectedCo} user={null} />}
-            {activeTab === '최저임금' && <MinWageChecker staffs={filtered} selectedCo={selectedCo} user={null} />}
-            {activeTab === '통상임금' && <OrdinaryWageCalculator staffs={filtered} selectedCo={selectedCo} user={null} />}
-            {activeTab === '비과세체크' && <TaxFreeLimitChecker staffs={filtered} selectedCo={selectedCo} user={null} />}
-            {activeTab === '총인건비예측' && <TotalLaborCostForecast staffs={filtered} selectedCo={selectedCo} user={null} />}
-            {activeTab === '세전세후' && <GrossNetComparison staffs={filtered} selectedCo={selectedCo} user={null} />}
-            {activeTab === '미지급수당' && <UnpaidAllowanceAlert staffs={filtered} selectedCo={selectedCo} user={null} />}
+            {activeTab === '4대보험EDI' && <InsuranceEDI staffs={filtered as any[]} selectedCo={selectedCo ?? ''} user={null} />}
+            {activeTab === '퇴직연금' && <RetirementPensionManager staffs={filtered as any[]} selectedCo={selectedCo ?? ''} user={null} />}
+            {activeTab === '임금피크제' && <WagePeakCalculator staffs={filtered as any[]} selectedCo={selectedCo ?? ''} user={null} />}
+            {activeTab === '최저임금' && <MinWageChecker staffs={filtered as any[]} selectedCo={selectedCo ?? ''} user={null} />}
+            {activeTab === '통상임금' && <OrdinaryWageCalculator staffs={filtered as any[]} selectedCo={selectedCo ?? ''} user={null} />}
+            {activeTab === '비과세체크' && <TaxFreeLimitChecker staffs={filtered as any[]} selectedCo={selectedCo ?? ''} user={null} />}
+            {activeTab === '총인건비예측' && <TotalLaborCostForecast staffs={filtered as any[]} selectedCo={selectedCo ?? ''} user={null} />}
+            {activeTab === '세전세후' && <GrossNetComparison staffs={filtered as any[]} selectedCo={selectedCo ?? ''} user={null} />}
+            {activeTab === '미지급수당' && <UnpaidAllowanceAlert staffs={filtered as any[]} selectedCo={selectedCo ?? ''} user={null} />}
             {activeTab === '급여고도화' && (
               <PayrollAdvancedCenter
-                staffs={staffs}
+                staffs={staffs as Record<string, unknown>[]}
                 selectedCo={selectedCo}
                 yearMonth={yearMonth}
                 payrollRecords={payrollRecords}
                 onRefresh={onRefresh}
               />
             )}
-            {activeTab === '무급결근차감' && <UnpaidAbsenceDeduction staffs={filtered} selectedCo={selectedCo} user={null} />}
+            {activeTab === '무급결근차감' && <UnpaidAbsenceDeduction staffs={filtered as any[]} selectedCo={selectedCo ?? ''} user={null} />}
           </>
         ) : (
           <div className="h-full flex items-center justify-center bg-[var(--card)] border border-dashed border-[var(--border)] rounded-[var(--radius-xl)] p-5">
             <div className="text-center">
               <div className="text-4xl mb-4">🔍</div>
               <p className="text-sm font-bold text-[var(--toss-gray-4)]">
-                &quot;{selectedCo}&quot; 소속 인원이 없습니다.
+                &quot;{selectedCo ?? ''}&quot; 소속 인원이 없습니다.
               </p>
               <p className="text-xs text-[var(--toss-gray-3)] mt-2">직원 명부에서 사업체를 확인해 주세요.</p>
             </div>
@@ -296,7 +308,7 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: any)
   );
 }
 
-function RunPayrollWizard({ staffs, selectedCo, onRefresh }: any) {
+function RunPayrollWizard({ staffs, selectedCo, onRefresh }: { staffs?: Staff[]; selectedCo?: string; onRefresh?: () => void }) {
   const [mode, setMode] = useState<'select' | 'regular' | 'interim'>('select');
 
   if (mode === 'regular') {
@@ -305,7 +317,7 @@ function RunPayrollWizard({ staffs, selectedCo, onRefresh }: any) {
         <button onClick={() => setMode('select')} className="px-4 py-2 bg-[var(--muted)] text-[var(--foreground)] text-xs font-bold rounded-[var(--radius-md)] hover:bg-[var(--toss-gray-2)] transition-colors">
           ← 마법사 홈으로 돌아가기
         </button>
-        <SalarySettlement staffs={staffs} selectedCo={selectedCo} onRefresh={onRefresh} />
+        <SalarySettlement staffs={staffs as any} selectedCo={selectedCo ?? ''} onRefresh={onRefresh} />
       </div>
     );
   }
@@ -316,7 +328,7 @@ function RunPayrollWizard({ staffs, selectedCo, onRefresh }: any) {
         <button onClick={() => setMode('select')} className="px-4 py-2 bg-[var(--muted)] text-[var(--foreground)] text-xs font-bold rounded-[var(--radius-md)] hover:bg-[var(--toss-gray-2)] transition-colors">
           ← 마법사 홈으로 돌아가기
         </button>
-        <InterimSettlement staffs={staffs} selectedCo={selectedCo} onRefresh={onRefresh} />
+        <InterimSettlement staffs={staffs as any} selectedCo={selectedCo} onRefresh={onRefresh} />
       </div>
     );
   }

@@ -135,7 +135,7 @@ export default function LoginPage() {
         
         <div className="mt-12 text-center">
           <p className="text-[10px] text-gray-300 font-bold leading-relaxed">
-            © 2026 SY INC. Management Service Organization.
+            © 2026 SY INC.
             <br />본 시스템은 인가된 사용자만 접근 가능합니다.
           </p>
         </div>

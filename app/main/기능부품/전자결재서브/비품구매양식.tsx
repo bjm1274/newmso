@@ -25,7 +25,7 @@ function isTargetInventory(row: any) {
     String(row?.department || '').trim() === INVENTORY_DEPARTMENT;
 }
 
-export default function SuppliesForm({ setExtraData, initialItems }: any) {
+export default function SuppliesForm({ setExtraData, initialItems }: Record<string, unknown>) {
   // MSO 삭제된 부서 목록
   const departments = ["병동팀", "수술팀", "외래팀", "검사팀", "총무팀", "원무팀", "진료부", "관리팀", "영양팀"];
   const [items, setItems] = useState(() => {
@@ -71,7 +71,7 @@ export default function SuppliesForm({ setExtraData, initialItems }: any) {
   }, []);
 
   useEffect(() => {
-    setExtraData({ items });
+    (setExtraData as (v: Record<string, unknown>) => void)({ items });
   }, [items, setExtraData]);
 
   const handleSearch = (idx: number, val: string) => {

@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import SmartDatePicker from '../공통/SmartDatePicker';
 
-export default function InvoiceAutoExtraction({ onRefresh, user }: any) {
+export default function InvoiceAutoExtraction({ onRefresh, user }: Record<string, unknown>) {
     const [file, setFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -64,9 +64,9 @@ export default function InvoiceAutoExtraction({ onRefresh, user }: any) {
             } else {
                 alert('추출된 데이터 형식이 올바르지 않습니다.');
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error(error);
-            alert(error.message || '추출에 실패했습니다. API 키 설정 등을 확인해보세요.');
+            alert(((error as Error)?.message ?? String(error)) || '추출에 실패했습니다. API 키 설정 등을 확인해보세요.');
         } finally {
             setIsLoading(false);
         }
@@ -100,8 +100,8 @@ export default function InvoiceAutoExtraction({ onRefresh, user }: any) {
                 expiry_date: item.expiry_date || null,
                 lot_number: item.lot_number || null,
                 is_udi: !!item.is_udi,
-                company: user?.company || '전체',
-                department: user?.department || '',
+                company: (user as Record<string, unknown>)?.['company'] as string || '전체',
+                department: (user as Record<string, unknown>)?.['department'] as string || '',
             }));
 
             const { error } = await withMissingColumnsFallback(
@@ -123,10 +123,10 @@ export default function InvoiceAutoExtraction({ onRefresh, user }: any) {
             successCount = payloads.length;
             alert(`${successCount}개의 품목이 성공적으로 입고(등록)되었습니다.`);
             clearFile();
-            if (onRefresh) onRefresh();
-        } catch (err: any) {
+            if (onRefresh) (onRefresh as () => void)();
+        } catch (err: unknown) {
             console.error('일괄 등록 에러:', err);
-            alert('일부 품목 파싱 중 오류가 발생했거나, DB 등록에 실패했습니다.\n\n' + err.message);
+            alert('일부 품목 파싱 중 오류가 발생했거나, DB 등록에 실패했습니다.\n\n' + ((err as Error)?.message ?? String(err)));
         } finally {
             setIsLoading(false);
         }

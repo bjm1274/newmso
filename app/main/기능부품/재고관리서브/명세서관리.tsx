@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
+type AnyRecord = Record<string, unknown>;
+
 const PRESET_HOSPITAL = {
   reg_num: '000-00-00000',
   sangho: '박철홍정형외과',
@@ -14,12 +16,16 @@ const PRESET_HOSPITAL = {
   type: '정형외과'
 };
 
-export default function InvoiceManagement({ user, inventory, suppliers, fetchSuppliers }: any) {
+export default function InvoiceManagement({ user, inventory, suppliers, fetchSuppliers }: AnyRecord) {
   const [showNewSupplier, setShowNewSupplier] = useState(false);
   const [showInvoiceForm, setShowInvoiceForm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
   const [customPresets, setCustomPresets] = useState<any[]>([]);
+
+  const _suppliers = (suppliers ?? []) as AnyRecord[];
+  const _inventory = (inventory ?? []) as AnyRecord[];
+  const _fetchSuppliers = fetchSuppliers as (() => void) | undefined;
 
   const [supplierForm, setSupplierForm] = useState({
     name: '',
@@ -58,11 +64,11 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
         alert('거래처가 등록되었습니다.');
         setSupplierForm({ name: '', contact: '', address: '', phone: '', email: '', reg_num: '', ceo: '' });
         setShowNewSupplier(false);
-        fetchSuppliers();
+        _fetchSuppliers?.();
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('handleAddSupplier error', err);
-      alert(`거래처 등록에 실패했습니다.\n\n${err?.message || ''}`);
+      alert(`거래처 등록에 실패했습니다.\n\n${(err as Error)?.message || ''}`);
     } finally {
       setLoading(false);
     }
@@ -102,11 +108,11 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
       } else {
         alert('거래처 정보가 수정되었습니다.');
         setEditingSupplier(null);
-        fetchSuppliers();
+        _fetchSuppliers?.();
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('handleUpdateSupplier error', err);
-      alert(`거래처 수정에 실패했습니다.\n\n${err?.message || ''}`);
+      alert(`거래처 수정에 실패했습니다.\n\n${(err as Error)?.message || ''}`);
     } finally {
       setEditLoading(false);
     }
@@ -124,11 +130,11 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
       } else {
         alert('거래처가 삭제되었습니다.');
         if (editingSupplier?.id === id) setEditingSupplier(null);
-        fetchSuppliers();
+        _fetchSuppliers?.();
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('handleDeleteSupplier error', err);
-      alert(`거래처 삭제에 실패했습니다.\n\n${err?.message || ''}`);
+      alert(`거래처 삭제에 실패했습니다.\n\n${(err as Error)?.message || ''}`);
     }
   };
 
@@ -239,25 +245,25 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {suppliers.map((supplier: any) => (
+          {_suppliers.map((supplier: AnyRecord) => (
             <div
-              key={supplier.id}
+              key={supplier.id as string}
               className="bg-[var(--card)] p-3 rounded-[var(--radius-md)] border border-[var(--border)] shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
             >
               <div>
-                <p className="font-semibold text-[var(--foreground)] text-sm">{supplier.name}</p>
+                <p className="font-semibold text-[var(--foreground)] text-sm">{supplier.name as string}</p>
                 <div className="mt-2 space-y-0.5">
                   <p className="text-[11px] text-[var(--toss-gray-3)] font-bold flex items-center gap-2">
-                    🧾 사업자번호: {supplier.reg_num || '-'}
+                    🧾 사업자번호: {(supplier.reg_num as string) || '-'}
                   </p>
                   <p className="text-[11px] text-[var(--toss-gray-3)] font-bold flex items-center gap-2">
-                    👤 대표자: {supplier.ceo || supplier.contact || '-'}
+                    👤 대표자: {(supplier.ceo as string) || (supplier.contact as string) || '-'}
                   </p>
                   <p className="text-[11px] text-[var(--toss-gray-3)] font-bold flex items-center gap-2">
-                    📞 {supplier.phone || '-'}
+                    📞 {(supplier.phone as string) || '-'}
                   </p>
                   <p className="text-[11px] text-[var(--toss-gray-3)] font-bold flex items-center gap-2 truncate">
-                    📍 {supplier.address || '-'}
+                    📍 {(supplier.address as string) || '-'}
                   </p>
                 </div>
               </div>
@@ -269,7 +275,7 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
                   수정
                 </button>
                 <button
-                  onClick={() => handleDeleteSupplier(supplier.id)}
+                  onClick={() => handleDeleteSupplier(supplier.id as string)}
                   className="px-3 py-1.5 rounded-[var(--radius-md)] text-[11px] font-semibold bg-red-50 text-red-600 hover:bg-red-100"
                 >
                   삭제
@@ -400,7 +406,7 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
                     if (value === '__HOSPITAL__') {
                       applyPreset('supplier', { ...PRESET_HOSPITAL });
                     } else {
-                      const s = suppliers.find((sup: any) => String(sup.id) === value);
+                      const s = _suppliers.find((sup: AnyRecord) => String(sup.id) === value);
                       if (s)
                         applyPreset('supplier', {
                           reg_num: s.reg_num || '',
@@ -417,9 +423,9 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
                 >
                   <option value="">공급자 선택</option>
                   <option value="__HOSPITAL__">본원 (박철홍정형외과)</option>
-                  {suppliers.map((s: any) => (
-                    <option key={s.id} value={String(s.id)}>
-                      {s.name}
+                  {_suppliers.map((s: AnyRecord) => (
+                    <option key={s.id as string} value={String(s.id)}>
+                      {s.name as string}
                     </option>
                   ))}
                 </select>
@@ -442,7 +448,7 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
                     if (value === '__HOSPITAL__') {
                       applyPreset('receiver', { ...PRESET_HOSPITAL });
                     } else {
-                      const s = suppliers.find((sup: any) => String(sup.id) === value);
+                      const s = _suppliers.find((sup: AnyRecord) => String(sup.id) === value);
                       if (s)
                         applyPreset('receiver', {
                           reg_num: s.reg_num || '',
@@ -459,9 +465,9 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
                 >
                   <option value="">거래처 선택</option>
                   <option value="__HOSPITAL__">본원 (박철홍정형외과)</option>
-                  {suppliers.map((s: any) => (
-                    <option key={s.id} value={String(s.id)}>
-                      {s.name}
+                  {_suppliers.map((s: AnyRecord) => (
+                    <option key={s.id as string} value={String(s.id)}>
+                      {s.name as string}
                     </option>
                   ))}
                 </select>
@@ -507,15 +513,15 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
                           />
                           {focusedRow === idx && (
                             <div className="absolute left-0 top-full w-full bg-[var(--card)] border border-[var(--border)] shadow-sm z-50 rounded-[var(--radius-lg)] max-h-40 overflow-y-auto">
-                              {inventory
-                                .filter((i: any) => i.item_name.includes(item.name))
-                                .map((i: any) => (
+                              {_inventory
+                                .filter((i: AnyRecord) => String(i.item_name ?? '').includes(item.name))
+                                .map((i: AnyRecord) => (
                                   <button
-                                    key={i.id}
+                                    key={i.id as string}
                                     onClick={() => selectItem(idx, i)}
                                     className="w-full text-left p-3 text-[11px] font-bold hover:bg-blue-50 border-b border-[var(--border-subtle)]"
                                   >
-                                    {i.item_name}
+                                    {i.item_name as string}
                                   </button>
                                 ))}
                             </div>

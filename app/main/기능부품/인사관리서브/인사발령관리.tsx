@@ -5,7 +5,8 @@ import SmartDatePicker from '../공통/SmartDatePicker';
 
 const ORDER_TYPES = ['승진', '전보(부서이동)', '퇴직/면직'] as const;
 
-export default function PersonnelAppointment({ staffs = [], selectedCo, user }: any) {
+export default function PersonnelAppointment({ staffs = [], selectedCo, user }: Record<string, unknown>) {
+    const _staffs = (staffs as Record<string, unknown>[]) ?? [];
     const [records, setRecords] = useState<any[]>([]);
     const [showForm, setShowForm] = useState(false);
     const [activeTab, setActiveTab] = useState<'발령목록' | '관보생성'>('발령목록');
@@ -18,7 +19,7 @@ export default function PersonnelAppointment({ staffs = [], selectedCo, user }: 
         if (data) setRecords(data);
     };
 
-    const filtered = staffs.filter((s: any) => (selectedCo === '전체' || s.company === selectedCo));
+    const filtered = _staffs.filter((s: any) => (selectedCo === '전체' || s.company === selectedCo));
     const filteredRecords = records.filter((r: any) => {
         if (selectedCo !== '전체' && r.company !== selectedCo) return false;
         if (filter !== '전체' && r.order_type !== filter) return false;
@@ -26,15 +27,15 @@ export default function PersonnelAppointment({ staffs = [], selectedCo, user }: 
     });
 
     const handleStaffSelect = (staffId: string) => {
-        const s = staffs.find((st: any) => st.id === staffId);
-        if (s) setForm({ ...form, staff_id: staffId, before_dept: s.department || '', before_position: s.position || '', before_role: s.role || '' });
+        const s = _staffs.find((st: any) => st.id === staffId);
+        if (s) setForm({ ...form, staff_id: staffId, before_dept: (s.department as string) || '', before_position: (s.position as string) || '', before_role: (s.role as string) || '' });
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const staff = staffs.find((s: any) => s.id === form.staff_id);
+        const staff = _staffs.find((s: any) => s.id === form.staff_id);
         if (!staff) return alert('직원을 선택해주세요.');
-        const newRec = { ...form, staff_name: staff.name, company: staff.company, status: '발령완료', issued_by: user?.name || '관리자', issued_at: new Date().toISOString() };
+        const newRec = { ...form, staff_name: staff.name as string, company: staff.company as string, status: '발령완료', issued_by: (user as Record<string, unknown>)?.name as string || '관리자', issued_at: new Date().toISOString() };
         const { data, error } = await supabase.from('personnel_appointments').insert([newRec]).select();
         if (error || !data?.[0]) {
             console.error('personnel_appointments insert failed:', error);
@@ -66,7 +67,7 @@ export default function PersonnelAppointment({ staffs = [], selectedCo, user }: 
         });
         if (thisMonth.length === 0) return alert('이번 달 발령 내역이 없습니다.');
         const lines = thisMonth.map((r: any) => `▸ ${r.staff_name} | ${r.order_type} | ${r.before_dept}${r.before_position ? `(${r.before_position})` : ''} → ${r.after_dept}${r.after_position ? `(${r.after_position})` : ''} | 발령일: ${r.effective_date}`);
-        const text = `═══ 인사발령 관보 ═══\n발행일: ${new Date().toLocaleDateString()}\n\n${lines.join('\n')}\n\n위와 같이 인사발령 합니다.\n${user?.company || ''} 대표`;
+        const text = `═══ 인사발령 관보 ═══\n발행일: ${new Date().toLocaleDateString()}\n\n${lines.join('\n')}\n\n위와 같이 인사발령 합니다.\n${(user as Record<string, unknown>)?.company as string || ''} 대표`;
         navigator.clipboard?.writeText(text);
         alert('관보 내용이 클립보드에 복사되었습니다!\n게시판에 붙여넣기 해주세요.');
     };
@@ -76,7 +77,7 @@ export default function PersonnelAppointment({ staffs = [], selectedCo, user }: 
             <header className="p-4 md:p-5 border-b border-[var(--border)] bg-[var(--card)] shrink-0">
                 <div className="flex justify-between items-center">
                     <div>
-                        <h2 className="text-xl font-bold text-[var(--foreground)] tracking-tight">📋 인사발령 관리 <span className="text-sm text-[var(--accent)] ml-2">[{selectedCo}]</span></h2>
+                        <h2 className="text-xl font-bold text-[var(--foreground)] tracking-tight">📋 인사발령 관리 <span className="text-sm text-[var(--accent)] ml-2">[{selectedCo as string}]</span></h2>
                     </div>
                     <div className="flex items-center gap-2">
                         <button onClick={generateGazette} className="px-4 py-2.5 bg-gray-800 text-white text-[11px] font-bold rounded-xl shadow-md hover:opacity-90 transition-all">📃 관보 생성</button>

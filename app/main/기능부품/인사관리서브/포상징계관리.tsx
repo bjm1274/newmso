@@ -6,7 +6,8 @@ import SmartDatePicker from '../공통/SmartDatePicker';
 const REWARD_TYPES = ['우수사원', '근속상', '모범직원', '특별공로', '사내공모 수상', '기타포상'] as const;
 const DISCIPLINE_TYPES = ['구두경고', '서면경고', '감봉', '정직', '해임', '기타'] as const;
 
-export default function RewardDisciplineManagement({ staffs = [], selectedCo, user }: any) {
+export default function RewardDisciplineManagement({ staffs = [], selectedCo, user }: Record<string, unknown>) {
+    const _staffs = (staffs as Record<string, unknown>[]) ?? [];
     const [records, setRecords] = useState<any[]>([]);
     const [showForm, setShowForm] = useState(false);
     const [activeTab, setActiveTab] = useState<'포상' | '징계' | '징계위원회'>('포상');
@@ -18,17 +19,17 @@ export default function RewardDisciplineManagement({ staffs = [], selectedCo, us
         if (data) setRecords(data);
     };
 
-    const filtered = staffs.filter((s: any) => (selectedCo === '전체' || s.company === selectedCo));
+    const filtered = _staffs.filter((s: any) => (selectedCo === '전체' || s.company === selectedCo));
     const rewards = records.filter((r: any) => r.category === '포상' && (selectedCo === '전체' || r.company === selectedCo));
     const disciplines = records.filter((r: any) => r.category === '징계' && (selectedCo === '전체' || r.company === selectedCo));
     const committees = disciplines.filter((r: any) => r.committee_date);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const staff = staffs.find((s: any) => s.id === form.staff_id);
+        const staff = _staffs.find((s: any) => s.id === form.staff_id);
         if (!staff) return alert('직원을 선택해주세요.');
         const cat = activeTab === '포상' ? '포상' : '징계';
-        const newRec = { ...form, category: cat, staff_name: staff.name, company: staff.company, department: staff.department || '', issued_by: user?.name || '관리자' };
+        const newRec = { ...form, category: cat, staff_name: staff.name as string, company: staff.company, department: (staff.department as string) || '', issued_by: (user as any)?.name || '관리자' };
         const { data, error } = await supabase.from('reward_discipline').insert([newRec]).select();
         if (error) {
             console.error('reward_discipline insert failed:', error);
@@ -47,7 +48,7 @@ export default function RewardDisciplineManagement({ staffs = [], selectedCo, us
             <header className="p-4 md:p-5 border-b border-[var(--border)] bg-[var(--card)] shrink-0">
                 <div className="flex justify-between items-center">
                     <div>
-                        <h2 className="text-xl font-bold text-[var(--foreground)] tracking-tight">🏅 포상 · 징계 관리 <span className="text-sm text-[var(--accent)] ml-2">[{selectedCo}]</span></h2>
+                        <h2 className="text-xl font-bold text-[var(--foreground)] tracking-tight">🏅 포상 · 징계 관리 <span className="text-sm text-[var(--accent)] ml-2">[{selectedCo as string}]</span></h2>
                     </div>
                     <button onClick={() => setShowForm(!showForm)} className="px-5 py-2.5 bg-[var(--accent)] text-white text-[11px] font-bold rounded-xl shadow-md hover:opacity-90 transition-all">{showForm ? '취소' : '+ 등록'}</button>
                 </div>

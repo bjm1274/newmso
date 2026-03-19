@@ -4,7 +4,21 @@ import { supabase } from '@/lib/supabase';
 import SmartDatePicker from '../../공통/SmartDatePicker';
 import SmartMonthPicker from '../../공통/SmartMonthPicker';
 
-export default function AttendanceMain({ staffs, selectedCo }: any) {
+type StaffMember = {
+  id: string;
+  name: string;
+  position: string;
+  department: string;
+  company: string;
+  [key: string]: unknown;
+};
+
+type AttendanceMainProps = {
+  staffs: StaffMember[];
+  selectedCo: string;
+};
+
+export default function AttendanceMain({ staffs, selectedCo }: AttendanceMainProps) {
   const [viewMode, setViewMode] = useState<'daily' | 'monthly' | 'calendar' | 'dashboard' | 'schedule'>('monthly');
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
@@ -21,14 +35,14 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
   const [bulkSaving, setBulkSaving] = useState(false);
 
   const filtered = useMemo(
-    () => selectedCo === '전체' ? staffs : staffs.filter((s: any) => s.company === selectedCo),
+    () => selectedCo === '전체' ? staffs : staffs.filter((s: StaffMember) => s.company === selectedCo),
     [selectedCo, staffs]
   );
 
   const fetchAttendance = async () => {
     setLoading(true);
     try {
-      const staffIds = filtered.map((s: any) => s.id);
+      const staffIds = filtered.map((s: StaffMember) => s.id);
       if (staffIds.length === 0) {
         setAttendanceData([]);
         return;
@@ -76,13 +90,13 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
     supabase
       .from('shift_assignments')
       .select('staff_id, work_date, shift_id')
-      .in('staff_id', filtered.map((s: any) => s.id))
+      .in('staff_id', filtered.map((s: StaffMember) => s.id))
       .gte('work_date', start)
       .lte('work_date', end)
       .then(({ data }) => {
         const map: Record<string, string> = {};
-        (data || []).forEach((r: any) => {
-          map[`${r.staff_id}_${r.work_date}`] = r.shift_id || '';
+        (data || []).forEach((r: Record<string, unknown>) => {
+          map[`${r.staff_id}_${r.work_date}`] = (r.shift_id as string) || '';
         });
         setShiftAssignments(map);
       });
@@ -91,7 +105,7 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
   const setAssignment = (staffId: string, workDate: string, shiftId: string | null) => {
     const key = `${staffId}_${workDate}`;
     setShiftAssignments((prev) => ({ ...prev, [key]: shiftId || '' }));
-    const companyName = filtered.find((s: any) => s.id === staffId)?.company;
+    const companyName = filtered.find((s: StaffMember) => s.id === staffId)?.company;
     supabase
       .from('shift_assignments')
       .upsert(
@@ -118,8 +132,8 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
     const absent = attendanceData.filter((a: any) => a.status === 'absent').length;
     const rate = total > 0 ? Math.round((present / total) * 100) : 0;
 
-    const atRiskStaff: any[] = [];
-    filtered.forEach((s: any) => {
+    const atRiskStaff: Record<string, unknown>[] = [];
+    filtered.forEach((s: StaffMember) => {
       const myAtts = attendanceData.filter((a: any) => a.staff_id === s.id);
       const lates = myAtts.filter((a: any) => a.status === 'late').length;
       const absents = myAtts.filter((a: any) => a.status === 'absent').length;
@@ -221,7 +235,7 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                    {filtered.map((s: any) => {
+                    {filtered.map((s: StaffMember) => {
                       const att = attendanceData.find((a: any) => a.staff_id === s.id && a.work_date === selectedDate);
                       const checkIn = att?.check_in_time ? new Date(att.check_in_time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '-';
                       const checkOut = att?.check_out_time ? new Date(att.check_out_time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '-';
@@ -306,7 +320,7 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                       return;
                     }
                     if (!confirm('현재 화면의 모든 직원에 대해 평일(월~금)을 모두 통상근무로 채우시겠습니까? (기존 데이터에 덮어씁니다)')) return;
-                    filtered.forEach((s: any) => {
+                    filtered.forEach((s: StaffMember) => {
                       daysArray.forEach((d) => {
                         const dStr = `${selectedMonth}-${String(d).padStart(2, '0')}`;
                         const dayOfWeek = new Date(dStr).getDay();
@@ -375,7 +389,7 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                  {filtered.map((s: any) => (
+                  {filtered.map((s: StaffMember) => (
                     <tr key={s.id} className="hover:bg-[var(--tab-bg)]/50 dark:hover:bg-zinc-800/30 group">
                       <td className="px-4 py-3 sticky left-0 bg-[var(--card)] dark:bg-zinc-900 group-hover:bg-[var(--tab-bg)] dark:group-hover:bg-zinc-800/80 z-10 border-r border-[var(--border)] dark:border-zinc-800 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] transition-colors">
                         <div className="flex flex-col">
@@ -454,7 +468,7 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                  {filtered.map((s: any) => {
+                  {filtered.map((s: StaffMember) => {
                     let workDays = 0;
                     return (
                       <tr key={s.id} className="hover:bg-[var(--tab-bg)]/50 dark:hover:bg-zinc-800/30 transition-colors group">
@@ -737,7 +751,7 @@ export default function AttendanceMain({ staffs, selectedCo }: any) {
                     }
                     setBulkSaving(true);
                     try {
-                      const staffIds = filtered.map((s: any) => s.id);
+                      const staffIds = filtered.map((s: StaffMember) => s.id);
                       const dates: string[] = [];
                       const cur = new Date(start);
                       const endD = new Date(end);

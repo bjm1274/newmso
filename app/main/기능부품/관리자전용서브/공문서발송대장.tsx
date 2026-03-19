@@ -50,8 +50,8 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
         .order('sent_date', { ascending: false });
       if (error) throw error;
       setDocs(data || []);
-    } catch (e: any) {
-      console.warn('공문서발송대장 조회 실패:', e.message);
+    } catch (e: unknown) {
+      console.warn('공문서발송대장 조회 실패:', ((e as Error)?.message ?? String(e)));
       setDocs([]);
     } finally {
       setLoading(false);
@@ -114,8 +114,8 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
       setShowForm(false);
       setEditingDoc(null);
       fetchDocs();
-    } catch (e: any) {
-      setMessage({ type: 'error', text: `저장 실패: ${e.message}` });
+    } catch (e: unknown) {
+      setMessage({ type: 'error', text: `저장 실패: ${((e as Error)?.message ?? String(e))}` });
     } finally {
       setSaving(false);
     }
@@ -127,8 +127,8 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
       const { error } = await supabase.from('official_doc_log').delete().eq('id', id);
       if (error) throw error;
       fetchDocs();
-    } catch (e: any) {
-      setMessage({ type: 'error', text: `삭제 실패: ${e.message}` });
+    } catch (e: unknown) {
+      setMessage({ type: 'error', text: `삭제 실패: ${((e as Error)?.message ?? String(e))}` });
     }
   };
 
@@ -140,8 +140,8 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
         .eq('id', doc.id!);
       if (error) throw error;
       fetchDocs();
-    } catch (e: any) {
-      setMessage({ type: 'error', text: `수신 확인 처리 실패: ${e.message}` });
+    } catch (e: unknown) {
+      setMessage({ type: 'error', text: `수신 확인 처리 실패: ${((e as Error)?.message ?? String(e))}` });
     }
   };
 

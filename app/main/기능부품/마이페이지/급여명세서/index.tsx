@@ -3,17 +3,63 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import SalaryDetail from '../../인사관리서브/급여명세/급여상세';
 
-export default function SalarySlipContainer({ user }: any) {
+interface StaffInfo {
+  company?: string;
+  name?: string;
+  employee_no?: string;
+  id?: string;
+  join_date?: string;
+  joined_at?: string;
+  department?: string;
+  position?: string;
+  base_salary?: number;
+  meal_allowance?: number;
+  night_duty_allowance?: number;
+  vehicle_allowance?: number;
+  childcare_allowance?: number;
+  research_allowance?: number;
+  other_taxfree?: number;
+}
+
+interface SalaryRecord {
+  company?: string;
+  base_salary?: number;
+  meal_allowance?: number;
+  night_duty_allowance?: number;
+  vehicle_allowance?: number;
+  childcare_allowance?: number;
+  research_allowance?: number;
+  other_taxfree?: number;
+  extra_allowance?: number;
+  overtime_pay?: number;
+  bonus?: number;
+  year_month?: string;
+  deduction_detail?: Record<string, number>;
+  total_taxable?: number;
+  total_taxfree?: number;
+  total_deduction?: number;
+  national_pension?: number;
+  health_insurance?: number;
+  long_term_care?: number;
+  employment_insurance?: number;
+  income_tax?: number;
+  local_tax?: number;
+  net_pay?: number;
+  advance_pay?: number;
+}
+
+export default function SalarySlipContainer({ user }: Record<string, unknown>) {
+  const _user = (user ?? {}) as Record<string, unknown>;
   const [unlocked, setUnlocked] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [verifyError, setVerifyError] = useState('');
   const [verifying, setVerifying] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [salaryData, setSalaryData] = useState<any>(null);
+  const [salaryData, setSalaryData] = useState<Record<string, unknown> | null>(null);
 
   const handlePasswordVerify = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user?.id) {
+    if (!_user.id) {
       setVerifyError('직원 계정으로 로그인한 뒤 이용해 주세요.');
       return;
     }
@@ -32,9 +78,9 @@ export default function SalarySlipContainer({ user }: any) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           password: pwd,
-          userId: user?.id,
-          name: user?.name,
-          employeeNo: user?.employee_no,
+          userId: _user.id as string,
+          name: _user.name as string,
+          employeeNo: _user.employee_no as string,
         }),
       });
       const payload = await response.json().catch(() => null);
@@ -70,13 +116,13 @@ export default function SalarySlipContainer({ user }: any) {
   const selectedYearMonth = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!_user.id) return;
 
     const fetchSalaryRecord = async () => {
       const { data, error } = await supabase
         .from('payroll_records')
         .select('*')
-        .eq('staff_id', user.id)
+        .eq('staff_id', _user.id as string)
         .eq('year_month', selectedYearMonth)
         .maybeSingle();
 
@@ -89,7 +135,7 @@ export default function SalarySlipContainer({ user }: any) {
     };
 
     fetchSalaryRecord();
-  }, [selectedYearMonth, user?.id]);
+  }, [selectedYearMonth, _user.id]);
 
   const handlePrint = () => { window.print(); };
 
@@ -180,9 +226,8 @@ export default function SalarySlipContainer({ user }: any) {
         <div className="flex-1 overflow-auto bg-[var(--muted)] p-4 sm:p-5 lg:p-5 flex justify-center custom-scrollbar">
           <div id="print-section" className="w-full max-w-7xl print:max-w-none print:w-full mx-auto shadow-sm print:shadow-none bg-[var(--card)] print:bg-transparent overflow-visible">
             <SalaryDetail
-              staff={user}
-              record={salaryData}
-              displayYearMonth={selectedYearMonth}
+              staff={_user as StaffInfo | undefined}
+              record={salaryData as SalaryRecord | undefined}
             />
           </div>
         </div>

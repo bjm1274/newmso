@@ -58,8 +58,8 @@ export default function WorkTypeChangeHistory({ staffs, selectedCo, user }: Prop
         .order('changed_date', { ascending: false });
       if (error) throw error;
       setRecords(data || []);
-    } catch (e: any) {
-      console.warn('근무형태변경이력 조회 실패:', e.message);
+    } catch (e: unknown) {
+      console.warn('근무형태변경이력 조회 실패:', ((e as Error)?.message ?? String(e)));
       setRecords([]);
     } finally {
       setLoading(false);
@@ -94,8 +94,8 @@ export default function WorkTypeChangeHistory({ staffs, selectedCo, user }: Prop
       setShowForm(false);
       setForm({ changed_date: new Date().toISOString().slice(0, 10), prev_type: '', new_type: '정규직', reason: '', approver: user?.name || '' });
       fetchRecords();
-    } catch (e: any) {
-      setMessage({ type: 'error', text: `저장 실패: ${e.message}` });
+    } catch (e: unknown) {
+      setMessage({ type: 'error', text: `저장 실패: ${((e as Error)?.message ?? String(e))}` });
     } finally {
       setSaving(false);
     }
@@ -107,8 +107,8 @@ export default function WorkTypeChangeHistory({ staffs, selectedCo, user }: Prop
       const { error } = await supabase.from('work_type_change_history').delete().eq('id', id);
       if (error) throw error;
       fetchRecords();
-    } catch (e: any) {
-      setMessage({ type: 'error', text: `삭제 실패: ${e.message}` });
+    } catch (e: unknown) {
+      setMessage({ type: 'error', text: `삭제 실패: ${((e as Error)?.message ?? String(e))}` });
     }
   };
 

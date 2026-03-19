@@ -15,29 +15,34 @@ export default function AnnualLeavePlanForm({
   staffs,
   setExtraData,
   setFormTitle,
-}: any) {
+}: Record<string, unknown>) {
+  const _user = (user ?? {}) as Record<string, unknown>;
+  const _staffs = (staffs as Record<string, unknown>[]) ?? [];
+  const _setFormTitle = setFormTitle as (v: string) => void;
+  const _setExtraData = setExtraData as (v: Record<string, unknown>) => void;
+
   const [remainingLeave, setRemainingLeave] = useState(0);
   const [planDates, setPlanDates] = useState<PlanDateRow[]>([
     { date: '', reason: DEFAULT_REASON },
   ]);
 
   useEffect(() => {
-    const staff = staffs.find((item: any) => item.id === user.id);
+    const staff = _staffs.find((item) => item.id === _user.id);
     if (!staff) return;
 
-    const total = staff.annual_leave_total ?? 15;
-    const used = staff.annual_leave_used ?? 0;
+    const total = (staff.annual_leave_total as number) ?? 15;
+    const used = (staff.annual_leave_used as number) ?? 0;
     setRemainingLeave(Math.max(0, total - used));
-  }, [staffs, user.id]);
+  }, [_staffs, _user.id]);
 
   useEffect(() => {
-    setFormTitle(`[연차계획서] ${user.name} (${new Date().getFullYear()}년 미사용 연차)`);
-    setExtraData({
+    _setFormTitle(`[연차계획서] ${_user.name} (${new Date().getFullYear()}년 미사용 연차)`);
+    _setExtraData({
       planDates,
       remainingLeave,
       type: 'annual_leave_plan',
     });
-  }, [planDates, remainingLeave, setExtraData, setFormTitle, user.name]);
+  }, [planDates, remainingLeave, _setExtraData, _setFormTitle, _user.name]);
 
   const addDateRow = () => {
     setPlanDates((prev) => [...prev, { date: '', reason: DEFAULT_REASON }]);
@@ -63,7 +68,7 @@ export default function AnnualLeavePlanForm({
       <div className="flex items-center justify-between border-b border-indigo-100 bg-indigo-50 p-3">
         <div>
           <p className="rounded-[var(--radius-md)] bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-500">
-            {user.name}님의 연차사용계획서
+            {_user.name as string}님의 연차사용계획서
           </p>
           <p className="mt-0.5 text-[11px] font-semibold text-indigo-500/70">
             미사용 연차의 사용 시기를 정리해 제출해주세요.

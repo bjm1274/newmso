@@ -3,8 +3,8 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { WEEKLY_MAX_HOURS } from '@/lib/tax-free-limits';
 
-export default function WeeklyHoursMonitor({ selectedCo, yearMonth: initialYm }: any) {
-  const [yearMonth, setYearMonth] = useState(initialYm || new Date().toISOString().slice(0, 7));
+export default function WeeklyHoursMonitor({ selectedCo, yearMonth: initialYm }: Record<string, unknown>) {
+  const [yearMonth, setYearMonth] = useState((initialYm as string) || new Date().toISOString().slice(0, 7));
   const [weeklyData, setWeeklyData] = useState<{ staffId: string; name: string; company?: string; weekStart: string; hours: number; exceeds: boolean }[]>([]);
   const [loading, setLoading] = useState(false);
 

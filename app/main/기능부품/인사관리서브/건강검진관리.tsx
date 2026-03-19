@@ -5,7 +5,8 @@ import SmartDatePicker from '../공통/SmartDatePicker';
 
 const CHECKUP_TYPES = ['일반검진', '특수검진', '채용검진', '배치전검진'] as const;
 
-export default function HealthCheckupManagement({ staffs = [], selectedCo }: any) {
+export default function HealthCheckupManagement({ staffs, selectedCo }: Record<string, unknown>) {
+    const _staffs = (staffs as Record<string, unknown>[]) ?? [];
     const [records, setRecords] = useState<any[]>([]);
     const [showForm, setShowForm] = useState(false);
     const [form, setForm] = useState({ staff_id: '', checkup_type: '일반검진', scheduled_date: '', hospital: '', memo: '' });
@@ -16,7 +17,7 @@ export default function HealthCheckupManagement({ staffs = [], selectedCo }: any
         if (data) setRecords(data);
     };
 
-    const filtered = staffs.filter((s: any) => (selectedCo === '전체' || s.company === selectedCo) && s.status !== '퇴사');
+    const filtered = _staffs.filter((s: any) => (selectedCo === '전체' || s.company === selectedCo) && s.status !== '퇴사');
     const filteredRecords = records.filter((r: any) => selectedCo === '전체' || r.company === selectedCo);
 
     const checkupDue = useMemo(() => filtered.filter((s: any) => {
@@ -27,7 +28,7 @@ export default function HealthCheckupManagement({ staffs = [], selectedCo }: any
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const staff = staffs.find((s: any) => s.id === form.staff_id);
+        const staff = _staffs.find((s: any) => s.id === form.staff_id);
         if (!staff) return alert('직원을 선택해주세요.');
         const newRec = { staff_id: form.staff_id, staff_name: staff.name, company: staff.company, department: staff.department || '', checkup_type: form.checkup_type, scheduled_date: form.scheduled_date, completed_date: null, status: '예정', hospital: form.hospital, result: '', memo: form.memo };
         const { data, error } = await supabase.from('health_checkups').insert([newRec]).select();
@@ -57,7 +58,7 @@ export default function HealthCheckupManagement({ staffs = [], selectedCo }: any
             <header className="p-4 md:p-5 border-b border-[var(--border)] bg-[var(--card)] shrink-0">
                 <div className="flex justify-between items-center">
                     <div>
-                        <h2 className="text-xl font-bold text-[var(--foreground)] tracking-tight">🩺 건강검진 관리 <span className="text-sm text-[var(--accent)] ml-2">[{selectedCo}]</span></h2>
+                        <h2 className="text-xl font-bold text-[var(--foreground)] tracking-tight">🩺 건강검진 관리 <span className="text-sm text-[var(--accent)] ml-2">[{selectedCo as string}]</span></h2>
                         <p className="text-[11px] text-[var(--toss-gray-3)] font-bold mt-1">법정 의무 건강검진 일정 관리 및 이력 추적</p>
                     </div>
                     <div className="flex items-center gap-2">

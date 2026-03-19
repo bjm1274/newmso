@@ -94,7 +94,7 @@ export default function PurchaseOrderManagement({
   suppliers,
   highlightedSource,
   onConsumeHighlightedSource,
-}: any) {
+}: Record<string, unknown>) {
   const [orderRecords, setOrderRecords] = useState<OrderRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [lowStockItems, setLowStockItems] = useState<any[]>([]);
@@ -106,9 +106,10 @@ export default function PurchaseOrderManagement({
   }, [inventory]);
 
   useEffect(() => {
+    const _highlightedSource = highlightedSource as Record<string, unknown>;
     const sourceKey = buildSourceKey(
-      highlightedSource?.approvalId || null,
-      Number.isInteger(Number(highlightedSource?.requestIndex)) ? Number(highlightedSource.requestIndex) : null,
+      (_highlightedSource?.approvalId as string) || null,
+      Number.isInteger(Number(_highlightedSource?.requestIndex)) ? Number(_highlightedSource.requestIndex) : null,
     );
     if (!sourceKey || orderRecords.length === 0) return;
 
@@ -135,7 +136,7 @@ export default function PurchaseOrderManagement({
       setHighlightedOrderId((current) => (current === matchedRecord.id ? null : current));
     }, 2600);
 
-    onConsumeHighlightedSource?.();
+    (onConsumeHighlightedSource as (() => void) | undefined)?.();
 
     return () => {
       window.clearTimeout(scrollTimer);
@@ -183,7 +184,7 @@ export default function PurchaseOrderManagement({
   };
 
   const checkLowStockItems = () => {
-    const items = inventory.filter((item: any) => getItemQuantity(item) <= getItemMinQuantity(item));
+    const items = (inventory as any[]).filter((item: any) => getItemQuantity(item) <= getItemMinQuantity(item));
     setLowStockItems(items);
   };
 
@@ -220,7 +221,7 @@ export default function PurchaseOrderManagement({
             items,
             status: '대기',
             total_amount: totalAmount,
-            created_by: user.id,
+            created_by: (user as Record<string, unknown>).id,
             notes: '자동 생성된 발주서 (안전재고 미달)',
           },
         ]);

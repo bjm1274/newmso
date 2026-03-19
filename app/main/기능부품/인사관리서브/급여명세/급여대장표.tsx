@@ -2,31 +2,58 @@
 
 import { getWorkDaysInMonth } from '@/lib/attendance-deduction';
 
+interface Staff {
+  id: number | string;
+  name?: string;
+  position?: string;
+  department?: string;
+  company?: string;
+}
+
+interface PayrollRecord {
+  staff_id: number | string;
+  total_taxfree?: number;
+  total_taxable?: number;
+  total_deduction?: number;
+  net_pay?: number;
+  advance_pay?: number;
+}
+
+interface PayrollTableProps {
+  staffs?: Staff[];
+  payrollRecords?: PayrollRecord[];
+  yearMonth?: string;
+  checkedIds?: (number | string)[];
+  setCheckedIds?: (ids: (number | string)[]) => void;
+  onSelect?: (id: number | string) => void;
+  onSendAll?: React.MouseEventHandler<HTMLButtonElement>;
+}
+
 /** 학습 문서 §5 메인 급여 테이블: 선택 | 직원(아바타·이름·직급·부서) | 근무일 | 지급(비과세) | 지급(과세) | 공제 | 차인지급액 | 명세서 */
 export default function PayrollTable({ staffs = [], payrollRecords = [], yearMonth = '', checkedIds = [], setCheckedIds,
   onSelect,
   onSendAll,
-}: any) {
+}: PayrollTableProps) {
   const isAllChecked = staffs.length > 0 && checkedIds.length === staffs.length;
   const monthWorkDays = yearMonth ? getWorkDaysInMonth(yearMonth) : 0;
 
   const toggleAll = () => {
-    if (isAllChecked) setCheckedIds([]);
-    else setCheckedIds(staffs.map((s: any) => s.id));
+    if (isAllChecked) setCheckedIds?.([]);
+    else setCheckedIds?.(staffs.map((s) => s.id));
   };
 
-  const toggleOne = (id: number) => {
-    if (checkedIds.includes(id)) setCheckedIds(checkedIds.filter((i: number) => i !== id));
-    else setCheckedIds([...checkedIds, id]);
+  const toggleOne = (id: number | string) => {
+    if (checkedIds.includes(id)) setCheckedIds?.(checkedIds.filter((i) => i !== id));
+    else setCheckedIds?.([...checkedIds, id]);
   };
 
   const getRecord = (staffId: string | number) =>
-    payrollRecords.find((r: any) => String(r.staff_id) === String(staffId));
+    payrollRecords.find((r) => String(r.staff_id) === String(staffId));
 
-  const sumTaxfree = staffs.reduce((s: number, st: any) => s + (getRecord(st.id)?.total_taxfree ?? 0), 0);
-  const sumTaxable = staffs.reduce((s: number, st: any) => s + (getRecord(st.id)?.total_taxable ?? 0), 0);
-  const sumDeduction = staffs.reduce((s: number, st: any) => s + (getRecord(st.id)?.total_deduction ?? 0), 0);
-  const sumNet = staffs.reduce((s: number, st: any) => s + (getRecord(st.id)?.net_pay ?? 0), 0);
+  const sumTaxfree = staffs.reduce((s, st) => s + (getRecord(st.id)?.total_taxfree ?? 0), 0);
+  const sumTaxable = staffs.reduce((s, st) => s + (getRecord(st.id)?.total_taxable ?? 0), 0);
+  const sumDeduction = staffs.reduce((s, st) => s + (getRecord(st.id)?.total_deduction ?? 0), 0);
+  const sumNet = staffs.reduce((s, st) => s + (getRecord(st.id)?.net_pay ?? 0), 0);
 
   return (
     <div className="space-y-4 h-full flex flex-col">
@@ -73,7 +100,7 @@ export default function PayrollTable({ staffs = [], payrollRecords = [], yearMon
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border)]">
-              {staffs.map((s: any) => {
+              {staffs.map((s) => {
                 const rec = getRecord(s.id);
                 const net = rec?.net_pay ?? 0;
                 const isAdvance = (rec?.advance_pay ?? 0) > 0;
@@ -81,7 +108,7 @@ export default function PayrollTable({ staffs = [], payrollRecords = [], yearMon
                 return (
                   <tr
                     key={s.id}
-                    onClick={() => onSelect(s.id)}
+                    onClick={() => onSelect?.(s.id)}
                     className={`cursor-pointer transition-colors ${checkedIds.includes(s.id) ? 'bg-[var(--toss-blue-light)]/70' : 'hover:bg-[var(--muted)]'}`}
                   >
                     <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
@@ -120,7 +147,7 @@ export default function PayrollTable({ staffs = [], payrollRecords = [], yearMon
 
       {/* 모바일 카드 */}
       <div className="md:hidden grid grid-cols-1 gap-3">
-        {staffs.map((s: any) => {
+        {staffs.map((s) => {
           const rec = getRecord(s.id);
           const net = rec?.net_pay ?? 0;
           const isAdvance = (rec?.advance_pay ?? 0) > 0;
@@ -129,7 +156,7 @@ export default function PayrollTable({ staffs = [], payrollRecords = [], yearMon
           return (
             <div
               key={s.id}
-              onClick={() => onSelect(s.id)}
+              onClick={() => onSelect?.(s.id)}
               className={`bg-[var(--card)] p-4 rounded-[var(--radius-md)] border transition-all active:scale-[0.99] ${isChecked ? 'border-[var(--accent)] ring-1 ring-[var(--accent)]/30' : 'border-[var(--border)]'}`}
             >
               <div className="flex justify-between items-start mb-3">

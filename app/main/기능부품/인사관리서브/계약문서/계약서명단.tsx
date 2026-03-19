@@ -1,21 +1,37 @@
 ﻿'use client';
 import { useState } from 'react';
 
-export default function ContractList({ selectedCo, staffs, contracts = [], onSelect, checkedIds, setCheckedIds, isCompact }: any) {
+type Staff = { id: number; name: string; employee_no?: string; company?: string; department?: string; position?: string };
+type Contract = { staff_id: number; status?: string };
+
+interface ContractListProps {
+  selectedCo?: string;
+  staffs?: Staff[];
+  contracts?: Contract[];
+  onSelect?: (id: number) => void;
+  checkedIds?: number[];
+  setCheckedIds?: (ids: number[]) => void;
+  isCompact?: boolean;
+}
+
+export default function ContractList({ selectedCo, staffs, contracts = [], onSelect, checkedIds: _checkedIds, setCheckedIds: _setCheckedIds, isCompact }: ContractListProps) {
   const [filter, setFilter] = useState('');
 
-  const filtered = staffs?.filter((s: any) =>
+  const checkedIds = (_checkedIds ?? []) as number[];
+  const setCheckedIds = (_setCheckedIds ?? (() => {})) as (ids: number[]) => void;
+
+  const filtered = (staffs ?? []).filter((s) =>
     (selectedCo === '전체' || s.company === selectedCo) &&
     (s.name.includes(filter) || s.employee_no?.includes(filter))
-  ) || [];
+  );
 
   const toggleAll = () => {
     if (checkedIds.length === filtered.length) setCheckedIds([]);
-    else setCheckedIds(filtered.map((s: any) => s.id));
+    else setCheckedIds(filtered.map((s) => s.id));
   };
 
   const toggleOne = (id: number) => {
-    if (checkedIds.includes(id)) setCheckedIds(checkedIds.filter((i: number) => i !== id));
+    if (checkedIds.includes(id)) setCheckedIds(checkedIds.filter((i) => i !== id));
     else setCheckedIds([...checkedIds, id]);
   };
 
@@ -74,15 +90,15 @@ export default function ContractList({ selectedCo, staffs, contracts = [], onSel
             </tr>
           </thead>
           <tbody>
-            {filtered.map((s: any) => {
-              const contract = contracts.find((c: any) => c.staff_id === s.id);
+            {filtered.map((s) => {
+              const contract = contracts.find((c) => c.staff_id === s.id);
               const status = contract?.status || '미발송';
               const statusColor = status === '서명완료' ? 'text-emerald-500 bg-emerald-50' : status === '서명대기' ? 'text-blue-500 bg-blue-50' : 'text-[var(--toss-gray-3)] bg-[var(--tab-bg)]';
 
               return (
                 <tr
                   key={s.id}
-                  onClick={() => onSelect(s.id)}
+                  onClick={() => onSelect?.(s.id)}
                   className="border-b border-[var(--border)] hover:bg-[var(--muted)] transition-colors cursor-pointer group"
                 >
                   <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>

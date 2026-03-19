@@ -6,9 +6,14 @@ import { WORKPLACE_LOCATION, ALLOWED_DISTANCE_M } from '@/lib/location';
 const HOSPITAL_LOCATION = WORKPLACE_LOCATION;
 const ALLOWED_RADIUS_METER = ALLOWED_DISTANCE_M;
 
-export default function CommuteRecord({ user, onRequestCorrection }: any) {
+interface CommuteRecordProps {
+  user?: Record<string, unknown>;
+  onRequestCorrection?: (log: Record<string, unknown>) => void;
+}
+
+export default function CommuteRecord({ user, onRequestCorrection }: CommuteRecordProps) {
   const [logs, setLogs] = useState<any[]>([]);
-  const [todayLog, setTodayLog] = useState<any>(null);
+  const [todayLog, setTodayLog] = useState<Record<string, unknown> | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [distance, setDistance] = useState<number | null>(null); // 병원과의 거리
@@ -23,7 +28,8 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
   }, []);
 
   useEffect(() => {
-    if (user?.id) {
+    const userId = (user as Record<string, unknown>)?.id;
+    if (userId) {
       initCommuteData();
     }
   }, [user, currentMonth]);
@@ -37,10 +43,11 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
 
   const fetchTodayLog = async () => {
     const today = new Date().toLocaleDateString('en-CA');
+    const userId = (user as Record<string, unknown>)?.id as string;
     const { data } = await supabase
       .from('attendance')
       .select('*')
-      .eq('staff_id', user.id)
+      .eq('staff_id', userId)
       .eq('date', today)
       .maybeSingle();
     setTodayLog(data || null);
@@ -49,11 +56,12 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
   const fetchMonthlyLogs = async () => {
     const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).toLocaleDateString('en-CA');
     const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).toLocaleDateString('en-CA');
+    const userId = (user as Record<string, unknown>)?.id as string;
 
     const { data } = await supabase
       .from('attendance')
       .select('*')
-      .eq('staff_id', user.id)
+      .eq('staff_id', userId)
       .gte('date', startOfMonth)
       .lte('date', endOfMonth)
       .order('date', { ascending: false });
@@ -122,8 +130,9 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
       const mins = checkIn && checkOut
         ? Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 60000)
         : null;
+      const userId = (user as Record<string, unknown>)?.id as string;
       await supabase.from('attendances').upsert({
-        staff_id: user.id,
+        staff_id: userId,
         work_date: workDate,
         check_in_time: checkIn,
         check_out_time: checkOut,
@@ -149,17 +158,19 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
     const now = new Date();
     const today = now.toLocaleDateString('en-CA');
     const timeString = now.toISOString();
+    const userId = (user as Record<string, unknown>)?.id as string;
+    const userDepartment = (user as Record<string, unknown>)?.department as string | undefined;
 
     try {
       if (type === 'in') {
         let lateThreshold = 9;
         let lateMinute = 10;
-        if (user.department === '의료진') { lateThreshold = 8; lateMinute = 30; }
+        if (userDepartment === '의료진') { lateThreshold = 8; lateMinute = 30; }
 
         const isLate = now.getHours() > lateThreshold || (now.getHours() === lateThreshold && now.getMinutes() > lateMinute);
 
         const { data, error } = await supabase.from('attendance').upsert([{
-          staff_id: user.id,
+          staff_id: userId,
           date: today,
           check_in: timeString,
           status: isLate ? '지각' : '정상'
@@ -175,20 +186,20 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
         const { data, error } = await supabase
           .from('attendance')
           .update({ check_out: timeString })
-          .eq('staff_id', user.id)
+          .eq('staff_id', userId)
           .eq('date', today)
           .is('check_out', null)
           .select()
           .single();
 
         if (error) throw error;
-        await syncToAttendances(today, todayLog.check_in, timeString, todayLog.status || '정상');
+        await syncToAttendances(today, todayLog.check_in as string | null, timeString, (todayLog.status as string) || '정상');
         setTodayLog(data);
         alert('퇴근 처리되었습니다. 고생하셨습니다!');
       }
       fetchMonthlyLogs();
-    } catch (error: any) {
-      alert('오류 발생: ' + error.message);
+    } catch (error: unknown) {
+      alert('오류 발생: ' + ((error as Error)?.message ?? String(error)));
     } finally {
       setIsProcessing(false);
     }
@@ -286,13 +297,13 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
                     <p className="text-xs font-bold text-[var(--toss-gray-3)]">
                       {workDate.toLocaleDateString('ko-KR', { weekday: 'long' })}
                     </p>
-                    <p className="font-semibold text-[var(--foreground)]">{log.status}</p>
+                    <p className="font-semibold text-[var(--foreground)]">{log.status as string}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4 md:gap-5 justify-between md:justify-end w-full">
                   <div className="flex gap-4">
-                    <TimeBox label="출근" time={formatTime(log.check_in)} />
-                    <TimeBox label="퇴근" time={formatTime(log.check_out)} />
+                    <TimeBox label="출근" time={formatTime(log.check_in as string)} />
+                    <TimeBox label="퇴근" time={formatTime(log.check_out as string)} />
                   </div>
                   {onRequestCorrection && (
                     <button
@@ -313,7 +324,14 @@ export default function CommuteRecord({ user, onRequestCorrection }: any) {
   );
 }
 
-function StatItem({ label, value, isWarning, isSuccess }: any) {
+interface StatItemProps {
+  label: string;
+  value: string;
+  isWarning?: boolean;
+  isSuccess?: boolean;
+}
+
+function StatItem({ label, value, isWarning, isSuccess }: StatItemProps) {
   return (
     <div className="bg-[var(--card)] border border-[var(--border)] p-4 rounded-[var(--radius-lg)] text-center shadow-sm">
       <p className="text-[11px] font-bold text-[var(--toss-gray-3)] mb-2 uppercase">{label}</p>
@@ -322,7 +340,12 @@ function StatItem({ label, value, isWarning, isSuccess }: any) {
   );
 }
 
-function TimeBox({ label, time }: any) {
+interface TimeBoxProps {
+  label: string;
+  time: string;
+}
+
+function TimeBox({ label, time }: TimeBoxProps) {
   return (
     <div className="text-right">
       <p className="text-[11px] font-bold text-[var(--toss-gray-3)] mb-1">{label}</p>

@@ -56,7 +56,7 @@ export default function SystemMasterCenter({
   initialTab?: MasterTabId;
 }) {
   const [activeTab, setActiveTab] = useState<MasterTabId>('개요');
-  const [overview, setOverview] = useState<any>(null);
+  const [overview, setOverview] = useState<Record<string, unknown> | null>(null);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [chatRooms, setChatRooms] = useState<any[]>([]);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
@@ -154,12 +154,13 @@ export default function SystemMasterCenter({
 
   const summaryCards = useMemo(() => {
     if (!overview?.summary) return [];
+    const summary = overview.summary as Record<string, unknown>;
     return [
-      { id: 'staff', label: '직원 계정', value: overview.summary.staffCount },
-      { id: 'audit', label: '감사 로그', value: overview.summary.auditCount },
-      { id: 'payroll', label: '급여 레코드', value: overview.summary.payrollCount },
-      { id: 'room', label: '채팅방', value: overview.summary.roomCount },
-      { id: 'message', label: '메시지', value: overview.summary.messageCount },
+      { id: 'staff', label: '직원 계정', value: summary.staffCount },
+      { id: 'audit', label: '감사 로그', value: summary.auditCount },
+      { id: 'payroll', label: '급여 레코드', value: summary.payrollCount },
+      { id: 'room', label: '채팅방', value: summary.roomCount },
+      { id: 'message', label: '메시지', value: summary.messageCount },
     ];
   }, [overview]);
 
@@ -250,7 +251,7 @@ export default function SystemMasterCenter({
                 </div>
               </div>
               <div className="mt-4 space-y-3">
-                {(overview.recentAudits || []).slice(0, 8).map((log: any) => (
+                {((overview.recentAudits as any[]) || []).slice(0, 8).map((log: any) => (
                   <div key={log.id} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] px-4 py-3">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-2.5 py-1 text-[10px] font-bold text-[var(--accent)]">{log.action}</span>
@@ -272,7 +273,7 @@ export default function SystemMasterCenter({
               <h3 className="text-base font-bold text-[var(--foreground)]">최근 급여 반영</h3>
               <p className="mt-1 text-xs text-[var(--toss-gray-3)]">최근 저장된 급여 레코드 기준입니다.</p>
               <div className="mt-4 space-y-3">
-                {(overview.recentPayrolls || []).slice(0, 8).map((record: any) => (
+                {((overview.recentPayrolls as any[]) || []).slice(0, 8).map((record: any) => (
                   <div key={record.id} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] px-4 py-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
@@ -317,7 +318,7 @@ export default function SystemMasterCenter({
                   </tr>
                 </thead>
                 <tbody>
-                  {(overview.sensitiveStaffs || []).map((staff: any) => (
+                  {((overview.sensitiveStaffs as any[]) || []).map((staff: any) => (
                     <tr key={staff.id} className="border-t border-[var(--border)]">
                       <td className="px-3 py-3">
                         <p className="font-bold text-[var(--foreground)]">{staff.name}</p>

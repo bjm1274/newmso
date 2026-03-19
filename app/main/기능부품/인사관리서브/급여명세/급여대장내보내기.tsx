@@ -4,14 +4,15 @@ import { useEffect, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { supabase } from '@/lib/supabase';
 
-export default function PayrollExport({ checkedIds = [], selectedCo, yearMonth: initialYm }: any) {
-  const [yearMonth, setYearMonth] = useState(initialYm || new Date().toISOString().slice(0, 7));
+export default function PayrollExport({ checkedIds = [], selectedCo, yearMonth: initialYm }: Record<string, unknown>) {
+  const _checkedIds = (checkedIds as string[]) ?? [];
+  const [yearMonth, setYearMonth] = useState((initialYm as string) || new Date().toISOString().slice(0, 7));
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
-    setYearMonth(initialYm || new Date().toISOString().slice(0, 7));
+    setYearMonth((initialYm as string) || new Date().toISOString().slice(0, 7));
   }, [initialYm]);
 
   useEffect(() => {
@@ -41,8 +42,8 @@ export default function PayrollExport({ checkedIds = [], selectedCo, yearMonth: 
       if (selectedCo && selectedCo !== '전체') {
         list = list.filter((record: any) => record.staff_members?.company === selectedCo);
       }
-      if (checkedIds.length > 0) {
-        const idSet = new Set(checkedIds.map((id: any) => String(id)));
+      if (_checkedIds.length > 0) {
+        const idSet = new Set(_checkedIds.map((id: string) => String(id)));
         list = list.filter((record: any) => idSet.has(String(record.staff_id)));
       }
 
@@ -53,7 +54,7 @@ export default function PayrollExport({ checkedIds = [], selectedCo, yearMonth: 
     return () => {
       active = false;
     };
-  }, [yearMonth, selectedCo, checkedIds.join(',')]);
+  }, [yearMonth, selectedCo, _checkedIds.join(',')]);
 
   const exportExcel = () => {
     const rows = records.map((record: any) => ({
@@ -87,7 +88,7 @@ export default function PayrollExport({ checkedIds = [], selectedCo, yearMonth: 
         const account = record.staff_members?.bank_account || '';
         const name = record.staff_members?.name || '';
         const amount = Number(record.net_pay) || 0;
-        return `20,${yearMonth.replace('-', '')}25,110,${account},${amount},${name},${yearMonth} 급여,`;
+        return `20,${(yearMonth as string).replace('-', '')}25,110,${account},${amount},${name},${yearMonth} 급여,`;
       });
     const csv = [header, ...rows].join('\n');
     const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8' });
@@ -109,7 +110,7 @@ export default function PayrollExport({ checkedIds = [], selectedCo, yearMonth: 
       <div className="flex items-center gap-2">
         <input
           type="month"
-          value={yearMonth}
+          value={yearMonth as string}
           onChange={(event) => setYearMonth(event.target.value)}
           className="h-9 px-3 border border-[var(--border)] rounded-md text-sm font-medium flex-1"
         />

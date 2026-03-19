@@ -1,8 +1,8 @@
 'use client';
 import { useState } from 'react';
 
-export default function DeptSalaryDistribution({ staffs = [], selectedCo }: any) {
-  const filtered = selectedCo === '전체' ? staffs : staffs.filter((s: any) => s.company === selectedCo);
+export default function DeptSalaryDistribution({ staffs = [], selectedCo }: Record<string, unknown>) {
+  const filtered = selectedCo === '전체' ? (staffs as any[]) : (staffs as any[]).filter((s: any) => s.company === selectedCo);
   const map: Record<string, { sum: number; count: number }> = {};
   filtered.forEach((s: any) => {
     const dept = s.department || '미지정';

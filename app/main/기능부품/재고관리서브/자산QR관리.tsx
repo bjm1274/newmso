@@ -2,28 +2,32 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
+type AnyRecord = Record<string, unknown>;
+
 // Mock Component for QR Asset Manager
-export default function QRAssetManager({ user, inventory, fetchInventory }: any) {
+export default function QRAssetManager({ user, inventory, fetchInventory }: AnyRecord) {
     const [scannerActive, setScannerActive] = useState(false);
-    const [scanResult, setScanResult] = useState<any>(null);
+    const [scanResult, setScanResult] = useState<AnyRecord | null>(null);
     const [activeTab, setActiveTab] = useState<'대시보드' | '내대여'>('대시보드');
 
     // Filter only asset-type inventory (e.g. laptops, cards, monitors)
-    const assets = inventory.filter((item: any) =>
+    const _inventory = (inventory ?? []) as AnyRecord[];
+    const assets = _inventory.filter((item: AnyRecord) =>
         item.category === '전자기기' ||
         item.category === '법인카드' ||
         item.category === '사무용품' ||
-        item.item_name.includes('노트북') ||
-        item.item_name.includes('모니터')
+        String(item.item_name ?? '').includes('노트북') ||
+        String(item.item_name ?? '').includes('모니터')
     );
 
-
+    const _user = (user ?? {}) as AnyRecord;
+    const _fetchInventory = fetchInventory as (() => void) | undefined;
 
     const handleBorrow = async () => {
         if (!scanResult) return;
         try {
             // Mocking the borrow logistics: deduct 1 from stock and log it
-            const newStock = (scanResult.quantity ?? scanResult.stock ?? 0) - 1;
+            const newStock = (Number(scanResult.quantity ?? scanResult.stock ?? 0)) - 1;
             if (newStock < 0) return alert('이미 대여중이거나 재고가 없습니다.');
 
             await supabase.from('inventory').update({ quantity: newStock, stock: newStock }).eq('id', scanResult.id);
@@ -33,22 +37,22 @@ export default function QRAssetManager({ user, inventory, fetchInventory }: any)
                 type: '대여',
                 change_type: '자산 대여',
                 quantity: 1,
-                actor_name: user?.name,
+                actor_name: _user.name,
                 company: scanResult.company
             }]);
 
-            alert(`[${scanResult.item_name}] 대여 처리가 완료되었습니다.`);
+            alert(`[${scanResult.item_name as string}] 대여 처리가 완료되었습니다.`);
             setScanResult(null);
-            fetchInventory();
+            _fetchInventory?.();
         } catch (e) {
             console.error(e);
             alert('대여 처리 중 오류가 발생했습니다.');
         }
     };
 
-    const handleReturn = async (item: any) => {
+    const handleReturn = async (item: AnyRecord) => {
         try {
-            const newStock = (item.quantity ?? item.stock ?? 0) + 1;
+            const newStock = (Number(item.quantity ?? item.stock ?? 0)) + 1;
             await supabase.from('inventory').update({ quantity: newStock, stock: newStock }).eq('id', item.id);
             await supabase.from('inventory_logs').insert([{
                 item_id: item.id,
@@ -56,12 +60,12 @@ export default function QRAssetManager({ user, inventory, fetchInventory }: any)
                 type: '반납',
                 change_type: '자산 반납',
                 quantity: 1,
-                actor_name: user?.name,
+                actor_name: _user.name,
                 company: item.company
             }]);
 
-            alert(`[${item.item_name}] 반납 처리가 완료되었습니다.`);
-            fetchInventory();
+            alert(`[${item.item_name as string}] 반납 처리가 완료되었습니다.`);
+            _fetchInventory?.();
         } catch (e) {
             console.error(e);
             alert('반납 처리 중 오류가 발생했습니다.');
@@ -111,8 +115,8 @@ export default function QRAssetManager({ user, inventory, fetchInventory }: any)
                         {scanResult ? (
                             <div className="bg-[var(--toss-blue-light)]/30 border border-[var(--accent)]/50 p-4 rounded-[var(--radius-lg)] shadow-sm animate-in slide-in-from-right relative overflow-hidden">
                                 <span className="px-2 py-0.5 bg-[var(--accent)] text-white text-[10px] font-bold rounded-[var(--radius-md)] uppercase tracking-widest">스캔 성공</span>
-                                <h3 className="text-base font-bold text-[var(--foreground)] mt-3">{scanResult.item_name}</h3>
-                                <p className="text-xs font-bold text-[var(--toss-gray-3)] mt-0.5">자산 분류: {scanResult.category || '미분류'} | 잔여 재고: {scanResult.quantity ?? scanResult.stock ?? 0}개</p>
+                                <h3 className="text-base font-bold text-[var(--foreground)] mt-3">{scanResult.item_name as string}</h3>
+                                <p className="text-xs font-bold text-[var(--toss-gray-3)] mt-0.5">자산 분류: {(scanResult.category as string) || '미분류'} | 잔여 재고: {Number(scanResult.quantity ?? scanResult.stock ?? 0)}개</p>
 
                                 <div className="mt-3 flex gap-2">
                                     <button onClick={handleBorrow} className="px-4 py-2 bg-[var(--accent)] text-white text-sm font-bold rounded-[var(--radius-md)] shadow-sm hover:opacity-90 transition-all">대여하기</button>
@@ -123,11 +127,11 @@ export default function QRAssetManager({ user, inventory, fetchInventory }: any)
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="bg-[var(--card)] border border-[var(--border)] p-3 rounded-[var(--radius-md)] shadow-sm">
                                     <p className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest mb-0.5">전자기기</p>
-                                    <p className="text-lg font-bold text-[var(--foreground)]">{assets.filter((a: any) => a.category === '전자기기' || a.item_name.includes('노트북')).length}대</p>
+                                    <p className="text-lg font-bold text-[var(--foreground)]">{assets.filter((a: AnyRecord) => a.category === '전자기기' || String(a.item_name ?? '').includes('노트북')).length}대</p>
                                 </div>
                                 <div className="bg-[var(--card)] border border-[var(--border)] p-3 rounded-[var(--radius-md)] shadow-sm">
                                     <p className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest mb-0.5">법인카드</p>
-                                    <p className="text-lg font-bold text-[var(--foreground)]">{assets.filter((a: any) => a.category === '법인카드').length}장</p>
+                                    <p className="text-lg font-bold text-[var(--foreground)]">{assets.filter((a: AnyRecord) => a.category === '법인카드').length}장</p>
                                 </div>
                             </div>
                         )}
@@ -150,11 +154,11 @@ export default function QRAssetManager({ user, inventory, fetchInventory }: any)
                                         {assets.length === 0 && (
                                             <tr><td colSpan={4} className="px-4 py-10 text-center text-[var(--toss-gray-3)] text-xs font-bold">자산이 없습니다.</td></tr>
                                         )}
-                                        {assets.map((item: any) => (
-                                            <tr key={item.id} className="hover:bg-[var(--muted)]/50 transition-colors">
-                                                <td className="px-4 py-2 text-[11px] font-bold text-[var(--accent)]">{item.category}</td>
-                                                <td className="px-4 py-2 text-xs font-bold text-[var(--foreground)]">{item.item_name}</td>
-                                                <td className="px-4 py-2 text-xs font-bold text-[var(--toss-gray-4)]">{item.quantity ?? item.stock ?? 0}</td>
+                                        {assets.map((item: AnyRecord) => (
+                                            <tr key={item.id as string} className="hover:bg-[var(--muted)]/50 transition-colors">
+                                                <td className="px-4 py-2 text-[11px] font-bold text-[var(--accent)]">{item.category as string}</td>
+                                                <td className="px-4 py-2 text-xs font-bold text-[var(--foreground)]">{item.item_name as string}</td>
+                                                <td className="px-4 py-2 text-xs font-bold text-[var(--toss-gray-4)]">{Number(item.quantity ?? item.stock ?? 0)}</td>
                                                 <td className="px-4 py-2 text-right">
                                                     <button className="px-2 py-1 bg-[var(--muted)] text-[var(--toss-gray-4)] text-[10px] font-bold rounded hover:bg-[var(--border)]">QR 출력</button>
                                                 </td>
@@ -171,9 +175,9 @@ export default function QRAssetManager({ user, inventory, fetchInventory }: any)
             {activeTab === '내대여' && (
                 <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] shadow-sm overflow-hidden min-h-[300px] flex flex-col">
                     <div className="p-4 border-b border-[var(--border)] bg-[var(--muted)]/50 flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-[var(--accent)] text-white flex items-center justify-center text-base font-bold shadow-sm">{user?.name?.[0] || 'U'}</div>
+                        <div className="w-10 h-10 rounded-full bg-[var(--accent)] text-white flex items-center justify-center text-base font-bold shadow-sm">{String(_user.name ?? 'U')[0]}</div>
                         <div>
-                            <h3 className="text-sm font-bold text-[var(--foreground)]">{user?.name} 님의 대여 현황</h3>
+                            <h3 className="text-sm font-bold text-[var(--foreground)]">{_user.name as string} 님의 대여 현황</h3>
                             <p className="text-[11px] font-bold text-[var(--toss-gray-3)] mt-0.5">대여 중인 기기는 퇴사 시 반드시 반납해야 합니다.</p>
                         </div>
                     </div>

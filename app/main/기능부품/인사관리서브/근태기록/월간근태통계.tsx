@@ -1,6 +1,6 @@
 ﻿'use client';
 
-export default function MonthlyStats({ stats }: any) {
+export default function MonthlyStats({ stats }: Record<string, unknown>) {
   return (
     <div className="p-4 h-full overflow-y-auto custom-scrollbar bg-[var(--muted)]/50">
       <div className="flex justify-between items-end mb-4 border-b pb-4">
@@ -11,7 +11,7 @@ export default function MonthlyStats({ stats }: any) {
       </div>
 
       <div className="space-y-4">
-        {stats.map((s: any, i: number) => (
+        {(stats as Record<string, unknown>[]).map((s: any, i: number) => (
           <div key={i} className="bg-[var(--card)] border border-[var(--border)] p-4 rounded-2xl shadow-sm hover:shadow-sm transition-all">
             <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-4">

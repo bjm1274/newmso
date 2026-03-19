@@ -2,13 +2,14 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
-export default function NotificationAutomation({ user }: any) {
+export default function NotificationAutomation({ user: userRaw }: Record<string, unknown>) {
+  const user = userRaw as Record<string, unknown> | undefined;
   const [payrollDay, setPayrollDay] = useState(25);
   const [enabled, setEnabled] = useState(true);
 
   useEffect(() => {
     const checkAndSend = async () => {
-      if (!enabled || !user?.id) return;
+      if (!enabled || !user?.['id']) return;
       const today = new Date();
       const day = today.getDate();
       const todayYmd = today.toISOString().slice(0, 10);
@@ -92,7 +93,7 @@ export default function NotificationAutomation({ user }: any) {
           target_year: currentYear,
           step: stepToday,
           remain_days: remain,
-          meta: { sent_by: user.id, today: todayYmd },
+          meta: { sent_by: user?.['id'] as string, today: todayYmd },
         });
       }
     };
@@ -101,7 +102,7 @@ export default function NotificationAutomation({ user }: any) {
     const t = setInterval(checkAndSend, 24 * 60 * 60 * 1000);
     checkAndSend();
     return () => clearInterval(t);
-  }, [enabled, payrollDay, user?.id]);
+  }, [enabled, payrollDay, user?.['id']]);
 
   return (
     <div className="bg-[var(--card)] p-4 border border-[var(--border)] rounded-[var(--radius-md)] shadow-sm max-w-xl space-y-3">

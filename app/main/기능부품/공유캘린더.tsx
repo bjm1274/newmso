@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 import SmartMonthPicker from './공통/SmartMonthPicker';
 import SmartDatePicker from './공통/SmartDatePicker';
 
-export default function SharedCalendar({ user }: any) {
+export default function SharedCalendar({ user }: Record<string, unknown>) {
   const [yearMonth, setYearMonth] = useState(new Date().toISOString().slice(0, 7));
   const [events, setEvents] = useState<any[]>([]);
 

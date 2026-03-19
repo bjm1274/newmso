@@ -2,8 +2,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
-export default function BusinessDashboard({ staffs = [], inventory = [] }: any) {
-  const [metrics, setMetrics] = useState<any>({});
+export default function BusinessDashboard({ staffs = [], inventory = [] }: Record<string, unknown>) {
+  const _staffs = (staffs as Record<string, unknown>[]) ?? [];
+  const [metrics, setMetrics] = useState<Record<string, unknown>>({});
   const [approvals, setApprovals] = useState<any[]>([]);
   const [attendances, setAttendances] = useState<any[]>([]);
   const [leaves, setLeaves] = useState<any[]>([]);
@@ -22,16 +23,16 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: any) 
   }, []);
 
   useEffect(() => {
-    const laborCost = staffs.reduce((s: number, st: any) => s + (st.base_salary || 0), 0);
-    const totalStaff = staffs.length;
+    const laborCost = _staffs.reduce((s: number, st: any) => s + (st.base_salary || 0), 0);
+    const totalStaff = _staffs.length;
     const onLeave = leaves.filter(l => l.leave_type === '연차').length;
     const attendanceRate = totalStaff > 0 ? ((totalStaff - onLeave) / totalStaff * 100).toFixed(1) : 0;
-    const leaveUsage = staffs.reduce((s: number, st: any) => s + (st.annual_leave_used || 0), 0);
-    const leaveTotal = staffs.reduce((s: number, st: any) => s + (st.annual_leave_total || 15), 0);
+    const leaveUsage = _staffs.reduce((s: number, st: any) => s + (st.annual_leave_used || 0), 0);
+    const leaveTotal = _staffs.reduce((s: number, st: any) => s + (st.annual_leave_total || 15), 0);
     const leaveRate = leaveTotal > 0 ? (leaveUsage / leaveTotal * 100).toFixed(1) : 0;
 
     // Simulated turnover prediction based on real data shape
-    const burnoutCandidates = staffs.filter((s: any) => (s.annual_leave_used || 0) < 3).length;
+    const burnoutCandidates = _staffs.filter((s: any) => (s.annual_leave_used || 0) < 3).length;
 
     setMetrics({
       totalLaborCost: laborCost,
@@ -68,19 +69,19 @@ export default function BusinessDashboard({ staffs = [], inventory = [] }: any) 
         <div className="bg-[var(--card)] p-3 border border-[var(--border)] shadow-sm rounded-[var(--radius-xl)] relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-4 text-3xl opacity-10 group-hover:scale-110 transition-transform">⚠️</div>
           <p className="text-[10px] font-black text-[var(--toss-gray-3)] uppercase tracking-widest">번아웃 의심 인원 (연차 미사용)</p>
-          <p className="text-xl font-black text-danger mt-1.5">{metrics.burnoutCandidates ?? 0}명</p>
+          <p className="text-xl font-black text-danger mt-1.5">{(metrics.burnoutCandidates ?? 0) as string}명</p>
           <p className="text-[10px] font-bold text-danger mt-1.5">지적 및 독려 필요</p>
         </div>
         <div className="bg-[var(--card)] p-3 border border-[var(--border)] shadow-sm rounded-[var(--radius-xl)] relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-4 text-3xl opacity-10 group-hover:scale-110 transition-transform">📉</div>
           <p className="text-[10px] font-black text-[var(--toss-gray-3)] uppercase tracking-widest">AI 예측 이직률 / 퇴사율</p>
-          <p className="text-xl font-black text-orange-500 mt-1.5">{metrics.turnoverPrediction ?? '-'}%</p>
+          <p className="text-xl font-black text-orange-500 mt-1.5">{(metrics.turnoverPrediction ?? '-') as string}%</p>
           <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mt-1.5">동종 업계 평균(4.5%) 대비 양호</p>
         </div>
         <div className="bg-[var(--card)] p-3 border border-[var(--border)] shadow-sm rounded-[var(--radius-xl)] relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-4 text-3xl opacity-10 group-hover:scale-110 transition-transform">🏝️</div>
           <p className="text-[10px] font-black text-[var(--toss-gray-3)] uppercase tracking-widest">조직 연차 사용률</p>
-          <p className="text-xl font-black text-primary mt-1.5">{metrics.leaveUsageRate ?? '-'}%</p>
+          <p className="text-xl font-black text-primary mt-1.5">{(metrics.leaveUsageRate ?? '-') as string}%</p>
           <div className="w-full h-1.5 bg-[var(--tab-bg)] rounded-full mt-2 overflow-hidden">
             <div className="h-full bg-primary" style={{ width: `${metrics.leaveUsageRate}%` }}></div>
           </div>

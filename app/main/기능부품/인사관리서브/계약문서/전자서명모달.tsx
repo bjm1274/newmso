@@ -28,7 +28,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
     const [agreements, setAgreements] = useState<Record<string, boolean>>({});
     const sigCanvas = useRef<SignatureCanvas>(null);
     const [isSigEmpty, setIsSigEmpty] = useState(true);
-    const [company, setCompany] = useState<any>(null);
+    const [company, setCompany] = useState<Record<string, unknown> | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
 
     const [localTemplateText, setLocalTemplateText] = useState<string>('');

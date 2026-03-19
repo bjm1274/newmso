@@ -10,7 +10,11 @@ export default function AttendanceForms({
   formType,
   setExtraData,
   setFormTitle,
-}: any) {
+}: Record<string, unknown>) {
+  const _user = (user ?? {}) as Record<string, unknown>;
+  const _staffs = ((staffs as Record<string, unknown>[]) ?? []);
+  const _setExtraData = setExtraData as (v: Record<string, unknown>) => void;
+  const _setFormTitle = setFormTitle as (v: string) => void;
   const [attendanceRows, setAttendanceRows] = useState<any[]>([]);
   const [schedules, setSchedules] = useState<any[]>([]);
   const [selectedDate, setSelectedDate] = useState('');
@@ -22,7 +26,7 @@ export default function AttendanceForms({
       const { data: attendance } = await supabase
         .from('attendance')
         .select('*')
-        .eq('staff_id', user.id)
+        .eq('staff_id', _user.id as string)
         .order('date', { ascending: false });
       const { data: workSchedules } = await supabase.from('work_schedules').select('*');
 
@@ -31,10 +35,10 @@ export default function AttendanceForms({
     };
 
     load();
-  }, [user.id]);
+  }, [_user.id]);
 
   const calculateOT = (record: any) => {
-    const staff = staffs.find((item: any) => item.id === user.id);
+    const staff = _staffs.find((item: any) => item.id === _user.id);
     const schedule = schedules.find((item: any) => item.id === staff?.schedule_id);
     if (!record?.check_out || !schedule?.end_time) return 0;
 
@@ -73,7 +77,7 @@ export default function AttendanceForms({
                 data-testid="approval-leave-type-select"
                 className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 text-xs font-bold shadow-sm focus:ring-2 focus:ring-[var(--accent)]/30"
                 onChange={(event) =>
-                  setExtraData((prev: any) => ({ ...prev, vType: event.target.value }))
+                  _setExtraData({ vType: event.target.value })
                 }
               >
                 <option>연차 (1.0)</option>
@@ -91,7 +95,7 @@ export default function AttendanceForms({
                 value={localStartDate}
                 onChange={(value) => {
                   setLocalStartDate(value);
-                  setExtraData((prev: any) => ({ ...prev, startDate: value }));
+                  _setExtraData({ startDate: value });
                 }}
                 className="w-full"
                 inputClassName="h-10 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 text-xs font-bold shadow-sm focus:ring-2 focus:ring-[var(--accent)]/30"
@@ -107,7 +111,7 @@ export default function AttendanceForms({
                 value={localEndDate}
                 onChange={(value) => {
                   setLocalEndDate(value);
-                  setExtraData((prev: any) => ({ ...prev, endDate: value }));
+                  _setExtraData({ endDate: value });
                 }}
                 className="w-full"
                 inputClassName="h-10 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 text-xs font-bold shadow-sm focus:ring-2 focus:ring-[var(--accent)]/30"
@@ -138,12 +142,12 @@ export default function AttendanceForms({
                   data-testid={`approval-overtime-record-${index}`}
                   onClick={() => {
                     setSelectedDate(row.date);
-                    setExtraData({
+                    _setExtraData({
                       date: row.date,
                       hours: overtimeHours,
                       amount: overtimeHours * 15000,
                     });
-                    setFormTitle(`[추가수당청구] ${row.date} 연장근무 ${overtimeHours}시간`);
+                    _setFormTitle(`[추가수당청구] ${row.date} 연장근무 ${overtimeHours}시간`);
                   }}
                   className={`flex items-center justify-between rounded-[var(--radius-lg)] border-2 p-3 text-left transition-all ${
                     selectedDate === row.date

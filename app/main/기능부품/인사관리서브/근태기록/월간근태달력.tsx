@@ -1,12 +1,17 @@
 'use client';
 import { useState } from 'react';
 
-export default function MonthlyCalendar({ calendarData, targetMonth, onCellClick, onBulkNormal }: any) {
+export default function MonthlyCalendar({ calendarData, targetMonth, onCellClick, onBulkNormal }: Record<string, unknown>) {
   // [상태] 현재 보고 있는 주차 (기본 1주차)
   const [activeWeek, setActiveWeek] = useState(1);
 
+  const _targetMonth = (targetMonth as string) ?? '';
+  const _calendarData = (calendarData as Record<string, unknown>[]) ?? [];
+  const _onBulkNormal = onBulkNormal as (staff: unknown) => void;
+  const _onCellClick = onCellClick as (e: unknown, d: unknown, staff: unknown) => void;
+
   // 1. 해당 월의 마지막 날짜 계산 (30일인지 31일인지)
-  const lastDay = new Date(Number(targetMonth.split('-')[0]), Number(targetMonth.split('-')[1]), 0).getDate();
+  const lastDay = new Date(Number(_targetMonth.split('-')[0]), Number(_targetMonth.split('-')[1]), 0).getDate();
   
   // 2. 주차별 날짜 범위 계산 함수 (7일 단위)
   const getWeekRange = (week: number) => {
@@ -28,7 +33,7 @@ export default function MonthlyCalendar({ calendarData, targetMonth, onCellClick
       {/* 상단 컨트롤러: 주차 선택 버튼 */}
       <div className="p-4 border-b bg-[var(--muted)] flex justify-between items-center shrink-0">
         <div className="flex items-center gap-4">
-            <h3 className="font-semibold text-[var(--foreground)] text-lg">🗓️ {targetMonth} 월간 근태 현황</h3>
+            <h3 className="font-semibold text-[var(--foreground)] text-lg">🗓️ {_targetMonth} 월간 근태 현황</h3>
             <div className="flex p-1.5 bg-[var(--toss-gray-2)] rounded-[var(--radius-md)] gap-1 shadow-inner">
                 {Array.from({ length: totalWeeks }, (_, i) => i + 1).map(week => {
                     const range = getWeekRange(week);
@@ -59,7 +64,7 @@ export default function MonthlyCalendar({ calendarData, targetMonth, onCellClick
               <th className="w-32 p-4 border-b border-r font-semibold text-[var(--toss-gray-3)] text-[11px] uppercase tracking-tight">직원명</th>
               {daysArray.map(d => (
                 <th key={d} className="p-3 border-b text-center">
-                    <span className="text-[11px] text-[var(--toss-gray-3)] font-bold block mb-0.5">{targetMonth}</span>
+                    <span className="text-[11px] text-[var(--toss-gray-3)] font-bold block mb-0.5">{_targetMonth}</span>
                     <span className="text-base font-semibold text-[var(--foreground)]">{d}일</span>
                 </th>
               ))}
@@ -70,11 +75,11 @@ export default function MonthlyCalendar({ calendarData, targetMonth, onCellClick
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--border)]">
-            {calendarData.map((row: any) => (
+            {_calendarData.map((row: any) => (
               <tr key={row.staff.id} className="hover:bg-blue-50/10 transition-colors group">
-                <td 
+                <td
                   className="p-4 font-semibold border-r text-center text-sm cursor-pointer group-hover:text-[var(--accent)] transition-colors bg-[var(--card)] sticky left-0 z-10"
-                  onClick={() => onBulkNormal(row.staff)}
+                  onClick={() => _onBulkNormal(row.staff)}
                 >
                   {row.staff.name}
                 </td>
@@ -92,7 +97,7 @@ export default function MonthlyCalendar({ calendarData, targetMonth, onCellClick
                   return (
                     <td key={i} className="p-2 h-28">
                       <div 
-                        onClick={(e) => onCellClick(e, d, row.staff)}
+                        onClick={(e) => _onCellClick(e, d, row.staff)}
                         className={`w-full h-full rounded-[var(--radius-lg)] border flex flex-col items-center justify-center cursor-pointer hover:shadow-sm transition-all p-2 ${statusStyle}`}
                       >
                         {d.status !== 'none' ? (

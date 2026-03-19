@@ -2,9 +2,10 @@
 import { useState } from 'react';
 import { calculateSeverancePay, formatWorkPeriod } from '@/lib/severance-pay';
 
-export default function SeveranceLeaveDashboard({ staffs = [] }: any) {
+export default function SeveranceLeaveDashboard({ staffs = [] }: Record<string, unknown>) {
+  const staffsArr = staffs as any[];
   const [filterCo, setFilterCo] = useState('전체');
-  const filtered = filterCo === '전체' ? staffs : staffs.filter((s: any) => s.company === filterCo);
+  const filtered = filterCo === '전체' ? staffsArr : staffsArr.filter((s: any) => s.company === filterCo);
   const active = filtered.filter((s: any) => (s.status || '재직') !== '퇴사');
 
   const items = active.map((s: any) => {
@@ -44,7 +45,7 @@ export default function SeveranceLeaveDashboard({ staffs = [] }: any) {
       <div className="flex items-center gap-2 mb-3">
         <select value={filterCo} onChange={(e) => setFilterCo(e.target.value)} className="h-9 px-3 border border-[var(--border)] rounded-md text-xs font-medium">
           <option value="전체">전체</option>
-          {(Array.from(new Set(staffs.map((s: any) => s.company))).filter(Boolean) as string[]).map((c) => (
+          {(Array.from(new Set(staffsArr.map((s: any) => s.company))).filter(Boolean) as string[]).map((c) => (
             <option key={c} value={c}>{c}</option>
           ))}
         </select>

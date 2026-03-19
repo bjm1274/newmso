@@ -16,7 +16,7 @@ interface Evaluation {
 }
 
 export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any; staffs?: any[] }) {
-    const [selectedStaff, setSelectedStaff] = useState<any>(null);
+    const [selectedStaff, setSelectedStaff] = useState<Record<string, unknown> | null>(null);
     const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
     const [loading, setLoading] = useState(false);
     const [fetchError, setFetchError] = useState<string | null>(null);
@@ -59,7 +59,7 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
 
     useEffect(() => {
         if (selectedStaff?.id) {
-            fetchEvaluations(selectedStaff.id);
+            fetchEvaluations(selectedStaff.id as string);
 
             // 실시간 구독
             const channel = supabase
@@ -70,7 +70,7 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
                     table: 'staff_evaluations',
                     filter: `staff_id=eq.${selectedStaff.id}`
                 }, () => {
-                    fetchEvaluations(selectedStaff.id);
+                    fetchEvaluations(selectedStaff.id as string);
                 })
                 .subscribe();
 
@@ -101,7 +101,7 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
             setEvaluations(prev => [
                 {
                     id: crypto.randomUUID(),
-                    staff_id: selectedStaff.id,
+                    staff_id: selectedStaff.id as string,
                     evaluator_id: user.id,
                     category,
                     content,
@@ -181,11 +181,11 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
                             <div className="flex items-center justify-between mb-4">
                                 <div className="flex items-center gap-3">
                                     <div className="w-12 h-12 bg-[var(--toss-blue-light)] text-[var(--accent)] rounded-full flex items-center justify-center text-xl font-black">
-                                        {selectedStaff.name?.slice(0, 1)}
+                                        {(selectedStaff.name as string)?.slice(0, 1)}
                                     </div>
                                     <div>
-                                        <h3 className="text-lg font-bold text-[var(--foreground)]">{selectedStaff.name} <span className="text-[var(--toss-gray-3)] text-xs font-medium">{selectedStaff.position}</span></h3>
-                                        <p className="text-[11px] font-bold text-[var(--accent)] uppercase tracking-wider">{selectedStaff.department} 소속</p>
+                                        <h3 className="text-lg font-bold text-[var(--foreground)]">{selectedStaff.name as string} <span className="text-[var(--toss-gray-3)] text-xs font-medium">{selectedStaff.position as string}</span></h3>
+                                        <p className="text-[11px] font-bold text-[var(--accent)] uppercase tracking-wider">{selectedStaff.department as string} 소속</p>
                                     </div>
                                 </div>
                                 <div className="text-right">

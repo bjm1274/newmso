@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
-export default function LaborCostTrend({ selectedCo }: any) {
+export default function LaborCostTrend({ selectedCo }: Record<string, unknown>) {
   const [months, setMonths] = useState<{ ym: string; total: number; count: number }[]>([]);
 
   useEffect(() => {

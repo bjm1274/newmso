@@ -2,12 +2,12 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
-export default function UDIManagement({ user, inventory, fetchInventory }: any) {
+export default function UDIManagement({ user, inventory, fetchInventory }: Record<string, unknown>) {
   const [loading, setLoading] = useState(false);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
 
   // UDI 대상 품목 필터링 (is_udi 필드 사용)
-  const udiItems = inventory.filter((item: any) => item.is_udi);
+  const udiItems = (inventory as any[]).filter((item: any) => item.is_udi);
 
   const toggleItemSelection = (itemId: string) => {
     setSelectedItems(prev => 
@@ -27,7 +27,7 @@ export default function UDIManagement({ user, inventory, fetchInventory }: any) 
       const reportItems = udiItems.filter((item: any) => selectedItems.includes(item.id));
       const reportData = {
         report_date: new Date().toISOString(),
-        reporter_id: user.id,
+        reporter_id: (user as Record<string, unknown>).id,
         items: reportItems.map((item: any) => ({
           name: item.item_name,
           quantity: item.quantity,

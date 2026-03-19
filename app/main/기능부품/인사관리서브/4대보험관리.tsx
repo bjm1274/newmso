@@ -28,7 +28,8 @@ const STATUS_COLORS: Record<string, string> = {
     '반려': 'bg-red-100 text-red-700',
 };
 
-export default function InsuranceManagement({ staffs = [], selectedCo }: any) {
+export default function InsuranceManagement({ staffs = [], selectedCo }: Record<string, unknown>) {
+    const _staffs = (staffs as Record<string, unknown>[]) ?? [];
     const [records, setRecords] = useState<InsuranceRecord[]>([]);
     const [showForm, setShowForm] = useState(false);
     const [filter, setFilter] = useState<string>('전체');
@@ -58,7 +59,7 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: any) {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const staff = staffs.find((s: any) => s.id === form.staff_id);
+        const staff = _staffs.find((s: any) => s.id === form.staff_id);
         if (!staff) return alert('직원을 선택해주세요.');
 
         const newRecord = {
@@ -91,7 +92,7 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: any) {
         await supabase.from('insurance_records').update({ status: '신고완료', reported_at: now }).eq('id', id);
     };
 
-    const filteredStaffs = staffs.filter((s: any) => {
+    const filteredStaffs = _staffs.filter((s: any) => {
         if (selectedCo !== '전체' && s.company !== selectedCo) return false;
         return s.status !== '퇴사';
     });
@@ -110,7 +111,7 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: any) {
     const pendingCount = records.filter(r => r.status === '미신고' && (selectedCo === '전체' || r.company === selectedCo)).length;
 
     // 4대보험 현황 요약 (간이)
-    const activeStaffs = staffs.filter((s: any) => s.status !== '퇴사' && (selectedCo === '전체' || s.company === selectedCo));
+    const activeStaffs = _staffs.filter((s: any) => s.status !== '퇴사' && (selectedCo === '전체' || s.company === selectedCo));
     const summaryCards = INSURANCE_TYPES.map(ins => ({
         name: ins,
         enrolled: activeStaffs.length,
@@ -124,7 +125,7 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: any) {
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
                         <h2 className="text-xl font-bold text-[var(--foreground)] tracking-tight">
-                            🏛️ 4대보험 관리 <span className="text-sm text-[var(--accent)] ml-2">[{selectedCo}]</span>
+                            🏛️ 4대보험 관리 <span className="text-sm text-[var(--accent)] ml-2">[{selectedCo as string}]</span>
                         </h2>
                     </div>
                     <div className="flex items-center gap-2">
@@ -277,7 +278,7 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: any) {
                 <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-sm">
                     <h3 className="text-sm font-bold text-[var(--foreground)] mb-4">🤖 자동 감지 알림</h3>
                     <div className="space-y-3">
-                        {staffs.filter((s: any) => {
+                        {_staffs.filter((s: any) => {
                             if (selectedCo !== '전체' && s.company !== selectedCo) return false;
                             const joinDate = s.joined_at ? new Date(s.joined_at) : null;
                             if (!joinDate) return false;
@@ -303,7 +304,7 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: any) {
                                 </button>
                             </div>
                         ))}
-                        {staffs.filter((s: any) => {
+                        {_staffs.filter((s: any) => {
                             if (selectedCo !== '전체' && s.company !== selectedCo) return false;
                             return s.status === '퇴사' && s.resigned_at;
                         }).slice(0, 5).map((s: any) => (
@@ -326,13 +327,13 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: any) {
                                 </button>
                             </div>
                         ))}
-                        {staffs.filter((s: any) => {
+                        {_staffs.filter((s: any) => {
                             if (selectedCo !== '전체' && s.company !== selectedCo) return false;
                             const joinDate = s.joined_at ? new Date(s.joined_at) : null;
                             if (!joinDate) return false;
                             const diff = (Date.now() - joinDate.getTime()) / (1000 * 60 * 60 * 24);
                             return diff <= 14 && s.status !== '퇴사';
-                        }).length === 0 && staffs.filter((s: any) => s.status === '퇴사' && s.resigned_at && (selectedCo === '전체' || s.company === selectedCo)).length === 0 && (
+                        }).length === 0 && _staffs.filter((s: any) => s.status === '퇴사' && s.resigned_at && (selectedCo === '전체' || s.company === selectedCo)).length === 0 && (
                                 <div className="text-center py-5 text-[var(--toss-gray-3)]">
                                     <p className="text-3xl mb-2 opacity-30">✅</p>
                                     <p className="text-[11px] font-bold">현재 미처리 건이 없습니다</p>

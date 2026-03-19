@@ -8,16 +8,23 @@ import SmartDatePicker from '../공통/SmartDatePicker';
  * @param formType - 현재 선택된 결재 양식 종류
  * @param setExtraData - 상위 Approval 컴포넌트로 데이터를 전달하는 함수
  */
-export default function AdminForms({ staffs, formType, setExtraData }: any) {
+type AdminFormsProps = {
+  staffs: { id: string; name: string; position: string; department?: string; departments?: { name: string } }[];
+  formType: string;
+  setExtraData: (updater: (p: Record<string, unknown>) => Record<string, unknown>) => void;
+};
+
+export default function AdminForms({ staffs, formType, setExtraData }: AdminFormsProps) {
   const [localExecutionDate, setLocalExecutionDate] = useState('');
 
   // 병원 실무에서 주로 사용하는 본문 가이드라인 정의
-  const hospitalGuides: any = {
+  const hospitalGuides: Record<string, string> = {
     '업무기안': "1. 기안 목적:\n2. 주요 내용:\n3. 관련 부서 협조 사항:\n4. 기대 효과:",
     '업무보고': "1. 금주 주요 성과:\n2. 미결 및 지연 사항:\n3. 차주 업무 계획:\n4. 건의 사항:",
     '회의록': "1. 회의 안건:\n2. 논의 내용:\n3. 결정 사항:\n4. 향후 일정:",
     '업무협조': "상기 부서에 다음과 같이 업무 협조를 요청합니다.\n\n[협조 내용]:"
   };
+  void hospitalGuides;
 
   const hospitalDepts = ['진료부', '병동팀', '수술팀', '외래팀', '검사팀', '총무팀', '원무팀', '관리팀', '영양팀'];
 
@@ -37,7 +44,7 @@ export default function AdminForms({ staffs, formType, setExtraData }: any) {
                 <label className="text-[11px] font-semibold text-purple-600 ml-1 uppercase">발령 구분</label>
                 <select
                   className="w-full p-4 rounded-[var(--radius-md)] border font-semibold text-xs bg-[var(--card)] outline-none shadow-sm focus:ring-2 focus:ring-purple-200 border-none"
-                  onChange={e => setExtraData((p: any) => ({ ...p, orderCategory: e.target.value }))}
+                  onChange={e => setExtraData((p) => ({ ...p, orderCategory: e.target.value }))}
                 >
                   <option value="">발령 구분 선택</option>
                   <option>정기 승진</option>
@@ -51,7 +58,7 @@ export default function AdminForms({ staffs, formType, setExtraData }: any) {
                 <label className="text-[11px] font-semibold text-purple-600 ml-1 uppercase">시행 일자</label>
                 <SmartDatePicker
                   value={localExecutionDate}
-                  onChange={val => { setLocalExecutionDate(val); setExtraData((p: any) => ({ ...p, executionDate: val })); }}
+                  onChange={val => { setLocalExecutionDate(val); setExtraData((p) => ({ ...p, executionDate: val })); }}
                   inputClassName="w-full h-[46px] px-4 rounded-[var(--radius-md)] bg-[var(--card)] font-semibold text-xs"
                 />
               </div>
@@ -62,10 +69,10 @@ export default function AdminForms({ staffs, formType, setExtraData }: any) {
                 <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] block ml-1">발령 대상자 선택</label>
                 <select
                   className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-lg)] text-xs font-bold outline-none border-none focus:ring-2 focus:ring-purple-100"
-                  onChange={e => setExtraData((p: any) => ({ ...p, orderTargetId: e.target.value }))}
+                  onChange={e => setExtraData((p) => ({ ...p, orderTargetId: e.target.value }))}
                 >
                   <option value="">직원을 선택하세요</option>
-                  {staffs.map((s: any) => (
+                  {staffs.map((s) => (
                     <option key={s.id} value={s.id}>{s.name} ({s.position} / {s.department || s.departments?.name})</option>
                   ))}
                 </select>
@@ -75,7 +82,7 @@ export default function AdminForms({ staffs, formType, setExtraData }: any) {
                 <div className="flex gap-2">
                   <select
                     className="flex-1 p-4 bg-blue-50/50 rounded-[var(--radius-lg)] text-xs font-semibold text-[var(--accent)] outline-none border-none focus:ring-2 focus:ring-[var(--accent)]/30"
-                    onChange={e => setExtraData((p: any) => ({ ...p, newPosition: e.target.value }))}
+                    onChange={e => setExtraData((p) => ({ ...p, newPosition: e.target.value }))}
                   >
                     <option value="">직급 선택</option>
                     <option>병원장</option>
@@ -88,7 +95,7 @@ export default function AdminForms({ staffs, formType, setExtraData }: any) {
                   </select>
                   <select
                     className="flex-1 p-4 bg-blue-50/50 rounded-[var(--radius-lg)] text-xs font-semibold text-[var(--accent)] outline-none border-none focus:ring-2 focus:ring-[var(--accent)]/30"
-                    onChange={e => setExtraData((p: any) => ({ ...p, targetDept: e.target.value }))}
+                    onChange={e => setExtraData((p) => ({ ...p, targetDept: e.target.value }))}
                   >
                     <option value="">부서 선택</option>
                     {hospitalDepts.map(d => <option key={d} value={d}>{d}</option>)}
@@ -108,14 +115,14 @@ export default function AdminForms({ staffs, formType, setExtraData }: any) {
                 type="text"
                 placeholder="예: 원무과, 간호부"
                 className="w-full p-4 rounded-[var(--radius-md)] border bg-[var(--card)] font-bold text-xs outline-none shadow-sm focus:ring-2 focus:ring-[var(--accent)]/30 border-none"
-                onChange={e => setExtraData((p: any) => ({ ...p, targetDept: e.target.value }))}
+                onChange={e => setExtraData((p) => ({ ...p, targetDept: e.target.value }))}
               />
             </div>
             <div className="space-y-2">
               <label className="text-[11px] font-semibold text-blue-500 ml-1">협조 희망일</label>
               <SmartDatePicker
                 value=""
-                onChange={val => setExtraData((p: any) => ({ ...p, deadlineDate: val }))}
+                onChange={val => setExtraData((p) => ({ ...p, deadlineDate: val }))}
                 className="w-full h-[46px] px-4 rounded-[var(--radius-md)] bg-[var(--card)] font-bold text-xs"
               />
             </div>
@@ -131,7 +138,7 @@ export default function AdminForms({ staffs, formType, setExtraData }: any) {
                 type="text"
                 placeholder="예: 대회의실, 원장실"
                 className="w-full p-4 rounded-[var(--radius-md)] border bg-[var(--card)] font-bold text-xs shadow-sm outline-none border-none focus:ring-2 focus:ring-green-100"
-                onChange={e => setExtraData((p: any) => ({ ...p, location: e.target.value }))}
+                onChange={e => setExtraData((p) => ({ ...p, location: e.target.value }))}
               />
             </div>
             <div className="space-y-2">
@@ -140,7 +147,7 @@ export default function AdminForms({ staffs, formType, setExtraData }: any) {
                 type="text"
                 placeholder="참석자 성함 나열"
                 className="w-full p-4 rounded-[var(--radius-md)] border bg-[var(--card)] font-bold text-xs shadow-sm outline-none border-none focus:ring-2 focus:ring-green-100"
-                onChange={e => setExtraData((p: any) => ({ ...p, attendees: e.target.value }))}
+                onChange={e => setExtraData((p) => ({ ...p, attendees: e.target.value }))}
               />
             </div>
           </div>
@@ -153,7 +160,7 @@ export default function AdminForms({ staffs, formType, setExtraData }: any) {
               <label className="text-[11px] font-semibold text-orange-500 ml-1">보고 주기</label>
               <select
                 className="w-full p-4 rounded-[var(--radius-md)] border bg-[var(--card)] font-semibold text-xs outline-none shadow-sm border-none focus:ring-2 focus:ring-orange-100"
-                onChange={e => setExtraData((p: any) => ({ ...p, reportCycle: e.target.value }))}
+                onChange={e => setExtraData((p) => ({ ...p, reportCycle: e.target.value }))}
               >
                 <option>주간 업무보고</option>
                 <option>월간 업무보고</option>

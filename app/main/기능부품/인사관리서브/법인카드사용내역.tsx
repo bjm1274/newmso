@@ -18,7 +18,7 @@ function autoClassify(merchant: string): string {
   return '기타';
 }
 
-export default function CorporateCardTransactions({ staffs = [] }: any) {
+export default function CorporateCardTransactions({ staffs = [] }: Record<string, unknown>) {
   const [activeTab, setActiveTab] = useState<'cards' | 'transactions'>('transactions');
   const [selectedCo, setSelectedCo] = useState('전체');
   const [cards, setCards] = useState<any[]>([]);
@@ -47,10 +47,10 @@ export default function CorporateCardTransactions({ staffs = [] }: any) {
       .gte('transaction_date', start)
       .lte('transaction_date', end)
       .order('transaction_date', { ascending: false });
-    let rows: any[] = error ? [] : (data || []);
-    if (selectedCo !== '전체') rows = rows.filter((r: any) => (r.company_name || r.corporate_cards?.company_name) === selectedCo);
-    if (filterCat) rows = rows.filter((r: any) => r.category === filterCat);
-    if (filterCardId) rows = rows.filter((r: any) => r.card_id === filterCardId);
+    let rows: Record<string, unknown>[] = error ? [] : (data || []);
+    if (selectedCo !== '전체') rows = rows.filter((r: Record<string, unknown>) => (r.company_name || (r.corporate_cards as Record<string, unknown>)?.company_name) === selectedCo);
+    if (filterCat) rows = rows.filter((r: Record<string, unknown>) => r.category === filterCat);
+    if (filterCardId) rows = rows.filter((r: Record<string, unknown>) => r.card_id === filterCardId);
     setList(rows);
   }, [month, selectedCo, filterCat, filterCardId]);
 
@@ -189,7 +189,7 @@ export default function CorporateCardTransactions({ staffs = [] }: any) {
 
   // '기타'로 분류된 항목을 일괄 자동 분류
   const handleBulkAutoClassify = async () => {
-    const unclassified = list.filter((r: any) => r.category === '기타' && r.merchant);
+    const unclassified = list.filter((r: Record<string, unknown>) => r.category === '기타' && r.merchant);
     if (unclassified.length === 0) return alert('자동 분류할 항목이 없습니다. (이미 분류됨)');
     if (!confirm(`${unclassified.length}건을 자동 분류하시겠습니까?`)) return;
     let updated = 0;
@@ -377,8 +377,8 @@ export default function CorporateCardTransactions({ staffs = [] }: any) {
             <input type="text" value={cardForm.issuer} onChange={(e) => setCardForm({ ...cardForm, issuer: e.target.value })} placeholder="발급사 (KB, 신한 등)" className="w-full p-3 border rounded-[var(--radius-lg)]" />
             <select value={cardForm.holder_id} onChange={(e) => setCardForm({ ...cardForm, holder_id: e.target.value })} className="w-full p-3 border rounded-[var(--radius-lg)]">
               <option value="">사용자 (선택)</option>
-              {staffs?.filter((s: any) => s.company === cardForm.company_name).map((s: any) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
+              {(staffs as Record<string, unknown>[] | undefined)?.filter((s: Record<string, unknown>) => s.company === cardForm.company_name).map((s: Record<string, unknown>) => (
+                <option key={s.id as string} value={s.id as string}>{s.name as string}</option>
               ))}
             </select>
             <div className="flex gap-2">

@@ -135,8 +135,8 @@ export default function DailyClosurePage({ user }: { user: any }) {
             alert('마감 보고가 저장되었습니다.');
             setView('list');
             loadClosures();
-        } catch (err: any) {
-            alert('저장 중 오류가 발생했습니다: ' + err.message);
+        } catch (err: unknown) {
+            alert('저장 중 오류가 발생했습니다: ' + ((err as Error)?.message ?? String(err)));
         } finally {
             setLoading(false);
         }

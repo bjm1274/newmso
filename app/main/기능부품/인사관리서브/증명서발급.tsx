@@ -43,13 +43,15 @@ function getClosingText(certType: string) {
   return map[certType] || '위와 같이 증명합니다.';
 }
 
-export default function CertificateGenerator({ staffs = [], selectedCo = '전체' }: any) {
+export default function CertificateGenerator({ staffs: _staffs = [], selectedCo: _selectedCo = '전체' }: Record<string, unknown>) {
+  const staffs = (_staffs as Record<string, unknown>[]);
+  const selectedCo = _selectedCo as string;
   const filteredStaffs = useMemo(
-    () => staffs.filter((staff: any) => selectedCo === '전체' || staff.company === selectedCo),
+    () => staffs.filter((staff: Record<string, unknown>) => selectedCo === '전체' || staff.company === selectedCo),
     [selectedCo, staffs],
   );
 
-  const [selectedStaff, setSelectedStaff] = useState<any>(null);
+  const [selectedStaff, setSelectedStaff] = useState<Record<string, unknown> | null>(null);
   const [certType, setCertType] = useState<string>(CERTIFICATE_TYPES[0]?.id || '재직증명서');
   const [purpose, setPurpose] = useState('기관 제출용');
   const [serialNo, setSerialNo] = useState('');
@@ -73,7 +75,7 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
         }
       });
       setSeals(sealMap);
-      setDesign(resolveDocumentDesign(designStore, 'certificate', selectedStaff?.company || selectedCo));
+      setDesign(resolveDocumentDesign(designStore, 'certificate', (selectedStaff?.company as string) || selectedCo));
     };
 
     loadResources().catch((error) => {
@@ -109,7 +111,7 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
     [certType],
   );
 
-  const companyName = selectedStaff?.company || selectedCo || 'SY INC.';
+  const companyName = ((selectedStaff?.company as string) || selectedCo || 'SY INC.') as string;
   const companyLabel = design.companyLabel || companyName;
   const primaryColor = design.primaryColor;
   const borderColor = design.borderColor;
@@ -126,16 +128,16 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
     selectedStaff?.role ||
     '-';
   const identityRows: Array<[string, string]> = [
-    ['성명', selectedStaff?.name || '-'],
-    ['사번', selectedStaff?.employee_no || String(selectedStaff?.id || '-')],
-    ['부서', selectedStaff?.department || '-'],
-    ['직위', selectedStaff?.position || '-'],
+    ['성명', (selectedStaff?.name as string) || '-'],
+    ['사번', (selectedStaff?.employee_no as string) || String(selectedStaff?.id || '-')],
+    ['부서', (selectedStaff?.department as string) || '-'],
+    ['직위', (selectedStaff?.position as string) || '-'],
   ];
   const certificateRows: Array<[string, string]> = [
-    ['근무부서', selectedStaff?.department || '-'],
-    ['직위/직급', [selectedStaff?.position, rankLabel].filter(Boolean).join(' / ') || '-'],
-    ['입사일자', formatDateLabel(joinedAt)],
-    ['담당업무', dutyLabel],
+    ['근무부서', (selectedStaff?.department as string) || '-'],
+    ['직위/직급', [(selectedStaff?.position as string), rankLabel].filter(Boolean).join(' / ') || '-'],
+    ['입사일자', formatDateLabel(joinedAt as string)],
+    ['담당업무', dutyLabel as string],
     ['발급일자', formatDateLabel(new Date().toISOString())],
     ['발급번호', serialNo || '__SERIAL__'],
     ...(certType === '급여지급증명서' || certType === '소득금액증명서' || certType === '원천징수영수증'
@@ -252,7 +254,7 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
               >
                 <div className="aspect-[3/4] overflow-hidden bg-[#eef2f6]" style={{ backgroundColor: profilePhotoUrl ? undefined : surface }}>
                 {profilePhotoUrl ? (
-                  <img src={profilePhotoUrl} alt={selectedStaff?.name || '직원 사진'} className="h-full w-full object-cover" />
+                  <img src={profilePhotoUrl} alt={(selectedStaff?.name as string) || '직원 사진'} className="h-full w-full object-cover" />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-4xl font-black text-[var(--toss-gray-3)]">
                     {String(selectedStaff?.name || '?').slice(0, 1)}
@@ -369,7 +371,7 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
                   1. 발급 직원
                 </span>
                 <select
-                  value={selectedStaff?.id || ''}
+                  value={(selectedStaff?.id as string) || ''}
                   onChange={(event) => setSelectedStaff(filteredStaffs.find((staff: any) => staff.id === event.target.value) || null)}
                   className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] px-3 py-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
                 >
@@ -525,7 +527,7 @@ export default function CertificateGenerator({ staffs = [], selectedCo = '전체
                 >
                   <div className="aspect-[3/4] overflow-hidden rounded-[var(--radius-xl)]" style={{ backgroundColor: surface }}>
                     {profilePhotoUrl ? (
-                      <img src={profilePhotoUrl} alt={selectedStaff?.name || '직원 사진'} className="h-full w-full object-cover" />
+                      <img src={profilePhotoUrl} alt={(selectedStaff?.name as string) || '직원 사진'} className="h-full w-full object-cover" />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center text-4xl font-black text-[var(--toss-gray-3)]">
                         {String(selectedStaff?.name || '?').slice(0, 1)}
