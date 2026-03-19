@@ -468,46 +468,46 @@ function normalizeShiftName(name: string) {
 }
 
 const OFFICE_PATTERN_KEYWORDS = [
-  '\ud1b5\uc0c1',
-  '\uc0c1\uadfc',
-  '\uc77c\ubc18',
-  '\uc8fc\uac04',
-  '\uace0\uc815',
+  '통상',
+  '상근',
+  '일반',
+  '주간',
+  '고정',
   'office',
   'weekday',
   'regular',
 ];
 
-const THREE_SHIFT_PATTERN_KEYWORDS = ['3\uad50\ub300', '3shift', '3-shift'];
-const TWO_SHIFT_PATTERN_KEYWORDS = ['2\uad50\ub300', '2shift', '2-shift'];
-const TWO_WORK_ONE_OFF_PATTERN_KEYWORDS = ['2\uc77c\uadfc\ubb341\uc77c\ud734\ubb34'];
-const ONE_WORK_ONE_OFF_PATTERN_KEYWORDS = ['1\uc77c\uadfc\ubb341\uc77c\ud734\ubb34'];
+const THREE_SHIFT_PATTERN_KEYWORDS = ['3교대', '3shift', '3-shift'];
+const TWO_SHIFT_PATTERN_KEYWORDS = ['2교대', '2shift', '2-shift'];
+const TWO_WORK_ONE_OFF_PATTERN_KEYWORDS = ['2일근무1일휴무'];
+const ONE_WORK_ONE_OFF_PATTERN_KEYWORDS = ['1일근무1일휴무'];
 const DAY_DEDICATED_PATTERN_KEYWORDS = [
-  '\uB370\uC774\uC804\uB2F4',
-  '\uC8FC\uAC04\uC804\uB2F4',
-  '\uC8FC\uAC04\uACE0\uC815',
+  '데이전담',
+  '주간전담',
+  '주간고정',
   'daydedicated',
   'dayfixed',
   'dayonly',
 ];
 const EVENING_DEDICATED_PATTERN_KEYWORDS = [
-  '\uC774\uBE0C\uC804\uB2F4',
-  '\uC774\uBE0C\uB2DD\uC804\uB2F4',
-  '\uC774\uBE0C\uACE0\uC815',
+  '이브전담',
+  '이브닝전담',
+  '이브고정',
   'eveningdedicated',
   'eveningfixed',
   'evefixed',
   'eveonly',
 ];
 const NIGHT_DEDICATED_PATTERN_KEYWORDS = [
-  '\uB098\uC774\uD2B8\uC804\uB2F4',
-  '\uC57C\uAC04\uC804\uB2F4',
-  '\uC57C\uAC04\uACE0\uC815',
+  '나이트전담',
+  '야간전담',
+  '야간고정',
   'nightdedicated',
   'nightfixed',
   'nightonly',
 ];
-const FIXED_PATTERN_KEYWORDS = ['\uC804\uB2F4', '\uACE0\uC815', 'fixed', 'dedicated', 'only'];
+const FIXED_PATTERN_KEYWORDS = ['전담', '고정', 'fixed', 'dedicated', 'only'];
 const MANAGEMENT_TEAM_KEYWORDS = ['관리팀', '시설관리', '환경관리'];
 const WARD_TEAM_KEYWORDS = ['병동', '입원', '간호', 'ward'];
 const OUTPATIENT_TEAM_KEYWORDS = ['외래', '검사', '원무', 'opd', 'outpatient'];
@@ -1857,8 +1857,8 @@ function inferDedicatedPatternGroup(
     return buildGroup(
       'day',
       'day_fixed',
-      '\uB370\uC774\uC804\uB2F4',
-      '\uC9C1\uC6D0 \uADFC\uBB34\uC720\uD615\uACFC \uBC30\uC815 \uADFC\uBB34\uB97C \uAE30\uC900\uC73C\uB85C \uB370\uC774 \uC804\uB2F4\uC790\uB85C \uC790\uB3D9 \uAC10\uC9C0\uD588\uC2B5\uB2C8\uB2E4.'
+      '데이전담',
+      '직원 근무유형과 배정 근무를 기준으로 데이 전담자로 자동 감지했습니다.'
     );
   }
 
@@ -1866,8 +1866,8 @@ function inferDedicatedPatternGroup(
     return buildGroup(
       'evening',
       'evening_fixed',
-      '\uC774\uBE0C\uC804\uB2F4',
-      '\uC9C1\uC6D0 \uADFC\uBB34\uC720\uD615\uACFC \uBC30\uC815 \uADFC\uBB34\uB97C \uAE30\uC900\uC73C\uB85C \uC774\uBE0C \uC804\uB2F4\uC790\uB85C \uC790\uB3D9 \uAC10\uC9C0\uD588\uC2B5\uB2C8\uB2E4.'
+      '이브전담',
+      '직원 근무유형과 배정 근무를 기준으로 이브 전담자로 자동 감지했습니다.'
     );
   }
 
@@ -1875,8 +1875,8 @@ function inferDedicatedPatternGroup(
     return buildGroup(
       'night',
       'night_fixed',
-      '\uB098\uC774\uD2B8\uC804\uB2F4',
-      '\uC9C1\uC6D0 \uADFC\uBB34\uC720\uD615\uACFC \uBC30\uC815 \uADFC\uBB34\uB97C \uAE30\uC900\uC73C\uB85C \uB098\uC774\uD2B8 \uC804\uB2F4\uC790\uB85C \uC790\uB3D9 \uAC10\uC9C0\uD588\uC2B5\uB2C8\uB2E4.'
+      '나이트전담',
+      '직원 근무유형과 배정 근무를 기준으로 나이트 전담자로 자동 감지했습니다.'
     );
   }
 
@@ -1886,24 +1886,24 @@ function inferDedicatedPatternGroup(
       return buildGroup(
         'day',
         'day_fixed',
-        '\uB370\uC774\uC804\uB2F4',
-        '\uACE0\uC815 \uADFC\uBB34 \uD78C\uD2B8\uC640 \uBC30\uC815 \uADFC\uBB34 \uC2DC\uAC04\uC744 \uAE30\uC900\uC73C\uB85C \uB370\uC774 \uC804\uB2F4\uC790\uB85C \uD310\uB2E8\uD588\uC2B5\uB2C8\uB2E4.'
+        '데이전담',
+        '고정 근무 힌트와 배정 근무 시간을 기준으로 데이 전담자로 판단했습니다.'
       );
     }
     if (assignedBand === 'evening') {
       return buildGroup(
         'evening',
         'evening_fixed',
-        '\uC774\uBE0C\uC804\uB2F4',
-        '\uACE0\uC815 \uADFC\uBB34 \uD78C\uD2B8\uC640 \uBC30\uC815 \uADFC\uBB34 \uC2DC\uAC04\uC744 \uAE30\uC900\uC73C\uB85C \uC774\uBE0C \uC804\uB2F4\uC790\uB85C \uD310\uB2E8\uD588\uC2B5\uB2C8\uB2E4.'
+        '이브전담',
+        '고정 근무 힌트와 배정 근무 시간을 기준으로 이브 전담자로 판단했습니다.'
       );
     }
     if (assignedBand === 'night') {
       return buildGroup(
         'night',
         'night_fixed',
-        '\uB098\uC774\uD2B8\uC804\uB2F4',
-        '\uACE0\uC815 \uADFC\uBB34 \uD78C\uD2B8\uC640 \uBC30\uC815 \uADFC\uBB34 \uC2DC\uAC04\uC744 \uAE30\uC900\uC73C\uB85C \uB098\uC774\uD2B8 \uC804\uB2F4\uC790\uB85C \uD310\uB2E8\uD588\uC2B5\uB2C8\uB2E4.'
+        '나이트전담',
+        '고정 근무 힌트와 배정 근무 시간을 기준으로 나이트 전담자로 판단했습니다.'
       );
     }
   }
@@ -3980,8 +3980,8 @@ export default function AutoRosterPlanner({
             key: `default-${defaultPlannerMode}`,
             label:
               defaultPlannerMode === 'rotation'
-                ? '\uC21C\uD658\uADFC\uBB34'
-                : '\uAE30\uBCF8 \uACE0\uC815\uADFC\uBB34',
+                ? '순환근무'
+                : '기본 고정근무',
             mode: defaultPlannerMode,
             source: 'default' as const,
           };
@@ -6341,8 +6341,8 @@ export default function AutoRosterPlanner({
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <div className="w-full rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--muted)]/70 px-4 py-3 text-sm font-semibold text-[var(--foreground)]">
               {selectedPatternProfile
-                ? '\uC120\uD0DD\uD55C \uD300 \uD328\uD134 \uD504\uB85C\uD544\uC744 \uAE30\uC900\uC73C\uB85C \uB370\uC774/\uC774\uBE0C/\uB098\uC774\uD2B8 \uC804\uB2F4\uC790\uC640 \uC21C\uD658 \uADFC\uBB34\uC790\uB97C \uAC19\uC774 \uD3B8\uC131\uD569\uB2C8\uB2E4.'
-                : '\uC800\uC7A5\uB41C \uD300 \uD328\uD134 \uD504\uB85C\uD544\uC774 \uC5C6\uC5B4\uB3C4 \uC9C1\uC6D0\uC758 shift_type\uACFC \uBC30\uC815 \uADFC\uBB34\uB97C \uAE30\uC900\uC73C\uB85C \uB370\uC774/\uC774\uBE0C/\uB098\uC774\uD2B8 \uC804\uB2F4\uC790\uB97C \uC790\uB3D9 \uAC10\uC9C0\uD558\uACE0, \uB098\uBA38\uC9C0\uB294 \uC21C\uD658 \uADFC\uBB34\uB85C \uD3B8\uC131\uD569\uB2C8\uB2E4.'}
+                ? '선택한 팀 패턴 프로필을 기준으로 데이/이브/나이트 전담자와 순환 근무자를 같이 편성합니다.'
+                : '저장된 팀 패턴 프로필이 없어도 직원의 shift_type과 배정 근무를 기준으로 데이/이브/나이트 전담자를 자동 감지하고, 나머지는 순환 근무로 편성합니다.'}
             </div>
             {plannerPatternPreviewGroups.length > 0 ? (
               <div

@@ -28,7 +28,8 @@
       "Bash(perl -i -pe 's/새로고침\\\\\\(\\\\\\)/새로고침?.\\(\\)/g' \"C:/Users/baek_/newmso/app/main/기능부품/인사관리서브/구성원현황.tsx\")",
       "Bash(perl -i -pe ':*)",
       "Bash(perl -i -pe 's/modalData\\\\.item\\\\./modalItem./g' \"C:/Users/baek_/newmso/app/main/기능부품/재고관리서브/재고팝업창.tsx\")",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(xargs file:*)"
     ]
   }
 }

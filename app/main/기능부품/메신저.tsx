@@ -475,6 +475,16 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     pendingBottomAlignRoomIdRef.current = roomId;
     isNearBottomRef.current = true;
     setShowScrollToLatest(false);
+    if (selectedRoomIdRef.current !== roomId) {
+      setMessages([]);
+      setReadCounts({});
+      setReactions({});
+      setPolls([]);
+      setPollVotes({});
+      setPinnedIds([]);
+      setPersistedPinnedMessages([]);
+      setBookmarkedIds(new Set());
+    }
     setSelectedRoomId(roomId);
     if (typeof window === 'undefined') return;
     try {
@@ -528,6 +538,47 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     isNearBottomRef.current = true;
     setShowScrollToLatest(false);
   }, []);
+
+  const alignRoomToLatest = useCallback((roomId: string | null | undefined, behavior: ScrollBehavior = 'auto') => {
+    if (!roomId) return;
+
+    let attempts = 0;
+    const maxAttempts = 4;
+
+    const tryAlign = () => {
+      if (selectedRoomIdRef.current !== roomId) return;
+
+      scrollToBottom(attempts === 0 ? behavior : 'auto');
+
+      const listEl = messageListRef.current;
+      if (!listEl) {
+        if (pendingBottomAlignRoomIdRef.current === roomId) {
+          pendingBottomAlignRoomIdRef.current = null;
+        }
+        return;
+      }
+
+      const distanceFromBottom = listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight;
+      if (distanceFromBottom > 24 && attempts < maxAttempts) {
+        attempts += 1;
+        requestAnimationFrame(() => {
+          requestAnimationFrame(tryAlign);
+        });
+        return;
+      }
+
+      if (pendingBottomAlignRoomIdRef.current === roomId) {
+        pendingBottomAlignRoomIdRef.current = null;
+      }
+    };
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(tryAlign);
+    });
+
+    window.setTimeout(tryAlign, 120);
+    window.setTimeout(tryAlign, 260);
+  }, [scrollToBottom]);
 
   const persistMessageReads = useCallback(async (messageIds: string[]) => {
     if (!user?.id || messageIds.length === 0) return;
@@ -793,10 +844,11 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
   const fetchData = useCallback(async () => {
     if (!selectedRoomId) return;
+    const roomIdForFetch = String(selectedRoomId);
     const { data: roomRows } = await supabase.from('chat_rooms').select('*');
     const repairedRooms = await repairDirectRooms(roomRows || []);
     const selectedRoomRecord =
-      repairedRooms.find(( room: ChatRoom) => String(room.id) === String(selectedRoomId)) || null;
+      repairedRooms.find(( room: ChatRoom) => String(room.id) === roomIdForFetch) || null;
     const selectedRoomKey = getDirectRoomMembersKey(selectedRoomRecord);
     const canonicalDirectRoom = selectedRoomKey
       ? repairedRooms
@@ -806,7 +858,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             new Date(a.last_message_at || a.created_at || 0).getTime()
           )[0]
       : null;
-    if (canonicalDirectRoom?.id && String(canonicalDirectRoom.id) !== String(selectedRoomId)) {
+    if (canonicalDirectRoom?.id && String(canonicalDirectRoom.id) !== roomIdForFetch) {
       setRoom(String(canonicalDirectRoom.id));
     }
     const roomIdsToLoad = Array.from(
@@ -815,7 +867,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           ? repairedRooms
               .filter(( room: ChatRoom) => getDirectRoomMembersKey(room) === selectedRoomKey)
               .map(( room: ChatRoom) => String(room.id))
-          : [String(selectedRoomId)]
+          : [roomIdForFetch]
       )
     );
 
@@ -877,11 +929,11 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       const { data: pinned, error: pinnedError } = await supabase
         .from('pinned_messages')
         .select('message_id')
-        .eq('room_id', selectedRoomId);
+        .eq('room_id', roomIdForFetch);
       if (pinnedError) throw pinnedError;
       const nextPinnedIds = (pinned || []).map((item: Record<string, unknown>) => String(item.message_id)).slice(-1);
       setPinnedIds(nextPinnedIds);
-      writeStoredPinnedIds(selectedRoomId, nextPinnedIds);
+      writeStoredPinnedIds(roomIdForFetch, nextPinnedIds);
       if (nextPinnedIds.length > 0) {
         const pinnedLookup = new Map<string, any>();
         (msgs || []).forEach((msg: ChatMessage) => {
@@ -930,7 +982,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       });
       setReactions(reactMap);
 
-      const { data: dbPolls } = await supabase.from('polls').select('*').eq('room_id', selectedRoomId);
+      const { data: dbPolls } = await supabase.from('polls').select('*').eq('room_id', roomIdForFetch);
       if (dbPolls?.length) {
         setPolls(dbPolls);
       } else {
@@ -949,7 +1001,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       console.error('반응/투표 데이터 불러오기 실패:', error);
     }
 
-    if (selectedRoomId && msgs?.length) {
+    if (roomIdForFetch && msgs?.length) {
       const unreadMsgIds = msgs
         .filter(( m: ChatMessage) => String(m.sender_id) !== effectiveChatUserId)
         .filter(( m: ChatMessage) => {
@@ -960,13 +1012,13 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       if (unreadMsgIds.length > 0) {
         try {
           await persistMessageReads(unreadMsgIds);
-          broadcastChatSync('message-read', selectedRoomId);
+          broadcastChatSync('message-read', roomIdForFetch);
 
           // table notification_settings might not exist
           try {
             await supabase.from('room_read_cursors').upsert({
               user_id: user!.id,
-              room_id: selectedRoomId,
+              room_id: roomIdForFetch,
               last_read_at: new Date().toISOString()
             }, { onConflict: 'user_id,room_id' });
           } catch (e) {
@@ -981,13 +1033,17 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             return next;
           });
 
-          setRoomUnreadCounts(prev => ({ ...prev, [selectedRoomId]: 0 }));
+          setRoomUnreadCounts(prev => ({ ...prev, [roomIdForFetch]: 0 }));
         } catch (e) {
           console.error('자동 읽음 처리 실패:', e);
         }
       }
     }
-  }, [selectedRoomId, user?.id, effectiveChatUserId, effectiveTodoUserId, repairDirectRooms, syncChatRoomsState, persistMessageReads, broadcastChatSync, resolveStaffProfile]);
+
+    if (pendingBottomAlignRoomIdRef.current === roomIdForFetch) {
+      alignRoomToLatest(roomIdForFetch, 'auto');
+    }
+  }, [selectedRoomId, user?.id, effectiveChatUserId, effectiveTodoUserId, repairDirectRooms, syncChatRoomsState, persistMessageReads, broadcastChatSync, resolveStaffProfile, alignRoomToLatest]);
 
   const roomNotifyRef = useRef(true);
   useEffect(() => { roomNotifyRef.current = roomNotifyOn; }, [roomNotifyOn]);
@@ -1316,8 +1372,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
   useEffect(() => {
     if (!selectedRoomId) return;
-    requestAnimationFrame(() => scrollToBottom('auto'));
-  }, [selectedRoomId, scrollToBottom]);
+    alignRoomToLatest(selectedRoomId, 'auto');
+  }, [alignRoomToLatest, selectedRoomId]);
 
   useLayoutEffect(() => {
     if (!selectedRoomId) {
@@ -1325,42 +1381,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       return;
     }
     if (pendingBottomAlignRoomIdRef.current !== selectedRoomId) return;
-
-    let cancelled = false;
-    let firstFrame = 0;
-    let secondFrame = 0;
-    let retryTimer: ReturnType<typeof setTimeout> | null = null;
-
-    const alignToLatest = () => {
-      firstFrame = requestAnimationFrame(() => {
-        secondFrame = requestAnimationFrame(() => {
-          if (cancelled || pendingBottomAlignRoomIdRef.current !== selectedRoomId) return;
-          scrollToBottom('auto');
-          const listEl = messageListRef.current;
-          if (!listEl) {
-            pendingBottomAlignRoomIdRef.current = null;
-            return;
-          }
-          const distanceFromBottom = listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight;
-          if (distanceFromBottom < 24) {
-            pendingBottomAlignRoomIdRef.current = null;
-          }
-        });
-      });
-    };
-
-    alignToLatest();
-    retryTimer = setTimeout(alignToLatest, 120);
-
-    return () => {
-      cancelled = true;
-      cancelAnimationFrame(firstFrame);
-      cancelAnimationFrame(secondFrame);
-      if (retryTimer) {
-        clearTimeout(retryTimer);
-      }
-    };
-  }, [selectedRoomId, messages.length, polls.length, pinnedIds.length, persistedPinnedMessages.length, scrollToBottom]);
+    alignRoomToLatest(selectedRoomId, 'auto');
+  }, [alignRoomToLatest, selectedRoomId, messages.length, polls.length, pinnedIds.length, persistedPinnedMessages.length]);
 
   const pinnedMessages = useMemo(
     () => messages.filter((m) => pinnedIds.includes(String(m.id))),
