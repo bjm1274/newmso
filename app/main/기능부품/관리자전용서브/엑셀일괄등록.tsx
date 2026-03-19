@@ -16,7 +16,7 @@ function mapEcountRow(r: any) {
   return { itemName, qty, unitPrice, category, company, minQty };
 }
 
-export default function ExcelBulkUpload({ onRefresh }: any) {
+export default function ExcelBulkUpload({ onRefresh }: Record<string, unknown>) {
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<UploadMode>('staff');
   const [preview, setPreview] = useState<any[]>([]);
@@ -102,7 +102,7 @@ export default function ExcelBulkUpload({ onRefresh }: any) {
           alert(`재고(이카운트) 반영 완료: 신규 ${inserted}건, 수정 ${updated}건`);
         }
         setPreview([]);
-        if (onRefresh) onRefresh();
+        if (onRefresh) (onRefresh as () => void)();
       }
     } catch (err) {
       console.error(err);

@@ -19,11 +19,11 @@ const SHIFT_TYPES = [
     { id: 'OFF', name: '휴무', color: 'bg-[var(--tab-bg)] text-[var(--toss-gray-3)] border-[var(--border)]', hours: 0 }
 ];
 
-export default function ShiftCalendar({ staffs, selectedCo }: any) {
+export default function ShiftCalendar({ staffs, selectedCo }: Record<string, unknown>) {
     const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
     const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
     const [monthDates, setMonthDates] = useState(getMonthDates(currentYear, currentMonth));
-    const [shifts, setShifts] = useState<any>({}); // Format: { "staffId_YYYY-MM-DD": "D" }
+    const [shifts, setShifts] = useState<Record<string, unknown>>({}); // Format: { "staffId_YYYY-MM-DD": "D" }
     const [loading, setLoading] = useState(false);
     const [shiftWorkerIds, setShiftWorkerIds] = useState<Set<string>>(new Set());
 
@@ -34,7 +34,7 @@ export default function ShiftCalendar({ staffs, selectedCo }: any) {
                 const shiftIds = data.map(d => d.id);
                 // Filter staff members who have a work_shift_id matching the shiftIds
                 // Assuming staff objects passed have work_shift_id
-                const validStaffIds = new Set<string>(staffs.filter((s: any) => s.work_shift_id && shiftIds.includes(s.work_shift_id)).map((s: any) => s.id));
+                const validStaffIds = new Set<string>((staffs as any[]).filter((s: any) => s.work_shift_id && shiftIds.includes(s.work_shift_id)).map((s: any) => s.id));
                 setShiftWorkerIds(validStaffIds);
             }
         };
@@ -42,7 +42,7 @@ export default function ShiftCalendar({ staffs, selectedCo }: any) {
     }, [staffs]);
 
     // Filter staff by company AND shift worker designation
-    const filteredStaffs = staffs?.filter((s: any) =>
+    const filteredStaffs = (staffs as any[])?.filter((s: any) =>
         (selectedCo === '전체' || s.company === selectedCo) && shiftWorkerIds.has(s.id)
     ) || [];
 

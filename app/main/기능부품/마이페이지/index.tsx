@@ -66,7 +66,15 @@ const LEGACY_FAVORITE_MAP: Partial<Record<FavoriteId, FavoriteId>> = {
   mypage_salary: 'mypage_records',
 };
 
-export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInitialTab, onOpenApproval, setMainMenu }: any) {
+interface MyPageMainProps {
+  user?: Record<string, unknown> | null;
+  initialMyPageTab?: string | null;
+  onConsumeMyPageInitialTab?: () => void;
+  onOpenApproval?: (options?: Record<string, unknown>) => void;
+  setMainMenu?: (menu: string) => void;
+}
+
+export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInitialTab, onOpenApproval, setMainMenu }: MyPageMainProps) {
   const [activeTab, setActiveTab] = useState<'profile' | 'records' | 'todo' | 'commute' | 'documents' | 'notifications'>('profile');
   const [recordsView, setRecordsView] = useState<'salary' | 'certificates'>('salary');
   const [favorites, setFavorites] = useState<FavoriteId[]>([]);
@@ -76,7 +84,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
   const [showSecret, setShowSecret] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
 
-  const [pendingContract, setPendingContract] = useState<any>(null);
+  const [pendingContract, setPendingContract] = useState<Record<string, unknown> | null>(null);
   const [showSignaturePad, setShowSignaturePad] = useState(false);
 
   // 미서명 계약서 확인
@@ -86,7 +94,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
       const { data } = await supabase
         .from('employment_contracts')
         .select('*')
-        .eq('staff_id', user.id)
+        .eq('staff_id', user.id as string)
         .eq('status', '서명대기')
         .order('requested_at', { ascending: false })
         .limit(1)
@@ -114,11 +122,11 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
 
       // 문서 보관함으로 자동 저장 (PDF는 보관함에서 열 때 생성됨)
       await supabase.from('document_repository').insert({
-        title: `${user.name} 근로계약서 (${new Date().toLocaleDateString()})`,
+        title: `${user?.name} 근로계약서 (${new Date().toLocaleDateString()})`,
         category: '계약서',
         content: contractText,
-        company_name: user.company || '전체',
-        created_by: user.id,
+        company_name: (user?.company as string) || '전체',
+        created_by: user?.id,
         version: 1
       });
 
@@ -126,7 +134,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
       await supabase.from('notifications').insert({
         user_id: 'system_admin',
         title: '계약서 서명 완료',
-        message: `${user.name} 님이 근로계약서에 전자서명을 완료했습니다.`,
+        message: `${user?.name} 님이 근로계약서에 전자서명을 완료했습니다.`,
         type: 'SUCCESS',
         read_at: null
       });
@@ -210,7 +218,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
         const raw = window.localStorage.getItem('erp_user');
         if (!raw) return;
         const parsed = JSON.parse(raw);
-        if (!user?.name || parsed?.name === user.name) {
+        if (!user?.name || parsed?.name === (user.name as string)) {
           setProfileSummary(buildProfileSummary(parsed));
         }
       } catch {
@@ -403,7 +411,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
             <div className="flex flex-wrap items-center gap-2">
               <AppLogo size={32} />
               <h1 className="page-header-title">
-                반갑습니다, {user.name}님
+                반갑습니다, {user?.name as string}님
               </h1>
             </div>
           </div>
@@ -749,7 +757,13 @@ function PayrollAndCertificatesHub({
   );
 }
 
-function TabButton({ isActive, onClick, label, icon, ariaLabel }: any) {
+function TabButton({ isActive, onClick, label, icon, ariaLabel }: {
+  isActive: boolean;
+  onClick: () => void;
+  label: string;
+  icon: string;
+  ariaLabel?: string;
+}) {
   return (
     <button
       onClick={onClick}
@@ -764,7 +778,13 @@ function TabButton({ isActive, onClick, label, icon, ariaLabel }: any) {
   );
 }
 
-function QuickFavoriteButton({ label, icon, onClick, active, onRemove }: any) {
+function QuickFavoriteButton({ label, icon, onClick, active, onRemove }: {
+  label: string;
+  icon: string;
+  onClick: () => void;
+  active: boolean;
+  onRemove?: () => void;
+}) {
   return (
     <button
       onClick={onClick}

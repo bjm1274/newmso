@@ -43,8 +43,8 @@ export default function UnpaidAbsenceDeduction({ staffs, selectedCo, user }: Pro
         .order('staff_name');
       if (error) throw error;
       setRecords(data || []);
-    } catch (e: any) {
-      console.warn('무급결근 조회 실패:', e.message);
+    } catch (e: unknown) {
+      console.warn('무급결근 조회 실패:', ((e as Error)?.message ?? String(e)));
       setRecords([]);
     } finally {
       setLoading(false);
@@ -126,8 +126,8 @@ export default function UnpaidAbsenceDeduction({ staffs, selectedCo, user }: Pro
       setEditingId(null);
       setForm({});
       fetchRecords();
-    } catch (e: any) {
-      setMessage({ type: 'error', text: `저장 실패: ${e.message}` });
+    } catch (e: unknown) {
+      setMessage({ type: 'error', text: `저장 실패: ${((e as Error)?.message ?? String(e))}` });
     } finally {
       setSaving(false);
     }
@@ -139,8 +139,8 @@ export default function UnpaidAbsenceDeduction({ staffs, selectedCo, user }: Pro
       const { error } = await supabase.from('unpaid_absence_records').delete().eq('id', id);
       if (error) throw error;
       fetchRecords();
-    } catch (e: any) {
-      setMessage({ type: 'error', text: `삭제 실패: ${e.message}` });
+    } catch (e: unknown) {
+      setMessage({ type: 'error', text: `삭제 실패: ${((e as Error)?.message ?? String(e))}` });
     }
   };
 

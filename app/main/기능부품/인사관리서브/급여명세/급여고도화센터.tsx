@@ -1,4 +1,5 @@
 'use client';
+import type { StaffMember } from '@/types';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -234,13 +235,13 @@ export default function PayrollAdvancedCenter({
   payrollRecords = [],
   onRefresh,
 }: {
-  staffs?: any[];
+  staffs?: Record<string, unknown>[];
   selectedCo?: string;
   yearMonth: string;
-  payrollRecords?: any[];
+  payrollRecords?: Record<string, unknown>[];
   onRefresh?: () => void;
 }) {
-  const [viewer, setViewer] = useState<any>(null);
+  const [viewer, setViewer] = useState<StaffMember | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [bonusItems, setBonusItems] = useState<BonusItem[]>([]);
@@ -259,7 +260,7 @@ export default function PayrollAdvancedCenter({
 
   const companyScope = selectedCo && selectedCo.trim() ? selectedCo : '전체';
   const filteredStaffs = useMemo(
-    () => (selectedCo === '전체' ? staffs : staffs.filter((staff: any) => staff.company === selectedCo)),
+    () => (selectedCo === '전체' ? (staffs as StaffMember[]) : (staffs as StaffMember[]).filter((staff) => staff.company === selectedCo)),
     [selectedCo, staffs]
   );
 
@@ -357,12 +358,12 @@ export default function PayrollAdvancedCenter({
 
   const currentApproval = approvalState;
   const viewerName = viewer?.name || '관리자';
-  const monthBonusItems = useMemo(() => bonusItems.filter((item) => item.yearMonth === yearMonth && filteredStaffs.some((staff: any) => String(staff.id) === item.staffId)), [bonusItems, filteredStaffs, yearMonth]);
-  const monthRetroItems = useMemo(() => retroItems.filter((item) => filteredStaffs.some((staff: any) => String(staff.id) === item.staffId)), [filteredStaffs, retroItems]);
-  const activeDeductions = useMemo(() => deductionItems.filter((item) => item.active && filteredStaffs.some((staff: any) => String(staff.id) === item.staffId)), [deductionItems, filteredStaffs]);
+  const monthBonusItems = useMemo(() => bonusItems.filter((item) => item.yearMonth === yearMonth && filteredStaffs.some((staff) => String(staff.id) === item.staffId)), [bonusItems, filteredStaffs, yearMonth]);
+  const monthRetroItems = useMemo(() => retroItems.filter((item) => filteredStaffs.some((staff) => String(staff.id) === item.staffId)), [filteredStaffs, retroItems]);
+  const activeDeductions = useMemo(() => deductionItems.filter((item) => item.active && filteredStaffs.some((staff) => String(staff.id) === item.staffId)), [deductionItems, filteredStaffs]);
   const visibleFreelancers = useMemo(() => freelancerItems.filter((item) => item.yearMonth === yearMonth), [freelancerItems, yearMonth]);
   const companySummary = useMemo(() => {
-    const staffMap = new Map(staffs.map((staff: any) => [String(staff.id), staff]));
+    const staffMap = new Map((staffs as StaffMember[]).map((staff) => [String(staff.id), staff]));
     const summary = new Map<string, { company: string; count: number; taxable: number; deductions: number; net: number }>();
 
     payrollRecords.forEach((record: any) => {
@@ -473,7 +474,7 @@ export default function PayrollAdvancedCenter({
 
   const addBonusItem = async () => {
     if (!bonusForm.staffId || bonusForm.amount <= 0) return;
-    const targetStaff = staffs.find((staff: any) => String(staff.id) === bonusForm.staffId);
+    const targetStaff = (staffs as StaffMember[]).find((staff) => String(staff.id) === bonusForm.staffId);
     setSavingKey('bonus');
     try {
       const payload = {
@@ -499,7 +500,7 @@ export default function PayrollAdvancedCenter({
 
   const addRetroItem = async () => {
     if (!retroForm.staffId || retroPreviewTotal <= 0) return;
-    const targetStaff = staffs.find((staff: any) => String(staff.id) === retroForm.staffId);
+    const targetStaff = (staffs as StaffMember[]).find((staff) => String(staff.id) === retroForm.staffId);
     setSavingKey('retro');
     try {
       const payload = {
@@ -526,7 +527,7 @@ export default function PayrollAdvancedCenter({
 
   const addDeductionItem = async () => {
     if (!deductionForm.staffId || deductionForm.monthlyAmount <= 0) return;
-    const targetStaff = staffs.find((staff: any) => String(staff.id) === deductionForm.staffId);
+    const targetStaff = (staffs as StaffMember[]).find((staff) => String(staff.id) === deductionForm.staffId);
     setSavingKey('deduction');
     try {
       const payload = {
@@ -598,7 +599,7 @@ export default function PayrollAdvancedCenter({
               <div className="mt-4 grid gap-3 md:grid-cols-4">
                 <select value={bonusForm.staffId} onChange={(event) => setBonusForm({ ...bonusForm, staffId: event.target.value })} className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-3 text-sm font-semibold outline-none">
                   <option value="">직원 선택</option>
-                  {filteredStaffs.map((staff: any) => <option key={staff.id} value={staff.id}>{staff.name}</option>)}
+                  {filteredStaffs.map((staff) => <option key={staff.id} value={staff.id}>{staff.name}</option>)}
                 </select>
                 <select value={bonusForm.category} onChange={(event) => setBonusForm({ ...bonusForm, category: event.target.value })} className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-3 text-sm font-semibold outline-none">
                   <option value="상여">상여</option>
@@ -610,7 +611,7 @@ export default function PayrollAdvancedCenter({
               <input type="text" value={bonusForm.note} onChange={(event) => setBonusForm({ ...bonusForm, note: event.target.value })} placeholder="성과 근거 / 산정 메모" className="mt-3 w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-3 text-sm font-semibold outline-none" />
               <div className="mt-4 space-y-2">
                 {monthBonusItems.map((item) => {
-                  const staff = filteredStaffs.find((row: any) => String(row.id) === item.staffId);
+                  const staff = filteredStaffs.find((row) => String(row.id) === item.staffId);
                   return (
                     <div key={item.id} className="flex items-center justify-between rounded-[var(--radius-lg)] bg-[var(--muted)] px-4 py-3">
                       <div>
@@ -632,7 +633,7 @@ export default function PayrollAdvancedCenter({
                   <div className="mt-3 space-y-2">
                     <select value={retroForm.staffId} onChange={(event) => setRetroForm({ ...retroForm, staffId: event.target.value })} className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-semibold outline-none">
                       <option value="">직원 선택</option>
-                      {filteredStaffs.map((staff: any) => <option key={staff.id} value={staff.id}>{staff.name}</option>)}
+                      {filteredStaffs.map((staff) => <option key={staff.id} value={staff.id}>{staff.name}</option>)}
                     </select>
                     <div className="grid grid-cols-2 gap-2">
                       <input type="month" value={retroForm.startMonth} onChange={(event) => setRetroForm({ ...retroForm, startMonth: event.target.value })} className="rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-semibold outline-none" />
@@ -653,7 +654,7 @@ export default function PayrollAdvancedCenter({
                   <div className="mt-3 space-y-2">
                     <select value={deductionForm.staffId} onChange={(event) => setDeductionForm({ ...deductionForm, staffId: event.target.value })} className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-semibold outline-none">
                       <option value="">직원 선택</option>
-                      {filteredStaffs.map((staff: any) => <option key={staff.id} value={staff.id}>{staff.name}</option>)}
+                      {filteredStaffs.map((staff) => <option key={staff.id} value={staff.id}>{staff.name}</option>)}
                     </select>
                     <select value={deductionForm.type} onChange={(event) => setDeductionForm({ ...deductionForm, type: event.target.value })} className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm font-semibold outline-none">
                       <option value="가압류">가압류</option>

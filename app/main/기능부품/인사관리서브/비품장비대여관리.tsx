@@ -5,12 +5,12 @@ import SmartDatePicker from '../공통/SmartDatePicker';
 
 const ASSET_TYPES = ['노트북', 'PC', '모니터', '키보드', '마우스', '회의실키', '기타'];
 
-export default function AssetLoanManager({ staffs = [], selectedCo }: any) {
+export default function AssetLoanManager({ staffs = [], selectedCo }: Record<string, unknown>) {
   const [list, setList] = useState<any[]>([]);
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ staffId: '', assetType: '노트북', assetName: '', loanedAt: new Date().toISOString().slice(0, 10) });
 
-  const filtered = selectedCo === '전체' ? staffs : staffs.filter((s: any) => s.company === selectedCo);
+  const filtered = selectedCo === '전체' ? (staffs as any[]) : (staffs as any[]).filter((s: any) => s.company === selectedCo);
 
   useEffect(() => {
     (async () => {

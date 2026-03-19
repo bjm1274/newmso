@@ -20,7 +20,15 @@
       "Bash(xargs perl:*)",
       "Bash(while read:*)",
       "Bash(do perl:*)",
-      "Bash(/dev/null done:*)"
+      "Bash(/dev/null done:*)",
+      "Bash(find /c/Users/baek_/newmso -name *.ts -path */types*)",
+      "Bash(__NEW_LINE_79091192da2da2dc__ perl -i -pe ':*)",
+      "Bash(__NEW_LINE_79091192da2da2dc__ echo:*)",
+      "Bash(perl -i -pe 's/setPosts\\\\\\(data as any\\\\\\)/setPosts\\(data as BoardPost[]\\)/g' \"C:/Users/baek_/newmso/app/main/기능부품/게시판.tsx\")",
+      "Bash(perl -i -pe 's/새로고침\\\\\\(\\\\\\)/새로고침?.\\(\\)/g' \"C:/Users/baek_/newmso/app/main/기능부품/인사관리서브/구성원현황.tsx\")",
+      "Bash(perl -i -pe ':*)",
+      "Bash(perl -i -pe 's/modalData\\\\.item\\\\./modalItem./g' \"C:/Users/baek_/newmso/app/main/기능부품/재고관리서브/재고팝업창.tsx\")",
+      "Bash(npm run:*)"
     ]
   }
 }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { normalizeMainMenuForUser } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
+import type { ErpUser, ERPData } from '@/types';
 
 import OrgChart from './OrgChart';
 import MyPage from '../마이페이지';
@@ -13,6 +14,34 @@ import HRView from '../인사관리';
 import InventoryView from '../재고관리_통합완성';
 import AdminView from '../관리자전용';
 import 추가기능 from '../추가기능';
+
+interface MainContentProps {
+  user: ErpUser | null;
+  mainMenu: string;
+  data: ERPData;
+  subView?: string | null;
+  setSubView?: (v: string | null) => void;
+  selectedCo?: string | null;
+  setSelectedCo?: (v: string | null) => void;
+  companies?: string[];
+  selectedCompanyId?: string | null;
+  setSelectedCompanyId?: (v: string | null) => void;
+  onRefresh?: () => void;
+  initialMyPageTab?: string | null;
+  onConsumeMyPageInitialTab?: () => void;
+  initialBoard?: string | null;
+  initialOpenChatRoomId?: string | null;
+  onConsumeOpenChatRoomId?: () => void;
+  initialOpenMessageId?: string | null;
+  initialOpenPostId?: string | null;
+  onConsumeOpenPostId?: () => void;
+  onOpenApproval?: () => void;
+  initialApprovalIntent?: string | null;
+  onConsumeApprovalIntent?: () => void;
+  initialInventoryWorkflowApprovalId?: string | null;
+  onConsumeInitialInventoryWorkflowApprovalId?: () => void;
+  setMainMenu?: (v: string) => void;
+}
 
 export default function MainContent({
   user,
@@ -39,7 +68,7 @@ export default function MainContent({
   initialInventoryWorkflowApprovalId,
   onConsumeInitialInventoryWorkflowApprovalId,
   setMainMenu,
-}: any) {
+}: MainContentProps) {
   const [annualLeaveNotice, setAnnualLeaveNotice] = useState<{ remaining: number; total: number } | null>(null);
 
   useEffect(() => {
@@ -101,7 +130,6 @@ export default function MainContent({
         <div className="min-h-0 flex-1 overflow-x-hidden">
           <BoardView
             user={user}
-            posts={data.posts?.filter((post: any) => post.board_type === (subView || '공지사항')) || []}
             subView={subView || '공지사항'}
             setSubView={setSubView}
             selectedCo={selectedCo}
@@ -122,13 +150,13 @@ export default function MainContent({
           <ApprovalView
             user={user}
             staffs={data.staffs}
-            selectedCo={selectedCo}
-            setSelectedCo={setSelectedCo}
+            selectedCo={selectedCo ?? '전체'}
+            setSelectedCo={setSelectedCo ? (co: string) => setSelectedCo(co) : () => {}}
             selectedCompanyId={selectedCompanyId}
             onRefresh={onRefresh}
             initialView={subView}
             onViewChange={setSubView}
-            initialComposeRequest={initialApprovalIntent}
+            initialComposeRequest={initialApprovalIntent as Record<string, unknown> | null | undefined}
             onConsumeComposeRequest={onConsumeApprovalIntent}
           />
         </div>
@@ -139,8 +167,8 @@ export default function MainContent({
           <HRView
             user={user}
             staffs={data.staffs}
-            depts={data.depts}
-            selectedCo={selectedCo}
+            depts={data.depts as unknown as Record<string, unknown>[]}
+            selectedCo={selectedCo ?? undefined}
             onRefresh={onRefresh}
             initialMenu={subView}
           />
@@ -150,10 +178,10 @@ export default function MainContent({
       {mainMenu === '재고관리' && (
         <div className="min-h-0 flex-1 overflow-x-hidden">
           <InventoryView
-            user={user}
+            user={user as never}
             depts={data.depts}
             onRefresh={onRefresh}
-            selectedCo={selectedCo}
+            selectedCo={selectedCo ?? undefined}
             selectedCompanyId={selectedCompanyId}
             initialView={subView}
             onViewChange={setSubView}
@@ -170,12 +198,12 @@ export default function MainContent({
             staffs={data.staffs}
             posts={data.posts}
             onSearchSelect={(type: string) => {
-              if (type === 'staff') setMainMenu(normalizeMainMenuForUser(user, '조직도'));
-              else if (type === 'post') setMainMenu('게시판');
-              else if (type === 'approval') setMainMenu('전자결재');
-              else if (type === 'message') setMainMenu('채팅');
+              if (type === 'staff') setMainMenu?.(normalizeMainMenuForUser(user, '조직도'));
+              else if (type === 'post') setMainMenu?.('게시판');
+              else if (type === 'approval') setMainMenu?.('전자결재');
+              else if (type === 'message') setMainMenu?.('채팅');
             }}
-            onOpenOrgChart={() => setMainMenu(normalizeMainMenuForUser(user, '조직도'))}
+            onOpenOrgChart={() => setMainMenu?.(normalizeMainMenuForUser(user, '조직도'))}
           />
         </div>
       )}

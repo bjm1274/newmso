@@ -5,8 +5,10 @@ import { calculateSeverancePay, formatWorkPeriod } from '@/lib/severance-pay';
 import { logAudit } from '@/lib/audit';
 import SmartDatePicker from '../../공통/SmartDatePicker';
 
-export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }: any) {
-  const [selectedStaff, setSelectedStaff] = useState<any>(null);
+export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }: Record<string, unknown>) {
+  const _staffs = (staffs as Record<string, unknown>[]) ?? [];
+  const _onRefresh = onRefresh as (() => void) | undefined;
+  const [selectedStaff, setSelectedStaff] = useState<Record<string, unknown> | null>(null);
   const [settlementDate, setSettlementDate] = useState(new Date().toISOString().split('T')[0]);
   const [reason, setReason] = useState('퇴사');
   const [includeSeverance, setIncludeSeverance] = useState(true);
@@ -14,8 +16,8 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
   const [filterRetirees, setFilterRetirees] = useState(false);
 
   const filtered = selectedCo === '전체'
-    ? staffs
-    : staffs.filter((s: any) => s.company === selectedCo);
+    ? _staffs
+    : _staffs.filter((s: any) => s.company === selectedCo);
 
   const candidates = filterRetirees
     ? filtered.filter((s: any) => (s.status || '').toLowerCase() === '퇴사' || s.resigned_at)
@@ -109,7 +111,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
 
       alert('중간정산이 저장되었습니다.');
       setSelectedStaff(null);
-      if (onRefresh) onRefresh();
+      if (_onRefresh) _onRefresh();
     } catch (e) {
       console.error(e);
       alert('저장 중 오류가 발생했습니다.');
@@ -142,7 +144,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
             <label className="text-xs font-medium text-[var(--toss-gray-4)]">정산 대상자</label>
             <select
               data-testid="interim-settlement-staff-select"
-              value={selectedStaff?.id ?? ''}
+              value={(selectedStaff?.id ?? '') as string}
               onChange={(e) => setSelectedStaff(candidates.find((s: any) => String(s.id) === e.target.value) || null)}
               className="w-full h-10 px-3 bg-[var(--input-bg)] border border-[var(--border)] rounded-md text-sm font-medium focus:ring-2 focus:ring-[var(--accent)] focus:border-[var(--accent)]"
             >

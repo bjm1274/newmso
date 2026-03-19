@@ -39,13 +39,13 @@ export default function LeaveManagement({
   initialTab,
   allowLeaveTabs = true,
   allowHolidayTab = true,
-}: any) {
+}: Record<string, unknown>) {
   const [leaves, setLeaves] = useState<Leave[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<LeaveManagementTabId>(initialTab || '연차/휴가 신청내역');
+  const [activeTab, setActiveTab] = useState<LeaveManagementTabId>((initialTab as LeaveManagementTabId) ?? '연차/휴가 신청내역');
   const [leaveConfig, setLeaveConfig] = useState<'입사일 기준' | '회계연도 기준'>('입사일 기준');
   const staffList = Array.isArray(staffs) ? staffs : [];
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<Record<string, unknown> | null>(null);
   const [showPendingModal, setShowPendingModal] = useState(false);
   const availableTabs = useMemo(
     () =>
@@ -87,7 +87,7 @@ export default function LeaveManagement({
 
   useEffect(() => {
     if (initialTab && availableTabs.some((tab) => tab.id === initialTab)) {
-      setActiveTab(initialTab);
+      setActiveTab(initialTab as LeaveManagementTabId);
     }
   }, [availableTabs, initialTab]);
 
@@ -135,7 +135,7 @@ export default function LeaveManagement({
           await supabase.from('staff_members').update({ annual_leave_used: used }).eq('id', leave.staff_id);
         }
       }
-      if (onRefresh) onRefresh();
+      if (onRefresh) (onRefresh as () => void)();
     } catch (err) {
       alert('처리에 실패했습니다.');
     }
@@ -148,7 +148,7 @@ export default function LeaveManagement({
     } else {
       alert('회계연도 기준으로 설정되었습니다. (1월 1일 일괄 산정)');
     }
-    if (onRefresh) onRefresh();
+    if (onRefresh) (onRefresh as () => void)();
   };
 
   const runAnnualLeaveAutoGrant = async () => {
@@ -158,7 +158,7 @@ export default function LeaveManagement({
       for (const s of staffList) {
         const joinDate = s.joined_at || s.join_date;
         if (!joinDate) continue;
-        const join = new Date(joinDate);
+        const join = new Date(joinDate as string);
         const now = new Date();
         const years = (now.getTime() - join.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
         let total = 0;
@@ -168,7 +168,7 @@ export default function LeaveManagement({
         await supabase.from('staff_members').update({ annual_leave_total: total }).eq('id', s.id);
       }
       alert('연차 자동 부여가 완료되었습니다.');
-      if (onRefresh) onRefresh();
+      if (onRefresh) (onRefresh as () => void)();
     } catch (e) {
       alert('처리 중 오류가 발생했습니다.');
     } finally {
@@ -327,9 +327,9 @@ export default function LeaveManagement({
         )}
 
         {activeTab === '연차 대시보드' && (
-          <LeaveDashboard staffs={staffList} selectedCo={selectedCo} currentUser={currentUser} />
+          <LeaveDashboard staffs={staffList} selectedCo={selectedCo as string} currentUser={currentUser} />
         )}
-        {activeTab === '연차사용촉진 자동화' && <AnnualLeavePromotion staffs={staffList} selectedCo={selectedCo} />}
+        {activeTab === '연차사용촉진 자동화' && <AnnualLeavePromotion staffs={staffList} selectedCo={selectedCo as string} />}
 
         {activeTab === '연차 자동부여 설정' && (
           <div className="bg-[var(--card)] p-5 border border-[var(--border)] shadow-sm rounded-2xl text-center max-w-2xl mx-auto">
@@ -381,7 +381,7 @@ export default function LeaveManagement({
         )}
 
         {activeTab === '공휴일 달력' && (
-          <HolidayCalendar staffs={staffList} selectedCo={selectedCo} user={user} />
+          <HolidayCalendar staffs={staffList} selectedCo={selectedCo as string} user={user} />
         )}
       </div>
 

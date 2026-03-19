@@ -55,7 +55,7 @@ export default function DocumentRepository({
 }) {
   const [docs, setDocs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState<any>(null);
+  const [selected, setSelected] = useState<Record<string, unknown> | null>(null);
   const [form, setForm] = useState({ title: '', category: '규정', content: '' });
   const [saving, setSaving] = useState(false);
   const [staffFilterName, setStaffFilterName] = useState<string | null>(null);
@@ -145,7 +145,7 @@ export default function DocumentRepository({
       if (isContract) return alert('근로계약서 카테고리의 문서는 법적 효력 유지를 위해 수정이 불가능합니다.');
 
       if (selected) {
-        const newVersion = (selected.version || 1) + 1;
+        const newVersion = (Number(selected.version) || 1) + 1;
         await supabase.from('document_versions').insert({
           document_id: selected.id,
           version: selected.version,
@@ -211,7 +211,7 @@ export default function DocumentRepository({
     if (!selected) return;
     // 이미 PDF URL이 있으면 바로 새 창으로 열기
     if (selected.file_url) {
-      window.open(selected.file_url, '_blank');
+      window.open(selected.file_url as string, '_blank');
       return;
     }
     // 없으면 선택된 문서 내용을 기반으로 즉시 PDF 생성 후 저장·열기
@@ -234,10 +234,10 @@ export default function DocumentRepository({
 
       const blob = doc.output('blob') as Blob;
       const safeCompany =
-        (selected.company_name && selected.company_name !== '전체'
+        String(selected.company_name && selected.company_name !== '전체'
           ? selected.company_name
           : selectedCo).replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || 'company';
-      const safeTitle = title.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || 'document';
+      const safeTitle = String(title).replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || 'document';
       const filePath = `${safeCompany}/${safeTitle}_${Date.now()}.pdf`;
       const uploadedUrl = await uploadDocumentPdf(filePath, blob);
       if (uploadedUrl) {
@@ -422,12 +422,12 @@ export default function DocumentRepository({
                   </div>
 
                   <div className="mt-14 pt-8 border-t border-dotted border-[var(--border)] text-center">
-                    <p className="font-bold text-[14px]">{new Date(selected.updated_at).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                    <p className="font-bold text-[14px]">{new Date(selected.updated_at as string).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
 
                     <div className="mt-10 flex justify-between items-start text-left">
                       <div className="w-1/2 space-y-2">
                         <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">[사용자]</p>
-                        <p className="font-bold">{selected.company_name || selectedCo}</p>
+                        <p className="font-bold">{(selected.company_name as string) || selectedCo}</p>
                         <div className="relative inline-block">
                           <p className="font-bold">대표이사 (인)</p>
                           <div className="absolute -top-3 -right-6 w-10 h-10 border-2 border-red-500/30 rounded-full flex items-center justify-center rotate-12">
@@ -437,7 +437,7 @@ export default function DocumentRepository({
                       </div>
                       <div className="w-1/2 text-right space-y-2">
                         <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">[근로자]</p>
-                        <p className="font-bold">{selected.title.split(' ')[0]}</p>
+                        <p className="font-bold">{(selected.title as string).split(' ')[0]}</p>
                         <p className="font-bold">(서명)</p>
                       </div>
                     </div>

@@ -193,15 +193,20 @@ function InnerTabBar({
   );
 }
 
-export default function AdminView({ user, staffs = [], onRefresh, initialTab }: any) {
+export default function AdminView(props: Record<string, unknown>) {
+  const user = props.user;
+  const staffs = (props.staffs ?? []) as any[];
+  const onRefresh = props.onRefresh as (() => void) | undefined;
+  const initialTab = props.initialTab as string | null | undefined;
+
   const initialState = normalizeAdminEntry(initialTab);
   const [activeTab, setActiveTab] = useState<AdminOuterTabId>(initialState.activeTab);
   const [analysisTab, setAnalysisTab] = useState<AnalysisTabId>(initialState.analysisTab);
   const [auditTab, setAuditTab] = useState<AuditTabId>(initialState.auditTab);
   const [inventory, setInventory] = useState<any[]>([]);
 
-  const isSystemMaster = isNamedSystemMasterAccount(user);
-  const hasAdminMenuAccess = canAccessMainMenu(user, '관리자');
+  const isSystemMaster = isNamedSystemMasterAccount(user as any);
+  const hasAdminMenuAccess = canAccessMainMenu(user as any, '관리자');
   const visibleAdminTabs = useMemo(() => {
     const tabs: AdminOuterTabId[] = [];
 
@@ -318,7 +323,7 @@ export default function AdminView({ user, staffs = [], onRefresh, initialTab }: 
         {activeTab === '수술검사템플릿' && <SurgeryExamTemplateManager />}
         {activeTab === '팝업관리' && <PopupManager />}
         {activeTab === '데이터백업' && <DataBackup />}
-        {activeTab === '데이터초기화' && <DataReseter onRefresh={onRefresh} />}
+        {activeTab === '데이터초기화' && <DataReseter onRefresh={onRefresh ?? (() => {})} />}
         {activeTab === '문서양식' && <FormBuilder user={user} />}
         {activeTab === '급여이상치' && <SalaryAnomalyDetector staffs={staffs} />}
         {activeTab === '공문서대장' && <OfficialDocumentLog staffs={staffs} selectedCo="전체" user={user} />}

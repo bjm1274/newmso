@@ -1,4 +1,5 @@
 'use client';
+import type { StaffMember } from '@/types';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import {
@@ -8,17 +9,22 @@ import {
   type TaxInsuranceRates,
 } from '@/lib/use-tax-insurance-rates';
 
-export default function YearEndSettlement({ staffs = [], selectedCo }: any) {
+interface YearEndSettlementProps {
+  staffs?: unknown[];
+  selectedCo?: unknown;
+}
+
+export default function YearEndSettlement({ staffs = [], selectedCo }: YearEndSettlementProps) {
   const [staffList, setStaffList] = useState<any[]>([]);
   const [settlementData, setSettlementData] = useState<any[]>([]);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
-  const [selectedStaff, setSelectedStaff] = useState<any>(null);
+  const [selectedStaff, setSelectedStaff] = useState<Record<string, unknown> | null>(null);
   const [showCertificate, setShowCertificate] = useState(false);
   const [taxInsuranceRates, setTaxInsuranceRates] = useState<TaxInsuranceRates>(DEFAULT_TAX_INSURANCE_RATES);
 
   // New OCR states
   const [isScanning, setIsScanning] = useState(false);
-  const [scanResult, setScanResult] = useState<any>(null);
+  const [scanResult, setScanResult] = useState<Record<string, unknown> | null>(null);
   const [uploadLoading, setUploadLoading] = useState(false);
 
   // Manual Input states
@@ -38,7 +44,7 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: any) {
   useEffect(() => {
     let active = true;
     (async () => {
-      const rates = await fetchTaxInsuranceRates(selectedCo || '전체', Number(selectedYear));
+      const rates = await fetchTaxInsuranceRates((selectedCo as string) || '전체', Number(selectedYear));
       if (active) setTaxInsuranceRates(rates);
     })();
     return () => {
@@ -78,7 +84,7 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: any) {
     if (staff) {
       const settlementByStaff: any = {};
 
-      staff.forEach((s: any) => {
+      staff.forEach((s: StaffMember) => {
         settlementByStaff[s.id] = {
           staff_id: s.id,
           staff_name: s.name,
@@ -118,11 +124,11 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: any) {
         }
       });
 
-      const settlement = Object.values(settlementByStaff).filter((item: any) => item.total_salary > 0 || item.is_manual).map((item: any) => {
+      const settlement = (Object.values(settlementByStaff) as Record<string, unknown>[]).filter((item) => (item.total_salary as number) > 0 || item.is_manual).map((item) => {
         const standardDeduction = 1500000; // 기본공제
-        const taxableIncome = Math.max(0, item.total_salary - standardDeduction);
+        const taxableIncome = Math.max(0, (item.total_salary as number) - standardDeduction);
         const calculatedTax = calculateYearEndTax(taxableIncome);
-        const refund = item.total_tax_paid - calculatedTax;
+        const refund = (item.total_tax_paid as number) - calculatedTax;
 
         return {
           ...item,
@@ -159,7 +165,7 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: any) {
     }, { onConflict: 'staff_id,year_month' });
 
     if (error) {
-      alert("저장 중 오류가 발생했습니다: " + error.message);
+      alert("저장 중 오류가 발생했습니다: " + ((error as Error)?.message ?? String(error)));
     } else {
       alert("수기 정산 데이터가 저장되었습니다.");
       setShowManualModal(false);
@@ -167,31 +173,37 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: any) {
     }
   };
 
-  const generateWithholdingCertificate = (staff: any) => {
+  const generateWithholdingCertificate = (staff: Record<string, unknown>) => {
+    const totalSalary = Number(staff.total_salary || 0);
+    const standardDeduction = Number(staff.standard_deduction || 0);
+    const taxableIncome = Number(staff.taxable_income || 0);
+    const calculatedTax = Number(staff.calculated_tax || 0);
+    const taxPaid = Number(staff.tax_paid || 0);
+    const refundOrAdditional = Number(staff.refund_or_additional || 0);
     return `
 근로소득 원천징수영수증
 발급일: ${new Date().toLocaleDateString('ko-KR')}
 정산년도: ${selectedYear}년
 
 [납세자 정보]
-성명: ${staff.staff_name}
+성명: ${staff.staff_name as string}
 주민등록번호: ****-***${String(staff.staff_id).slice(-3)}
 주소: [등록된 주소]
 
 [소득 정보]
-근로소득액: ₩${(staff.total_salary || 0).toLocaleString()}
-기본공제: ₩${(staff.standard_deduction || 0).toLocaleString()}
-과세표준: ₩${(staff.taxable_income || 0).toLocaleString()}
+근로소득액: ₩${totalSalary.toLocaleString()}
+기본공제: ₩${standardDeduction.toLocaleString()}
+과세표준: ₩${taxableIncome.toLocaleString()}
 
 [세금 정보]
-산출세액: ₩${(staff.calculated_tax || 0).toLocaleString()}
-기납부세액: ₩${(staff.tax_paid || 0).toLocaleString()}
-환급/추가납부: ₩${Math.abs(staff.refund_or_additional || 0).toLocaleString()}
+산출세액: ₩${calculatedTax.toLocaleString()}
+기납부세액: ₩${taxPaid.toLocaleString()}
+환급/추가납부: ₩${Math.abs(refundOrAdditional).toLocaleString()}
 
 [보험료 정보]
-건강보험료: ₩${Math.round((staff.total_salary || 0) * 0.03395).toLocaleString()}
-국민연금료: ₩${Math.round((staff.total_salary || 0) * 0.045).toLocaleString()}
-고용보험료: ₩${Math.round((staff.total_salary || 0) * 0.008).toLocaleString()}
+건강보험료: ₩${Math.round(totalSalary * 0.03395).toLocaleString()}
+국민연금료: ₩${Math.round(totalSalary * 0.045).toLocaleString()}
+고용보험료: ₩${Math.round(totalSalary * 0.008).toLocaleString()}
 
 [발급 기관]
 박철홍정형외과
@@ -202,19 +214,19 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: any) {
     `;
   };
 
-  const downloadCertificate = (staff: any) => {
+  const downloadCertificate = (staff: Record<string, unknown>) => {
     const certificate = generateWithholdingCertificate(staff);
     const blob = new Blob([certificate], { type: 'text/plain;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `원천징수영수증_${staff.staff_name}_${selectedYear}.txt`;
+    link.download = `원천징수영수증_${staff.staff_name as string}_${selectedYear}.txt`;
     link.click();
   };
 
-  const legacySendCertificateEmail = async (staff: any) => {
+  const legacySendCertificateEmail = async (staff: Record<string, unknown>) => {
     // 이메일 발송 로직
     const { error } = await supabase.from('email_queue').insert([{
-      recipient: staff.staff_email,
+      recipient: staff.staff_email as string,
       subject: `[${selectedYear}년] 근로소득 원천징수영수증`,
       body: generateWithholdingCertificate(staff),
       type: 'withholding_certificate',
@@ -229,7 +241,7 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: any) {
 
   void legacySendCertificateEmail;
 
-  const sendCertificateEmail = async (staff: any) => {
+  const sendCertificateEmail = async (staff: Record<string, unknown>) => {
     if (!staff?.staff_email) {
       alert('직원 이메일이 등록되지 않아 발송할 수 없습니다.');
       return;
@@ -237,7 +249,7 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: any) {
 
     const { error } = await supabase.from('email_queue').insert([
       {
-        recipient: staff.staff_email,
+        recipient: staff.staff_email as string,
         subject: `[${selectedYear}] 근로소득 원천징수영수증`,
         body: generateWithholdingCertificate(staff),
         type: 'withholding_certificate',
@@ -261,7 +273,7 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: any) {
     }
 
     console.error('withholding certificate email failed:', error);
-    alert(`이메일 발송에 실패했습니다: ${error.message}`);
+    alert(`이메일 발송에 실패했습니다: ${((error as Error)?.message ?? String(error))}`);
   };
 
   return (
@@ -287,8 +299,9 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: any) {
               const input = document.createElement('input');
               input.type = 'file';
               input.accept = '.pdf,image/*';
-              input.onchange = (e: any) => {
-                if (e.target.files?.[0]) handleOCRScan(e.target.files[0]);
+              input.onchange = (e: Event) => {
+                const target = e.target as HTMLInputElement;
+                if (target.files?.[0]) handleOCRScan(target.files[0]);
               };
               input.click();
             }}
@@ -326,15 +339,15 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: any) {
           <div className="grid grid-cols-3 gap-4">
             <div className="bg-[var(--card)]/60 p-3 rounded-[var(--radius-md)]">
               <p className="text-[10px] text-emerald-600 font-bold">결정세액 (예상)</p>
-              <p className="text-sm font-black text-[var(--foreground)]">₩{scanResult.tax_paid.toLocaleString()}</p>
+              <p className="text-sm font-black text-[var(--foreground)]">₩{Number(scanResult.tax_paid ?? 0).toLocaleString()}</p>
             </div>
             <div className="bg-[var(--card)]/60 p-3 rounded-[var(--radius-md)]">
               <p className="text-[10px] text-emerald-600 font-bold">카드 등 공제액</p>
-              <p className="text-sm font-black text-[var(--foreground)]">₩{scanResult.deductions.credit_card.toLocaleString()}</p>
+              <p className="text-sm font-black text-[var(--foreground)]">₩{Number((scanResult.deductions as Record<string, unknown>)?.credit_card ?? 0).toLocaleString()}</p>
             </div>
             <div className="bg-[var(--card)]/60 p-3 rounded-[var(--radius-md)]">
               <p className="text-[10px] text-emerald-600 font-bold">의료비 공제액</p>
-              <p className="text-sm font-black text-[var(--foreground)]">₩{scanResult.deductions.medical.toLocaleString()}</p>
+              <p className="text-sm font-black text-[var(--foreground)]">₩{Number((scanResult.deductions as Record<string, unknown>)?.medical ?? 0).toLocaleString()}</p>
             </div>
           </div>
         </div>

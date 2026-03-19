@@ -20,21 +20,22 @@ export default function MyProfileCard({
   setShowSecret: setControlledShowSecret,
   isEditing: controlledIsEditing,
   setIsEditing: setControlledIsEditing,
-}: any) {
+}: Record<string, unknown>) {
   const MASKED_TEXT = '********';
-  const [user, setUser] = useState<any>(normalizeProfileUser(initialUser || {}));
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(getProfilePhotoUrl(initialUser));
+  const _iu = (initialUser ?? {}) as Record<string, unknown>;
+  const [user, setUser] = useState<Record<string, unknown>>(normalizeProfileUser(_iu));
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(getProfilePhotoUrl((_iu)));
   const [uploading, setUploading] = useState(false);
   const [internalShowSecret, setInternalShowSecret] = useState(false);
   const [debugMsg, setDebugMsg] = useState(''); // 디버깅용 메시지
   const [internalIsEditing, setInternalIsEditing] = useState(false);
-  const [editForm, setEditForm] = useState({
-    email: initialUser?.email || '',
-    phone: initialUser?.phone || '',
-    extension: initialUser?.extension || initialUser?.permissions?.extension || '',
-    address: initialUser?.address || '',
-    bank_name: initialUser?.bank_name || initialUser?.permissions?.bank_name || '',
-    bank_account: initialUser?.bank_account || initialUser?.permissions?.bank_account || '',
+  const [editForm, setEditForm] = useState<{ email: string; phone: string; extension: string; address: string; bank_name: string; bank_account: string }>({
+    email: ((_iu)?.email as string) || '',
+    phone: ((_iu)?.phone as string) || '',
+    extension: ((_iu)?.extension as string) || ((_iu.permissions as Record<string, unknown>)?.extension as string) || '',
+    address: ((_iu)?.address as string) || '',
+    bank_name: ((_iu)?.bank_name as string) || ((_iu.permissions as Record<string, unknown>)?.bank_name as string) || '',
+    bank_account: ((_iu)?.bank_account as string) || ((_iu.permissions as Record<string, unknown>)?.bank_account as string) || '',
   });
   // 다크모드 토글은 사용하지 않도록 제거 (항상 라이트 모드)
 
@@ -70,23 +71,23 @@ export default function MyProfileCard({
 
   // [핵심] 페이지 로드 시 ID가 없으면 '이름'으로 ID를 찾아내는 복구 로직
   useEffect(() => {
-    if (!initialUser?.id && initialUser?.name) {
-      recoverUserIdentity(initialUser.name);
+    if (!(_iu)?.id && (_iu)?.name) {
+      recoverUserIdentity((_iu).name as string);
     } else {
       setDebugMsg("초기 사용자 이름조차 없습니다. 재로그인 필요.");
     }
-  }, [initialUser?.id, initialUser?.name]);
+  }, [(_iu)?.id, (_iu)?.name]);
 
   // 편집 폼은 user 정보가 바뀔 때 동기화
   useEffect(() => {
     if (user) {
       setEditForm({
-        email: user.email || '',
-        phone: user.phone || '',
-        extension: user.extension || user.permissions?.extension || '',
-        address: user.address || '',
-        bank_name: user.bank_name || user.permissions?.bank_name || '',
-        bank_account: user.bank_account || user.permissions?.bank_account || '',
+        email: (user.email as string) || '',
+        phone: (user.phone as string) || '',
+        extension: (user.extension as string) || ((user.permissions as Record<string, unknown>)?.extension as string) || '',
+        address: (user.address as string) || '',
+        bank_name: (user.bank_name as string) || ((user.permissions as Record<string, unknown>)?.bank_name as string) || '',
+        bank_account: (user.bank_account as string) || ((user.permissions as Record<string, unknown>)?.bank_account as string) || '',
       });
     }
   }, [user]);
@@ -153,9 +154,9 @@ export default function MyProfileCard({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           password: input,
-          userId: user?.id || initialUser?.id,
-          name: user?.name || initialUser?.name,
-          employeeNo: user?.employee_no || initialUser?.employee_no,
+          userId: user?.id || (_iu)?.id,
+          name: user?.name || (_iu)?.name,
+          employeeNo: user?.employee_no || (_iu)?.employee_no,
         }),
       });
       const payload = await response.json().catch(() => null);
@@ -184,8 +185,8 @@ export default function MyProfileCard({
       setUploading(true);
 
       let currentUser = user;
-      if (!currentUser?.id && initialUser?.name) {
-        await recoverUserIdentity(initialUser.name);
+      if (!currentUser?.id && (_iu)?.name) {
+        await recoverUserIdentity((_iu).name as string);
         try {
           const stored = localStorage.getItem('erp_user');
           if (stored) currentUser = JSON.parse(stored);
@@ -257,7 +258,7 @@ export default function MyProfileCard({
       }
 
       // 4. 화면 반영
-      } catch (error: any) {
+      } catch (error: unknown) {
         legacyUploadError = error;
       }
       persistedToLegacyColumn = persistedToLegacyColumn || !legacyUploadError;
@@ -294,9 +295,9 @@ export default function MyProfileCard({
 
       alert('사진이 정상적으로 등록되었습니다!');
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('프로필 사진 업로드 실패:', error);
-      const msg: string = error?.message || '';
+      const msg: string = (error as Error)?.message || '';
       if (msg.includes('The resource was not found') || msg.includes('bucket')) {
         alert('프로필 사진 업로드에 실패했습니다.\n\nSupabase 대시보드 → Storage에서 버킷 이름 "profiles"인 Public 버킷을 생성한 뒤, supabase_migrations 폴더의 storage_profiles_policies.sql 정책을 적용해 주세요.');
       } else {
@@ -407,8 +408,8 @@ export default function MyProfileCard({
   const handleSaveProfile = async () => {
     try {
       let currentUser = user;
-      if (!currentUser?.id && initialUser?.name) {
-        await recoverUserIdentity(initialUser.name);
+      if (!currentUser?.id && (_iu)?.name) {
+        await recoverUserIdentity((_iu).name as string);
         try {
           const stored = localStorage.getItem('erp_user');
           if (stored) currentUser = JSON.parse(stored);
@@ -527,10 +528,10 @@ export default function MyProfileCard({
             <div className="flex flex-col gap-2.5 lg:flex-row lg:items-start lg:justify-between">
               <div className="flex flex-col items-start gap-1">
                 <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-[var(--foreground)] tracking-tight">
-                  {user.name} {user.position}
+                  {user.name as string} {user.position as string}
                 </h2>
                 <p className="text-sm sm:text-base lg:text-lg font-bold text-[var(--accent)] underline decoration-[var(--toss-blue-light)] underline-offset-4">
-                  {user.department} 소속
+                  {user.department as string} 소속
                 </p>
               </div>
 
@@ -628,7 +629,7 @@ export default function MyProfileCard({
             ) : (
               <div className="grid grid-cols-1 min-[520px]:grid-cols-2 xl:grid-cols-3 gap-x-4 gap-y-3">
                 <InfoItem label="연락처" value={showSecret ? user.phone : MASKED_TEXT} isMasked={!showSecret} />
-                <InfoItem label="내선번호" value={user.extension || user.permissions?.extension} />
+                <InfoItem label="내선번호" value={user.extension || (user.permissions as Record<string, unknown>)?.extension} />
                 <InfoItem label="거주지" value={showSecret ? user.address : MASKED_TEXT} isMasked={!showSecret} />
                 <InfoItem
                   label="기본급"
@@ -701,34 +702,35 @@ export default function MyProfileCard({
   );
 }
 
-function InfoItem({ label, value, isMasked }: any) {
+function InfoItem({ label, value, isMasked }: { label?: unknown; value?: unknown; isMasked?: unknown }) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-wide">{label}</span>
+      <span className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-wide">{label as string}</span>
       <span className={`text-[15px] font-bold leading-snug ${isMasked ? 'text-[var(--toss-gray-3)] tracking-widest' : 'text-[var(--foreground)]'}`}>
-        {value || '-'}
+        {(value as string) || '-'}
       </span>
     </div>
   );
 }
 
-function EditableItem({ label, value, onChange, placeholder, testId }: any) {
+function EditableItem({ label, value, onChange, placeholder, testId }: { label?: unknown; value?: unknown; onChange?: unknown; placeholder?: unknown; testId?: unknown }) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-wide">{label}</span>
+      <span className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-wide">{label as string}</span>
       <input
         type="text"
-        data-testid={testId}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
+        data-testid={testId as string}
+        value={value as string}
+        onChange={(e) => (onChange as (v: string) => void)(e.target.value)}
+        placeholder={placeholder as string}
         className="w-full px-3 py-2.5 rounded-[var(--radius-lg)] border border-[var(--border)] text-[14px] font-semibold text-[var(--foreground)] bg-[var(--input-bg)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)]"
       />
     </div>
   );
 }
 
-function LeaveAndCommuteSummary({ user, onOpenApproval }: any) {
+function LeaveAndCommuteSummary({ user: _rawUser, onOpenApproval }: Record<string, unknown>) {
+  const user = (_rawUser ?? {}) as Record<string, unknown>;
   const [summary, setSummary] = useState<{
     total: number;
     used: number;
@@ -822,7 +824,7 @@ function LeaveAndCommuteSummary({ user, onOpenApproval }: any) {
           </p>
         </div>
         <button
-          onClick={() => onOpenApproval?.({ type: '휴가신청' })}
+          onClick={() => (onOpenApproval as ((v: unknown) => void) | undefined)?.({ type: '휴가신청' })}
           className="px-3 py-1.5 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-[var(--radius-md)] text-[11px] font-bold hover:bg-emerald-100 transition-colors"
         >
           🏖️ 연차 신청

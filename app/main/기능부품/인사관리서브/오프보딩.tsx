@@ -3,7 +3,9 @@ import { useState, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import SmartDatePicker from '../공통/SmartDatePicker';
 
-export default function OffboardingView({ staffs, selectedCo = '전체', onRefresh }: any) {
+export default function OffboardingView({ staffs, selectedCo = '전체', onRefresh }: Record<string, unknown>) {
+    const _staffs = (staffs as Record<string, unknown>[]) ?? [];
+    const _onRefresh = onRefresh as () => void;
     const [activeTab, setActiveTab] = useState<'진행중' | '과거이력'>('진행중');
     const [selectedStaff, setSelectedStaff] = useState<string>('');
     const [exitDate, setExitDate] = useState<string>('');
@@ -13,14 +15,14 @@ export default function OffboardingView({ staffs, selectedCo = '전체', onRefre
 
     // Filter active staffs who are NOT currently offboarding
     // Filter active staffs who are NOT currently offboarding, respect company filter
-    const eligibleStaffs = staffs.filter((s: any) =>
+    const eligibleStaffs = _staffs.filter((s: any) =>
         (s.status === '재직' || s.status === '계약') &&
         (selectedCo === '전체' || s.company === selectedCo)
     );
 
     const handleStartOffboarding = async () => {
         if (!selectedStaff || !exitDate) return alert('대상자와 퇴사 예정일을 선택해주세요.');
-        const staff = staffs.find((s: any) => s.id === selectedStaff);
+        const staff = _staffs.find((s: any) => s.id === selectedStaff);
         if (!staff) return;
 
         if (!confirm(`[${staff.name}] 님의 오프보딩 파이프라인을 가동하시겠습니까?\n퇴사 예정일: ${exitDate}`)) return;
@@ -33,7 +35,7 @@ export default function OffboardingView({ staffs, selectedCo = '전체', onRefre
             // 2. Offboarding checklist tracking (create a new record in a custom table if exists, else we simulate it)
             // For this UI, we can just visually update or rely on '퇴사예정' status
             alert(`${staff.name} 오프보딩 파이프라인이 생성되었습니다.`);
-            onRefresh();
+            _onRefresh();
             setSelectedStaff('');
             setExitDate('');
         } catch (e) {
@@ -44,11 +46,11 @@ export default function OffboardingView({ staffs, selectedCo = '전체', onRefre
         }
     };
 
-    const pendingList = staffs.filter((s: any) =>
+    const pendingList = _staffs.filter((s: any) =>
         (s.status === '퇴사예정' || (s.status === '퇴사' && s.resigned_at > new Date().toISOString().slice(0, 10))) &&
         (selectedCo === '전체' || s.company === selectedCo)
     );
-    const pastList = staffs.filter((s: any) =>
+    const pastList = _staffs.filter((s: any) =>
         s.status === '퇴사' &&
         (selectedCo === '전체' || s.company === selectedCo)
     );
@@ -58,7 +60,7 @@ export default function OffboardingView({ staffs, selectedCo = '전체', onRefre
         try {
             await supabase.from('staff_members').update({ status: '퇴사' }).eq('id', id);
             alert('최종 퇴사 처리 되었습니다.');
-            onRefresh();
+            _onRefresh();
         } catch (e) {
             console.error(e);
         }

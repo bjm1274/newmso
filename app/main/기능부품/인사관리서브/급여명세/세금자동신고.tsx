@@ -23,7 +23,7 @@ function isMissingSchemaError(error: any) {
   return code.startsWith('PGRST') || message.includes('schema cache') || message.includes('Could not find the table');
 }
 
-export default function TaxAutoReport({ selectedCo = '전체' }: any) {
+export default function TaxAutoReport({ selectedCo = '전체' }: Record<string, unknown>) {
   const [taxData, setTaxData] = useState<TaxRow[]>([]);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [reportStatus, setReportStatus] = useState('미신고');
@@ -122,12 +122,12 @@ export default function TaxAutoReport({ selectedCo = '전체' }: any) {
           setTaxData(nextTaxData);
           setReportStatus(nextStatus);
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('tax auto report load failed:', error);
         if (active) {
           setTaxData([]);
           setReportStatus('조회 실패');
-          setErrorMessage(error?.message || '세금 신고 데이터를 불러오지 못했습니다.');
+          setErrorMessage((error as Error)?.message || '세금 신고 데이터를 불러오지 못했습니다.');
         }
       } finally {
         if (active) setLoading(false);

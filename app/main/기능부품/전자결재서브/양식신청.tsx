@@ -15,7 +15,9 @@ function describeError(error: any) {
   };
 }
 
-export default function FormRequest({ user, staffs }: any) {
+export default function FormRequest({ user: _user, staffs: _staffs }: Record<string, unknown>) {
+  const user = (_user ?? {}) as Record<string, unknown>;
+  const staffs = (_staffs ?? []) as Record<string, unknown>[];
   const forms = CERTIFICATE_TYPES;
   const [selectedForm, setSelectedForm] = useState<string>(forms[0]?.id ?? '');
   const [purpose, setPurpose] = useState('');
@@ -129,7 +131,7 @@ export default function FormRequest({ user, staffs }: any) {
             2. 신청 대상 직원
           </label>
           <div className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] p-3 text-sm font-bold text-[var(--foreground)]">
-            {user?.name} ({user?.position || '직원'}) - 본인 계정으로만 증명서를 신청할 수 있습니다.
+            {user?.name as string} ({(user?.position as string) || '직원'}) - 본인 계정으로만 증명서를 신청할 수 있습니다.
           </div>
         </div>
 

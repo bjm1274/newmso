@@ -2,8 +2,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 
-export default function AttendanceDeductionRules({ selectedCo = '전체' }: any) {
-  const [rules, setRules] = useState<any>(null);
+export default function AttendanceDeductionRules({ selectedCo = '전체' }: Record<string, unknown>) {
+  const [rules, setRules] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -67,7 +67,7 @@ export default function AttendanceDeductionRules({ selectedCo = '전체' }: any)
           </div>
           {rules.late_deduction_type === 'fixed' && (
             <div className="mt-2">
-              <input type="number" value={rules.late_deduction_amount || 0} onChange={e => setRules({ ...rules, late_deduction_amount: Number(e.target.value) })} className="w-32 p-2 border rounded-[var(--radius-md)] text-sm font-bold" />
+              <input type="number" value={(rules.late_deduction_amount as string) || 0} onChange={e => setRules({ ...rules, late_deduction_amount: Number(e.target.value) })} className="w-32 p-2 border rounded-[var(--radius-md)] text-sm font-bold" />
               <span className="ml-2 text-xs font-bold text-[var(--toss-gray-4)]">원/회</span>
             </div>
           )}
@@ -87,7 +87,7 @@ export default function AttendanceDeductionRules({ selectedCo = '전체' }: any)
           </div>
           {rules.early_leave_deduction_type === 'fixed' && (
             <div className="mt-2">
-              <input type="number" value={rules.early_leave_deduction_amount || 0} onChange={e => setRules({ ...rules, early_leave_deduction_amount: Number(e.target.value) })} className="w-32 p-2 border rounded-[var(--radius-md)] text-sm font-bold" />
+              <input type="number" value={(rules.early_leave_deduction_amount as string) || 0} onChange={e => setRules({ ...rules, early_leave_deduction_amount: Number(e.target.value) })} className="w-32 p-2 border rounded-[var(--radius-md)] text-sm font-bold" />
               <span className="ml-2 text-xs font-bold text-[var(--toss-gray-4)]">원/회</span>
             </div>
           )}

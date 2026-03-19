@@ -2,11 +2,11 @@
 import { useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
-export default function PhotoModule({ user, inventory, fetchInventory }: any) {
+export default function PhotoModule({ user, inventory, fetchInventory }: Record<string, unknown>) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
-  const [recognizedData, setRecognizedData] = useState<any>(null);
+  const [recognizedData, setRecognizedData] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
@@ -56,20 +56,23 @@ export default function PhotoModule({ user, inventory, fetchInventory }: any) {
     }
   };
 
+  const _inventory = (inventory as Record<string, unknown>[]) ?? [];
+  const _fetchInventory = fetchInventory as () => void;
+
   const handleConfirmRecognition = async () => {
     if (!recognizedData) return;
     setLoading(true);
     try {
-      const item = inventory.find((i: any) => i.item_name === recognizedData.item_name);
+      const item = _inventory.find((i: any) => i.item_name === recognizedData.item_name);
       if (item) {
-        const newQty = item.quantity + 1;
-        await supabase.from('inventory').update({ 
+        const newQty = (item.quantity as number) + 1;
+        await supabase.from('inventory').update({
           quantity: newQty,
           expiry_date: recognizedData.expiry_date,
           lot_number: recognizedData.lot_number
         }).eq('id', item.id);
         alert(`${item.item_name} 1개 입고 완료`);
-        fetchInventory();
+        _fetchInventory();
         setRecognizedData(null);
         setShowConfirmDialog(false);
         stopCamera();
@@ -120,23 +123,23 @@ export default function PhotoModule({ user, inventory, fetchInventory }: any) {
             <h3 className="text-2xl font-semibold text-[var(--foreground)] mb-5 tracking-tight">인식 정보 확인</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
               <img
-                src={recognizedData.image_url}
+                src={recognizedData.image_url as string}
                 alt="인식된 재고 이미지"
                 className="rounded-[var(--radius-md)] border-4 border-[var(--border-subtle)] shadow-sm"
               />
               <div className="space-y-4">
                 <div>
                   <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">제품명</p>
-                  <p className="text-lg font-semibold text-[var(--foreground)]">{recognizedData.item_name}</p>
+                  <p className="text-lg font-semibold text-[var(--foreground)]">{recognizedData.item_name as string}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">유효기간</p>
-                    <p className="text-sm font-semibold text-[var(--accent)]">{recognizedData.expiry_date}</p>
+                    <p className="text-sm font-semibold text-[var(--accent)]">{recognizedData.expiry_date as string}</p>
                   </div>
                   <div>
                     <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">LOT번호</p>
-                    <p className="text-sm font-semibold text-[var(--accent)]">{recognizedData.lot_number}</p>
+                    <p className="text-sm font-semibold text-[var(--accent)]">{recognizedData.lot_number as string}</p>
                   </div>
                 </div>
               </div>

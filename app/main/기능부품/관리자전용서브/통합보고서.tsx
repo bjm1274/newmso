@@ -9,9 +9,18 @@ import * as XLSX from 'xlsx';
 
 type ReportTab = '인사현황' | '급여요약' | '재고현황';
 
+interface StaffMember {
+  dept?: string;
+  department?: string;
+  employment_type?: string;
+  contract_type?: string;
+  base_salary?: number;
+  [key: string]: unknown;
+}
+
 const PIE_COLORS = ['#4F8EF7', '#34C759', '#FF9500', '#FF6B6B', '#AF52DE', '#5AC8FA'];
 
-export default function IntegratedReport({ staffs = [] }: { staffs: any[] }) {
+export default function IntegratedReport({ staffs = [] }: { staffs: StaffMember[] }) {
   const [activeTab, setActiveTab] = useState<ReportTab>('인사현황');
   const [inventory, setInventory] = useState<any[]>([]);
   const [loadingInventory, setLoadingInventory] = useState(false);
@@ -28,8 +37,8 @@ export default function IntegratedReport({ staffs = [] }: { staffs: any[] }) {
 
   // ── 인사현황 데이터 ──
   const deptMap: Record<string, { total: number; regular: number; contract: number }> = {};
-  staffs.forEach((s: any) => {
-    const dept = s.dept || s.department || '미분류';
+  staffs.forEach((s: StaffMember) => {
+    const dept = String(s.dept || s.department || '미분류');
     if (!deptMap[dept]) deptMap[dept] = { total: 0, regular: 0, contract: 0 };
     deptMap[dept].total++;
     if (s.employment_type === '계약직' || s.contract_type === '계약직') {
@@ -46,7 +55,7 @@ export default function IntegratedReport({ staffs = [] }: { staffs: any[] }) {
     contract: v.contract,
   }));
 
-  const totalRegular = staffs.filter((s: any) => s.employment_type !== '계약직' && s.contract_type !== '계약직').length;
+  const totalRegular = staffs.filter((s: StaffMember) => s.employment_type !== '계약직' && s.contract_type !== '계약직').length;
   const totalContract = staffs.length - totalRegular;
   const employmentPieData = [
     { name: '정규직', value: totalRegular },
@@ -54,11 +63,11 @@ export default function IntegratedReport({ staffs = [] }: { staffs: any[] }) {
   ].filter(d => d.value > 0);
 
   // ── 급여 요약 데이터 ──
-  const totalSalary = staffs.reduce((acc: number, s: any) => acc + (s.base_salary || 0), 0);
+  const totalSalary = staffs.reduce((acc: number, s: StaffMember) => acc + (s.base_salary || 0), 0);
 
   const salaryByDept: Record<string, number> = {};
-  staffs.forEach((s: any) => {
-    const dept = s.dept || s.department || '미분류';
+  staffs.forEach((s: StaffMember) => {
+    const dept = String(s.dept || s.department || '미분류');
     salaryByDept[dept] = (salaryByDept[dept] || 0) + (s.base_salary || 0);
   });
 
@@ -69,11 +78,11 @@ export default function IntegratedReport({ staffs = [] }: { staffs: any[] }) {
 
   // ── 재고 현황 데이터 ──
   const categoryMap: Record<string, { count: number; totalAmount: number }> = {};
-  inventory.forEach((item: any) => {
-    const cat = item.category || '미분류';
+  inventory.forEach((item: Record<string, unknown>) => {
+    const cat = String(item.category || '미분류');
     if (!categoryMap[cat]) categoryMap[cat] = { count: 0, totalAmount: 0 };
     categoryMap[cat].count++;
-    categoryMap[cat].totalAmount += (item.unit_price || item.price || 0) * (item.quantity || 1);
+    categoryMap[cat].totalAmount += (Number(item.unit_price || item.price || 0)) * (Number(item.quantity || 1));
   });
 
   const inventoryChartData = Object.entries(categoryMap).map(([category, v]) => ({
@@ -84,7 +93,7 @@ export default function IntegratedReport({ staffs = [] }: { staffs: any[] }) {
 
   // ── Excel 다운로드 ──
   const handleExcelDownload = () => {
-    let sheetData: any[][] = [];
+    let sheetData: unknown[][] = [];
     let sheetName = '';
 
     if (activeTab === '인사현황') {
@@ -286,7 +295,7 @@ export default function IntegratedReport({ staffs = [] }: { staffs: any[] }) {
             {[
               { label: '전체 인건비 합계', value: `${totalSalary.toLocaleString()}원`, color: 'text-[var(--accent)]' },
               { label: '1인 평균 급여', value: staffs.length > 0 ? `${Math.round(totalSalary / staffs.length).toLocaleString()}원` : '-', color: 'text-[var(--foreground)]' },
-              { label: '급여 데이터 인원', value: `${staffs.filter((s: any) => s.base_salary > 0).length}명`, color: 'text-[#34C759]' },
+              { label: '급여 데이터 인원', value: `${staffs.filter((s: StaffMember) => (s.base_salary ?? 0) > 0).length}명`, color: 'text-[#34C759]' },
             ].map(card => (
               <div key={card.label} className="bg-[var(--card)] rounded-[var(--radius-lg)] p-4 border border-[var(--border)] shadow-sm">
                 <div className="text-xs text-[var(--toss-gray-3)] font-bold mb-1">{card.label}</div>

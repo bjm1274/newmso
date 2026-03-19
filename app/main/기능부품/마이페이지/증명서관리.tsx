@@ -48,26 +48,27 @@ function sanitizeFilename(value: string) {
     .slice(0, 80);
 }
 
-export default function MyCertificates({ user }: any) {
+export default function MyCertificates({ user }: Record<string, unknown>) {
+  const _user = (user ?? {}) as Record<string, unknown>;
   const [approvedDocs, setApprovedDocs] = useState<any[]>([]);
   const [issuedCerts, setIssuedCerts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!user?.id) {
+      if (!_user.id) {
         setLoading(false);
         return;
       }
-      const approvalRes = await supabase.from('approvals').select('*').eq('sender_id', user.id).eq('status', '승인').eq('type', '양식신청').order('created_at', { ascending: false });
+      const approvalRes = await supabase.from('approvals').select('*').eq('sender_id', _user.id as string).eq('status', '승인').eq('type', '양식신청').order('created_at', { ascending: false });
       setApprovedDocs(approvalRes.data || []);
-      const certRes = await supabase.from('certificate_issuances').select('*, staff_members(name)').eq('staff_id', user.id).order('issued_at', { ascending: false }).limit(20);
+      const certRes = await supabase.from('certificate_issuances').select('*, staff_members(name)').eq('staff_id', _user.id as string).order('issued_at', { ascending: false }).limit(20);
       setIssuedCerts(certRes.error ? [] : (certRes.data || []));
       setLoading(false);
     };
 
     fetchData();
-  }, [user?.id]);
+  }, [_user.id]);
 
   // 간단한 인쇄 기능 (브라우저 기본 인쇄창 호출)
   const handlePrint = (doc: any) => {

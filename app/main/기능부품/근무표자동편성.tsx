@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import type { StaffMember } from '@/types';
 import {
   buildDefaultPatternProfile,
   findPatternStaffGroup,
@@ -196,7 +197,7 @@ type PreviewCell = {
 };
 
 type PreviewRow = {
-  staff: any;
+  staff: StaffMember;
   config: StaffConfig;
   cells: PreviewCell[];
   counts: {
@@ -240,11 +241,11 @@ type WizardOffOverride = {
   nextShiftId: string;
 };
 
-function getDepartmentName(target: any) {
-  return target?.department || target?.team || '';
+function getDepartmentName(target: StaffMember | null | undefined): string {
+  return String(target?.department || (target as Record<string, unknown>)?.team || '');
 }
 
-function isManagerOrHigher(user: any) {
+function isManagerOrHigher(user: StaffMember | null | undefined) {
   const position = String(user?.position || '');
   return (
     user?.role === 'admin' ||
@@ -273,7 +274,7 @@ function getMonthEndDateKey(monthDates: string[]) {
   return monthDates[monthDates.length - 1] || '';
 }
 
-function isStaffNewNurse(staff: any, referenceDateKey: string) {
+function isStaffNewNurse(staff: StaffMember, referenceDateKey: string) {
   const joinedAt = String(
     staff?.join_date || staff?.joined_at || staff?.hire_date || staff?.start_date || ''
   )
@@ -1777,10 +1778,10 @@ function buildDefaultShiftOrder(shifts: WorkShift[]) {
   return unique.slice(0, 3);
 }
 
-function inferPattern(staff: any, shifts: WorkShift[]) {
-  const assignedShift = shifts.find((shift) => shift.id === staff?.shift_id);
-  const sources = [
-    staff?.shift_type,
+function inferPattern(staff: StaffMember, shifts: WorkShift[]) {
+  const assignedShift = shifts.find((shift) => shift.id === (staff as Record<string, unknown>)?.shift_id);
+  const sources: Array<string | null | undefined> = [
+    (staff as Record<string, unknown>)?.shift_type as string | undefined,
     assignedShift?.shift_type,
     assignedShift?.name,
   ];
@@ -1817,14 +1818,15 @@ function getBandShiftIds(
 }
 
 function inferDedicatedPatternGroup(
-  staff: any,
+  staff: StaffMember,
   shifts: WorkShift[]
 ): PlannerResolvedPatternGroup | null {
   if (shifts.length === 0) return null;
 
-  const assignedShift = shifts.find((shift) => shift.id === staff?.shift_id) || null;
-  const sources = [
-    staff?.shift_type,
+  const s = staff as Record<string, unknown>;
+  const assignedShift = shifts.find((shift) => shift.id === s?.shift_id) || null;
+  const sources: Array<string | null | undefined> = [
+    s?.shift_type as string | undefined,
     staff?.position,
     staff?.role,
     assignedShift?.shift_type,
@@ -1915,21 +1917,22 @@ function resolvePlannerPatternGroup({
   availableShifts,
   allShifts,
 }: {
-  staff: any;
+  staff: StaffMember;
   patternProfile?: RosterPatternProfile | null;
   availableShifts: WorkShift[];
   allShifts: WorkShift[];
 }): PlannerResolvedPatternGroup | null {
+  const staffExtra = staff as Record<string, unknown>;
   const matchedGroup = patternProfile
     ? findPatternStaffGroup(patternProfile, {
         name: String(staff.name || ''),
         position: String(staff.position || ''),
         role: String(staff.role || ''),
-        employmentType: String(staff.employment_type || ''),
+        employmentType: String(staffExtra.employment_type || ''),
         department: String(getDepartmentName(staff) || ''),
-        shiftType: String(staff.shift_type || ''),
-        assignedShiftId: String(staff.shift_id || ''),
-        assignedShiftName: getShiftNameById(String(staff.shift_id || ''), allShifts),
+        shiftType: String(staffExtra.shift_type || ''),
+        assignedShiftId: String(staffExtra.shift_id || ''),
+        assignedShiftName: getShiftNameById(String(staffExtra.shift_id || ''), allShifts),
       })
     : null;
 
@@ -2064,25 +2067,25 @@ function buildWizardPresetDescription(pattern: string, weeklyTemplateWeeks: Week
   return `${pattern} · 근무유형 ${shiftCount}개`;
 }
 
-function normalizePresetRecord(record: any): RosterWizardPreset | null {
+function normalizePresetRecord(record: Record<string, unknown>): RosterWizardPreset | null {
   if (!record || typeof record !== 'object') return null;
   const id = String(record.id || '').trim();
   const name = String(record.name || '').trim();
   if (!id || !name) return null;
   const shiftIds = Array.isArray(record.shiftIds)
     ? record.shiftIds
-        .map((shiftId: any) => String(shiftId || '').trim())
+        .map((shiftId: unknown) => String(shiftId || '').trim())
         .filter(Boolean)
     : [];
   const shiftNames = Array.isArray(record.shiftNames)
     ? record.shiftNames
-        .map((shiftName: any) => String(shiftName || '').trim())
+        .map((shiftName: unknown) => String(shiftName || '').trim())
         .filter(Boolean)
     : [];
 
   const customPatternSlots = Array.isArray(record.customPatternSlots)
     ? record.customPatternSlots
-        .map((token: any) => {
+        .map((token: unknown) => {
           if (token === 'OFF') return 'OFF' as const;
           const slot = Number(token);
           return Number.isInteger(slot) && slot > 0 ? slot : null;
@@ -2092,12 +2095,13 @@ function normalizePresetRecord(record: any): RosterWizardPreset | null {
 
   const weeklyTemplateWeeks = Array.isArray(record.weeklyTemplateWeeks)
     ? record.weeklyTemplateWeeks
-        .map((week: any) => {
-          const shiftSlot = Number(week?.shiftSlot);
+        .map((week: unknown) => {
+          const w = week as Record<string, unknown> | null | undefined;
+          const shiftSlot = Number(w?.shiftSlot);
           if (!Number.isInteger(shiftSlot) || shiftSlot <= 0) return null;
           return {
             shiftSlot,
-            activeWeekdays: normalizeActiveWeekdays(Array.isArray(week?.activeWeekdays) ? week.activeWeekdays : []),
+            activeWeekdays: normalizeActiveWeekdays(Array.isArray(w?.activeWeekdays) ? w.activeWeekdays as number[] : []),
           };
         })
         .filter(
@@ -2222,7 +2226,7 @@ function selectDistributedDays({
   return picks.sort((a, b) => a - b);
 }
 
-function buildInitialConfig(staff: any, index: number, shifts: WorkShift[], days: number) {
+function buildInitialConfig(staff: StaffMember, index: number, shifts: WorkShift[], days: number) {
   const primary = shifts.find((shift) => shift.id === staff?.shift_id)?.id || shifts[0]?.id || '';
   const secondary = shifts[1]?.id || primary;
   const tertiary = shifts[2]?.id || secondary || primary;
@@ -2441,17 +2445,17 @@ export default function AutoRosterPlanner({
   selectedCo = '전체',
   panelMode = 'planner',
 }: {
-  user?: any;
-  staffs?: any[];
+  user?: StaffMember;
+  staffs?: StaffMember[];
   selectedCo?: string;
   panelMode?: 'planner' | 'patterns' | 'rules';
 }) {
   const canAccess = isManagerOrHigher(user);
   const isAdmin = user?.role === 'admin' || user?.company === 'SY INC.' || user?.permissions?.mso === true;
   const ownDepartment = getDepartmentName(user);
-  const activeStaffs = useMemo(() => staffs.filter((staff: any) => staff?.status !== '퇴사'), [staffs]);
+  const activeStaffs = useMemo(() => staffs.filter((staff) => staff?.status !== '퇴사'), [staffs]);
   const companyOptions = useMemo(
-    () => Array.from(new Set(activeStaffs.map((staff: any) => staff.company).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'ko')),
+    () => Array.from(new Set(activeStaffs.map((staff) => staff.company).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'ko')),
     [activeStaffs]
   );
 
@@ -2619,8 +2623,8 @@ export default function AutoRosterPlanner({
     const list = Array.from(
       new Set(
         activeStaffs
-          .filter((staff: any) => staff.company === selectedCompany)
-          .map((staff: any) => getDepartmentName(staff))
+          .filter((staff) => staff.company === selectedCompany)
+          .map((staff) => getDepartmentName(staff))
           .filter(Boolean)
       )
     ).sort((a, b) => a.localeCompare(b, 'ko'));
@@ -2635,7 +2639,7 @@ export default function AutoRosterPlanner({
     if (!departmentOptions.length) return;
     const defaultDepartment = departmentOptions.includes(ownDepartment)
       ? ownDepartment
-      : departmentOptions.find((department) => department !== '전체 부서') || departmentOptions[0];
+      : departmentOptions.find((department) => department !== '전체 부서') || departmentOptions[0] || '';
     if (!selectedDepartment || !departmentOptions.includes(selectedDepartment) || selectedDepartment === '전체 부서') {
       setSelectedDepartment(defaultDepartment);
     }
@@ -2675,7 +2679,7 @@ export default function AutoRosterPlanner({
         );
 
         if (error) throw error;
-        setWorkShifts((data || []).map((shift: any) => ({
+        setWorkShifts(((data || []) as unknown as WorkShift[]).map((shift) => ({
           ...shift,
           weekly_work_days: shift?.weekly_work_days ?? null,
           is_weekend_work: shift?.is_weekend_work ?? null,
@@ -2857,7 +2861,7 @@ export default function AutoRosterPlanner({
   }, [recommendedAiShiftIds, usesStrictTeamRecommendation, workingShifts]);
 
   const targetStaffs = useMemo(() => {
-    return activeStaffs.filter((staff: any) => {
+    return activeStaffs.filter((staff) => {
       if (selectedCompany && staff.company !== selectedCompany) return false;
       if (selectedDepartment && selectedDepartment !== '전체 부서') {
         return getDepartmentName(staff) === selectedDepartment;
@@ -2867,17 +2871,17 @@ export default function AutoRosterPlanner({
   }, [activeStaffs, selectedCompany, selectedDepartment]);
 
   const orderedTargetStaffIds = useMemo(
-    () => targetStaffs.map((staff: any) => String(staff.id)),
+    () => targetStaffs.map((staff) => String(staff.id)),
     [targetStaffs]
   );
   const enabledTargetStaffs = useMemo(
-    () => targetStaffs.filter((staff: any) => staffConfigs[String(staff.id)]?.enabled !== false),
+    () => targetStaffs.filter((staff) => staffConfigs[String(staff.id)]?.enabled !== false),
     [staffConfigs, targetStaffs]
   );
   const effectiveTargetStaffConfigs = useMemo(() => {
     const nextMap = new Map<string, StaffConfig>();
 
-    targetStaffs.forEach((staff: any, index: number) => {
+    targetStaffs.forEach((staff, index) => {
       nextMap.set(
         String(staff.id),
         staffConfigs[String(staff.id)] ||
@@ -2904,7 +2908,7 @@ export default function AutoRosterPlanner({
     }
 
     setPreferredOffStaffId((prev) =>
-      targetStaffs.some((staff: any) => String(staff.id) === prev) ? prev : String(targetStaffs[0].id)
+      targetStaffs.some((staff) => String(staff.id) === prev) ? prev : String(targetStaffs[0].id)
     );
   }, [targetStaffs]);
 
@@ -2951,7 +2955,7 @@ export default function AutoRosterPlanner({
     if (typeof window === 'undefined') return;
     if (!selectedCompany || !selectedDepartment) return;
 
-    const targetStaffIdSet = new Set(targetStaffs.map((staff: any) => String(staff.id)));
+    const targetStaffIdSet = new Set(targetStaffs.map((staff) => String(staff.id)));
     try {
       const raw = window.localStorage.getItem(staffNightRangeStorageKey);
       if (!raw) return;
@@ -2962,7 +2966,7 @@ export default function AutoRosterPlanner({
 
       setStaffConfigs((prev) => {
         const next = { ...prev };
-        targetStaffs.forEach((staff: any, index: number) => {
+        targetStaffs.forEach((staff, index) => {
           const staffId = String(staff.id);
           const stored = normalized[staffId];
           if (!stored) return;
@@ -3001,7 +3005,7 @@ export default function AutoRosterPlanner({
 
     try {
       const normalized: StoredStaffNightRangeMap = {};
-      targetStaffs.forEach((staff: any) => {
+      targetStaffs.forEach((staff) => {
         const config = effectiveTargetStaffConfigs.get(String(staff.id));
         if (!config) return;
         if ((config.minNightShiftCount || 0) <= 0 && (config.maxNightShiftCount || 0) <= 0) return;
@@ -3079,7 +3083,7 @@ export default function AutoRosterPlanner({
 
     setStaffConfigs((prev) => {
       const next: Record<string, StaffConfig> = {};
-      targetStaffs.forEach((staff: any, index: number) => {
+      targetStaffs.forEach((staff, index) => {
         const current = prev[staff.id];
         const baseConfig =
           current || buildInitialConfig(staff, index, defaultShiftOrder.length ? defaultShiftOrder : workingShifts, monthDates.length);
@@ -3230,11 +3234,11 @@ export default function AutoRosterPlanner({
     [userWizardPresets, wizardSelectedPresetId]
   );
   const wizardSelectedStaffs = useMemo(
-    () => targetStaffs.filter((staff: any) => wizardSelectedStaffIds.includes(String(staff.id))),
+    () => targetStaffs.filter((staff) => wizardSelectedStaffIds.includes(String(staff.id))),
     [targetStaffs, wizardSelectedStaffIds]
   );
   const wizardExcludedStaffs = useMemo(
-    () => targetStaffs.filter((staff: any) => !wizardSelectedStaffIds.includes(String(staff.id))),
+    () => targetStaffs.filter((staff) => !wizardSelectedStaffIds.includes(String(staff.id))),
     [targetStaffs, wizardSelectedStaffIds]
   );
   const wizardOverrideDateOptions = useMemo(() => monthDates.slice(0, -1), [monthDates]);
@@ -3336,7 +3340,7 @@ export default function AutoRosterPlanner({
   const preferredOffEntries = useMemo(
     () =>
       targetStaffs
-        .map((staff: any) => ({
+        .map((staff) => ({
           staff,
           dates: [...(preferredOffSelections[String(staff.id)] || [])].sort(),
         }))
@@ -3439,7 +3443,7 @@ export default function AutoRosterPlanner({
     );
 
     return enabledTargetStaffs
-      .map((staff: any) => {
+      .map((staff) => {
         const plan = planByStaffId.get(String(staff.id));
         if (!plan) return null;
 
@@ -3957,7 +3961,7 @@ export default function AutoRosterPlanner({
     if (enabledTargetStaffs.length === 0) return [];
 
     const groups = new Map<string, PlannerPatternPreviewGroup>();
-    enabledTargetStaffs.forEach((staff: any) => {
+    enabledTargetStaffs.forEach((staff) => {
       const resolvedGroup = resolvePlannerPatternGroup({
         staff,
         patternProfile: selectedPatternProfile,
@@ -4388,7 +4392,7 @@ export default function AutoRosterPlanner({
             weekly_work_days: shift.weekly_work_days,
             is_weekend_work: shift.is_weekend_work,
           })),
-          staffs: enabledTargetStaffs.map((staff: any) => ({
+          staffs: enabledTargetStaffs.map((staff) => ({
             id: String(staff.id),
             name: String(staff.name || ''),
             employeeNo: String(staff.employee_no || ''),
@@ -4451,9 +4455,9 @@ export default function AutoRosterPlanner({
       }
       setGeminiAppliedAt(new Date().toLocaleString('ko-KR'));
       alert('Gemini가 팀 특성을 분석해 월간 근무표 초안을 만들었습니다. 아래 미리보기에서 확인하세요.');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Gemini 팀 추천 실패:', error);
-      alert(`Gemini 팀 추천 중 오류가 발생했습니다.\n${error?.message || '알 수 없는 오류'}`);
+      alert(`Gemini 팀 추천 중 오류가 발생했습니다.\n${(error as Error)?.message || '알 수 없는 오류'}`);
     } finally {
       setGeminiLoading(false);
     }
@@ -4519,7 +4523,7 @@ export default function AutoRosterPlanner({
       let approvedLeaveBlockedDatesByStaff = new Map<string, Set<string>>();
 
       const targetStaffIds = enabledTargetStaffs
-        .map((staff: any) => String(staff?.id || ''))
+        .map((staff) => String(staff?.id || ''))
         .filter(Boolean);
       const targetStaffIdSet = new Set(targetStaffIds);
 
@@ -4553,7 +4557,7 @@ export default function AutoRosterPlanner({
         approvedLeaveBlockedDatesByStaff,
         preferredOffBlockedDatesByStaff
       );
-      const resolvedGroupsByStaff = enabledTargetStaffs.map((staff: any) => {
+      const resolvedGroupsByStaff = enabledTargetStaffs.map((staff) => {
         const config =
           effectiveTargetStaffConfigs.get(String(staff.id)) ||
           buildInitialConfig(
@@ -4774,15 +4778,15 @@ export default function AutoRosterPlanner({
       );
       setGeminiAppliedAt(new Date().toLocaleString('ko-KR'));
       alert('저장된 교대방식 패턴과 선택한 근무유형을 기준으로 월간 초안을 생성했습니다. 아래 미리보기에서 확인하세요.');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('패턴 기반 근무표 생성 실패:', error);
-      alert(`패턴 기반 근무표 생성 중 오류가 발생했습니다.\n${error?.message || '알 수 없는 오류'}`);
+      alert(`패턴 기반 근무표 생성 중 오류가 발생했습니다.\n${(error as Error)?.message || '알 수 없는 오류'}`);
     } finally {
       setGeminiLoading(false);
     }
   };
 
-  const updateConfig = (staff: any, index: number, patch: Partial<StaffConfig>) => {
+  const updateConfig = (staff: StaffMember, index: number, patch: Partial<StaffConfig>) => {
     setStaffConfigs((prev) => {
       const current =
         prev[staff.id] ||
@@ -5316,7 +5320,7 @@ export default function AutoRosterPlanner({
 
     setStaffConfigs((prev) => {
       const next = { ...prev };
-      targetStaffs.forEach((staff: any, index: number) => {
+      targetStaffs.forEach((staff, index) => {
         const current =
           prev[staff.id] ||
           buildInitialConfig(staff, index, defaultShiftOrder.length ? defaultShiftOrder : workingShifts, monthDates.length);
@@ -5416,9 +5420,9 @@ export default function AutoRosterPlanner({
       }
 
       alert(`${selectedDepartment} 팀 ${enabledRows.length}명의 ${selectedMonth} 근무표를 저장했습니다.`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('근무표 저장 실패:', error);
-      alert(`근무표 저장에 실패했습니다.\n${error?.message || '알 수 없는 오류'}`);
+      alert(`근무표 저장에 실패했습니다.\n${(error as Error)?.message || '알 수 없는 오류'}`);
     } finally {
       setSaving(false);
     }
@@ -6423,7 +6427,7 @@ export default function AutoRosterPlanner({
                     {targetStaffs.length === 0 ? (
                       <option value="">직원 없음</option>
                     ) : (
-                      targetStaffs.map((staff: any) => (
+                      targetStaffs.map((staff) => (
                         <option key={staff.id} value={String(staff.id)}>
                           {staff.name}
                         </option>
@@ -7181,7 +7185,7 @@ export default function AutoRosterPlanner({
                 </tr>
               </thead>
               <tbody>
-                {targetStaffs.map((staff: any, index: number) => {
+                {targetStaffs.map((staff, index) => {
                   const config =
                     staffConfigs[staff.id] ||
                     buildInitialConfig(staff, index, defaultShiftOrder.length ? defaultShiftOrder : workingShifts, monthDates.length);
@@ -7538,7 +7542,7 @@ export default function AutoRosterPlanner({
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                           {teamOptions.map((department) => {
                             const teamStaffCount = activeStaffs.filter(
-                              (staff: any) =>
+                              (staff) =>
                                 staff.company === selectedCompany && getDepartmentName(staff) === department
                             ).length;
                             const selected = selectedDepartment === department;
@@ -7624,7 +7628,7 @@ export default function AutoRosterPlanner({
                   ) : (
                     <>
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                        {targetStaffs.map((staff: any) => {
+                        {targetStaffs.map((staff) => {
                           const staffId = String(staff.id);
                           const selected = wizardSelectedStaffIds.includes(staffId);
                           return (
@@ -7673,7 +7677,7 @@ export default function AutoRosterPlanner({
                           className="rounded-[var(--radius-xl)] border border-dashed border-[var(--border)] bg-[var(--muted)] px-4 py-3 text-sm font-semibold text-[var(--foreground)]"
                           data-testid="roster-wizard-excluded-summary"
                         >
-                          Excluded: {wizardExcludedStaffs.map((staff: any) => staff.name).join(', ')}
+                          Excluded: {wizardExcludedStaffs.map((staff) => staff.name).join(', ')}
                         </div>
                       )}
                     </>
@@ -7824,7 +7828,7 @@ export default function AutoRosterPlanner({
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                      {wizardSelectedStaffs.map((staff: any, index: number) => {
+                      {wizardSelectedStaffs.map((staff, index) => {
                         const staffId = String(staff.id);
                         const override = wizardOffOverrides[staffId] || {
                           enabled: false,

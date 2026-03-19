@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import type { StaffMember, InventoryItem, Supplier } from '@/types';
 import { canAccessInventorySection } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnFallback } from '@/lib/supabase-compat';
@@ -31,6 +32,7 @@ import {
   processInventoryIssue,
   requestInventoryReorder,
   summarizeSupplyRequestWorkflow,
+  type SupplyRequestWorkflowItem,
 } from '@/app/main/inventory-utils';
 
 const INV_VIEW_KEY = 'erp_inventory_view';
@@ -44,6 +46,37 @@ type SupplierWorkspaceTab = 'suppliers' | 'documents';
 type LinkedSupplyOrderTarget = {
   approvalId: string;
   requestIndex: number;
+};
+type WorkflowItem = Record<string, unknown>;
+type WorkflowSummary = {
+  issue_ready_count?: number;
+  order_required_count?: number;
+  issued_count?: number;
+  ordered_count?: number;
+};
+type LiveInventoryWorkflow = {
+  items?: WorkflowItem[];
+  summary?: WorkflowSummary;
+};
+type ApprovalRecord = {
+  id?: string | null;
+  title?: string;
+  type?: string;
+  status?: string;
+  sender_id?: string | null;
+  sender_name?: string | null;
+  sender_company?: string | null;
+  company_id?: string | null;
+  doc_number?: string | null;
+  meta_data?: {
+    items?: Record<string, unknown>[];
+    inventory_workflow?: Record<string, unknown>;
+    doc_number?: string | null;
+    [key: string]: unknown;
+  };
+  live_inventory_workflow?: LiveInventoryWorkflow;
+  created_at?: string | null;
+  [key: string]: unknown;
 };
 
 function resolveInventoryView(view?: string | null): {
@@ -89,8 +122,8 @@ const INVENTORY_VIEW_META: Record<string, { title: string; description: string }
   이관: { title: '재고 이관', description: '' },
 };
 
-function isExpirySoon(item: any, threshold: number) {
-  return Boolean(item?.expiry_date) && new Date(item.expiry_date).getTime() < threshold;
+function isExpirySoon(item: InventoryItem, threshold: number) {
+  return Boolean(item?.expiry_date) && new Date(item.expiry_date as string).getTime() < threshold;
 }
 
 function formatCurrency(value: number) {
@@ -107,7 +140,17 @@ export default function IntegratedInventoryManagement({
   onViewChange,
   initialWorkflowApprovalId,
   onConsumeInitialWorkflowApprovalId,
-}: any) {
+}: {
+  user?: StaffMember;
+  depts?: Array<string | { name?: string }>;
+  selectedCo?: string;
+  selectedCompanyId?: string | null;
+  onRefresh?: () => void;
+  initialView?: string | null;
+  onViewChange?: (view: string) => void;
+  initialWorkflowApprovalId?: string | null;
+  onConsumeInitialWorkflowApprovalId?: () => void;
+}) {
   const initialResolvedView = resolveInventoryView(initialView);
   const defaultInventoryView =
     INVENTORY_VIEWS.find((view) => canAccessInventorySection(user, view)) || '현황';
@@ -116,19 +159,19 @@ export default function IntegratedInventoryManagement({
   );
   const [viewCompany, setViewCompany] = useState<string>('전체'); // 현황 탭용 회사 선택
   const [selectedDept, setSelectedDept] = useState('전체');
-  const [inventory, setInventory] = useState<any[]>([]);
-  const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [statusFilter, setStatusFilter] = useState<InventoryStatusFilter>(initialResolvedView.statusFilter ?? '전체');
-  const [stockModal, setStockModal] = useState<{ item: any; type: 'in' | 'out'; targetCompany: string; targetDept: string } | null>(null);
+  const [stockModal, setStockModal] = useState<{ item: InventoryItem; type: 'in' | 'out'; targetCompany: string; targetDept: string } | null>(null);
   const [stockAmount, setStockAmount] = useState(1);
-  const [logs, setLogs] = useState<any[]>([]);
+  const [logs, setLogs] = useState<Record<string, unknown>[]>([]);
   const [registrationMode, setRegistrationMode] = useState<'form' | 'excel' | 'auto_extract'>('form');
   const [supplierWorkspaceTab, setSupplierWorkspaceTab] = useState<SupplierWorkspaceTab>(initialResolvedView.supplierTab ?? 'suppliers');
   const [showExpiryCenter, setShowExpiryCenter] = useState(Boolean(initialResolvedView.showExpiryCenter));
-  const [pendingSupplyApprovals, setPendingSupplyApprovals] = useState<any[]>([]);
-  const [completedSupplyApprovals, setCompletedSupplyApprovals] = useState<any[]>([]);
+  const [pendingSupplyApprovals, setPendingSupplyApprovals] = useState<ApprovalRecord[]>([]);
+  const [completedSupplyApprovals, setCompletedSupplyApprovals] = useState<ApprovalRecord[]>([]);
   const [workflowActionKey, setWorkflowActionKey] = useState<string | null>(null);
   const [highlightedSupplyApprovalId, setHighlightedSupplyApprovalId] = useState<string | null>(null);
   const [highlightedSupplyOrderTarget, setHighlightedSupplyOrderTarget] = useState<LinkedSupplyOrderTarget | null>(null);
@@ -183,18 +226,18 @@ export default function IntegratedInventoryManagement({
 
   // 현황 탭: 회사별 부서 선택용 목록
   const companiesInInventory = useMemo(() =>
-    Array.from(new Set(inventory.map((i: any) => (i.company || '').trim()).filter(Boolean))).sort(),
+    Array.from(new Set(inventory.map((i) => (i.company || '').trim()).filter(Boolean))).sort(),
     [inventory]
   );
   const getDepartmentsForCompany = useCallback((companyName: string) => {
     if (!companyName || companyName === '전체') return [];
     const inventoryDepartments = inventory
-      .filter((i: any) => (i.company || '').trim() === companyName)
-      .map((i: any) => (i.department || '').trim())
+      .filter((i) => (i.company || '').trim() === companyName)
+      .map((i) => ((i.department as string | undefined) || '').trim())
       .filter(Boolean);
     const configuredDepartments = Array.isArray(depts)
       ? depts
-          .map((dept: any) => (typeof dept === 'string' ? dept : dept?.name || ''))
+          .map((dept) => (typeof dept === 'string' ? dept : (dept as { name?: string })?.name || ''))
           .map((name: string) => name.trim())
           .filter(Boolean)
       : [];
@@ -213,20 +256,20 @@ export default function IntegratedInventoryManagement({
   const baseFilteredInventory = useMemo(() => {
     let list = inventory;
     if (activeView === '현황' && viewCompany && viewCompany !== '전체') {
-      list = list.filter((i: any) => (i.company || '').trim() === viewCompany);
+      list = list.filter((i) => (i.company || '').trim() === viewCompany);
     }
     if (searchKeyword.trim()) {
       const k = searchKeyword.toLowerCase();
-      list = list.filter((i: any) =>
-        (i.item_name || '').toLowerCase().includes(k) ||
+      list = list.filter((i) =>
+        ((i as Record<string, unknown>).item_name as string || i.name || '').toLowerCase().includes(k) ||
         (i.name || '').toLowerCase().includes(k) ||
         (i.category || '').toLowerCase().includes(k) ||
-        (i.lot_number || '').toLowerCase().includes(k) ||
+        ((i as Record<string, unknown>).lot_number as string || '').toLowerCase().includes(k) ||
         (i.company || '').toLowerCase().includes(k)
       );
     }
     if (selectedDept && selectedDept !== '전체') {
-      list = list.filter((i: any) => (i.department || '').trim() === selectedDept);
+      list = list.filter((i) => ((i as Record<string, unknown>).department as string || '').trim() === selectedDept);
     }
     return list;
   }, [inventory, searchKeyword, selectedDept, activeView, viewCompany]);
@@ -234,7 +277,7 @@ export default function IntegratedInventoryManagement({
   const filteredInventory = useMemo(() => {
     if (statusFilter === '전체') return baseFilteredInventory;
 
-    return baseFilteredInventory.filter((item: any) => {
+    return baseFilteredInventory.filter((item) => {
       const quantity = getItemQuantity(item);
       const minQuantity = getItemMinQuantity(item);
       const expiryImminent = isExpirySoon(item, expiryThreshold);
@@ -247,19 +290,19 @@ export default function IntegratedInventoryManagement({
   }, [baseFilteredInventory, expiryThreshold, statusFilter]);
 
   const lowStockFilteredItems = useMemo(
-    () => baseFilteredInventory.filter((item: any) => getItemQuantity(item) <= getItemMinQuantity(item)),
+    () => baseFilteredInventory.filter((item) => getItemQuantity(item) <= getItemMinQuantity(item)),
     [baseFilteredInventory],
   );
 
   const expiryFilteredItems = useMemo(
-    () => baseFilteredInventory.filter((item: any) => isExpirySoon(item, expiryThreshold)),
+    () => baseFilteredInventory.filter((item) => isExpirySoon(item, expiryThreshold)),
     [baseFilteredInventory, expiryThreshold],
   );
 
   const urgentActionItems = useMemo(() => {
     return baseFilteredInventory
-      .filter((item: any) => getItemQuantity(item) <= getItemMinQuantity(item) || isExpirySoon(item, expiryThreshold))
-      .sort((a: any, b: any) => {
+      .filter((item) => getItemQuantity(item) <= getItemMinQuantity(item) || isExpirySoon(item, expiryThreshold))
+      .sort((a, b) => {
         const aLow = getItemQuantity(a) <= getItemMinQuantity(a);
         const bLow = getItemQuantity(b) <= getItemMinQuantity(b);
         if (aLow !== bLow) return aLow ? -1 : 1;
@@ -269,33 +312,33 @@ export default function IntegratedInventoryManagement({
   }, [baseFilteredInventory, expiryThreshold]);
 
   const totalQuantity = useMemo(
-    () => filteredInventory.reduce((sum: number, item: any) => sum + getItemQuantity(item), 0),
+    () => filteredInventory.reduce((sum: number, item) => sum + getItemQuantity(item), 0),
     [filteredInventory],
   );
 
   const totalInventoryValue = useMemo(
-    () => filteredInventory.reduce((sum: number, item: any) => sum + (Number(item.unit_price || 0) * getItemQuantity(item)), 0),
+    () => filteredInventory.reduce((sum: number, item) => sum + (Number((item as Record<string, unknown>).unit_price || 0) * getItemQuantity(item)), 0),
     [filteredInventory],
   );
 
   const outOfStockItems = useMemo(
-    () => baseFilteredInventory.filter((item: any) => getItemQuantity(item) === 0),
+    () => baseFilteredInventory.filter((item) => getItemQuantity(item) === 0),
     [baseFilteredInventory],
   );
 
   const inventoryNameById = useMemo(
-    () => new Map(inventory.map((item: any) => [String(item.id), item.item_name || item.name || '품목'])),
+    () => new Map(inventory.map((item) => [String(item.id), (item as Record<string, unknown>).item_name as string || item.name || '품목'])),
     [inventory],
   );
 
   const todayLogCount = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
-    return logs.filter((log: any) => String(log.created_at || '').slice(0, 10) === today).length;
+    return logs.filter((log) => String(log.created_at || '').slice(0, 10) === today).length;
   }, [logs]);
 
   const recentLogPreview = useMemo(
     () =>
-      logs.slice(0, 5).map((log: any) => ({
+      logs.slice(0, 5).map((log) => ({
         ...log,
         itemLabel:
           inventoryNameById.get(String(log.item_id || log.inventory_id || '')) ||
@@ -384,10 +427,10 @@ export default function IntegratedInventoryManagement({
       if (approvalsError) throw approvalsError;
       if (inventoryError) throw inventoryError;
 
-      const nextPendingApprovals: any[] = [];
-      const nextCompletedApprovals: any[] = [];
+      const nextPendingApprovals: ApprovalRecord[] = [];
+      const nextCompletedApprovals: ApprovalRecord[] = [];
 
-      (approvalsData || []).forEach((approval: any) => {
+      (approvalsData || []).forEach((approval) => {
         const workflowItems = buildSupplyRequestWorkflowItems(
           approval?.meta_data?.items,
           supportInventoryRows || [],
@@ -418,15 +461,17 @@ export default function IntegratedInventoryManagement({
         nextPendingApprovals.push(nextApproval);
       });
 
-      nextCompletedApprovals.sort((left: any, right: any) => {
+      nextCompletedApprovals.sort((left, right) => {
+        const leftApproval = left as Record<string, unknown>;
+        const rightApproval = right as Record<string, unknown>;
         const leftLatestProcessedAt = Math.max(
-          ...((left?.live_inventory_workflow?.items || []).map((item: any) =>
-            item?.processed_at ? new Date(item.processed_at).getTime() : 0,
+          ...(((leftApproval?.live_inventory_workflow as Record<string, unknown>)?.items as Record<string, unknown>[] || []).map((item) =>
+            item?.processed_at ? new Date(item.processed_at as string).getTime() : 0,
           )),
         );
         const rightLatestProcessedAt = Math.max(
-          ...((right?.live_inventory_workflow?.items || []).map((item: any) =>
-            item?.processed_at ? new Date(item.processed_at).getTime() : 0,
+          ...(((rightApproval?.live_inventory_workflow as Record<string, unknown>)?.items as Record<string, unknown>[] || []).map((item) =>
+            item?.processed_at ? new Date(item.processed_at as string).getTime() : 0,
           )),
         );
         return rightLatestProcessedAt - leftLatestProcessedAt;
@@ -521,7 +566,7 @@ export default function IntegratedInventoryManagement({
     if (!initialWorkflowApprovalId || activeView !== '현황') return;
 
     const matchedApproval = [...pendingSupplyApprovals, ...completedSupplyApprovals].find(
-      (approval: any) => String(approval?.id) === String(initialWorkflowApprovalId),
+      (approval) => String((approval as Record<string, unknown>)?.id) === String(initialWorkflowApprovalId),
     );
 
     if (!matchedApproval) return;
@@ -606,16 +651,16 @@ export default function IntegratedInventoryManagement({
     [openInventoryView],
   );
 
-  const handleStockUpdate = async (item: any, type: 'in' | 'out', amount: number, targetCompany: string, targetDept: string) => {
+  const handleStockUpdate = async (item: InventoryItem, type: 'in' | 'out', amount: number, targetCompany: string, targetDept: string) => {
     if (amount <= 0) return alert("수량은 0보다 커야 합니다.");
-    const currentQty = item.quantity ?? item.stock ?? 0;
+    const currentQty = item.quantity ?? (item as Record<string, unknown>).stock as number ?? 0;
     const newStock = type === 'in' ? currentQty + amount : currentQty - amount;
     if (type === 'out' && newStock < 0) return alert("재고가 부족하여 출고할 수 없습니다.");
     try {
       // 해당 물품의 귀속 회사/부서를 완전히 변경하는 것이 아니라면 inventory 테이블의 소속 구조는 유지하고 로그에만 사유를 기록
       const { error } = await supabase.from('inventory').update({ quantity: newStock, stock: newStock }).eq('id', item.id);
       if (!error) {
-        const logRows: any[] = [{
+        const logRows: Record<string, unknown>[] = [{
           item_id: item.id,
           inventory_id: item.id,
           type: type === 'in' ? '입고' : '출고',
@@ -632,7 +677,7 @@ export default function IntegratedInventoryManagement({
         await withMissingColumnFallback(
           () => supabase.from('inventory_logs').insert(logRows),
           () => {
-            const legacyRows = logRows.map(({ company_id, ...rest }: any) => rest);
+            const legacyRows = logRows.map(({ company_id: _cid, ...rest }) => rest);
             return supabase.from('inventory_logs').insert(legacyRows);
           }
         );
@@ -646,7 +691,7 @@ export default function IntegratedInventoryManagement({
     }
   };
 
-  const updateSupplyApprovalWorkflow = useCallback(async (approval: any, nextItems: any[]) => {
+  const updateSupplyApprovalWorkflow = useCallback(async (approval: ApprovalRecord, nextItems: SupplyRequestWorkflowItem[]) => {
     const summary = summarizeSupplyRequestWorkflow(nextItems);
     const workflowStatus = nextItems.every(
       (item) => item.status === 'issued' || item.status === 'ordered',
@@ -680,7 +725,7 @@ export default function IntegratedInventoryManagement({
     return nextWorkflow;
   }, []);
 
-  const handleSupplyIssue = useCallback(async (approval: any, workflowItem: any) => {
+  const handleSupplyIssue = useCallback(async (approval: ApprovalRecord, workflowItem: WorkflowItem) => {
     const actionKey = `${approval.id}:${workflowItem.request_index}:issue`;
     setWorkflowActionKey(actionKey);
 
@@ -692,7 +737,7 @@ export default function IntegratedInventoryManagement({
       const liveItems = buildSupplyRequestWorkflowItems(
         approval?.meta_data?.items,
         supportInventoryRows || [],
-        approval?.meta_data?.inventory_workflow?.items,
+        (approval?.meta_data?.inventory_workflow as Record<string, unknown> | undefined)?.items as Record<string, unknown>[] | undefined,
       );
       const currentItem = liveItems.find(
         (item) => Number(item.request_index) === Number(workflowItem.request_index),
@@ -710,7 +755,7 @@ export default function IntegratedInventoryManagement({
 
       const sourceItem =
         (supportInventoryRows || []).find(
-          (row: any) => String(row.id) === String(currentItem.source_inventory_id),
+          (row) => String(row.id) === String(currentItem.source_inventory_id),
         ) || findSupplySourceInventoryItem(supportInventoryRows || [], currentItem.name);
 
       if (!sourceItem) {
@@ -728,11 +773,11 @@ export default function IntegratedInventoryManagement({
         destinationCompanyId: approval?.company_id ?? null,
       });
 
-      const nextItems = liveItems.map((item) =>
+      const nextItems: SupplyRequestWorkflowItem[] = liveItems.map((item) =>
         Number(item.request_index) === Number(currentItem.request_index)
           ? {
               ...item,
-              status: 'issued',
+              status: 'issued' as const,
               processed_at: new Date().toISOString(),
               processed_by_id: user?.id || null,
               processed_by_name: user?.name || null,
@@ -765,15 +810,15 @@ export default function IntegratedInventoryManagement({
       ]);
       onRefresh?.();
       alert('불출 처리가 완료되었습니다.');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('물품신청 불출 처리 실패:', error);
-      alert(error?.message || '불출 처리 중 오류가 발생했습니다.');
+      alert((error as Error)?.message || '불출 처리 중 오류가 발생했습니다.');
     } finally {
       setWorkflowActionKey(null);
     }
   }, [fetchLogs, fetchPendingSupplyApprovals, onRefresh, refreshCurrentInventory, updateSupplyApprovalWorkflow, user]);
 
-  const handleSupplyOrder = useCallback(async (approval: any, workflowItem: any) => {
+  const handleSupplyOrder = useCallback(async (approval: ApprovalRecord, workflowItem: WorkflowItem) => {
     const actionKey = `${approval.id}:${workflowItem.request_index}:order`;
     setWorkflowActionKey(actionKey);
 
@@ -785,7 +830,7 @@ export default function IntegratedInventoryManagement({
       const liveItems = buildSupplyRequestWorkflowItems(
         approval?.meta_data?.items,
         supportInventoryRows || [],
-        approval?.meta_data?.inventory_workflow?.items,
+        (approval?.meta_data?.inventory_workflow as Record<string, unknown> | undefined)?.items as Record<string, unknown>[] | undefined,
       );
       const currentItem = liveItems.find(
         (item) => Number(item.request_index) === Number(workflowItem.request_index),
@@ -800,7 +845,7 @@ export default function IntegratedInventoryManagement({
 
       const sourceItem =
         (supportInventoryRows || []).find(
-          (row: any) => String(row.id) === String(currentItem.source_inventory_id),
+          (row) => String(row.id) === String(currentItem.source_inventory_id),
         ) || findSupplySourceInventoryItem(supportInventoryRows || [], currentItem.name);
 
       let orderRequested = false;
@@ -830,11 +875,11 @@ export default function IntegratedInventoryManagement({
         note = `자동 발주 기안을 생성했습니다. 보충 수량 ${reorderQuantity}개`;
       }
 
-      const nextItems = liveItems.map((item) =>
+      const nextItems: SupplyRequestWorkflowItem[] = liveItems.map((item) =>
         Number(item.request_index) === Number(currentItem.request_index)
           ? {
               ...item,
-              status: 'ordered',
+              status: 'ordered' as const,
               processed_at: new Date().toISOString(),
               processed_by_id: user?.id || null,
               processed_by_name: user?.name || null,
@@ -863,9 +908,9 @@ export default function IntegratedInventoryManagement({
 
       await fetchPendingSupplyApprovals();
       alert(orderRequested ? '발주 요청을 등록했습니다.' : '자동 발주 기준 재고가 없어 발주 필요 상태로만 표시했습니다.');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('물품신청 발주 처리 실패:', error);
-      alert(error?.message || '발주 처리 중 오류가 발생했습니다.');
+      alert((error as Error)?.message || '발주 처리 중 오류가 발생했습니다.');
     } finally {
       setWorkflowActionKey(null);
     }
@@ -873,7 +918,7 @@ export default function IntegratedInventoryManagement({
 
   const pendingSupplyApprovalSummary = useMemo(() => (
     pendingSupplyApprovals.reduce(
-      (summary, approval: any) => {
+      (summary, approval) => {
         const workflowSummary = approval?.live_inventory_workflow?.summary;
         summary.approval_count += 1;
         summary.issue_ready_count += Number(workflowSummary?.issue_ready_count || 0);
@@ -884,13 +929,13 @@ export default function IntegratedInventoryManagement({
         approval_count: 0,
         issue_ready_count: 0,
         order_required_count: 0,
-      },
+      } as { approval_count: number; issue_ready_count: number; order_required_count: number },
     )
   ), [pendingSupplyApprovals]);
 
   const completedSupplyApprovalSummary = useMemo(() => (
     completedSupplyApprovals.reduce(
-      (summary, approval: any) => {
+      (summary, approval) => {
         const workflowSummary = approval?.live_inventory_workflow?.summary;
         summary.approval_count += 1;
         summary.issued_count += Number(workflowSummary?.issued_count || 0);
@@ -901,7 +946,7 @@ export default function IntegratedInventoryManagement({
         approval_count: 0,
         issued_count: 0,
         ordered_count: 0,
-      },
+      } as { approval_count: number; issued_count: number; ordered_count: number },
     )
   ), [completedSupplyApprovals]);
 
@@ -920,7 +965,7 @@ export default function IntegratedInventoryManagement({
     );
   }
 
-  const handleAutoApprovalRequest = async (item: any) => {
+  const handleAutoApprovalRequest = async (item: InventoryItem) => {
     const quantity = getItemQuantity(item);
     const minQuantity = getItemMinQuantity(item);
     const itemName = item.item_name || item.name || '품목';
@@ -1085,7 +1130,7 @@ export default function IntegratedInventoryManagement({
                     </div>
 
                     <div className="mt-4 space-y-3">
-                      {pendingSupplyApprovals.map((approval: any) => {
+                      {pendingSupplyApprovals.map((approval) => {
                         const workflowItems = approval?.live_inventory_workflow?.items || [];
                         const workflowSummary = approval?.live_inventory_workflow?.summary || {
                           issue_ready_count: 0,
@@ -1122,7 +1167,7 @@ export default function IntegratedInventoryManagement({
                             </div>
 
                             <div className="mt-3 space-y-2">
-                              {workflowItems.map((workflowItem: any) => {
+                              {(workflowItems as Record<string, unknown>[]).map((workflowItem) => {
                                 const actionKeyPrefix = `${approval.id}:${workflowItem.request_index}`;
                                 const isBusy =
                                   workflowActionKey === `${actionKeyPrefix}:issue` ||
@@ -1139,22 +1184,22 @@ export default function IntegratedInventoryManagement({
                                     data-testid={`inventory-supply-approval-item-${approval.id}-${workflowItem.request_index}`}
                                   >
                                     <div className="min-w-0">
-                                      <p className="truncate text-sm font-bold text-[var(--foreground)]">{workflowItem.name}</p>
+                                      <p className="truncate text-sm font-bold text-[var(--foreground)]">{String(workflowItem.name ?? '')}</p>
                                       <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
-                                        용도 {workflowItem.purpose || '-'} / 수령부서 {workflowItem.dept || '-'}
+                                        용도 {String(workflowItem.purpose ?? '') || '-'} / 수령부서 {String(workflowItem.dept ?? '') || '-'}
                                       </p>
-                                      {workflowItem.note && (
-                                        <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">{workflowItem.note}</p>
+                                      {!!workflowItem.note && (
+                                        <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">{String(workflowItem.note)}</p>
                                       )}
                                     </div>
                                     <div className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2 text-center">
                                       <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">요청</p>
-                                      <p className="mt-1 text-sm font-bold text-[var(--foreground)]">{workflowItem.qty}</p>
+                                      <p className="mt-1 text-sm font-bold text-[var(--foreground)]">{String(workflowItem.qty ?? '')}</p>
                                     </div>
                                     <div className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2 text-center">
                                       <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">재고</p>
-                                      <p className={`mt-1 text-sm font-bold ${workflowItem.shortage_qty > 0 ? 'text-orange-600' : 'text-emerald-600'}`}>
-                                        {workflowItem.available_qty}
+                                      <p className={`mt-1 text-sm font-bold ${Number(workflowItem.shortage_qty) > 0 ? 'text-orange-600' : 'text-emerald-600'}`}>
+                                        {String(workflowItem.available_qty ?? '')}
                                       </p>
                                     </div>
                                     <div className="flex items-center">
@@ -1201,7 +1246,7 @@ export default function IntegratedInventoryManagement({
                                       )}
                                       {(isIssued || isOrdered) && (
                                         <span className="text-[10px] font-bold text-[var(--toss-gray-3)]">
-                                          {workflowItem.processed_by_name || '처리 완료'}
+                                          {String(workflowItem.processed_by_name ?? '') || '처리 완료'}
                                         </span>
                                       )}
                                     </div>
@@ -1242,14 +1287,15 @@ export default function IntegratedInventoryManagement({
                     </div>
 
                     <div className="mt-4 space-y-3">
-                      {completedSupplyApprovals.slice(0, 8).map((approval: any) => {
+                      {completedSupplyApprovals.slice(0, 8).map((approval) => {
                         const workflowItems = approval?.live_inventory_workflow?.items || [];
                         const latestProcessedAt =
-                          workflowItems.reduce((latest: string | null, item: any) => {
-                            if (!item?.processed_at) return latest;
-                            if (!latest) return item.processed_at;
-                            return new Date(item.processed_at).getTime() > new Date(latest).getTime()
-                              ? item.processed_at
+                          workflowItems.reduce((latest: string | null, item) => {
+                            const processedAt = item?.processed_at as string | null | undefined;
+                            if (!processedAt) return latest;
+                            if (!latest) return processedAt;
+                            return new Date(processedAt).getTime() > new Date(latest).getTime()
+                              ? processedAt
                               : latest;
                           }, null) || approval.created_at;
 
@@ -1273,33 +1319,33 @@ export default function IntegratedInventoryManagement({
                                 </p>
                               </div>
                               <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
-                                최근 처리 {new Date(latestProcessedAt).toLocaleString('ko-KR')}
+                                최근 처리 {latestProcessedAt ? new Date(latestProcessedAt).toLocaleString('ko-KR') : '-'}
                               </p>
                             </div>
 
                             <div className="mt-3 space-y-2">
-                              {workflowItems.map((workflowItem: any) => {
+                              {workflowItems.map((workflowItem) => {
                                 const isOrdered = workflowItem.status === 'ordered';
                                 const isIssued = workflowItem.status === 'issued';
 
                                 return (
                                   <div
-                                    key={`history-item-${approval.id}-${workflowItem.request_index}`}
+                                    key={`history-item-${approval.id}-${String(workflowItem.request_index ?? '')}`}
                                     className="grid gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 py-3 lg:grid-cols-[minmax(0,1.6fr)_88px_130px_auto]"
-                                    data-testid={`inventory-supply-history-item-${approval.id}-${workflowItem.request_index}`}
+                                    data-testid={`inventory-supply-history-item-${approval.id}-${String(workflowItem.request_index ?? '')}`}
                                   >
                                     <div className="min-w-0">
-                                      <p className="truncate text-sm font-bold text-[var(--foreground)]">{workflowItem.name}</p>
+                                      <p className="truncate text-sm font-bold text-[var(--foreground)]">{String(workflowItem.name ?? '')}</p>
                                       <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
-                                        용도 {workflowItem.purpose || '-'} / 수령부서 {workflowItem.dept || '-'}
+                                        용도 {String(workflowItem.purpose ?? '') || '-'} / 수령부서 {String(workflowItem.dept ?? '') || '-'}
                                       </p>
-                                      {workflowItem.note && (
-                                        <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">{workflowItem.note}</p>
+                                      {!!workflowItem.note && (
+                                        <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">{String(workflowItem.note)}</p>
                                       )}
                                     </div>
                                     <div className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-2 text-center">
                                       <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">처리수량</p>
-                                      <p className="mt-1 text-sm font-bold text-[var(--foreground)]">{workflowItem.qty}</p>
+                                      <p className="mt-1 text-sm font-bold text-[var(--foreground)]">{String(workflowItem.qty ?? '')}</p>
                                     </div>
                                     <div className="flex items-center">
                                       <span className={`rounded-[var(--radius-md)] px-3 py-1 text-[10px] font-bold ${
@@ -1310,14 +1356,14 @@ export default function IntegratedInventoryManagement({
                                     </div>
                                     <div className="flex flex-wrap items-center justify-end gap-2">
                                       <span className="text-[10px] font-bold text-[var(--toss-gray-3)]">
-                                        {workflowItem.processed_by_name || '처리 완료'}
+                                        {String(workflowItem.processed_by_name ?? '') || '처리 완료'}
                                       </span>
                                       {isOrdered && (
                                         <button
                                           type="button"
-                                          onClick={() => openLinkedSupplyOrder(approval.id, workflowItem.request_index)}
+                                          onClick={() => openLinkedSupplyOrder(approval.id ?? '', workflowItem.request_index as number)}
                                           className="rounded-[var(--radius-md)] bg-[var(--foreground)] px-3 py-2 text-[11px] font-bold text-white"
-                                          data-testid={`inventory-supply-history-open-order-${approval.id}-${workflowItem.request_index}`}
+                                          data-testid={`inventory-supply-history-open-order-${approval.id}-${String(workflowItem.request_index ?? '')}`}
                                         >
                                           발주 보기
                                         </button>
@@ -1409,13 +1455,16 @@ export default function IntegratedInventoryManagement({
                         const quantity = getItemQuantity(item);
                         const minQuantity = getItemMinQuantity(item);
                         const expiryImminent = isExpirySoon(item, expiryThreshold);
+                        const itemExtra = item as Record<string, unknown>;
+                        const itemName = String(itemExtra.item_name || item.name || '');
+                        const itemDept = String(itemExtra.department || '');
 
                         return (
                           <article key={item.id} className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] p-3.5">
                             <div className="flex items-start justify-between gap-3">
                               <div>
-                                <p className="text-sm font-bold text-[var(--foreground)]">{item.item_name || item.name}</p>
-                                <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{item.company || '-'} · {item.department || '부서 미지정'}</p>
+                                <p className="text-sm font-bold text-[var(--foreground)]">{itemName}</p>
+                                <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{item.company || '-'} · {itemDept || '부서 미지정'}</p>
                               </div>
                               <span className={`rounded-[var(--radius-md)] px-2.5 py-1 text-[10px] font-bold ${
                                 quantity <= minQuantity ? 'bg-red-50 text-red-600' : 'bg-orange-50 text-orange-600'
@@ -1432,7 +1481,7 @@ export default function IntegratedInventoryManagement({
                               <button
                                 type="button"
                                 onClick={() => {
-                                  setStockModal({ item, type: 'in', targetCompany: item.company || '전체', targetDept: item.department || '전체' });
+                                  setStockModal({ item, type: 'in', targetCompany: item.company || '전체', targetDept: itemDept || '전체' });
                                   setStockAmount(Math.max(1, minQuantity - quantity + 1));
                                 }}
                                 className="flex-1 rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-1.5 text-[11px] font-bold text-white"
@@ -1475,6 +1524,11 @@ export default function IntegratedInventoryManagement({
                           const quantity = getItemQuantity(item);
                           const minQuantity = getItemMinQuantity(item);
                           const isExpiryImminent = isExpirySoon(item, expiryThreshold);
+                          const itemEx = item as Record<string, unknown>;
+                          const displayName = String(itemEx.item_name || item.name || '');
+                          const itemDepartment = String(itemEx.department || '');
+                          const lotNumber = itemEx.lot_number ? String(itemEx.lot_number) : null;
+                          const isUdi = Boolean(itemEx.is_udi);
                           return (
                             <tr key={item.id} className="hover:bg-[var(--toss-blue-light)]/50 transition-all group">
                               <td className="px-5 py-3.5">
@@ -1482,10 +1536,10 @@ export default function IntegratedInventoryManagement({
                                 <p className="text-[8px] font-bold text-[var(--toss-gray-3)]">{item.category || '미분류'}</p>
                               </td>
                               <td className="px-5 py-3.5">
-                                <p className="text-xs font-semibold text-[var(--foreground)] group-hover:text-[var(--accent)] transition-colors">{item.item_name || item.name}</p>
+                                <p className="text-xs font-semibold text-[var(--foreground)] group-hover:text-[var(--accent)] transition-colors">{displayName}</p>
                                 <div className="flex gap-1 mt-0.5">
-                                  {item.lot_number && <span className="text-[7px] font-semibold bg-[var(--muted)] text-[var(--toss-gray-4)] px-1 py-0.5 rounded">LOT: {item.lot_number}</span>}
-                                  {item.is_udi && <span className="text-[7px] font-semibold bg-purple-50 text-purple-500 px-1 py-0.5 rounded uppercase">UDI</span>}
+                                  {lotNumber && <span className="text-[7px] font-semibold bg-[var(--muted)] text-[var(--toss-gray-4)] px-1 py-0.5 rounded">LOT: {lotNumber}</span>}
+                                  {isUdi && <span className="text-[7px] font-semibold bg-purple-50 text-purple-500 px-1 py-0.5 rounded uppercase">UDI</span>}
                                 </div>
                               </td>
                               <td className="px-5 py-3.5 text-center">
@@ -1508,15 +1562,15 @@ export default function IntegratedInventoryManagement({
                                 </span>
                               </td>
                               <td data-testid={`inventory-actions-${item.id}`} className="px-5 py-3.5 text-right space-x-1">
-                                <button data-testid={`inventory-stock-in-${item.id}`} onClick={() => { setStockModal({ item, type: 'in', targetCompany: item.company || '전체', targetDept: item.department || '전체' }); setStockAmount(1); }} className="px-2 py-1 bg-[var(--toss-blue-light)] text-[var(--accent)] text-[11px] font-semibold rounded-md hover:bg-[var(--toss-blue-light)]">입고</button>
-                                <button data-testid={`inventory-stock-out-${item.id}`} onClick={() => { setStockModal({ item, type: 'out', targetCompany: item.company || '전체', targetDept: item.department || '전체' }); setStockAmount(1); }} className="px-2 py-1 bg-[var(--muted)] text-[var(--toss-gray-4)] text-[11px] font-semibold rounded-md hover:bg-[var(--muted)]/80">출고</button>
+                                <button data-testid={`inventory-stock-in-${item.id}`} onClick={() => { setStockModal({ item, type: 'in', targetCompany: item.company || '전체', targetDept: itemDepartment || '전체' }); setStockAmount(1); }} className="px-2 py-1 bg-[var(--toss-blue-light)] text-[var(--accent)] text-[11px] font-semibold rounded-md hover:bg-[var(--toss-blue-light)]">입고</button>
+                                <button data-testid={`inventory-stock-out-${item.id}`} onClick={() => { setStockModal({ item, type: 'out', targetCompany: item.company || '전체', targetDept: itemDepartment || '전체' }); setStockAmount(1); }} className="px-2 py-1 bg-[var(--muted)] text-[var(--toss-gray-4)] text-[11px] font-semibold rounded-md hover:bg-[var(--muted)]/80">출고</button>
                                 {quantity <= minQuantity && (
                                   <button data-testid={`inventory-reorder-${item.id}`} onClick={() => handleAutoApprovalRequest(item)} className="px-2 py-1 bg-orange-600 text-white text-[11px] font-semibold rounded-md shadow-sm">발주</button>
                                 )}
                                 <button
                                   data-testid={`inventory-delete-${item.id}`}
                                   onClick={async () => {
-                                    if (confirm(`[${item.item_name}] 품목을 정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
+                                    if (confirm(`[${displayName}] 품목을 정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
                                       try {
                                         await supabase.from('inventory').delete().eq('id', item.id);
                                         alert('삭제되었습니다.');
@@ -1590,26 +1644,34 @@ export default function IntegratedInventoryManagement({
                       </tr>
                     </thead>
                     <tbody>
-                      {logs.map((log: any) => (
-                        <tr key={log.id} className="border-t border-[var(--border)]">
-                          <td className="px-4 py-3 font-mono text-[11px] text-[var(--toss-gray-4)]">{new Date(log.created_at).toLocaleString('ko-KR')}</td>
+                      {logs.map((log) => {
+                        const logId = String(log.id ?? '');
+                        const logCreatedAt = log.created_at ? new Date(String(log.created_at)).toLocaleString('ko-KR') : '-';
+                        const logChangeType = String(log.change_type || log.type || '');
+                        const logQuantity = log.quantity ?? '-';
+                        const logPrevQty = log.prev_quantity;
+                        const logNextQty = log.next_quantity;
+                        return (
+                        <tr key={logId} className="border-t border-[var(--border)]">
+                          <td className="px-4 py-3 font-mono text-[11px] text-[var(--toss-gray-4)]">{logCreatedAt}</td>
                           <td className="px-4 py-3">
                             <span className={`rounded-[var(--radius-md)] px-2.5 py-1 text-[10px] font-bold ${
-                              (log.change_type || log.type) === '입고'
+                              logChangeType === '입고'
                                 ? 'bg-[var(--toss-blue-light)] text-[var(--accent)]'
                                 : 'bg-[var(--muted)] text-[var(--toss-gray-4)]'
                             }`}>
-                              {log.change_type || log.type || '-'}
+                              {logChangeType || '-'}
                             </span>
                           </td>
-                          <td className="px-4 py-3 font-bold text-[var(--foreground)]">{log.quantity ?? '-'}</td>
+                          <td className="px-4 py-3 font-bold text-[var(--foreground)]">{String(logQuantity)}</td>
                           <td className="px-4 py-3 text-[var(--toss-gray-3)]">
-                            {(log.prev_quantity ?? '') !== '' ? `${log.prev_quantity} → ${log.next_quantity}` : '-'}
+                            {logPrevQty !== undefined && logPrevQty !== null ? `${String(logPrevQty)} → ${String(logNextQty ?? '')}` : '-'}
                           </td>
-                          <td className="px-4 py-3 text-[var(--foreground)]">{log.actor_name || '-'}</td>
-                          <td className="px-4 py-3 text-[var(--toss-gray-4)]">{log.company || '-'}</td>
+                          <td className="px-4 py-3 text-[var(--foreground)]">{String(log.actor_name || '') || '-'}</td>
+                          <td className="px-4 py-3 text-[var(--toss-gray-4)]">{String(log.company || '') || '-'}</td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 )}
@@ -1696,9 +1758,9 @@ export default function IntegratedInventoryManagement({
           {activeView === '재고실사' && <InventoryCount user={user} inventory={inventory} fetchInventory={() => fetchInventory(selectedCo)} />}
           {activeView === '이관' && <InventoryTransfer user={user} inventory={inventory} fetchInventory={() => fetchInventory(selectedCo)} />}
           {activeView === '카테고리' && <CategoryManager user={user} />}
-          {activeView === '소모품통계' && <ConsumableStats user={user} selectedCo={selectedCo} />}
-          {activeView === '납품확인서' && <DeliveryConfirmation user={user} selectedCo={selectedCo} />}
-          {activeView === '수요예측' && <InventoryDemandForecast user={user} inventory={inventory} selectedCo={selectedCo} />}
+          {activeView === '소모품통계' && <ConsumableStats user={user} selectedCo={selectedCo ?? ''} />}
+          {activeView === '납품확인서' && <DeliveryConfirmation user={user} selectedCo={selectedCo ?? ''} />}
+          {activeView === '수요예측' && <InventoryDemandForecast user={user} inventory={inventory} selectedCo={selectedCo ?? ''} />}
         </main>
       </div>
 
@@ -1707,13 +1769,13 @@ export default function IntegratedInventoryManagement({
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[110] flex items-center justify-center p-4" onClick={() => setStockModal(null)}>
           <div data-testid="inventory-stock-modal" className="bg-[var(--card)] rounded-[var(--radius-lg)] shadow-sm p-5 max-w-sm w-full" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-[var(--foreground)] mb-4">{stockModal.type === 'in' ? '입고' : '출고'} 상세 입력</h3>
-            <p className="text-xs font-bold text-[var(--toss-gray-3)] mb-2">{stockModal.item.item_name || stockModal.item.name}</p>
-            <p className="text-[11px] text-[var(--toss-gray-3)] mb-4">현재고: {stockModal.item.quantity ?? stockModal.item.stock ?? 0}</p>
+            <p className="text-xs font-bold text-[var(--toss-gray-3)] mb-2">{String((stockModal.item as Record<string, unknown>).item_name || stockModal.item.name || '')}</p>
+            <p className="text-[11px] text-[var(--toss-gray-3)] mb-4">현재고: {stockModal.item.quantity ?? Number((stockModal.item as Record<string, unknown>).stock ?? 0)}</p>
 
             <div className="space-y-4 mb-4">
               <div>
                 <label className="text-[11px] font-bold text-[var(--toss-gray-3)] mb-1 block">수량 (개/단위)</label>
-                <input data-testid="inventory-stock-amount-input" type="number" min={1} max={stockModal.type === 'out' ? (stockModal.item.quantity ?? stockModal.item.stock ?? 0) : 99999} value={stockAmount} onChange={e => setStockAmount(Math.max(1, parseInt(e.target.value) || 1))} className="w-full px-4 py-3 rounded-[var(--radius-md)] border border-[var(--border)] text-sm font-semibold" />
+                <input data-testid="inventory-stock-amount-input" type="number" min={1} max={stockModal.type === 'out' ? (stockModal.item.quantity ?? Number((stockModal.item as Record<string, unknown>).stock ?? 0)) : 99999} value={stockAmount} onChange={e => setStockAmount(Math.max(1, parseInt(e.target.value) || 1))} className="w-full px-4 py-3 rounded-[var(--radius-md)] border border-[var(--border)] text-sm font-semibold" />
               </div>
               <div className="flex gap-2">
                 <div className="flex-1">

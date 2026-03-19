@@ -114,9 +114,6 @@ export default function LoginPage() {
           <h1 className="text-[22px] font-bold text-[var(--foreground)] tracking-tight">
             SY INC. 통합 시스템
           </h1>
-          <p className="mt-1.5 text-[11px] text-[var(--toss-gray-3)] uppercase tracking-widest font-medium">
-            Management Service Organization
-          </p>
         </div>
 
         {/* 로그인 카드 */}

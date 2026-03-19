@@ -7,14 +7,17 @@ import {
   resolveDocumentDesign,
 } from '@/lib/document-designs';
 
-export default function PayrollSlipPDF({ staff, record, yearMonth }: any) {
+export default function PayrollSlipPDF({ staff: _staff, record: _record, yearMonth: _yearMonth }: Record<string, unknown>) {
+  const staff = (_staff ?? {}) as Record<string, unknown>;
+  const record = (_record ?? {}) as Record<string, unknown>;
+  const yearMonth = _yearMonth as string | undefined;
   const printRef = useRef<HTMLDivElement>(null);
   const [design, setDesign] = useState(() => resolveDocumentDesign(null, 'payroll_slip'));
 
   useEffect(() => {
     const load = async () => {
       const store = await fetchDocumentDesignStore();
-      setDesign(resolveDocumentDesign(store, 'payroll_slip', staff?.company));
+      setDesign(resolveDocumentDesign(store, 'payroll_slip', staff?.company as string | undefined));
     };
 
     load().catch((error) => {
@@ -52,7 +55,7 @@ export default function PayrollSlipPDF({ staff, record, yearMonth }: any) {
     popup.close();
   };
 
-  const companyName = staff?.company || design.companyLabel || 'SY INC.';
+  const companyName = (staff?.company as string) || design.companyLabel || 'SY INC.';
   const displayTitle = `${companyName} ${design.title}`;
   const displayMonth = String(yearMonth || new Date().toISOString().slice(0, 7));
   const netPay = Number(record?.net_pay || 0);
@@ -82,7 +85,7 @@ export default function PayrollSlipPDF({ staff, record, yearMonth }: any) {
           <div className="rounded-[var(--radius-lg)] p-4" style={{ backgroundColor: alphaColor(design.primaryColor, 0.08) }}>
             <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--toss-gray-3)]">직원</p>
             <p className="mt-2 text-sm font-bold text-[var(--foreground)]">
-              {staff?.name || '-'} / {staff?.department || '-'}
+              {(staff?.name as string) || '-'} / {(staff?.department as string) || '-'}
             </p>
           </div>
           <div className="rounded-[var(--radius-lg)] p-4" style={{ backgroundColor: alphaColor(design.primaryColor, 0.08) }}>

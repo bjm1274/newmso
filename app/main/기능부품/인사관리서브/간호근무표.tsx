@@ -11,6 +11,17 @@ type WorkShift = {
   is_active?: boolean | null;
 };
 
+type StaffMember = {
+  id: string;
+  name?: string;
+  position?: string;
+  department?: string;
+  team?: string;
+  company?: string;
+  status?: string;
+  [key: string]: unknown;
+};
+
 type ScheduleMap = Record<string, Record<number, string>>;
 type ShiftOption = {
   token: string;
@@ -380,7 +391,7 @@ function inferDefaultPattern(shiftCount: number) {
   return '상근';
 }
 
-export default function NurseSchedule({ staffs = [], selectedCo }: { staffs: any[]; selectedCo: string; user: any }) {
+export default function NurseSchedule({ staffs = [], selectedCo }: { staffs: StaffMember[]; selectedCo: string; user?: unknown }) {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth() + 1);
@@ -400,21 +411,21 @@ export default function NurseSchedule({ staffs = [], selectedCo }: { staffs: any
   const [wizardNightShiftCount, setWizardNightShiftCount] = useState(0);
   const [selectedStaffIds, setSelectedStaffIds] = useState<string[]>([]);
 
-  const scopedStaffs = (staffs || []).filter((staff: any) => {
+  const scopedStaffs = (staffs || []).filter((staff: StaffMember) => {
     if (staff?.status === '퇴사') return false;
     return selectedCo === '전체' || staff?.company === selectedCo;
   });
-  const depts = Array.from(new Set(scopedStaffs.map((staff: any) => getStaffDepartment(staff)).filter(Boolean))).sort(sortByKorean);
+  const depts = Array.from(new Set(scopedStaffs.map((staff: StaffMember) => getStaffDepartment(staff)).filter(Boolean))).sort(sortByKorean);
   const days = getDaysInMonth(year, month);
   const ym = `${year}-${String(month).padStart(2, '0')}`;
 
-  const getRelevantWorkShifts = (targetStaffs: any[]) => {
-    const companySet = new Set(targetStaffs.map((staff: any) => staff?.company).filter(Boolean));
+  const getRelevantWorkShifts = (targetStaffs: StaffMember[]) => {
+    const companySet = new Set(targetStaffs.map((staff) => staff?.company).filter(Boolean));
     const filtered = workShifts.filter((shift) => companySet.size && companySet.has(shift.company_name || ''));
     return sortWorkShifts(filtered);
   };
 
-  const getShiftOptionsForStaffs = (targetStaffs: any[]) => {
+  const getShiftOptionsForStaffs = (targetStaffs: StaffMember[]) => {
     const dynamicOptions = getRelevantWorkShifts(targetStaffs).map((shift) => ({
       token: buildShiftToken(shift.id),
       label: shift.name,
@@ -437,16 +448,19 @@ export default function NurseSchedule({ staffs = [], selectedCo }: { staffs: any
     }
   }, [dept, depts]);
 
-  const visibleStaffs = scopedStaffs.filter((staff: any) => getStaffDepartment(staff) === dept);
+  const visibleStaffs = scopedStaffs.filter((staff: StaffMember) => getStaffDepartment(staff) === dept);
   const legendOptions = getShiftOptionsForStaffs(visibleStaffs);
 
   useEffect(() => {
     const fetchSchedule = async () => {
       const { data } = await supabase.from('nurse_schedules').select('*').eq('year_month', ym);
       const mapped: ScheduleMap = {};
-      (data || []).forEach((row: any) => {
-        if (!mapped[row.staff_id]) mapped[row.staff_id] = {};
-        mapped[row.staff_id][row.day] = row.shift_code;
+      (data || []).forEach((row: Record<string, unknown>) => {
+        const staffId = String(row.staff_id ?? '');
+        const day = Number(row.day);
+        const shiftCode = String(row.shift_code ?? '');
+        if (!mapped[staffId]) mapped[staffId] = {};
+        mapped[staffId][day] = shiftCode;
       });
       setSchedule(mapped);
     };
@@ -470,7 +484,7 @@ export default function NurseSchedule({ staffs = [], selectedCo }: { staffs: any
     fetchWorkShifts();
   }, [selectedCo]);
 
-  const wizardTargetStaffs = scopedStaffs.filter((staff: any) => getStaffDepartment(staff) === wizardDept);
+  const wizardTargetStaffs = scopedStaffs.filter((staff: StaffMember) => getStaffDepartment(staff) === wizardDept);
   const wizardWorkingShiftOptions = getRelevantWorkShifts(wizardTargetStaffs).map((shift) => ({
     token: buildShiftToken(shift.id),
     label: shift.name,
@@ -483,8 +497,8 @@ export default function NurseSchedule({ staffs = [], selectedCo }: { staffs: any
   useEffect(() => {
     if (!wizardOpen) return;
 
-    const validStaffIds = new Set(wizardTargetStaffs.map((staff: any) => String(staff.id)));
-    const defaultStaffIds = wizardTargetStaffs.map((staff: any) => String(staff.id));
+    const validStaffIds = new Set(wizardTargetStaffs.map((staff: StaffMember) => String(staff.id)));
+    const defaultStaffIds = wizardTargetStaffs.map((staff: StaffMember) => String(staff.id));
     const validShiftTokens = new Set(wizardWorkingShiftOptions.map((option) => option.token));
     const defaultPrimary = wizardWorkingShiftOptions[0]?.token || '';
     const defaultSecondary = wizardWorkingShiftOptions[1]?.token || defaultPrimary;
@@ -541,12 +555,12 @@ export default function NurseSchedule({ staffs = [], selectedCo }: { staffs: any
   };
 
   const saveSchedule = async () => {
-    const staffIds = scopedStaffs.map((staff: any) => staff.id).filter(Boolean);
+    const staffIds = scopedStaffs.map((staff: StaffMember) => staff.id).filter(Boolean);
     if (staffIds.length === 0) return alert('저장할 직원이 없습니다.');
 
     setSaving(true);
     try {
-      const rows: any[] = [];
+      const rows: Record<string, unknown>[] = [];
       staffIds.forEach((staffId: string) => {
         Object.entries(schedule[staffId] || {}).forEach(([dayStr, token]) => {
           rows.push({ staff_id: staffId, year_month: ym, day: Number(dayStr), shift_code: token });
@@ -566,7 +580,7 @@ export default function NurseSchedule({ staffs = [], selectedCo }: { staffs: any
 
   const openWizard = () => {
     const targetDept = dept || depts[0] || '';
-    const targetStaffs = scopedStaffs.filter((staff: any) => getStaffDepartment(staff) === targetDept);
+    const targetStaffs = scopedStaffs.filter((staff: StaffMember) => getStaffDepartment(staff) === targetDept);
     const shiftOptions = getRelevantWorkShifts(targetStaffs);
     const defaultPattern = inferDefaultPattern(shiftOptions.length);
     const primary = shiftOptions[0]?.id ? buildShiftToken(shiftOptions[0].id) : '';
@@ -574,7 +588,7 @@ export default function NurseSchedule({ staffs = [], selectedCo }: { staffs: any
     const tertiary = shiftOptions[2]?.id ? buildShiftToken(shiftOptions[2].id) : secondary || primary;
 
     setWizardDept(targetDept);
-    setSelectedStaffIds(targetStaffs.map((staff: any) => String(staff.id)));
+    setSelectedStaffIds(targetStaffs.map((staff: StaffMember) => String(staff.id)));
     setWizardPattern(defaultPattern);
     setWizardPrimaryToken(primary);
     setWizardSecondaryToken(secondary);
@@ -591,7 +605,7 @@ export default function NurseSchedule({ staffs = [], selectedCo }: { staffs: any
     if ((wizardPattern === '2교대' || wizardPattern === '3교대' || wizardPattern === '2일근무1일휴무') && !wizardSecondaryToken) return alert('보조 근무유형을 선택하세요.');
     if ((wizardPattern === '3교대' || wizardPattern === '야간전담') && !wizardTertiaryToken) return alert('야간/3차 근무유형을 선택하세요.');
 
-    const targetStaffs = wizardTargetStaffs.filter((staff: any) => selectedStaffIds.includes(String(staff.id)));
+    const targetStaffs = wizardTargetStaffs.filter((staff: StaffMember) => selectedStaffIds.includes(String(staff.id)));
     if (!targetStaffs.length) return alert('생성 대상 직원이 없습니다.');
     if (!confirm(`${wizardDept} 팀 ${targetStaffs.length}명의 ${ym} 간호 근무표를 생성하시겠습니까?\n선택한 직원의 기존 편성은 덮어씁니다.`)) return;
 
@@ -622,7 +636,7 @@ export default function NurseSchedule({ staffs = [], selectedCo }: { staffs: any
   };
 
   const countByCategory = (day: number, category: string) =>
-    visibleStaffs.filter((staff: any) => getScheduleCategory(schedule[staff.id]?.[day] || OFF_TOKEN) === category).length;
+    visibleStaffs.filter((staff: StaffMember) => getScheduleCategory(schedule[staff.id]?.[day] || OFF_TOKEN) === category).length;
 
   const staffCategoryCount = (staffId: string, category: string) =>
     Object.values(schedule[staffId] || {}).filter((token) => getScheduleCategory(token) === category).length;
@@ -738,7 +752,7 @@ export default function NurseSchedule({ staffs = [], selectedCo }: { staffs: any
                   </div>
 
                   <div className="mt-4 flex gap-2 flex-wrap">
-                    <button type="button" onClick={() => setSelectedStaffIds(wizardTargetStaffs.map((staff: any) => String(staff.id)))} className="px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--foreground)] text-white text-[11px] font-bold">
+                    <button type="button" onClick={() => setSelectedStaffIds(wizardTargetStaffs.map((staff: StaffMember) => String(staff.id)))} className="px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--foreground)] text-white text-[11px] font-bold">
                       전체 선택
                     </button>
                     <button type="button" onClick={() => setSelectedStaffIds([])} className="px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--toss-gray-4)] text-[11px] font-bold">
@@ -751,7 +765,7 @@ export default function NurseSchedule({ staffs = [], selectedCo }: { staffs: any
                       <div className="px-4 py-5 text-center text-sm font-bold text-[var(--toss-gray-3)]">선택한 팀에 직원이 없습니다.</div>
                     ) : (
                       <div className="divide-y divide-[var(--border)]">
-                        {wizardTargetStaffs.map((staff: any) => {
+                        {wizardTargetStaffs.map((staff: StaffMember) => {
                           const checked = selectedStaffIds.includes(String(staff.id));
                           return (
                             <label key={staff.id} className="flex items-center justify-between gap-3 px-4 py-3 cursor-pointer hover:bg-[var(--muted)]/60">
@@ -941,7 +955,7 @@ export default function NurseSchedule({ staffs = [], selectedCo }: { staffs: any
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border)]">
-              {visibleStaffs.map((staff: any) => (
+              {visibleStaffs.map((staff: StaffMember) => (
                 <tr key={staff.id} className="hover:bg-[var(--muted)]/30">
                   <td className="px-3 py-1.5 sticky left-0 bg-[var(--card)] border-r border-[var(--border)] z-10">
                     <p className="text-xs font-bold text-[var(--foreground)]">{staff.name}</p>

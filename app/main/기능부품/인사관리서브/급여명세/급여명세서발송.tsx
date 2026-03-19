@@ -16,28 +16,29 @@ function isMissingSchemaError(error: any) {
   return code.startsWith('PGRST') || message.includes('schema cache') || message.includes('Could not find the table');
 }
 
-export default function PayrollEmailSender({ staffs = [], yearMonth }: any) {
+export default function PayrollEmailSender({ staffs = [], yearMonth }: Record<string, unknown>) {
+  const _staffs = (staffs as Record<string, unknown>[]) ?? [];
   const [loading, setLoading] = useState(false);
   const [eligibleCount, setEligibleCount] = useState(0);
   const [summary, setSummary] = useState<SendSummary | null>(null);
   const [loadError, setLoadError] = useState('');
 
   const staffMap = useMemo(
-    () => new Map((staffs || []).map((staff: any) => [String(staff.id), staff])),
-    [staffs]
+    () => new Map((_staffs || []).map((staff: any) => [String(staff.id), staff])),
+    [_staffs]
   );
 
   useEffect(() => {
     let active = true;
 
     (async () => {
-      if (!staffs?.length) {
+      if (!_staffs?.length) {
         setEligibleCount(0);
         setLoadError('');
         return;
       }
 
-      const staffIds = staffs.map((staff: any) => staff.id);
+      const staffIds = _staffs.map((staff: any) => staff.id);
       const { data, error } = await supabase
         .from('payroll_records')
         .select('staff_id')
@@ -62,15 +63,15 @@ export default function PayrollEmailSender({ staffs = [], yearMonth }: any) {
     return () => {
       active = false;
     };
-  }, [staffs, yearMonth]);
+  }, [_staffs, yearMonth]);
 
   const handleSendAll = async () => {
-    if (!staffs?.length) {
+    if (!_staffs?.length) {
       alert('발송 가능한 직원이 없습니다.');
       return;
     }
 
-    const staffIds = staffs.map((staff: any) => staff.id);
+    const staffIds = _staffs.map((staff: any) => staff.id);
     const { data: records, error } = await supabase
       .from('payroll_records')
       .select('staff_id, year_month, net_pay, status, record_type')
@@ -189,7 +190,7 @@ export default function PayrollEmailSender({ staffs = [], yearMonth }: any) {
       </div>
 
       <div className="flex items-center justify-between rounded-[var(--radius-md)] bg-[var(--page-bg)] px-3 py-2 mb-3">
-        <span className="text-xs font-medium text-[var(--toss-gray-3)]">{yearMonth} 확정 명세서</span>
+        <span className="text-xs font-medium text-[var(--toss-gray-3)]">{yearMonth as string} 확정 명세서</span>
         <span className="text-sm font-bold text-[var(--foreground)]" data-testid="payroll-email-eligible-count">
           {eligibleCount}명
         </span>
