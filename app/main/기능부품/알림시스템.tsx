@@ -317,11 +317,20 @@ function ToastCard({ notif, onClose, onAction }: { notif: ToastItem; onClose: (i
   );
 }
 
+// ─── User 타입 ───
+interface UserLike {
+  id?: string | number;
+  name?: string;
+  department?: string;
+  permissions?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
 // ─── 메인 컴포넌트 ───
 export default function NotificationSystem({
   user, onOpenChatRoom, onOpenMessage, onOpenApproval, onOpenInventory, onOpenBoard, onOpenPost,
 }: {
-  user: any;
+  user: UserLike | null | undefined;
   onOpenChatRoom?: (roomId: string) => void;
   onOpenMessage?: (roomId: string, messageId: string) => void;
   onOpenApproval?: () => void;
@@ -353,7 +362,7 @@ export default function NotificationSystem({
   // 배지 카운트 DB 동기화
   const syncBadge = useCallback(async () => {
     if (!user?.id) return;
-    const { count } = await supabase.from('notifications').select('*', { count: 'exact', head: true }).eq('user_id', user.id).is('read_at', null);
+    const { count } = await supabase.from('notifications').select('*', { count: 'exact', head: true }).eq('user_id', String(user.id)).is('read_at', null);
     if (count !== null) { setUnreadCount(count); setAppBadge(count); }
   }, [user?.id]);
 
@@ -379,23 +388,25 @@ export default function NotificationSystem({
     );
   }, [user?.id]);
 
-  const emitIncomingNotification = useCallback((row: any) => {
+  const emitIncomingNotification = useCallback((row: Record<string, unknown>) => {
     if (!row?.id) return;
     const rowId = String(row.id);
     if (shownIdsRef.current.has(rowId)) return;
     shownIdsRef.current.add(rowId);
 
     const settings = loadNotifSettings();
-    const type = row.type || 'notification';
+    const type = String(row.type || 'notification');
     if (settings.types[type] === false) return;
+
+    const rowMetadata = (row.metadata && typeof row.metadata === 'object') ? row.metadata as Record<string, unknown> : {};
 
     addToast({
       id: rowId,
-      title: row.title || '알림',
-      body: row.body || '',
+      title: String(row.title || '알림'),
+      body: String(row.body || ''),
       type,
-      senderName: row.metadata?.sender_name,
-      data: row.metadata || {},
+      senderName: rowMetadata.sender_name as string | undefined,
+      data: rowMetadata,
     });
 
     if (typeof window !== 'undefined') {
@@ -405,8 +416,8 @@ export default function NotificationSystem({
           title: row.title,
           body: row.body,
           type,
-          room_id: row.metadata?.room_id,
-          data: row.metadata,
+          room_id: rowMetadata.room_id,
+          data: rowMetadata,
         },
       }));
       window.dispatchEvent(new CustomEvent('erp-new-notification', { detail: row }));
@@ -421,8 +432,8 @@ export default function NotificationSystem({
 
     const isChatType = type === 'message' || type === 'mention';
     const canShowNativeNotification = claimCrossTabNotification('display', rowId, 5000);
-    if (canShowNativeNotification && (!isChatType || !hasPushSubscriptionActive(user?.id))) {
-      sendNotification(row.title, { body: row.body, tag: type, data: row.metadata });
+    if (canShowNativeNotification && (!isChatType || !hasPushSubscriptionActive(String(user?.id ?? '')))) {
+      sendNotification(String(row.title || '알림'), { body: String(row.body || ''), tag: type, data: rowMetadata });
     }
     void syncBadge();
   }, [addToast, claimCrossTabNotification, syncBadge, user?.id]);
@@ -453,7 +464,7 @@ export default function NotificationSystem({
   // ─── Supabase Realtime 구독 ───
   useEffect(() => {
     if (!user?.id) return;
-    initNotificationService(user.id);
+    initNotificationService(String(user.id));
     const uid = String(user.id);
     const mountedAt = mountedAtRef.current;
     void syncBadge();
@@ -481,8 +492,8 @@ export default function NotificationSystem({
 
     // A. notifications 테이블 INSERT 수신 → Toast + 소리 + 진동
     const nTableChannel = supabase.channel(`noti-db-${uid}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${uid}` }, (payload: any) => {
-        emitIncomingNotification(payload.new);
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${uid}` }, (payload: Record<string, unknown>) => {
+        emitIncomingNotification(payload.new as Record<string, unknown>);
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${uid}` }, () => syncBadge())
       .subscribe();
@@ -521,7 +532,7 @@ export default function NotificationSystem({
         const prevStock = Number(p.old?.stock ?? Number.POSITIVE_INFINITY);
         const prevMinStock = Number(p.old?.min_stock ?? nextMinStock);
         const enteredLowStock = nextStock <= nextMinStock && (prevStock > prevMinStock || prevMinStock !== nextMinStock);
-        if (enteredLowStock && (user.permissions?.inventory || user.department === '행정팀'))
+        if (enteredLowStock && (user?.permissions?.inventory || user?.department === '행정팀'))
           insertNoti(
             { type: 'inventory', title: `⚠️ 재고 부족 경고`, body: `${p.new.item_name || p.new.name}: 현재 ${p.new.stock}개 (최소 ${p.new.min_stock}개)`, data: { id: p.new.id, type: 'inventory' } },
             `inventory:low:${String(p.new.id)}:${nextStock}:${nextMinStock}`,
@@ -568,13 +579,13 @@ export default function NotificationSystem({
           msg.sender_id ? supabase.from('staff_members').select('name').eq('id', msg.sender_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
         ]);
         if (roomRes.error || !roomRes.data) return;
-        const members: string[] = Array.isArray(roomRes.data?.members) ? roomRes.data.members.map((id: any) => String(id)) : [];
+        const members: string[] = Array.isArray(roomRes.data?.members) ? roomRes.data.members.map((id: string) => String(id)) : [];
         const isNoticeRoom = String(msg.room_id) === '00000000-0000-0000-0000-000000000000' || roomRes.data?.type === 'notice';
         const canReceive = isNoticeRoom || members.includes(uid);
         if (!canReceive) return;
         const senderName = (senderRes.data as any)?.name || '알 수 없음';
         const content = (msg.content || '').trim();
-        const isMention = user?.name && content.includes(`@${user.name}`);
+        const isMention = user?.name && content.includes(`@${String(user.name)}`);
         insertNoti({
           type: isMention ? 'mention' : 'message',
           title: isMention ? `📣 ${senderName}님이 멘션` : senderName,
@@ -612,7 +623,7 @@ export default function NotificationSystem({
         .order('created_at', { ascending: false })
         .limit(50)
         .then(({ data: rows }) => {
-          rows?.forEach((row: any) => {
+          rows?.forEach((row: Record<string, unknown>) => {
             if (row?.id) shownIdsRef.current.add(String(row.id));
           });
         });
@@ -627,7 +638,7 @@ export default function NotificationSystem({
       .order('created_at', { ascending: true })
       .limit(20)
       .then(({ data: rows }) => {
-        rows?.forEach((row: any) => {
+        rows?.forEach((row: Record<string, unknown>) => {
           if (!row?.read_at) emitIncomingNotification(row);
         });
         void syncBadge();
@@ -641,7 +652,7 @@ export default function NotificationSystem({
         .order('created_at', { ascending: false })
         .limit(20)
         .then(({ data: rows }) => {
-          rows?.forEach((row: any) => {
+          rows?.forEach((row: Record<string, unknown>) => {
             if (!row?.read_at) emitIncomingNotification(row);
           });
           void syncBadge();
@@ -666,9 +677,9 @@ export default function NotificationSystem({
       if (document.visibilityState === 'hidden') { lastHiddenRef.current = Date.now(); return; }
       if (!user?.id || Date.now() - lastHiddenRef.current < 2000) return;
       const since = new Date(Date.now() - 90 * 1000).toISOString();
-      supabase.from('notifications').select('id,title,body,type,metadata,created_at').eq('user_id', user.id).gte('created_at', since).order('created_at', { ascending: false }).limit(20)
+      supabase.from('notifications').select('id,title,body,type,metadata,created_at').eq('user_id', String(user.id)).gte('created_at', since).order('created_at', { ascending: false }).limit(20)
         .then(({ data: rows }) => {
-          rows?.forEach((row: any) => {
+          rows?.forEach((row: Record<string, unknown>) => {
             emitIncomingNotification(row);
           });
           void syncBadge();

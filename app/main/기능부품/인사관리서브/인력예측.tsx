@@ -1,7 +1,7 @@
 ﻿'use client';
 import { useState, useEffect } from 'react';
 
-export default function WorkforcePrediction({ staffs }: any) {
+export default function WorkforcePrediction({ staffs }: Record<string, unknown>) {
   const [predictionData, setPredictionData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 

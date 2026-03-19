@@ -6,7 +6,8 @@ import SmartDatePicker from '../공통/SmartDatePicker';
 const EVENT_TYPES = ['생일', '결혼', '출산', '사망(본인가족)', '회갑/칠순', '입학/졸업', '기타'] as const;
 const AMOUNT_GUIDE: Record<string, string> = { '생일': '30,000~50,000', '결혼': '50,000~100,000', '출산': '50,000', '사망(본인가족)': '100,000~200,000', '회갑/칠순': '50,000', '입학/졸업': '30,000', '기타': '별도 결정' };
 
-export default function CongratulationsCondolences({ staffs = [], selectedCo }: any) {
+export default function CongratulationsCondolences({ staffs = [], selectedCo }: Record<string, unknown>) {
+    const _staffs = (staffs as Record<string, unknown>[]) ?? [];
     const [records, setRecords] = useState<any[]>([]);
     const [showForm, setShowForm] = useState(false);
     const [filter, setFilter] = useState('전체');
@@ -18,7 +19,7 @@ export default function CongratulationsCondolences({ staffs = [], selectedCo }: 
         if (data) setRecords(data);
     };
 
-    const filtered = staffs.filter((s: any) => (selectedCo === '전체' || s.company === selectedCo) && s.status !== '퇴사');
+    const filtered = _staffs.filter((s: any) => (selectedCo === '전체' || s.company === selectedCo) && s.status !== '퇴사');
     const filteredRecords = records.filter((r: any) => {
         if (selectedCo !== '전체' && r.company !== selectedCo) return false;
         if (filter !== '전체' && r.event_type !== filter) return false;
@@ -27,7 +28,7 @@ export default function CongratulationsCondolences({ staffs = [], selectedCo }: 
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const staff = staffs.find((s: any) => s.id === form.staff_id);
+        const staff = _staffs.find((s: any) => s.id === form.staff_id);
         if (!staff) return alert('직원을 선택해주세요.');
         const newRec = { ...form, staff_name: staff.name, company: staff.company, department: staff.department || '', status: '지급완료' };
         const { data, error } = await supabase.from('congratulations_condolences').insert([newRec]).select();
@@ -46,7 +47,7 @@ export default function CongratulationsCondolences({ staffs = [], selectedCo }: 
             <header className="p-4 md:p-5 border-b border-[var(--border)] bg-[var(--card)] shrink-0">
                 <div className="flex justify-between items-center">
                     <div>
-                        <h2 className="text-xl font-bold text-[var(--foreground)] tracking-tight">🎊 경조사 관리 <span className="text-sm text-[var(--accent)] ml-2">[{selectedCo}]</span></h2>
+                        <h2 className="text-xl font-bold text-[var(--foreground)] tracking-tight">🎊 경조사 관리 <span className="text-sm text-[var(--accent)] ml-2">[{selectedCo as string}]</span></h2>
                         <p className="text-[11px] text-[var(--toss-gray-3)] font-bold mt-1">직원 경조사 등록 및 경조금 지급 이력 관리</p>
                     </div>
                     <button onClick={() => setShowForm(!showForm)} className="px-5 py-2.5 bg-[var(--accent)] text-white text-[11px] font-bold rounded-xl shadow-md hover:opacity-90 transition-all">{showForm ? '취소' : '+ 경조사 등록'}</button>

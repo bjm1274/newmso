@@ -4,11 +4,12 @@ import { supabase } from '@/lib/supabase';
 
 type DeptStat = { dept: string; company?: string; total: number; used: number; remain: number; expiring: number };
 
-export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }: any) {
+export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }: Record<string, unknown>) {
+  const _staffs = (staffs as Record<string, unknown>[]) ?? [];
   const [byDept, setByDept] = useState<DeptStat[]>([]);
 
   useEffect(() => {
-    const filtered = selectedCo === '전체' ? staffs : staffs.filter((s: any) => s.company === selectedCo);
+    const filtered = selectedCo === '전체' ? _staffs : _staffs.filter((s: any) => s.company === selectedCo);
     const map: Record<string, { total: number; used: number; company?: string }> = {};
     filtered.forEach((s: any) => {
       const dept = s.department || '미지정';
@@ -29,7 +30,7 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
         expiring: 0,
       }))
     );
-  }, [staffs, selectedCo]);
+  }, [_staffs, selectedCo]);
 
   const [viewMode, setViewMode] = useState<'dept' | 'personal'>('dept');
   const [showPlanModal, setShowPlanModal] = useState(false);
@@ -38,8 +39,8 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
   const [submitting, setSubmitting] = useState(false);
 
   const filteredStaffs = useMemo(
-    () => (selectedCo === '전체' ? staffs : staffs.filter((s: any) => s.company === selectedCo)),
-    [staffs, selectedCo]
+    () => (selectedCo === '전체' ? _staffs : _staffs.filter((s: any) => s.company === selectedCo)),
+    [_staffs, selectedCo]
   );
 
   const submitLeavePlan = async (staff: any, remain: number) => {
@@ -69,12 +70,13 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
 
   const personalList = useMemo(() => {
     // 팀장/관리자는 팀 전체, 일반 직원은 본인만 기본 표시
-    const isManager = ['팀장', '실장', '부장', '원장', '병원장', '대표이사'].includes(currentUser?.position || '');
-    if (isManager && currentUser?.department) {
-      return filteredStaffs.filter((s: any) => s.department === currentUser.department);
+    const _cu = currentUser as Record<string, unknown> | undefined;
+    const isManager = ['팀장', '실장', '부장', '원장', '병원장', '대표이사'].includes((_cu?.position as string) || '');
+    if (isManager && _cu?.department) {
+      return filteredStaffs.filter((s: any) => s.department === (_cu.department as string));
     }
-    if (currentUser?.id) {
-      return filteredStaffs.filter((s: any) => s.id === currentUser.id);
+    if (_cu?.id) {
+      return filteredStaffs.filter((s: any) => s.id === (_cu.id as string));
     }
     return filteredStaffs;
   }, [filteredStaffs, currentUser]);
@@ -84,7 +86,7 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
       <div className="flex items-center justify-between mb-4 pb-3 border-b border-[var(--border)]">
         <h3 className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-2">
           연차 종합 대시보드
-          {selectedCo !== '전체' && <span className="px-2 py-0.5 bg-blue-50 text-[var(--accent)] text-[10px] rounded-[var(--radius-md)]">{selectedCo}</span>}
+          {selectedCo !== '전체' && <span className="px-2 py-0.5 bg-blue-50 text-[var(--accent)] text-[10px] rounded-[var(--radius-md)]">{selectedCo as string}</span>}
         </h3>
         <div className="flex gap-0.5 bg-[var(--tab-bg)] rounded-[var(--radius-md)] p-0.5">
           <button
@@ -236,7 +238,7 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
                 )}
 
                 {/* 연차 촉진 알림 연동 배너 (개인별 뷰에서 잔여 연차가 있을 때) */}
-                {remain > 0 && s.id && currentUser?.id === s.id && (
+                {remain > 0 && s.id && (currentUser as Record<string, unknown> | undefined)?.id === (s.id as string) && (
                   <div className="px-4 py-3 bg-red-50/50 border-t border-red-100 flex items-center justify-between text-xs mt-3 rounded-[var(--radius-md)]">
                     <div>
                       <span className="font-semibold text-red-600">🚨 연차 사용 촉진 안내</span>

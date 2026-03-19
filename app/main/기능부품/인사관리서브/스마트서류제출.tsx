@@ -26,8 +26,15 @@ const REQUIRED_DOCS = [
     { id: '특수검진', label: '특수 건강검진' },
 ];
 
-export default function DocumentScanner({ user, staffs, selectedCo = '전체' }: any) {
-    const filteredStaffs = staffs.filter((s: any) => selectedCo === '전체' || s.company === selectedCo);
+interface DocumentScannerProps {
+    user?: Record<string, unknown>;
+    staffs?: Record<string, unknown>[];
+    selectedCo?: string;
+}
+
+export default function DocumentScanner({ user, staffs, selectedCo = '전체' }: DocumentScannerProps) {
+    const _staffs = (staffs ?? []) as Record<string, unknown>[];
+    const filteredStaffs = _staffs.filter((s: any) => selectedCo === '전체' || s.company === selectedCo);
     const [activeTab, setActiveTab] = useState<'내제출' | '관리자현황'>('내제출');
     const [myDocs, setMyDocs] = useState<any[]>([]);
     const [allDocs, setAllDocs] = useState<any[]>([]);
@@ -36,7 +43,9 @@ export default function DocumentScanner({ user, staffs, selectedCo = '전체' }:
     const [uploadingDocId, setUploadingDocId] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const isAdmin = user?.company === 'SY INC.' || user?.permissions?.mso === true;
+    const _user = (user ?? {}) as Record<string, unknown>;
+    const _userPerms = (_user.permissions ?? {}) as Record<string, unknown>;
+    const isAdmin = _user.company === 'SY INC.' || _userPerms.mso === true;
     const docTypes = REQUIRED_DOCS.map(doc => doc.id); // Use IDs from REQUIRED_DOCS
 
     const fetchDocs = async () => {
@@ -54,7 +63,7 @@ export default function DocumentScanner({ user, staffs, selectedCo = '전체' }:
             .order('created_at', { ascending: false });
 
         if (repositoryDocs) {
-            setMyDocs(repositoryDocs.filter(d => d.created_by === user.id));
+            setMyDocs(repositoryDocs.filter(d => d.created_by === _user.id));
             if (isAdmin) setAllDocs(repositoryDocs);
         }
     };
@@ -71,7 +80,7 @@ export default function DocumentScanner({ user, staffs, selectedCo = '전체' }:
 
             if (blobs.length === 1 && blobs[0].type === 'application/pdf') {
                 finalBlob = blobs[0];
-                fileName = sanitizeFileName(`${user.name}_${docType}_${Date.now()}.pdf`);
+                fileName = sanitizeFileName(`${_user.name as string}_${docType}_${Date.now()}.pdf`);
             } else {
                 // Merge images into PDF
                 const doc = new jsPDF();
@@ -90,10 +99,10 @@ export default function DocumentScanner({ user, staffs, selectedCo = '전체' }:
                 }
                 const pdfArrayBuffer = doc.output('arraybuffer');
                 finalBlob = new Blob([pdfArrayBuffer], { type: 'application/pdf' });
-                fileName = sanitizeFileName(`${user.name}_${docType}_${Date.now()}.pdf`);
+                fileName = sanitizeFileName(`${_user.name as string}_${docType}_${Date.now()}.pdf`);
             }
 
-            const filePath = `hr_documents/${user.id}/${fileName}`;
+            const filePath = `hr_documents/${_user.id as string}/${fileName}`;
 
             const { error: uploadError } = await supabase.storage
                 .from('board-attachments')
@@ -103,10 +112,10 @@ export default function DocumentScanner({ user, staffs, selectedCo = '전체' }:
             const { data: urlData } = supabase.storage.from('board-attachments').getPublicUrl(filePath);
 
             await supabase.from('document_repository').insert([{
-                title: `${user.name} - ${docType}`,
+                title: `${_user.name as string} - ${docType}`,
                 category: docType,
-                company_name: user.company || '전체',
-                created_by: user.id,
+                company_name: _user.company as string || '전체',
+                created_by: _user.id,
                 file_url: urlData.publicUrl
             }]);
 
@@ -309,7 +318,13 @@ export default function DocumentScanner({ user, staffs, selectedCo = '전체' }:
     );
 }
 
-function CameraScanner({ doc, onCapture, onClose }: any) {
+interface CameraScannerProps {
+    doc: { id: string; label: string };
+    onCapture: (blobs: Blob[]) => void;
+    onClose: () => void;
+}
+
+function CameraScanner({ doc, onCapture, onClose }: CameraScannerProps) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [capturedBlobs, setCapturedBlobs] = useState<Blob[]>([]);

@@ -10,8 +10,8 @@ type Props = {
 export default function ContractPreview({ staff, contract }: Props) {
   const [text, setText] = useState<string>('');
   const [loading, setLoading] = useState(false);
-  const [company, setCompany] = useState<any>(null);
-  const [shift, setShift] = useState<any>(null);
+  const [company, setCompany] = useState<Record<string, unknown> | null>(null);
+  const [shift, setShift] = useState<Record<string, unknown> | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -413,16 +413,16 @@ export default function ContractPreview({ staff, contract }: Props) {
                   <h3 className="text-[11px] font-black text-[var(--foreground)] border-b-2 border-slate-800 pb-1 mb-0">「사용자」</h3>
                   <div className="grid grid-cols-12 border-l border-[var(--border)] text-[10.5px]">
                     <div className="col-span-4 bg-[var(--tab-bg)] border-r border-b border-[var(--border)] p-2 font-bold text-center text-[var(--toss-gray-4)]">회사명</div>
-                    <div className="col-span-8 border-r border-b border-[var(--border)] p-2 font-black text-[var(--foreground)]">{company?.name || staff.company}</div>
+                    <div className="col-span-8 border-r border-b border-[var(--border)] p-2 font-black text-[var(--foreground)]">{(company?.name as string) || staff.company}</div>
 
                     <div className="col-span-4 bg-[var(--tab-bg)] border-r border-b border-[var(--border)] p-2 font-bold text-center text-[var(--toss-gray-4)]">사업자번호</div>
-                    <div className="col-span-8 border-r border-b border-[var(--border)] p-2 font-semibold text-[var(--toss-gray-5)]">{company?.business_no || '-'}</div>
+                    <div className="col-span-8 border-r border-b border-[var(--border)] p-2 font-semibold text-[var(--toss-gray-5)]">{(company?.business_no as string) || '-'}</div>
 
                     <div className="col-span-4 bg-[var(--tab-bg)] border-r border-b border-[var(--border)] p-2 font-bold text-center text-[var(--toss-gray-4)]">주소</div>
-                    <div className="col-span-8 border-r border-b border-[var(--border)] p-2 font-semibold text-[var(--toss-gray-5)] leading-tight">{company?.address || '-'}</div>
+                    <div className="col-span-8 border-r border-b border-[var(--border)] p-2 font-semibold text-[var(--toss-gray-5)] leading-tight">{(company?.address as string) || '-'}</div>
 
                     <div className="col-span-4 bg-[var(--tab-bg)] border-r border-b border-[var(--border)] p-2 font-bold text-center text-[var(--toss-gray-4)]">연락처</div>
-                    <div className="col-span-8 border-r border-b border-[var(--border)] p-2 font-semibold text-[var(--toss-gray-5)]">{company?.phone || '-'}</div>
+                    <div className="col-span-8 border-r border-b border-[var(--border)] p-2 font-semibold text-[var(--toss-gray-5)]">{(company?.phone as string) || '-'}</div>
                   </div>
                 </div>
 
@@ -485,16 +485,16 @@ export default function ContractPreview({ staff, contract }: Props) {
                   <div className="flex flex-col gap-3 w-1/2">
                     <span className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">「사용자」</span>
                     <div className="space-y-1">
-                      <p className="font-bold text-[13px] text-[var(--foreground)]">{company?.name || staff.company}</p>
+                      <p className="font-bold text-[13px] text-[var(--foreground)]">{(company?.name as string) || staff.company}</p>
                       <div className="relative inline-block w-fit">
                         {(() => {
-                          const isHosp = (company?.name || staff.company || '').match(/병원|의원|정형외과|내과|소아과|치과/);
+                          const isHosp = ((company?.name as string) || staff.company || '').match(/병원|의원|정형외과|내과|소아과|치과/);
                           const title = isHosp ? '대표원장' : '대표이사';
-                          return <p className="font-bold text-[13px] text-[var(--foreground)]">{title} {company?.ceo_name || '(인)'}</p>;
+                          return <p className="font-bold text-[13px] text-[var(--foreground)]">{title} {(company?.ceo_name as string) || '(인)'}</p>;
                         })()}
                         {company?.seal_url ? (
                           <img
-                            src={company.seal_url}
+                            src={company.seal_url as string}
                             className="absolute -top-6 -right-12 w-16 h-16 object-contain opacity-90 select-none pointer-events-none"
                             style={{ mixBlendMode: 'multiply' }}
                             alt="직인"

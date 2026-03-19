@@ -4,7 +4,10 @@ import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
 import SmartDatePicker from '../공통/SmartDatePicker';
 
-export default function ProductRegistration({ user, suppliers, fetchInventory, fetchSuppliers }: any) {
+export default function ProductRegistration({ user: _user, suppliers: _suppliers, fetchInventory: _fetchInventory, fetchSuppliers }: Record<string, unknown>) {
+  const user = (_user ?? {}) as Record<string, unknown>;
+  const suppliers = (_suppliers ?? []) as Record<string, unknown>[];
+  const fetchInventory = _fetchInventory as (() => void) | undefined;
   const [loading, setLoading] = useState(false);
   const [departments, setDepartments] = useState<string[]>([]);
   const [companies, setCompanies] = useState<string[]>(['박철홍정형외과', '수연의원', 'SY INC.']);
@@ -20,8 +23,8 @@ export default function ProductRegistration({ user, suppliers, fetchInventory, f
     insurance_code: '',
     spec: '',
     is_udi: false,
-    company: user?.company || '박철홍정형외과',
-    department: user?.department || ''
+    company: (user?.company as string) || '박철홍정형외과',
+    department: (user?.department as string) || ''
   });
 
   // 수연의원 / SY INC. / 병원 전체의 부서명을 staff_members에서 동적으로 수집
@@ -82,7 +85,7 @@ export default function ProductRegistration({ user, suppliers, fetchInventory, f
       );
       if (error) throw error;
       alert(`${productForm.item_name} 등록이 완료되었습니다.`);
-      fetchInventory();
+      fetchInventory?.();
       // 폼 초기화
       setProductForm({
         item_name: '',
@@ -96,15 +99,16 @@ export default function ProductRegistration({ user, suppliers, fetchInventory, f
         insurance_code: '',
         spec: '',
         is_udi: false,
-        company: user?.company || '박철홍정형외과',
-        department: user?.department || ''
+        company: (user?.company as string) || '박철홍정형외과',
+        department: (user?.department as string) || ''
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn('등록 실패:', err);
+      const errObj = err as { message?: string; error_description?: string; details?: string };
       const message =
-        typeof err?.message === 'string'
-          ? err.message
-          : (err?.error_description || err?.details || '').toString();
+        typeof errObj?.message === 'string'
+          ? errObj.message
+          : (errObj?.error_description || errObj?.details || '').toString();
       alert(`등록 실패\n\n${message || '데이터베이스 제약 조건 때문에 저장에 실패했습니다. 필수 항목을 다시 확인해 주세요.'}`);
     } finally {
       setLoading(false);

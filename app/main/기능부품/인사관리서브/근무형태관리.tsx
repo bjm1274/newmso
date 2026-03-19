@@ -268,13 +268,13 @@ function createEmptyShiftState(selectedCo?: string): ShiftFormState {
   }, 'weekdays');
 }
 
-export default function ShiftManagement({ selectedCo }: any) {
+export default function ShiftManagement({ selectedCo }: Record<string, unknown>) {
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
   const [companyOptions, setCompanyOptions] = useState<string[]>(DEFAULT_COMPANY_OPTIONS);
-  const [newShift, setNewShift] = useState<ShiftFormState>(() => createEmptyShiftState(selectedCo));
+  const [newShift, setNewShift] = useState<ShiftFormState>(() => createEmptyShiftState(selectedCo as string));
 
   const fetchShifts = async () => {
     setLoading(true);
@@ -458,11 +458,11 @@ export default function ShiftManagement({ selectedCo }: any) {
       alert(editingShiftId ? '근무 형태가 수정되었습니다.' : '근무 형태가 등록되었습니다.');
       setShowAddModal(false);
       setEditingShiftId(null);
-      setNewShift(createEmptyShiftState(selectedCo));
+      setNewShift(createEmptyShiftState(selectedCo as string));
       fetchShifts();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('근무형태 저장 최종 실패:', err);
-      alert('저장에 실패했습니다.\n원인: ' + (err?.message || '알 수 없는 오류'));
+      alert('저장에 실패했습니다.\n원인: ' + ((err as Error)?.message || '알 수 없는 오류'));
     }
   };
 
@@ -477,8 +477,8 @@ export default function ShiftManagement({ selectedCo }: any) {
         if (retry.error) throw retry.error;
       }
       fetchShifts();
-    } catch (err: any) {
-      alert('삭제에 실패했습니다.\n원인: ' + (err?.message || ''));
+    } catch (err: unknown) {
+      alert('삭제에 실패했습니다.\n원인: ' + ((err as Error)?.message || ''));
     }
   };
 
@@ -489,13 +489,13 @@ export default function ShiftManagement({ selectedCo }: any) {
     <div className="p-5 space-y-5 animate-in fade-in duration-500" data-testid="shift-management">
       <header className="flex justify-between items-center">
         <div>
-          <h2 className="text-lg font-bold text-[var(--foreground)] tracking-tight">근무 형태 관리 <span className="text-sm text-[var(--accent)]">[{selectedCo}]</span></h2>
+          <h2 className="text-lg font-bold text-[var(--foreground)] tracking-tight">근무 형태 관리 <span className="text-sm text-[var(--accent)]">[{selectedCo as string}]</span></h2>
         </div>
         <button
           type="button"
           onClick={() => {
             setEditingShiftId(null);
-            setNewShift(createEmptyShiftState(selectedCo));
+            setNewShift(createEmptyShiftState(selectedCo as string));
             setShowAddModal(true);
           }}
           className="px-5 py-4 bg-[var(--accent)] text-white text-sm font-bold rounded-[var(--radius-lg)] shadow-sm hover:shadow-sm transform hover:scale-[1.02] transition-all flex items-center gap-2"
@@ -519,8 +519,8 @@ export default function ShiftManagement({ selectedCo }: any) {
                       start_time: shift.start_time,
                       end_time: shift.end_time,
                       description: shift.description || '',
-                      company_name: shift.company_name || selectedCo || '박철홍정형외과',
-                      selectedCompanies: [shift.company_name || selectedCo || '박철홍정형외과'],
+                      company_name: shift.company_name || (selectedCo as string) || '박철홍정형외과',
+                      selectedCompanies: [shift.company_name || (selectedCo as string) || '박철홍정형외과'],
                       break_start_time: shift.break_start_time || '',
                       break_end_time: shift.break_end_time || '',
                       shift_type: shift.shift_type || '',

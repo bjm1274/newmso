@@ -73,8 +73,8 @@ export default function AnnualLeaveManualGrant({
 
       setMessage(payload.message || `${staff.name} 연차 저장 완료`);
       onRefresh?.();
-    } catch (error: any) {
-      setMessage(`저장 실패: ${error?.message || String(error)}`);
+    } catch (error: unknown) {
+      setMessage(`저장 실패: ${(error as Error)?.message || String(error)}`);
     } finally {
       setSaving(false);
     }
@@ -97,8 +97,8 @@ export default function AnnualLeaveManualGrant({
 
       setMessage(payload.message || `총 ${filtered.length}명 연차 반영 완료`);
       onRefresh?.();
-    } catch (error: any) {
-      setMessage(`저장 실패: ${error?.message || String(error)}`);
+    } catch (error: unknown) {
+      setMessage(`저장 실패: ${(error as Error)?.message || String(error)}`);
     } finally {
       setSaving(false);
     }

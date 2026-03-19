@@ -1,4 +1,5 @@
 'use client';
+import type { StaffMember } from '@/types';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { calculateAttendanceDeduction } from '@/lib/attendance-deduction';
@@ -12,11 +13,31 @@ import {
   type TaxInsuranceRates,
 } from '@/lib/use-tax-insurance-rates';
 
-export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any) {
+interface SettlementEntry {
+  base_salary: number;
+  meal_allowance: number;
+  night_duty_allowance: number;
+  vehicle_allowance: number;
+  childcare_allowance: number;
+  research_allowance: number;
+  other_taxfree: number;
+  extra_allowance: number;
+  overtime_pay: number;
+  bonus: number;
+  apply_tax: boolean;
+  apply_insurance: boolean;
+  attendance_deduction: number;
+  attendance_deduction_detail: Record<string, unknown>;
+  custom_deduction: number;
+  dependent_count: number;
+  advance_pay: number;
+}
+
+export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { staffs: StaffMember[]; selectedCo: string; onRefresh?: () => void }) {
   const [step, setStep] = useState(1);
   const [yearMonth, setYearMonth] = useState(new Date().toISOString().slice(0, 7));
-  const [selectedStaffs, setSelectedStaffs] = useState<any[]>([]);
-  const [settlementData, setSettlementData] = useState<any>({});
+  const [selectedStaffs, setSelectedStaffs] = useState<StaffMember[]>([]);
+  const [settlementData, setSettlementData] = useState<Record<string, SettlementEntry>>({});
   const [loading, setLoading] = useState(false);
   const [taxFreeLimits, setTaxFreeLimits] = useState<TaxFreeSettings>(DEFAULT_SETTINGS);
   const [taxInsuranceRates, setTaxInsuranceRates] = useState<TaxInsuranceRates>(DEFAULT_TAX_INSURANCE_RATES);
@@ -46,9 +67,9 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
     research: taxFreeLimits.research_limit,
   };
 
-  const filteredStaffs = staffs.filter((s: any) => selectedCo === '전체' || s.company === selectedCo);
+  const filteredStaffs = staffs.filter((s: StaffMember) => selectedCo === '전체' || s.company === selectedCo);
 
-  const toggleStaff = (staff: any) => {
+  const toggleStaff = (staff: StaffMember) => {
     if (selectedStaffs.find(s => s.id === staff.id)) {
       setSelectedStaffs(selectedStaffs.filter(s => s.id !== staff.id));
     } else {
@@ -60,9 +81,9 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
     if (selectedStaffs.length === 0) return alert("정산 대상을 선택해 주세요.");
 
     // 기본급여가 설정되지 않은 직원은 명세서를 생성하지 못하도록 1단계에서 차단
-    const noBase = selectedStaffs.filter((s: any) => !s.base_salary || s.base_salary <= 0);
+    const noBase = selectedStaffs.filter((s: StaffMember) => !Number(s.base_salary) || Number(s.base_salary) <= 0);
     if (noBase.length > 0) {
-      const names = noBase.map((s: any) => s.name).join(', ');
+      const names = noBase.map((s: StaffMember) => s.name).join(', ');
       alert(
         `기본급(연봉)이 0원으로 설정된 직원이 포함되어 있어 급여 정산을 진행할 수 없습니다.\n\n` +
         `기본급을 먼저 직원 등록 화면에서 입력해 주세요.\n\n문제 대상: ${names}`
@@ -71,7 +92,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
     }
     setLoading(true);
     try {
-      const staffIds = selectedStaffs.map((s: any) => s.id);
+      const staffIds = selectedStaffs.map((s: StaffMember) => s.id);
       const [year, month] = yearMonth.split('-').map((value) => Number(value));
       const lastDay = new Date(year, month, 0).getDate();
       const [startDate, endDate] = [`${yearMonth}-01`, `${yearMonth}-${String(lastDay).padStart(2, '0')}`];
@@ -100,10 +121,10 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
       const r = rule || fallbackRule;
 
       const initialData: any = {};
-      selectedStaffs.forEach((s: any) => {
+      selectedStaffs.forEach((s: StaffMember) => {
         const staffAtts = (attendances || []).filter((a: any) => a.staff_id === s.id);
         const { total, detail } = calculateAttendanceDeduction(
-          s.base_salary || 0,
+          Number(s.base_salary) || 0,
           yearMonth,
           staffAtts,
           r ? { late_deduction_type: r.late_deduction_type, late_deduction_amount: r.late_deduction_amount, early_leave_deduction_type: r.early_leave_deduction_type, early_leave_deduction_amount: r.early_leave_deduction_amount } : undefined
@@ -119,16 +140,16 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
           extra_allowance: Number(s.overtime_allowance || 0) + Number(s.night_work_allowance || 0) + Number(s.holiday_work_allowance || 0) + Number(s.annual_leave_pay || 0),
           overtime_pay: 0,
           bonus: 0,
-          apply_tax: s.permissions?.insurance?.income_tax !== false,
-          apply_insurance: s.permissions?.insurance?.national !== false,
+          apply_tax: (s.permissions?.insurance as Record<string, unknown>)?.income_tax !== false,
+          apply_insurance: (s.permissions?.insurance as Record<string, unknown>)?.national !== false,
           attendance_deduction: total,
           attendance_deduction_detail: { ...detail, original_deduction: total },
           custom_deduction: 0,
           dependent_count:
             Number(
               s.dependent_count ??
-              s.permissions?.payroll?.dependent_count ??
-              s.permissions?.tax?.dependent_count ??
+              (s.permissions?.payroll as Record<string, unknown>)?.dependent_count ??
+              (s.permissions?.tax as Record<string, unknown>)?.dependent_count ??
               s.permissions?.dependents ??
               0
             ) || 0,
@@ -180,15 +201,15 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
     const total_payment = total_taxable + total_taxfree;
 
     // 직원별 보험/복지 설정 가져오기 (Duru-nuri, Medical Benefit 등)
-    const staff = staffs.find((s: any) => String(s.id) === String(id));
-    const insSettings = staff?.permissions?.insurance || {};
-    const isMedicalBenefit = staff?.permissions?.is_medical_benefit || false;
+    const staff = staffs.find((s: StaffMember) => String(s.id) === String(id));
+    const insSettings = (staff?.permissions?.insurance as Record<string, unknown>) || {};
+    const isMedicalBenefit = Boolean(staff?.permissions?.is_medical_benefit) || false;
 
     // 두루누리 적용 여부 판단 (기간 체크)
-    let isDuruNuriActive = insSettings.duru_nuri || false;
+    let isDuruNuriActive = Boolean(insSettings.duru_nuri) || false;
     if (isDuruNuriActive && insSettings.duru_nuri_start && insSettings.duru_nuri_end) {
       const current = yearMonth; // "YYYY-MM"
-      isDuruNuriActive = (current >= insSettings.duru_nuri_start && current <= insSettings.duru_nuri_end);
+      isDuruNuriActive = (current >= String(insSettings.duru_nuri_start) && current <= String(insSettings.duru_nuri_end));
     }
 
     // 공제 상세: 4대보험은 저장된 연도별 요율을 사용합니다.
@@ -245,7 +266,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
   const handleFinalize = async () => {
     if (!confirm(`${selectedStaffs.length}명의 급여 정산을 확정하고 명세서를 생성하시겠습니까?`)) return;
 
-    const needsExactIncomeTax = selectedStaffs.some((staff: any) => settlementData[staff.id]?.apply_tax);
+    const needsExactIncomeTax = selectedStaffs.some((staff: StaffMember) => settlementData[staff.id]?.apply_tax);
     if (needsExactIncomeTax && !hasExactIncomeTaxBracket(taxInsuranceRates)) {
       alert(
         '근로소득세 간이세액표가 설정되지 않아 급여를 안전하게 확정할 수 없습니다.\n\n' +
@@ -377,7 +398,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
               <button data-testid="salary-settlement-select-all" onClick={() => setSelectedStaffs(filteredStaffs)} className="text-sm font-medium text-[var(--accent)] hover:underline">전체 선택</button>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[380px] overflow-y-auto custom-scrollbar">
-              {filteredStaffs.map((s: any) => (
+              {filteredStaffs.map((s: StaffMember) => (
                 <div
                   key={s.id}
                   data-testid={`salary-settlement-staff-${s.id}`}
@@ -408,7 +429,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: any)
               </div>
             )}
             <div className="max-h-[500px] overflow-y-auto space-y-4 p-2 custom-scrollbar">
-              {selectedStaffs.map((s: any) => {
+              {selectedStaffs.map((s: StaffMember) => {
                 const data = settlementData[s.id];
                 const advancePay = Number(data?.advance_pay) || 0;
                 const isAdvanceOnly = advancePay > 0;

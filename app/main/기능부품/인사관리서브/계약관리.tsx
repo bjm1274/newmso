@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 import ContractList from './계약문서/계약서명단';
 import ContractPreview from './계약문서/계약서미리보기';
 
-export default function ContractMain({ staffs, selectedCo, onRefresh }: any) {
+export default function ContractMain({ staffs, selectedCo, onRefresh }: Record<string, unknown>) {
   const [selectedStaffId, setSelectedStaffId] = useState<number | null>(null);
   const [checkedIds, setCheckedIds] = useState<number[]>([]);
   const [contracts, setContracts] = useState<any[]>([]);
@@ -47,14 +47,14 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: any) {
           : '표준근로계약서';
 
       const requests = checkedIds.map((staffId: number) => {
-        const s = staffs?.find((x: any) => x.id === staffId);
+        const s = (staffs as any[])?.find((x: any) => x.id === staffId);
         const probationMonths = s?.permissions?.probation_months || 0;
         const joinDate = s?.joined_at || s?.join_date;
 
         // 근로조건 적용일 계산 (수습 종료 익일)
         let conditionsAppDate = salaryInfo.effective_date;
         if (joinDate && probationMonths > 0) {
-          const d = new Date(joinDate);
+          const d = new Date(joinDate as string);
           d.setMonth(d.getMonth() + probationMonths);
           conditionsAppDate = d.toISOString().split('T')[0];
         }
@@ -103,7 +103,7 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: any) {
 
       if (includeTaxFree) {
         await Promise.all(checkedIds.map((id: number) => {
-          const s = staffs?.find((x: any) => x.id === id);
+          const s = (staffs as any[])?.find((x: any) => x.id === id);
           return supabase.from('staff_members').update({
             base_salary: salaryInfo.base_salary ?? s?.base_salary ?? 0,
             meal_allowance: salaryInfo.meal_allowance ?? s?.meal_allowance ?? 0,
@@ -128,7 +128,7 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: any) {
       );
 
       alert("계약서가 발송되었습니다. 직원이 로그인 시 즉시 서명 화면이 표시됩니다.");
-      fetchContracts(); setCheckedIds([]); if (onRefresh) onRefresh();
+      fetchContracts(); setCheckedIds([]); if (onRefresh) (onRefresh as () => void)();
     } catch (err) { alert("오류가 발생했습니다."); } finally { setLoading(false); }
   };
 
@@ -136,7 +136,7 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: any) {
     <div className="flex flex-col h-full animate-in fade-in duration-500 bg-[var(--tab-bg)]/20">
       <header className="p-5 border-b border-[var(--border)] bg-[var(--card)] flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
         <div>
-          <h2 className="text-lg font-bold text-[var(--foreground)] tracking-tight">전자 계약 및 법적 비과세 관리 <span className="text-sm text-[var(--accent)] ml-2">[{selectedCo}]</span></h2>
+          <h2 className="text-lg font-bold text-[var(--foreground)] tracking-tight">전자 계약 및 법적 비과세 관리 <span className="text-sm text-[var(--accent)] ml-2">[{selectedCo as string}]</span></h2>
           <div className="flex gap-0.5 p-1 app-tab-bar w-fit mt-2">
             {['계약현황', '신규/변경계약서', '연봉계약갱신'].map(tab => (
               <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 text-xs font-medium rounded-md transition-all whitespace-nowrap ${activeTab === tab ? 'bg-[var(--card)] text-[var(--accent)] shadow-sm' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--card)]/60'}`}>{tab}</button>
@@ -213,17 +213,22 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: any) {
                   </div>
                 </div>
               )}
-              <ContractList selectedCo={selectedCo} staffs={staffs} contracts={contracts} onSelect={setSelectedStaffId} checkedIds={checkedIds} setCheckedIds={setCheckedIds} isCompact={true} />
+              <ContractList selectedCo={selectedCo as string} staffs={staffs as any[]} contracts={contracts} onSelect={setSelectedStaffId} checkedIds={checkedIds} setCheckedIds={setCheckedIds} isCompact={true} />
             </div>
           </div>
 
           {/* 우측: 계약서 대화면 프리뷰 (Live Preview) */}
           <div className="flex-1 bg-[var(--page-bg)] overflow-y-auto custom-scrollbar p-5">
             <div className="max-w-[850px] mx-auto">
-              <ContractPreview
-                staff={staffs.find((s: any) => s.id === selectedStaffId)}
-                contract={contracts.find((c: any) => c.staff_id === selectedStaffId)}
-              />
+              {(() => {
+                const staffList = staffs as any[];
+                return (
+                  <ContractPreview
+                    staff={staffList.find((s: any) => s.id === selectedStaffId)}
+                    contract={contracts.find((c: any) => c.staff_id === selectedStaffId)}
+                  />
+                );
+              })()}
             </div>
           </div>
         </div>

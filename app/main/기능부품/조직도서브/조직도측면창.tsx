@@ -94,7 +94,17 @@ const MAIN_MENUS = [
   { id: '관리자', icon: '⚙️', label: '관리자', testId: 'sidebar-menu-admin' },
 ];
 
-export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
+type SidebarUser = {
+  id?: string | null;
+  name?: string | null;
+  role?: string | null;
+  company?: string | null;
+  permissions?: Record<string, unknown> | null;
+  department?: string | null;
+  [key: string]: unknown;
+};
+
+export default function Sidebar({ user, mainMenu, onMenuChange }: { user?: SidebarUser | null; mainMenu?: string; onMenuChange: (menuId: string) => void }) {
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
 
   const visibleMenus = MAIN_MENUS.filter((menu) => canAccessMainMenu(user, menu.id));
@@ -114,7 +124,7 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: any) {
 
       const myRooms = (rooms || []).filter((room: any) => {
         if (room.id === NOTICE_ROOM_ID) return true;
-        return Array.isArray(room.members) && room.members.some((id: any) => String(id) === String(user.id));
+        return Array.isArray(room.members) && room.members.some((id: string) => String(id) === String(user.id));
       });
 
       if (myRooms.length === 0) {

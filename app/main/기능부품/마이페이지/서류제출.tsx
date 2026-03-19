@@ -3,7 +3,8 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { jsPDF } from 'jspdf';
 
-export default function MyDocuments({ user }: any) {
+export default function MyDocuments(props: Record<string, unknown>) {
+    const user = props.user as { id?: string; name?: string; company?: string } | undefined;
     const [documents, setDocuments] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
@@ -55,7 +56,7 @@ export default function MyDocuments({ user }: any) {
 
             if (blobs.length === 1 && blobs[0].type === 'application/pdf') {
                 finalBlob = blobs[0];
-                fileName = `${user.id}_${docType}_${Date.now()}.pdf`;
+                fileName = `${user!.id}_${docType}_${Date.now()}.pdf`;
             } else {
                 const doc = new jsPDF();
                 for (let i = 0; i < blobs.length; i++) {
@@ -72,10 +73,10 @@ export default function MyDocuments({ user }: any) {
                 }
                 const pdfArrayBuffer = doc.output('arraybuffer');
                 finalBlob = new Blob([pdfArrayBuffer], { type: 'application/pdf' });
-                fileName = `${user.id}_${docType}_${Date.now()}.pdf`;
+                fileName = `${user!.id}_${docType}_${Date.now()}.pdf`;
             }
 
-            const filePath = `hr_documents/${user.id}/${fileName}`;
+            const filePath = `hr_documents/${user!.id}/${fileName}`;
             const { error: uploadError } = await supabase.storage
                 .from('board-attachments')
                 .upload(filePath, finalBlob, { contentType: 'application/pdf', upsert: true });
@@ -84,10 +85,10 @@ export default function MyDocuments({ user }: any) {
             const { data: urlData } = supabase.storage.from('board-attachments').getPublicUrl(filePath);
 
             const { error: dbError } = await supabase.from('document_repository').insert({
-                created_by: user.id,
+                created_by: user!.id,
                 category: docType,
-                title: `${user.name} - ${docType}`,
-                company_name: user.company || '전체',
+                title: `${user!.name} - ${docType}`,
+                company_name: user!.company || '전체',
                 file_url: urlData.publicUrl
             });
 
@@ -95,8 +96,8 @@ export default function MyDocuments({ user }: any) {
 
             alert(`${docType} 업로드가 완료되었습니다.`);
             fetchDocuments();
-        } catch (error: any) {
-            alert(`업로드 실패: ${error.message}`);
+        } catch (error: unknown) {
+            alert(`업로드 실패: ${((error as Error)?.message ?? String(error))}`);
         } finally {
             setUploading(false);
         }
@@ -211,7 +212,10 @@ export default function MyDocuments({ user }: any) {
     );
 }
 
-function CameraScanner({ doc, onCapture, onClose }: any) {
+function CameraScanner(scannerProps: Record<string, unknown>) {
+    const doc = scannerProps.doc as { id: string; label: string };
+    const onCapture = scannerProps.onCapture as (blobs: Blob[]) => void;
+    const onClose = scannerProps.onClose as () => void;
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [capturedBlobs, setCapturedBlobs] = useState<Blob[]>([]);

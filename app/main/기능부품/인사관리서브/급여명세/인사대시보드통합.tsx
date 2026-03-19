@@ -8,8 +8,8 @@ import LaborCostTrend from './인건비추이분석';
 import DeptSalaryDistribution from './부서별급여분포';
 import TurnoverDashboard from './이직률근속률대시보드';
 
-export default function HRDashboardIntegrated({ staffs = [], selectedCo, checkedIds, yearMonth }: any) {
-  const [ym, setYm] = useState(yearMonth || new Date().toISOString().slice(0, 7));
+export default function HRDashboardIntegrated({ staffs = [], selectedCo, checkedIds, yearMonth }: Record<string, unknown>) {
+  const [ym, setYm] = useState((yearMonth as string) || new Date().toISOString().slice(0, 7));
 
   return (
     <div className="space-y-4 animate-in fade-in duration-300">

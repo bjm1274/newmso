@@ -18,7 +18,7 @@ function stringifyBracket(value: any) {
 export default function TaxInsuranceRatesPanel({ companyName }: { companyName?: string }) {
   const [list, setList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState<any>(null);
+  const [editing, setEditing] = useState<Record<string, unknown> | null>(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     effective_year: new Date().getFullYear(),
@@ -94,8 +94,8 @@ export default function TaxInsuranceRatesPanel({ companyName }: { companyName?: 
           return;
         }
         parsedBracket = parsed.map((entry) => ({ ...entry, official: form.official_confirmed }));
-      } catch (error: any) {
-        alert(`소득세 세율표 JSON이 올바르지 않습니다: ${error?.message || error}`);
+      } catch (error: unknown) {
+        alert(`소득세 세율표 JSON이 올바르지 않습니다: ${(error as Error)?.message || error}`);
         return;
       }
     }
@@ -118,8 +118,8 @@ export default function TaxInsuranceRatesPanel({ companyName }: { companyName?: 
       alert(editing ? '세율/보험요율을 수정했습니다.' : '세율/보험요율을 저장했습니다.');
       resetForm();
       await loadList();
-    } catch (error: any) {
-      alert(`저장 실패: ${error?.message || error}`);
+    } catch (error: unknown) {
+      alert(`저장 실패: ${(error as Error)?.message || error}`);
     } finally {
       setSaving(false);
     }

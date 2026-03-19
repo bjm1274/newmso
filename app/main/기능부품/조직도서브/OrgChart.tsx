@@ -2,11 +2,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 
-export default function OrgChart({ user, staffs, depts, selectedCo, setSelectedCo, onRefresh }: any) {
+export default function OrgChart({ user, staffs: _staffs, depts, selectedCo, setSelectedCo, onRefresh }: Record<string, unknown>) {
+  const staffs = (_staffs ?? []) as Record<string, unknown>[];
   const [expandedDepts, setExpandedDepts] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filteredStaffs, setFilteredStaffs] = useState<any[]>([]);
-  const [selectedStaff, setSelectedStaff] = useState<any>(null);
+  const [filteredStaffs, setFilteredStaffs] = useState<Record<string, unknown>[]>([]);
+  const [selectedStaff, setSelectedStaff] = useState<Record<string, unknown> | null>(null);
 
   useEffect(() => {
     // 검색 필터링
@@ -198,19 +199,19 @@ export default function OrgChart({ user, staffs, depts, selectedCo, setSelectedC
         <div className="border-t border-[var(--border)] bg-[var(--muted)] p-4">
           <div className="flex items-start gap-4">
             <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold text-2xl">
-              {selectedStaff.name?.charAt(0)}
+              {(selectedStaff.name as string)?.charAt(0)}
             </div>
             <div className="flex-1">
-              <h3 className="text-xl font-semibold text-[var(--foreground)]">{selectedStaff.name}</h3>
-              <p className="text-sm text-[var(--toss-gray-4)] mb-3">{selectedStaff.department} · {selectedStaff.position}</p>
+              <h3 className="text-xl font-semibold text-[var(--foreground)]">{selectedStaff.name as string}</h3>
+              <p className="text-sm text-[var(--toss-gray-4)] mb-3">{selectedStaff.department as string} · {selectedStaff.position as string}</p>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <p className="font-bold text-[var(--foreground)]">📧 이메일</p>
-                  <p className="text-[var(--toss-gray-4)]">{selectedStaff.email}</p>
+                  <p className="text-[var(--toss-gray-4)]">{selectedStaff.email as string}</p>
                 </div>
                 <div>
                   <p className="font-bold text-[var(--foreground)]">📞 연락처</p>
-                  <p className="text-[var(--toss-gray-4)]">{selectedStaff.phone || '등록 안 됨'}</p>
+                  <p className="text-[var(--toss-gray-4)]">{(selectedStaff.phone as string) || '등록 안 됨'}</p>
                 </div>
               </div>
             </div>

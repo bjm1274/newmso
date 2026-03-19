@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { canAccessApprovalSection } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
 import { isMissingColumnError, withMissingColumnFallback } from '@/lib/supabase-compat';
+import type { StaffMember } from '@/types';
 import {
   buildSupplyRequestWorkflowItems,
   fetchSupportInventoryRows,
@@ -126,7 +127,20 @@ function sanitizeCustomFormTypes(
     });
 }
 
-export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, selectedCompanyId, onRefresh, initialView, onViewChange, initialComposeRequest, onConsumeComposeRequest }: any) {
+interface ApprovalViewProps {
+  user: StaffMember | null;
+  staffs: StaffMember[];
+  selectedCo: string;
+  setSelectedCo: (co: string) => void;
+  selectedCompanyId?: string | null;
+  onRefresh?: () => void;
+  initialView?: string | null;
+  onViewChange?: (view: string) => void;
+  initialComposeRequest?: Record<string, unknown> | null;
+  onConsumeComposeRequest?: () => void;
+}
+
+export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, selectedCompanyId, onRefresh, initialView, onViewChange, initialComposeRequest, onConsumeComposeRequest }: ApprovalViewProps) {
   const defaultApprovalView =
     APPROVAL_VIEWS.find((view) => canAccessApprovalSection(user, view)) || '기안함';
   const [viewMode, setViewMode] = useState(
@@ -134,25 +148,25 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       ? initialView
       : defaultApprovalView
   );
-  const [approvals, setApprovals] = useState<any[]>([]);
+  const [approvals, setApprovals] = useState<Record<string, unknown>[]>([]);
   const [formType, setFormType] = useState('연차/휴가');
   const [formTitle, setFormTitle] = useState('');
   const [formContent, setFormContent] = useState('');
-  const [approverLine, setApproverLine] = useState<any[]>([]);
-  const [ccLine, setCcLine] = useState<any[]>([]);
-  const [extraData, setExtraData] = useState<any>({});
+  const [approverLine, setApproverLine] = useState<StaffMember[]>([]);
+  const [ccLine, setCcLine] = useState<{ id: string; name: string; position?: string | null }[]>([]);
+  const [extraData, setExtraData] = useState<Record<string, unknown>>({});
   const [customFormTypes, setCustomFormTypes] = useState<{ name: string; slug: string }[]>([]);
-  const [formTemplateDesigns, setFormTemplateDesigns] = useState<Record<string, any>>({});
-  const [lastDraftByType, setLastDraftByType] = useState<Record<string, any>>({});
+  const [formTemplateDesigns, setFormTemplateDesigns] = useState<Record<string, Record<string, unknown>>>({});
+  const [lastDraftByType, setLastDraftByType] = useState<Record<string, Record<string, unknown> | null>>({});
   const [suppliesLoadKey, setSuppliesLoadKey] = useState(0);
   const [selectedApprovalId, setSelectedApprovalId] = useState<string | null>(null);
   const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대기' | '승인' | '반려'>('전체');
   const [approvalDocumentFilter, setApprovalDocumentFilter] = useState(ALL_DOCUMENT_FILTER);
   const [approvalDateFrom, setApprovalDateFrom] = useState('');
   const [approvalDateTo, setApprovalDateTo] = useState('');
-  const [savedApproverLine, setSavedApproverLine] = useState<any[]>([]);
+  const [savedApproverLine, setSavedApproverLine] = useState<StaffMember[]>([]);
   // 결재선 다중 템플릿 (name + line 배열)
-  const [approverTemplates, setApproverTemplates] = useState<{id: string; name: string; line: any[]}[]>([]);
+  const [approverTemplates, setApproverTemplates] = useState<{id: string; name: string; line: StaffMember[]}[]>([]);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [templateNameInput, setTemplateNameInput] = useState('');
   // 결재함 일괄 처리용
@@ -191,10 +205,11 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     () => [...BUILTIN_FORM_TYPES, ...customFormTypes.map((item) => item.slug)],
     [customFormTypes]
   );
-  const resolveApprovalTemplateMeta = useCallback((item: any) => {
-    const rawSlug = String(item?.meta_data?.form_slug || '').trim();
+  const resolveApprovalTemplateMeta = useCallback((item: Record<string, unknown>) => {
+    const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
+    const rawSlug = String(metaData?.form_slug || '').trim();
     const rawType = String(item?.type || '').trim();
-    const rawName = String(item?.meta_data?.form_name || '').trim();
+    const rawName = String(metaData?.form_name || '').trim();
 
     const builtinBySlug = BUILTIN_FORM_TYPE_DEFINITIONS.find((template) => template.slug === rawSlug || template.slug === rawType);
     if (builtinBySlug) return builtinBySlug;
@@ -214,10 +229,10 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     };
   }, [customFormTypes]);
 
-  const resolveApprovalTemplateDesign = useCallback((item: any) => {
+  const resolveApprovalTemplateDesign = useCallback((item: Record<string, unknown>) => {
     const template = resolveApprovalTemplateMeta(item);
-    const storedDesign = template.slug ? formTemplateDesigns?.[template.slug] || {} : {};
-    const companyLabel = storedDesign.companyLabel || item?.sender_company || user?.company || DEFAULT_APPROVAL_TEMPLATE_DESIGN.companyLabel;
+    const storedDesign = template.slug ? (formTemplateDesigns?.[template.slug] || {}) : {};
+    const companyLabel = String(storedDesign.companyLabel || item?.sender_company || user?.company || DEFAULT_APPROVAL_TEMPLATE_DESIGN.companyLabel);
 
     return {
       ...DEFAULT_APPROVAL_TEMPLATE_DESIGN,
@@ -226,12 +241,12 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       subtitle: storedDesign.subtitle || `${template.name || '결재'} 승인 문서`,
       companyLabel,
       sealLabel: storedDesign.sealLabel || `${companyLabel} 직인`,
-      templateName: template.name || item?.type || '결재 문서',
-      templateSlug: template.slug || item?.meta_data?.form_slug || item?.type || 'generic',
+      templateName: template.name || (item?.type as string) || '결재 문서',
+      templateSlug: template.slug || ((item?.meta_data as Record<string, unknown> | null | undefined)?.form_slug as string) || (item?.type as string) || 'generic',
     };
   }, [formTemplateDesigns, resolveApprovalTemplateMeta, user?.company]);
 
-  const openApprovalPrintView = useCallback((item: any) => {
+  const openApprovalPrintView = useCallback((item: Record<string, unknown>) => {
     const design = resolveApprovalTemplateDesign(item);
     const templateMeta = resolveApprovalTemplateMeta(item);
     const win = window.open('', '_blank');
@@ -281,8 +296,8 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     </div>
     <div class="meta">
       <div><strong>회사</strong>${escapeHtml(design.companyLabel || item?.sender_company || '')}</div>
-      <div><strong>문서번호</strong>${escapeHtml(item?.doc_number || item?.meta_data?.doc_number || '-')}</div>
-      <div><strong>기안일</strong>${escapeHtml(new Date(item.created_at).toLocaleDateString('ko-KR'))}</div>
+      <div><strong>문서번호</strong>${escapeHtml((item?.doc_number as string) || ((item?.meta_data as Record<string, unknown> | null | undefined)?.doc_number as string) || '-')}</div>
+      <div><strong>기안일</strong>${escapeHtml(new Date(item.created_at as string).toLocaleDateString('ko-KR'))}</div>
       <div><strong>문서종류</strong>${escapeHtml(templateMeta.name || item?.type || '-')}</div>
       <div><strong>기안자</strong>${escapeHtml(item?.sender_name || '-')}</div>
       <div><strong>상태</strong>${escapeHtml(item?.status || '-')}</div>
@@ -310,36 +325,37 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const APPROVER_POSITIONS = ['팀장', '간호과장', '실장', '부장', '이사', '병원장'];
   const approverCandidates = useMemo(() => {
     if (!Array.isArray(staffs)) return [];
-    const order = (s: any) => {
-      const i = APPROVER_POSITIONS.indexOf(s.position);
+    const order = (s: StaffMember) => {
+      const i = APPROVER_POSITIONS.indexOf(s.position || '');
       return i >= 0 ? i : 999;
     };
-    return [...staffs].sort((a: any, b: any) => order(a) - order(b) || (a.name || '').localeCompare(b.name || ''));
+    return [...staffs].sort((a, b) => order(a) - order(b) || (a.name || '').localeCompare(b.name || ''));
   }, [staffs]);
-  const normalizeApprovalLineIds = useCallback((line: any): string[] => {
+  const normalizeApprovalLineIds = useCallback((line: unknown): string[] => {
     if (!Array.isArray(line)) return [];
     const ids = line
-      .map((entry: any) => {
+      .map((entry: unknown) => {
         if (entry == null) return null;
         if (typeof entry === 'string' || typeof entry === 'number') return String(entry);
-        if (typeof entry === 'object' && entry.id != null) return String(entry.id);
+        if (typeof entry === 'object' && entry !== null && 'id' in entry && (entry as Record<string, unknown>).id != null) return String((entry as Record<string, unknown>).id);
         return null;
       })
       .filter(Boolean) as string[];
     return Array.from(new Set(ids));
   }, []);
-  const resolveApprovalLineIds = useCallback((item: any): string[] => {
-    const explicitLineIds = normalizeApprovalLineIds(item?.approver_line ?? item?.meta_data?.approver_line);
+  const resolveApprovalLineIds = useCallback((item: Record<string, unknown>): string[] => {
+    const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
+    const explicitLineIds = normalizeApprovalLineIds(item?.approver_line ?? metaData?.approver_line);
     if (explicitLineIds.length > 0) return explicitLineIds;
     if (item?.current_approver_id != null) return [String(item.current_approver_id)];
     return [];
   }, [normalizeApprovalLineIds]);
-  const resolveCurrentApproverId = useCallback((item: any): string | null => {
+  const resolveCurrentApproverId = useCallback((item: Record<string, unknown>): string | null => {
     if (item?.current_approver_id != null) return String(item.current_approver_id);
     const lineIds = resolveApprovalLineIds(item);
     return lineIds[0] ?? null;
   }, [resolveApprovalLineIds]);
-  const insertApprovalWithLegacyFallback = useCallback(async (row: any) => {
+  const insertApprovalWithLegacyFallback = useCallback(async (row: Record<string, unknown>) => {
     let candidateRow = { ...row };
 
     while (true) {
@@ -354,8 +370,9 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       candidateRow = legacyRow;
     }
   }, []);
-  const prepareSupplyApprovalInventoryWorkflow = useCallback(async (item: any) => {
-    const requestedItems = Array.isArray(item?.meta_data?.items) ? item.meta_data.items : [];
+  const prepareSupplyApprovalInventoryWorkflow = useCallback(async (item: Record<string, unknown>) => {
+    const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
+    const requestedItems = Array.isArray(metaData?.items) ? metaData.items : [];
     if (!item?.id || requestedItems.length === 0) {
       return null;
     }
@@ -366,10 +383,11 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       throw sourceInventoryError;
     }
 
+    const inventoryWorkflow = metaData?.inventory_workflow as Record<string, unknown> | null | undefined;
     const workflowItems = buildSupplyRequestWorkflowItems(
       requestedItems,
       sourceInventoryRows || [],
-      item?.meta_data?.inventory_workflow?.items,
+      inventoryWorkflow?.items as unknown[] | undefined,
     );
     const summary = summarizeSupplyRequestWorkflow(workflowItems);
     const now = new Date().toISOString();
@@ -377,13 +395,13 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       status: 'pending',
       source_company: INVENTORY_SUPPORT_COMPANY,
       source_department: INVENTORY_SUPPORT_DEPARTMENT,
-      created_at: item?.meta_data?.inventory_workflow?.created_at || now,
+      created_at: inventoryWorkflow?.created_at || now,
       updated_at: now,
       items: workflowItems,
       summary,
     };
     const nextMetaData = {
-      ...(item?.meta_data || {}),
+      ...(metaData || {}),
       inventory_workflow: workflow,
     };
 
@@ -404,7 +422,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
         .eq('department', INVENTORY_SUPPORT_DEPARTMENT);
 
       const managerNotifications = (inventoryManagers || [])
-        .map((staff: any) => ({
+        .map((staff: { id: string; name: string }) => ({
           user_id: staff.id,
           type: 'inventory',
           title: `[물품신청 승인] ${item.title}`,
@@ -443,14 +461,15 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
 
     return { workflow, summary };
   }, []);
-  const canUserApproveItem = useCallback((item: any) => {
+  const canUserApproveItem = useCallback((item: Record<string, unknown>) => {
     if (item?.status !== '대기' || !user?.id) return false;
     return String(resolveCurrentApproverId(item) || '') === String(user.id);
   }, [resolveCurrentApproverId, user?.id]);
-  const syncApprovalRouting = useCallback(async (item: any, currentApproverId: string | null) => {
+  const syncApprovalRouting = useCallback(async (item: Record<string, unknown>, currentApproverId: string | null) => {
     if (!item?.id || !currentApproverId) return null;
-    const storedLineIds = normalizeApprovalLineIds(item.approver_line ?? item?.meta_data?.approver_line);
-    const updates: any = {};
+    const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
+    const storedLineIds = normalizeApprovalLineIds(item.approver_line ?? metaData?.approver_line);
+    const updates: Record<string, unknown> = {};
 
     if (!item.current_approver_id) {
       updates.current_approver_id = currentApproverId;
@@ -467,7 +486,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       const { error } = await supabase.from('approvals').update(effectiveUpdates).eq('id', item.id);
       if (!isMissingColumnError(error, 'approver_line') || !('approver_line' in effectiveUpdates)) {
         if (!error) {
-          setApprovals((prev) => prev.map((approval: any) => (
+          setApprovals((prev) => prev.map((approval) => (
             approval.id === item.id ? { ...approval, ...effectiveUpdates } : approval
           )));
         }
@@ -502,9 +521,9 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
         const parsed = stored ? JSON.parse(stored) : [];
         const activeCustomTypes = Array.isArray(parsed)
           ? parsed
-              .filter((row: any) => row?.is_active !== false)
-              .map((row: any) => ({ name: row.name, slug: row.slug }))
-              .filter((row: any) => row.name && row.slug)
+              .filter((row: Record<string, unknown>) => row?.is_active !== false)
+              .map((row: Record<string, unknown>) => ({ name: row.name as string, slug: row.slug as string }))
+              .filter((row: { name: string; slug: string }) => row.name && row.slug)
           : [];
         setCustomFormTypes(activeCustomTypes.length ? activeCustomTypes : normalizedFallbackTypes);
       } catch {
@@ -514,7 +533,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     }
     supabase.from('approval_form_types').select('name, slug').eq('is_active', true).order('sort_order').then(({ data, error }) => {
       if (!error && data?.length) {
-        setCustomFormTypes(data.map((r: any) => ({ name: r.name, slug: r.slug })));
+        setCustomFormTypes(data.map((r: { name: string; slug: string }) => ({ name: r.name, slug: r.slug })));
       } else {
         // Fallback hardcoded types if table is missing or empty
         setCustomFormTypes([
@@ -627,7 +646,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
         ? initialComposeRequest.viewMode
         : '작성하기';
     const nextView = resolveAccessibleView(requestedView);
-    const nextFormType = normalizeComposeFormType(initialComposeRequest?.formType || initialComposeRequest?.type);
+    const nextFormType = normalizeComposeFormType((initialComposeRequest?.formType || initialComposeRequest?.type) as string | undefined);
 
     if (!nextView) {
       onConsumeComposeRequest?.();
@@ -647,7 +666,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
         Array.from(
           new Set(
             nextDates
-              .map((value: any) => String(value || '').slice(0, 10))
+              .map((value: unknown) => String(value || '').slice(0, 10))
               .filter(Boolean)
           )
         )
@@ -673,7 +692,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
         return query;
       }
     );
-    if (data) setApprovals(data as any);
+    if (data) setApprovals(data as Record<string, unknown>[]);
   }, [isMso, user?.company_id, user?.company, selectedCompanyId, selectedCo]);
 
   // 항상 최신 fetchApprovals를 ref에 유지 (realtime 클로저 stale 방지)
@@ -715,21 +734,22 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const loadLastDraft = useCallback(() => {
     const last = lastDraftByType[formType];
     if (!last) return;
-    setFormTitle(last.title || '');
-    setFormContent(last.content || '');
-    setExtraData(last.meta_data || {});
+    const lastMeta = last.meta_data as Record<string, unknown> | null | undefined;
+    setFormTitle((last.title as string) || '');
+    setFormContent((last.content as string) || '');
+    setExtraData((lastMeta as Record<string, unknown>) || {});
     const storedApproverLine = Array.isArray(last.approver_line)
-      ? last.approver_line
-      : Array.isArray(last.meta_data?.approver_line)
-        ? last.meta_data.approver_line
+      ? last.approver_line as unknown[]
+      : Array.isArray(lastMeta?.approver_line)
+        ? lastMeta.approver_line as unknown[]
         : [];
     if (storedApproverLine.length > 0 && Array.isArray(staffs)) {
       const line = storedApproverLine
-        .map((id: string) => staffs.find((s: any) => s.id === id))
+        .map((id) => staffs.find((s) => s.id === (id as string)))
         .filter(Boolean);
-      if (line.length > 0) setApproverLine(line);
+      if (line.length > 0) setApproverLine(line as StaffMember[]);
     }
-    if (formType === '물품신청' && last.meta_data?.items?.length) setSuppliesLoadKey((k) => k + 1);
+    if (formType === '물품신청' && (lastMeta?.items as unknown[] | null | undefined)?.length) setSuppliesLoadKey((k) => k + 1);
   }, [lastDraftByType, formType, staffs]);
 
   // 물품신청은 같은 내용을 자주 쓰므로,
@@ -805,7 +825,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     if (count === 0) return;
     if (!confirm(`선택된 ${count}건을 일괄 승인하시겠습니까?`)) return;
     const results = await Promise.all(selectedApprovalIds.map(async (id) => {
-      const item = approvals.find((a: any) => a.id === id);
+      const item = approvals.find((a) => a.id === id);
       if (!item) return null;
       const currentApproverId = resolveCurrentApproverId(item);
       if (!currentApproverId || String(currentApproverId) !== String(user?.id)) return id;
@@ -814,7 +834,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       const lineIds = resolveApprovalLineIds({ ...item, current_approver_id: currentApproverId, approver_line: normalizeApprovalLineIds(item.approver_line).length > 0 ? item.approver_line : [currentApproverId] });
       const currentIndex = lineIds.findIndex((lid: string) => String(lid) === String(currentApproverId));
       const isFinal = currentIndex === lineIds.length - 1 || currentIndex === -1;
-      const updateData: any = isFinal ? { status: '승인' } : { current_approver_id: lineIds[currentIndex + 1] };
+      const updateData: Record<string, unknown> = isFinal ? { status: '승인' } : { current_approver_id: lineIds[currentIndex + 1] };
       const { error } = await supabase.from('approvals').update(updateData).eq('id', id);
       return error ? id : null;
     }));
@@ -835,15 +855,16 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     const reason = window.prompt(`선택된 ${count}건을 일괄 반려합니다.\n반려 사유를 입력해 주세요. (선택)`);
     if (reason === null) return;
     const results = await Promise.all(selectedApprovalIds.map(async (id) => {
-      const item = approvals.find((a: any) => a.id === id);
+      const item = approvals.find((a) => a.id === id);
       if (!item) return null;
       const currentApproverId = resolveCurrentApproverId(item);
       if (!currentApproverId || String(currentApproverId) !== String(user?.id)) return id;
       const routingError = await syncApprovalRouting(item, currentApproverId);
       if (routingError) return id;
+      const itemMetaData = item.meta_data as Record<string, unknown> | null | undefined;
       const { error } = await supabase.from('approvals').update({
         status: '반려',
-        meta_data: { ...(item.meta_data || {}), reject_reason: reason },
+        meta_data: { ...(itemMetaData || {}), reject_reason: reason },
       }).eq('id', id);
       return error ? id : null;
     }));
@@ -867,7 +888,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  const handleApproveAction = async (item: any) => {
+  const handleApproveAction = async (item: Record<string, unknown>) => {
     if (!confirm("승인하시겠습니까? 관련 데이터가 즉시 업데이트됩니다.")) return;
 
     const currentApproverId = resolveCurrentApproverId(item);
@@ -885,18 +906,19 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       return;
     }
 
+    const itemMetaForLine = item?.meta_data as Record<string, unknown> | null | undefined;
     const lineIds = resolveApprovalLineIds({
       ...item,
       current_approver_id: currentApproverId,
       approver_line:
-        normalizeApprovalLineIds(item.approver_line ?? item?.meta_data?.approver_line).length > 0
-          ? (item.approver_line ?? item?.meta_data?.approver_line)
+        normalizeApprovalLineIds(item.approver_line ?? itemMetaForLine?.approver_line).length > 0
+          ? (item.approver_line ?? itemMetaForLine?.approver_line)
           : [currentApproverId],
     });
     const currentIndex = lineIds.findIndex((id: string) => String(id) === String(currentApproverId));
     const isFinalApproval = currentIndex === lineIds.length - 1 || currentIndex === -1;
 
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
     if (isFinalApproval) {
       updateData.status = '승인';
     } else {
@@ -908,7 +930,8 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     if (!appError) {
       if (isFinalApproval) {
         let supplyApprovalSummary: ReturnType<typeof summarizeSupplyRequestWorkflow> | null = null;
-        if (item.type === '물품신청' && item.meta_data.items) {
+        const itemMetaData = item.meta_data as Record<string, unknown> | null | undefined;
+        if (item.type === '물품신청' && itemMetaData?.items) {
           try {
             const workflowResult = await prepareSupplyApprovalInventoryWorkflow(item);
             supplyApprovalSummary = workflowResult?.summary ?? null;
@@ -918,11 +941,11 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
           }
         }
 
-        if (item.type === '인사명령' && item.meta_data.orderTargetId) {
-          const { orderTargetId, newPosition, orderCategory, targetDept } = item.meta_data;
+        if (item.type === '인사명령' && itemMetaData?.orderTargetId) {
+          const { orderTargetId, newPosition, orderCategory, targetDept } = itemMetaData as { orderTargetId: string; newPosition?: string; orderCategory?: string; targetDept?: string };
           const { data: currentStaff } = await supabase.from('staff_members').select('department, position').eq('id', orderTargetId).single();
 
-          const staffUpdate: any = {};
+          const staffUpdate: Record<string, unknown> = {};
           if (newPosition) staffUpdate.position = newPosition;
           if (orderCategory === '부서 이동(전보)' && targetDept) {
             staffUpdate.department = targetDept;
@@ -946,8 +969,8 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
         }
 
         if (item.type === '연차/휴가') {
-          const startStr = item.meta_data?.startDate || item.meta_data?.start;
-          const endStr = item.meta_data?.endDate || item.meta_data?.end || startStr;
+          const startStr = String(itemMetaData?.startDate || itemMetaData?.start || '');
+          const endStr = String(itemMetaData?.endDate || itemMetaData?.end || startStr);
           if (!startStr) {
             alert("최종 승인 처리가 완료되었습니다.");
             fetchApprovals();
@@ -966,7 +989,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
           try {
             await supabase.from('leave_requests').insert({
               staff_id: item.sender_id,
-              leave_type: item.meta_data?.leaveType || '연차',
+              leave_type: itemMetaData?.leaveType || '연차',
               start_date: startStr,
               end_date: endStr,
               reason: item.title,
@@ -991,14 +1014,14 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
           await supabase.from('staff_members').update({ annual_leave_used: used }).eq('id', item.sender_id);
         }
 
-        if (item.type === '양식신청' && item.meta_data?.form_type && item.meta_data?.target_staff && item.meta_data?.auto_issue) {
+        if (item.type === '양식신청' && itemMetaData?.form_type && itemMetaData?.target_staff && itemMetaData?.auto_issue) {
           try {
             const sn = `CERT-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(Date.now()).slice(-6)}`;
             await supabase.from('certificate_issuances').insert({
-              staff_id: item.meta_data.target_staff,
-              cert_type: item.meta_data.form_type,
+              staff_id: itemMetaData.target_staff,
+              cert_type: itemMetaData.form_type,
               serial_no: sn,
-              purpose: item.meta_data.purpose || '제출용',
+              purpose: itemMetaData.purpose || '제출용',
               issued_by: user?.id,
             });
           } catch (_) { }
@@ -1018,7 +1041,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     }
   };
 
-  const handleRejectAction = async (item: any) => {
+  const handleRejectAction = async (item: Record<string, unknown>) => {
     const currentApproverId = resolveCurrentApproverId(item);
     if (!currentApproverId) {
       alert("결재자가 지정되지 않아 반려할 수 없습니다. 결재선을 다시 확인해 주세요.");
@@ -1035,9 +1058,10 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       alert("결재선을 초기화하지 못했습니다. 잠시 후 다시 시도해 주세요.");
       return;
     }
+    const rejectMetaData = item.meta_data as Record<string, unknown> | null | undefined;
     const { error } = await supabase
       .from('approvals')
-      .update({ status: '반려', meta_data: { ...(item.meta_data || {}), reject_reason: reason } })
+      .update({ status: '반려', meta_data: { ...(rejectMetaData || {}), reject_reason: reason } })
       .eq('id', item.id);
     if (!error) {
       alert("반려 처리되었습니다.");
@@ -1058,7 +1082,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     }
 
     const requiredCc = formType === '물품신청' ? ['관리팀', '행정팀'] : ['행정팀'];
-    const extraCc = Array.isArray((extraData as any)?.cc_departments) ? (extraData as any).cc_departments : [];
+    const extraCc = Array.isArray(extraData?.cc_departments) ? extraData.cc_departments as string[] : [];
     const cc_departments = Array.from(new Set([...extraCc, ...requiredCc]));
 
     // 문서번호 자동 채번: 연도-월-순번
@@ -1071,12 +1095,12 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     const resolvedFormSlug = selectedCustomForm?.slug || builtInForm?.slug || formType;
     const resolvedFormName = selectedCustomForm?.name || builtInForm?.name || formType;
 
-    const row: any = {
+    const row: Record<string, unknown> = {
       sender_id: user.id,
       sender_name: user.name || '이름 없음',
       sender_company: user.company || '',
       current_approver_id: approverLine[0].id,
-      approver_line: approverLine.map((a: any) => a.id),
+      approver_line: approverLine.map((a) => a.id),
       type: formType,
       title: formTitle,
       content: formContent || '',
@@ -1086,7 +1110,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
         form_name: resolvedFormName,
         cc_departments,
         cc_users: ccLine.map(c => ({ id: c.id, name: c.name })),
-        approver_line: approverLine.map((a: any) => a.id),
+        approver_line: approverLine.map((a) => a.id),
         doc_number: docNumber,
       },
       doc_number: docNumber,
@@ -1115,16 +1139,16 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
 
   const byCompany = useMemo(() => {
     if (selectedCo === '전체') return approvals;
-    return approvals.filter((a: any) => a.sender_company === selectedCo);
+    return approvals.filter((a) => a.sender_company === selectedCo);
   }, [approvals, selectedCo]);
 
   const draftBaseList = useMemo(() => {
-    return byCompany.filter((a: any) => a.sender_id === user?.id);
+    return byCompany.filter((a) => a.sender_id === user?.id);
   }, [byCompany, user?.id]);
 
   const approvalBaseList = useMemo(() => {
     const uid = user?.id != null ? String(user.id) : '';
-    return byCompany.filter((a: any) => {
+    return byCompany.filter((a) => {
       const lineIds = resolveApprovalLineIds(a);
       const currentApproverId = resolveCurrentApproverId(a);
       return lineIds.some((id: string) => String(id) === uid) || String(currentApproverId || '') === uid;
@@ -1136,24 +1160,24 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     return Array.from(
       new Set(
         source
-          .map((item: any) => String(item?.type || '').trim())
+          .map((item) => String(item?.type || '').trim())
           .filter(Boolean)
       )
     ).sort((a, b) => a.localeCompare(b, 'ko-KR'));
   }, [approvalBaseList, draftBaseList, viewMode]);
 
   const dateRangeInvalid = Boolean(approvalDateFrom && approvalDateTo && approvalDateFrom > approvalDateTo);
-  const applyListFilters = useCallback((items: any[]) => {
+  const applyListFilters = useCallback((items: Record<string, unknown>[]) => {
     let filtered = approvalStatusFilter === '전체'
       ? items
-      : items.filter((item: any) => item.status === approvalStatusFilter);
+      : items.filter((item) => item.status === approvalStatusFilter);
 
     if (approvalDocumentFilter !== ALL_DOCUMENT_FILTER) {
-      filtered = filtered.filter((item: any) => item.type === approvalDocumentFilter);
+      filtered = filtered.filter((item) => item.type === approvalDocumentFilter);
     }
 
     if (approvalDateFrom || approvalDateTo) {
-      filtered = filtered.filter((item: any) => matchesCreatedDateRange(item.created_at, approvalDateFrom, approvalDateTo));
+      filtered = filtered.filter((item) => matchesCreatedDateRange(item.created_at as string | null, approvalDateFrom, approvalDateTo));
     }
 
     return filtered;
@@ -1173,14 +1197,14 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const bulkTargetList = useMemo(() => {
     if (viewMode !== '결재함') return [];
     return approvalBoxList.filter(
-      (a: any) => canUserApproveItem(a)
+      (a) => canUserApproveItem(a)
     );
   }, [approvalBoxList, canUserApproveItem, viewMode]);
 
-  const allBulkSelected = bulkTargetList.length > 0 && bulkTargetList.every((a: any) => selectedApprovalIds.includes(a.id));
+  const allBulkSelected = bulkTargetList.length > 0 && bulkTargetList.every((a) => selectedApprovalIds.includes(a.id as string));
 
   useEffect(() => {
-    setSelectedApprovalIds((prev) => prev.filter((id) => bulkTargetList.some((item: any) => item.id === id)));
+    setSelectedApprovalIds((prev) => prev.filter((id) => bulkTargetList.some((item) => item.id === id)));
   }, [bulkTargetList]);
 
   useEffect(() => {
@@ -1208,7 +1232,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     if (allBulkSelected) {
       setSelectedApprovalIds([]);
     } else {
-      setSelectedApprovalIds(bulkTargetList.map((a: any) => a.id));
+      setSelectedApprovalIds(bulkTargetList.map((a) => a.id as string));
     }
   };
 
@@ -1266,22 +1290,22 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
 
                 <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2 items-start">
                   <select data-testid="approval-approver-select" onChange={(e) => {
-                    const s = approverCandidates.find((st: any) => st.id === e.target.value);
+                    const s = approverCandidates.find((st) => st.id === e.target.value);
                     if (s && !approverLine.find(al => al.id === s.id)) setApproverLine([...approverLine, s]);
                     e.target.value = '';
                   }} className="min-w-0 p-3 bg-[var(--input-bg)] rounded-[var(--radius-md)] text-xs font-bold border border-[var(--border)] outline-none shadow-sm">
                     <option value="">결재자 추가...</option>
-                    {approverCandidates.map((s: any) => (
+                    {approverCandidates.map((s) => (
                       <option key={s.id} value={s.id}>{s.name} {s.position || ''} {s.company ? `(${s.company})` : ''}</option>
                     ))}
                   </select>
                   <select onChange={e => {
-                    const s = staffs.find((sf: any) => String(sf.id) === e.target.value);
+                    const s = staffs.find((sf) => String(sf.id) === e.target.value);
                     if (s && !ccLine.find(c => c.id === s.id)) setCcLine(prev => [...prev, { id: s.id, name: s.name, position: s.position }]);
                     e.target.value = '';
                   }} className="min-w-0 p-3 bg-[var(--input-bg)] rounded-[var(--radius-md)] text-xs font-bold border border-[var(--border)] outline-none shadow-sm">
                     <option value="">참조자 추가...</option>
-                    {staffs.filter((s: any) => !ccLine.find(c => c.id === s.id)).map((s: any) => <option key={s.id} value={s.id}>{s.name} ({s.position})</option>)}
+                    {staffs.filter((s) => !ccLine.find(c => c.id === s.id)).map((s) => <option key={s.id} value={s.id}>{s.name} ({s.position})</option>)}
                   </select>
                   <button
                     type="button"
@@ -1361,7 +1385,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
               {formType !== '양식신청' && lastDraftByType[formType] && (
                 <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-100 rounded-[var(--radius-lg)]">
                   <span className="text-[11px] font-bold text-amber-700">
-                    마지막 상신: {lastDraftByType[formType].title || '(제목 없음)'} · {new Date(lastDraftByType[formType].created_at).toLocaleDateString()}
+                    마지막 상신: {(lastDraftByType[formType]!.title as string) || '(제목 없음)'} · {new Date(lastDraftByType[formType]!.created_at as string).toLocaleDateString()}
                   </span>
                   <button
                     type="button"
@@ -1377,7 +1401,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                 {['연차/휴가', '연장근무'].includes(formType) ? (
                   <AttendanceForms user={user} staffs={staffs} formType={formType} setExtraData={setExtraData} setFormTitle={setFormTitle} />
                 ) : formType === '물품신청' ? (
-                  <SuppliesForm key={suppliesLoadKey} setExtraData={setExtraData} initialItems={suppliesLoadKey > 0 ? lastDraftByType['물품신청']?.meta_data?.items : undefined} />
+                  <SuppliesForm key={suppliesLoadKey} setExtraData={setExtraData} initialItems={suppliesLoadKey > 0 ? ((lastDraftByType['물품신청']?.meta_data as Record<string, unknown> | null | undefined)?.items as unknown[] | undefined) : undefined} />
                 ) : formType === '수리요청서' ? (
                   <RepairRequestForm setExtraData={setExtraData} />
                 ) : formType === '양식신청' ? (
@@ -1392,7 +1416,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                 ) : formType === '연차계획서' ? (
                   <AnnualLeavePlanForm user={user} staffs={staffs} setExtraData={setExtraData} setFormTitle={setFormTitle} />
                 ) : (
-                  <AdminForms staffs={staffs} formType={formType} setExtraData={setExtraData} />
+                  <AdminForms staffs={staffs as { id: string; name: string; position: string }[]} formType={formType} setExtraData={setExtraData} />
                 )}
               </div>
 
@@ -1550,38 +1574,46 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-1.5 sm:[grid-template-columns:repeat(auto-fill,minmax(176px,176px))] sm:justify-start">
-                {listForView.map((item: any) => {
+                {listForView.map((item) => {
+                  const itemId = item.id as string;
+                  const itemType = item.type as string | null | undefined;
+                  const itemStatus = item.status as string | null | undefined;
+                  const itemSenderCompany = item.sender_company as string | null | undefined;
+                  const itemTitle = item.title as string | null | undefined;
+                  const itemSenderName = item.sender_name as string | null | undefined;
+                  const itemCreatedAt = item.created_at as string;
+                  const itemDocNumber = item.doc_number as string | null | undefined;
                   const lineIds = resolveApprovalLineIds(item);
                   const currentApproverId = resolveCurrentApproverId(item);
                   const steps = lineIds.map((id: string, i: number) => {
-                    const staff = Array.isArray(staffs) ? staffs.find((s: any) => s.id === id) : null;
+                    const staff = Array.isArray(staffs) ? staffs.find((s) => s.id === id) : null;
                     const name = staff?.name || '?';
                     const isCurrent = String(id) === String(currentApproverId || '');
                     return { step: i + 1, name, isCurrent };
                   });
                   const currentStep = steps.find((s: { step: number; name: string; isCurrent: boolean }) => s.isCurrent) || null;
                   const isBulkTarget = viewMode === '결재함' && canUserApproveItem(item);
-                  const isChecked = selectedApprovalIds.includes(item.id);
+                  const isChecked = selectedApprovalIds.includes(itemId);
                   const templateMeta = resolveApprovalTemplateMeta(item);
                   const templateDesign = resolveApprovalTemplateDesign(item);
                   return (
                     <div
-                      key={item.id}
-                      data-testid={`approval-card-${item.id}`}
+                      key={itemId}
+                      data-testid={`approval-card-${itemId}`}
                       role="button"
                       tabIndex={0}
-                      onClick={() => setSelectedApprovalId(item.id)}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedApprovalId(item.id); } }}
+                      onClick={() => setSelectedApprovalId(itemId)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedApprovalId(itemId); } }}
                       className={`w-full min-h-[112px] bg-[var(--card)] px-2 py-1.5 border rounded-[var(--radius-md)] shadow-sm flex flex-col justify-between gap-1 group hover:border-[var(--accent)]/30 hover:shadow-md transition-all animate-in fade-in-up cursor-pointer ${isChecked ? 'border-[var(--accent)]/50 bg-[var(--toss-blue-light)]' : 'border-[var(--border)]'}`}
                     >
                       <div className="flex gap-1 items-start flex-1 min-w-0">
                         {/* 일괄 처리 체크박스 (결재함 대기 항목에만 표시) */}
                         {isBulkTarget && (
-                          <div onClick={(e) => { e.stopPropagation(); toggleSelectOne(item.id); }} className="shrink-0 cursor-pointer">
+                          <div onClick={(e) => { e.stopPropagation(); toggleSelectOne(itemId); }} className="shrink-0 cursor-pointer">
                             <input
                               type="checkbox"
                               checked={isChecked}
-                              onChange={() => toggleSelectOne(item.id)}
+                              onChange={() => toggleSelectOne(itemId)}
                               onClick={(e) => e.stopPropagation()}
                               className="w-4 h-4 accent-[var(--accent)] rounded cursor-pointer"
                             />
@@ -1591,7 +1623,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                           className="w-7 h-7 shrink-0 rounded-md flex items-center justify-center text-[11px] shadow-inner transition-colors"
                           style={{ backgroundColor: alphaColor(templateDesign.primaryColor, 0.12), color: templateDesign.primaryColor || '#155eef' }}
                         >
-                          {item.type === '물품신청' ? '📦' : item.type === '양식신청' ? '📄' : item.type === '인사명령' ? '🎖️' : item.type === '수리요청서' ? '🔧' : '📋'}
+                          {itemType === '물품신청' ? '📦' : itemType === '양식신청' ? '📄' : itemType === '인사명령' ? '🎖️' : itemType === '수리요청서' ? '🔧' : '📋'}
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap gap-0.5 mb-0 items-center">
@@ -1599,17 +1631,17 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                               className="px-1.5 py-[2px] rounded-md text-[10px] font-semibold"
                               style={{ backgroundColor: alphaColor(templateDesign.primaryColor, 0.1), color: templateDesign.primaryColor || '#155eef' }}
                             >
-                              {templateMeta.name || item.type}
+                              {templateMeta.name || itemType}
                             </span>
-                            <span className={`px-1.5 py-[2px] rounded-md text-[10px] font-semibold ${item.status === '승인' ? 'bg-green-100 text-green-600' : item.status === '반려' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-500'}`}>{item.status}</span>
-                            <span className="px-1.5 py-[2px] bg-[var(--toss-blue-light)] rounded-md text-[10px] font-semibold text-[var(--accent)]">{item.sender_company}</span>
+                            <span className={`px-1.5 py-[2px] rounded-md text-[10px] font-semibold ${itemStatus === '승인' ? 'bg-green-100 text-green-600' : itemStatus === '반려' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-500'}`}>{itemStatus}</span>
+                            <span className="px-1.5 py-[2px] bg-[var(--toss-blue-light)] rounded-md text-[10px] font-semibold text-[var(--accent)]">{itemSenderCompany}</span>
                           </div>
-                          <h3 className="font-semibold text-[13px] text-[var(--foreground)] tracking-tight line-clamp-2 leading-[1.35]">{item.title}</h3>
-                          <p className="text-[10px] text-[var(--toss-gray-3)] font-medium mt-0.5 line-clamp-2 leading-[1.35]">기안자: {item.sender_name || '사용자'} | {new Date(item.created_at).toLocaleDateString()}{item.doc_number && ` | 문서번호: ${item.doc_number}`}</p>
+                          <h3 className="font-semibold text-[13px] text-[var(--foreground)] tracking-tight line-clamp-2 leading-[1.35]">{itemTitle}</h3>
+                          <p className="text-[10px] text-[var(--toss-gray-3)] font-medium mt-0.5 line-clamp-2 leading-[1.35]">기안자: {itemSenderName || '사용자'} | {new Date(itemCreatedAt).toLocaleDateString()}{itemDocNumber && ` | 문서번호: ${itemDocNumber}`}</p>
                           {steps.length > 0 && (
                             <div className="mt-0.5 flex flex-wrap gap-0.5">
                               <span className="inline-flex items-center px-1.5 py-[2px] rounded-md text-[10px] font-semibold bg-[var(--muted)] text-[var(--toss-gray-3)]">결재선 {steps.length}명</span>
-                              {item.status === '승인' ? (
+                              {itemStatus === '승인' ? (
                                 <span className="inline-flex items-center px-1.5 py-[2px] rounded-md text-[10px] font-semibold bg-green-50 text-green-600">최종 승인</span>
                               ) : currentStep ? (
                                 <span className="inline-flex items-center px-1.5 py-[2px] rounded-md text-[10px] font-semibold bg-amber-100 text-amber-700">현재 {currentStep.step}. {currentStep.name}</span>
@@ -1624,10 +1656,10 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                           openApprovalPrintView(item);
                           return;
                           const win = window.open('', '_blank')!;
-                          win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>결재문서</title><style>body{font-family:'Malgun Gothic',sans-serif;padding:30px;max-width:800px;margin:0 auto}h1{font-size:20px;text-align:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:20px}.meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;font-size:12px}.meta div{border:1px solid #ccc;padding:8px;border-radius:4px}.content{border:1px solid #ccc;padding:15px;min-height:200px;font-size:13px;line-height:1.6;border-radius:4px}.approval-line{margin-top:20px;display:flex;gap:10px}.sig-box{border:1px solid #ccc;padding:10px;min-width:80px;text-align:center;font-size:11px}@media print{button{display:none}}</style></head><body><h1>결 재 문 서</h1><div class="meta"><div><strong>문서번호:</strong> ${item.doc_number || '-'}</div><div><strong>기안일:</strong> ${new Date(item.created_at).toLocaleDateString('ko-KR')}</div><div><strong>기안자:</strong> ${item.sender_name}</div><div><strong>소속:</strong> ${item.sender_company}</div><div><strong>문서종류:</strong> ${item.type}</div><div><strong>상태:</strong> ${item.status}</div></div><h3 style="font-size:16px;margin-bottom:10px">${item.title}</h3><div class="content">${(item.content || '').replace(/\n/g, '<br>')}</div><div class="approval-line">${(item.approver_line || []).map((id: string, i: number) => `<div class="sig-box">${i + 1}단계<br><br><br>(인)</div>`).join('')}</div><script>window.onload=()=>window.print()</script></body></html>`);
+                          win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>결재문서</title><style>body{font-family:'Malgun Gothic',sans-serif;padding:30px;max-width:800px;margin:0 auto}h1{font-size:20px;text-align:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:20px}.meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;font-size:12px}.meta div{border:1px solid #ccc;padding:8px;border-radius:4px}.content{border:1px solid #ccc;padding:15px;min-height:200px;font-size:13px;line-height:1.6;border-radius:4px}.approval-line{margin-top:20px;display:flex;gap:10px}.sig-box{border:1px solid #ccc;padding:10px;min-width:80px;text-align:center;font-size:11px}@media print{button{display:none}}</style></head><body><h1>결 재 문 서</h1><div class="meta"><div><strong>문서번호:</strong> ${itemDocNumber || '-'}</div><div><strong>기안일:</strong> ${new Date(itemCreatedAt).toLocaleDateString('ko-KR')}</div><div><strong>기안자:</strong> ${itemSenderName}</div><div><strong>소속:</strong> ${itemSenderCompany}</div><div><strong>문서종류:</strong> ${itemType}</div><div><strong>상태:</strong> ${itemStatus}</div></div><h3 style="font-size:16px;margin-bottom:10px">${itemTitle}</h3><div class="content">${((item.content as string) || '').replace(/\n/g, '<br>')}</div><div class="approval-line">${((item.approver_line as string[]) || []).map((id: string, i: number) => `<div class="sig-box">${i + 1}단계<br><br><br>(인)</div>`).join('')}</div><script>window.onload=()=>window.print()</script></body></html>`);
                           win.document.close();
                         }} className="px-2 py-1 bg-[var(--tab-bg)] text-[var(--toss-gray-4)] border border-[var(--border)] rounded-md text-[10px] font-semibold hover:bg-[var(--muted)]">PDF</button>
-                        {(viewMode === '결재함' || (viewMode === '기안함' && item.status === '대기')) && canUserApproveItem(item) && (
+                        {(viewMode === '결재함' || (viewMode === '기안함' && itemStatus === '대기')) && canUserApproveItem(item) && (
                           <>
                             <button type="button" onClick={() => handleApproveAction(item)} className="px-2 py-1 bg-[var(--accent)] text-white rounded-md text-[10px] font-semibold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all">승인</button>
                             <button type="button" onClick={() => handleRejectAction(item)} className="px-2 py-1 bg-red-50 text-red-600 border border-red-200 rounded-md text-[10px] font-semibold shadow-sm hover:bg-red-100 active:scale-[0.98] transition-all">반려</button>
@@ -1668,8 +1700,14 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
 
       {/* 결재 상세 모달 */}
       {selectedApprovalId && (() => {
-        const item = approvals.find((a: any) => a.id === selectedApprovalId);
+        const item = approvals.find((a) => a.id === selectedApprovalId);
         if (!item) return null;
+        const detailType = item.type as string | null | undefined;
+        const detailTitle = item.title as string | null | undefined;
+        const detailSenderName = item.sender_name as string | null | undefined;
+        const detailCreatedAt = item.created_at as string;
+        const detailContent = item.content as string | null | undefined;
+        const detailStatus = item.status as string | null | undefined;
         const templateMeta = resolveApprovalTemplateMeta(item);
         const templateDesign = resolveApprovalTemplateDesign(item);
         return (
@@ -1693,18 +1731,18 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                     className="inline-flex px-2 py-0.5 rounded-md text-[11px] font-semibold"
                     style={{ backgroundColor: alphaColor(templateDesign.primaryColor, 0.1), color: templateDesign.primaryColor || '#155eef' }}
                   >
-                    {templateMeta.name || item.type}
+                    {templateMeta.name || detailType}
                   </span>
-                  <p className="mt-2 text-[11px] text-[var(--toss-gray-3)]">{templateDesign.subtitle || '전자결재 승인 문서'}</p>
+                  <p className="mt-2 text-[11px] text-[var(--toss-gray-3)]">{(templateDesign.subtitle as string | null | undefined) || '전자결재 승인 문서'}</p>
                 </div>
                 <button type="button" onClick={() => setSelectedApprovalId(null)} className="p-2 rounded-[var(--radius-md)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)]">✕</button>
               </div>
               <div className="p-4 md:p-4 overflow-y-auto flex-1">
-                <h3 className="font-bold text-[var(--foreground)] text-lg mb-2">{item.title || '(제목 없음)'}</h3>
-                <p className="text-[11px] text-[var(--toss-gray-3)] mb-4">기안자: {item.sender_name} · {new Date(item.created_at).toLocaleString('ko-KR')}</p>
-                <div className="text-sm text-[var(--toss-gray-4)] whitespace-pre-wrap border-t border-[var(--border)] pt-4">{item.content || '-'}</div>
+                <h3 className="font-bold text-[var(--foreground)] text-lg mb-2">{detailTitle || '(제목 없음)'}</h3>
+                <p className="text-[11px] text-[var(--toss-gray-3)] mb-4">기안자: {detailSenderName} · {new Date(detailCreatedAt).toLocaleString('ko-KR')}</p>
+                <div className="text-sm text-[var(--toss-gray-4)] whitespace-pre-wrap border-t border-[var(--border)] pt-4">{detailContent || '-'}</div>
               </div>
-              {item.status === '대기' && (
+              {detailStatus === '대기' && (
                 <div className="p-4 md:p-4 border-t border-[var(--border)] safe-area-pb">
                   {canUserApproveItem(item) ? (
                     <div className="flex gap-3">

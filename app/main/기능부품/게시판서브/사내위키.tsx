@@ -1,11 +1,14 @@
 'use client';
 import { useState } from 'react';
 
-const mockWikiData: any[] = [];
+type WikiDoc = { id: string; name: string; content: string; [key: string]: unknown; };
+type WikiFolder = { id: string; name: string; isOpen?: boolean; children: WikiDoc[]; [key: string]: unknown; };
+
+const mockWikiData: WikiFolder[] = [];
 
 export default function WikiDashboard() {
     const [nodes, setNodes] = useState(mockWikiData);
-    const [selectedDoc, setSelectedDoc] = useState<any>(mockWikiData[0].children[0]);
+    const [selectedDoc, setSelectedDoc] = useState<WikiDoc | null>(mockWikiData[0]?.children[0] ?? null);
     const [searchTerm, setSearchTerm] = useState('');
 
     const toggleFolder = (folderId: string) => {
@@ -39,7 +42,7 @@ export default function WikiDashboard() {
                             </button>
                             {folder.isOpen && (
                                 <div className="ml-4 mt-1 pl-2 border-l border-[var(--border)] space-y-1">
-                                    {folder.children.map((doc: any) => (
+                                    {folder.children.map((doc: WikiDoc) => (
                                         <button
                                             key={doc.id}
                                             onClick={() => setSelectedDoc(doc)}

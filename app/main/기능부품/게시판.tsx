@@ -4,6 +4,7 @@ import { canAccessBoard } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnFallback } from '@/lib/supabase-compat';
 import SmartDatePicker from './공통/SmartDatePicker';
+import type { StaffMember, BoardPost, ScheduleItem, AttachmentItem } from '@/types';
 const CHAT_ROOM_KEY = 'erp_chat_last_room';
 const CHAT_FOCUS_KEY = 'erp_chat_focus_keyword';
 
@@ -44,15 +45,16 @@ function buildScheduleTimeValue(period: string, hour: string, minute: string) {
   return `${hh}:${mm}`;
 }
 
-function getMissingBoardPostColumn(error: any) {
+function getMissingBoardPostColumn(error: unknown) {
   if (!error) return null;
-  const message = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''}`.toLowerCase();
+  const e = error as Record<string, unknown>;
+  const message = `${e?.message || ''} ${e?.details || ''} ${e?.hint || ''}`.toLowerCase();
   return BOARD_POST_OPTIONAL_COLUMNS.find((column) => message.includes(column.toLowerCase())) || null;
 }
 
 async function runBoardPostMutation<T>(
-  mutation: (payload: Record<string, any>) => PromiseLike<{ data: T | null; error: any }>,
-  payload: Record<string, any>
+  mutation: (payload: Record<string, unknown>) => PromiseLike<{ data: T | null; error: unknown }>,
+  payload: Record<string, unknown>
 ) {
   let nextPayload = { ...payload };
   let result = await mutation(nextPayload);
@@ -71,7 +73,21 @@ async function runBoardPostMutation<T>(
   return { ...result, payload: nextPayload };
 }
 
-export default function BoardView({ user, subView, setSubView, selectedCo, selectedCompanyId, initialBoard, initialPostId, onConsumePostId, surgeries, mris, onRefresh, setMainMenu }: any) {
+interface BoardViewProps {
+  user: StaffMember | null;
+  subView?: string | null;
+  setSubView?: (v: string | null) => void;
+  selectedCo?: string | null;
+  selectedCompanyId?: string | null;
+  initialBoard?: string | null;
+  initialPostId?: string | null;
+  onConsumePostId?: () => void;
+  surgeries?: ScheduleItem[];
+  mris?: ScheduleItem[];
+  onRefresh?: () => void;
+  setMainMenu?: (menu: string) => void;
+}
+export default function BoardView({ user, subView, setSubView, selectedCo, selectedCompanyId, initialBoard, initialPostId, onConsumePostId, surgeries, mris, onRefresh, setMainMenu }: BoardViewProps) {
   const defaultBoard =
     BOARD_IDS.find((boardId) => canAccessBoard(user, boardId, 'read')) || '공지사항';
   const [activeBoard, setActiveBoard] = useState(
@@ -81,7 +97,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
         ? subView
         : defaultBoard
   );
-  const [posts, setPosts] = useState<any[]>([]);
+  const [posts, setPosts] = useState<BoardPost[]>([]);
   const [showNewPost, setShowNewPost] = useState(false);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -105,12 +121,12 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   const [scheduleMinute, setScheduleMinute] = useState('');
   const [loading, setLoading] = useState(false);
   const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
-  const [comments, setComments] = useState<Record<string, any[]>>({});
+  const [comments, setComments] = useState<Record<string, Record<string, unknown>[]>>({});
   const [newComment, setNewComment] = useState('');
 
   // 수술/검사명 프리셋 (Supabase surgery_templates / mri_templates)
-  const [surgeryTemplates, setSurgeryTemplates] = useState<any[]>([]);
-  const [mriTemplates, setMriTemplates] = useState<any[]>([]);
+  const [surgeryTemplates, setSurgeryTemplates] = useState<Record<string, unknown>[]>([]);
+  const [mriTemplates, setMriTemplates] = useState<Record<string, unknown>[]>([]);
 
   // 수술/MRI 부위 필터 (사람 모형: 아래팔/위팔 기준만, 손·손가락·팔꿈치 제외)
   const BODY_PARTS = [
@@ -230,10 +246,10 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
         if (!isAdmin) {
           setPosts([]);
         } else {
-          setPosts(data as any);
+          setPosts(data as BoardPost[]);
         }
       } else {
-        setPosts(data as any);
+        setPosts(data as BoardPost[]);
       }
     }
   };
@@ -242,7 +258,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   useEffect(() => {
     const requestedBoard = [initialBoard, subView].find(
       (boardId): boardId is string =>
-        Boolean(boardId) && BOARD_IDS.includes(boardId) && canAccessBoard(user, boardId, 'read')
+        Boolean(boardId) && BOARD_IDS.includes(boardId as string) && canAccessBoard(user, boardId as string, 'read')
     );
 
     if (requestedBoard && requestedBoard !== activeBoard) {
@@ -305,7 +321,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     const keywords = keywordMap[resolvedBodyPart] || [];
     if (keywords.length === 0) return currentTemplates;
 
-    return currentTemplates.filter((t: any) => {
+    return currentTemplates.filter((t: Record<string, unknown>) => {
       if (t.body_part) return t.body_part === resolvedBodyPart;
       const name = (t.name || '') as string;
       return keywords.some((k) => name.includes(k));
@@ -351,7 +367,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   }, [selectedPostId, comments]);
 
   // 수술·MRI 일정 카드 → 관련 채팅방 열기
-  const openChatForSchedule = async (post: any) => {
+  const openChatForSchedule = async (post: BoardPost) => {
     if (!user?.id) {
       alert('직원 계정으로 로그인한 경우에만 채팅을 사용할 수 있습니다.');
       return;
@@ -397,7 +413,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     }
   };
 
-  const handleLike = async (post: any) => {
+  const handleLike = async (post: BoardPost) => {
     const postId = post.id;
     const likes = (post.likes_count ?? 0) + 1;
     await supabase.from('board_posts').update({ likes_count: likes }).eq('id', postId);
@@ -438,7 +454,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   const handleDeleteComment = async (postId: string, commentId: string) => {
     if (!user?.id) return;
     const list = comments[postId] || [];
-    const comment = list.find((c: any) => c.id === commentId);
+    const comment = list.find((c: Record<string, unknown>) => c.id === commentId);
     if (!comment) return;
     const isAdmin = user.permissions?.mso || user.role === 'admin';
     if (String(comment.author_id) !== String(user.id) && !isAdmin) {
@@ -454,7 +470,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     }
     setComments((prev) => {
       const postComments = (prev[postId] || []).filter(
-        (c: any) => c.id !== commentId && String(c.parent_comment_id) !== String(commentId)
+        (c: Record<string, unknown>) => c.id !== commentId && String(c.parent_comment_id) !== String(commentId)
       );
       return { ...prev, [postId]: postComments };
     });
@@ -466,10 +482,10 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   };
 
   const selectedPostFromList = useMemo(
-    () => posts.find((p: any) => p.id === selectedPostId) || null,
+    () => posts.find((p: BoardPost) => p.id === selectedPostId) || null,
     [posts, selectedPostId]
   );
-  const [selectedPostDetail, setSelectedPostDetail] = useState<any>(null);
+  const [selectedPostDetail, setSelectedPostDetail] = useState<BoardPost | null>(null);
   const selectedPost = selectedPostDetail || selectedPostFromList;
 
   useEffect(() => {
@@ -500,11 +516,11 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
         const nextViews = currentViews + 1;
         await supabase.from('board_posts').update({ views: nextViews }).eq('id', selectedPostId);
         setPosts((prev) =>
-          prev.map((p: any) =>
+          prev.map((p: BoardPost) =>
             p.id === selectedPostId ? { ...p, views: nextViews } : p
           )
         );
-        setSelectedPostDetail((prev: any) =>
+        setSelectedPostDetail((prev: BoardPost | null) =>
           prev && prev.id === selectedPostId ? { ...prev, views: nextViews } : prev
         );
       } catch {
@@ -515,16 +531,17 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
 
   const isDepartmentHead = ['팀장', '과장', '실장', '부장', '이사', '원장', '병원장'].some(p => user?.position?.includes(p)) || user?.permissions?.mso || user?.role === 'admin';
 
-  const canEditPost = (post: any) => {
+  const canEditPost = (post: BoardPost) => {
     if (!user) return false;
-    if (!canAccessBoard(user, post?.board_type || activeBoard, 'write')) return false;
+    if (!canAccessBoard(user, (post?.board_type as string) || activeBoard, 'write')) return false;
     // 일반 직원도 자신이 올린 수술/MRI일정에 대해 '요청'을 할 수 있도록 조건 완화 (작성자 본인 포함)
     return (post.author_id && String(post.author_id) === String(user.id)) || isDepartmentHead;
   };
 
-  const sendScheduleApprovalRequest = async (post: any, actionType: '삭제' | '수정', updatedData?: any) => {
+  const sendScheduleApprovalRequest = async (post: BoardPost, actionType: '삭제' | '수정', updatedData?: Record<string, unknown>) => {
+    if (!user) return;
     try {
-      const rows: any[] = [{
+      const rows: Record<string, unknown>[] = [{
         sender_id: user.id,
         sender_name: user.name,
         sender_company: user.company,
@@ -545,7 +562,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       const { error } = await withMissingColumnFallback(
         () => supabase.from('approvals').insert(rows),
         () => {
-          const legacyRows = rows.map(({ company_id, ...rest }: any) => rest);
+          const legacyRows = rows.map(({ company_id, ...rest }: Record<string, unknown>) => rest);
           return supabase.from('approvals').insert(legacyRows);
         }
       );
@@ -557,7 +574,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     }
   };
 
-  const handleDeletePost = async (post: any) => {
+  const handleDeletePost = async (post: BoardPost) => {
     if (!canEditPost(post)) {
       alert('이 게시물을 삭제할 권한이 없습니다.');
       return;
@@ -580,7 +597,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     alert('게시물이 삭제되었습니다.');
   };
 
-  const handleEditPostStart = (post: any) => {
+  const handleEditPostStart = (post: BoardPost) => {
     if (!canEditPost(post)) {
       alert('수정 권한이 없습니다.');
       return;
@@ -677,7 +694,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     setLoading(true);
     try {
       const tags = tagsInput ? tagsInput.split(',').map((t) => t.trim()).filter(Boolean) : [];
-      const postData: any = {
+      const postData: Partial<BoardPost> & Record<string, unknown> = {
         board_type: activeBoard,
         title: normalizedTitle,
         content: isScheduleBoard ? normalizedScheduleChartNo || null : normalizedContent || null,
@@ -758,7 +775,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
             setLoading(false);
             return;
           }
-          await sendScheduleApprovalRequest({ id: editingPostId, title: postData.title, board_type: activeBoard }, '수정', postData);
+          await sendScheduleApprovalRequest({ id: editingPostId, title: postData.title ?? '', board_type: activeBoard } as unknown as BoardPost, '수정', postData);
           resetForm();
           setShowNewPost(false);
           setLoading(false);
@@ -782,7 +799,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
         return;
       }
 
-      const { data: insertedPost, error } = await runBoardPostMutation<any>(
+      const { data: insertedPost, error } = await runBoardPostMutation<BoardPost>(
         (payload) => supabase.from('board_posts').insert([payload]).select().single(),
         postData
       );
@@ -798,7 +815,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
         if (activeBoard === '공지사항' || activeBoard === '경조사') {
           try {
             const { data: staffList } = await supabase.from('staff_members').select('id');
-            const staffIds = (staffList || []).map((s: any) => s.id).filter(Boolean);
+            const staffIds = (staffList || []).map((s: { id: string }) => s.id).filter(Boolean);
             if (staffIds.length > 0) {
               const label = activeBoard === '공지사항' ? '📢 새 공지사항' : '🎉 새 경조사';
               const body = (insertedPost.title || '(제목 없음)').slice(0, 80);
@@ -815,15 +832,16 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
           }
         }
       } else {
-        const hint = (activeBoard === '수술일정' || activeBoard === 'MRI일정') && (error.message?.includes('column') || error.code === '42703')
+        const hint = (activeBoard === '수술일정' || activeBoard === 'MRI일정') && (((error as Record<string, unknown>)?.message as string || "").includes('column') || ((error as Record<string, unknown>)?.code) === '42703')
           ? '\n\n수술일정/MRI일정용 컬럼이 없을 수 있습니다. Supabase에 board_posts_schedule_columns.sql 마이그레이션을 적용해 주세요.'
           : '';
-        alert(`게시물 등록에 실패했습니다.\n\n${error.message || ''}${hint}`);
+        alert(`게시물 등록에 실패했습니다.\n\n${(error as Record<string, unknown>)?.message || ''}${hint}`);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('게시물 등록 실패:', error);
-      const msg = typeof error?.message === 'string' ? error.message : '';
-      const hint = (activeBoard === '수술일정' || activeBoard === 'MRI일정') && (msg.includes('column') || error?.code === '42703')
+      const errObj = error as Record<string, unknown>;
+      const msg = typeof errObj?.message === 'string' ? errObj.message : '';
+      const hint = (activeBoard === '수술일정' || activeBoard === 'MRI일정') && (msg.includes('column') || ((error as Record<string, unknown>)?.code) === '42703')
         ? '\n\n수술일정/MRI일정용 컬럼이 없을 수 있습니다. Supabase에 board_posts_schedule_columns.sql 마이그레이션을 적용해 주세요.'
         : '';
       alert(`게시물 등록에 실패했습니다.\n\n${msg}${hint}`);
@@ -909,9 +927,9 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                             ? '자주 쓰는 수술명 선택 (부위 선택 또는 사람 모형에서 선택 가능)'
                             : '자주 쓰는 검사명 선택 (부위 선택 또는 사람 모형에서 선택 가능)'}
                         </option>
-                        {filteredTemplates.map((t: any) => (
-                          <option key={t.id} value={t.name}>
-                            {t.name}
+                        {filteredTemplates.map((t: Record<string, unknown>) => (
+                          <option key={t.id as React.Key} value={t.name as string}>
+                            { t.name as string }
                           </option>
                         ))}
                       </select>
@@ -1292,18 +1310,18 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                       </p>
                     ) : (
                       <ul className="space-y-1">
-                        {filteredTemplates.map((t: any) => (
-                          <li key={t.id}>
+                        {filteredTemplates.map((t: Record<string, unknown>) => (
+                          <li key={t.id as React.Key}>
                             <button
                               type="button"
                               onClick={() => {
-                                setTitle(t.name);
+                                setTitle(t.name as string);
                                 setShowBodyPicker(false);
                               }}
                               className="w-full text-left px-3 py-2 rounded-[var(--radius-md)] text-[12px] font-bold text-[var(--foreground)] hover:bg-[var(--card)] hover:shadow-sm flex items-center gap-2"
                             >
                               <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
-                              <span className="flex-1 truncate">{t.name}</span>
+                              <span className="flex-1 truncate">{ t.name as string }</span>
                             </button>
                           </li>
                         ))}
@@ -1370,7 +1388,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
 
               {(() => {
                 const searchLower = searchKeyword.trim().toLowerCase();
-                const filteredPosts = searchLower ? posts.filter((p: any) =>
+                const filteredPosts = searchLower ? posts.filter((p: BoardPost) =>
                   (p.patient_name || '').toLowerCase().includes(searchLower) ||
                   (p.content || '').toLowerCase().includes(searchLower)
                 ) : posts;
@@ -1380,8 +1398,8 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                 }
 
                 // 날짜별 일정 매핑 (YYYY-MM-DD → 배열)
-                const eventsByDate: Record<string, any[]> = {};
-                (filteredPosts).forEach((p: any) => {
+                const eventsByDate: Record<string, BoardPost[]> = {};
+                (filteredPosts).forEach((p: BoardPost) => {
                   const d = p.schedule_date;
                   if (!d) return;
                   eventsByDate[d] = eventsByDate[d] ? [...eventsByDate[d], p] : [p];
@@ -1445,17 +1463,17 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                               )}
                             </div>
                             <div className="space-y-1">
-                              {events.slice(0, 4).map((ev: any) => (
+                              {events.slice(0, 4).map((ev: Record<string, unknown>) => (
                                 <button
-                                  key={ev.id}
+                                  key={ev.id as React.Key}
                                   type="button"
-                                  onClick={() => setSelectedPostId(ev.id)}
+                                  onClick={() => setSelectedPostId(ev.id as string)}
                                   className="w-full text-left px-1.5 py-1 rounded-md bg-[var(--toss-blue-light)]/50 text-[10px] md:text-[11px] font-bold text-[var(--foreground)] hover:bg-[var(--toss-blue-light)] flex flex-row items-center gap-1 leading-[1.2] overflow-hidden"
                                 >
-                                  <span className="text-[var(--accent)] shrink-0">{ev.schedule_time || ''}</span>
-                                  <span className="truncate opacity-80 flex-1 min-w-0">{ev.title}</span>
+                                  <span className="text-[var(--accent)] shrink-0">{(ev.schedule_time as string) || ''}</span>
+                                  <span className="truncate opacity-80 flex-1 min-w-0">{ev.title as string}</span>
                                   <span className="font-semibold text-emerald-700 dark:text-emerald-400 shrink-0 max-w-[40%] truncate">
-                                    {ev.patient_name || '미지정'} {ev.content && `(${ev.content})`}
+                                    {(ev.patient_name as string) || '미지정'} {ev.content ? `(${ev.content as string})` : null}
                                   </span>
                                 </button>
                               ))}
@@ -1564,10 +1582,10 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                             {post.author_name || '익명'}
                           </div>
                           <div className="w-20 md:w-24 text-[11px] font-bold text-[var(--toss-gray-3)] text-center shrink-0">
-                            {new Date(post.created_at).toLocaleDateString()}
+                            {new Date(post.created_at ?? '').toLocaleDateString()}
                           </div>
                           <div className="w-14 text-[11px] font-bold text-[var(--toss-gray-3)] text-center shrink-0">
-                            조회 {post.views ?? 0}
+                            조회 {(post.views as number) ?? 0}
                           </div>
                         </div>
                       )}
@@ -1595,14 +1613,14 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
                     <p className="text-[11px] md:text-[12px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">
-                      {selectedPost.board_type}
+                      {selectedPost.board_type as string}
                     </p>
                     <h3 className="text-lg md:text-xl font-semibold text-[var(--foreground)]">
                       {selectedPost.title}
                     </h3>
                     <p className="mt-2 text-[11px] md:text-[12px] text-[var(--toss-gray-3)] font-bold">
                       👤 {selectedPost.author_name || '익명'} ·{' '}
-                      {new Date(selectedPost.created_at).toLocaleString('ko-KR')}
+                      {new Date(selectedPost.created_at ?? '').toLocaleString('ko-KR')}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1701,11 +1719,11 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                       <div className="max-h-40 overflow-y-auto custom-scrollbar space-y-1 text-[11px]">
                         {posts
                           .filter(
-                            (p: any) =>
+                            (p: BoardPost) =>
                               p.board_type === selectedPost.board_type &&
                               p.schedule_date === selectedPost.schedule_date
                           )
-                          .map((p: any) => (
+                          .map((p: BoardPost) => (
                             <button
                               key={p.id}
                               type="button"
@@ -1741,7 +1759,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                   <div className="pt-4 border-t border-[var(--border)]">
                     <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-2">첨부파일 ({(Array.isArray(selectedPost.attachments) ? selectedPost.attachments : []).length}개)</p>
                     <div className="flex flex-wrap gap-4">
-                      {(Array.isArray(selectedPost.attachments) ? selectedPost.attachments : []).map((att: any, i: number) =>
+                      {(Array.isArray(selectedPost.attachments) ? selectedPost.attachments as AttachmentItem[] : []).map((att: AttachmentItem, i: number) =>
                         att.type === 'image' ? (
                           <a key={i} href={att.url} target="_blank" rel="noopener noreferrer" className="block">
                             <img
@@ -1797,10 +1815,11 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                     </span>
                   </p>
                   {(() => {
-                    const list = comments[selectedPost.id] || [];
-                    const roots = list.filter((c: any) => !c.parent_comment_id);
-                    const repliesByParent: Record<string, any[]> = {};
-                    list.forEach((c: any) => {
+                    type CommentRow = { id: string; author_id?: string; author_name?: string; content?: string; parent_comment_id?: string | null; [key: string]: unknown; };
+                    const list = (comments[selectedPost.id] || []) as CommentRow[];
+                    const roots = list.filter((c) => !c.parent_comment_id);
+                    const repliesByParent: Record<string, CommentRow[]> = {};
+                    list.forEach((c) => {
                       if (!c.parent_comment_id) return;
                       const key = String(c.parent_comment_id);
                       if (!repliesByParent[key]) repliesByParent[key] = [];
@@ -1808,7 +1827,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                     });
                     return (
                       <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
-                        {roots.map((c: any) => (
+                        {roots.map((c) => (
                           <div key={c.id} className="space-y-1">
                             <div className="text-xs text-[var(--toss-gray-4)] flex gap-2 items-center flex-wrap">
                               <span className="font-bold">{c.author_name}:</span>
@@ -1837,7 +1856,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                                 )}
                               </span>
                             </div>
-                            {(repliesByParent[String(c.id)] || []).map((r: any) => (
+                            {(repliesByParent[String(c.id)] || []).map((r) => (
                               <div key={r.id} className="ml-6 text-xs text-[var(--toss-gray-4)] flex gap-2 items-center flex-wrap">
                                 <span className="font-bold">{r.author_name}:</span>
                                 <span className="flex-1 min-w-0">{r.content}</span>

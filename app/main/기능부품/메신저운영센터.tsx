@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { StaffMember } from '@/types';
 import { supabase } from '@/lib/supabase';
 
 const NOTICE_ROOM_ID = '00000000-0000-0000-0000-000000000000';
@@ -57,8 +58,8 @@ export default function MessengerOperationsCenter({
   selectedRoomId,
   onClose,
 }: {
-  user?: any;
-  staffs?: any[];
+  user?: unknown;
+  staffs?: Record<string, unknown>[];
   selectedRoomId?: string | null;
   onClose: () => void;
 }) {
@@ -74,10 +75,11 @@ export default function MessengerOperationsCenter({
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const activeStaffs = useMemo(
-    () => staffs.filter((staff: any) => staff?.status !== '퇴사'),
+    () => (staffs as unknown as StaffMember[]).filter((staff) => staff?.status !== '퇴사'),
     [staffs]
   );
-  const companyScope = user?.company || '전체';
+  const _user = (user ?? {}) as Record<string, unknown>;
+  const companyScope = (_user.company as string) || '전체';
 
   const loadDriveLinks = useCallback(async () => {
     const { data, error } = await supabase
@@ -90,11 +92,11 @@ export default function MessengerOperationsCenter({
     if (error) throw error;
 
     if ((data || []).length > 0) {
-      setDriveLinks((data || []).map((row: any) => ({
+      setDriveLinks((data || []).map((row: Record<string, unknown>) => ({
         id: String(row.id),
-        company_name: row.company_name || companyScope,
-        name: row.name || '',
-        url: row.url || '',
+        company_name: (row.company_name as string) || companyScope,
+        name: (row.name as string) || '',
+        url: (row.url as string) || '',
         sort_order: Number(row.sort_order || 0),
       })));
       return;
@@ -105,8 +107,8 @@ export default function MessengerOperationsCenter({
       name: item.name,
       url: item.url,
       sort_order: item.sort_order,
-      created_by: user?.id || null,
-      updated_by: user?.id || null,
+      created_by: (_user.id as string) || null,
+      updated_by: (_user.id as string) || null,
     }));
 
     const { data: inserted, error: insertError } = await supabase
@@ -115,14 +117,14 @@ export default function MessengerOperationsCenter({
       .select('id, company_name, name, url, sort_order');
 
     if (insertError) throw insertError;
-    setDriveLinks((inserted || []).map((row: any) => ({
+    setDriveLinks((inserted || []).map((row: Record<string, unknown>) => ({
       id: String(row.id),
-      company_name: row.company_name || companyScope,
-      name: row.name || '',
-      url: row.url || '',
+      company_name: (row.company_name as string) || companyScope,
+      name: (row.name as string) || '',
+      url: (row.url as string) || '',
       sort_order: Number(row.sort_order || 0),
     })));
-  }, [companyScope, user?.id]);
+  }, [companyScope, _user.id]);
 
   useEffect(() => {
     const load = async () => {
@@ -220,10 +222,10 @@ export default function MessengerOperationsCenter({
   }, [activeStaffs.length, noticeMessages, readMap]);
 
   const presenceRows = useMemo(() => {
-    const attendanceMap = new Map(attendanceRows.map((row: any) => [String(row.staff_id), row.status]));
-    const shiftMap = new Map(shiftAssignments.map((row: any) => [String(row.staff_id), row.shift_id]));
+    const attendanceMap = new Map(attendanceRows.map((row: Record<string, unknown>) => [String(row.staff_id), row.status]));
+    const shiftMap = new Map(shiftAssignments.map((row: Record<string, unknown>) => [String(row.staff_id), row.shift_id]));
 
-    return activeStaffs.map((staff: any) => {
+    return activeStaffs.map((staff) => {
       const attendanceStatus = attendanceMap.get(String(staff.id));
       let status = '오프라인';
       if (attendanceStatus === 'present' || attendanceStatus === 'late') status = '근무중';
@@ -291,8 +293,10 @@ export default function MessengerOperationsCenter({
     }
   };
 
-  const sendReminder = async (row: any) => {
-    const nonReaders = activeStaffs.filter((staff: any) => !row.readers.includes(String(staff.id)));
+  type NoticeRow = (typeof noticeRows)[number];
+
+  const sendReminder = async (row: NoticeRow) => {
+    const nonReaders = activeStaffs.filter((staff) => !row.readers.includes(String(staff.id)));
     if (nonReaders.length === 0) {
       alert('이미 전원이 확인했습니다.');
       return;
@@ -300,7 +304,7 @@ export default function MessengerOperationsCenter({
 
     setBusyId(row.id);
     try {
-      const payload = nonReaders.map((staff: any) => ({
+      const payload = nonReaders.map((staff) => ({
         user_id: staff.id,
         type: 'notice_reminder',
         title: '중요 공지 확인 요청',
@@ -334,8 +338,8 @@ export default function MessengerOperationsCenter({
           name,
           url,
           sort_order: nextSortOrder,
-          created_by: user?.id || null,
-          updated_by: user?.id || null,
+          created_by: (_user.id as string) || null,
+          updated_by: (_user.id as string) || null,
         })
         .select('id, company_name, name, url, sort_order')
         .single();
@@ -373,7 +377,7 @@ export default function MessengerOperationsCenter({
         .update({
           name: target.name.trim(),
           url: target.url.trim(),
-          updated_by: user?.id || null,
+          updated_by: (_user.id as string) || null,
         })
         .eq('id', id);
       if (error) throw error;

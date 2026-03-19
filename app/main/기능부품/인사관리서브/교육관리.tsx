@@ -28,7 +28,7 @@ interface LicenseAlert {
   type: 'URGENT' | 'PENDING';
 }
 
-export default function EducationMain({ staffs, selectedCo }: any) {
+export default function EducationMain({ staffs, selectedCo }: Record<string, unknown>) {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [licenseNotifications, setLicenseNotifications] = useState<LicenseAlert[]>([]);
   const [completionMap, setCompletionMap] = useState<Record<string, { is_completed: boolean; certificate_url?: string | null }>>({});
@@ -36,7 +36,7 @@ export default function EducationMain({ staffs, selectedCo }: any) {
   const [activeTab, setActiveTab] = useState('의무교육');
   const educationListRef = useRef<HTMLDivElement>(null);
   const licenseDashboardRef = useRef<HTMLDivElement>(null);
-  const activeStaffs = useMemo(() => getScopedActiveStaffs(staffs, selectedCo), [staffs, selectedCo]);
+  const activeStaffs = useMemo(() => getScopedActiveStaffs(staffs as any[], selectedCo as string | undefined), [staffs, selectedCo]);
 
   const scrollToSection = (target: HTMLDivElement | null) => {
     target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -232,7 +232,7 @@ export default function EducationMain({ staffs, selectedCo }: any) {
         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-xl font-semibold text-[var(--foreground)] tracking-tight">
-              Compliance & 자격 관리 <span className="text-sm text-[var(--accent)] ml-2">[{selectedCo}]</span>
+              Compliance & 자격 관리 <span className="text-sm text-[var(--accent)] ml-2">[{selectedCo as string}]</span>
             </h2>
           </div>
           <div className="flex gap-2 flex-wrap">
@@ -331,13 +331,13 @@ export default function EducationMain({ staffs, selectedCo }: any) {
         {activeTab === '의무교육' ? (
           <>
             <EducationStatus
-              selectedCo={selectedCo}
+              selectedCo={selectedCo as string}
               summary={educationSummary}
               onOpenRoster={() => scrollToSection(educationListRef.current)}
             />
             <div ref={educationListRef} className="bg-[var(--card)] border border-[var(--border)] p-5 shadow-sm rounded-2xl">
               <EducationList
-                selectedCo={selectedCo}
+                selectedCo={selectedCo as string}
                 staffs={activeStaffs}
                 notifications={notifications}
                 completions={completionMap}

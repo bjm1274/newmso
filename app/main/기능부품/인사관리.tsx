@@ -319,7 +319,16 @@ function SectionTabBar({
   );
 }
 
-export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu, selectedCo: mainSelectedCo }: any) {
+interface HRMainViewProps {
+  user?: Record<string, unknown> | null;
+  staffs?: Record<string, unknown>[];
+  depts?: Record<string, unknown>[];
+  onRefresh?: () => void;
+  initialMenu?: string | null;
+  selectedCo?: string | null;
+}
+
+export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu, selectedCo: mainSelectedCo }: HRMainViewProps) {
   const [현재메뉴, 메뉴설정] = useState<HrMenuId>(normalizeHrMenu(initialMenu));
   const [선택워크스페이스, 워크스페이스설정] = useState<HrWorkspaceId>(
     getWorkspaceForHrMenu(normalizeHrMenu(initialMenu))
@@ -335,8 +344,10 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
   const [휴가내부탭, 휴가내부탭설정] = useState<LeaveSuiteTabId>(getLeaveSuiteInitialTab(initialMenu));
   const [전체직원목록, 전체직원목록설정] = useState<any[]>([]);
 
-  const hasAccess = canAccessMainMenu(user, '인사관리');
-  const isMsoViewer = user?.company === 'SY INC.' || user?.permissions?.mso === true;
+  type UserLike = Parameters<typeof canAccessMainMenu>[0];
+  const userLike = user as unknown as UserLike;
+  const hasAccess = canAccessMainMenu(userLike, '인사관리');
+  const isMsoViewer = (user?.company as string) === 'SY INC.' || (user?.permissions as Record<string, unknown>)?.mso === true;
   const visibleHrTabs = HR_TABS.filter((tab) => canAccessHrTab(user, tab));
   const visibleHrTabIds = visibleHrTabs.map((tab) => tab.id);
   const activeMenu = visibleHrTabs.some((tab) => tab.id === 현재메뉴) ? 현재메뉴 : (visibleHrTabs[0]?.id || '구성원');
@@ -356,7 +367,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
   );
   const 인사부서목록 = useMemo(
     () =>
-      Array.from(new Set(인사직원목록.map((staff: any) => staff?.department).filter(Boolean))).map((name) => ({ name })),
+      Array.from(new Set(인사직원목록.map((staff: any) => staff?.department).filter(Boolean))) as string[],
     [인사직원목록]
   );
 
@@ -632,13 +643,13 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
             <div className="flex h-full flex-col">
               <div className="min-h-0 flex-1 overflow-y-auto">
                 <구성원관리
-                  직원목록={인사직원목록}
+                  직원목록={인사직원목록 as import('@/types').StaffMember[]}
                   부서목록={인사부서목록}
                   선택사업체={선택사업체}
                   보기상태={직원상태필터}
-                  on문서보기={인사서류보기}
+                  onOpenDocumentRepoForStaff={인사서류보기}
                   새로고침={onRefresh}
-                  창상태={등록창상태}
+                  창상태={등록창상태 ? '열기' : undefined}
                   창닫기={() => 창상태설정(false)}
                   onOpenNewStaff={() => 창상태설정(true)}
                 />
@@ -699,11 +710,11 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
               <div className="min-h-0 flex-1 overflow-y-auto">
                 {교대근무탭 === '캘린더' && <ShiftCalendar staffs={인사직원목록} selectedCo={선택사업체} />}
                 {교대근무탭 === '생성마법사' && (
-                  <AutoRosterPlanner user={user} staffs={인사직원목록} selectedCo={선택사업체} />
+                  <AutoRosterPlanner user={user as unknown as import('@/types').StaffMember} staffs={인사직원목록} selectedCo={선택사업체} />
                 )}
                 {교대근무탭 === '근무규칙생성' && (
                   <AutoRosterPlanner
-                    user={user}
+                    user={user as unknown as import('@/types').StaffMember}
                     staffs={인사직원목록}
                     selectedCo={선택사업체}
                     panelMode="rules"
@@ -711,7 +722,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
                 )}
                 {교대근무탭 === '교대방식패턴' && (
                   <AutoRosterPlanner
-                    user={user}
+                    user={user as unknown as import('@/types').StaffMember}
                     staffs={인사직원목록}
                     selectedCo={선택사업체}
                     panelMode="patterns"
@@ -807,7 +818,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
 
           {activeMenu === '서류제출' && (
             <div className="p-3 md:p-4">
-              <DocumentScanner user={user} staffs={인사직원목록} selectedCo={선택사업체} />
+              <DocumentScanner user={user ?? undefined} staffs={인사직원목록} selectedCo={선택사업체 ?? undefined} />
             </div>
           )}
 

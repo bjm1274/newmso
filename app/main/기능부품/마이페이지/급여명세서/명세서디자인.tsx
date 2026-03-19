@@ -2,13 +2,37 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
-export default function SalarySlipUI({ user, currentDate, salaryData, totalPayment, totalDeduction }: any) {
+type SalaryData = {
+  base_salary: number;
+  overtime_pay: number;
+  bonus: number;
+  national_pension: number;
+  health_insurance: number;
+  income_tax: number;
+};
+
+type UserInfo = {
+  name?: string;
+  department?: string;
+  position?: string;
+  company?: string;
+};
+
+type SalarySlipUIProps = {
+  user: UserInfo;
+  currentDate: Date;
+  salaryData: SalaryData | null;
+  totalPayment: number;
+  totalDeduction: number;
+};
+
+export default function SalarySlipUI({ user, currentDate, salaryData, totalPayment, totalDeduction }: SalarySlipUIProps) {
   const [sealUrl, setSealUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user?.company) return;
     supabase.from('contract_templates').select('seal_url').eq('company_name', user.company).maybeSingle().then(({ data }) => {
-      if (data?.seal_url) setSealUrl(data.seal_url);
+      if (data?.seal_url) setSealUrl(data.seal_url as string);
     });
   }, [user?.company]);
   if (!salaryData) return null;
@@ -122,7 +146,7 @@ export default function SalarySlipUI({ user, currentDate, salaryData, totalPayme
   );
 }
 
-function TableRow({ label, value }: any) {
+function TableRow({ label, value }: { label: string; value: number }) {
   return (
     <tr>
       <td className="py-2.5 text-[var(--toss-gray-4)] font-bold">{label}</td>

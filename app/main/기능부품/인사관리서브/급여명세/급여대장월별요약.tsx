@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
-export default function PayrollMonthlySummary({ selectedCo }: any) {
+export default function PayrollMonthlySummary({ selectedCo }: Record<string, unknown>) {
   const [yearMonth, setYearMonth] = useState(new Date().toISOString().slice(0, 7));
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);

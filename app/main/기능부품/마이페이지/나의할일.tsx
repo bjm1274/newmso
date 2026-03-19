@@ -6,8 +6,9 @@ function isUuidLike(value: string | null | undefined) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
 }
 
-export default function MyTodoList({ user: initialUser }: any) {
-  const [user, setUser] = useState<any>(initialUser || {});
+export default function MyTodoList({ user: initialUser }: Record<string, unknown>) {
+  const _iu = (initialUser ?? {}) as Record<string, unknown>;
+  const [user, setUser] = useState<Record<string, unknown>>(_iu);
   const [tasks, setTasks] = useState<any[]>([]);
   const [newTask, setNewTask] = useState('');
   const [recoverAttempted, setRecoverAttempted] = useState(false);
@@ -25,20 +26,20 @@ export default function MyTodoList({ user: initialUser }: any) {
   // 1. 유저 ID 확인 및 자동 복구 로직 (user 변경 시에만 실행, selectedDate 변경 시 불필요한 재조회 방지)
   useEffect(() => {
     const checkAndRecoverUser = async () => {
-      if (initialUser?.id && isUuidLike(initialUser.id)) {
-        setUser(initialUser);
-        fetchTasks(initialUser.id);
+      if ((_iu)?.id && isUuidLike(_iu.id as string)) {
+        setUser((_iu));
+        fetchTasks(_iu.id as string);
         setRecoverAttempted(true);
         return;
       }
 
-      if (initialUser?.name) {
+      if ((_iu)?.name) {
         setRecoverAttempted(true);
         try {
           const { data, error } = await supabase
             .from('staff_members')
             .select('*')
-            .eq('name', initialUser.name)
+            .eq('name', (_iu)?.name)
             .maybeSingle();
 
           if (data && !error) {
@@ -54,10 +55,10 @@ export default function MyTodoList({ user: initialUser }: any) {
     };
 
     checkAndRecoverUser();
-  }, [initialUser]);
+  }, [(_iu)]);
 
   useEffect(() => {
-    if (user?.id) fetchTasks(user.id);
+    if (user?.id) fetchTasks(user.id as string);
   }, [viewRange, selectedDate]);
 
   useEffect(() => {
@@ -65,7 +66,7 @@ export default function MyTodoList({ user: initialUser }: any) {
     const channel = supabase
       .channel(`todos-realtime-${user.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'todos', filter: `user_id=eq.${user.id}` }, () => {
-        fetchTasks(user.id);
+        fetchTasks(user.id as string);
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -160,9 +161,9 @@ export default function MyTodoList({ user: initialUser }: any) {
       if (error) throw error;
       setTasks(prev => prev.map(t => t.id === optimisticTask.id ? data : t));
 
-    } catch (error: any) {
-      alert('저장 실패: ' + error.message);
-      fetchTasks(user.id);
+    } catch (error: unknown) {
+      alert('저장 실패: ' + ((error as Error)?.message ?? String(error)));
+      fetchTasks(user.id as string);
     }
   };
 
@@ -171,7 +172,7 @@ export default function MyTodoList({ user: initialUser }: any) {
       setTasks(tasks.map(t => t.id === taskId ? { ...t, is_complete: !currentStatus } : t));
       await supabase.from('todos').update({ is_complete: !currentStatus }).eq('id', taskId);
     } catch (error) {
-      if(user?.id) fetchTasks(user.id);
+      if(user?.id) fetchTasks(user.id as string);
     }
   };
 
@@ -181,7 +182,7 @@ export default function MyTodoList({ user: initialUser }: any) {
       setTasks(tasks.filter(t => t.id !== taskId));
       await supabase.from('todos').delete().eq('id', taskId);
     } catch (error) {
-      if(user?.id) fetchTasks(user.id);
+      if(user?.id) fetchTasks(user.id as string);
     }
   };
 
@@ -294,19 +295,22 @@ export default function MyTodoList({ user: initialUser }: any) {
   );
 }
 
-function TodoItem({ task, onToggle, onDelete }: any) {
+function TodoItem({ task: _rawTask, onToggle: _onToggle, onDelete: _onDelete }: Record<string, unknown>) {
+  const task = (_rawTask ?? {}) as Record<string, unknown>;
+  const onToggle = _onToggle as (id: unknown, status: unknown) => void;
+  const onDelete = _onDelete as (id: unknown) => void;
   return (
     <div className="group flex items-center gap-3 p-4 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] hover:border-[var(--accent)] hover:shadow-sm transition-all animate-fade-in-up">
       <button onClick={() => onToggle(task.id, task.is_complete)} className={`w-6 h-6 rounded-[var(--radius-md)] border-2 flex items-center justify-center transition-all flex-shrink-0 ${task.is_complete ? 'bg-green-500 border-green-500 text-white' : 'border-[var(--border)] hover:border-[var(--accent)]'}`}>
-        {task.is_complete && <span className="text-[11px] font-bold">V</span>}
+        {!!task.is_complete && <span className="text-[11px] font-bold">V</span>}
       </button>
       <div className="flex-1 flex items-center gap-2 min-w-0">
         <span className={`flex-1 text-sm font-bold truncate ${task.is_complete ? 'text-[var(--toss-gray-3)] line-through decoration-2' : 'text-[var(--foreground)]'}`}>
-          {task.content}
+          {task.content as string}
         </span>
-        {task.task_date && (
+        {!!task.task_date && (
           <span className="shrink-0 text-[11px] font-bold text-[var(--toss-gray-3)]">
-            {task.task_date}
+            {task.task_date as string}
           </span>
         )}
       </div>

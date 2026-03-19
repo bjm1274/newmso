@@ -109,8 +109,8 @@ function MainPageContent() {
   );
 
   const handleSelectedCoChange = useCallback(
-    (nextCo: string) => {
-      setSelectedCo(nextCo);
+    (nextCo: string | null) => {
+      setSelectedCo(nextCo ?? '전체');
       if (!isMsoUser) return;
       if (!nextCo || nextCo === '전체') {
         persistSelectedCompanyId(null);
@@ -730,14 +730,9 @@ function MainPageContent() {
       <Sidebar
         user={user}
         mainMenu={mainMenu}
-        subView={subView}
         onMenuChange={(menu: string, sub?: string) => {
           setMainMenu(menu);
           if (sub !== undefined) setSubView(sub);
-        }}
-        onOpenNotifications={() => {
-          setMainMenu('내정보');
-          setInitialMyPageTab('notifications');
         }}
       />
 
@@ -800,7 +795,7 @@ function MainPageContent() {
         />
         {/* 전역 알림 및 푸시 처리 (채팅 탭을 열지 않아도 작동) */}
         <NotificationSystem
-          user={user}
+          user={user as Parameters<typeof NotificationSystem>[0]['user']}
           onOpenChatRoom={(roomId) => { setMainMenu('채팅'); setInitialOpenChatRoomId(roomId); }}
           onOpenMessage={(roomId, messageId) => { setMainMenu('채팅'); setInitialOpenChatRoomId(roomId); setInitialOpenMessageId(messageId); }}
           onOpenApproval={() => setMainMenu('전자결재')}
@@ -826,10 +821,10 @@ function MainPageContent() {
           mainMenu={mainMenu}
           data={data}
           subView={subView}
-          setSubView={setSubView}
+          setSubView={setSubView as (v: string | null) => void}
           selectedCo={selectedCo}
           setSelectedCo={handleSelectedCoChange}
-          companies={companies}
+          companies={companies as unknown as string[]}
           selectedCompanyId={selectedCompanyId}
           setSelectedCompanyId={handleSelectedCompanyIdChange}
           onRefresh={() => fetchERPData(user, selectedCompanyId)}
