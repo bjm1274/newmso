@@ -106,15 +106,13 @@ export async function PATCH(request: NextRequest) {
     let existingQuery = supabase
       .from('virtual_account_deposits')
       .select('id, company_id')
-      .eq('id', id)
-      .limit(1)
-      .maybeSingle();
+      .eq('id', id);
 
     if (companyId && session.user.is_system_master !== true) {
       existingQuery = existingQuery.eq('company_id', companyId);
     }
 
-    const existing = await existingQuery;
+    const existing = await existingQuery.limit(1).maybeSingle();
     if (existing.error) {
       return NextResponse.json({ error: existing.error.message }, { status: 500 });
     }
