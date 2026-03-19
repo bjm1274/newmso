@@ -41,6 +41,7 @@ interface MainContentProps {
   initialInventoryWorkflowApprovalId?: string | null;
   onConsumeInitialInventoryWorkflowApprovalId?: () => void;
   setMainMenu?: (v: string) => void;
+  onOpenChatMessage?: (roomId: string, messageId: string) => void;
 }
 
 export default function MainContent({
@@ -68,6 +69,7 @@ export default function MainContent({
   initialInventoryWorkflowApprovalId,
   onConsumeInitialInventoryWorkflowApprovalId,
   setMainMenu,
+  onOpenChatMessage,
 }: MainContentProps) {
   const [annualLeaveNotice, setAnnualLeaveNotice] = useState<{ remaining: number; total: number } | null>(null);
 
@@ -103,6 +105,7 @@ export default function MainContent({
             onConsumeMyPageInitialTab={onConsumeMyPageInitialTab}
             onOpenApproval={onOpenApproval}
             setMainMenu={setMainMenu}
+            onOpenChatMessage={onOpenChatMessage}
           />
         </div>
       )}
