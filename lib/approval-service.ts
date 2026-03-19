@@ -33,7 +33,7 @@ export interface ApprovalDocument {
  * 결재 문서 생성
  */
 export async function createApprovalDocument(request: CreateApprovalRequest) {
-  const { error } = await supabase.from('approvals').insert([
+  const { data, error } = await supabase.from('approvals').insert([
     {
       sender_id: request.sender_id,
       sender_name: request.sender_name,
@@ -44,14 +44,14 @@ export async function createApprovalDocument(request: CreateApprovalRequest) {
       status: '대기',
       meta_data: request.meta_data ?? {},
     },
-  ]);
+  ]).select('id').single();
 
   if (error) {
     console.error('[Approval] Create Document Error:', error);
     throw error;
   }
 
-  return { success: true, message: '결재 문서가 생성되었습니다' };
+  return { success: true, message: '결재 문서가 생성되었습니다', id: data?.id };
 }
 
 /**
@@ -120,7 +120,6 @@ export async function updateApprovalStatus(
 ) {
   const updates: Record<string, unknown> = {
     status,
-    updated_at: new Date().toISOString(),
   };
 
   if (approverId) updates.approver_id = approverId;

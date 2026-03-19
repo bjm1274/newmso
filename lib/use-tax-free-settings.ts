@@ -57,12 +57,13 @@ export async function saveTaxFreeSettings(
   year: number = new Date().getFullYear()
 ) {
   const co = companyName === '전체' ? '전체' : companyName;
-  await supabase
+  const { error } = await supabase
     .from('tax_free_settings')
     .upsert(
       { company_name: co, effective_year: year, ...settings, updated_at: new Date().toISOString() },
       { onConflict: 'company_name,effective_year' }
     );
+  if (error) throw error;
 }
 
 export function getLimitByKey(
