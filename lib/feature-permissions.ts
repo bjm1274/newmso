@@ -31,6 +31,7 @@ export const EXTRA_FEATURE_PERMISSION_ITEMS: FeaturePermissionItem[] = [
   { key: 'extra_퇴원심사', label: '퇴원심사' },
   { key: 'extra_마감보고', label: '마감보고' },
   { key: 'extra_직원평가', label: '직원평가' },
+  { key: 'extra_입금실시간조회', label: '입금 실시간 조회' },
 ];
 
 export const BOARD_PERMISSION_ITEMS: FeaturePermissionItem[] = [
