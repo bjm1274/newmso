@@ -58,20 +58,39 @@ export default function MyDocuments(props: Record<string, unknown>) {
                 finalBlob = blobs[0];
                 fileName = `${user!.id}_${docType}_${Date.now()}.pdf`;
             } else {
-                const doc = new jsPDF();
+                const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = pdf.internal.pageSize.getHeight();
+
                 for (let i = 0; i < blobs.length; i++) {
-                    if (i > 0) doc.addPage();
+                    if (i > 0) pdf.addPage();
                     const imgData = await new Promise<string>((resolve) => {
                         const reader = new FileReader();
                         reader.onloadend = () => resolve(reader.result as string);
                         reader.readAsDataURL(blobs[i]);
                     });
-                    const imgProps = doc.getImageProperties(imgData);
-                    const pdfWidth = doc.internal.pageSize.getWidth();
-                    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-                    doc.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+
+                    // 이미지 포맷 자동 감지
+                    let fmt: 'JPEG' | 'PNG' | 'WEBP' = 'JPEG';
+                    if (imgData.startsWith('data:image/png')) fmt = 'PNG';
+                    else if (imgData.startsWith('data:image/webp')) fmt = 'WEBP';
+
+                    const imgProps = pdf.getImageProperties(imgData);
+                    const imgAR = imgProps.width / imgProps.height;
+                    const pageAR = pdfWidth / pdfHeight;
+
+                    let drawW = pdfWidth;
+                    let drawH = pdfHeight;
+                    if (imgAR > pageAR) {
+                        drawH = pdfWidth / imgAR;
+                    } else {
+                        drawW = pdfHeight * imgAR;
+                    }
+                    const offsetX = (pdfWidth - drawW) / 2;
+                    const offsetY = (pdfHeight - drawH) / 2;
+                    pdf.addImage(imgData, fmt, offsetX, offsetY, drawW, drawH);
                 }
-                const pdfArrayBuffer = doc.output('arraybuffer');
+                const pdfArrayBuffer = pdf.output('arraybuffer');
                 finalBlob = new Blob([pdfArrayBuffer], { type: 'application/pdf' });
                 fileName = `${user!.id}_${docType}_${Date.now()}.pdf`;
             }
@@ -89,7 +108,9 @@ export default function MyDocuments(props: Record<string, unknown>) {
                 category: docType,
                 title: `${user!.name} - ${docType}`,
                 company_name: user!.company || '전체',
-                file_url: urlData.publicUrl
+                file_url: urlData.publicUrl,
+                version: 1,
+                content: null,
             });
 
             if (dbError) throw dbError;
@@ -116,6 +137,15 @@ export default function MyDocuments(props: Record<string, unknown>) {
                     <h2 className="text-xl md:text-2xl font-bold text-[var(--foreground)] tracking-tight">스마트 서류 제출</h2>
                 </div>
             </div>
+
+            {uploading && (
+                <div className="fixed inset-0 z-[600] bg-black/50 flex items-center justify-center">
+                    <div className="bg-[var(--card)] rounded-2xl p-6 flex flex-col items-center gap-3 shadow-xl">
+                        <div className="w-8 h-8 border-4 border-[var(--border)] border-t-[var(--accent)] rounded-full animate-spin" />
+                        <p className="text-sm font-bold text-[var(--foreground)]">PDF 변환 및 업로드 중...</p>
+                    </div>
+                </div>
+            )}
 
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                 <div className="col-span-2 md:col-span-4 lg:col-span-5 xl:col-span-6 bg-blue-50/50 p-4 rounded-2xl border border-blue-100 flex items-center gap-4">
@@ -218,6 +248,7 @@ function CameraScanner(scannerProps: Record<string, unknown>) {
     const onClose = scannerProps.onClose as () => void;
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const guideRef = useRef<HTMLDivElement>(null);
     const [capturedBlobs, setCapturedBlobs] = useState<Blob[]>([]);
     const [currentPreview, setCurrentPreview] = useState<string | null>(null);
     const [stream, setStream] = useState<MediaStream | null>(null);
@@ -245,16 +276,63 @@ function CameraScanner(scannerProps: Record<string, unknown>) {
     }, []);
 
     const takePhoto = () => {
-        if (videoRef.current && canvasRef.current) {
-            const video = videoRef.current;
-            const canvas = canvasRef.current;
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
+        if (!videoRef.current || !canvasRef.current) return;
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        const vW = video.videoWidth;
+        const vH = video.videoHeight;
+
+        if (!vW || !vH) return;
+
+        // 가이드 영역을 기준으로 크롭
+        if (guideRef.current && video.getBoundingClientRect) {
+            const videoRect = video.getBoundingClientRect();
+            const guideRect = guideRef.current.getBoundingClientRect();
+
+            // object-cover 스케일 계산
+            const videoAR = vW / vH;
+            const containerAR = videoRect.width / videoRect.height;
+
+            let scale: number;
+            let offsetX = 0;
+            let offsetY = 0;
+
+            if (videoAR > containerAR) {
+                // 비디오가 더 넓음 → 높이 기준 스케일, 좌우 크롭
+                scale = vH / videoRect.height;
+                offsetX = (vW - videoRect.width * scale) / 2;
+            } else {
+                // 비디오가 더 좁음 → 너비 기준 스케일, 상하 크롭
+                scale = vW / videoRect.width;
+                offsetY = (vH - videoRect.height * scale) / 2;
+            }
+
+            // 가이드 박스를 비디오 픽셀 좌표로 변환
+            const gx = offsetX + (guideRect.left - videoRect.left) * scale;
+            const gy = offsetY + (guideRect.top - videoRect.top) * scale;
+            const gw = guideRect.width * scale;
+            const gh = guideRect.height * scale;
+
+            // 안전 범위 클리핑
+            const sx = Math.max(0, Math.round(gx));
+            const sy = Math.max(0, Math.round(gy));
+            const sw = Math.min(Math.round(gw), vW - sx);
+            const sh = Math.min(Math.round(gh), vH - sy);
+
+            canvas.width = sw;
+            canvas.height = sh;
             const ctx = canvas.getContext('2d');
-            ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const dataUrl = canvas.toDataURL('image/png');
-            setCurrentPreview(dataUrl);
+            ctx?.drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh);
+        } else {
+            // 폴백: 전체 프레임
+            canvas.width = vW;
+            canvas.height = vH;
+            const ctx = canvas.getContext('2d');
+            ctx?.drawImage(video, 0, 0, vW, vH);
         }
+
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+        setCurrentPreview(dataUrl);
     };
 
     const addCurrentPage = () => {
@@ -264,7 +342,7 @@ function CameraScanner(scannerProps: Record<string, unknown>) {
                     setCapturedBlobs(prev => [...prev, blob]);
                     setCurrentPreview(null);
                 }
-            }, 'image/png');
+            }, 'image/jpeg', 0.92);
         }
     };
 
@@ -292,14 +370,14 @@ function CameraScanner(scannerProps: Record<string, unknown>) {
                         <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none p-5">
                             {isIDCard ? (
-                                <div className="w-full aspect-[1.58/1] border-2 border-dashed border-white/50 rounded-xl relative">
+                                <div ref={guideRef} className="w-full aspect-[1.58/1] border-2 border-dashed border-white/50 rounded-xl relative">
                                     <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-blue-500 rounded-tl-lg" />
                                     <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-blue-500 rounded-tr-lg" />
                                     <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-blue-500 rounded-bl-lg" />
                                     <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-blue-500 rounded-br-lg" />
                                 </div>
                             ) : (
-                                <div className="h-full aspect-[1/1.414] border-2 border-dashed border-white/50 rounded-lg relative">
+                                <div ref={guideRef} className="h-full aspect-[1/1.414] border-2 border-dashed border-white/50 rounded-lg relative">
                                     <div className="absolute -top-1 -left-1 w-8 h-8 border-t-4 border-l-4 border-emerald-500 rounded-tl-xl" />
                                     <div className="absolute -top-1 -right-1 w-8 h-8 border-t-4 border-r-4 border-emerald-500 rounded-tr-xl" />
                                     <div className="absolute -bottom-1 -left-1 w-8 h-8 border-b-4 border-l-4 border-emerald-500 rounded-bl-xl" />
