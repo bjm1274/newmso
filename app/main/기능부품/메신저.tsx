@@ -49,6 +49,30 @@ function normalizeMemberIds(members: unknown): string[] {
   return Array.isArray(members) ? members.map((id: unknown) => String(id)) : [];
 }
 
+function isActiveNoticeMember(staff: StaffMember | null | undefined): boolean {
+  if (!staff?.id) return false;
+
+  const status = String(staff.status || '').trim();
+  const dynamicStaff = staff as Record<string, unknown>;
+  const resignedAt = typeof dynamicStaff.resigned_at === 'string' ? dynamicStaff.resigned_at.trim() : '';
+  const resignDate = typeof dynamicStaff.resign_date === 'string' ? dynamicStaff.resign_date.trim() : '';
+  const isActiveFlag = dynamicStaff.is_active;
+
+  if (isActiveFlag === false) return false;
+  if (status === '퇴사') return false;
+  if (resignedAt) return false;
+  if (resignDate) return false;
+  return true;
+}
+
+function haveSameMembers(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) return false;
+
+  const sortedLeft = [...left].sort();
+  const sortedRight = [...right].sort();
+  return sortedLeft.every((value, index) => value === sortedRight[index]);
+}
+
 function getDirectRoomMembersKey(room: ChatRoom | null | undefined): string | null {
   if (room?.type !== 'direct') return null;
   const members = normalizeMemberIds(room?.members);
@@ -292,6 +316,14 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     });
     return Array.from(merged.values());
   }, [chatDirectoryStaffs, staffs]);
+  const noticeRoomMembers = useMemo(
+    () => allKnownStaffs.filter((staff: StaffMember) => isActiveNoticeMember(staff)),
+    [allKnownStaffs]
+  );
+  const noticeRoomMemberIds = useMemo(
+    () => noticeRoomMembers.map((staff: StaffMember) => String(staff.id)),
+    [noticeRoomMembers]
+  );
   const findKnownStaffById = useCallback(
     (staffId: string | null | undefined) =>
       allKnownStaffs.find(( staff: StaffMember) => String(staff.id) === String(staffId)) || null,
@@ -789,6 +821,25 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     return list;
   }, [repairDirectRooms, updateUnreadForRooms]);
 
+  const syncNoticeRoomMembers = useCallback(async (rooms?: ChatRoom[]) => {
+    const sourceRooms = Array.isArray(rooms) ? rooms : chatRoomsRef.current;
+    const noticeRoom = sourceRooms.find((room: ChatRoom) => String(room.id) === NOTICE_ROOM_ID);
+    if (!noticeRoom) return;
+
+    const currentMemberIds = normalizeMemberIds(noticeRoom.members);
+    if (haveSameMembers(currentMemberIds, noticeRoomMemberIds)) return;
+
+    try {
+      const { error } = await supabase
+        .from('chat_rooms')
+        .update({ name: NOTICE_ROOM_NAME, type: 'notice', members: noticeRoomMemberIds })
+        .eq('id', NOTICE_ROOM_ID);
+      if (error) throw error;
+    } catch (error) {
+      console.error('공지방 참여자 동기화 실패:', error);
+    }
+  }, [noticeRoomMemberIds]);
+
   useEffect(() => {
     chatRoomsRef.current = chatRooms;
   }, [chatRooms]);
@@ -1061,12 +1112,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
       if (!noticeRoom) {
         await supabase.from('chat_rooms').insert([
-          { id: NOTICE_ROOM_ID, name: NOTICE_ROOM_NAME, type: 'notice', members: [] },
+          { id: NOTICE_ROOM_ID, name: NOTICE_ROOM_NAME, type: 'notice', members: noticeRoomMemberIds },
         ]);
       } else {
         await supabase
           .from('chat_rooms')
-          .update({ name: NOTICE_ROOM_NAME, type: 'notice' })
+          .update({ name: NOTICE_ROOM_NAME, type: 'notice', members: noticeRoomMemberIds })
           .eq('id', NOTICE_ROOM_ID);
       }
       const { data: rooms } = await supabase.from('chat_rooms').select('*');
@@ -1074,7 +1125,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     };
     loadRooms();
     // selectedRoomId는 의도적으로 제외 — 채팅방 목록은 마운트 시 1회만 로드
-  }, [syncChatRoomsState]);
+  }, [noticeRoomMemberIds, syncChatRoomsState]);
+
+  useEffect(() => {
+    if (!chatRooms.some((room: ChatRoom) => String(room.id) === NOTICE_ROOM_ID)) return;
+    void syncNoticeRoomMembers(chatRooms);
+  }, [chatRooms, syncNoticeRoomMembers]);
 
   useEffect(() => {
     const channel = supabase.channel('chat-rooms-list')
@@ -1402,11 +1458,11 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
   const roomMembers = useMemo(() => {
     if (!selectedRoomId) return [];
-    if (selectedRoomId === NOTICE_ROOM_ID) return allKnownStaffs;
+    if (selectedRoomId === NOTICE_ROOM_ID) return noticeRoomMembers;
     const room = chatRooms.find(( r: ChatRoom) => r.id === selectedRoomId);
     if (!room || !Array.isArray(room.members) || !room.members.length) return [];
     return room.members.map((id: unknown) => resolveRoomMemberProfile(room, String(id)));
-  }, [allKnownStaffs, chatRooms, resolveRoomMemberProfile, selectedRoomId]);
+  }, [chatRooms, noticeRoomMembers, resolveRoomMemberProfile, selectedRoomId]);
 
   const selectedRoom = useMemo(
     () => chatRooms.find(( r: ChatRoom) => r.id === selectedRoomId) || null,
@@ -3080,22 +3136,28 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
                 <div className="space-y-3">
                   <div className="flex justify-between items-center px-1">
-                    <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider">참여자 ({(selectedRoom?.members as unknown[] | null | undefined)?.length || 0})</p>
-              <button data-testid="chat-open-add-member-modal" onClick={() => setShowAddMemberModal(true)} className="w-6 h-6 flex items-center justify-center bg-[var(--tab-bg)] dark:bg-zinc-800 rounded-[var(--radius-md)] text-[var(--toss-gray-4)] hover:text-emerald-500 transition-colors">+</button>
+                    <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider">참여자 ({roomMembers.length || 0})</p>
+              {selectedRoom?.id !== NOTICE_ROOM_ID && (
+                <button data-testid="chat-open-add-member-modal" onClick={() => setShowAddMemberModal(true)} className="w-6 h-6 flex items-center justify-center bg-[var(--tab-bg)] dark:bg-zinc-800 rounded-[var(--radius-md)] text-[var(--toss-gray-4)] hover:text-emerald-500 transition-colors">+</button>
+              )}
                   </div>
                   <div className="space-y-3">
-                    {(selectedRoom?.members as unknown[] | null | undefined)?.map((memberId) => {
-                      const s = resolveRoomMemberProfile(selectedRoom!, String(memberId));
-                      const isOwner = selectedRoom?.created_by === user?.id;
+                    {roomMembers.map((member) => {
+                      const memberId = String(member.id);
+                      const s =
+                        selectedRoom?.id === NOTICE_ROOM_ID
+                          ? member
+                          : resolveRoomMemberProfile(selectedRoom!, memberId);
+                      const isOwner = selectedRoom?.id !== NOTICE_ROOM_ID && selectedRoom?.created_by === user?.id;
                       return (
-                        <div data-testid={`chat-room-member-${memberId}`} key={memberId as React.Key} className="flex items-center justify-between group">
+                        <div data-testid={`chat-room-member-${memberId}`} key={memberId} className="flex items-center justify-between group">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-[10px] font-bold text-emerald-600">
                               {s?.photo_url ? <img src={s.photo_url} alt={`${s.name}'s profile`} className="w-full h-full rounded-full object-cover" /> : (s?.name?.[0] || '?')}
                             </div>
                             <div>
                               <p className="text-xs font-bold text-foreground">{s?.name || '이름 없음'}</p>
-                              <p className="text-[10px] text-[var(--toss-gray-4)] font-medium">{(s?.department || '')} 쨌 {s?.position}</p>
+                              <p className="text-[10px] text-[var(--toss-gray-4)] font-medium">{[s?.department, s?.position].filter(Boolean).join(' · ')}</p>
                             </div>
                           </div>
                           {isOwner && String(memberId) !== String(user?.id) && (
@@ -3807,7 +3869,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                         <span className="ml-1 text-[var(--toss-gray-3)]">
                           {s.position ? ` ${s.position}` : ''}
                           {s.company || s.department
-                            ? ` 쨌 ${s.company || s.department}`
+                            ? ` · ${s.company || s.department}`
                             : ''}
                         </span>
                       </span>

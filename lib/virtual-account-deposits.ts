@@ -118,21 +118,25 @@ function inferMatchStatus(input: {
   matched_target_id?: unknown;
   matched_note?: unknown;
 }): MatchStatus {
+  const hasMatchSignals = Boolean(
+    pickText(
+      input.patient_name,
+      input.patient_id,
+      input.transaction_label,
+      input.matched_target_type,
+      input.matched_target_id,
+    ),
+  );
   const explicit = normalizeText(input.match_status);
-  if (explicit === 'matched' || explicit === 'unmatched') {
+  if (explicit === 'matched') {
     return explicit;
   }
 
-  return pickText(
-    input.patient_name,
-    input.patient_id,
-    input.transaction_label,
-    input.matched_target_type,
-    input.matched_target_id,
-    input.matched_note,
-  )
-    ? 'matched'
-    : 'unmatched';
+  if (explicit === 'unmatched' && !hasMatchSignals) {
+    return explicit;
+  }
+
+  return hasMatchSignals || pickText(input.matched_note) ? 'matched' : 'unmatched';
 }
 
 function normalizeBankName(raw: string | null) {
