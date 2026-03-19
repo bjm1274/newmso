@@ -10,6 +10,7 @@ import HandoverNotesView from './인계노트';
 import DischargeReviewView from './퇴원심사';
 import ClosingReportView from './마감보고';
 import StaffEvaluationView from './직원평가시스템';
+import RealtimeDepositView from './입금실시간조회';
 
 const EXTERNAL_LINKS = [
   { id: 'km-park', label: 'KM Park', url: 'http://kmp0001103.iptime.org/login?redirectTo=undefined', icon: '🏥' },
@@ -32,6 +33,7 @@ const FEATURE_CARDS: FeatureCard[] = [
   { id: '퇴원심사', label: '퇴원심사', icon: '🏥', subView: '퇴원심사' },
   { id: '마감보고', label: '마감보고', icon: '💰', subView: '마감보고' },
   { id: '직원평가', label: '직원평가', icon: '✍️', subView: '직원평가' },
+  { id: '입금실시간조회', label: '입금 실시간 조회', icon: '🏦', subView: '입금실시간조회' },
 ];
 
 const FEATURE_CARD_TEST_IDS = [
@@ -42,6 +44,7 @@ const FEATURE_CARD_TEST_IDS = [
   'discharge-review',
   'closing-report',
   'staff-evaluation',
+  'realtime-deposit',
 ] as const;
 
 const MAX_RECENT = 5;
@@ -281,6 +284,19 @@ export default function ExtraFeatures({
           <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
             <StaffEvaluationView user={user || {}} staffs={staffs} />
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (subView === '입금실시간조회') {
+    return (
+      <div data-testid="extra-subview" className="flex-1 overflow-y-auto bg-[var(--page-bg)] p-3 md:p-4 custom-scrollbar">
+        <div className="mx-auto w-full max-w-6xl space-y-3">
+          <button data-testid="extra-back-button" type="button" onClick={() => setSubView(null)} className="text-[11px] font-bold text-[var(--accent)] hover:underline">
+            ← 목록으로
+          </button>
+          <RealtimeDepositView user={user || {}} />
         </div>
       </div>
     );

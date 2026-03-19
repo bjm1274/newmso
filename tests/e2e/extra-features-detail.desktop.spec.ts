@@ -41,6 +41,7 @@ const extraFeaturesUser = {
     'extra_\uD1F4\uC6D0\uC2EC\uC0AC': true,
     'extra_\uB9C8\uAC10\uBCF4\uACE0': true,
     'extra_\uC9C1\uC6D0\uD3C9\uAC00': true,
+    'extra_\uC785\uAE08\uC2E4\uC2DC\uAC04\uC870\uD68C': true,
   },
 };
 
@@ -57,6 +58,14 @@ test('extra features cards open one by one in a practical click-through flow', a
     localStorage: {
       erp_last_menu: '추가기능',
     },
+  });
+
+  await page.route('**/api/payments/virtual-account-deposits**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ deposits: [] }),
+    });
   });
 
   await page.goto(`/main?open_menu=${encodeURIComponent('추가기능')}`);
@@ -77,6 +86,7 @@ test('extra features cards open one by one in a practical click-through flow', a
     'discharge-review',
     'closing-report',
     'staff-evaluation',
+    'realtime-deposit',
   ] as const;
 
   for (const testId of internalCards) {
