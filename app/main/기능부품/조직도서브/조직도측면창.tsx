@@ -146,6 +146,9 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: { user?: Sideb
         cursorMap[cursor.room_id] = cursor.last_read_at;
       });
 
+      // 커서가 없는 방은 최근 30일 메시지만 미읽음으로 카운트 (오래된 메시지가 영구적으로 배지 띄우는 문제 방지)
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
       let totalUnread = 0;
       for (const roomId of roomIds) {
         let query = supabase
@@ -158,6 +161,9 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: { user?: Sideb
         const lastReadAt = cursorMap[roomId];
         if (lastReadAt) {
           query = query.gt('created_at', lastReadAt);
+        } else {
+          // 한 번도 방에 들어가지 않은 경우 → 최근 30일 메시지만 카운트
+          query = query.gt('created_at', thirtyDaysAgo);
         }
 
         const { count, error: countError } = await query;
