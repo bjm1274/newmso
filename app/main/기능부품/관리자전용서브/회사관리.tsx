@@ -82,19 +82,22 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
           memo: form.memo || null,
         })
         .eq('id', editing.id);
-      if (!error) {
-        setEditing(null);
-        setForm({
-          name: '',
-          type: 'HOSPITAL',
-          ceo_name: '',
-          business_no: '',
-          address: '',
-          phone: '',
-          memo: '',
-        });
-        fetchCompanies();
+      if (error) {
+        console.error('companies update failed:', error);
+        alert('회사 정보 저장에 실패했습니다: ' + error.message);
+        return;
       }
+      setEditing(null);
+      setForm({
+        name: '',
+        type: 'HOSPITAL',
+        ceo_name: '',
+        business_no: '',
+        address: '',
+        phone: '',
+        memo: '',
+      });
+      fetchCompanies();
     } else {
       const { error } = await supabase.from('companies').insert({
         name: form.name.trim(),
@@ -107,18 +110,21 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
         phone: form.phone || null,
         memo: form.memo || null,
       });
-      if (!error) {
-        setForm({
-          name: '',
-          type: 'HOSPITAL',
-          ceo_name: '',
-          business_no: '',
-          address: '',
-          phone: '',
-          memo: '',
-        });
-        fetchCompanies();
+      if (error) {
+        console.error('companies insert failed:', error);
+        alert('회사 추가에 실패했습니다: ' + error.message);
+        return;
       }
+      setForm({
+        name: '',
+        type: 'HOSPITAL',
+        ceo_name: '',
+        business_no: '',
+        address: '',
+        phone: '',
+        memo: '',
+      });
+      fetchCompanies();
     }
   };
 
