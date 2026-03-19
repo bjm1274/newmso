@@ -6,7 +6,8 @@ function isUuidLike(value: string | null | undefined) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
 }
 
-export default function MyTodoList({ user: initialUser }: Record<string, unknown>) {
+export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatNavigate }: Record<string, unknown>) {
+  const onChatNavigate = _onChatNavigate as ((roomId: string, messageId: string) => void) | undefined;
   const _iu = (initialUser ?? {}) as Record<string, unknown>;
   const [user, setUser] = useState<Record<string, unknown>>(_iu);
   const [tasks, setTasks] = useState<any[]>([]);
@@ -267,7 +268,7 @@ export default function MyTodoList({ user: initialUser }: Record<string, unknown
                 진행 중 ({inProgressTasks.length})
               </h4>
               {inProgressTasks.map(task => (
-                <TodoItem key={task.id} task={task} onToggle={toggleTask} onDelete={deleteTask} />
+                <TodoItem key={task.id} task={task} onToggle={toggleTask} onDelete={deleteTask} onChatNavigate={onChatNavigate} />
               ))}
               {inProgressTasks.length === 0 && <p className="text-[11px] text-[var(--toss-gray-3)] italic pl-3">진행 중인 일이 없습니다.</p>}
             </section>
@@ -279,7 +280,7 @@ export default function MyTodoList({ user: initialUser }: Record<string, unknown
                   완료 내역 ({completedTasks.length})
                 </h4>
                 {completedTasks.map(task => (
-                  <TodoItem key={task.id} task={task} onToggle={toggleTask} onDelete={deleteTask} />
+                  <TodoItem key={task.id} task={task} onToggle={toggleTask} onDelete={deleteTask} onChatNavigate={onChatNavigate} />
                 ))}
               </section>
             )}
@@ -295,10 +296,12 @@ export default function MyTodoList({ user: initialUser }: Record<string, unknown
   );
 }
 
-function TodoItem({ task: _rawTask, onToggle: _onToggle, onDelete: _onDelete }: Record<string, unknown>) {
+function TodoItem({ task: _rawTask, onToggle: _onToggle, onDelete: _onDelete, onChatNavigate: _onChatNavigate }: Record<string, unknown>) {
   const task = (_rawTask ?? {}) as Record<string, unknown>;
   const onToggle = _onToggle as (id: unknown, status: unknown) => void;
   const onDelete = _onDelete as (id: unknown) => void;
+  const onChatNavigate = _onChatNavigate as ((roomId: string, messageId: string) => void) | undefined;
+  const isChatSource = !!(task.source_message_id && task.source_room_id);
   return (
     <div className="group flex items-center gap-3 p-4 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] hover:border-[var(--accent)] hover:shadow-sm transition-all animate-fade-in-up">
       <button onClick={() => onToggle(task.id, task.is_complete)} className={`w-6 h-6 rounded-[var(--radius-md)] border-2 flex items-center justify-center transition-all flex-shrink-0 ${task.is_complete ? 'bg-green-500 border-green-500 text-white' : 'border-[var(--border)] hover:border-[var(--accent)]'}`}>
@@ -314,6 +317,15 @@ function TodoItem({ task: _rawTask, onToggle: _onToggle, onDelete: _onDelete }: 
           </span>
         )}
       </div>
+      {isChatSource && onChatNavigate && (
+        <button
+          onClick={() => onChatNavigate(task.source_room_id as string, task.source_message_id as string)}
+          title="채팅 메시지로 이동"
+          className="shrink-0 text-[var(--accent)] hover:text-white hover:bg-[var(--accent)] transition-all text-[11px] font-semibold px-2 py-1 bg-[var(--toss-blue-light)] rounded-md"
+        >
+          💬 채팅
+        </button>
+      )}
       <button onClick={() => onDelete(task.id)} className="opacity-0 group-hover:opacity-100 text-[var(--toss-gray-3)] hover:text-red-500 transition-all text-[11px] font-semibold px-2 py-1 bg-[var(--muted)] hover:bg-red-50 rounded-md">삭제</button>
     </div>
   );

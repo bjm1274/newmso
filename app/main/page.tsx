@@ -845,6 +845,11 @@ function MainPageContent() {
           initialInventoryWorkflowApprovalId={initialInventoryWorkflowApprovalId}
           onConsumeInitialInventoryWorkflowApprovalId={() => setInitialInventoryWorkflowApprovalId(null)}
           setMainMenu={setMainMenu}
+          onOpenChatMessage={(roomId, messageId) => {
+            setMainMenu('채팅');
+            setInitialOpenChatRoomId(roomId);
+            setInitialOpenMessageId(messageId);
+          }}
         />
       </div>
     </div>

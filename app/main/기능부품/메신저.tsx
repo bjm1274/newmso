@@ -1949,6 +1949,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         content: `[채팅] ${content}`,
         is_complete: false,
         task_date: getKoreanTodayString(),
+        source_message_id: activeActionMsg.id,
+        source_room_id: activeActionMsg.room_id,
       }]);
       if (!error) {
         alert('할 일 등록 완료');

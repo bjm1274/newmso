@@ -72,9 +72,10 @@ interface MyPageMainProps {
   onConsumeMyPageInitialTab?: () => void;
   onOpenApproval?: (options?: Record<string, unknown>) => void;
   setMainMenu?: (menu: string) => void;
+  onOpenChatMessage?: (roomId: string, messageId: string) => void;
 }
 
-export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInitialTab, onOpenApproval, setMainMenu }: MyPageMainProps) {
+export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInitialTab, onOpenApproval, setMainMenu, onOpenChatMessage }: MyPageMainProps) {
   const [activeTab, setActiveTab] = useState<'profile' | 'records' | 'todo' | 'commute' | 'documents' | 'notifications'>('profile');
   const [recordsView, setRecordsView] = useState<'salary' | 'certificates'>('salary');
   const [favorites, setFavorites] = useState<FavoriteId[]>([]);
@@ -552,7 +553,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
               />
             </div>
           )}
-          {activeTab === 'todo' && <div data-testid="mypage-todo-tab" className="pb-3"><MyTodoList user={user} /></div>}
+          {activeTab === 'todo' && <div data-testid="mypage-todo-tab" className="pb-3"><MyTodoList user={user} onChatNavigate={onOpenChatMessage} /></div>}
           {activeTab === 'records' && (
             <div data-testid="mypage-records-tab" className="pb-3">
               <PayrollAndCertificatesHub
