@@ -255,32 +255,34 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: { user?: Sideb
 
       {/* 모바일 하단 탭바 */}
       <nav
-        className="safe-area-pb no-scrollbar fixed bottom-0 left-0 right-0 z-[100] flex items-center gap-0.5 overflow-x-auto border-t border-[var(--border)] bg-[var(--card)] px-1.5 py-1 shadow-[0_-1px_0_var(--border)] md:hidden"
+        className="safe-area-pb fixed bottom-0 left-0 right-0 z-[100] flex items-center border-t border-[var(--border)] bg-[var(--card)] px-1.5 py-1 shadow-[0_-1px_0_var(--border)] md:hidden"
         data-testid="mobile-tabbar"
       >
-        {visibleMenus.map((menu) => (
-          <button
-            key={menu.id}
-            type="button"
-            data-testid={`${menu.testId}-mobile`}
-            onClick={() => handleMenuClick(menu.id)}
-            className={`flex min-h-[48px] flex-1 touch-manipulation flex-col items-center justify-center rounded-[var(--radius-md)] px-2 py-1.5 transition-all ${
-              mainMenu === menu.id ? 'text-[var(--accent)]' : 'text-[var(--toss-gray-3)]'
-            }`}
-          >
-            <span className="relative text-[15px] leading-none">
-              {menu.icon}
-              {menu.id === '채팅' && chatUnreadCount > 0 && (
-                <span className="absolute -top-1.5 -right-2.5 min-w-[15px] h-[15px] px-0.5 rounded-[var(--radius-md)] bg-red-500 text-white text-[8px] font-bold flex items-center justify-center">
-                  {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
-                </span>
-              )}
-            </span>
-            <span className="mt-0.5 w-full truncate text-center text-[9.5px] font-bold">{menu.label}</span>
-          </button>
-        ))}
+        <div className="no-scrollbar flex flex-1 items-center gap-0.5 overflow-x-auto">
+          {visibleMenus.map((menu) => (
+            <button
+              key={menu.id}
+              type="button"
+              data-testid={`${menu.testId}-mobile`}
+              onClick={() => handleMenuClick(menu.id)}
+              className={`flex min-h-[48px] flex-1 touch-manipulation flex-col items-center justify-center rounded-[var(--radius-md)] px-2 py-1.5 transition-all ${
+                mainMenu === menu.id ? 'text-[var(--accent)]' : 'text-[var(--toss-gray-3)]'
+              }`}
+            >
+              <span className="relative text-[15px] leading-none">
+                {menu.icon}
+                {menu.id === '채팅' && chatUnreadCount > 0 && (
+                  <span className="absolute -top-1.5 -right-2.5 min-w-[15px] h-[15px] px-0.5 rounded-[var(--radius-md)] bg-red-500 text-white text-[8px] font-bold flex items-center justify-center">
+                    {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+                  </span>
+                )}
+              </span>
+              <span className="mt-0.5 w-full truncate text-center text-[9.5px] font-bold">{menu.label}</span>
+            </button>
+          ))}
+        </div>
         {user && (
-          <div className="flex min-h-[48px] flex-none flex-col items-center justify-center px-2">
+          <div className="flex min-h-[48px] flex-none flex-col items-center justify-center px-2 border-l border-[var(--border)]">
             <NotificationCenter user={user} />
           </div>
         )}
