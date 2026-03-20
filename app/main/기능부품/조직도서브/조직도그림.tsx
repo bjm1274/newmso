@@ -193,16 +193,17 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
         const coStaffs = filtered.filter((s) => s.company === co);
         if (coStaffs.length === 0) return null;
         if (co === 'SY INC.') {
-          const director = coStaffs.find((s) => s.position === '본부장' || Number(s.employee_no) === 100);
+          const msoStaffs = coStaffs.filter((s) => s.position !== '병원장' && s.position !== '원장');
+          const director = msoStaffs.find((s) => s.position === '본부장' || Number(s.employee_no) === 100);
           const departments: OrgDepartment[] = msoStructure.map(dept => {
             const headPositions = MSO_DIVISION_HEAD_POSITIONS[dept.name] || [];
-            const heads = coStaffs.filter((s) => headPositions.includes(s.position || '') && s.id !== director?.id);
+            const heads = msoStaffs.filter((s) => headPositions.includes(s.position || '') && s.id !== director?.id);
             return {
               deptName: dept.name,
               heads,
               teams: dept.teams.map(team => ({
                 teamName: team,
-                members: coStaffs.filter((s) => s.department === team && s.id !== director?.id)
+                members: msoStaffs.filter((s) => s.department === team && s.id !== director?.id)
               })).filter(t => t.members.length > 0)
             };
           }).filter(d => d.teams.length > 0);
@@ -232,16 +233,18 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
     const coStaffs = filtered.filter((s) => s.company === currentCo);
 
     if (currentCo === 'SY INC.') {
-      const director = coStaffs.find((s) => s.position === '본부장' || Number(s.employee_no) === 100);
+      // 병원장/원장은 병원 소속 — SY INC. 조직도에서 제외
+      const msoStaffs = coStaffs.filter((s) => s.position !== '병원장' && s.position !== '원장');
+      const director = msoStaffs.find((s) => s.position === '본부장' || Number(s.employee_no) === 100);
       let departments: OrgDepartment[] = msoStructure.map(dept => {
         const headPositions = MSO_DIVISION_HEAD_POSITIONS[dept.name] || [];
-        const heads = coStaffs.filter((s) => headPositions.includes(s.position || '') && s.id !== director?.id);
+        const heads = msoStaffs.filter((s) => headPositions.includes(s.position || '') && s.id !== director?.id);
         return {
           deptName: dept.name,
           heads,
           teams: dept.teams.map(team => ({
             teamName: team,
-            members: coStaffs.filter((s) => s.department === team && s.id !== director?.id)
+            members: msoStaffs.filter((s) => s.department === team && s.id !== director?.id)
           })).filter(t => t.members.length > 0)
         };
       }).filter(d => d.teams.length > 0);
@@ -386,24 +389,24 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
   };
 
   return (
-    <div className="flex flex-row h-full app-page font-sans overflow-hidden">
-      {/* 좌측 세로 탭 - 회사 선택, 관리자 메뉴와 동일 스타일 */}
-      <aside className="flex flex-col gap-1.5 p-3 md:p-4 bg-[var(--card)] border-r border-[var(--border)] shrink-0 w-[72px] md:w-44 overflow-y-auto">
-        {companies.map(co => (
-          <button
-            key={co}
-            onClick={() => setSelectedCo(co)}
-            className={`w-full px-3 py-2.5 text-[11px] md:text-[11px] font-semibold rounded-[var(--radius-md)] transition-all text-left ${selectedCo === co ? 'bg-[var(--accent)] text-white shadow-md' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]'}`}
-          >
-            {co}
-          </button>
-        ))}
-      </aside>
-
+    <div className="flex flex-col h-full app-page font-sans overflow-hidden">
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* 상단 필터 및 검색 */}
-        <div className="p-4 md:p-4 bg-[var(--card)] border-b border-[var(--border)] flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center shrink-0 shadow-sm">
-          <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+        <div className="px-4 pt-3 pb-0 bg-[var(--card)] border-b border-[var(--border)] shrink-0 shadow-sm">
+          {/* 회사 탭 */}
+          <div className="flex gap-1.5 mb-3 overflow-x-auto no-scrollbar">
+            {companies.map(co => (
+              <button
+                key={co}
+                onClick={() => setSelectedCo(co)}
+                className={`px-4 py-2 text-[11px] font-bold rounded-xl whitespace-nowrap transition-all shrink-0 ${selectedCo === co ? 'bg-[var(--accent)] text-white shadow-sm' : 'bg-[var(--muted)] text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--tab-bg)]'}`}
+              >
+                {co}
+              </button>
+            ))}
+          </div>
+          {/* 검색/필터 행 */}
+          <div className="flex flex-wrap items-center gap-3 w-full pb-3">
             {(selectedCo === '박철홍정형외과' || selectedCo === '수연의원' || selectedCo === 'SY INC.') && allTeamOptions.length > 0 && (
               <select
                 value={selectedTeamFilter}
