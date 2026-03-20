@@ -117,7 +117,7 @@ export default function MainContent({
       )}
 
       {mainMenu === '채팅' && (
-        <div className="z-20 min-h-0 flex-1 overflow-hidden bg-[var(--card)]">
+        <div className="z-20 min-h-0 flex-1 flex flex-col overflow-hidden bg-[var(--card)]">
           <ChatView
             user={user}
             onRefresh={onRefresh}
