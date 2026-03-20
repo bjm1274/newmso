@@ -1081,6 +1081,27 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       return;
     }
 
+    if (formType === '연차/휴가') {
+      const startDate = extraData.startDate as string | undefined;
+      const endDate = extraData.endDate as string | undefined;
+      if (!startDate || startDate.length < 10) {
+        alert("시작 일자를 입력해주세요.");
+        return;
+      }
+      if (!endDate || endDate.length < 10) {
+        alert("종료 일자를 입력해주세요.");
+        return;
+      }
+    }
+
+    if (formType === '연차계획서') {
+      const planDates = extraData.planDates as Array<{ date: string; reason: string }> | undefined;
+      if (!planDates || planDates.length === 0 || planDates.some((row) => !row.date || row.date.length < 10)) {
+        alert("모든 사용 예정일을 입력해주세요.");
+        return;
+      }
+    }
+
     const requiredCc = formType === '물품신청' ? ['관리팀', '행정팀'] : ['행정팀'];
     const extraCc = Array.isArray(extraData?.cc_departments) ? extraData.cc_departments as string[] : [];
     const cc_departments = Array.from(new Set([...extraCc, ...requiredCc]));

@@ -89,13 +89,13 @@ export default function AnnualLeavePlanForm({
             >
               <div className="flex-1">
                 <label className="mb-1 ml-1 block text-[10px] font-bold text-[var(--toss-gray-3)]">
-                  사용 예정일
+                  사용 예정일 <span className="text-red-500">*</span>
                 </label>
                 <SmartDatePicker
                   value={item.date}
                   onChange={(value) => updateDate(index, value)}
                   data-testid={`annual-leave-plan-date-${index}`}
-                  inputClassName="w-full h-[41px] rounded-[var(--radius-md)] bg-[var(--muted)] px-2.5 text-xs font-bold"
+                  inputClassName={`w-full h-[41px] rounded-[var(--radius-md)] px-2.5 text-xs font-bold border ${!item.date ? 'bg-red-50 border-red-300' : 'bg-[var(--muted)] border-transparent'}`}
                 />
               </div>
               <div className="flex-[1.5]">
