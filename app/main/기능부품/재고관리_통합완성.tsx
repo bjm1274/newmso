@@ -1506,7 +1506,7 @@ export default function IntegratedInventoryManagement({
                 </div>
 
                 <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] shadow-sm">
-                  <div className="overflow-x-auto no-scrollbar">
+                  <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse min-w-[1000px]">
                       <thead>
                         <tr className="bg-[var(--muted)]/50 border-b border-[var(--border)]">
@@ -1628,7 +1628,7 @@ export default function IntegratedInventoryManagement({
                   새로고침
                 </button>
               </div>
-              <div className="overflow-x-auto no-scrollbar">
+              <div className="overflow-x-auto">
                 {logs.length === 0 ? (
                   <div className="px-4 py-10 text-center text-sm font-semibold text-[var(--toss-gray-3)]">이력이 없습니다.</div>
                 ) : (
