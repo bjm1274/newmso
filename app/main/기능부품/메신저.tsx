@@ -2537,7 +2537,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                 event.stopPropagation();
                                 updateRoomPreference(room.id, { pinned: !isPinned });
                               }}
-                              className={`px-1.5 py-1 rounded-md text-[9px] font-bold ${isSelected ? 'text-white/80 hover:bg-[var(--card)]/10' : 'text-[var(--toss-gray-3)] hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800'}`}
+                              className={`min-w-[44px] min-h-[44px] flex items-center justify-center px-1.5 py-1 rounded-md text-[9px] font-bold ${isSelected ? 'text-white/80 hover:bg-[var(--card)]/10' : 'text-[var(--toss-gray-3)] hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800'}`}
                               title={isPinned ? '고정 해제' : '상단 고정'}
                             >
                               {isPinned ? '해제' : '고정'}
@@ -2549,7 +2549,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                 event.stopPropagation();
                                 updateRoomPreference(room.id, { hidden: !isHidden });
                               }}
-                              className={`px-1.5 py-1 rounded-md text-[9px] font-bold ${isSelected ? 'text-white/80 hover:bg-[var(--card)]/10' : 'text-[var(--toss-gray-3)] hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800'}`}
+                              className={`min-w-[44px] min-h-[44px] flex items-center justify-center px-1.5 py-1 rounded-md text-[9px] font-bold ${isSelected ? 'text-white/80 hover:bg-[var(--card)]/10' : 'text-[var(--toss-gray-3)] hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800'}`}
                               title={isHidden ? '숨김 해제' : '대화 숨김'}
                             >
                               {isHidden ? '표시' : '숨김'}
@@ -2591,7 +2591,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                 onClick={() => {
                                   void openDirectChat(s);
                                 }}
-                                className="px-3 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-all border border-blue-100 dark:border-blue-800/50"
+                                className="px-3 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg text-[10px] font-bold opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-all border border-blue-100 dark:border-blue-800/50"
                               >
                                 대화
                               </button>
@@ -2839,7 +2839,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                       className={`max-w-[200px] md:max-w-[240px] max-h-[200px] rounded-[var(--radius-md)] object-cover ${msg.content ? 'border border-[var(--border)]' : 'shadow-sm'}`}
                                     />
                                   </a>
-                                  <div className="absolute opacity-0 group-hover:opacity-100 transition-opacity inset-0 flex items-center justify-center bg-black/40 rounded-[var(--radius-md)] gap-2 pointer-events-none">
+                                  <div className="absolute opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity inset-0 flex items-center justify-center bg-black/40 rounded-[var(--radius-md)] gap-2 pointer-events-none">
                                     <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(furl, '_blank') }} className="pointer-events-auto p-1.5 bg-[var(--card)]/20 hover:bg-[var(--card)]/40 rounded-[var(--radius-md)] text-white" title="미리보기">보기</button>
                                     <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigator.clipboard.writeText(furl).then(() => alert('공유 링크를 복사했습니다.')) }} className="pointer-events-auto p-1.5 bg-[var(--card)]/20 hover:bg-[var(--card)]/40 rounded-[var(--radius-md)] text-white" title="공유">공유</button>
                                     <a href={furl} download target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="pointer-events-auto p-1.5 bg-[var(--card)]/20 hover:bg-[var(--card)]/40 rounded-full text-white" title="다운로드">저장</a>
@@ -2927,7 +2927,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                           </div>
                         )}
                         <div
-                          className={`flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity ${isMine ? 'flex-row-reverse' : ''}`}
+                          className={`flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity ${isMine ? 'flex-row-reverse' : ''}`}
                           onClick={e => e.stopPropagation()}
                         >
                           <button
