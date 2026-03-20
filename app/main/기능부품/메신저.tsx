@@ -2401,7 +2401,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   }, [deleteMessage]);
 
   return (
-    <div data-testid="chat-view" className="flex flex-1 min-h-0 overflow-hidden relative font-sans h-full bg-[var(--background)] md:h-[100dvh] md:max-h-[100dvh] md:bg-[var(--card)]">
+    <div data-testid="chat-view" className="flex flex-1 min-h-0 overflow-hidden relative font-sans bg-[var(--background)] md:h-[100dvh] md:max-h-[100dvh] md:bg-[var(--card)]">
       <aside className={`${selectedRoomId ? 'hidden md:flex' : 'flex'} w-full md:w-80 border-r border-[var(--border)] dark:border-zinc-800 bg-[var(--card)] dark:bg-zinc-950 flex-col shrink-0 z-50 transition-all`}>
         <div className="p-4 md:p-4 space-y-4 flex flex-col min-h-0">
           <div className="flex gap-1 bg-[var(--tab-bg)] dark:bg-zinc-800 p-1 rounded-xl glass">
@@ -2680,7 +2680,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         <div
           ref={messageListRef}
           onScroll={updateScrollPositionState}
-          className="flex-1 min-h-0 overflow-y-auto p-4 md:p-4 pb-24 md:pb-6 space-y-3 custom-scrollbar"
+          className="flex-1 min-h-0 overflow-y-auto p-4 md:p-4 pb-4 space-y-3 custom-scrollbar"
         >
           {!selectedRoomId ? (
             <div className="h-full flex flex-col items-center justify-center text-[var(--toss-gray-3)]">
@@ -2957,7 +2957,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         </div>
 
         {showScrollToLatest && selectedRoomId && (
-          <div className="absolute right-4 bottom-24 md:bottom-20 z-20">
+          <div className="absolute right-4 bottom-4 z-20">
             <button
               type="button"
               onClick={() => scrollToBottom('smooth')}
@@ -2969,7 +2969,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         )}
 
         <div
-          className={`absolute left-0 right-0 bottom-0 md:relative p-2 md:p-3 bg-[var(--card)] shrink-0 transition-all z-10 ${isDragging ? 'border-t-2 border-[var(--accent)] border-dashed bg-blue-50 dark:bg-blue-900/20' : 'border-t border-[var(--border)]'}`}
+          className={`relative p-2 md:p-3 bg-[var(--card)] shrink-0 transition-all z-10 ${isDragging ? 'border-t-2 border-[var(--accent)] border-dashed bg-blue-50 dark:bg-blue-900/20' : 'border-t border-[var(--border)]'}`}
           onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
           onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }}
           onDrop={async (e) => {
