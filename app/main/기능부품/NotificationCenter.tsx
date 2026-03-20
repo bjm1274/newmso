@@ -87,7 +87,7 @@ export default function NotificationCenter({ user }: { user: any }) {
       prevCountRef.current = typeof unread === 'number' ? unread : prevCountRef.current;
     };
 
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: Event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
@@ -95,6 +95,7 @@ export default function NotificationCenter({ user }: { user: any }) {
 
     window.addEventListener('erp-new-notification', handleNewNotification);
     document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside, { passive: true });
 
     const fallbackPoll = window.setInterval(() => {
       void fetchNotifications();
@@ -103,6 +104,7 @@ export default function NotificationCenter({ user }: { user: any }) {
     return () => {
       window.removeEventListener('erp-new-notification', handleNewNotification);
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
       window.clearInterval(fallbackPoll);
     };
   }, [user?.id, fetchNotifications]);
