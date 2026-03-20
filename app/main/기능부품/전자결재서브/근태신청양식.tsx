@@ -20,6 +20,12 @@ export default function AttendanceForms({
   const [selectedDate, setSelectedDate] = useState('');
   const [localStartDate, setLocalStartDate] = useState('');
   const [localEndDate, setLocalEndDate] = useState('');
+  const [vType, setVType] = useState('연차 (1.0)');
+
+  useEffect(() => {
+    if (formType !== '연차/휴가') return;
+    _setExtraData({ vType, startDate: localStartDate, endDate: localEndDate });
+  }, [vType, localStartDate, localEndDate, formType]);
 
   useEffect(() => {
     const load = async () => {
@@ -75,10 +81,9 @@ export default function AttendanceForms({
               </label>
               <select
                 data-testid="approval-leave-type-select"
+                value={vType}
                 className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 text-xs font-bold shadow-sm focus:ring-2 focus:ring-[var(--accent)]/30"
-                onChange={(event) =>
-                  _setExtraData({ vType: event.target.value })
-                }
+                onChange={(event) => setVType(event.target.value)}
               >
                 <option>연차 (1.0)</option>
                 <option>반차 (0.5)</option>
@@ -88,33 +93,27 @@ export default function AttendanceForms({
 
             <div className="space-y-1.5">
               <label className="ml-1 text-[11px] font-bold uppercase text-[var(--accent)]">
-                시작 일자
+                시작 일자 <span className="text-red-500">*</span>
               </label>
               <SmartDatePicker
                 data-testid="approval-leave-start-date"
                 value={localStartDate}
-                onChange={(value) => {
-                  setLocalStartDate(value);
-                  _setExtraData({ startDate: value });
-                }}
+                onChange={setLocalStartDate}
                 className="w-full"
-                inputClassName="h-10 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 text-xs font-bold shadow-sm focus:ring-2 focus:ring-[var(--accent)]/30"
+                inputClassName={`h-10 rounded-[var(--radius-md)] border bg-[var(--card)] px-4 text-xs font-bold shadow-sm focus:ring-2 focus:ring-[var(--accent)]/30 ${!localStartDate ? 'border-red-300' : 'border-[var(--border)]'}`}
               />
             </div>
 
             <div className="space-y-1.5">
               <label className="ml-1 text-[11px] font-bold uppercase text-[var(--accent)]">
-                종료 일자
+                종료 일자 <span className="text-red-500">*</span>
               </label>
               <SmartDatePicker
                 data-testid="approval-leave-end-date"
                 value={localEndDate}
-                onChange={(value) => {
-                  setLocalEndDate(value);
-                  _setExtraData({ endDate: value });
-                }}
+                onChange={setLocalEndDate}
                 className="w-full"
-                inputClassName="h-10 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 text-xs font-bold shadow-sm focus:ring-2 focus:ring-[var(--accent)]/30"
+                inputClassName={`h-10 rounded-[var(--radius-md)] border bg-[var(--card)] px-4 text-xs font-bold shadow-sm focus:ring-2 focus:ring-[var(--accent)]/30 ${!localEndDate ? 'border-red-300' : 'border-[var(--border)]'}`}
               />
             </div>
           </div>
