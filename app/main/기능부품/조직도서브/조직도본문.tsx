@@ -96,7 +96,7 @@ export default function MainContent({
   }, [user]);
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col overflow-x-hidden bg-[var(--page-bg)] pb-[88px] md:pb-0">
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[var(--page-bg)] pb-[88px] md:pb-0">
       {mainMenu === '내정보' && (
         <div className="w-full min-h-0 flex-1 overflow-x-hidden" data-testid="mypage-view">
           <MyPage
