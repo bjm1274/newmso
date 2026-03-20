@@ -47,6 +47,15 @@ interface OrgChartProps {
   setSelectedCo: (co: string) => void;
 }
 
+const DEPT_STYLES: Record<string, { gradient: string; color: string }> = {
+  진료부: { gradient: 'from-blue-600 to-blue-500', color: '#3B82F6' },
+  간호부: { gradient: 'from-rose-500 to-pink-500', color: '#F43F5E' },
+  총무부: { gradient: 'from-emerald-600 to-green-500', color: '#10B981' },
+  운영본부: { gradient: 'from-violet-600 to-purple-500', color: '#8B5CF6' },
+  전략기획본부: { gradient: 'from-sky-600 to-blue-400', color: '#0EA5E9' },
+};
+const DEFAULT_DEPT_STYLE = { gradient: 'from-slate-700 to-slate-600', color: '#64748B' };
+
 /** 간호과장 이상 직급만 조직도에서 개인 연락처(phone) 조회 가능 (기능 비활성화됨 - 내선번호만 표시) */
 // const CAN_SEE_PERSONAL_CONTACT_POSITIONS = ['병원장', '원장', '이사', '진료부장', '간호과장', '간호부장', '실장', '총무부장', '본부장', '팀장', '부장'];
 
@@ -544,84 +553,134 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                     {group.type === 'pyramid' ? (
                       <>
                         <div className="hidden md:flex flex-col items-center min-w-max w-full">
-                          {(group as OrgPyramidData).director && (
-                            <div className="relative mb-24">
-                              <StaffCardRow staff={(group as OrgPyramidData).director!} onClick={() => setSelectedMember((group as OrgPyramidData).director!)} onMoveStaff={handleMoveStaff} isEditMode={isEditMode} setDraggedStaff={setDraggedStaff} draggedStaff={draggedStaff} />
-                              <div className="absolute left-1/2 -bottom-24 w-0.5 h-24 bg-[var(--toss-blue-light)] -translate-x-1/2"></div>
-                            </div>
-                          )}
-                          <div className="flex gap-20 relative pt-12 border-t-2 border-[var(--toss-blue-light)] items-start w-full justify-start">
-                            {(group as OrgPyramidData).departments?.map((dept, dIdx) => (
-                              <div key={dIdx} className={`flex flex-col min-w-0 ${dept.deptName === '진료부' ? 'flex-grow-0 min-w-[11rem] max-w-[12rem] items-start' : dept.deptName === '총무부' ? 'flex-grow-0 min-w-0 items-center ml-auto' : 'flex-1 items-center'}`}>
-                                <div className={`flex flex-row items-end gap-2 w-full mb-12 relative z-10 min-h-[88px] ${dept.deptName === '간호부' ? 'justify-start' : 'justify-center'}`}>
-                                  <div className="relative shrink-0 self-center">
-                                    <div className="bg-[#1E293B] text-white px-5 py-3 rounded-[var(--radius-md)] text-[11px] font-semibold shadow-sm whitespace-nowrap">{dept.deptName}</div>
-                                    <div className="absolute left-1/2 -bottom-12 w-0.5 h-12 bg-[var(--border)] -translate-x-1/2"></div>
+                          {/* 원장/대표 - 프리미엄 카드 */}
+                          {(group as OrgPyramidData).director && (() => {
+                            const dir = (group as OrgPyramidData).director!;
+                            const photoUrl = dir.photo_url || dir.avatar_url;
+                            return (
+                              <div className="flex flex-col items-center mb-4">
+                                <div
+                                  onClick={() => setSelectedMember(dir)}
+                                  className="flex items-center gap-4 px-8 py-4 bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0F172A] rounded-2xl shadow-lg border border-[#334155]/80 cursor-pointer hover:shadow-xl hover:-translate-y-0.5 transition-all min-w-[240px] group"
+                                >
+                                  <div className="w-14 h-14 rounded-xl bg-white/10 flex items-center justify-center overflow-hidden border-2 border-white/20 shrink-0">
+                                    {photoUrl ? <img src={photoUrl} alt={dir.name ?? ''} className="w-full h-full object-cover" /> : <span className="text-2xl text-white/50">👤</span>}
                                   </div>
+                                  <div className="flex flex-col min-w-0">
+                                    <p className="text-white font-bold text-base leading-tight group-hover:text-blue-200 transition-colors">{dir.name}</p>
+                                    <p className="text-blue-400 text-xs font-semibold mt-1">{dir.position}</p>
+                                    {dir.company && <p className="text-slate-400 text-[10px] mt-0.5">{dir.company}</p>}
+                                  </div>
+                                </div>
+                                <div className="w-0.5 h-10 bg-gradient-to-b from-slate-500 to-[var(--toss-blue-light)]"></div>
+                              </div>
+                            );
+                          })()}
+                          <div className="flex gap-12 relative pt-0 border-t-2 border-[var(--toss-blue-light)] items-start w-full justify-start">
+                            {(group as OrgPyramidData).departments?.map((dept, dIdx) => {
+                              const ds = DEPT_STYLES[dept.deptName] || DEFAULT_DEPT_STYLE;
+                              return (
+                                <div key={dIdx} className={`flex flex-col items-center min-w-0 ${dept.deptName === '진료부' ? 'flex-grow-0 min-w-[11rem] max-w-[12rem]' : dept.deptName === '총무부' ? 'flex-grow-0 min-w-0 ml-auto' : 'flex-1'}`}>
+                                  {/* 부서 헤더 */}
+                                  <div className="flex flex-col items-center mb-6">
+                                    <div className="w-0.5 h-8 bg-[var(--toss-blue-light)]"></div>
+                                    <div className={`px-6 py-2.5 rounded-xl text-white font-bold text-xs shadow-md whitespace-nowrap bg-gradient-to-r ${ds.gradient}`}>
+                                      {dept.deptName}
+                                    </div>
+                                    <div className="w-0.5 h-5 bg-[var(--border)]"></div>
+                                  </div>
+                                  {/* 부서장 */}
                                   {dept.heads?.length > 0 && (
-                                    <div className={`flex gap-1.5 justify-center items-end ${dept.deptName === '간호부' ? 'flex-nowrap shrink-0' : 'flex-wrap'}`}>
+                                    <div className="flex gap-1.5 flex-wrap justify-center mb-4">
+                                      {dept.heads.map((h) => (
+                                        <StaffCardRow key={h.id} staff={h} onClick={() => setSelectedMember(h)} onMoveStaff={handleMoveStaff} isEditMode={isEditMode} setDraggedStaff={setDraggedStaff} draggedStaff={draggedStaff} />
+                                      ))}
+                                    </div>
+                                  )}
+                                  {/* 팀 목록 */}
+                                  <div className={`flex flex-row gap-3 items-start w-full pb-2 ${dept.deptName === '총무부' ? 'flex-wrap justify-center' : 'overflow-x-auto no-scrollbar'}`}>
+                                    {dept.teams?.map((team, tIdx) => (
+                                      <div
+                                        key={tIdx}
+                                        className={`flex flex-col gap-3 bg-[var(--card)] p-4 rounded-2xl border border-[var(--border)] shrink-0 shadow-sm transition-all hover:shadow-md ${isEditMode ? 'hover:border-[var(--accent)] min-h-[80px]' : ''}`}
+                                        style={{ borderTopColor: ds.color, borderTopWidth: '3px' }}
+                                        onDragOver={isEditMode ? (e) => e.preventDefault() : undefined}
+                                        onDrop={isEditMode ? async (e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          if (!draggedStaff || draggedStaff.department === team.teamName) return;
+                                          if (confirm(`${draggedStaff.name}님을 [${team.teamName}] (으)로 이동하시겠습니까?`)) {
+                                            await supabase.from('staff_members').update({ department: team.teamName }).eq('id', draggedStaff.id);
+                                            alert('이동되었습니다.');
+                                            window.location.reload();
+                                          }
+                                        } : undefined}
+                                      >
+                                        <p className="text-[10px] font-bold text-center tracking-wider" style={{ color: ds.color }}>{team.teamName}</p>
+                                        <div className="flex flex-col gap-2.5">
+                                          {team.members.map((m) => (
+                                            <StaffCardRow key={m.id} staff={m} onClick={() => setSelectedMember(m)} onMoveStaff={handleMoveStaff} isEditMode={isEditMode} setDraggedStaff={setDraggedStaff} draggedStaff={draggedStaff} />
+                                          ))}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                        <div className="md:hidden w-full space-y-4">
+                          {(group as OrgPyramidData).director && (() => {
+                            const dir = (group as OrgPyramidData).director!;
+                            const photoUrl = dir.photo_url || dir.avatar_url;
+                            return (
+                              <div
+                                onClick={() => setSelectedMember(dir)}
+                                className="flex items-center gap-3 px-5 py-3.5 bg-gradient-to-r from-[#0F172A] to-[#1E293B] rounded-2xl shadow-md border border-[#334155]/80 cursor-pointer"
+                              >
+                                <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center overflow-hidden border border-white/20 shrink-0">
+                                  {photoUrl ? <img src={photoUrl} alt={dir.name ?? ''} className="w-full h-full object-cover" /> : <span className="text-lg text-white/50">👤</span>}
+                                </div>
+                                <div>
+                                  <p className="text-white font-bold text-sm">{dir.name}</p>
+                                  <p className="text-blue-400 text-[11px] font-semibold">{dir.position}</p>
+                                  {dir.company && <p className="text-slate-400 text-[10px]">{dir.company}</p>}
+                                </div>
+                              </div>
+                            );
+                          })()}
+                          {(group as OrgPyramidData).departments?.map((dept, dIdx) => {
+                            const ds = DEPT_STYLES[dept.deptName] || DEFAULT_DEPT_STYLE;
+                            return (
+                              <div key={dIdx} className="space-y-3">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className={`text-[11px] font-bold text-white px-3 py-1 rounded-lg bg-gradient-to-r ${ds.gradient}`}>{dept.deptName}</span>
+                                  {dept.heads?.length > 0 && (
+                                    <div className="flex flex-wrap gap-2">
                                       {dept.heads.map((h) => (
                                         <StaffCardRow key={h.id} staff={h} onClick={() => setSelectedMember(h)} onMoveStaff={handleMoveStaff} isEditMode={isEditMode} setDraggedStaff={setDraggedStaff} draggedStaff={draggedStaff} />
                                       ))}
                                     </div>
                                   )}
                                 </div>
-                                <div className={`flex flex-row gap-4 items-start justify-start w-full pb-2 ${dept.deptName === '총무부' ? 'flex-wrap' : 'overflow-x-auto no-scrollbar'}`}>
-                                  {dept.teams?.map((team, tIdx) => (
+                                <div className="flex flex-row gap-3 overflow-x-auto pb-2 no-scrollbar">
+                                  {dept.teams?.map((t, tIdx) => (
                                     <div
                                       key={tIdx}
-                                      className={`flex flex-col gap-4 bg-[var(--card)]/40 p-5 rounded-2xl border border-dashed border-[var(--border)] shrink-0 transition-colors ${isEditMode ? 'hover:border-[var(--border)] min-h-[100px]' : ''}`}
-                                      onDragOver={isEditMode ? (e) => e.preventDefault() : undefined}
-                                      onDrop={isEditMode ? async (e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        if (!draggedStaff || draggedStaff.department === team.teamName) return;
-                                        if (confirm(`${draggedStaff.name}님을 [${team.teamName}] (으)로 이동하시겠습니까?`)) {
-                                          await supabase.from('staff_members').update({ department: team.teamName }).eq('id', draggedStaff.id);
-                                          alert('이동되었습니다.');
-                                          window.location.reload();
-                                        }
-                                      } : undefined}
+                                      className="flex flex-col gap-2.5 shrink-0 min-w-[140px] bg-[var(--card)] rounded-2xl border border-[var(--border)] p-3 shadow-sm"
+                                      style={{ borderTopColor: ds.color, borderTopWidth: '3px' }}
                                     >
-                                      <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] text-center mb-1">[{team.teamName}]</p>
-                                      <div className="flex flex-col gap-3">
-                                        {team.members.map((m) => (
-                                          <StaffCardRow key={m.id} staff={m} onClick={() => setSelectedMember(m)} onMoveStaff={handleMoveStaff} isEditMode={isEditMode} setDraggedStaff={setDraggedStaff} draggedStaff={draggedStaff} />
-                                        ))}
-                                      </div>
+                                      <p className="text-[10px] font-bold text-center tracking-wider" style={{ color: ds.color }}>{t.teamName}</p>
+                                      {t.members.map((m) => (
+                                        <StaffCardRow key={m.id} staff={m} onClick={() => setSelectedMember(m)} onMoveStaff={handleMoveStaff} isEditMode={isEditMode} setDraggedStaff={setDraggedStaff} draggedStaff={draggedStaff} />
+                                      ))}
                                     </div>
                                   ))}
                                 </div>
                               </div>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="md:hidden w-full space-y-5">
-                          {(group as OrgPyramidData).director && <StaffCardRow staff={(group as OrgPyramidData).director!} onClick={() => setSelectedMember((group as OrgPyramidData).director!)} onMoveStaff={handleMoveStaff} isEditMode={isEditMode} setDraggedStaff={setDraggedStaff} draggedStaff={draggedStaff} />}
-                          {(group as OrgPyramidData).departments?.map((dept, dIdx) => (
-                            <div key={dIdx} className="space-y-4">
-                              <div className="flex flex-wrap items-center gap-3">
-                                <h3 className="text-xs font-semibold text-[var(--foreground)] border-l-4 border-[var(--accent)] pl-3 py-1 shrink-0">{dept.deptName}</h3>
-                                {dept.heads?.length > 0 && (
-                                  <div className="flex flex-wrap gap-2">
-                                    {dept.heads.map((h) => (
-                                      <StaffCardRow key={h.id} staff={h} onClick={() => setSelectedMember(h)} onMoveStaff={handleMoveStaff} isEditMode={isEditMode} setDraggedStaff={setDraggedStaff} draggedStaff={draggedStaff} />
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                              <div className="flex flex-row gap-4 overflow-x-auto pb-2 no-scrollbar">
-                                {dept.teams?.map((t, tIdx) => (
-                                  <div key={tIdx} className="flex flex-col gap-3 shrink-0 min-w-[140px]">
-                                    <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] text-center">[{t.teamName}]</p>
-                                    {t.members.map((m) => (
-                                      <StaffCardRow key={m.id} staff={m} onClick={() => setSelectedMember(m)} onMoveStaff={handleMoveStaff} isEditMode={isEditMode} setDraggedStaff={setDraggedStaff} draggedStaff={draggedStaff} />
-                                    ))}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </>
                     ) : (
@@ -639,115 +698,154 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
               <div className="flex flex-col items-center w-full">
                 {/* PC 피라미드 뷰 (md 이상) */}
                 <div className="hidden md:flex flex-col items-center min-w-max">
-                  {(viewData as any).director && (
-                    <div className="relative mb-24">
-                      <StaffCardRow staff={(viewData as any).director} onClick={() => setSelectedMember((viewData as any).director)} onMoveStaff={handleMoveStaff} isEditMode={isEditMode} setDraggedStaff={setDraggedStaff} draggedStaff={draggedStaff} />
-                      <div className="absolute left-1/2 -bottom-24 w-0.5 h-24 bg-[var(--toss-blue-light)] -translate-x-1/2"></div>
-                    </div>
-                  )}
+                  {/* 원장/대표 - 프리미엄 카드 */}
+                  {(viewData as OrgPyramidData).director && (() => {
+                    const dir = (viewData as OrgPyramidData).director!;
+                    const photoUrl = dir.photo_url || dir.avatar_url;
+                    return (
+                      <div className="flex flex-col items-center mb-4">
+                        <div
+                          onClick={() => setSelectedMember(dir)}
+                          className="flex items-center gap-4 px-8 py-4 bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0F172A] rounded-2xl shadow-lg border border-[#334155]/80 cursor-pointer hover:shadow-xl hover:-translate-y-0.5 transition-all min-w-[240px] group"
+                        >
+                          <div className="w-14 h-14 rounded-xl bg-white/10 flex items-center justify-center overflow-hidden border-2 border-white/20 shrink-0">
+                            {photoUrl ? <img src={photoUrl} alt={dir.name ?? ''} className="w-full h-full object-cover" /> : <span className="text-2xl text-white/50">👤</span>}
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <p className="text-white font-bold text-base leading-tight group-hover:text-blue-200 transition-colors">{dir.name}</p>
+                            <p className="text-blue-400 text-xs font-semibold mt-1">{dir.position}</p>
+                          </div>
+                        </div>
+                        <div className="w-0.5 h-10 bg-gradient-to-b from-slate-500 to-[var(--toss-blue-light)]"></div>
+                      </div>
+                    );
+                  })()}
 
-                  <div className="flex gap-20 relative pt-12 border-t-2 border-[var(--toss-blue-light)] items-start w-full">
-                    {(viewData as OrgPyramidData).departments.map((dept, dIdx) => (
-                      <div key={dIdx} className={`flex flex-col min-w-0 ${dept.deptName === '진료부' ? 'flex-grow-0 min-w-[11rem] max-w-[12rem] items-start' : dept.deptName === '총무부' ? 'flex-grow-0 min-w-0 items-center ml-auto' : 'flex-1 items-center'}`}>
-                        <div className={`flex flex-row items-end gap-2 w-full mb-12 relative z-10 min-h-[88px] ${dept.deptName === '간호부' ? 'justify-start' : 'justify-center'}`}>
-                          <div className="relative shrink-0 self-center">
-                            <div className="bg-[#1E293B] text-white px-5 py-3 rounded-[var(--radius-md)] text-[11px] font-semibold shadow-sm whitespace-nowrap">
+                  <div className="flex gap-12 relative pt-0 border-t-2 border-[var(--toss-blue-light)] items-start w-full">
+                    {(viewData as OrgPyramidData).departments.map((dept, dIdx) => {
+                      const ds = DEPT_STYLES[dept.deptName] || DEFAULT_DEPT_STYLE;
+                      return (
+                        <div key={dIdx} className={`flex flex-col items-center min-w-0 ${dept.deptName === '진료부' ? 'flex-grow-0 min-w-[11rem] max-w-[12rem]' : dept.deptName === '총무부' ? 'flex-grow-0 min-w-0 ml-auto' : 'flex-1'}`}>
+                          {/* 부서 헤더 */}
+                          <div className="flex flex-col items-center mb-6">
+                            <div className="w-0.5 h-8 bg-[var(--toss-blue-light)]"></div>
+                            <div className={`px-6 py-2.5 rounded-xl text-white font-bold text-xs shadow-md whitespace-nowrap bg-gradient-to-r ${ds.gradient}`}>
                               {dept.deptName}
                             </div>
-                            <div className="absolute left-1/2 -bottom-12 w-0.5 h-12 bg-[var(--border)] -translate-x-1/2"></div>
+                            <div className="w-0.5 h-5 bg-[var(--border)]"></div>
                           </div>
+                          {/* 부서장 */}
                           {dept.heads?.length > 0 && (
-                            <div className={`flex gap-1.5 justify-center items-end ${dept.deptName === '간호부' ? 'flex-nowrap shrink-0' : 'flex-wrap'}`}>
+                            <div className="flex gap-1.5 flex-wrap justify-center mb-4">
+                              {dept.heads.map((h) => (
+                                <StaffCardRow key={h.id} staff={h} onClick={() => setSelectedMember(h)} onMoveStaff={handleMoveStaff} isEditMode={isEditMode} setDraggedStaff={setDraggedStaff} draggedStaff={draggedStaff} />
+                              ))}
+                            </div>
+                          )}
+                          {/* 팀 목록 */}
+                          <div className={`flex flex-row gap-3 items-start w-full pb-2 ${dept.deptName === '총무부' ? 'flex-wrap justify-center' : 'overflow-x-auto no-scrollbar'}`}>
+                            {dept.teams.map((team, tIdx) => (
+                              <div
+                                key={tIdx}
+                                className={`flex flex-col gap-3 bg-[var(--card)] p-4 rounded-2xl border border-[var(--border)] shrink-0 shadow-sm transition-all hover:shadow-md ${isEditMode ? 'hover:border-[var(--accent)] min-h-[80px]' : ''}`}
+                                style={{ borderTopColor: ds.color, borderTopWidth: '3px' }}
+                                onDragOver={isEditMode ? (e) => e.preventDefault() : undefined}
+                                onDrop={isEditMode ? async (e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  if (!draggedStaff || draggedStaff.department === team.teamName) return;
+                                  if (confirm(`${draggedStaff.name}님을 [${team.teamName}] (으)로 이동하시겠습니까?`)) {
+                                    await supabase.from('staff_members').update({ department: team.teamName }).eq('id', draggedStaff.id);
+                                    alert('이동되었습니다.');
+                                    window.location.reload();
+                                  }
+                                } : undefined}
+                              >
+                                <p className="text-[10px] font-bold text-center tracking-wider" style={{ color: ds.color }}>{team.teamName}</p>
+                                <div className="flex flex-col gap-2.5">
+                                  {team.members.map((m) => (
+                                    <StaffCardRow key={m.id} staff={m} onClick={() => setSelectedMember(m)} onMoveStaff={handleMoveStaff} isEditMode={isEditMode} setDraggedStaff={setDraggedStaff} draggedStaff={draggedStaff} />
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 모바일 뷰 (md 미만) */}
+                <div className="md:hidden w-full space-y-4">
+                  {(viewData as OrgPyramidData).director && (() => {
+                    const dir = (viewData as OrgPyramidData).director!;
+                    const photoUrl = dir.photo_url || dir.avatar_url;
+                    return (
+                      <div
+                        onClick={() => setSelectedMember(dir)}
+                        className="flex items-center gap-3 px-5 py-3.5 bg-gradient-to-r from-[#0F172A] to-[#1E293B] rounded-2xl shadow-md border border-[#334155]/80 cursor-pointer"
+                      >
+                        <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center overflow-hidden border border-white/20 shrink-0">
+                          {photoUrl ? <img src={photoUrl} alt={dir.name ?? ''} className="w-full h-full object-cover" /> : <span className="text-lg text-white/50">👤</span>}
+                        </div>
+                        <div>
+                          <p className="text-white font-bold text-sm">{dir.name}</p>
+                          <p className="text-blue-400 text-[11px] font-semibold">{dir.position}</p>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  {(viewData as OrgPyramidData).departments.map((dept, dIdx) => {
+                    const ds = DEPT_STYLES[dept.deptName] || DEFAULT_DEPT_STYLE;
+                    return (
+                      <div key={dIdx} className="space-y-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className={`text-[11px] font-bold text-white px-3 py-1 rounded-lg bg-gradient-to-r ${ds.gradient}`}>{dept.deptName}</span>
+                          {dept.heads?.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
                               {dept.heads.map((h) => (
                                 <StaffCardRow key={h.id} staff={h} onClick={() => setSelectedMember(h)} onMoveStaff={handleMoveStaff} isEditMode={isEditMode} setDraggedStaff={setDraggedStaff} draggedStaff={draggedStaff} />
                               ))}
                             </div>
                           )}
                         </div>
-
-                        <div className={`flex flex-row gap-4 items-start justify-start w-full pb-2 ${dept.deptName === '총무부' ? 'flex-wrap' : 'overflow-x-auto no-scrollbar'}`}>
-                          {dept.teams.map((team, tIdx) => (
+                        <div className="flex flex-row gap-3 overflow-x-auto pb-2 no-scrollbar">
+                          {dept.teams.map((t, tIdx) => (
                             <div
                               key={tIdx}
-                              className={`flex flex-col gap-4 bg-[var(--card)]/40 p-5 rounded-2xl border border-dashed border-[var(--border)] shrink-0 transition-colors ${isEditMode ? 'hover:border-[var(--border)] min-h-[100px]' : ''}`}
+                              className={`flex flex-col gap-2.5 shrink-0 min-w-[140px] bg-[var(--card)] rounded-2xl border border-[var(--border)] p-3 shadow-sm transition-all ${isEditMode ? 'hover:border-[var(--accent)] min-h-[80px]' : ''}`}
+                              style={{ borderTopColor: ds.color, borderTopWidth: '3px' }}
                               onDragOver={isEditMode ? (e) => e.preventDefault() : undefined}
                               onDrop={isEditMode ? async (e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                if (!draggedStaff || draggedStaff.department === team.teamName) return;
-                                if (confirm(`${draggedStaff.name}님을 [${team.teamName}] (으)로 이동하시겠습니까?`)) {
-                                  await supabase.from('staff_members').update({ department: team.teamName }).eq('id', draggedStaff.id);
+                                if (!draggedStaff || draggedStaff.department === t.teamName) return;
+                                if (confirm(`${draggedStaff.name}님을 [${t.teamName}] (으)로 이동하시겠습니까?`)) {
+                                  await supabase.from('staff_members').update({ department: t.teamName }).eq('id', draggedStaff.id);
                                   alert('이동되었습니다.');
                                   window.location.reload();
                                 }
                               } : undefined}
                             >
-                              <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] text-center mb-1">[{team.teamName}]</p>
-                              <div className="flex flex-col gap-3">
-                                {team.members.map((m) => (
-                                  <StaffCardRow key={m.id} staff={m} onClick={() => setSelectedMember(m)} onMoveStaff={handleMoveStaff} isEditMode={isEditMode} setDraggedStaff={setDraggedStaff} draggedStaff={draggedStaff} />
-                                ))}
-                              </div>
+                              <p className="text-[10px] font-bold text-center tracking-wider" style={{ color: ds.color }}>{t.teamName}</p>
+                              {t.members.map((m) => (
+                                <StaffCardRow
+                                  key={m.id}
+                                  staff={m}
+                                  onClick={() => setSelectedMember(m)}
+                                  onMoveStaff={handleMoveStaff}
+                                  isEditMode={isEditMode}
+                                  setDraggedStaff={setDraggedStaff}
+                                  draggedStaff={draggedStaff}
+                                />
+                              ))}
                             </div>
                           ))}
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 모바일 리스트 뷰 (md 미만) */}
-                <div className="md:hidden w-full space-y-5">
-                  {(viewData as OrgPyramidData).director && (
-                    <div className="flex flex-col items-center">
-                      <StaffCardRow staff={(viewData as OrgPyramidData).director!} onClick={() => setSelectedMember((viewData as OrgPyramidData).director!)} onMoveStaff={handleMoveStaff} isEditMode={isEditMode} setDraggedStaff={setDraggedStaff} draggedStaff={draggedStaff} />
-                    </div>
-                  )}
-                  {(viewData as OrgPyramidData).departments.map((dept, dIdx) => (
-                    <div key={dIdx} className="space-y-4">
-                      <div className="flex flex-wrap items-center gap-3">
-                        <h3 className="text-xs font-semibold text-[var(--foreground)] border-l-4 border-[var(--accent)] pl-3 py-1 shrink-0">{dept.deptName}</h3>
-                        {dept.heads?.length > 0 && (
-                          <div className="flex flex-wrap gap-2">
-                            {dept.heads.map((h) => (
-                              <StaffCardRow key={h.id} staff={h} onClick={() => setSelectedMember(h)} onMoveStaff={handleMoveStaff} isEditMode={isEditMode} setDraggedStaff={setDraggedStaff} draggedStaff={draggedStaff} />
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex flex-row gap-4 overflow-x-auto pb-2 no-scrollbar">
-                        {dept.teams.map((t, tIdx) => (
-                          <div
-                            key={tIdx}
-                            className={`flex flex-col gap-3 shrink-0 min-w-[140px] rounded-2xl transition-all ${isEditMode ? 'border-2 border-dashed border-transparent hover:border-[var(--border)] p-2 min-h-[100px]' : ''}`}
-                            onDragOver={isEditMode ? (e) => e.preventDefault() : undefined}
-                            onDrop={isEditMode ? async (e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              if (!draggedStaff || draggedStaff.department === t.teamName) return;
-                              if (confirm(`${draggedStaff.name}님을 [${t.teamName}] (으)로 이동하시겠습니까?`)) {
-                                await supabase.from('staff_members').update({ department: t.teamName }).eq('id', draggedStaff.id);
-                                alert('이동되었습니다.');
-                                window.location.reload();
-                              }
-                            } : undefined}
-                          >
-                            <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] text-center">[{t.teamName}]</p>
-                            {t.members.map((m) => (
-                              <StaffCardRow
-                                key={m.id}
-                                staff={m}
-                                onMoveStaff={handleMoveStaff}
-                                isEditMode={isEditMode}
-                                setDraggedStaff={setDraggedStaff}
-                                draggedStaff={draggedStaff}
-                              />
-                            ))}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             ) : (
