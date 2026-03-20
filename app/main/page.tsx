@@ -724,7 +724,7 @@ function MainPageContent() {
 
   return (
     <div
-      className="flex min-h-[100dvh] w-full flex-col overflow-x-hidden bg-[var(--background)] md:flex-row"
+      className="flex h-[100dvh] w-full flex-col overflow-hidden bg-[var(--background)] md:flex-row"
       data-testid="main-shell"
     >
       <Sidebar
@@ -783,7 +783,7 @@ function MainPageContent() {
         </aside>
       )}
 
-      <div className="relative flex min-h-0 flex-1 flex-col overflow-x-hidden">
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         {/* 접속 시 한 번 알림·GPS 권한 요청 모달 */}
         <PermissionPromptModal />
         {/* 채팅·전자결재·연차촉진·출퇴근 실시간 알림 통합 배너 (웹·모바일 즉시 표시) */}
