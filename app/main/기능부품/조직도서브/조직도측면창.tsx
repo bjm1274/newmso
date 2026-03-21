@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { canAccessMainMenu } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
 import NotificationCenter from '../NotificationCenter';
@@ -107,7 +107,10 @@ type SidebarUser = {
 export default function Sidebar({ user, mainMenu, onMenuChange }: { user?: SidebarUser | null; mainMenu?: string; onMenuChange: (menuId: string) => void }) {
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
 
-  const visibleMenus = MAIN_MENUS.filter((menu) => canAccessMainMenu(user, menu.id));
+  const visibleMenus = useMemo(
+    () => MAIN_MENUS.filter((menu) => canAccessMainMenu(user, menu.id)),
+    [user]
+  );
 
   const fetchChatUnreadCount = useCallback(async () => {
     if (!user?.id) {
@@ -146,9 +149,6 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: { user?: Sideb
         cursorMap[cursor.room_id] = cursor.last_read_at;
       });
 
-      // 커서가 없는 방은 최근 30일 메시지만 미읽음으로 카운트 (오래된 메시지가 영구적으로 배지 띄우는 문제 방지)
-      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-
       let totalUnread = 0;
       for (const roomId of roomIds) {
         let query = supabase
@@ -161,9 +161,6 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: { user?: Sideb
         const lastReadAt = cursorMap[roomId];
         if (lastReadAt) {
           query = query.gt('created_at', lastReadAt);
-        } else {
-          // 한 번도 방에 들어가지 않은 경우 → 최근 30일 메시지만 카운트
-          query = query.gt('created_at', thirtyDaysAgo);
         }
 
         const { count, error: countError } = await query;
@@ -203,7 +200,7 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: { user?: Sideb
     };
   }, [fetchChatUnreadCount, user?.id]);
 
-  const handleMenuClick = (menuId: string) => {
+  const handleMenuClick = useCallback((menuId: string) => {
     if (menuId === '내정보' && typeof window !== 'undefined') {
       try {
         window.localStorage.removeItem(MYPAGE_TAB_KEY);
@@ -213,7 +210,7 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: { user?: Sideb
     }
 
     onMenuChange(menuId);
-  };
+  }, [onMenuChange]);
 
   return (
     <>
@@ -223,7 +220,7 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: { user?: Sideb
         data-testid="desktop-sidebar"
       >
         <div className="mb-2 flex w-full shrink-0 flex-col items-center px-1.5">
-          {user && <NotificationCenter user={user} />}
+          {user && <NotificationCenter user={user} onOpenMenu={onMenuChange} />}
         </div>
 
         <div className="no-scrollbar flex w-full flex-1 flex-col gap-0.5 overflow-y-auto px-1.5">
@@ -280,13 +277,12 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: { user?: Sideb
           </button>
         ))}
         {user && (
-          <div className="sticky right-0 flex min-h-[48px] flex-none flex-col items-center justify-center bg-[var(--card)] pl-1 pr-1 border-l border-[var(--border)]">
-            <NotificationCenter user={user} />
+          <div className="flex min-h-[48px] flex-none flex-col items-center justify-center px-2">
+            <NotificationCenter user={user} onOpenMenu={onMenuChange} />
           </div>
         )}
       </nav>
     </>
   );
 }
-
 

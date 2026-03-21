@@ -524,7 +524,7 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
                   onToggleEdit={handleToggleEdit}
                 />
                 <div className="min-w-0 flex-1">
-                  <RoleDashboard user={user} setMainMenu={setMainMenu} />
+                  <RoleDashboard user={user} setMainMenu={setMainMenu} onOpenApproval={onOpenApproval} />
                 </div>
               </div>
               <MyProfileCard

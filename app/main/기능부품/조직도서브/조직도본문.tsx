@@ -1,19 +1,51 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
 import { normalizeMainMenuForUser } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
-import type { ErpUser, ERPData } from '@/types';
+import type { ErpUser, ERPData, StaffMember } from '@/types';
 
-import OrgChart from './OrgChart';
-import MyPage from '../마이페이지';
-import ChatView from '../메신저';
-import BoardView from '../게시판';
-import ApprovalView from '../전자결재';
-import HRView from '../인사관리';
-import InventoryView from '../재고관리_통합완성';
-import AdminView from '../관리자전용';
-import 추가기능 from '../추가기능';
+const OrgChart = dynamic(() => import('./OrgChart'), {
+  ssr: false,
+  loading: () => <MenuViewLoading label="조직도" />,
+});
+const MyPage = dynamic(() => import('../마이페이지'), {
+  ssr: false,
+  loading: () => <MenuViewLoading label="내정보" />,
+});
+const NotificationInbox = dynamic(() => import('../알림인박스'), {
+  ssr: false,
+  loading: () => <MenuViewLoading label="알림" />,
+});
+const ChatView = dynamic(() => import('../메신저'), {
+  ssr: false,
+  loading: () => <MenuViewLoading label="채팅" />,
+});
+const BoardView = dynamic(() => import('../게시판'), {
+  ssr: false,
+  loading: () => <MenuViewLoading label="게시판" />,
+});
+const ApprovalView = dynamic(() => import('../전자결재'), {
+  ssr: false,
+  loading: () => <MenuViewLoading label="전자결재" />,
+});
+const HRView = dynamic(() => import('../인사관리'), {
+  ssr: false,
+  loading: () => <MenuViewLoading label="인사관리" />,
+});
+const InventoryView = dynamic(() => import('../재고관리_통합완성'), {
+  ssr: false,
+  loading: () => <MenuViewLoading label="재고관리" />,
+});
+const AdminView = dynamic(() => import('../관리자전용'), {
+  ssr: false,
+  loading: () => <MenuViewLoading label="관리자" />,
+});
+const ExtraFeatures = dynamic(() => import('../추가기능'), {
+  ssr: false,
+  loading: () => <MenuViewLoading label="추가기능" />,
+});
 
 interface MainContentProps {
   user: ErpUser | null;
@@ -42,6 +74,20 @@ interface MainContentProps {
   onConsumeInitialInventoryWorkflowApprovalId?: () => void;
   setMainMenu?: (v: string) => void;
   onOpenChatMessage?: (roomId: string, messageId: string) => void;
+}
+
+function MenuViewLoading({ label }: { label: string }) {
+  return (
+    <div className="flex min-h-[320px] items-center justify-center rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)]">
+      <div className="flex flex-col items-center gap-3 text-center">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--toss-blue-light)] border-t-[var(--accent)]" />
+        <div className="space-y-1">
+          <p className="text-sm font-bold text-[var(--foreground)]">{label} 불러오는 중</p>
+          <p className="text-xs font-medium text-[var(--toss-gray-3)]">필요한 화면만 로드해서 더 빠르게 열고 있습니다.</p>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function MainContent({
@@ -92,7 +138,7 @@ export default function MainContent({
       }
     };
 
-    checkNotifications();
+    void checkNotifications();
   }, [user]);
 
   return (
@@ -110,9 +156,21 @@ export default function MainContent({
         </div>
       )}
 
+      {mainMenu === '알림' && (
+        <div className="w-full min-h-0 flex-1 overflow-x-hidden" data-testid="notifications-view">
+          <NotificationInbox user={user} onRefresh={() => {}} />
+        </div>
+      )}
+
       {mainMenu === '조직도' && (
         <div className="min-h-0 flex-1 overflow-x-hidden" data-testid="org-view">
-          <OrgChart user={user} staffs={data.staffs} depts={data.depts} selectedCo={selectedCo} setSelectedCo={setSelectedCo} />
+          <OrgChart
+            user={user}
+            staffs={data.staffs}
+            depts={data.depts}
+            selectedCo={selectedCo}
+            setSelectedCo={setSelectedCo}
+          />
         </div>
       )}
 
@@ -196,7 +254,7 @@ export default function MainContent({
 
       {mainMenu === '추가기능' && (
         <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden" data-testid="extra-view">
-          <추가기능
+          <ExtraFeatures
             user={user}
             staffs={data.staffs}
             posts={data.posts}
@@ -206,7 +264,6 @@ export default function MainContent({
               else if (type === 'approval') setMainMenu?.('전자결재');
               else if (type === 'message') setMainMenu?.('채팅');
             }}
-            onOpenOrgChart={() => setMainMenu?.(normalizeMainMenuForUser(user, '조직도'))}
           />
         </div>
       )}

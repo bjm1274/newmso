@@ -8,6 +8,7 @@ type UserLike = {
 
 export type MainMenuId =
   | '내정보'
+  | '알림'
   | '조직도'
   | '추가기능'
   | '채팅'
@@ -128,6 +129,7 @@ const LEGACY_PERMISSION_ALIASES: Record<string, string[]> = {
   menu_재고관리: ['inventory'],
   menu_관리자: ['admin'],
   extra_조직도: ['menu_조직도'],
+  extra_입금실시간조회: ['menu_추가기능'],
   extra_인계노트: ['handover_read'],
   approval_기안함: ['approval'],
   approval_결재함: ['approval'],
@@ -287,6 +289,7 @@ export function isPrivilegedUser(user: UserLike | null | undefined): boolean {
 export function canAccessMainMenu(user: UserLike | null | undefined, menuId: string): boolean {
   switch (menuId as MainMenuId) {
     case '내정보':
+    case '알림':
     case '채팅':
       return true;
     case '조직도':
@@ -383,6 +386,7 @@ export function canAccessExtraFeature(
   user: UserLike | null | undefined,
   featureIdOrPermissionKey: string
 ): boolean {
+  if (featureIdOrPermissionKey === '조직도') return true;
   if (isPrivilegedUser(user)) return true;
   if (!canAccessMainMenu(user, '추가기능')) return false;
   return hasPermission(user, resolvePermissionKey(featureIdOrPermissionKey, EXTRA_FEATURE_PERMISSION_KEYS));
