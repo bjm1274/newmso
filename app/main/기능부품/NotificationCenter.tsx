@@ -1,6 +1,6 @@
-'use client';
+﻿'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { sound } from '@/lib/sounds';
@@ -46,7 +46,13 @@ function buildInventoryNotificationHref(metadata: Record<string, any>) {
   return `/main?${params.toString()}`;
 }
 
-export default function NotificationCenter({ user }: { user: any }) {
+export default function NotificationCenter({
+  user,
+  onOpenMenu,
+}: {
+  user: any;
+  onOpenMenu?: (menuId: string) => void;
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -117,7 +123,7 @@ export default function NotificationCenter({ user }: { user: any }) {
     prevCountRef.current = unreadCount;
   }, [unreadCount]);
 
-  const markAllAsRead = async () => {
+  const markAllAsRead = useCallback(async () => {
     if (!user?.id) return;
 
     const readAt = new Date().toISOString();
@@ -133,9 +139,9 @@ export default function NotificationCenter({ user }: { user: any }) {
     })));
     setUnreadCount(0);
     sound.playSystem();
-  };
+  }, [user?.id]);
 
-  const markAsRead = async (id: string) => {
+  const markAsRead = useCallback(async (id: string) => {
     const readAt = new Date().toISOString();
     await supabase.from('notifications').update({ read_at: readAt }).eq('id', id);
     setNotifications((prev) =>
@@ -144,9 +150,25 @@ export default function NotificationCenter({ user }: { user: any }) {
       )
     );
     setUnreadCount((prev) => Math.max(0, prev - 1));
-  };
+  }, []);
 
-  const handleNotiClick = (notification: any) => {
+  const openMyPage = useCallback(() => {
+    if (onOpenMenu) {
+      onOpenMenu('내정보');
+      return;
+    }
+    router.push('/main?open_menu=내정보');
+  }, [onOpenMenu, router]);
+
+  const openMyNotifications = useCallback(() => {
+    if (onOpenMenu) {
+      onOpenMenu('알림');
+      return;
+    }
+    router.push('/main?open_menu=알림');
+  }, [onOpenMenu, router]);
+
+  const handleNotiClick = useCallback((notification: any) => {
     if (!notification.read_at) {
       void markAsRead(notification.id);
     }
@@ -176,7 +198,7 @@ export default function NotificationCenter({ user }: { user: any }) {
       notification.type === 'hr' ||
       notification.type === '인사'
     ) {
-      router.push('/main?open_menu=내정보');
+      openMyNotifications();
       return;
     }
 
@@ -185,11 +207,17 @@ export default function NotificationCenter({ user }: { user: any }) {
       return;
     }
 
-    router.push('/main?open_menu=내정보');
-  };
+    openMyPage();
+  }, [markAsRead, openMyNotifications, openMyPage, router]);
 
-  const unread = notifications.filter((notification) => !notification.read_at);
-  const read = notifications.filter((notification) => !!notification.read_at);
+  const unread = useMemo(
+    () => notifications.filter((notification) => !notification.read_at),
+    [notifications]
+  );
+  const read = useMemo(
+    () => notifications.filter((notification) => !!notification.read_at),
+    [notifications]
+  );
 
   return (
     <div className="relative z-[260]" ref={dropdownRef} data-testid="notification-center">
@@ -345,7 +373,7 @@ export default function NotificationCenter({ user }: { user: any }) {
               type="button"
               onClick={() => {
                 setIsOpen(false);
-                router.push('/main?open_menu=내정보');
+                openMyNotifications();
               }}
               className="text-[11px] font-bold text-[var(--accent)] hover:underline"
             >

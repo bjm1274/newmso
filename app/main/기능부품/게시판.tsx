@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useDeferredValue, useState, useEffect, useMemo, useRef } from 'react';
 import { canAccessBoard } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnFallback } from '@/lib/supabase-compat';
@@ -87,6 +87,14 @@ interface BoardViewProps {
   onRefresh?: () => void;
   setMainMenu?: (menu: string) => void;
 }
+type BoardCommentRow = {
+  id: string;
+  author_id?: string;
+  author_name?: string;
+  content?: string;
+  parent_comment_id?: string | null;
+  [key: string]: unknown;
+};
 export default function BoardView({ user, subView, setSubView, selectedCo, selectedCompanyId, initialBoard, initialPostId, onConsumePostId, surgeries, mris, onRefresh, setMainMenu }: BoardViewProps) {
   const defaultBoard =
     BOARD_IDS.find((boardId) => canAccessBoard(user, boardId, 'read')) || '공지사항';
@@ -114,6 +122,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   const [scheduleTransfusion, setScheduleTransfusion] = useState(false);
   const [scheduleSide, setScheduleSide] = useState<'좌' | '우' | ''>('');
   const [searchKeyword, setSearchKeyword] = useState('');
+  const deferredSearchKeyword = useDeferredValue(searchKeyword);
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
   const [schedulePeriod, setSchedulePeriod] = useState('');
@@ -195,6 +204,55 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     description: '',
   };
   const canCreatePost = canAccessBoard(user, activeBoard, 'write');
+  const scheduleCalendarData = useMemo(() => {
+    const toKey = (date: Date) =>
+      `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+    if (activeBoard !== '수술일정' && activeBoard !== 'MRI일정') {
+      return {
+        filteredPosts: [] as BoardPost[],
+        eventsByDate: {} as Record<string, BoardPost[]>,
+        days: [] as Date[],
+        month: calendarMonth.getMonth(),
+        toKey,
+      };
+    }
+
+    const searchLower = deferredSearchKeyword.trim().toLowerCase();
+    const filteredPosts = searchLower
+      ? posts.filter((post: BoardPost) =>
+          (post.patient_name || '').toLowerCase().includes(searchLower) ||
+          (post.content || '').toLowerCase().includes(searchLower)
+        )
+      : posts;
+
+    const eventsByDate: Record<string, BoardPost[]> = {};
+    filteredPosts.forEach((post: BoardPost) => {
+      const dateKey = post.schedule_date;
+      if (!dateKey) return;
+      if (!eventsByDate[dateKey]) {
+        eventsByDate[dateKey] = [];
+      }
+      eventsByDate[dateKey].push(post);
+    });
+
+    const year = calendarMonth.getFullYear();
+    const month = calendarMonth.getMonth();
+    const firstOfMonth = new Date(year, month, 1);
+    const startDay = firstOfMonth.getDay();
+    const startDate = new Date(year, month, 1 - startDay);
+    const days = Array.from({ length: 42 }, (_, index) => (
+      new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + index)
+    ));
+
+    return {
+      filteredPosts,
+      eventsByDate,
+      days,
+      month,
+      toKey,
+    };
+  }, [activeBoard, posts, deferredSearchKeyword, calendarMonth]);
 
   // 오전/오후 + 시/분 드롭다운 값을 HH:MM 문자열로 변환
   const updateScheduleTime = (period: string, hour: string, minute: string) => {
@@ -487,6 +545,23 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   );
   const [selectedPostDetail, setSelectedPostDetail] = useState<BoardPost | null>(null);
   const selectedPost = selectedPostDetail || selectedPostFromList;
+  const selectedPostComments = useMemo(
+    () => (selectedPost ? ((comments[selectedPost.id] || []) as BoardCommentRow[]) : []),
+    [comments, selectedPost]
+  );
+  const selectedPostCommentTree = useMemo(() => {
+    const roots = selectedPostComments.filter((comment) => !comment.parent_comment_id);
+    const repliesByParent: Record<string, BoardCommentRow[]> = {};
+
+    selectedPostComments.forEach((comment) => {
+      if (!comment.parent_comment_id) return;
+      const key = String(comment.parent_comment_id);
+      if (!repliesByParent[key]) repliesByParent[key] = [];
+      repliesByParent[key].push(comment);
+    });
+
+    return { roots, repliesByParent };
+  }, [selectedPostComments]);
 
   useEffect(() => {
     if (!selectedPostId) {
@@ -1387,39 +1462,11 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
               </div>
 
               {(() => {
-                const searchLower = searchKeyword.trim().toLowerCase();
-                const filteredPosts = searchLower ? posts.filter((p: BoardPost) =>
-                  (p.patient_name || '').toLowerCase().includes(searchLower) ||
-                  (p.content || '').toLowerCase().includes(searchLower)
-                ) : posts;
+                const { filteredPosts, eventsByDate, days, month, toKey } = scheduleCalendarData;
 
                 if (filteredPosts.length === 0) {
                   return <div className="py-8 text-center text-xs text-[var(--toss-gray-3)] font-bold">등록된 일정이 없습니다.</div>;
                 }
-
-                // 날짜별 일정 매핑 (YYYY-MM-DD → 배열)
-                const eventsByDate: Record<string, BoardPost[]> = {};
-                (filteredPosts).forEach((p: BoardPost) => {
-                  const d = p.schedule_date;
-                  if (!d) return;
-                  eventsByDate[d] = eventsByDate[d] ? [...eventsByDate[d], p] : [p];
-                });
-
-                const year = calendarMonth.getFullYear();
-                const month = calendarMonth.getMonth();
-                const firstOfMonth = new Date(year, month, 1);
-                const startDay = firstOfMonth.getDay(); // 0:일 ~ 6:토
-                const startDate = new Date(year, month, 1 - startDay);
-                const days: Date[] = [];
-                for (let i = 0; i < 42; i += 1) {
-                  days.push(new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + i));
-                }
-
-                const toKey = (d: Date) =>
-                  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
-                    d.getDate(),
-                  )
-                    .padStart(2, '0')}`;
 
                 return (
                   <div className="border border-[var(--border)] rounded-[var(--radius-lg)] overflow-hidden">
@@ -1815,16 +1862,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                     </span>
                   </p>
                   {(() => {
-                    type CommentRow = { id: string; author_id?: string; author_name?: string; content?: string; parent_comment_id?: string | null; [key: string]: unknown; };
-                    const list = (comments[selectedPost.id] || []) as CommentRow[];
-                    const roots = list.filter((c) => !c.parent_comment_id);
-                    const repliesByParent: Record<string, CommentRow[]> = {};
-                    list.forEach((c) => {
-                      if (!c.parent_comment_id) return;
-                      const key = String(c.parent_comment_id);
-                      if (!repliesByParent[key]) repliesByParent[key] = [];
-                      repliesByParent[key].push(c);
-                    });
+                    const { roots, repliesByParent } = selectedPostCommentTree;
                     return (
                       <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
                         {roots.map((c) => (

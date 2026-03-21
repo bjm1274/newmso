@@ -45,13 +45,25 @@ const extraFeaturesUser = {
   },
 };
 
+const partnerCompanyStaff = {
+  ...fakeUser,
+  id: '99999999-9999-9999-9999-999999999999',
+  employee_no: 'E2E-099',
+  name: 'Cross Viewer',
+  company: 'Partner Hospital',
+  company_id: '33333333-3333-3333-3333-333333333333',
+  department: '영상의학과',
+  position: '사원',
+  role: 'staff',
+};
+
 test('extra features cards open one by one in a practical click-through flow', async ({
   page,
 }) => {
   const runtimeErrors = trackRuntimeErrors(page);
 
   await mockSupabase(page, {
-    staffMembers: [extraFeaturesUser],
+    staffMembers: [extraFeaturesUser, partnerCompanyStaff],
   });
   await seedSession(page, {
     user: extraFeaturesUser,
@@ -74,9 +86,12 @@ test('extra features cards open one by one in a practical click-through flow', a
   await expect(page.getByTestId('extra-features-list')).toBeVisible();
 
   await page.getByTestId('extra-card-org-chart').click();
-  await expect(page.getByTestId('org-view')).toBeVisible();
-
-  await page.getByTestId('sidebar-menu-extra').click();
+  await expect(page.getByTestId('extra-subview')).toBeVisible();
+  await expect(page.getByTestId('org-chart-pyramid-view')).toBeVisible();
+  await expect(page.getByText('Cross Viewer')).toBeVisible();
+  await page.getByRole('button', { name: 'Partner Hospital' }).click();
+  await expect(page.getByText('Cross Viewer')).toBeVisible();
+  await page.getByTestId('extra-back-button').click();
   await expect(page.getByTestId('extra-features-list')).toBeVisible();
 
   const internalCards = [

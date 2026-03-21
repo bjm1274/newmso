@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback } from 'react';
+import { useDeferredValue, useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { getProfilePhotoUrl, normalizeProfileUser } from '@/lib/profile-photo';
 import SmartDatePicker from './공통/SmartDatePicker';
@@ -208,6 +208,8 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   const pendingBottomAlignRoomIdRef = useRef<string | null>(null);
   const [omniSearch, setOmniSearch] = useState('');
   const [chatSearch, setChatSearch] = useState('');
+  const deferredOmniSearch = useDeferredValue(omniSearch);
+  const deferredChatSearch = useDeferredValue(chatSearch);
   const [inputMsg, setInputMsg] = useState('');
   const [activeActionMsg, setActiveActionMsg] = useState<ChatMessage | null>(null);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
@@ -316,6 +318,14 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     });
     return Array.from(merged.values());
   }, [chatDirectoryStaffs, staffs]);
+  const allKnownStaffMap = useMemo(() => {
+    const next = new Map<string, StaffMember>();
+    allKnownStaffs.forEach((staff: StaffMember) => {
+      if (!staff?.id) return;
+      next.set(String(staff.id), staff);
+    });
+    return next;
+  }, [allKnownStaffs]);
   const noticeRoomMembers = useMemo(
     () => allKnownStaffs.filter((staff: StaffMember) => isActiveNoticeMember(staff)),
     [allKnownStaffs]
@@ -326,8 +336,8 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   );
   const findKnownStaffById = useCallback(
     (staffId: string | null | undefined) =>
-      allKnownStaffs.find(( staff: StaffMember) => String(staff.id) === String(staffId)) || null,
-    [allKnownStaffs]
+      allKnownStaffMap.get(String(staffId)) || null,
+    [allKnownStaffMap]
   );
   const resolveStaffProfile = useCallback(
     (staffId: string | null | undefined, fallbackName?: string | null) => {
@@ -753,6 +763,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [addMemberSearch, setAddMemberSearch] = useState('');
+  const deferredAddMemberSearch = useDeferredValue(addMemberSearch);
   const [addMemberSelectingIds, setAddMemberSelectingIds] = useState<string[]>([]);
 
   const [threadRoot, setThreadRoot] = useState<any | null>(null);
@@ -1484,15 +1495,15 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     return staffs
       .filter(( s: StaffMember) => !currentMemberIds.has(String(s.id)))
       .filter(( s: StaffMember) => {
-        if (!addMemberSearch.trim()) return true;
-        const key = addMemberSearch.trim();
+        if (!deferredAddMemberSearch.trim()) return true;
+        const key = deferredAddMemberSearch.trim();
         return (
           s.name?.includes(key) ||
           s.department?.includes(key) ||
           s.position?.includes(key)
         );
       });
-  }, [selectedRoom, staffs, addMemberSearch]);
+  }, [selectedRoom, staffs, deferredAddMemberSearch]);
 
   const visibleRooms = useMemo(
     () => {
@@ -1522,17 +1533,66 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     [chatRooms, effectiveChatUserId]
   );
 
+  const roomLabelMap = useMemo(() => {
+    const next = new Map<string, string>();
+    visibleRooms.forEach((room: ChatRoom) => {
+      next.set(String(room.id), getRoomDisplayName(room, allKnownStaffs, effectiveChatUserId));
+    });
+    return next;
+  }, [visibleRooms, allKnownStaffs, effectiveChatUserId]);
+
   const sidebarRooms = useMemo(() => {
-    const keyword = omniSearch.trim().toLowerCase();
+    const keyword = deferredOmniSearch.trim().toLowerCase();
     const filtered = visibleRooms.filter(( room: ChatRoom) => {
-      const label = getRoomDisplayName(room, allKnownStaffs, effectiveChatUserId).toLowerCase();
+      const label = (roomLabelMap.get(String(room.id)) || '').toLowerCase();
       const isHidden = roomPrefs[room.id]?.hidden === true;
       if (isHidden && !showHiddenRooms) return false;
       if (!keyword) return true;
       return label.includes(keyword);
     });
     return sortRoomsForSidebar(filtered, roomPrefs);
-  }, [visibleRooms, omniSearch, roomPrefs, showHiddenRooms, allKnownStaffs, effectiveChatUserId]);
+  }, [visibleRooms, deferredOmniSearch, roomPrefs, showHiddenRooms, roomLabelMap]);
+  const sidebarRoomItems = useMemo(() => {
+    return sidebarRooms.map((room: ChatRoom) => {
+      const roomId = String(room.id);
+      const members = normalizeMemberIds(room.members);
+      const peer =
+        room.type === 'direct'
+          ? members
+              .map((memberId) => allKnownStaffMap.get(memberId))
+              .find(
+                (staff: StaffMember | undefined) =>
+                  Boolean(staff) && String(staff!.id) !== effectiveChatUserId
+              ) || null
+          : null;
+
+      return {
+        room,
+        roomId,
+        unread: roomUnreadCounts[room.id] || 0,
+        isSelected: selectedRoomId === room.id,
+        isNoticeChannel: room.id === NOTICE_ROOM_ID,
+        label: roomLabelMap.get(roomId) || '',
+        preview: getRoomPreviewText(room),
+        isPeerOnline: peer ? Boolean(presenceMap[String(peer.id)]) : false,
+        isPinned: roomPrefs[room.id]?.pinned === true,
+        isHidden: roomPrefs[room.id]?.hidden === true,
+      };
+    });
+  }, [
+    allKnownStaffMap,
+    effectiveChatUserId,
+    presenceMap,
+    roomLabelMap,
+    roomPrefs,
+    roomUnreadCounts,
+    selectedRoomId,
+    sidebarRooms,
+  ]);
+  const visibleRoomIds = useMemo(
+    () => visibleRooms.map((room: ChatRoom) => room.id),
+    [visibleRooms]
+  );
 
   const typingNoticeText = useMemo(() => {
     const names = Object.values(typingUsers).filter(Boolean);
@@ -2068,6 +2128,16 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     });
   }, [mediaMessages, mediaFilter]);
 
+  const sharedMediaPreviewMessages = useMemo(
+    () => messages.filter((message) => message.file_kind === 'image' || message.file_kind === 'video').slice(-6),
+    [messages]
+  );
+
+  const sharedLinkPreviewMessages = useMemo(
+    () => messages.filter((message) => message.content && message.content.includes('http')).slice(-3),
+    [messages]
+  );
+
   const mentionCandidates = useMemo(() => {
     if (!showMentionList) return [];
     const base =
@@ -2210,19 +2280,18 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     } catch (_) { }
   };
 
-  const handleGlobalSearch = async () => {
+  const handleGlobalSearch = useCallback(async () => {
     if (!globalSearchQuery.trim()) return;
     setGlobalSearchLoading(true);
     try {
-      const roomIds = visibleRooms.map(r => r.id);
-      if (roomIds.length === 0) {
+      if (visibleRoomIds.length === 0) {
         setGlobalSearchResults([]);
         return;
       }
       const { data, error } = await supabase
         .from('messages')
         .select('*')
-        .in('room_id', roomIds)
+        .in('room_id', visibleRoomIds)
         .ilike('content', `%${globalSearchQuery}%`)
         .order('created_at', { ascending: false })
         .limit(50);
@@ -2253,25 +2322,31 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     } finally {
       setGlobalSearchLoading(false);
     }
-  };
+  }, [globalSearchQuery, resolveStaffProfile, visibleRoomIds]);
 
-  const combinedTimeline = useMemo(() => {
+  const visibleTimelineMessages = useMemo(() => {
     const msgs = messages.filter(( m: ChatMessage) => !m.is_deleted);
-    let filtered = msgs;
-    if (chatSearch.trim()) {
-      const q = chatSearch.toLowerCase();
-      filtered = msgs.filter((m) =>
+    if (deferredChatSearch.trim()) {
+      const q = deferredChatSearch.toLowerCase();
+      return msgs.filter((m) =>
         (m.content || '').toLowerCase().includes(q) ||
         ((m.staff as { name?: string } | null | undefined)?.name || '').toLowerCase().includes(q)
       );
     }
-    const ms = filtered.map(m => ({ ...m, type: 'message' }));
-    const ps = polls
+    return msgs;
+  }, [messages, deferredChatSearch]);
+  const selectedRoomPollTimelineItems = useMemo(
+    () =>
+      polls
       .filter((p: Record<string, unknown>) => p.room_id === selectedRoomId)
-      .map(p => ({ ...p, type: 'poll', created_at: p.created_at || new Date().toISOString() }));
-
+      .map(p => ({ ...p, type: 'poll', created_at: p.created_at || new Date().toISOString() })),
+    [polls, selectedRoomId]
+  );
+  const combinedTimeline = useMemo(() => {
+    const ms = visibleTimelineMessages.map(m => ({ ...m, type: 'message' }));
+    const ps = selectedRoomPollTimelineItems;
     return [...ms, ...ps].sort((a, b) => new Date((a as Record<string,unknown>).created_at as string || 0).getTime() - new Date((b as Record<string,unknown>).created_at as string || 0).getTime());
-  }, [messages, chatSearch, polls, selectedRoomId]);
+  }, [selectedRoomPollTimelineItems, visibleTimelineMessages]);
 
   useEffect(() => {
     const load = async () => {
@@ -2471,29 +2546,11 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   {showHiddenRooms ? '숨김방 닫기' : '숨김방 보기'}
                 </button>
               </div>
-              {sidebarRooms.map(room => {
-                  const unread = roomUnreadCounts[room.id] || 0;
-                  const isSelected = selectedRoomId === room.id;
-                  const isNoticeChannel = room.id === NOTICE_ROOM_ID;
-                  const label = getRoomDisplayName(room, allKnownStaffs, effectiveChatUserId);
-                  const preview = getRoomPreviewText(room);
-                  const members = normalizeMemberIds(room.members);
-                  const peer =
-                    room.type === 'direct'
-                      ? allKnownStaffs.find(
-                          ( staff: StaffMember) =>
-                            members.includes(String(staff.id)) &&
-                            String(staff.id) !== effectiveChatUserId
-                        )
-                      : null;
-                  const isPeerOnline = peer ? Boolean(presenceMap[String(peer.id)]) : false;
-                  const isPinned = roomPrefs[room.id]?.pinned === true;
-                  const isHidden = roomPrefs[room.id]?.hidden === true;
-
+              {sidebarRoomItems.map(({ room, roomId, unread, isSelected, isNoticeChannel, label, preview, isPeerOnline, isPinned, isHidden }) => {
                   return (
                     <div
-                      key={room.id}
-                      data-testid={`chat-room-${room.id}`}
+                      key={roomId}
+                      data-testid={`chat-room-${roomId}`}
                       onClick={() => setRoom(room.id)}
                       className={`group p-3.5 rounded-xl cursor-pointer transition-all flex items-center justify-between gap-3 border relative overflow-hidden ${isSelected
                         ? 'bg-zinc-800 border-zinc-700 shadow-sm'
@@ -2532,10 +2589,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                           <>
                             <button
                               type="button"
-                              data-testid={`chat-room-pin-${room.id}`}
+                               data-testid={`chat-room-pin-${roomId}`}
                               onClick={(event) => {
                                 event.stopPropagation();
-                                updateRoomPreference(room.id, { pinned: !isPinned });
+                                 updateRoomPreference(room.id, { pinned: !isPinned });
                               }}
                               className={`min-w-[44px] min-h-[44px] flex items-center justify-center px-1.5 py-1 rounded-md text-[9px] font-bold ${isSelected ? 'text-white/80 hover:bg-[var(--card)]/10' : 'text-[var(--toss-gray-3)] hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800'}`}
                               title={isPinned ? '고정 해제' : '상단 고정'}
@@ -2544,7 +2601,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                             </button>
                             <button
                               type="button"
-                              data-testid={`chat-room-hide-${room.id}`}
+                               data-testid={`chat-room-hide-${roomId}`}
                               onClick={(event) => {
                                 event.stopPropagation();
                                 updateRoomPreference(room.id, { hidden: !isHidden });
@@ -3098,7 +3155,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     <button className="text-[10px] font-bold text-[var(--accent)]">전체보기</button>
                   </div>
                   <div className="grid grid-cols-3 gap-1 rounded-2xl overflow-hidden">
-                    {messages.filter(m => m.file_kind === 'image' || m.file_kind === 'video').slice(-6).map((m) => (
+                    {sharedMediaPreviewMessages.map((m) => (
                       <div key={m.id} className="aspect-square bg-[var(--tab-bg)] dark:bg-zinc-800 relative group cursor-pointer">
                         {m.file_kind === 'image' ? (
                           <img src={m.file_url || ''} alt="Attached image" className="w-full h-full object-cover" />
@@ -3107,7 +3164,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                         )}
                       </div>
                     ))}
-                    {messages.filter(m => m.file_kind === 'image' || m.file_kind === 'video').length === 0 && (
+                    {sharedMediaPreviewMessages.length === 0 && (
                       <div className="col-span-3 py-5 text-center bg-[var(--tab-bg)] dark:bg-zinc-800/30 rounded-2xl border border-dashed border-[var(--border)] dark:border-zinc-700">
                         <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">주고받은 미디어가 없습니다.</p>
                       </div>
@@ -3118,7 +3175,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 <div className="space-y-3">
                   <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider px-1">링크</p>
                   <div className="space-y-2">
-                    {messages.filter(m => m.content && m.content.includes('http')).slice(-3).map((m) => {
+                    {sharedLinkPreviewMessages.map((m) => {
                       const urlMatch = (m.content || '').match(/https?:\/\/[^\s]+/);
                       const url = urlMatch ? urlMatch[0] : '';
                       return (
@@ -3128,7 +3185,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                         </a>
                       );
                     })}
-                    {messages.filter(m => m.content && m.content.includes('http')).length === 0 && (
+                    {sharedLinkPreviewMessages.length === 0 && (
                       <div className="py-4 text-center bg-[var(--tab-bg)] dark:bg-zinc-800/30 rounded-xl border border-[var(--border-subtle)] dark:border-zinc-800">
                         <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">공유된 링크가 없습니다.</p>
                       </div>
