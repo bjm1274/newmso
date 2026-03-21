@@ -308,7 +308,7 @@ export default function ExtraFeatures({
   if (subView === '조직도') {
     return (
       <FeatureShell onBack={() => setSubView(null)} maxWidth="max-w-7xl">
-        <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] shadow-sm">
+        <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] shadow-sm overflow-x-auto">
           <OrgChart
             user={user || null}
             staffs={staffs}
