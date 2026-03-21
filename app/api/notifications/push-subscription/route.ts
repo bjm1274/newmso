@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       .neq('staff_id', staffId);
 
     if (deleteError) {
-      return NextResponse.json({ error: deleteError.message }, { status: 500 });
+      return NextResponse.json({ error: '구독 정보 처리 중 오류가 발생했습니다.' }, { status: 500 });
     }
 
     const { error: upsertError } = await supabase.from('push_subscriptions').upsert(
@@ -67,13 +67,12 @@ export async function POST(request: NextRequest) {
     );
 
     if (upsertError) {
-      return NextResponse.json({ error: upsertError.message }, { status: 500 });
+      return NextResponse.json({ error: '구독 정보 처리 중 오류가 발생했습니다.' }, { status: 500 });
     }
 
     return NextResponse.json({ ok: true });
-  } catch (error) {
-    console.error('push subscription sync failed', error);
-    return NextResponse.json({ error: 'Failed to sync push subscription.' }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: '구독 정보 처리 중 오류가 발생했습니다.' }, { status: 500 });
   }
 }
 
@@ -99,12 +98,11 @@ export async function DELETE(request: NextRequest) {
       .eq('endpoint', endpoint);
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: '구독 정보 처리 중 오류가 발생했습니다.' }, { status: 500 });
     }
 
     return NextResponse.json({ ok: true });
-  } catch (error) {
-    console.error('push subscription delete failed', error);
-    return NextResponse.json({ error: 'Failed to delete push subscription.' }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: '구독 정보 처리 중 오류가 발생했습니다.' }, { status: 500 });
   }
 }

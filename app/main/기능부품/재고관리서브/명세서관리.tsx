@@ -6,16 +6,26 @@ import { supabase } from '@/lib/supabase';
 type AnyRecord = Record<string, unknown>;
 
 const PRESET_HOSPITAL = {
-  reg_num: '000-00-00000',
-  sangho: '박철홍정형외과',
-  ceo: '박철홍',
-  addr: '전라남도 목포시',
-  phone: '061-000-0000',
+  reg_num: '',
+  sangho: '',
+  ceo: '',
+  addr: '',
+  phone: '',
   contact: '',
   email: '',
-  status: '보건업',
-  type: '정형외과'
+  status: '',
+  type: ''
 };
+
+function isValidRegNum(v: string) {
+  return !v || /^\d{3}-\d{2}-\d{5}$/.test(v);
+}
+function isValidPhone(v: string) {
+  return !v || /^0\d{1,2}-\d{3,4}-\d{4}$/.test(v);
+}
+function isValidEmail(v: string) {
+  return !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+}
 
 export default function InvoiceManagement({ user, inventory, suppliers, fetchSuppliers }: AnyRecord) {
   const [showNewSupplier, setShowNewSupplier] = useState(false);
@@ -55,21 +65,22 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
 
   const handleAddSupplier = async () => {
     if (!supplierForm.name) return toast('거래처명을 입력해주세요.', 'warning');
+    if (!isValidRegNum(supplierForm.reg_num)) return toast('사업자번호 형식이 올바르지 않습니다. (예: 123-45-67890)', 'warning');
+    if (!isValidPhone(supplierForm.phone)) return toast('전화번호 형식이 올바르지 않습니다. (예: 02-1234-5678)', 'warning');
+    if (!isValidEmail(supplierForm.email)) return toast('이메일 형식이 올바르지 않습니다.', 'warning');
     setLoading(true);
     try {
       const { error } = await supabase.from('suppliers').insert([supplierForm]);
       if (error) {
-        console.error('suppliers insert error', error);
-        toast(`거래처 등록에 실패했습니다.\n\n${error.message || ''}`, 'error');
+        toast('거래처 등록에 실패했습니다.', 'error');
       } else {
         toast('거래처가 등록되었습니다.', 'success');
         setSupplierForm({ name: '', contact: '', address: '', phone: '', email: '', reg_num: '', ceo: '' });
         setShowNewSupplier(false);
         _fetchSuppliers?.();
       }
-    } catch (err: unknown) {
-      console.error('handleAddSupplier error', err);
-      toast(`거래처 등록에 실패했습니다.\n\n${(err as Error)?.message || ''}`, 'error');
+    } catch {
+      toast('거래처 등록에 실패했습니다.', 'error');
     } finally {
       setLoading(false);
     }
@@ -91,6 +102,9 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
   const handleUpdateSupplier = async () => {
     if (!editingSupplier?.id) return;
     if (!editingSupplier.name) return toast('거래처명을 입력해주세요.', 'warning');
+    if (!isValidRegNum(editingSupplier.reg_num)) return toast('사업자번호 형식이 올바르지 않습니다. (예: 123-45-67890)', 'warning');
+    if (!isValidPhone(editingSupplier.phone)) return toast('전화번호 형식이 올바르지 않습니다. (예: 02-1234-5678)', 'warning');
+    if (!isValidEmail(editingSupplier.email)) return toast('이메일 형식이 올바르지 않습니다.', 'warning');
     setEditLoading(true);
     try {
       const payload = {
@@ -104,16 +118,14 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
       };
       const { error } = await supabase.from('suppliers').update(payload).eq('id', editingSupplier.id);
       if (error) {
-        console.error('suppliers update error', error);
-        toast(`거래처 수정에 실패했습니다.\n\n${error.message || ''}`, 'error');
+        toast('거래처 수정에 실패했습니다.', 'error');
       } else {
         toast('거래처 정보가 수정되었습니다.', 'success');
         setEditingSupplier(null);
         _fetchSuppliers?.();
       }
-    } catch (err: unknown) {
-      console.error('handleUpdateSupplier error', err);
-      toast(`거래처 수정에 실패했습니다.\n\n${(err as Error)?.message || ''}`, 'error');
+    } catch {
+      toast('거래처 수정에 실패했습니다.', 'error');
     } finally {
       setEditLoading(false);
     }
@@ -126,16 +138,14 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
     try {
       const { error } = await supabase.from('suppliers').delete().eq('id', id);
       if (error) {
-        console.error('suppliers delete error', error);
-        toast(`거래처 삭제에 실패했습니다.\n\n${error.message || ''}`, 'error');
+        toast('거래처 삭제에 실패했습니다.', 'error');
       } else {
         toast('거래처가 삭제되었습니다.', 'success');
         if (editingSupplier?.id === id) setEditingSupplier(null);
         _fetchSuppliers?.();
       }
-    } catch (err: unknown) {
-      console.error('handleDeleteSupplier error', err);
-      toast(`거래처 삭제에 실패했습니다.\n\n${(err as Error)?.message || ''}`, 'error');
+    } catch {
+      toast('거래처 삭제에 실패했습니다.', 'error');
     }
   };
 

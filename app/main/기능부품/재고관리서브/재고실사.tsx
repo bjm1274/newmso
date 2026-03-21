@@ -120,7 +120,9 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
           })),
           created_at: new Date().toISOString(),
         }]);
-      } catch { /* 테이블 없으면 무시 */ }
+      } catch {
+        // inventory_count_sessions 테이블 미존재 시 무시 (선택적 기록)
+      }
 
       setReport(discrepancyList.map(item => ({
         item_name: item.item_name,

@@ -114,18 +114,18 @@ export async function POST(request: Request) {
 
     const candidateRows = Array.from(candidates.values());
     if (!candidateRows.length) {
-        return NextResponse.json({ verified: false, error: 'Staff not found' }, { status: 404 });
+      return NextResponse.json({ verified: false, error: 'Staff not found' }, { status: 404 });
     }
 
+    // 타이밍 공격 방지: 조기 반환하지 않고 모든 후보를 순회
+    let isVerified = false;
     for (const staff of candidateRows) {
       const storedPassword = pickStoredPassword(staff);
-      const verified = await verifyStoredPassword(storedPassword, password);
-      if (verified.ok) {
-        return NextResponse.json({ verified: true });
-      }
+      const result = await verifyStoredPassword(storedPassword, password);
+      if (result.ok) isVerified = true;
     }
 
-    return NextResponse.json({ verified: false });
+    return NextResponse.json({ verified: isVerified });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Verification failed';
     return NextResponse.json({ verified: false, error: message }, { status: 500 });

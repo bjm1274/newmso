@@ -168,7 +168,7 @@ export async function GET(request: NextRequest) {
       .limit(500);
 
     if (staffError) {
-      return NextResponse.json({ error: staffError.message }, { status: 500 });
+      return NextResponse.json({ error: '직원 데이터를 불러오는 중 오류가 발생했습니다.' }, { status: 500 });
     }
 
     const safeStaffRows = (staffRows || []).map((row: any) => sanitizeStaffRow(row));
@@ -277,11 +277,11 @@ export async function GET(request: NextRequest) {
       ]);
 
       if (roomRes.error) {
-        return NextResponse.json({ error: roomRes.error.message }, { status: 500 });
+        return NextResponse.json({ error: '채팅방 데이터를 불러오는 중 오류가 발생했습니다.' }, { status: 500 });
       }
 
       if (messageRes.error) {
-        return NextResponse.json({ error: messageRes.error.message }, { status: 500 });
+        return NextResponse.json({ error: '메시지 데이터를 불러오는 중 오류가 발생했습니다.' }, { status: 500 });
       }
 
       const rooms = roomRes.data || [];
@@ -300,8 +300,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({ error: 'Unsupported scope' }, { status: 400 });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });
   }
 }

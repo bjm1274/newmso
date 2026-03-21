@@ -53,6 +53,10 @@ export async function POST(req: NextRequest) {
         if (!session) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
+        const perms = (session.user as any)?.permissions ?? {};
+        if (!perms.inventory && !perms.admin && !perms.mso) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
 
         const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
         if (!apiKey) {
