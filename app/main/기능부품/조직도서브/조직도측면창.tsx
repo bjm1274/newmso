@@ -261,11 +261,11 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: { user?: Sideb
             type="button"
             data-testid={`${menu.testId}-mobile`}
             onClick={() => handleMenuClick(menu.id)}
-            className={`flex min-h-[48px] flex-1 touch-manipulation flex-col items-center justify-center rounded-[var(--radius-md)] px-2 py-1.5 transition-all ${
+            className={`flex min-h-[56px] flex-1 touch-manipulation flex-col items-center justify-center rounded-[var(--radius-md)] px-2 py-1.5 transition-all ${
               mainMenu === menu.id ? 'text-[var(--accent)]' : 'text-[var(--toss-gray-3)]'
             }`}
           >
-            <span className="relative text-[15px] leading-none">
+            <span className="relative text-[22px] leading-none">
               {menu.icon}
               {menu.id === '채팅' && chatUnreadCount > 0 && (
                 <span className="absolute -top-1.5 -right-2.5 min-w-[15px] h-[15px] px-0.5 rounded-[var(--radius-md)] bg-red-500 text-white text-[8px] font-bold flex items-center justify-center">
@@ -273,15 +273,18 @@ export default function Sidebar({ user, mainMenu, onMenuChange }: { user?: Sideb
                 </span>
               )}
             </span>
-            <span className="mt-0.5 w-full truncate text-center text-[9.5px] font-bold">{menu.label}</span>
+            <span className="mt-0.5 w-full truncate text-center text-[11px] font-bold">{menu.label}</span>
           </button>
         ))}
-        {user && (
-          <div className="flex min-h-[48px] flex-none flex-col items-center justify-center px-2">
-            <NotificationCenter user={user} onOpenMenu={onMenuChange} />
-          </div>
-        )}
+        {/* 알림 버튼 자리 확보 */}
+        <div className="min-h-[56px] w-[56px] flex-none" />
       </nav>
+      {/* 알림버튼 - overflow 클리핑 방지를 위해 nav 외부에 fixed 위치로 렌더링 */}
+      {user && (
+        <div className="fixed bottom-0 right-0 z-[200] flex min-h-[56px] w-[56px] flex-col items-center justify-center md:hidden safe-area-pb">
+          <NotificationCenter user={user} onOpenMenu={onMenuChange} />
+        </div>
+      )}
     </>
   );
 }
