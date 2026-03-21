@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -85,7 +86,7 @@ export default function LoginPage() {
       void supabase.realtime.setAuth(payload.supabaseAccessToken ?? null);
       setLoading(false);
       if (payload.notice) {
-        alert(payload.notice);
+        toast(payload.notice);
       }
       router.push('/main');
     } catch {

@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -119,11 +120,11 @@ export default function PopupManager() {
 
   const handleAddPopup = async () => {
     if (!newPopup.title.trim()) {
-      return alert('팝업 제목을 입력해주세요.');
+      return toast('팝업 제목을 입력해주세요.', 'warning');
     }
 
     if (!selectedFile && !newPopup.media_url.trim()) {
-      return alert('팝업에 사용할 파일을 선택해주세요.');
+      return toast('팝업에 사용할 파일을 선택해주세요.', 'warning');
     }
 
     setSaving(true);
@@ -138,14 +139,14 @@ export default function PopupManager() {
         throw new Error(error.message || '팝업 저장에 실패했습니다.');
       }
 
-      alert('새 팝업이 생성되었습니다.');
+      toast('새 팝업이 생성되었습니다.');
       setSelectedFile(null);
       setNewPopup({ title: '', media_url: '', media_type: 'image', width: 400, height: 500 });
       await loadPopups();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : '파일 업로드에 실패했습니다.';
-      alert(message);
+      toast(message);
     } finally {
       setSaving(false);
     }
@@ -172,12 +173,12 @@ export default function PopupManager() {
         throw new Error(payload?.error || '팝업 삭제에 실패했습니다.');
       }
 
-      alert(payload?.warning || payload?.message || '팝업이 삭제되었습니다.');
+      toast(payload?.warning || payload?.message || '팝업이 삭제되었습니다.', 'success');
       await loadPopups();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : '팝업 삭제 중 오류가 발생했습니다.';
-      alert(message);
+      toast(message);
     } finally {
       setDeletingPopupId(null);
     }

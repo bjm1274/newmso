@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { StaffMember } from '@/types';
 import { supabase } from '@/lib/supabase';
@@ -154,11 +155,11 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       // 2. 요청 상태 변경
       await supabase.from('audit_logs').update({ target_type: 'ESS_PROFILE_UPDATE_APPROVED' }).eq('id', request.id);
 
-      alert('승인되었습니다.');
+      toast('승인되었습니다.');
       setEssRequests(prev => prev.filter(r => r.id !== request.id));
       새로고침?.();
     } catch (error) {
-      alert('승인 처리 중 오류 발생');
+      toast('승인 처리 중 오류 발생', 'error');
     }
   };
 
@@ -166,10 +167,10 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     if (!confirm(`${request.user_name}님의 정보 변경 요청을 반려하시겠습니까?`)) return;
     try {
       await supabase.from('audit_logs').update({ target_type: 'ESS_PROFILE_UPDATE_REJECTED' }).eq('id', request.id);
-      alert('반려되었습니다.');
+      toast('반려되었습니다.');
       setEssRequests(prev => prev.filter(r => r.id !== request.id));
     } catch (error) {
-      alert('반려 처리 중 오류 발생');
+      toast('반려 처리 중 오류 발생', 'error');
     }
   };
 
@@ -269,7 +270,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   }, [창상태, 편집모드, 선택사업체, 팀목록캐시]);
 
   const 정보저장 = async () => {
-    if (!신규직원.성명 || !신규직원.입사일 || 신규직원.입사일 === '0000-00-00' || 신규직원.입사일 === '') return alert('성함과 실제 입사일은 필수 입력 사항입니다.');
+    if (!신규직원.성명 || !신규직원.입사일 || 신규직원.입사일 === '0000-00-00' || 신규직원.입사일 === '') return toast('성함과 실제 입사일은 필수 입력 사항입니다.', 'warning');
     try {
       const actor = readClientAuditActor();
       const dateOrNull = (val: string) => (val === '0000-00-00' || val === '0000-00' || !val || val === '') ? null : val;
@@ -352,7 +353,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           actor.userId,
           actor.userName
         );
-        alert('직원 정보가 수정되었습니다.');
+        toast('직원 정보가 수정되었습니다.', 'success');
       } else {
         // 사번 부여 로직: 박철홍이면 1, 아니면 기존 숫자 사번의 최대값 다음 번호 사용
         let newEmployeeNo = '';
@@ -394,7 +395,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           .select()
           .single();
         if (insertErr) {
-          return alert('직원 등록 실패: ' + (insertErr.message || 'DB 오류'));
+          return toast('직원 등록 실패: ' + (insertErr.message || 'DB 오류'), 'error');
         }
 
         await logAudit(
@@ -409,11 +410,11 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           actor.userId,
           actor.userName
         );
-        alert(`직원 등록 완료!\n로그인 아이디: 사번 ${newEmployeeNo} 또는 이름 ${신규직원.성명}\n(동명이인이 있으면 사번으로 로그인하세요)`);
+        toast(`직원 등록 완료!\n로그인 아이디: 사번 ${newEmployeeNo} 또는 이름 ${신규직원.성명}\n(동명이인이 있으면 사번으로 로그인하세요)`, 'success');
       }
       닫기함수(); 새로고침?.();
     } catch (error: unknown) {
-      alert('처리 중 오류가 발생했습니다: ' + (((error as Error)?.message ?? String(error)) || 'Unknown error'));
+      toast('처리 중 오류가 발생했습니다: ' + (((error as Error)?.message ?? String(error)) || 'Unknown error'), 'error');
     }
   };
 
@@ -498,13 +499,13 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         actor.userId,
         actor.userName
       );
-      alert('직원이 삭제(퇴사 처리)되었습니다.');
+      toast('직원이 삭제(퇴사 처리)되었습니다.', 'success');
       if (선택된직원ID === 직원.id) {
         닫기함수();
       }
       새로고침?.();
     } catch (e: unknown) {
-      alert('직원 삭제 중 오류가 발생했습니다.');
+      toast('직원 삭제 중 오류가 발생했습니다.', 'error');
     }
   };
 
@@ -779,7 +780,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                                 const genderDigit = parseInt(raw.slice(6, 7), 10);
                                 const birthYear = (genderDigit === 1 || genderDigit === 2) ? 1900 + yearPrefix : 2000 + yearPrefix;
                                 const age = new Date().getFullYear() - birthYear;
-                                if (age >= 60 && 신규직원.ins_national) alert(`만 ${age}세는 국민연금 의무 가입 대상이 아닙니다.\n국민연금 체크를 해제해 주세요.`);
+                                if (age >= 60 && 신규직원.ins_national) toast(`만 ${age}세는 국민연금 의무 가입 대상이 아닙니다.\n국민연금 체크를 해제해 주세요.`);
                               }
                               신규직원설정({ ...신규직원, 주민번호: formatted });
                             }}
@@ -1111,7 +1112,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                                     const genderDigit = parseInt(raw.slice(6, 7), 10);
                                     const birthYear = (genderDigit === 1 || genderDigit === 2) ? 1900 + yearPrefix : 2000 + yearPrefix;
                                     const age = new Date().getFullYear() - birthYear;
-                                    if (age >= 60) return alert('만 60세 이상은 국민연금 가입 대상이 아닙니다.');
+                                    if (age >= 60) return toast('만 60세 이상은 국민연금 가입 대상이 아닙니다.');
                                   }
                                   신규직원설정({ ...신규직원, [item.key]: e.target.checked });
                                 }}
@@ -1152,7 +1153,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                           <label className="flex items-center gap-3 cursor-pointer">
                             <input type="checkbox" checked={신규직원.is_basic_living} onChange={e => {
                               if (e.target.checked && 신규직원.ins_health) {
-                                alert('기초생활수급 및 의료급여 수급자는 건강보험 가입 제외 대상일 수 있습니다.\n건강보험 체크 상태를 확인 및 해제해 주세요.');
+                                toast('기초생활수급 및 의료급여 수급자는 건강보험 가입 제외 대상일 수 있습니다.\n건강보험 체크 상태를 확인 및 해제해 주세요.', 'warning');
                               }
                               신규직원설정({ ...신규직원, is_basic_living: e.target.checked });
                             }} className="w-4 h-4 rounded text-emerald-600" />

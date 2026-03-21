@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import SalaryDetail from './급여명세/급여상세';
@@ -223,9 +224,9 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: Payr
                     onSelect={setSelectedStaffId}
                     onSendAll={async () => {
                       const records = payrollRecords.filter(r => r.year_month === yearMonth);
-                      if (records.length === 0) return alert("해당 월에 정산 완료된 레코드가 없습니다.");
+                      if (records.length === 0) return toast("해당 월에 정산 완료된 레코드가 없습니다.", 'success');
                       if (confirm(`${records.length}명의 직원에게 급여명세서 알림을 발송하시겠습니까?`)) {
-                        alert(`${records.length}건의 알림 발송이 예약되었습니다.`);
+                        toast(`${records.length}건의 알림 발송이 예약되었습니다.`, 'success');
                       }
                     }}
                   />

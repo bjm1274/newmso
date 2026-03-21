@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -189,7 +190,7 @@ export default function PurchaseOrderManagement({
   };
 
   const handleAutoGeneratePurchaseOrder = async () => {
-    if (lowStockItems.length === 0) return alert('발주가 필요한 항목이 없습니다.');
+    if (lowStockItems.length === 0) return toast('발주가 필요한 항목이 없습니다.', 'warning');
     if (!confirm(`${lowStockItems.length}개 항목에 대한 발주서를 자동으로 생성하시겠습니까?`)) return;
 
     setLoading(true);
@@ -229,10 +230,10 @@ export default function PurchaseOrderManagement({
         if (error) throw error;
       }
 
-      alert(`발주서가 생성되었습니다.\n대상 항목: ${lowStockItems.length}건`);
+      toast(`발주서가 생성되었습니다.\n대상 항목: ${lowStockItems.length}건`);
       await fetchPurchaseOrders();
     } catch (err) {
-      alert('발주서 생성에 실패했습니다.');
+      toast('발주서 생성에 실패했습니다.', 'error');
     } finally {
       setLoading(false);
     }
@@ -243,10 +244,10 @@ export default function PurchaseOrderManagement({
     try {
       const { error } = await supabase.from('purchase_orders').update({ status: '승인' }).eq('id', orderId);
       if (error) throw error;
-      alert('발주서가 승인 처리되었습니다.');
+      toast('발주서가 승인 처리되었습니다.', 'success');
       await fetchPurchaseOrders();
     } catch (err) {
-      alert('발주서 승인 처리에 실패했습니다.');
+      toast('발주서 승인 처리에 실패했습니다.', 'error');
     }
   };
 

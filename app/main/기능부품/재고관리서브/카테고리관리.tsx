@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -97,7 +98,7 @@ export default function CategoryManager({ user }: { user: any }) {
   };
 
   const handleSave = async () => {
-    if (!form.name.trim()) return alert('카테고리명을 입력하세요.');
+    if (!form.name.trim()) return toast('카테고리명을 입력하세요.', 'warning');
     setSaving(true);
     try {
       const payload = { name: form.name, parent_id: form.parent_id || null, description: form.description, color: form.color };
@@ -108,7 +109,7 @@ export default function CategoryManager({ user }: { user: any }) {
       }
       setShowModal(false);
       fetchCategories();
-    } catch { alert('저장 실패'); } finally { setSaving(false); }
+    } catch { toast('저장 실패', 'error'); } finally { setSaving(false); }
   };
 
   const importFromInventory = async () => {
@@ -116,11 +117,11 @@ export default function CategoryManager({ user }: { user: any }) {
     const cats = Array.from(new Set((data || []).map((r: any) => r.category).filter(Boolean)));
     const existing = categories.map(c => c.name);
     const newCats = cats.filter(c => !existing.includes(c));
-    if (newCats.length === 0) return alert('새로 추가할 카테고리가 없습니다.');
+    if (newCats.length === 0) return toast('새로 추가할 카테고리가 없습니다.');
     if (!confirm(`재고 데이터에서 ${newCats.length}개 카테고리를 가져오시겠습니까?\n${newCats.slice(0, 5).join(', ')}${newCats.length > 5 ? ' ...' : ''}`)) return;
     await supabase.from('inventory_categories').insert(newCats.map((name, i) => ({ name, parent_id: null, color: CAT_COLORS[i % CAT_COLORS.length] })));
     fetchCategories();
-    alert(`${newCats.length}개 카테고리가 추가되었습니다.`);
+    toast(`${newCats.length}개 카테고리가 추가되었습니다.`);
   };
 
   return (

@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import SignatureCanvas from 'react-signature-canvas';
@@ -157,10 +158,10 @@ export default function ContractSignatureModal({ contract, user, templateText, o
     const handleNext = () => {
         if (step === 1) setStep(2);
         else if (step === 2) {
-            if (!allAgreed) return alert('모든 필수 항목에 동의해야 합니다.');
+            if (!allAgreed) return toast('모든 필수 항목에 동의해야 합니다.');
             setStep(3);
         } else if (step === 3) {
-            if (!agreements['confidentiality']) return alert('비밀유지서약서 내용에 동의해야 합니다.');
+            if (!agreements['confidentiality']) return toast('비밀유지서약서 내용에 동의해야 합니다.');
             setStep(4);
         }
     };
@@ -172,7 +173,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
 
     const handleSubmit = async () => {
         if (isSigEmpty || sigCanvas.current?.isEmpty()) {
-            return alert('서명을 완료해 주세요.');
+            return toast('서명을 완료해 주세요.', 'success');
         }
 
         setIsGenerating(true);
@@ -265,7 +266,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
             onSuccess(signatureData, fullContractHTML);
         } catch (error) {
             console.error(error);
-            alert("서류 생성 중 오류가 발생했습니다.");
+            toast("서류 생성 중 오류가 발생했습니다.", 'error');
         } finally {
             setIsGenerating(false);
         }

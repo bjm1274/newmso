@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -90,12 +91,12 @@ export default function TaxInsuranceRatesPanel({ companyName }: { companyName?: 
       try {
         const parsed = JSON.parse(form.income_tax_bracket_text);
         if (!Array.isArray(parsed)) {
-          alert('소득세 세율표는 JSON 배열 형식이어야 합니다.');
+          toast('소득세 세율표는 JSON 배열 형식이어야 합니다.');
           return;
         }
         parsedBracket = parsed.map((entry) => ({ ...entry, official: form.official_confirmed }));
       } catch (error: unknown) {
-        alert(`소득세 세율표 JSON이 올바르지 않습니다: ${(error as Error)?.message || error}`);
+        toast(`소득세 세율표 JSON이 올바르지 않습니다: ${(error as Error)?.message || error}`, 'error');
         return;
       }
     }
@@ -115,11 +116,11 @@ export default function TaxInsuranceRatesPanel({ companyName }: { companyName?: 
         .from('tax_insurance_rates')
         .upsert(payload, { onConflict: 'effective_year,company_name' });
       if (error) throw error;
-      alert(editing ? '세율/보험요율을 수정했습니다.' : '세율/보험요율을 저장했습니다.');
+      toast(editing ? '세율/보험요율을 수정했습니다.' : '세율/보험요율을 저장했습니다.', 'success');
       resetForm();
       await loadList();
     } catch (error: unknown) {
-      alert(`저장 실패: ${(error as Error)?.message || error}`);
+      toast(`저장 실패: ${(error as Error)?.message || error}`, 'error');
     } finally {
       setSaving(false);
     }

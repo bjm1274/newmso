@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -44,8 +45,8 @@ export default function DeliveryConfirmation({ user, selectedCo }: { user: any; 
   };
 
   const handleSave = async () => {
-    if (!form.supplier_name.trim()) return alert('공급업체명을 입력하세요.');
-    if (form.items.some(i => !i.name.trim())) return alert('모든 품목명을 입력하세요.');
+    if (!form.supplier_name.trim()) return toast('공급업체명을 입력하세요.', 'warning');
+    if (form.items.some(i => !i.name.trim())) return toast('모든 품목명을 입력하세요.', 'warning');
     setSaving(true);
     try {
       const docNumber = form.doc_number || autoDocNumber();
@@ -55,8 +56,8 @@ export default function DeliveryConfirmation({ user, selectedCo }: { user: any; 
       }]);
       setShowForm(false);
       fetchDeliveries();
-      alert('납품확인서가 저장되었습니다.');
-    } catch { alert('저장 실패'); } finally { setSaving(false); }
+      toast('납품확인서가 저장되었습니다.', 'success');
+    } catch { toast('저장 실패', 'error'); } finally { setSaving(false); }
   };
 
   const printDelivery = (d: any) => {
