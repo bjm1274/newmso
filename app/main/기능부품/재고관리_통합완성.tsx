@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { StaffMember, InventoryItem, Supplier } from '@/types';
 import { canAccessInventorySection } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
@@ -160,6 +160,7 @@ export default function IntegratedInventoryManagement({
   const [viewCompany, setViewCompany] = useState<string>('전체'); // 현황 탭용 회사 선택
   const [selectedDept, setSelectedDept] = useState('전체');
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const inventoryLoadedRef = useRef(false);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchKeyword, setSearchKeyword] = useState('');
@@ -355,7 +356,10 @@ export default function IntegratedInventoryManagement({
   };
 
   const fetchInventory = useCallback(async (companyFilter?: string) => {
-    setLoading(true);
+    // 이미 데이터가 있을 때는 전체 로딩 스피너를 표시하지 않음 (탭 전환 시 깜빡임 방지)
+    if (!inventoryLoadedRef.current) {
+      setLoading(true);
+    }
     try {
       const effectiveCo = companyFilter !== undefined ? companyFilter : selectedCo;
       const scopedCompanyName = !isMsoUser
@@ -386,7 +390,10 @@ export default function IntegratedInventoryManagement({
         }
       );
       if (error) throw error;
-      if (data) setInventory(data);
+      if (data) {
+        setInventory(data);
+        inventoryLoadedRef.current = true;
+      }
     } catch (err) {
       console.error('재고 데이터 로드 실패:', err);
       setInventory([]);
@@ -560,7 +567,12 @@ export default function IntegratedInventoryManagement({
     if (activeView !== '현황') {
       applyResolvedView('현황');
     }
-  }, [activeView, applyResolvedView, initialWorkflowApprovalId]);
+    // 운영팀이 아닌 사용자는 공급 워크플로우를 처리할 수 없으므로
+    // 즉시 소비하여 '현황' 뷰에 무한으로 갇히지 않도록 한다
+    if (!isInventoryOpsUser) {
+      onConsumeInitialWorkflowApprovalId?.();
+    }
+  }, [activeView, applyResolvedView, initialWorkflowApprovalId, isInventoryOpsUser, onConsumeInitialWorkflowApprovalId]);
 
   useEffect(() => {
     if (!initialWorkflowApprovalId || activeView !== '현황') return;
