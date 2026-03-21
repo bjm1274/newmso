@@ -34,9 +34,8 @@ export async function GET(req: Request) {
   const { data, error } = await supabase.rpc('cleanup_chat_messages_by_retention');
 
   if (error) {
-    console.error('chat-retention error', error);
     return NextResponse.json(
-      { error: error.message, deleted: 0 },
+      { error: '채팅 보관 정리 중 오류가 발생했습니다.', deleted: 0 },
       { status: 500 }
     );
   }

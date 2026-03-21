@@ -86,8 +86,8 @@ export async function GET(request: NextRequest) {
 
   try {
     freshSessionUser = await readLatestSessionUser(currentSessionUser);
-  } catch (error) {
-    console.error('세션 사용자 동기화 실패:', error);
+  } catch {
+    // 동기화 실패 시 기존 세션 사용자 유지
   }
 
   const supabaseAccessToken = await createSupabaseAccessToken(freshSessionUser);
