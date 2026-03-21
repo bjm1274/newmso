@@ -62,13 +62,11 @@ async function getMutedUserIds(supabase: ReturnType<typeof getAdminClient>, room
       .eq('notifications_enabled', false);
 
     if (error) {
-      console.warn('room_notification_settings lookup failed', error.message);
       return new Set<string>();
     }
 
     return new Set((data || []).map((row: { user_id: string }) => String(row.user_id)));
-  } catch (error) {
-    console.warn('room_notification_settings lookup crashed', error);
+  } catch {
     return new Set<string>();
   }
 }
@@ -142,7 +140,7 @@ export async function POST(request: NextRequest) {
     ]);
 
     if (subscriptionRes.error) {
-      return NextResponse.json({ error: subscriptionRes.error.message }, { status: 500 });
+      return NextResponse.json({ error: '알림 발송 중 오류가 발생했습니다.' }, { status: 500 });
     }
 
     const senderName = String((senderRes.data as { name?: string } | null)?.name || session.user.name || '새 메시지');
@@ -186,7 +184,7 @@ export async function POST(request: NextRequest) {
         if (statusCode === 404 || statusCode === 410) {
           expiredIds.push(subscription.id);
         }
-        console.error('chat push send failed', statusCode || 'unknown', error?.body || error);
+        // 실패한 구독 기록 (로깅 없이 처리)
       }
     }
 
@@ -196,9 +194,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ sent, failed });
   } catch (error: any) {
-    console.error('chat push route failed', error);
     return NextResponse.json(
-      { error: error?.message || 'Failed to send chat push.' },
+      { error: '알림 발송 중 오류가 발생했습니다.' },
       { status: 500 }
     );
   }

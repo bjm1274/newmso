@@ -13,7 +13,6 @@ const MODELS = [
 async function callGemini(prompt: string): Promise<string> {
     const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
     if (!apiKey) {
-        console.error('Environment keys available:', Object.keys(process.env).filter(k => k.includes('KEY') || k.includes('API')));
         throw new Error('Gemini API 키가 설정되지 않았습니다. .env.local 파일에 GEMINI_API_KEY가 있는지 확인해주세요.');
     }
 
@@ -39,7 +38,6 @@ async function callGemini(prompt: string): Promise<string> {
             } else {
                 const errMsg = data?.error?.message || JSON.stringify(data).substring(0, 150);
                 lastError = `[${model}] API 오류 (${res.status}): ${errMsg}`;
-                console.error(`Gemini [${model}] error:`, data);
                 // API 키 만료/잘못된 키는 즉시 중단
                 if (res.status === 403 || errMsg.includes('expired') || errMsg.includes('invalid')) {
                     throw new Error(`API 키 오류: ${errMsg}. Google AI Studio에서 새 키를 발급하세요.`);
@@ -48,7 +46,6 @@ async function callGemini(prompt: string): Promise<string> {
             }
         } catch (err) {
             if (err instanceof Error && (err.message.includes('API 키 오류') || err.message.includes('상태'))) throw err;
-            console.error(`Model ${model} failed:`, err);
             lastError = String(err);
         }
     }
@@ -154,7 +151,11 @@ ${diseaseCodes ? '- 상병명-처방 연관성 (상병에 맞지 않는 처방 �
         return NextResponse.json({ analysis });
     } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        console.error('Discharge review API error:', msg);
-        return NextResponse.json({ error: msg }, { status: 500 });
+        // Gemini API 키 오류나 쿼터 초과는 사용자에게 직접 안내
+        const isUserFacingError = msg.includes('API 키') || msg.includes('쿼터') || msg.includes('Gemini');
+        return NextResponse.json(
+          { error: isUserFacingError ? msg : '퇴원심사 분석 중 오류가 발생했습니다.' },
+          { status: 500 }
+        );
     }
 }
