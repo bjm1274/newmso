@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -116,10 +117,10 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
             setContent('');
             setCategory('성과');
             setScore(3);
-            alert('기록이 완료되었습니다.');
+            toast('기록이 완료되었습니다.', 'success');
         } catch (err) {
             console.error('평가 저장 실패:', err);
-            alert('저장에 실패했습니다.');
+            toast('저장에 실패했습니다.', 'error');
         } finally {
             setIsSubmitting(false);
         }
@@ -132,7 +133,7 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
             if (error) throw error;
             setEvaluations(prev => prev.filter((item) => item.id !== id));
         } catch (err) {
-            alert('삭제에 실패했습니다.');
+            toast('삭제에 실패했습니다.', 'error');
         }
     };
 

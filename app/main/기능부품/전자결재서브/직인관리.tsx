@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -121,8 +122,8 @@ export default function SealManager({ user, selectedCo }: Props) {
   };
 
   const handleSave = async () => {
-    if (!company.trim()) return alert('법인명을 입력해주세요.');
-    if (!imageFile && !imagePreview) return alert('직인 이미지를 업로드해주세요.');
+    if (!company.trim()) return toast('법인명을 입력해주세요.', 'warning');
+    if (!imageFile && !imagePreview) return toast('직인 이미지를 업로드해주세요.', 'warning');
     setSaving(true);
     try {
       let imageUrl = imagePreview || '';
@@ -148,14 +149,14 @@ export default function SealManager({ user, selectedCo }: Props) {
       } else {
         await fetchSeals();
       }
-      alert('직인이 등록되었습니다.');
+      toast('직인이 등록되었습니다.', 'success');
       setShowForm(false);
       setCompany(selectedCo === '전체' ? '' : selectedCo);
       setSealType('법인인감');
       setImagePreview(null);
       setImageFile(null);
     } catch {
-      alert('저장에 실패했습니다.');
+      toast('저장에 실패했습니다.', 'error');
     } finally {
       setSaving(false);
     }
@@ -178,7 +179,7 @@ export default function SealManager({ user, selectedCo }: Props) {
       setSeals(next);
       writeLocalSeals(next);
     } catch {
-      alert('변경에 실패했습니다.');
+      toast('변경에 실패했습니다.', 'error');
     }
   };
 
@@ -199,7 +200,7 @@ export default function SealManager({ user, selectedCo }: Props) {
       setSeals(next);
       writeLocalSeals(next);
     } catch {
-      alert('삭제에 실패했습니다.');
+      toast('삭제에 실패했습니다.', 'error');
     }
   };
 

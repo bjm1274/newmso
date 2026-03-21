@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -109,9 +110,9 @@ export default function HolidayCalendar({ staffs, selectedCo, user }: Props) {
         company: selectedCo === '전체' ? undefined : selectedCo,
       }));
       await supabase.from('attendance_records').upsert(inserts, { onConflict: 'work_date' });
-      alert('공휴일이 근태 기록에 반영되었습니다.');
+      toast('공휴일이 근태 기록에 반영되었습니다.');
     } catch {
-      alert('반영에 실패했습니다.');
+      toast('반영에 실패했습니다.', 'error');
     } finally {
       setApplying(false);
     }

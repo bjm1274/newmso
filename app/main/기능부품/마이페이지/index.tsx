@@ -1,3 +1,4 @@
+import { toast } from '@/lib/toast';
 ﻿'use client';
 import { useState, useEffect } from 'react';
 
@@ -140,11 +141,11 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
         read_at: null
       });
 
-      alert('근로계약서 서명이 성공적으로 완료되었습니다. 마이페이지 > 급여·증명서 또는 문서보관함에서 확인하실 수 있습니다.');
+      toast('근로계약서 서명이 성공적으로 완료되었습니다. 마이페이지 > 급여·증명서 또는 문서보관함에서 확인하실 수 있습니다.', 'success');
       setPendingContract(null);
       setShowSignaturePad(false);
     } catch (e) {
-      alert('서명 저장 중 오류가 발생했습니다.');
+      toast('서명 저장 중 오류가 발생했습니다.', 'error');
     }
   };
 
@@ -350,18 +351,18 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
       const payload = await response.json().catch(() => null);
 
       if (!response.ok) {
-        alert(payload?.error ? `본인 확인 중 오류가 발생했습니다.\n${payload.error}` : '본인 확인 중 오류가 발생했습니다.');
+        toast(payload?.error ? `본인 확인 중 오류가 발생했습니다.\n${payload.error}` : '본인 확인 중 오류가 발생했습니다.', 'error');
         return false;
       }
 
       if (!payload?.verified) {
-        alert('비밀번호가 일치하지 않습니다.');
+        toast('비밀번호가 일치하지 않습니다.');
         return false;
       }
 
       return true;
     } catch {
-      alert('본인 확인 중 오류가 발생했습니다.');
+      toast('본인 확인 중 오류가 발생했습니다.', 'error');
       return false;
     }
   };

@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import SmartDatePicker from '../공통/SmartDatePicker';
@@ -60,7 +61,7 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: Record<
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const staff = _staffs.find((s: any) => s.id === form.staff_id);
-        if (!staff) return alert('직원을 선택해주세요.');
+        if (!staff) return toast('직원을 선택해주세요.', 'warning');
 
         const newRecord = {
             staff_id: form.staff_id,
@@ -78,7 +79,7 @@ export default function InsuranceManagement({ staffs = [], selectedCo }: Record<
 
         const { data, error } = await supabase.from('insurance_records').insert([newRecord]).select();
         if (error) {
-            alert('보험 신고 기록 저장에 실패했습니다. (DB 연결 확인 필요)');
+            toast('보험 신고 기록 저장에 실패했습니다. (DB 연결 확인 필요)', 'error');
         } else if (data) {
             setRecords([data[0], ...records]);
         }

@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback } from 'react';
 
 const AS_STORAGE_KEY = 'erp_as_records';
@@ -135,8 +136,8 @@ export default function ASReturnManagement({ user }: { user: any }) {
 
   // AS 저장 (Supabase 우선, 실패 시 localStorage)
   const saveAsRecord = async () => {
-    if (!asForm.device_name.trim()) return alert('기기명을 입력해주세요.');
-    if (!asForm.received_date) return alert('접수일을 입력해주세요.');
+    if (!asForm.device_name.trim()) return toast('기기명을 입력해주세요.', 'warning');
+    if (!asForm.received_date) return toast('접수일을 입력해주세요.', 'warning');
 
     const now = new Date().toISOString();
 
@@ -180,8 +181,8 @@ export default function ASReturnManagement({ user }: { user: any }) {
 
   // 반품 저장
   const saveReturnRecord = async () => {
-    if (!returnForm.item_name.trim()) return alert('품목명을 입력해주세요.');
-    if (returnForm.quantity < 1) return alert('수량은 1 이상이어야 합니다.');
+    if (!returnForm.item_name.trim()) return toast('품목명을 입력해주세요.', 'warning');
+    if (returnForm.quantity < 1) return toast('수량은 1 이상이어야 합니다.');
 
     const now = new Date().toISOString();
 

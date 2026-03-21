@@ -1,3 +1,4 @@
+import { toast } from '@/lib/toast';
 ﻿'use client';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -58,7 +59,7 @@ export default function SurgeryExamTemplateManager() {
   const addTemplate = async (type: 'surgery' | 'mri') => {
     const name = type === 'surgery' ? newSurgeryName.trim() : newMriName.trim();
     if (!name) {
-      alert('항목 이름을 입력해 주세요.');
+      toast('항목 이름을 입력해 주세요.', 'warning');
       return;
     }
     setLoading(true);
@@ -85,7 +86,7 @@ export default function SurgeryExamTemplateManager() {
       await loadAll();
     } catch (e) {
       console.error('템플릿 추가 실패', e);
-      alert('항목 추가 중 오류가 발생했습니다.');
+      toast('항목 추가 중 오류가 발생했습니다.', 'error');
     } finally {
       setLoading(false);
     }
@@ -100,7 +101,7 @@ export default function SurgeryExamTemplateManager() {
       await loadAll();
     } catch (e) {
       console.error('템플릿 삭제 실패', e);
-      alert('항목 삭제 중 오류가 발생했습니다.');
+      toast('항목 삭제 중 오류가 발생했습니다.', 'error');
     } finally {
       setLoading(false);
     }
@@ -117,7 +118,7 @@ export default function SurgeryExamTemplateManager() {
       await loadAll();
     } catch (e) {
       console.error('템플릿 상태 변경 실패', e);
-      alert('활성/비활성 변경 중 오류가 발생했습니다.');
+      toast('활성/비활성 변경 중 오류가 발생했습니다.', 'error');
     } finally {
       setLoading(false);
     }

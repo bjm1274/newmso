@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { canAccessApprovalSection } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
@@ -499,14 +500,6 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   }, [normalizeApprovalLineIds]);
 
   useEffect(() => {
-    const fallbackTypes = [
-      { name: '?닿??좎껌', slug: 'leave' },
-      { name: '?곗옣洹쇰Τ', slug: 'overtime' },
-      { name: '鍮꾪뭹援щℓ', slug: 'purchase' },
-      { name: '異쒓껐?뺤젙', slug: 'attendance_fix' },
-      { name: '?묒떇?좎껌', slug: 'generic' }
-    ];
-
     const normalizedFallbackTypes = [
       { name: '연차/휴가', slug: 'leave' },
       { name: '연장근무', slug: 'overtime' },
@@ -841,9 +834,9 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     const failedCount = results.filter(Boolean).length;
     setSelectedApprovalIds([]);
     if (failedCount > 0) {
-      alert(`${count - failedCount}건 승인 완료, ${failedCount}건 실패했습니다.`);
+      toast(`${count - failedCount}건 승인 완료, ${failedCount}건 실패했습니다.`, 'error');
     } else {
-      alert(`${count}건이 일괄 승인 처리되었습니다.`);
+      toast(`${count}건이 일괄 승인 처리되었습니다.`, 'success');
     }
     fetchApprovals();
   };
@@ -871,9 +864,9 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     const failedCount = results.filter(Boolean).length;
     setSelectedApprovalIds([]);
     if (failedCount > 0) {
-      alert(`${count - failedCount}건 반려 완료, ${failedCount}건 실패했습니다.`);
+      toast(`${count - failedCount}건 반려 완료, ${failedCount}건 실패했습니다.`, 'error');
     } else {
-      alert(`${count}건이 일괄 반려 처리되었습니다.`);
+      toast(`${count}건이 일괄 반려 처리되었습니다.`, 'success');
     }
     fetchApprovals();
   };
@@ -893,16 +886,16 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
 
     const currentApproverId = resolveCurrentApproverId(item);
     if (!currentApproverId) {
-      alert("결재자가 지정되지 않아 승인할 수 없습니다. 결재선을 다시 확인해 주세요.");
+      toast("결재자가 지정되지 않아 승인할 수 없습니다. 결재선을 다시 확인해 주세요.", 'warning');
       return;
     }
     if (String(currentApproverId) !== String(user?.id)) {
-      alert("현재 결재자만 승인할 수 있습니다.");
+      toast("현재 결재자만 승인할 수 있습니다.");
       return;
     }
     const routingError = await syncApprovalRouting(item, currentApproverId);
     if (routingError) {
-      alert("결재선을 초기화하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      toast("결재선을 초기화하지 못했습니다. 잠시 후 다시 시도해 주세요.");
       return;
     }
 
@@ -937,7 +930,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
             supplyApprovalSummary = workflowResult?.summary ?? null;
           } catch (workflowError) {
             console.error('물품신청 승인 후 재고 처리 준비 실패:', workflowError);
-            alert('최종 승인되었지만 경영지원팀 알림 또는 재고 처리 큐 생성에는 실패했습니다. 재고 화면에서 다시 확인해주세요.');
+            toast('최종 승인되었지만 경영지원팀 알림 또는 재고 처리 큐 생성에는 실패했습니다. 재고 화면에서 다시 확인해주세요.', 'error');
           }
         }
 
@@ -972,14 +965,14 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
           const startStr = String(itemMetaData?.startDate || itemMetaData?.start || '');
           const endStr = String(itemMetaData?.endDate || itemMetaData?.end || startStr);
           if (!startStr) {
-            alert("최종 승인 처리가 완료되었습니다.");
+            toast("최종 승인 처리가 완료되었습니다.", 'success');
             fetchApprovals();
             return;
           }
           const start = new Date(startStr);
           const end = new Date(endStr || startStr);
           if (isNaN(start.getTime())) {
-            alert("최종 승인 처리가 완료되었습니다.");
+            toast("최종 승인 처리가 완료되었습니다.", 'success');
             fetchApprovals();
             return;
           }
@@ -1028,34 +1021,34 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
         }
 
         if (supplyApprovalSummary) {
-          alert(`최종 승인되었습니다. 경영지원팀에 처리 알림을 보냈습니다.\n출고 가능 ${supplyApprovalSummary.issue_ready_count}건, 발주 필요 ${supplyApprovalSummary.order_required_count}건`);
+          toast(`최종 승인되었습니다. 경영지원팀에 처리 알림을 보냈습니다.\n출고 가능 ${supplyApprovalSummary.issue_ready_count}건, 발주 필요 ${supplyApprovalSummary.order_required_count}건`, 'success');
         } else {
-          alert("최종 승인 처리가 완료되었습니다.");
+          toast("최종 승인 처리가 완료되었습니다.", 'success');
         }
       } else {
-        alert("승인되어 다음 결재자에게 진행되었습니다.");
+        toast("승인되어 다음 결재자에게 진행되었습니다.");
       }
       fetchApprovals();
     } else {
-      alert("승인 처리에 실패했습니다. " + (appError?.message || ""));
+      toast("승인 처리에 실패했습니다. " + (appError?.message || ""), 'error');
     }
   };
 
   const handleRejectAction = async (item: Record<string, unknown>) => {
     const currentApproverId = resolveCurrentApproverId(item);
     if (!currentApproverId) {
-      alert("결재자가 지정되지 않아 반려할 수 없습니다. 결재선을 다시 확인해 주세요.");
+      toast("결재자가 지정되지 않아 반려할 수 없습니다. 결재선을 다시 확인해 주세요.", 'warning');
       return;
     }
     if (String(currentApproverId) !== String(user?.id)) {
-      alert("현재 결재자만 반려할 수 있습니다.");
+      toast("현재 결재자만 반려할 수 있습니다.");
       return;
     }
     const reason = window.prompt("반려 사유를 입력해 주세요. (선택)");
     if (reason === null) return;
     const routingError = await syncApprovalRouting(item, currentApproverId);
     if (routingError) {
-      alert("결재선을 초기화하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      toast("결재선을 초기화하지 못했습니다. 잠시 후 다시 시도해 주세요.");
       return;
     }
     const rejectMetaData = item.meta_data as Record<string, unknown> | null | undefined;
@@ -1064,20 +1057,20 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       .update({ status: '반려', meta_data: { ...(rejectMetaData || {}), reject_reason: reason } })
       .eq('id', item.id);
     if (!error) {
-      alert("반려 처리되었습니다.");
+      toast("반려 처리되었습니다.", 'success');
       fetchApprovals();
     } else {
-      alert("반려 처리에 실패했습니다. " + (error?.message || ""));
+      toast("반려 처리에 실패했습니다. " + (error?.message || ""), 'error');
     }
   };
 
   const handleSubmit = async () => {
     if (!user?.id) {
-      alert("로그인한 직원 계정으로만 기안할 수 있습니다.");
+      toast("로그인한 직원 계정으로만 기안할 수 있습니다.");
       return;
     }
     if (!formTitle || approverLine.length === 0) {
-      alert("제목과 결재선을 지정해주세요.");
+      toast("제목과 결재선을 지정해주세요.");
       return;
     }
 
@@ -1085,11 +1078,11 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       const startDate = extraData.startDate as string | undefined;
       const endDate = extraData.endDate as string | undefined;
       if (!startDate || startDate.length < 10) {
-        alert("시작 일자를 입력해주세요.");
+        toast("시작 일자를 입력해주세요.", 'warning');
         return;
       }
       if (!endDate || endDate.length < 10) {
-        alert("종료 일자를 입력해주세요.");
+        toast("종료 일자를 입력해주세요.", 'warning');
         return;
       }
     }
@@ -1097,7 +1090,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     if (formType === '연차계획서') {
       const planDates = extraData.planDates as Array<{ date: string; reason: string }> | undefined;
       if (!planDates || planDates.length === 0 || planDates.some((row) => !row.date || row.date.length < 10)) {
-        alert("모든 사용 예정일을 입력해주세요.");
+        toast("모든 사용 예정일을 입력해주세요.", 'warning');
         return;
       }
     }
@@ -1144,11 +1137,11 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
 
     if (error) {
       console.error('기안 상신 실패:', error);
-      alert("기안이 올라가지 않았습니다.\n\n" + (error.message || ""));
+      toast("기안이 올라가지 않았습니다.\n\n" + (error.message || ""), 'error');
       return;
     }
     clearDraftFromStorage();
-    alert("상신 완료!");
+    toast("상신 완료!", 'success');
     const nextView = resolveAccessibleView('기안함');
     if (nextView) {
       setViewMode(nextView);
@@ -1805,14 +1798,14 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
               onChange={e => setTemplateNameInput(e.target.value)}
               placeholder="템플릿 이름 (예: 연차 기본, 물품 신청)"
               className="w-full px-4 py-3 border border-[var(--border)] rounded-[var(--radius-md)] text-sm font-semibold bg-[var(--muted)] outline-none focus:ring-2 focus:ring-[var(--accent)]/20 focus:border-[var(--accent)] mb-4"
-              onKeyDown={e => { if (e.key === 'Enter' && templateNameInput.trim() && approverLine.length > 0) { const newTpl = { id: Date.now().toString(), name: templateNameInput.trim(), line: approverLine }; const next = [...approverTemplates, newTpl]; setApproverTemplates(next); if (typeof window !== 'undefined' && user?.id) window.localStorage.setItem(`erp_approveline_templates_${user.id}`, JSON.stringify(next)); setShowTemplateModal(false); alert(`"${newTpl.name}" 템플릿이 저장되었습니다.`); } }}
+              onKeyDown={e => { if (e.key === 'Enter' && templateNameInput.trim() && approverLine.length > 0) { const newTpl = { id: Date.now().toString(), name: templateNameInput.trim(), line: approverLine }; const next = [...approverTemplates, newTpl]; setApproverTemplates(next); if (typeof window !== 'undefined' && user?.id) window.localStorage.setItem(`erp_approveline_templates_${user.id}`, JSON.stringify(next)); setShowTemplateModal(false); toast(`"${newTpl.name}" 템플릿이 저장되었습니다.`, 'success'); } }}
             />
             <div className="flex gap-2">
               <button onClick={() => setShowTemplateModal(false)} className="flex-1 py-3 rounded-[var(--radius-md)] bg-[var(--muted)] text-[var(--toss-gray-4)] font-semibold text-sm">취소</button>
               <button
                 onClick={() => {
-                  if (!templateNameInput.trim()) return alert('템플릿 이름을 입력하세요.');
-                  if (approverLine.length === 0) return alert('결재선을 먼저 지정해주세요.');
+                  if (!templateNameInput.trim()) return toast('템플릿 이름을 입력하세요.', 'warning');
+                  if (approverLine.length === 0) return toast('결재선을 먼저 지정해주세요.');
                   const newTpl = { id: Date.now().toString(), name: templateNameInput.trim(), line: approverLine };
                   const next = [...approverTemplates, newTpl];
                   setApproverTemplates(next);
@@ -1820,7 +1813,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                     window.localStorage.setItem(`erp_approveline_templates_${user.id}`, JSON.stringify(next));
                   }
                   setShowTemplateModal(false);
-                  alert(`"${newTpl.name}" 템플릿이 저장되었습니다.`);
+                  toast(`"${newTpl.name}" 템플릿이 저장되었습니다.`, 'success');
                 }}
                 className="flex-1 py-3 rounded-[var(--radius-md)] bg-[var(--accent)] text-white font-semibold text-sm"
               >

@@ -1,3 +1,4 @@
+import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import {
   fetchTaxFreeSettings,
@@ -58,10 +59,10 @@ export default function TaxFreeSettingsPanel({ companyName, onSaved }: { company
     setSaving(true);
     try {
       await saveTaxFreeSettings(co, settings, year);
-      alert('비과세 항목 설정이 저장되었습니다.');
+      toast('비과세 항목 설정이 저장되었습니다.', 'success');
       onSaved?.();
     } catch (e) {
-      alert('저장 중 오류가 발생했습니다.');
+      toast('저장 중 오류가 발생했습니다.', 'error');
     } finally {
       setSaving(false);
     }

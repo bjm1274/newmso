@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { calculateSeverancePay, formatWorkPeriod } from '@/lib/severance-pay';
@@ -65,7 +66,7 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
   const result = selectedStaff ? calculateSettlement(selectedStaff) : null;
 
   const handleConfirm = async () => {
-    if (!selectedStaff) return alert('정산 대상을 선택해 주세요.');
+    if (!selectedStaff) return toast('정산 대상을 선택해 주세요.', 'warning');
     if (!confirm('정산 내역을 확정하고 저장하시겠습니까?')) return;
 
     setLoading(true);
@@ -109,12 +110,12 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
         console.error('interim payroll audit log failed:', auditError);
       }
 
-      alert('중간정산이 저장되었습니다.');
+      toast('중간정산이 저장되었습니다.', 'success');
       setSelectedStaff(null);
       if (_onRefresh) _onRefresh();
     } catch (e) {
       console.error(e);
-      alert('저장 중 오류가 발생했습니다.');
+      toast('저장 중 오류가 발생했습니다.', 'error');
     } finally {
       setLoading(false);
     }

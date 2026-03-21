@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -85,8 +86,8 @@ export default function ApprovalFormBuilder({ user }: Props) {
   };
 
   const handleSave = async () => {
-    if (!formName.trim()) return alert('양식 이름을 입력해주세요.');
-    if (fields.length === 0) return alert('최소 1개 이상의 필드를 추가해주세요.');
+    if (!formName.trim()) return toast('양식 이름을 입력해주세요.', 'warning');
+    if (fields.length === 0) return toast('최소 1개 이상의 필드를 추가해주세요.');
     setSaving(true);
     try {
       await supabase.from('custom_form_templates').insert({
@@ -95,11 +96,11 @@ export default function ApprovalFormBuilder({ user }: Props) {
         created_by: user?.id,
         created_at: new Date().toISOString(),
       });
-      alert('양식이 저장되었습니다.');
+      toast('양식이 저장되었습니다.', 'success');
       setFormName('');
       setFields([]);
     } catch {
-      alert('저장에 실패했습니다.');
+      toast('저장에 실패했습니다.', 'error');
     } finally {
       setSaving(false);
     }
@@ -111,7 +112,7 @@ export default function ApprovalFormBuilder({ user }: Props) {
       await supabase.from('custom_form_templates').delete().eq('id', id);
       setSavedForms(prev => prev.filter(f => f.id !== id));
     } catch {
-      alert('삭제에 실패했습니다.');
+      toast('삭제에 실패했습니다.', 'error');
     }
   };
 

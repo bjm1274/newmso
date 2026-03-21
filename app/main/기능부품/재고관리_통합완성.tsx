@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { StaffMember, InventoryItem, Supplier } from '@/types';
 import { canAccessInventorySection } from '@/lib/access-control';
@@ -663,10 +664,10 @@ export default function IntegratedInventoryManagement({
   );
 
   const handleStockUpdate = async (item: InventoryItem, type: 'in' | 'out', amount: number, targetCompany: string, targetDept: string) => {
-    if (amount <= 0) return alert("수량은 0보다 커야 합니다.");
+    if (amount <= 0) return toast("수량은 0보다 커야 합니다.");
     const currentQty = item.quantity ?? (item as Record<string, unknown>).stock as number ?? 0;
     const newStock = type === 'in' ? currentQty + amount : currentQty - amount;
-    if (type === 'out' && newStock < 0) return alert("재고가 부족하여 출고할 수 없습니다.");
+    if (type === 'out' && newStock < 0) return toast("재고가 부족하여 출고할 수 없습니다.");
     try {
       // 해당 물품의 귀속 회사/부서를 완전히 변경하는 것이 아니라면 inventory 테이블의 소속 구조는 유지하고 로그에만 사유를 기록
       const { error } = await supabase.from('inventory').update({ quantity: newStock, stock: newStock }).eq('id', item.id);
@@ -692,7 +693,7 @@ export default function IntegratedInventoryManagement({
             return supabase.from('inventory_logs').insert(legacyRows);
           }
         );
-        alert(`${type === 'in' ? '입고' : '출고'} 처리가 완료되었습니다.`);
+        toast(`${type === 'in' ? '입고' : '출고'} 처리가 완료되었습니다.`, 'success');
         refreshCurrentInventory();
         void fetchLogs();
         if (onRefresh) onRefresh();
@@ -820,10 +821,10 @@ export default function IntegratedInventoryManagement({
         fetchPendingSupplyApprovals(),
       ]);
       onRefresh?.();
-      alert('불출 처리가 완료되었습니다.');
+      toast('불출 처리가 완료되었습니다.', 'success');
     } catch (error: unknown) {
       console.error('물품신청 불출 처리 실패:', error);
-      alert((error as Error)?.message || '불출 처리 중 오류가 발생했습니다.');
+      toast((error as Error)?.message || '불출 처리 중 오류가 발생했습니다.', 'error');
     } finally {
       setWorkflowActionKey(null);
     }
@@ -918,10 +919,10 @@ export default function IntegratedInventoryManagement({
       }
 
       await fetchPendingSupplyApprovals();
-      alert(orderRequested ? '발주 요청을 등록했습니다.' : '자동 발주 기준 재고가 없어 발주 필요 상태로만 표시했습니다.');
+      toast(orderRequested ? '발주 요청을 등록했습니다.' : '자동 발주 기준 재고가 없어 발주 필요 상태로만 표시했습니다.', 'success');
     } catch (error: unknown) {
       console.error('물품신청 발주 처리 실패:', error);
-      alert((error as Error)?.message || '발주 처리 중 오류가 발생했습니다.');
+      toast((error as Error)?.message || '발주 처리 중 오류가 발생했습니다.', 'error');
     } finally {
       setWorkflowActionKey(null);
     }
@@ -991,10 +992,10 @@ export default function IntegratedInventoryManagement({
         reason: `현재고(${quantity})가 안전재고(${minQuantity}) 이하로 떨어져 자동 기안되었습니다.\n보충 필요량: ${requestQuantity}개`,
       });
       if (error) throw error;
-      alert('비품구매 신청서가 MSO 관리자에게 성공적으로 상신되었습니다.');
+      toast('비품구매 신청서가 MSO 관리자에게 성공적으로 상신되었습니다.', 'success');
     } catch (err) {
       console.error('결재 상신 실패:', err);
-      alert('자동 기안 중 오류가 발생했습니다.');
+      toast('자동 기안 중 오류가 발생했습니다.', 'error');
     }
   };
 
@@ -1584,10 +1585,10 @@ export default function IntegratedInventoryManagement({
                                     if (confirm(`[${displayName}] 품목을 정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
                                       try {
                                         await supabase.from('inventory').delete().eq('id', item.id);
-                                        alert('삭제되었습니다.');
+                                        toast('삭제되었습니다.', 'success');
                                         refreshCurrentInventory();
                                       } catch (err) {
-                                        alert('삭제 오류가 발생했습니다.');
+                                        toast('삭제 오류가 발생했습니다.', 'error');
                                       }
                                     }
                                   }}
