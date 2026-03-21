@@ -1,5 +1,5 @@
 'use client';
-import { Suspense, useState, useEffect, useCallback } from 'react';
+import { Suspense, useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnFallback } from '@/lib/supabase-compat';
@@ -90,6 +90,28 @@ function MainPageContent() {
   });
   const [loginAt] = useState<string>(new Date().toISOString());
   const isMsoUser = user?.company === 'SY INC.' || user?.permissions?.mso === true;
+  const companyById = useMemo(
+    () => new Map(companies.map((company) => [company.id, company])),
+    [companies]
+  );
+  const companyIdByName = useMemo(
+    () => new Map(companies.map((company) => [company.name, company.id])),
+    [companies]
+  );
+  const navigationIntent = useMemo(
+    () => ({
+      openChatRoom: searchParams.get('open_chat_room')?.trim() || null,
+      openMessage: searchParams.get('open_msg')?.trim() || null,
+      openMenu: searchParams.get('open_menu')?.trim() || null,
+      openSubView: searchParams.get('open_subview')?.trim() || null,
+      openMyPageTab: searchParams.get('open_mypage_tab')?.trim() || null,
+      openPost: searchParams.get('open_post')?.trim() || null,
+      openBoard: searchParams.get('open_board')?.trim() || null,
+      openInventoryView: searchParams.get('open_inventory_view')?.trim() || null,
+      openInventoryApproval: searchParams.get('open_inventory_approval')?.trim() || null,
+    }),
+    [searchParams]
+  );
 
   const handleSelectedCompanyIdChange = useCallback(
     (id: string | null) => {
@@ -100,12 +122,12 @@ function MainPageContent() {
         setSelectedCo('전체');
         return;
       }
-      const matchedCompany = companies.find((company) => company.id === id);
+      const matchedCompany = companyById.get(id);
       if (matchedCompany?.name) {
         setSelectedCo(matchedCompany.name);
       }
     },
-    [companies, isMsoUser]
+    [companyById, isMsoUser]
   );
 
   const handleSelectedCoChange = useCallback(
@@ -117,12 +139,11 @@ function MainPageContent() {
         setSelectedCompanyIdState(null);
         return;
       }
-      const matchedCompany = companies.find((company) => company.name === nextCo);
-      const nextCompanyId = matchedCompany?.id ?? null;
+      const nextCompanyId = companyIdByName.get(nextCo) ?? null;
       persistSelectedCompanyId(nextCompanyId);
       setSelectedCompanyIdState(nextCompanyId);
     },
-    [companies, isMsoUser]
+    [companyIdByName, isMsoUser]
   );
 
   const handleOpenApproval = useCallback((intent?: Record<string, unknown>) => {
@@ -432,26 +453,30 @@ function MainPageContent() {
 
   // 알림 클릭 시 open_chat_room 쿼리 처리 → 채팅 메뉴 + 해당 채팅방 연동 (웹/모바일 동일)
   useEffect(() => {
-    const roomId = searchParams.get('open_chat_room')?.trim();
-    const msgId = searchParams.get('open_msg')?.trim();
+    const roomId = navigationIntent.openChatRoom;
+    const msgId = navigationIntent.openMessage;
     if (roomId || msgId) {
       setMainMenu('채팅');
       if (roomId) setInitialOpenChatRoomId(roomId);
       if (msgId) setInitialOpenMessageId(msgId);
       router.replace('/main', { scroll: false });
     }
-  }, [searchParams, router]);
+  }, [navigationIntent.openChatRoom, navigationIntent.openMessage, router]);
 
   // 페이지 이동 처리 (알림 인박스에서 메뉴 오픈용)
   useEffect(() => {
-    const targetMenu = searchParams.get('open_menu')?.trim();
-    const targetSubView = searchParams.get('open_subview')?.trim();
-    const openPost = searchParams.get('open_post')?.trim();
-    const openInventoryView = searchParams.get('open_inventory_view')?.trim();
-    const openInventoryApproval = searchParams.get('open_inventory_approval')?.trim();
-    if (targetMenu || targetSubView || openPost || openInventoryView || openInventoryApproval) {
+    const targetMenu = navigationIntent.openMenu;
+    const targetSubView = navigationIntent.openSubView;
+    const openMyPageTab = navigationIntent.openMyPageTab;
+    const openPost = navigationIntent.openPost;
+    const openInventoryView = navigationIntent.openInventoryView;
+    const openInventoryApproval = navigationIntent.openInventoryApproval;
+    if (targetMenu || targetSubView || openMyPageTab || openPost || openInventoryView || openInventoryApproval) {
       if (targetMenu) setMainMenu(targetMenu);
       if (targetSubView) setSubView(targetSubView);
+      if (targetMenu === '내정보' && openMyPageTab) {
+        setInitialMyPageTab(openMyPageTab);
+      }
       if (targetMenu === '재고관리' || openInventoryView || openInventoryApproval) {
         setMainMenu('재고관리');
         if (openInventoryView) {
@@ -461,7 +486,7 @@ function MainPageContent() {
           setInitialInventoryWorkflowApprovalId(openInventoryApproval);
         }
       }
-      const openBoard = searchParams.get('open_board')?.trim();
+      const openBoard = navigationIntent.openBoard;
       if (openBoard) {
         setInitialBoardView(openBoard);
       }
@@ -471,7 +496,16 @@ function MainPageContent() {
       }
       router.replace('/main', { scroll: false });
     }
-  }, [searchParams, router]);
+  }, [
+    navigationIntent.openBoard,
+    navigationIntent.openInventoryApproval,
+    navigationIntent.openInventoryView,
+    navigationIntent.openMenu,
+    navigationIntent.openMyPageTab,
+    navigationIntent.openPost,
+    navigationIntent.openSubView,
+    router,
+  ]);
 
   // 온라인 상태(Presence) 업데이트: 일정 주기로 last_seen_at 갱신
   useEffect(() => {
@@ -529,14 +563,14 @@ function MainPageContent() {
       return;
     }
 
-    const matchedCompany = companies.find((company) => company.name === selectedCo);
+    const matchedCompany = selectedCo ? companyById.get(companyIdByName.get(selectedCo) || '') : null;
     if (!matchedCompany) return;
 
     if (selectedCompanyId !== matchedCompany.id) {
       persistSelectedCompanyId(matchedCompany.id);
       setSelectedCompanyIdState(matchedCompany.id);
     }
-  }, [companies, isMsoUser, selectedCo, selectedCompanyId]);
+  }, [companyById, companyIdByName, isMsoUser, selectedCo, selectedCompanyId]);
 
   // 2. 상태 변경 시마다 로컬 스토리지 업데이트
   useEffect(() => {
@@ -547,7 +581,7 @@ function MainPageContent() {
     }
   }, [mainMenu, subView, selectedCo, user]);
 
-  const fetchERPData = async (currentUser?: ErpUser | null, companyIdFilter?: string | null) => {
+  const fetchERPData = useCallback(async (currentUser?: ErpUser | null, companyIdFilter?: string | null) => {
     setLoading(true);
     const u = currentUser ?? user;
     try {
@@ -561,7 +595,7 @@ function MainPageContent() {
       const filterCompanyId = isMso
         ? (() => {
             if (!filterCompanyName) return null;
-            const matchedCompanyId = companies.find((company) => company.name === filterCompanyName)?.id ?? null;
+            const matchedCompanyId = companyIdByName.get(filterCompanyName) ?? null;
             return matchedCompanyId ?? companyIdFilter ?? null;
           })()
         : u?.company_id;
@@ -645,7 +679,7 @@ function MainPageContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [companyIdByName, persistClientUser, selectedCo, user]);
 
   // 현재 메인 메뉴에 해당하는 서브메뉴 목록
   const isSystemMaster = isNamedSystemMasterAccount(user);
@@ -670,6 +704,13 @@ function MainPageContent() {
 
       return true;
     });
+  const currentSubMenuGroups = useMemo(
+    () =>
+      mainMenu === '관리자' || mainMenu === '재고관리'
+        ? Array.from(new Set(currentSubMenus.map((subMenu) => subMenu.group))).filter(Boolean)
+        : [],
+    [currentSubMenus, mainMenu]
+  );
   const subgroupLabels: Record<string, string> = {
     '재고 대시보드': '📊 재고 대시보드',
     '입출고 운영': '📦 입출고 운영',
@@ -708,6 +749,19 @@ function MainPageContent() {
     }
   }, [currentSubMenus, mainMenu, resolveLegacyNavigation, subView, user]);
 
+  const handleMenuChange = useCallback((menu: string, sub?: string) => {
+    setMainMenu(menu);
+    if (sub !== undefined) setSubView(sub);
+  }, []);
+
+  const handleSubViewChange = useCallback((nextSubView: string) => {
+    setSubView(nextSubView);
+  }, []);
+
+  const handleRefresh = useCallback(() => {
+    void fetchERPData(user, selectedCompanyId);
+  }, [fetchERPData, selectedCompanyId, user]);
+
   // user 없으면 로그인 페이지로 리다이렉트 (초기 로드 시)
   if (!user) {
     return (
@@ -730,17 +784,14 @@ function MainPageContent() {
       <Sidebar
         user={user}
         mainMenu={mainMenu}
-        onMenuChange={(menu: string, sub?: string) => {
-          setMainMenu(menu);
-          if (sub !== undefined) setSubView(sub);
-        }}
+        onMenuChange={handleMenuChange}
       />
 
       {currentSubMenus.length > 0 && (
         <aside className="no-scrollbar flex w-full shrink-0 flex-row overflow-x-auto border-b border-[var(--border)] bg-[var(--card)] px-2 py-1.5 md:sticky md:top-0 md:max-h-[100dvh] md:w-[var(--submenu-width)] md:flex-col md:overflow-x-visible md:overflow-y-auto md:border-r md:border-b-0 md:px-2 md:py-3">
           {(() => {
             if (mainMenu === '관리자' || mainMenu === '재고관리') {
-              const groups = Array.from(new Set(currentSubMenus.map(s => s.group))).filter(Boolean);
+              const groups = currentSubMenuGroups;
 
               return groups.map(groupName => (
                 <div key={groupName!} className="flex flex-row md:flex-col gap-0.5 mb-0 md:mb-3 shrink-0">
@@ -750,7 +801,7 @@ function MainPageContent() {
                   {currentSubMenus.filter(s => s.group === groupName).map(sub => (
                     <button
                       key={sub.id}
-                      onClick={() => setSubView(sub.id)}
+                      onClick={() => handleSubViewChange(sub.id)}
                       data-testid={buildSubMenuTestId(mainMenu, sub.id)}
                       className={`flex-none md:w-full text-center md:text-left px-3 md:px-2.5 py-1.5 text-[11px] font-semibold rounded-[var(--radius-md)] transition-all whitespace-nowrap md:flex md:items-center md:gap-1.5 ${subView === sub.id
                         ? 'bg-[var(--foreground)] text-white'
@@ -768,7 +819,7 @@ function MainPageContent() {
             return currentSubMenus.map((sub) => (
               <button
                 key={sub.id}
-                onClick={() => setSubView(sub.id)}
+                onClick={() => handleSubViewChange(sub.id)}
                 data-testid={buildSubMenuTestId(mainMenu, sub.id)}
                 className={`flex-none md:w-full text-center md:text-left px-3 md:px-2.5 py-1.5 text-[11px] font-semibold rounded-[var(--radius-md)] transition-all whitespace-nowrap md:flex md:items-center md:gap-1.5 ${subView === sub.id
                   ? 'bg-[var(--accent)] text-white'
@@ -790,7 +841,7 @@ function MainPageContent() {
         <ChatAlertBanner
           onOpenChat={(roomId) => { setMainMenu('채팅'); setInitialOpenChatRoomId(roomId); }}
           onOpenApproval={() => setMainMenu('전자결재')}
-          onOpenNotifications={() => { setMainMenu('내정보'); setInitialMyPageTab('notifications'); }}
+          onOpenNotifications={() => { setMainMenu('알림'); setInitialMyPageTab(null); }}
           onOpenInventory={() => setMainMenu('재고관리')}
         />
         {/* 전역 알림 및 푸시 처리 (채팅 탭을 열지 않아도 작동) */}
@@ -827,7 +878,7 @@ function MainPageContent() {
           companies={companies as unknown as string[]}
           selectedCompanyId={selectedCompanyId}
           setSelectedCompanyId={handleSelectedCompanyIdChange}
-          onRefresh={() => fetchERPData(user, selectedCompanyId)}
+          onRefresh={handleRefresh}
           initialMyPageTab={initialMyPageTab}
           onConsumeMyPageInitialTab={() => setInitialMyPageTab(null)}
           initialBoard={initialBoardView}

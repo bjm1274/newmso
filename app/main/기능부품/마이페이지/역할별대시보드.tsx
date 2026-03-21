@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 interface Props {
   user: any;
   setMainMenu?: (menu: string) => void;
+  onOpenApproval?: (options?: Record<string, unknown>) => void;
 }
 
 type TodayAttendance = {
@@ -20,7 +21,7 @@ type AnnualLeaveSummary = {
 
 const MANAGER_POSITIONS = ['과장', '간호과장', '실장', '수간호사', '파트장', '센터장', '부장', '본부장', '이사', '원장', '병원장', '대표'];
 
-export default function RoleDashboard({ user, setMainMenu }: Props) {
+export default function RoleDashboard({ user, setMainMenu, onOpenApproval }: Props) {
   const [pendingApprovals, setPendingApprovals] = useState(0);
   const [lowStockCount, setLowStockCount] = useState(0);
   const [todayAttendance, setTodayAttendance] = useState<TodayAttendance>({ in: null, out: null });
@@ -117,6 +118,15 @@ export default function RoleDashboard({ user, setMainMenu }: Props) {
     return value.slice(11, 16);
   };
 
+  const openApprovalInbox = () => {
+    if (typeof onOpenApproval === 'function') {
+      onOpenApproval({ viewMode: '결재함' });
+      return;
+    }
+
+    setMainMenu?.('전자결재');
+  };
+
   return (
     <div className="mb-0">
       {isAdmin ? (
@@ -124,6 +134,7 @@ export default function RoleDashboard({ user, setMainMenu }: Props) {
           pendingApprovals={pendingApprovals}
           lowStockCount={lowStockCount}
           setMainMenu={setMainMenu}
+          openApprovalInbox={openApprovalInbox}
         />
       ) : isManager ? (
         <ManagerDashboard
@@ -133,6 +144,7 @@ export default function RoleDashboard({ user, setMainMenu }: Props) {
           todayAttendance={todayAttendance}
           lowStockCount={lowStockCount}
           setMainMenu={setMainMenu}
+          openApprovalInbox={openApprovalInbox}
           formatTime={formatTime}
         />
       ) : (
@@ -141,6 +153,7 @@ export default function RoleDashboard({ user, setMainMenu }: Props) {
           annualLeave={annualLeave}
           pendingApprovals={pendingApprovals}
           setMainMenu={setMainMenu}
+          openApprovalInbox={openApprovalInbox}
           formatTime={formatTime}
         />
       )}
@@ -193,12 +206,14 @@ function UserDashboard({
   annualLeave,
   pendingApprovals,
   setMainMenu,
+  openApprovalInbox,
   formatTime,
 }: {
   todayAttendance: TodayAttendance;
   annualLeave: AnnualLeaveSummary | null;
   pendingApprovals: number;
   setMainMenu?: (menu: string) => void;
+  openApprovalInbox: () => void;
   formatTime: (value: string | null) => string;
 }) {
   return (
@@ -218,7 +233,7 @@ function UserDashboard({
       <button
         type="button"
         className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 text-left transition-all hover:bg-[var(--toss-blue-light)]/30"
-        onClick={() => setMainMenu?.('전자결재')}
+        onClick={openApprovalInbox}
       >
         <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">결재 대기</p>
         <p className={`text-lg font-bold ${pendingApprovals > 0 ? 'text-orange-500' : 'text-[var(--foreground)]'}`}>{pendingApprovals}건</p>
@@ -245,6 +260,7 @@ function ManagerDashboard({
   todayAttendance,
   lowStockCount,
   setMainMenu,
+  openApprovalInbox,
   formatTime,
 }: {
   teamCount: number;
@@ -253,6 +269,7 @@ function ManagerDashboard({
   todayAttendance: TodayAttendance;
   lowStockCount: number;
   setMainMenu?: (menu: string) => void;
+  openApprovalInbox: () => void;
   formatTime: (value: string | null) => string;
 }) {
   return (
@@ -270,7 +287,7 @@ function ManagerDashboard({
             ? 'border-orange-200 bg-orange-50 hover:bg-orange-100'
             : 'border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]'
         }`}
-        onClick={() => setMainMenu?.('전자결재')}
+        onClick={openApprovalInbox}
       >
         <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">결재 대기</p>
         <p className={`text-lg font-bold ${pendingApprovals > 0 ? 'text-orange-600' : 'text-[var(--foreground)]'}`}>{pendingApprovals}건</p>
@@ -303,10 +320,12 @@ function AdminDashboard({
   pendingApprovals,
   lowStockCount,
   setMainMenu,
+  openApprovalInbox,
 }: {
   pendingApprovals: number;
   lowStockCount: number;
   setMainMenu?: (menu: string) => void;
+  openApprovalInbox: () => void;
 }) {
   return (
     <div className="mb-0 flex flex-wrap items-stretch gap-3">
@@ -315,7 +334,7 @@ function AdminDashboard({
         value={`${pendingApprovals}건`}
         icon="✅"
         active={pendingApprovals > 0}
-        onValueClick={() => setMainMenu?.('전자결재')}
+        onValueClick={openApprovalInbox}
       />
       <AdminActionCard
         title="재고 부족"
