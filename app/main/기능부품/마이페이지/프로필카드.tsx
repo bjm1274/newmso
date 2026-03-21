@@ -1,3 +1,4 @@
+import { toast } from '@/lib/toast';
 ﻿'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -112,7 +113,6 @@ export default function MyProfileCard({
       setAvatarUrl(getProfilePhotoUrl(normalizedUser));
 
       // 3. 브라우저 저장소 동기화 (다른 탭·할일 등에서 동일 사용자 인식)
-      localStorage.setItem('user_session', JSON.stringify(normalizedUser));
       localStorage.setItem('erp_user', JSON.stringify(normalizedUser));
       broadcastProfileUpdate(normalizedUser);
       // setDebugMsg(`ID 복구 완료: ${data.id}`);
@@ -132,7 +132,6 @@ export default function MyProfileCard({
     }
 
     try {
-      localStorage.removeItem('user_session');
       localStorage.removeItem('erp_user');
       localStorage.removeItem('erp_login_at');
       persistSupabaseAccessToken(null);
@@ -162,13 +161,13 @@ export default function MyProfileCard({
       const payload = await response.json().catch(() => null);
 
       if (!response.ok) {
-        alert('비밀번호가 일치하지 않습니다.');
+        toast('비밀번호가 일치하지 않습니다.');
         return false;
       }
 
       return true;
     } catch {
-      alert('본인 확인 중 오류가 발생했습니다.');
+      toast('본인 확인 중 오류가 발생했습니다.', 'error');
       return false;
     }
   };
@@ -193,7 +192,7 @@ export default function MyProfileCard({
         } catch (_) { }
       }
       if (!currentUser?.id) {
-        alert('사진 등록은 직원 계정(이름으로 로그인)으로 이용해 주세요. MSO 관리자 계정에는 프로필 사진 기능을 사용할 수 없습니다.');
+        toast('사진 등록은 직원 계정(이름으로 로그인)으로 이용해 주세요. MSO 관리자 계정에는 프로필 사진 기능을 사용할 수 없습니다.', 'success');
         setUploading(false);
         return;
       }
@@ -289,19 +288,18 @@ export default function MyProfileCard({
         uploadedAt
       );
       setUser(updatedUser);
-      localStorage.setItem('user_session', JSON.stringify(updatedUser));
       localStorage.setItem('erp_user', JSON.stringify(updatedUser));
       broadcastProfileUpdate(updatedUser);
 
-      alert('사진이 정상적으로 등록되었습니다!');
+      toast('사진이 정상적으로 등록되었습니다!', 'success');
 
     } catch (error: unknown) {
       console.error('프로필 사진 업로드 실패:', error);
       const msg: string = (error as Error)?.message || '';
       if (msg.includes('The resource was not found') || msg.includes('bucket')) {
-        alert('프로필 사진 업로드에 실패했습니다.\n\nSupabase 대시보드 → Storage에서 버킷 이름 "profiles"인 Public 버킷을 생성한 뒤, supabase_migrations 폴더의 storage_profiles_policies.sql 정책을 적용해 주세요.');
+        toast('프로필 사진 업로드에 실패했습니다.\n\nSupabase 대시보드 → Storage에서 버킷 이름 "profiles"인 Public 버킷을 생성한 뒤, supabase_migrations 폴더의 storage_profiles_policies.sql 정책을 적용해 주세요.', 'error');
       } else {
-        alert('프로필 사진 업로드에 실패했습니다.\n\n' + (msg || '잠시 후 다시 시도해 주세요.'));
+        toast('프로필 사진 업로드에 실패했습니다.\n\n' + (msg || '잠시 후 다시 시도해 주세요.'), 'error');
       }
     } finally {
       setUploading(false);
@@ -375,7 +373,6 @@ export default function MyProfileCard({
       bank_name: updatedUser.bank_name || updatedUser.permissions?.bank_name || '',
       bank_account: updatedUser.bank_account || updatedUser.permissions?.bank_account || '',
     });
-    localStorage.setItem('user_session', JSON.stringify(updatedUser));
     localStorage.setItem('erp_user', JSON.stringify(updatedUser));
     broadcastProfileUpdate(updatedUser);
 
@@ -400,9 +397,9 @@ export default function MyProfileCard({
     );
 
     applyIsEditing(false);
-    alert('내 정보가 바로 저장되었고 인사관리에도 즉시 반영되었습니다.');
+    toast('내 정보가 바로 저장되었고 인사관리에도 즉시 반영되었습니다.', 'success');
     return;
-    alert('내 정보가 바로 저장되었습니다. 인사관리에도 즉시 반영됩니다.');
+    toast('내 정보가 바로 저장되었습니다. 인사관리에도 즉시 반영됩니다.', 'success');
   };
 
   const handleSaveProfile = async () => {
@@ -416,7 +413,7 @@ export default function MyProfileCard({
         } catch (_) { }
       }
       if (!currentUser?.id) {
-        alert('내 정보 수정은 직원 계정(이름으로 로그인)에서만 가능합니다.');
+        toast('내 정보 수정은 직원 계정(이름으로 로그인)에서만 가능합니다.', 'success');
         return;
       }
 
@@ -451,18 +448,18 @@ export default function MyProfileCard({
       if (error) {
         const safeError: any = error;
         console.error(error);
-        alert(`정보 변경 요청 중 오류가 발생했습니다.\n상세: ${safeError.message || JSON.stringify(safeError)}`);
+        toast(`정보 변경 요청 중 오류가 발생했습니다.\n상세: ${safeError.message || JSON.stringify(safeError)}`, 'error');
         return;
-        alert(`정보 변경 요청 중 오류가 발생했습니다.\n상세: ${error.message || JSON.stringify(error)}`);
+        toast(`정보 변경 요청 중 오류가 발생했습니다.\n상세: ${error.message || JSON.stringify(error)}`, 'error');
         return;
       }
 
       applyIsEditing(false);
-      alert('인사팀으로 내 정보 변경 요청(결재 대기)이 전송되었습니다. 관리자 승인 후 반영됩니다.');
+      toast('인사팀으로 내 정보 변경 요청(결재 대기)이 전송되었습니다. 관리자 승인 후 반영됩니다.', 'success');
       }
     } catch (err) {
       console.error(err);
-      alert('요청 전송에 실패했습니다.');
+      toast('요청 전송에 실패했습니다.', 'error');
     }
   };
 

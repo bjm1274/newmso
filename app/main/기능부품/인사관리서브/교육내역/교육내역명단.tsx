@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 
 import { useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -84,7 +85,7 @@ export default function EducationList({
 
         if (uploadError) {
           console.warn('Storage error, but continuing', uploadError);
-          alert('파일 업로드 중 권한 에러가 발생했을 수 있습니다. 이수 상태는 저장하고 사본 URL은 비워 둡니다.');
+          toast('파일 업로드 중 권한 에러가 발생했을 수 있습니다. 이수 상태는 저장하고 사본 URL은 비워 둡니다.', 'success');
         } else {
           const { data: publicData } = supabase.storage.from('board-attachments').getPublicUrl(path);
           url = publicData.publicUrl;
@@ -117,7 +118,7 @@ export default function EducationList({
       setSelectedAction(null);
     } catch (error) {
       console.error('교육 이수 상태 업데이트 실패:', serializeEducationQueryError(error));
-      alert('상태 업데이트 중 오류가 발생했습니다.');
+      toast('상태 업데이트 중 오류가 발생했습니다.', 'error');
     } finally {
       setUploading(false);
     }

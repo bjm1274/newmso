@@ -1,3 +1,4 @@
+import { toast } from '@/lib/toast';
 ﻿'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -117,10 +118,10 @@ export default function AnnualLeavePromotion({ staffs, selectedCo }: { staffs: S
           link: '/main/전자결재?view=작성하기&type=연차계획서'
         },
       }]);
-      alert('연차사용촉진 통보가 발송되었습니다.');
+      toast('연차사용촉진 통보가 발송되었습니다.', 'success');
       fetchSubmittedPlans();
     } catch {
-      alert('발송 실패');
+      toast('발송 실패', 'error');
     } finally {
       setLoading(false);
     }

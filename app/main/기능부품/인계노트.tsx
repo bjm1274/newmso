@@ -1,3 +1,4 @@
+import { toast } from '@/lib/toast';
 ﻿'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -624,11 +625,11 @@ export default function HandoverNotes({ user }: Props) {
     const roomNumber = normalizeRoomNumber(newRoomNumber);
     const capacity = normalizeRoomCapacity(newRoomCapacity) || 4;
     if (!roomNumber) {
-      alert('병실 호수를 입력해주세요.');
+      toast('병실 호수를 입력해주세요.', 'warning');
       return;
     }
     if (roomConfigs.some((room) => room.roomNumber === roomNumber)) {
-      alert('같은 병실 호수가 이미 있습니다.');
+      toast('같은 병실 호수가 이미 있습니다.', 'warning');
       return;
     }
     replaceRooms([...roomConfigs, createRoom(roomNumber, capacity, selectedDateKey)]);
@@ -702,7 +703,7 @@ export default function HandoverNotes({ user }: Props) {
     const trimmedContent = content.trim();
     if (!trimmedContent || saving) return;
     if (noteScope === 'patient' && !selectedBed) {
-      alert('환자별 인계는 병상 설정에서 환자를 지정한 뒤 선택해주세요.');
+      toast('환자별 인계는 병상 설정에서 환자를 지정한 뒤 선택해주세요.', 'warning');
       return;
     }
 
@@ -760,7 +761,7 @@ export default function HandoverNotes({ user }: Props) {
 
       if (error) {
         console.error('인계노트 저장 실패:', error);
-        alert('인계노트 저장 중 오류가 발생했습니다.');
+        toast('인계노트 저장 중 오류가 발생했습니다.', 'error');
         return;
       }
 
@@ -776,7 +777,7 @@ export default function HandoverNotes({ user }: Props) {
       setSelectedBedKey('');
     } catch (error) {
       console.error('인계노트 저장 중 오류:', error);
-      alert('인계노트 저장 중 오류가 발생했습니다.');
+      toast('인계노트 저장 중 오류가 발생했습니다.', 'error');
     } finally {
       setSaving(false);
     }
@@ -808,7 +809,7 @@ export default function HandoverNotes({ user }: Props) {
     } catch (error) {
       console.error('인계노트 완료 처리 실패:', error);
       setNotes((prev) => prev.map((note) => (note.id === targetNote.id ? { ...note, is_completed: targetNote.is_completed } : note)));
-      alert('인계노트 완료 처리 중 오류가 발생했습니다.');
+      toast('인계노트 완료 처리 중 오류가 발생했습니다.', 'error');
     } finally {
       setNoteMutationId(null);
     }
@@ -817,7 +818,7 @@ export default function HandoverNotes({ user }: Props) {
   async function saveNoteEdit(targetNote: HandoverNote) {
     const trimmedContent = editingContent.trim();
     if (!trimmedContent) {
-      alert('수정할 내용을 입력해주세요.');
+      toast('수정할 내용을 입력해주세요.', 'success');
       return;
     }
 
@@ -866,7 +867,7 @@ export default function HandoverNotes({ user }: Props) {
       cancelNoteEdit();
     } catch (error) {
       console.error('인계노트 수정 실패:', error);
-      alert('인계노트 수정 중 오류가 발생했습니다.');
+      toast('인계노트 수정 중 오류가 발생했습니다.', 'error');
     } finally {
       setNoteMutationId(null);
     }
@@ -888,7 +889,7 @@ export default function HandoverNotes({ user }: Props) {
       }
     } catch (error) {
       console.error('인계노트 삭제 실패:', error);
-      alert('인계노트 삭제 중 오류가 발생했습니다.');
+      toast('인계노트 삭제 중 오류가 발생했습니다.', 'error');
     } finally {
       setNoteMutationId(null);
     }

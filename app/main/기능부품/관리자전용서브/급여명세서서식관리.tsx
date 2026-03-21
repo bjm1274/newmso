@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -613,10 +614,10 @@ export default function PayrollSlipDesignManager() {
       if (error) {
         throw error;
       }
-      alert('문서 디자인 설정을 저장했습니다.');
+      toast('문서 디자인 설정을 저장했습니다.', 'success');
     } catch (error) {
       console.error(error);
-      alert('문서 디자인 저장 중 오류가 발생했습니다.');
+      toast('문서 디자인 저장 중 오류가 발생했습니다.', 'error');
     } finally {
       setSaving(false);
     }

@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { getItemName, getItemQuantity, getRecommendedOrderQuantity, requestInventoryReorder } from '@/app/main/inventory-utils';
@@ -102,9 +103,9 @@ export default function InventoryDemandForecast({ user, inventory, selectedCo }:
         reason: `현재 재고: ${getItemQuantity(fc.item)}개, 일평균 소비: ${fc.avgDailyUsage.toFixed(1)}개, 예상 소진: ${fc.daysLeft}일, 발주 권장량: ${fc.orderQty}개`,
       });
       if (error) throw error;
-      alert('자동발주 신청이 완료되었습니다.');
+      toast('자동발주 신청이 완료되었습니다.', 'success');
     } catch {
-      alert('신청에 실패했습니다.');
+      toast('신청에 실패했습니다.', 'error');
     } finally {
       setOrdering(null);
     }

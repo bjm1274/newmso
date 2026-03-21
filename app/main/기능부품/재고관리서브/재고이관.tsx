@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
@@ -240,7 +241,7 @@ export default function InventoryTransfer({
 
   const handleTransfer = async () => {
     if (validationMessage || !selectedItem || quantityValidation.quantity === null) {
-      alert(validationMessage || '이관 정보를 다시 확인하세요.');
+      toast(validationMessage || '이관 정보를 다시 확인하세요.', 'warning');
       return;
     }
 
@@ -384,9 +385,9 @@ export default function InventoryTransfer({
       resetForm();
       setActiveTab('history');
       await Promise.all([Promise.resolve(fetchInventory()), fetchTransfers()]);
-      alert('이관이 완료되었습니다.');
+      toast('이관이 완료되었습니다.', 'success');
     } catch {
-      alert('이관 처리 실패');
+      toast('이관 처리 실패', 'error');
     } finally {
       setSaving(false);
     }

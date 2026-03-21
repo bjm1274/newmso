@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -53,22 +54,22 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
   }, []);
 
   const handleAddSupplier = async () => {
-    if (!supplierForm.name) return alert('거래처명을 입력해주세요.');
+    if (!supplierForm.name) return toast('거래처명을 입력해주세요.', 'warning');
     setLoading(true);
     try {
       const { error } = await supabase.from('suppliers').insert([supplierForm]);
       if (error) {
         console.error('suppliers insert error', error);
-        alert(`거래처 등록에 실패했습니다.\n\n${error.message || ''}`);
+        toast(`거래처 등록에 실패했습니다.\n\n${error.message || ''}`, 'error');
       } else {
-        alert('거래처가 등록되었습니다.');
+        toast('거래처가 등록되었습니다.', 'success');
         setSupplierForm({ name: '', contact: '', address: '', phone: '', email: '', reg_num: '', ceo: '' });
         setShowNewSupplier(false);
         _fetchSuppliers?.();
       }
     } catch (err: unknown) {
       console.error('handleAddSupplier error', err);
-      alert(`거래처 등록에 실패했습니다.\n\n${(err as Error)?.message || ''}`);
+      toast(`거래처 등록에 실패했습니다.\n\n${(err as Error)?.message || ''}`, 'error');
     } finally {
       setLoading(false);
     }
@@ -89,7 +90,7 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
 
   const handleUpdateSupplier = async () => {
     if (!editingSupplier?.id) return;
-    if (!editingSupplier.name) return alert('거래처명을 입력해주세요.');
+    if (!editingSupplier.name) return toast('거래처명을 입력해주세요.', 'warning');
     setEditLoading(true);
     try {
       const payload = {
@@ -104,15 +105,15 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
       const { error } = await supabase.from('suppliers').update(payload).eq('id', editingSupplier.id);
       if (error) {
         console.error('suppliers update error', error);
-        alert(`거래처 수정에 실패했습니다.\n\n${error.message || ''}`);
+        toast(`거래처 수정에 실패했습니다.\n\n${error.message || ''}`, 'error');
       } else {
-        alert('거래처 정보가 수정되었습니다.');
+        toast('거래처 정보가 수정되었습니다.', 'success');
         setEditingSupplier(null);
         _fetchSuppliers?.();
       }
     } catch (err: unknown) {
       console.error('handleUpdateSupplier error', err);
-      alert(`거래처 수정에 실패했습니다.\n\n${(err as Error)?.message || ''}`);
+      toast(`거래처 수정에 실패했습니다.\n\n${(err as Error)?.message || ''}`, 'error');
     } finally {
       setEditLoading(false);
     }
@@ -126,15 +127,15 @@ export default function InvoiceManagement({ user, inventory, suppliers, fetchSup
       const { error } = await supabase.from('suppliers').delete().eq('id', id);
       if (error) {
         console.error('suppliers delete error', error);
-        alert(`거래처 삭제에 실패했습니다.\n\n${error.message || ''}`);
+        toast(`거래처 삭제에 실패했습니다.\n\n${error.message || ''}`, 'error');
       } else {
-        alert('거래처가 삭제되었습니다.');
+        toast('거래처가 삭제되었습니다.', 'success');
         if (editingSupplier?.id === id) setEditingSupplier(null);
         _fetchSuppliers?.();
       }
     } catch (err: unknown) {
       console.error('handleDeleteSupplier error', err);
-      alert(`거래처 삭제에 실패했습니다.\n\n${(err as Error)?.message || ''}`);
+      toast(`거래처 삭제에 실패했습니다.\n\n${(err as Error)?.message || ''}`, 'error');
     }
   };
 

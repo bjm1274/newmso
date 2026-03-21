@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import SmartDatePicker from '../공통/SmartDatePicker';
@@ -27,13 +28,13 @@ export default function RewardDisciplineManagement({ staffs = [], selectedCo, us
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const staff = _staffs.find((s: any) => s.id === form.staff_id);
-        if (!staff) return alert('직원을 선택해주세요.');
+        if (!staff) return toast('직원을 선택해주세요.', 'warning');
         const cat = activeTab === '포상' ? '포상' : '징계';
         const newRec = { ...form, category: cat, staff_name: staff.name as string, company: staff.company, department: (staff.department as string) || '', issued_by: (user as any)?.name || '관리자' };
         const { data, error } = await supabase.from('reward_discipline').insert([newRec]).select();
         if (error) {
             console.error('reward_discipline insert failed:', error);
-            alert('포상/징계 기록 저장에 실패했습니다.');
+            toast('포상/징계 기록 저장에 실패했습니다.', 'error');
             return;
         }
         if (data?.[0]) { setRecords([data[0], ...records]); }

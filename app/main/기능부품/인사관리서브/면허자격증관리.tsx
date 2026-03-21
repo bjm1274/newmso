@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -67,8 +68,8 @@ export default function LicenseManager({ staffs = [], selectedCo, user }: { staf
   };
 
   const handleSave = async () => {
-    if (!form.license_name.trim()) return alert('면허/자격증명을 입력하세요.');
-    if (!form.staff_id) return alert('직원을 선택하세요.');
+    if (!form.license_name.trim()) return toast('면허/자격증명을 입력하세요.', 'warning');
+    if (!form.staff_id) return toast('직원을 선택하세요.', 'warning');
     setSaving(true);
     try {
       if (editId) {
@@ -78,7 +79,7 @@ export default function LicenseManager({ staffs = [], selectedCo, user }: { staf
       }
       setShowModal(false);
       fetchLicenses();
-    } catch { alert('저장 실패'); } finally { setSaving(false); }
+    } catch { toast('저장 실패', 'error'); } finally { setSaving(false); }
   };
 
   const handleDelete = async (id: string) => {

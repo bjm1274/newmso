@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -93,9 +94,9 @@ export default function ShiftCalendar({ staffs, selectedCo }: Record<string, unk
             // In a real scenario, we would upsert to an `employee_shifts` table.
             // Mocking the delay here for demonstration.
             await new Promise(r => setTimeout(r, 600));
-            alert('스케줄이 성공적으로 저장 및 배포되었습니다. 직원들의 마이페이지에 업데이트됩니다.');
+            toast('스케줄이 성공적으로 저장 및 배포되었습니다. 직원들의 마이페이지에 업데이트됩니다.', 'success');
         } catch (e) {
-            alert('스케줄 저장 실패');
+            toast('스케줄 저장 실패', 'error');
         } finally {
             setLoading(false);
         }

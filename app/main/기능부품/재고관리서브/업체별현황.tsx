@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -89,7 +90,7 @@ export default function VendorAnalysis() {
       .insert(prescriptions.filter(p => p.patient_name && p.item_name));
 
     if (!error) {
-      alert('환자 처방 데이터가 자동 분류되었습니다.');
+      toast('환자 처방 데이터가 자동 분류되었습니다.');
       setShowUploadModal(false);
       setUploadFile(null);
       fetchVendorData();

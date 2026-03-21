@@ -1,3 +1,4 @@
+import { toast } from '@/lib/toast';
 ﻿'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -84,7 +85,7 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
         .eq('id', editing.id);
       if (error) {
         console.error('companies update failed:', error);
-        alert('회사 정보 저장에 실패했습니다: ' + error.message);
+        toast('회사 정보 저장에 실패했습니다: ' + error.message, 'error');
         return;
       }
       setEditing(null);
@@ -112,7 +113,7 @@ export default function CompanyManager({ staffs = [], onRefresh }: Props) {
       });
       if (error) {
         console.error('companies insert failed:', error);
-        alert('회사 추가에 실패했습니다: ' + error.message);
+        toast('회사 추가에 실패했습니다: ' + error.message, 'error');
         return;
       }
       setForm({

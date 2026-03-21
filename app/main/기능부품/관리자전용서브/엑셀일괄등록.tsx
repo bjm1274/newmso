@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import * as XLSX from 'xlsx';
@@ -48,7 +49,7 @@ export default function ExcelBulkUpload({ onRefresh }: Record<string, unknown>) 
               join_date: r.입사일 ?? r.join_date ?? null
             }, { onConflict: 'employee_no' });
           }
-          alert(`${rows.length}건 등록 완료`);
+          toast(`${rows.length}건 등록 완료`, 'success');
         } else if (mode === 'inventory') {
           for (const r of rows) {
             await supabase.from('inventory').insert({
@@ -62,7 +63,7 @@ export default function ExcelBulkUpload({ onRefresh }: Record<string, unknown>) 
               category: r.분류 ?? r.category ?? ''
             });
           }
-          alert(`${rows.length}건 등록 완료`);
+          toast(`${rows.length}건 등록 완료`, 'success');
         } else {
           // 재고 리스트 - 이카운트 형식: 한 번에 올리고, 동일 품목+회사면 수정 반영
           const { data: existingList } = await supabase.from('inventory').select('id, item_name, name, company');
@@ -99,14 +100,14 @@ export default function ExcelBulkUpload({ onRefresh }: Record<string, unknown>) 
               if (insertedRow?.id) byKey[key] = { id: insertedRow.id };
             }
           }
-          alert(`재고(이카운트) 반영 완료: 신규 ${inserted}건, 수정 ${updated}건`);
+          toast(`재고(이카운트) 반영 완료: 신규 ${inserted}건, 수정 ${updated}건`, 'success');
         }
         setPreview([]);
         if (onRefresh) (onRefresh as () => void)();
       }
     } catch (err) {
       console.error(err);
-      alert('파일 처리 실패');
+      toast('파일 처리 실패', 'error');
     } finally {
       setLoading(false);
       e.target.value = '';

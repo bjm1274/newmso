@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import SmartDatePicker from '../공통/SmartDatePicker';
@@ -89,7 +90,7 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
     : cards.filter((c: any) => c.company_name === selectedCo);
 
   const handleAddCard = async () => {
-    if (!cardForm.company_name || !cardForm.card_nickname) return alert('회사와 카드별칭을 입력하세요.');
+    if (!cardForm.company_name || !cardForm.card_nickname) return toast('회사와 카드별칭을 입력하세요.', 'warning');
     const { error } = await supabase.from('corporate_cards').insert({
       company_name: cardForm.company_name,
       card_nickname: cardForm.card_nickname,
@@ -99,7 +100,7 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
     });
     if (error) {
       console.error('corporate_cards insert failed:', error);
-      alert('법인카드 저장에 실패했습니다.');
+      toast('법인카드 저장에 실패했습니다.', 'error');
       return;
     }
     setCardForm({ company_name: '박철홍정형외과', card_nickname: '', last_four: '', issuer: '', holder_id: '' });
@@ -112,14 +113,14 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
     const { error } = await supabase.from('corporate_cards').update({ status: 'inactive' }).eq('id', id);
     if (error) {
       console.error('corporate_cards update failed:', error);
-      alert('카드 비활성화에 실패했습니다.');
+      toast('카드 비활성화에 실패했습니다.', 'error');
       return;
     }
     fetchCards();
   };
 
   const handleAdd = async () => {
-    if (!form.date || !form.merchant || form.amount <= 0) return alert('필수 항목을 입력하세요.');
+    if (!form.date || !form.merchant || form.amount <= 0) return toast('필수 항목을 입력하세요.', 'warning');
     const co = selectedCo !== '전체' ? selectedCo : (form.card_id ? cards.find((c: any) => c.id === form.card_id)?.company_name : null) || '전체';
     const { error } = await supabase.from('corporate_card_transactions').insert({
       transaction_date: form.date,
@@ -132,7 +133,7 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
     });
     if (error) {
       console.error('corporate_card_transactions insert failed:', error);
-      alert('사용내역 저장에 실패했습니다.');
+      toast('사용내역 저장에 실패했습니다.', 'error');
       return;
     }
     setForm({ date: '', merchant: '', category: '식비', amount: 0, description: '', card_id: '' });
@@ -179,7 +180,7 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
         }
         imported++;
       }
-      alert(failed > 0 ? `${imported}건 가져왔고 ${failed}건은 실패했습니다.` : `${imported}건 가져왔습니다. (카테고리 자동 분류 적용)`);
+      toast(failed > 0 ? `${imported}건 가져왔고 ${failed}건은 실패했습니다.` : `${imported}건 가져왔습니다. (카테고리 자동 분류 적용)`, 'error');
       fetchTransactions();
     } finally {
       setImporting(false);
@@ -190,7 +191,7 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
   // '기타'로 분류된 항목을 일괄 자동 분류
   const handleBulkAutoClassify = async () => {
     const unclassified = list.filter((r: Record<string, unknown>) => r.category === '기타' && r.merchant);
-    if (unclassified.length === 0) return alert('자동 분류할 항목이 없습니다. (이미 분류됨)');
+    if (unclassified.length === 0) return toast('자동 분류할 항목이 없습니다. (이미 분류됨)', 'warning');
     if (!confirm(`${unclassified.length}건을 자동 분류하시겠습니까?`)) return;
     let updated = 0;
     let failed = 0;
@@ -206,7 +207,7 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
         updated++;
       }
     }
-    alert(failed > 0 ? `${updated}건 자동 분류, ${failed}건 실패했습니다.` : `${updated}건 자동 분류 완료.`);
+    toast(failed > 0 ? `${updated}건 자동 분류, ${failed}건 실패했습니다.` : `${updated}건 자동 분류 완료.`, 'error');
     fetchTransactions();
   };
 

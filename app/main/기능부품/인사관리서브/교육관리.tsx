@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -203,7 +204,7 @@ export default function EducationMain({ staffs, selectedCo }: Record<string, unk
 
   const handleAlertPanel = () => {
     if (activeAlerts.length === 0) {
-      alert('현재 확인할 알림 대상이 없습니다.');
+      toast('현재 확인할 알림 대상이 없습니다.', 'warning');
       return;
     }
     setShowNoti((prev) => !prev);
@@ -311,9 +312,9 @@ export default function EducationMain({ staffs, selectedCo }: Record<string, unk
                       read_at: null,
                     });
                     if (!error) {
-                      alert(`${item.name}님에게 독촉 알림이 성공적으로 전송되었습니다.`);
+                      toast(`${item.name}님에게 독촉 알림이 성공적으로 전송되었습니다.`, 'success');
                     } else {
-                      alert('알림 전송 중 오류가 발생했습니다.');
+                      toast('알림 전송 중 오류가 발생했습니다.', 'error');
                       console.error(error);
                     }
                   }}

@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import SmartDatePicker from '../공통/SmartDatePicker';
@@ -29,12 +30,12 @@ export default function HealthCheckupManagement({ staffs, selectedCo }: Record<s
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const staff = _staffs.find((s: any) => s.id === form.staff_id);
-        if (!staff) return alert('직원을 선택해주세요.');
+        if (!staff) return toast('직원을 선택해주세요.', 'warning');
         const newRec = { staff_id: form.staff_id, staff_name: staff.name, company: staff.company, department: staff.department || '', checkup_type: form.checkup_type, scheduled_date: form.scheduled_date, completed_date: null, status: '예정', hospital: form.hospital, result: '', memo: form.memo };
         const { data, error } = await supabase.from('health_checkups').insert([newRec]).select();
         if (error) {
             console.error('health_checkups insert failed:', error);
-            alert('건강검진 일정 저장에 실패했습니다.');
+            toast('건강검진 일정 저장에 실패했습니다.', 'error');
             return;
         }
         if (data?.[0]) { setRecords([data[0], ...records]); }
@@ -47,7 +48,7 @@ export default function HealthCheckupManagement({ staffs, selectedCo }: Record<s
         const { error } = await supabase.from('health_checkups').update({ status: '완료', completed_date: now }).eq('id', id);
         if (error) {
             console.error('health_checkups update failed:', error);
-            alert('건강검진 완료 처리에 실패했습니다.');
+            toast('건강검진 완료 처리에 실패했습니다.', 'error');
             return;
         }
         setRecords(records.map((r: any) => r.id === id ? { ...r, status: '완료', completed_date: now } : r));

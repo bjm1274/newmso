@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -44,7 +45,7 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
   );
 
   const submitLeavePlan = async (staff: any, remain: number) => {
-    if (!planDates.trim()) return alert('사용 예정일(계획)을 입력해주세요.');
+    if (!planDates.trim()) return toast('사용 예정일(계획)을 입력해주세요.', 'warning');
     setSubmitting(true);
     try {
       await supabase.from('approvals').insert([{
@@ -57,12 +58,12 @@ export default function LeaveDashboard({ staffs = [], selectedCo, currentUser }:
         status: '대기',
         meta_data: { type: 'annual_leave_plan', remaining: remain }
       }]);
-      alert('연차 사용 계획서가 성공적으로 제출되었습니다. (전자결재 상신)');
+      toast('연차 사용 계획서가 성공적으로 제출되었습니다. (전자결재 상신)', 'success');
       setShowPlanModal(false);
       setPlanDates('');
       setPlanReason('');
     } catch {
-      alert('제출 실패');
+      toast('제출 실패', 'error');
     } finally {
       setSubmitting(false);
     }

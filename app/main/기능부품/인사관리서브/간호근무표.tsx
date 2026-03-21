@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -556,7 +557,7 @@ export default function NurseSchedule({ staffs = [], selectedCo }: { staffs: Sta
 
   const saveSchedule = async () => {
     const staffIds = scopedStaffs.map((staff: StaffMember) => staff.id).filter(Boolean);
-    if (staffIds.length === 0) return alert('저장할 직원이 없습니다.');
+    if (staffIds.length === 0) return toast('저장할 직원이 없습니다.', 'success');
 
     setSaving(true);
     try {
@@ -570,9 +571,9 @@ export default function NurseSchedule({ staffs = [], selectedCo }: { staffs: Sta
       await supabase.from('nurse_schedules').delete().eq('year_month', ym).in('staff_id', staffIds);
       if (rows.length > 0) await supabase.from('nurse_schedules').insert(rows);
       setEditMode(false);
-      alert('근무표가 저장되었습니다.');
+      toast('근무표가 저장되었습니다.', 'success');
     } catch {
-      alert('저장 실패');
+      toast('저장 실패', 'error');
     } finally {
       setSaving(false);
     }
@@ -599,14 +600,14 @@ export default function NurseSchedule({ staffs = [], selectedCo }: { staffs: Sta
   };
 
   const applyWizard = () => {
-    if (!wizardDept) return alert('생성할 팀을 선택하세요.');
-    if (!selectedStaffIds.length) return alert('생성할 직원을 한 명 이상 선택하세요.');
-    if (!wizardPrimaryToken) return alert('주 근무유형을 선택하세요.');
-    if ((wizardPattern === '2교대' || wizardPattern === '3교대' || wizardPattern === '2일근무1일휴무') && !wizardSecondaryToken) return alert('보조 근무유형을 선택하세요.');
-    if ((wizardPattern === '3교대' || wizardPattern === '야간전담') && !wizardTertiaryToken) return alert('야간/3차 근무유형을 선택하세요.');
+    if (!wizardDept) return toast('생성할 팀을 선택하세요.', 'warning');
+    if (!selectedStaffIds.length) return toast('생성할 직원을 한 명 이상 선택하세요.', 'warning');
+    if (!wizardPrimaryToken) return toast('주 근무유형을 선택하세요.', 'warning');
+    if ((wizardPattern === '2교대' || wizardPattern === '3교대' || wizardPattern === '2일근무1일휴무') && !wizardSecondaryToken) return toast('보조 근무유형을 선택하세요.', 'warning');
+    if ((wizardPattern === '3교대' || wizardPattern === '야간전담') && !wizardTertiaryToken) return toast('야간/3차 근무유형을 선택하세요.', 'warning');
 
     const targetStaffs = wizardTargetStaffs.filter((staff: StaffMember) => selectedStaffIds.includes(String(staff.id)));
-    if (!targetStaffs.length) return alert('생성 대상 직원이 없습니다.');
+    if (!targetStaffs.length) return toast('생성 대상 직원이 없습니다.');
     if (!confirm(`${wizardDept} 팀 ${targetStaffs.length}명의 ${ym} 간호 근무표를 생성하시겠습니까?\n선택한 직원의 기존 편성은 덮어씁니다.`)) return;
 
     setGenerating(true);
@@ -632,7 +633,7 @@ export default function NurseSchedule({ staffs = [], selectedCo }: { staffs: Sta
     setEditMode(true);
     setWizardOpen(false);
     setGenerating(false);
-    alert(`${wizardDept} 팀 ${targetStaffs.length}명의 근무표가 생성되었습니다. 저장 버튼으로 확정하세요.`);
+    toast(`${wizardDept} 팀 ${targetStaffs.length}명의 근무표가 생성되었습니다. 저장 버튼으로 확정하세요.`, 'success');
   };
 
   const countByCategory = (day: number, category: string) =>

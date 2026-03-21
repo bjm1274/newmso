@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -35,7 +36,7 @@ export default function TeamManager({ onRefresh }: { onRefresh?: () => void }) {
   }, [company, fetchTeams]);
 
   const handleAdd = async () => {
-    if (!newTeam.team_name.trim()) return alert('팀명을 입력하세요.');
+    if (!newTeam.team_name.trim()) return toast('팀명을 입력하세요.', 'warning');
     const { error } = await supabase.from('org_teams').insert({
       company_name: company,
       division: company === 'SY INC.' ? (newTeam.division === '운영본부' ? '총무부' : '진료부') : newTeam.division,
@@ -52,7 +53,7 @@ export default function TeamManager({ onRefresh }: { onRefresh?: () => void }) {
       fetchTeams();
       onRefresh?.();
     } else {
-      alert('이미 존재하는 팀명이거나 오류가 발생했습니다.');
+      toast('이미 존재하는 팀명이거나 오류가 발생했습니다.', 'error');
     }
   };
 

@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import ContractList from './계약문서/계약서명단';
@@ -38,7 +39,7 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: Record<s
   useEffect(() => { fetchContracts(); }, []);
 
   const handleRequestSignature = async () => {
-    if (checkedIds.length === 0) return alert("직원을 선택해주세요.");
+    if (checkedIds.length === 0) return toast("직원을 선택해주세요.", 'warning');
     setLoading(true);
     try {
       const includeTaxFree = activeTab === '연봉계약갱신' || activeTab === '신규/변경계약서';
@@ -127,9 +128,9 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: Record<s
         }))
       );
 
-      alert("계약서가 발송되었습니다. 직원이 로그인 시 즉시 서명 화면이 표시됩니다.");
+      toast("계약서가 발송되었습니다. 직원이 로그인 시 즉시 서명 화면이 표시됩니다.", 'success');
       fetchContracts(); setCheckedIds([]); if (onRefresh) (onRefresh as () => void)();
-    } catch (err) { alert("오류가 발생했습니다."); } finally { setLoading(false); }
+    } catch (err) { toast("오류가 발생했습니다.", 'error'); } finally { setLoading(false); }
   };
 
   return (

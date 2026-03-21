@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -74,7 +75,7 @@ export default function IncidentReport({ staffs, selectedCo, user }: Props) {
   useEffect(() => { fetchReports(); }, []);
 
   const handleSave = async () => {
-    if (!form.location.trim() || !form.description.trim()) return alert('장소와 사고 경위를 입력해주세요.');
+    if (!form.location.trim() || !form.description.trim()) return toast('장소와 사고 경위를 입력해주세요.', 'warning');
     setSaving(true);
     try {
       const { error } = await supabase.from('incident_reports').insert({
@@ -85,14 +86,14 @@ export default function IncidentReport({ staffs, selectedCo, user }: Props) {
         created_at: new Date().toISOString(),
       });
       if (error) throw error;
-      alert('사고 보고서가 등록되었습니다.');
+      toast('사고 보고서가 등록되었습니다.', 'success');
       setForm(emptyForm());
       setSelectedPersons([]);
       setTab('목록');
       fetchReports();
     } catch (error) {
       console.error('incident_reports insert failed:', error);
-      alert('저장에 실패했습니다.');
+      toast('저장에 실패했습니다.', 'error');
     } finally {
       setSaving(false);
     }
@@ -105,7 +106,7 @@ export default function IncidentReport({ staffs, selectedCo, user }: Props) {
       setReports(prev => prev.map(r => r.id === id ? { ...r, status } : r));
     } catch (error) {
       console.error('incident_reports status update failed:', error);
-      alert('상태 변경에 실패했습니다.');
+      toast('상태 변경에 실패했습니다.', 'error');
     }
   };
 

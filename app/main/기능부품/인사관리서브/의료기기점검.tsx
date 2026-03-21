@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -69,7 +70,7 @@ export default function MedicalDeviceInspection({ selectedCo, user }: { selected
   };
 
   const handleSaveDevice = async () => {
-    if (!deviceForm.name.trim()) return alert('장비명을 입력하세요.');
+    if (!deviceForm.name.trim()) return toast('장비명을 입력하세요.', 'warning');
     setSaving(true);
     try {
       if (editDeviceId) {
@@ -79,7 +80,7 @@ export default function MedicalDeviceInspection({ selectedCo, user }: { selected
       }
       setShowDeviceModal(false);
       fetchDevices();
-    } catch { alert('저장 실패'); } finally { setSaving(false); }
+    } catch { toast('저장 실패', 'error'); } finally { setSaving(false); }
   };
 
   const handleSaveInspection = async () => {
@@ -93,8 +94,8 @@ export default function MedicalDeviceInspection({ selectedCo, user }: { selected
       setShowInspectModal(false);
       fetchDevices();
       fetchHistories();
-      alert('점검 기록이 등록되었습니다.');
-    } catch { alert('저장 실패'); } finally { setSaving(false); }
+      toast('점검 기록이 등록되었습니다.', 'success');
+    } catch { toast('저장 실패', 'error'); } finally { setSaving(false); }
   };
 
   const handleDeleteDevice = async (id: string) => {

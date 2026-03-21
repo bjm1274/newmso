@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -45,7 +46,6 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
 
           if (data && !error) {
             setUser(data);
-            localStorage.setItem('user_session', JSON.stringify(data));
             localStorage.setItem('erp_user', JSON.stringify(data));
             fetchTasks(data.id);
           }
@@ -131,7 +131,7 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
     
     // 안전장치: ID가 없으면 한 번 더 확인
     if (!user?.id) {
-      alert("잠시만 기다려주세요. 사용자 정보를 확인 중입니다.");
+      toast("잠시만 기다려주세요. 사용자 정보를 확인 중입니다.", 'warning');
       return;
     }
 
@@ -163,7 +163,7 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
       setTasks(prev => prev.map(t => t.id === optimisticTask.id ? data : t));
 
     } catch (error: unknown) {
-      alert('저장 실패: ' + ((error as Error)?.message ?? String(error)));
+      toast('저장 실패: ' + ((error as Error)?.message ?? String(error)), 'error');
       fetchTasks(user.id as string);
     }
   };

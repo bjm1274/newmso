@@ -91,7 +91,6 @@ export async function POST(req: NextRequest) {
 `;
 
         const text = await extractWithGemini(prompt, base64Data, mimeType);
-        console.log('Gemini Raw Result:', text);
 
         // JSON 부분만 정규식으로 안전하게 추출
         const jsonMatch = text.match(/\[\s*\{[\s\S]*\}\s*\]/);
