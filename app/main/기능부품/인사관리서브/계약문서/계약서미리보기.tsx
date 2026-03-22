@@ -183,12 +183,15 @@ export default function ContractPreview({ staff, contract }: Props) {
       Number(salarySource.other_taxfree || user?.other_taxfree || 0),
     ];
     const totalMonthlyWage = salaryItems.reduce((s, n) => s + n, 0);
+    // 과세 항목: 기본급 + 직책수당 (index 0, 1) — renderSalaryTable과 동일 기준
+    const taxableTotal = salaryItems[0] + salaryItems[1];
     const wph = Number(salarySource.working_hours_per_week || user?.working_hours_per_week || 40);
     const mwh = Math.round((wph * 52) / 12);
-    const hwage = mwh > 0 ? Math.round(salaryItems[0] / mwh) : 0; // 기본급 기준 시급
+    const hwage = mwh > 0 ? Math.round(taxableTotal / mwh) : 0; // 과세합계 기준 통상임금 시급
     vars.total_monthly = formatWon(totalMonthlyWage);
     vars.annual_salary = formatWon(totalMonthlyWage * 12);
     vars.hourly_wage = formatWon(hwage);
+    vars.monthly_work_hours = String(mwh);
 
     let result = template;
 
@@ -300,7 +303,7 @@ export default function ContractPreview({ staff, contract }: Props) {
         <div className="grid grid-cols-12 gap-1 mt-1">
           <span className="col-span-4 text-[10px] font-bold text-[var(--toss-gray-4)]">시급 환산 (통상임금)</span>
           <span className="col-span-3 text-[11px] font-black text-emerald-700 text-right">{hourlyWage.toLocaleString()}</span>
-          <span className="col-span-5 text-[10px] text-[var(--toss-gray-3)] text-right">= 과세합계 ÷ 209시간</span>
+          <span className="col-span-5 text-[10px] text-[var(--toss-gray-3)] text-right">= 과세합계 ÷ {monthlyWorkHours}시간 (주{wph}h 기준)</span>
         </div>
       </div>
     );
