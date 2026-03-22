@@ -111,7 +111,7 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: Payr
           .from('tax_insurance_rates')
           .select('income_tax_bracket')
           .eq('effective_year', targetYear)
-          .eq('company_name', '?꾩껜')
+          .eq('company_name', selectedCo && selectedCo !== '전체' ? selectedCo : '전체')
           .maybeSingle();
         officialBracketConfigured = Array.isArray(data?.income_tax_bracket)
           && data.income_tax_bracket.length > 0
