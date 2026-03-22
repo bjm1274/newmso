@@ -1,5 +1,5 @@
-﻿'use client';
-import { useState, useEffect } from 'react';
+'use client';
+﻿import { useState, useEffect } from 'react';
 
 export default function WorkforcePrediction({ staffs }: Record<string, unknown>) {
   const [predictionData, setPredictionData] = useState<any[]>([]);

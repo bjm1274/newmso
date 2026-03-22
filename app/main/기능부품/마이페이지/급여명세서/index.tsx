@@ -1,5 +1,5 @@
-﻿'use client';
-import { useState, useEffect } from 'react';
+'use client';
+﻿import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import SalaryDetail from '../../인사관리서브/급여명세/급여상세';
 

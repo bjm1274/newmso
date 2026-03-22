@@ -1,5 +1,5 @@
-﻿'use client';
-import { useState, useEffect } from 'react';
+'use client';
+﻿import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
 function generateICS(events: { title: string; start: string; end: string; desc?: string }[]) {
