@@ -75,9 +75,17 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   const [선택된직원ID, 선택된직원ID설정] = useState<string | number | null>(null);
   const [근무형태목록, 근무형태목록설정] = useState<any[]>([]);
   const [팀목록캐시, 팀목록캐시설정] = useState<Record<string, string[]>>({});
+  const [새근무형태표시, 새근무형태표시설정] = useState(false);
+  const [새근무형태, 새근무형태설정] = useState({ name: '', start_time: '09:00', end_time: '18:00', break_start_time: '12:00', break_end_time: '13:00' });
   const [activeTab, setActiveTab] = useState('기본'); // '기본', '소속', '급여'
   const [신규직원, 신규직원설정] = useState(() => createEmptyStaffForm(선택사업체 ?? undefined));
   const previousModalOpenRef = useRef(false);
+  // 직원목록에서 회사 목록 동적 생성
+  const 회사목록 = useMemo(
+    () => Array.from(new Set(직원목록.map((s) => s.company).filter(Boolean))).sort() as string[],
+    [직원목록],
+  );
+
   const taxableSalaryTotal = useMemo(
     () =>
       TAXABLE_SALARY_FIELDS.reduce(
@@ -880,9 +888,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                         <div className="space-y-2">
                           <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">사업체</label>
                           <select value={신규직원.사업체} onChange={e => 신규직원설정({ ...신규직원, 사업체: e.target.value, 팀: 팀목록가져오기(e.target.value)[0] ?? '', 근무형태ID: '' })} className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-lg)] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--accent)]/30 appearance-none" data-testid="new-staff-company-select">
-                            <option value="박철홍정형외과">박철홍정형외과</option>
-                            <option value="수연의원">수연의원</option>
-                            <option value="SY INC.">SY INC.</option>
+                            <option value="">사업체 선택</option>
+                            {회사목록.map(c => <option key={c} value={c}>{c}</option>)}
                           </select>
                         </div>
                         <div className="space-y-2">
@@ -994,7 +1001,16 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                         </div>
                       )}
                       <div className="space-y-2">
-                        <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">지정 스케줄 (근무형태)</label>
+                        <div className="flex items-center justify-between">
+                          <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">지정 스케줄 (근무형태)</label>
+                          <button
+                            type="button"
+                            onClick={() => { 새근무형태표시설정(v => !v); 새근무형태설정({ name: '', start_time: '09:00', end_time: '18:00', break_start_time: '12:00', break_end_time: '13:00' }); }}
+                            className="text-[11px] font-bold text-[var(--accent)] flex items-center gap-0.5 hover:underline"
+                          >
+                            + 새 유형 추가
+                          </button>
+                        </div>
                         <select value={신규직원.근무형태ID} onChange={e => 신규직원설정({ ...신규직원, 근무형태ID: e.target.value })} className="w-full p-4 bg-[var(--toss-blue-light)] rounded-[var(--radius-lg)] border-none outline-none font-bold text-sm text-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/30 appearance-none" data-testid="new-staff-shift-select">
                           <option value="">근무형태 선택</option>
                           {getVisibleShiftOptions(신규직원.사업체).map((s: StaffMember) => (
@@ -1003,6 +1019,64 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                             </option>
                           ))}
                         </select>
+                        {새근무형태표시 && (
+                          <div className="bg-blue-50 border border-blue-100 rounded-[var(--radius-lg)] p-3 space-y-2 animate-in fade-in slide-in-from-top-2">
+                            <p className="text-[11px] font-bold text-blue-700">새 근무형태 추가</p>
+                            <input
+                              type="text"
+                              placeholder="근무형태명 (예: 주간, 야간, 오전)"
+                              value={새근무형태.name}
+                              onChange={e => 새근무형태설정(v => ({ ...v, name: e.target.value }))}
+                              className="w-full p-2.5 text-xs font-bold bg-white rounded-[var(--radius-md)] border border-blue-100 outline-none"
+                            />
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <p className="text-[10px] font-bold text-blue-600 mb-1">출근</p>
+                                <input type="time" value={새근무형태.start_time} onChange={e => 새근무형태설정(v => ({ ...v, start_time: e.target.value }))} className="w-full p-2 text-xs bg-white rounded-[var(--radius-md)] border border-blue-100 outline-none" />
+                              </div>
+                              <div>
+                                <p className="text-[10px] font-bold text-blue-600 mb-1">퇴근</p>
+                                <input type="time" value={새근무형태.end_time} onChange={e => 새근무형태설정(v => ({ ...v, end_time: e.target.value }))} className="w-full p-2 text-xs bg-white rounded-[var(--radius-md)] border border-blue-100 outline-none" />
+                              </div>
+                              <div>
+                                <p className="text-[10px] font-bold text-blue-600 mb-1">휴게 시작</p>
+                                <input type="time" value={새근무형태.break_start_time} onChange={e => 새근무형태설정(v => ({ ...v, break_start_time: e.target.value }))} className="w-full p-2 text-xs bg-white rounded-[var(--radius-md)] border border-blue-100 outline-none" />
+                              </div>
+                              <div>
+                                <p className="text-[10px] font-bold text-blue-600 mb-1">휴게 종료</p>
+                                <input type="time" value={새근무형태.break_end_time} onChange={e => 새근무형태설정(v => ({ ...v, break_end_time: e.target.value }))} className="w-full p-2 text-xs bg-white rounded-[var(--radius-md)] border border-blue-100 outline-none" />
+                              </div>
+                            </div>
+                            <div className="flex gap-2 pt-1">
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (!새근무형태.name.trim()) return toast('근무형태명을 입력하세요.', 'warning');
+                                  const { data: created, error } = await supabase.from('work_shifts').insert({
+                                    name: 새근무형태.name.trim(),
+                                    company_name: 신규직원.사업체 || null,
+                                    start_time: 새근무형태.start_time,
+                                    end_time: 새근무형태.end_time,
+                                    break_start_time: 새근무형태.break_start_time,
+                                    break_end_time: 새근무형태.break_end_time,
+                                    is_active: true,
+                                  }).select().single();
+                                  if (error || !created) { toast('근무형태 저장에 실패했습니다.', 'error'); return; }
+                                  근무형태목록설정(prev => [...prev, created]);
+                                  신규직원설정(prev => ({ ...prev, 근무형태ID: created.id }));
+                                  새근무형태표시설정(false);
+                                  toast(`'${created.name}' 근무형태가 추가되었습니다.`);
+                                }}
+                                className="flex-1 py-2 bg-[var(--accent)] text-white text-[11px] font-bold rounded-[var(--radius-md)]"
+                              >
+                                저장 후 선택
+                              </button>
+                              <button type="button" onClick={() => 새근무형태표시설정(false)} className="px-3 py-2 bg-white text-[11px] font-bold text-[var(--toss-gray-3)] rounded-[var(--radius-md)] border border-blue-100">
+                                취소
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

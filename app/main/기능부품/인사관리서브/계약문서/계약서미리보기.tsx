@@ -154,18 +154,41 @@ export default function ContractPreview({ staff, contract }: Props) {
       childcare_allowance: formatWon(salarySource.childcare_allowance),
       research_allowance: formatWon(salarySource.research_allowance),
       other_taxfree: formatWon(salarySource.other_taxfree),
-      shift_start: shift?.start_time ? String(shift.start_time).slice(0, 5) : '',
-      shift_end: shift?.end_time ? String(shift.end_time).slice(0, 5) : '',
-      break_start: shift?.break_start_time ? String(shift.break_start_time).slice(0, 5) : '',
-      break_end: shift?.break_end_time ? String(shift.break_end_time).slice(0, 5) : '',
-      probation_months: String(contract?.probation_months || '3'),
+      shift_name: shift?.name || '',
+      shift_start: shift?.start_time ? String(shift.start_time).slice(0, 5) : (contract?.shift_start_time || '').slice(0, 5),
+      shift_end: shift?.end_time ? String(shift.end_time).slice(0, 5) : (contract?.shift_end_time || '').slice(0, 5),
+      break_start: shift?.break_start_time ? String(shift.break_start_time).slice(0, 5) : (contract?.break_start_time || '').slice(0, 5),
+      break_end: shift?.break_end_time ? String(shift.break_end_time).slice(0, 5) : (contract?.break_end_time || '').slice(0, 5),
+      working_hours_per_week: String(salarySource.working_hours_per_week || user?.working_hours_per_week || 40),
+      working_days_per_week: String(salarySource.working_days_per_week || user?.working_days_per_week || 5),
+      contract_type: user?.employment_type || salarySource.contract_type || user?.고용형태 || '정규직',
+      probation_months: String(contract?.probation_months ?? user?.probation_months ?? '3'),
       probation_percent: String(contract?.probation_percent || '90'),
       payment_day: String(contract?.payment_day || '7'),
       contract_start: formatDate(contract?.contract_start_date || user?.joined_at || salarySource?.join_date),
       contract_end: contract?.contract_end_date ? formatDate(contract.contract_end_date) : '정년도달시',
       conditions_applied_at: formatDate(contract?.conditions_applied_at || salarySource?.effective_date),
+      resident_no: user?.resident_no ? user.resident_no.replace(/(\d{6})-?(\d{7})/, '$1-$2') : '',
       today: formatDate(new Date().toISOString()),
     };
+
+    // 임금 합계 변수는 renderSalaryTable과 동일 로직으로 계산
+    const salaryItems = [
+      Number(salarySource.base_salary || 0),
+      Number(salarySource.position_allowance || user?.position_allowance || 0),
+      Number(salarySource.meal_allowance || user?.meal_allowance || 0),
+      Number(salarySource.vehicle_allowance || user?.vehicle_allowance || 0),
+      Number(salarySource.childcare_allowance || user?.childcare_allowance || 0),
+      Number(salarySource.research_allowance || user?.research_allowance || 0),
+      Number(salarySource.other_taxfree || user?.other_taxfree || 0),
+    ];
+    const totalMonthlyWage = salaryItems.reduce((s, n) => s + n, 0);
+    const wph = Number(salarySource.working_hours_per_week || user?.working_hours_per_week || 40);
+    const mwh = Math.round((wph * 52) / 12);
+    const hwage = mwh > 0 ? Math.round(salaryItems[0] / mwh) : 0; // 기본급 기준 시급
+    vars.total_monthly = formatWon(totalMonthlyWage);
+    vars.annual_salary = formatWon(totalMonthlyWage * 12);
+    vars.hourly_wage = formatWon(hwage);
 
     let result = template;
 
@@ -239,7 +262,9 @@ export default function ContractPreview({ staff, contract }: Props) {
     const totalMonthly = items.reduce((sum, i) => sum + i.amount, 0);
     const taxableTotal = items.filter(i => i.taxable).reduce((sum, i) => sum + i.amount, 0);
     const taxFreeTotal = items.filter(i => !i.taxable).reduce((sum, i) => sum + i.amount, 0);
-    const hourlyWage = Math.round(taxableTotal / 209);
+    const wph = Number(src.working_hours_per_week || staff?.working_hours_per_week || 40);
+    const monthlyWorkHours = Math.round((wph * 52) / 12);
+    const hourlyWage = monthlyWorkHours > 0 ? Math.round(taxableTotal / monthlyWorkHours) : 0;
 
     return (
       <div className="mt-4 mb-2 bg-[var(--tab-bg)]/80 border border-[var(--border)] rounded-xl p-4">
