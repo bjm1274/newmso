@@ -105,10 +105,9 @@ export async function POST(req: NextRequest) {
         const parsedData = JSON.parse(jsonMatch[0]);
 
         return NextResponse.json({ success: true, data: parsedData });
-    } catch (error: any) {
-        console.error('Invoice Extraction Error:', error);
+    } catch {
         return NextResponse.json(
-            { error: error?.message || '명세서 정보 추출에 실패했습니다.' },
+            { error: '명세서 정보 추출에 실패했습니다.' },
             { status: 500 }
         );
     }

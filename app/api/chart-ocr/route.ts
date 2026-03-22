@@ -31,7 +31,6 @@ async function callGeminiVision(prompt: string, imageBase64: string, mimeType: s
             const text = response.text();
             if (text) return text;
         } catch (err: any) {
-            console.error(`Vision model ${modelName} failed:`, err.message);
             if (err.message?.includes('404')) continue;
             throw err;
         }
