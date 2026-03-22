@@ -1,11 +1,10 @@
 'use client';
 import { toast } from '@/lib/toast';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import SmartDatePicker from '../공통/SmartDatePicker';
 import SmartMonthPicker from '../공통/SmartMonthPicker';
 
-const COMPANIES = ['전체', '박철홍정형외과', '수연의원', 'SY INC.'];
 const CATEGORIES = ['식비', '교통', '경비', '복리후생', '의료', '기타'];
 
 // 가맹점명 키워드 기반 자동 분류
@@ -31,7 +30,7 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
   const [addingCard, setAddingCard] = useState(false);
   const [importing, setImporting] = useState(false);
   const [form, setForm] = useState({ date: '', merchant: '', category: '식비', amount: 0, description: '', card_id: '' });
-  const [cardForm, setCardForm] = useState({ company_name: '박철홍정형외과', card_nickname: '', last_four: '', issuer: '', holder_id: '' });
+  const [cardForm, setCardForm] = useState({ company_name: '', card_nickname: '', last_four: '', issuer: '', holder_id: '' });
 
   const fetchCards = useCallback(async () => {
     const { data, error } = await supabase.from('corporate_cards').select('*, staff_members(name)').eq('status', 'active').order('company_name');
@@ -54,6 +53,14 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
     if (filterCardId) rows = rows.filter((r: Record<string, unknown>) => r.card_id === filterCardId);
     setList(rows);
   }, [month, selectedCo, filterCat, filterCardId]);
+
+  // cards와 staffs에서 회사 목록 동적 생성
+  const COMPANIES = useMemo(() => {
+    const fromCards = (cards as any[]).map((c) => c.company_name).filter(Boolean);
+    const fromStaffs = (staffs as any[]).map((s: any) => s.company).filter(Boolean);
+    const names = Array.from(new Set([...fromCards, ...fromStaffs])).sort();
+    return ['전체', ...names];
+  }, [cards, staffs]);
 
   useEffect(() => {
     fetchCards();
@@ -99,11 +106,10 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
       holder_id: cardForm.holder_id || null,
     });
     if (error) {
-      console.error('corporate_cards insert failed:', error);
       toast('법인카드 저장에 실패했습니다.', 'error');
       return;
     }
-    setCardForm({ company_name: '박철홍정형외과', card_nickname: '', last_four: '', issuer: '', holder_id: '' });
+    setCardForm({ company_name: '', card_nickname: '', last_four: '', issuer: '', holder_id: '' });
     setAddingCard(false);
     fetchCards();
   };
@@ -112,7 +118,6 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
     if (!confirm('카드를 비활성화하시겠습니까?')) return;
     const { error } = await supabase.from('corporate_cards').update({ status: 'inactive' }).eq('id', id);
     if (error) {
-      console.error('corporate_cards update failed:', error);
       toast('카드 비활성화에 실패했습니다.', 'error');
       return;
     }
@@ -132,7 +137,6 @@ export default function CorporateCardTransactions({ staffs = [] }: Record<string
       card_id: form.card_id || null,
     });
     if (error) {
-      console.error('corporate_card_transactions insert failed:', error);
       toast('사용내역 저장에 실패했습니다.', 'error');
       return;
     }

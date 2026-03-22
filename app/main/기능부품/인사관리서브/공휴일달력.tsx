@@ -61,6 +61,22 @@ const HOLIDAYS: Record<string, string> = {
   '2026-10-03': '개천절',
   '2026-10-09': '한글날',
   '2026-12-25': '크리스마스',
+  // 2027년 (음력 기반 공휴일은 확정 후 업데이트 필요)
+  '2027-01-01': '신정',
+  '2027-01-25': '설날연휴',
+  '2027-01-26': '설날',
+  '2027-01-27': '설날연휴',
+  '2027-03-01': '삼일절',
+  '2027-05-05': '어린이날',
+  '2027-05-13': '부처님오신날',
+  '2027-06-06': '현충일',
+  '2027-08-15': '광복절',
+  '2027-10-01': '추석연휴',
+  '2027-10-02': '추석',
+  '2027-10-03': '개천절',
+  '2027-10-04': '추석연휴',
+  '2027-10-09': '한글날',
+  '2027-12-25': '크리스마스',
 };
 
 export default function HolidayCalendar({ staffs, selectedCo, user }: Props) {
@@ -78,6 +94,9 @@ export default function HolidayCalendar({ staffs, selectedCo, user }: Props) {
   const calDates: (number | null)[] = Array(startDow).fill(null);
   for (let d = 1; d <= totalDays; d++) calDates.push(d);
   while (calDates.length % 7 !== 0) calDates.push(null);
+
+  const knownYears = [...new Set(Object.keys(HOLIDAYS).map(k => Number(k.slice(0, 4))))];
+  const hasDataForYear = knownYears.includes(year);
 
   const dateKey = (d: number) => `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
   const isHoliday = (d: number) => HOLIDAYS[dateKey(d)];
@@ -126,7 +145,8 @@ export default function HolidayCalendar({ staffs, selectedCo, user }: Props) {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)]">공휴일 자동 반영 달력</h2>
-          <p className="text-xs text-[var(--toss-gray-3)] mt-1">2024~2026 한국 법정 공휴일이 반영된 달력</p>
+          <p className="text-xs text-[var(--toss-gray-3)] mt-1">한국 법정 공휴일이 반영된 달력 ({Math.min(...knownYears)}~{Math.max(...knownYears)}년)</p>
+          {!hasDataForYear && <p className="text-xs text-orange-500 mt-1">⚠️ {year}년 공휴일 데이터가 없습니다. 관리자에게 업데이트를 요청하세요.</p>}
         </div>
         <div className="flex gap-2">
           {(['월별', '연간'] as const).map(t => (

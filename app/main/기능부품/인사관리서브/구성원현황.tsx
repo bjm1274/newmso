@@ -10,10 +10,10 @@ import CertTransferPanel from './교육자격인사이동패널';
 import SmartDatePicker from '../공통/SmartDatePicker';
 
 function createEmptyStaffForm(selectedCompany?: string) {
-  const company = selectedCompany && selectedCompany !== '전체' ? selectedCompany : '박철홍정형외과';
+  const company = selectedCompany && selectedCompany !== '전체' ? selectedCompany : '';
 
   return {
-    성명: '', 전화번호: '', 내선번호: '', 사업체: company, 팀: '원무팀', 직함: '', 입사일: '', 퇴사일: '',
+    성명: '', 전화번호: '', 내선번호: '', 사업체: company, 팀: '', 직함: '', 입사일: '', 퇴사일: '',
     주민번호: '', 이메일: '', 주소: '', 면허사항: '', 면허번호: '', 취득일자: '', 면허기타내용: '', 계좌정보: '', 임금정보: '', 상태: '재직',
     연차총개수: 0, 연차사용개수: 0, 근무형태ID: '',
     고용형태: '정규직' as string, 계약종료일: '' as string,
@@ -260,7 +260,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
     if (!justOpened || 편집모드) return;
 
-    const defaultCompany = 선택사업체 && 선택사업체 !== '전체' ? 선택사업체 : '박철홍정형외과';
+    const defaultCompany = 선택사업체 && 선택사업체 !== '전체' ? 선택사업체 : '';
     const defaultTeam = 팀목록가져오기(defaultCompany)[0] ?? '원무팀';
 
     신규직원설정({
@@ -461,7 +461,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
   const 닫기함수 = () => {
     편집모드설정(false); 선택된직원ID설정(null);
-    const defaultCompany = 선택사업체 && 선택사업체 !== '전체' ? 선택사업체 : '박철홍정형외과';
+    const defaultCompany = 선택사업체 && 선택사업체 !== '전체' ? 선택사업체 : '';
     신규직원설정({
       ...createEmptyStaffForm(defaultCompany),
       팀: 팀목록가져오기(defaultCompany)[0] ?? '원무팀',
