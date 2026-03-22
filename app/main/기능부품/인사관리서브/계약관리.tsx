@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import ContractList from './계약문서/계약서명단';
 import ContractPreview from './계약문서/계약서미리보기';
+import ContractTemplateEditor from './계약문서/계약서양식편집';
 
 export default function ContractMain({ staffs, selectedCo, onRefresh }: Record<string, unknown>) {
   const [selectedStaffId, setSelectedStaffId] = useState<number | null>(null);
@@ -157,17 +158,23 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: Record<s
         <div>
           <h2 className="text-lg font-bold text-[var(--foreground)] tracking-tight">전자 계약 및 법적 비과세 관리 <span className="text-sm text-[var(--accent)] ml-2">[{selectedCo as string}]</span></h2>
           <div className="flex gap-0.5 p-1 app-tab-bar w-fit mt-2">
-            {['계약현황', '신규/변경계약서', '연봉계약갱신'].map(tab => (
+            {['계약현황', '신규/변경계약서', '연봉계약갱신', '양식 편집'].map(tab => (
               <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 text-xs font-medium rounded-md transition-all whitespace-nowrap ${activeTab === tab ? 'bg-[var(--card)] text-[var(--accent)] shadow-sm' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)] hover:bg-[var(--card)]/60'}`}>{tab}</button>
             ))}
           </div>
         </div>
-        <button onClick={handleRequestSignature} disabled={loading || checkedIds.length === 0} className="px-4 py-3 bg-[var(--foreground)] text-white text-[11px] font-semibold rounded-[var(--radius-md)] shadow-sm hover:scale-[0.98] transition-all disabled:opacity-50">
-          {loading ? '처리 중...' : `${activeTab === '연봉계약갱신' ? '연봉 갱신 및 계약 발송' : activeTab === '신규/변경계약서' ? `${contractSubType} 계약서 발송` : '근로계약서 발송'} (${checkedIds.length}명)`}
-        </button>
+        {activeTab !== '양식 편집' && (
+          <button onClick={handleRequestSignature} disabled={loading || checkedIds.length === 0} className="px-4 py-3 bg-[var(--foreground)] text-white text-[11px] font-semibold rounded-[var(--radius-md)] shadow-sm hover:scale-[0.98] transition-all disabled:opacity-50">
+            {loading ? '처리 중...' : `${activeTab === '연봉계약갱신' ? '연봉 갱신 및 계약 발송' : activeTab === '신규/변경계약서' ? `${contractSubType} 계약서 발송` : '근로계약서 발송'} (${checkedIds.length}명)`}
+          </button>
+        )}
       </header>
 
       <div className="flex-1 overflow-hidden">
+        {/* 양식 편집 탭: 전체 화면 에디터 */}
+        {activeTab === '양식 편집' ? (
+          <ContractTemplateEditor selectedCo={selectedCo as string} />
+        ) : (
         <div className="flex h-full">
           {/* 좌측: 계약 대상자 명단 (Compact List) */}
           <div className="w-1/3 lg:w-1/4 border-r border-[var(--border)] bg-[var(--card)] overflow-y-auto custom-scrollbar">
@@ -251,6 +258,7 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: Record<s
             </div>
           </div>
         </div>
+        )}
       </div>
     </div>
   );
