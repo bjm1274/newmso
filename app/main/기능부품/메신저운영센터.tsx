@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { StaffMember } from '@/types';
@@ -287,7 +288,7 @@ export default function MessengerOperationsCenter({
       );
     } catch (error) {
       console.error('중요공지 지정 실패:', error);
-      alert('중요공지 지정에 실패했습니다.');
+      toast('중요공지 지정에 실패했습니다.', 'error');
     } finally {
       setBusyId(null);
     }
@@ -298,7 +299,7 @@ export default function MessengerOperationsCenter({
   const sendReminder = async (row: NoticeRow) => {
     const nonReaders = activeStaffs.filter((staff) => !row.readers.includes(String(staff.id)));
     if (nonReaders.length === 0) {
-      alert('이미 전원이 확인했습니다.');
+      toast('이미 전원이 확인했습니다.', 'warning');
       return;
     }
 
@@ -313,10 +314,10 @@ export default function MessengerOperationsCenter({
       }));
       const { error } = await supabase.from('notifications').insert(payload);
       if (error) throw error;
-      alert(`${nonReaders.length}명에게 공지 확인 알림을 보냈습니다.`);
+      toast(`${nonReaders.length}명에게 공지 확인 알림을 보냈습니다.`, 'warning');
     } catch (error) {
       console.error('공지 리마인드 실패:', error);
-      alert('공지 리마인드 발송에 실패했습니다.');
+      toast('공지 리마인드 발송에 실패했습니다.', 'error');
     } finally {
       setBusyId(null);
     }
@@ -357,7 +358,7 @@ export default function MessengerOperationsCenter({
       setNewDriveUrl('');
     } catch (error) {
       console.error('드라이브 링크 추가 실패:', error);
-      alert('드라이브 링크 추가에 실패했습니다.');
+      toast('드라이브 링크 추가에 실패했습니다.', 'error');
     } finally {
       setBusyId(null);
     }
@@ -383,7 +384,7 @@ export default function MessengerOperationsCenter({
       if (error) throw error;
     } catch (error) {
       console.error('드라이브 링크 저장 실패:', error);
-      alert('드라이브 링크 저장에 실패했습니다.');
+      toast('드라이브 링크 저장에 실패했습니다.', 'error');
     } finally {
       setBusyId(null);
     }
@@ -400,7 +401,7 @@ export default function MessengerOperationsCenter({
       setDriveLinks((prev) => prev.filter((item) => item.id !== id));
     } catch (error) {
       console.error('드라이브 링크 삭제 실패:', error);
-      alert('드라이브 링크 삭제에 실패했습니다.');
+      toast('드라이브 링크 삭제에 실패했습니다.', 'error');
     } finally {
       setBusyId(null);
     }

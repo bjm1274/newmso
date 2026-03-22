@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import type { StaffMember } from '@/types';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -57,7 +58,7 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: YearEndSe
     // 실제 OCR API 연동 전까지 시뮬레이션 데이터를 제거합니다.
     await new Promise(resolve => setTimeout(resolve, 1500));
     setUploadLoading(false);
-    alert("스마트 OCR 분석 서비스 준비 중입니다. 현재는 수기 입력 기능을 이용해 주세요.");
+    toast("스마트 OCR 분석 서비스 준비 중입니다. 현재는 수기 입력 기능을 이용해 주세요.", 'warning');
   };
 
   const fetchSettlementData = async () => {
@@ -150,7 +151,7 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: YearEndSe
   };
 
   const handleManualSave = async () => {
-    if (!manualForm.staff_id) return alert("직원을 선택해 주세요.");
+    if (!manualForm.staff_id) return toast("직원을 선택해 주세요.", 'warning');
 
     const staff = staffList.find(s => String(s.id) === String(manualForm.staff_id));
     if (!staff) return;
@@ -165,9 +166,9 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: YearEndSe
     }, { onConflict: 'staff_id,year_month' });
 
     if (error) {
-      alert("저장 중 오류가 발생했습니다: " + ((error as Error)?.message ?? String(error)));
+      toast("저장 중 오류가 발생했습니다: " + ((error as Error)?.message ?? String(error)), 'error');
     } else {
-      alert("수기 정산 데이터가 저장되었습니다.");
+      toast("수기 정산 데이터가 저장되었습니다.", 'success');
       setShowManualModal(false);
       fetchSettlementData();
     }
@@ -235,7 +236,7 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: YearEndSe
     }]);
 
     if (!error) {
-      alert('이메일이 발송되었습니다.');
+      toast('이메일이 발송되었습니다.', 'success');
     }
   };
 
@@ -243,7 +244,7 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: YearEndSe
 
   const sendCertificateEmail = async (staff: Record<string, unknown>) => {
     if (!staff?.staff_email) {
-      alert('직원 이메일이 등록되지 않아 발송할 수 없습니다.');
+      toast('직원 이메일이 등록되지 않아 발송할 수 없습니다.', 'success');
       return;
     }
 
@@ -259,7 +260,7 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: YearEndSe
     ]);
 
     if (!error) {
-      alert('이메일 발송을 예약했습니다.');
+      toast('이메일 발송을 예약했습니다.', 'success');
       return;
     }
 
@@ -268,12 +269,12 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: YearEndSe
     const missingSchema = code.startsWith('PGRST') || message.includes('schema cache') || message.includes('Could not find the table');
     if (missingSchema) {
       console.warn('email_queue table is not configured:', error);
-      alert('이메일 큐가 설정되지 않아 메일을 보낼 수 없습니다. 다운로드 버튼으로 직접 저장해 주세요.');
+      toast('이메일 큐가 설정되지 않아 메일을 보낼 수 없습니다. 다운로드 버튼으로 직접 저장해 주세요.', 'success');
       return;
     }
 
     console.error('withholding certificate email failed:', error);
-    alert(`이메일 발송에 실패했습니다: ${((error as Error)?.message ?? String(error))}`);
+    toast(`이메일 발송에 실패했습니다: ${((error as Error)?.message ?? String(error))}`, 'error');
   };
 
   return (
@@ -308,7 +309,7 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: YearEndSe
             disabled={uploadLoading}
             className="px-4 py-2 bg-[var(--accent)] text-white text-xs font-black rounded-[var(--radius-md)] hover:scale-105 transition-all shadow-sm flex items-center gap-2"
           >
-            {uploadLoading ? "📑 분석 중..." : "📸 영수증 스마트 스캔"}
+            {uploadLoading ? "📑 분석 중..." : "📸 영수증 스마트 스캔 (준비 중)"}
           </button>
           <button
             onClick={() => setShowManualModal(true)}

@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -41,7 +42,7 @@ type ShiftFormState = {
   work_day_mode: WorkDayMode;
 };
 
-const DEFAULT_COMPANY_OPTIONS = ['박철홍정형외과', '수연의원', 'SY INC.'];
+const DEFAULT_COMPANY_OPTIONS: string[] = [];
 const SHIFT_META_MARKER = '[SHIFT_META]';
 
 type ShiftContractMeta = {
@@ -363,7 +364,7 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
   const addCustomPattern = () => {
     const name = newPatternName.trim();
     if (!name) return;
-    if (allPatterns.includes(name)) return alert('이미 존재하는 패턴입니다.');
+    if (allPatterns.includes(name)) return toast('이미 존재하는 패턴입니다.', 'warning');
     setCustomPatterns([...customPatterns, name]);
     setNewShift((prev) => applyWorkDayMode({ ...prev, shift_type: name }, prev.work_day_mode || 'weekdays'));
     setNewPatternName('');
@@ -371,7 +372,7 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
   };
 
   const handleSaveShift = async () => {
-    if (!newShift.name) return alert('근무 형태 명칭을 입력하세요.');
+    if (!newShift.name) return toast('근무 형태 명칭을 입력하세요.', 'warning');
 
     const selectedCompanies = Array.from(
       new Set(newShift.selectedCompanies.map((company) => company.trim()).filter(Boolean))
@@ -379,11 +380,11 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
     const selectedCompanyName = newShift.company_name?.trim() || selectedCompanies[0] || '';
 
     if (editingShiftId && !selectedCompanyName) {
-      return alert('적용 사업체를 선택하세요.');
+      return toast('적용 사업체를 선택하세요.', 'warning');
     }
 
     if (!editingShiftId && selectedCompanies.length === 0) {
-      return alert('적용 사업체를 하나 이상 선택하세요.');
+      return toast('적용 사업체를 하나 이상 선택하세요.', 'warning');
     }
 
     const fullPayload: any = {
@@ -455,14 +456,14 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
         }
       }
 
-      alert(editingShiftId ? '근무 형태가 수정되었습니다.' : '근무 형태가 등록되었습니다.');
+      toast(editingShiftId ? '근무 형태가 수정되었습니다.' : '근무 형태가 등록되었습니다.', 'success');
       setShowAddModal(false);
       setEditingShiftId(null);
       setNewShift(createEmptyShiftState(selectedCo as string));
       fetchShifts();
     } catch (err: unknown) {
       console.error('근무형태 저장 최종 실패:', err);
-      alert('저장에 실패했습니다.\n원인: ' + ((err as Error)?.message || '알 수 없는 오류'));
+      toast('저장에 실패했습니다.\n원인: ' + ((err as Error)?.message || '알 수 없는 오류'), 'error');
     }
   };
 
@@ -478,7 +479,7 @@ export default function ShiftManagement({ selectedCo }: Record<string, unknown>)
       }
       fetchShifts();
     } catch (err: unknown) {
-      alert('삭제에 실패했습니다.\n원인: ' + ((err as Error)?.message || ''));
+      toast('삭제에 실패했습니다.\n원인: ' + ((err as Error)?.message || ''), 'error');
     }
   };
 

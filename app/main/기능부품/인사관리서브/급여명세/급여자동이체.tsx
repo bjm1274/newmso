@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -81,7 +82,7 @@ export default function SalaryAutoTransfer() {
 
     setTransferStatus('완료');
     fetchStaffAndSalary();
-    alert('급여 이체가 완료되었습니다.');
+    toast('급여 이체가 완료되었습니다.', 'success');
   };
 
   const getBankCode = (bankName: string) => {

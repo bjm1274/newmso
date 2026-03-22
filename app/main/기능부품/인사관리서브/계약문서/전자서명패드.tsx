@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useRef, useState, useEffect } from 'react';
 
 interface SignaturePadProps {
@@ -94,7 +95,7 @@ export default function SignaturePad({ onSignComplete, onCancel }: SignaturePadP
 
     const handleSave = () => {
         if (!hasDrawn) {
-            alert('서명을 입력해주세요.');
+            toast('서명을 입력해주세요.', 'warning');
             return;
         }
         const canvas = canvasRef.current;

@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import SmartDatePicker from '../../공통/SmartDatePicker';
@@ -316,7 +317,7 @@ export default function AttendanceMain({ staffs, selectedCo }: AttendanceMainPro
                   onClick={() => {
                     const standardShift = workShifts.find(sh => sh.name.includes('통상') || sh.name.includes('일반') || sh.name.includes('주간') || sh.name.includes('9to6'));
                     if (!standardShift) {
-                      alert('통상/일반/주간 이라는 이름이 포함된 근무형태가 부재합니다.');
+                      toast('통상/일반/주간 이라는 이름이 포함된 근무형태가 부재합니다.');
                       return;
                     }
                     if (!confirm('현재 화면의 모든 직원에 대해 평일(월~금)을 모두 통상근무로 채우시겠습니까? (기존 데이터에 덮어씁니다)')) return;
@@ -769,12 +770,12 @@ export default function AttendanceMain({ staffs, selectedCo }: AttendanceMainPro
                       for (const row of rows) {
                         await supabase.from('attendances').upsert(row, { onConflict: 'staff_id,work_date' });
                       }
-                      alert(`적용 완료: ${dates.length}일 × ${staffIds.length}명 = ${rows.length}건을 "${bulkStatus === 'present' ? '정상' : bulkStatus}"으로 수정했습니다.`);
+                      toast(`적용 완료: ${dates.length}일 × ${staffIds.length}명 = ${rows.length}건을 "${bulkStatus === 'present' ? '정상' : bulkStatus}"으로 수정했습니다.`, 'success');
                       setBulkEditOpen(false);
                       fetchAttendance();
                     } catch (e) {
                       console.error(e);
-                      alert('일괄 수정 중 오류가 발생했습니다.');
+                      toast('일괄 수정 중 오류가 발생했습니다.', 'error');
                     } finally {
                       setBulkSaving(false);
                     }

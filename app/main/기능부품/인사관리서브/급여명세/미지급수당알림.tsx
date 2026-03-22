@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -115,9 +116,9 @@ export default function UnpaidAllowanceAlert({ staffs, selectedCo, user }: Props
         status: '대기',
         company: item.staff.company,
       });
-      window.alert('결재 상신이 완료되었습니다.');
+      toast('결재 상신이 완료되었습니다.', 'success');
     } catch {
-      window.alert('결재 상신에 실패했습니다.');
+      toast('결재 상신에 실패했습니다.', 'error');
     } finally {
       setSubmitting(null);
     }

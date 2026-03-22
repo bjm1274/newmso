@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -28,7 +29,7 @@ export default function QRAssetManager({ user, inventory, fetchInventory }: AnyR
         try {
             // Mocking the borrow logistics: deduct 1 from stock and log it
             const newStock = (Number(scanResult.quantity ?? scanResult.stock ?? 0)) - 1;
-            if (newStock < 0) return alert('이미 대여중이거나 재고가 없습니다.');
+            if (newStock < 0) return toast('이미 대여중이거나 재고가 없습니다.', 'warning');
 
             await supabase.from('inventory').update({ quantity: newStock, stock: newStock }).eq('id', scanResult.id);
             await supabase.from('inventory_logs').insert([{
@@ -41,12 +42,12 @@ export default function QRAssetManager({ user, inventory, fetchInventory }: AnyR
                 company: scanResult.company
             }]);
 
-            alert(`[${scanResult.item_name as string}] 대여 처리가 완료되었습니다.`);
+            toast(`[${scanResult.item_name as string}] 대여 처리가 완료되었습니다.`, 'success');
             setScanResult(null);
             _fetchInventory?.();
         } catch (e) {
             console.error(e);
-            alert('대여 처리 중 오류가 발생했습니다.');
+            toast('대여 처리 중 오류가 발생했습니다.', 'error');
         }
     };
 
@@ -64,11 +65,11 @@ export default function QRAssetManager({ user, inventory, fetchInventory }: AnyR
                 company: item.company
             }]);
 
-            alert(`[${item.item_name as string}] 반납 처리가 완료되었습니다.`);
+            toast(`[${item.item_name as string}] 반납 처리가 완료되었습니다.`, 'success');
             _fetchInventory?.();
         } catch (e) {
             console.error(e);
-            alert('반납 처리 중 오류가 발생했습니다.');
+            toast('반납 처리 중 오류가 발생했습니다.', 'error');
         }
     };
 

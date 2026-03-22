@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -128,7 +129,7 @@ export default function OrgChartEditor({
   };
 
   const handleSave = async () => {
-    if (!editNode?.name?.trim()) return alert('이름을 입력하세요.');
+    if (!editNode?.name?.trim()) return toast('이름을 입력하세요.', 'warning');
     setSaving(true);
     try {
       if (editNode.id) {
@@ -144,12 +145,12 @@ export default function OrgChartEditor({
       }
       setShowModal(false);
       fetchNodes();
-    } catch { alert('저장 실패'); } finally { setSaving(false); }
+    } catch { toast('저장 실패', 'error'); } finally { setSaving(false); }
   };
 
   const importFromStaff = async () => {
     if (!sourceStaffs.length) {
-      alert('현재 선택한 사업체에 등록된 직원이 없습니다.');
+      toast('현재 선택한 사업체에 등록된 직원이 없습니다.', 'success');
       return;
     }
     if (!confirm(`직원 ${sourceStaffs.length}명으로 조직도를 자동 구성하시겠습니까?\n기존 조직도가 초기화됩니다.`)) return;
@@ -170,8 +171,8 @@ export default function OrgChartEditor({
       }));
       if (staffRows.length > 0) await supabase.from('org_chart_nodes').insert(staffRows);
       fetchNodes();
-      alert('조직도가 생성되었습니다.');
-    } catch { alert('생성 실패'); } finally { setSaving(false); }
+      toast('조직도가 생성되었습니다.');
+    } catch { toast('생성 실패', 'error'); } finally { setSaving(false); }
   };
 
   return (

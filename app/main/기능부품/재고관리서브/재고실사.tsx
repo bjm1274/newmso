@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { getItemName, getItemQuantity, validateInventoryQuantity } from '@/app/main/inventory-utils';
@@ -63,7 +64,7 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
     if (invalidEntries.length > 0) {
       const preview = invalidEntries.slice(0, 5).map((item) => `- ${item.item_name}`).join('\n');
       const suffix = invalidEntries.length > 5 ? `\n외 ${invalidEntries.length - 5}개 품목` : '';
-      alert(`실물 수량을 다시 확인하세요.\n${preview}${suffix}`);
+      toast(`실물 수량을 다시 확인하세요.\n${preview}${suffix}`, 'warning');
       return;
     }
 
@@ -119,7 +120,9 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
           })),
           created_at: new Date().toISOString(),
         }]);
-      } catch { /* 테이블 없으면 무시 */ }
+      } catch {
+        // inventory_count_sessions 테이블 미존재 시 무시 (선택적 기록)
+      }
 
       setReport(discrepancyList.map(item => ({
         item_name: item.item_name,
@@ -131,7 +134,7 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
       fetchInventory();
       setSessionStarted(false);
     } catch (err) {
-      alert('실사 저장 중 오류가 발생했습니다.');
+      toast('실사 저장 중 오류가 발생했습니다.', 'error');
     } finally {
       setSaving(false);
     }

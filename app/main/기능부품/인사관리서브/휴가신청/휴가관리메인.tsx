@@ -1,4 +1,5 @@
-﻿'use client';
+'use client';
+import { toast } from '@/lib/toast';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import AnnualLeavePromotion from './연차촉진시스템';
@@ -124,7 +125,7 @@ export default function LeaveManagement({
 
       if (error) throw error;
       setLeaves((prev) => prev.map((l) => (l.id === id ? { ...l, status } : l)));
-      alert(`신청이 ${status} 처리되었습니다.`);
+      toast(`신청이 ${status} 처리되었습니다.`, 'success');
       if (status === '승인') {
         // 승인 시 연차 사용일수 반영 (staff_members annual_leave_used 업데이트)
         const leave = leaves.find((l) => l.id === id);
@@ -137,16 +138,16 @@ export default function LeaveManagement({
       }
       if (onRefresh) (onRefresh as () => void)();
     } catch (err) {
-      alert('처리에 실패했습니다.');
+      toast('처리에 실패했습니다.', 'error');
     }
   };
 
   const handleApplyLeaveConfig = (type: '입사일 기준' | '회계연도 기준') => {
     setLeaveConfig(type);
     if (type === '입사일 기준') {
-      alert('입사일 기준으로 설정되었습니다. 아래 "연차 자동 부여 실행" 버튼으로 재계산하세요.');
+      toast('입사일 기준으로 설정되었습니다. 아래 "연차 자동 부여 실행" 버튼으로 재계산하세요.');
     } else {
-      alert('회계연도 기준으로 설정되었습니다. (1월 1일 일괄 산정)');
+      toast('회계연도 기준으로 설정되었습니다. (1월 1일 일괄 산정)');
     }
     if (onRefresh) (onRefresh as () => void)();
   };
@@ -167,10 +168,10 @@ export default function LeaveManagement({
         if (years < 1) total = Math.min(11, Math.floor((new Date(now).getTime() - join.getTime()) / (30 * 24 * 60 * 60 * 1000)));
         await supabase.from('staff_members').update({ annual_leave_total: total }).eq('id', s.id);
       }
-      alert('연차 자동 부여가 완료되었습니다.');
+      toast('연차 자동 부여가 완료되었습니다.', 'success');
       if (onRefresh) (onRefresh as () => void)();
     } catch (e) {
-      alert('처리 중 오류가 발생했습니다.');
+      toast('처리 중 오류가 발생했습니다.', 'error');
     } finally {
       setLoading(false);
     }

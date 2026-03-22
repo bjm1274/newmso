@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useState } from 'react';
 import type { StaffMember } from '@/types';
@@ -4198,22 +4199,22 @@ export default function AutoRosterPlanner({
   const savePatternProfile = () => {
     const nextName = patternDraft.name.trim();
     if (!nextName) {
-      alert('패턴 이름을 입력하세요.');
+      toast('패턴 이름을 입력하세요.', 'warning');
       return;
     }
 
     if (patternDraft.teamKeywords.length === 0) {
-      alert('적용할 팀 키워드를 한 개 이상 입력하세요.');
+      toast('적용할 팀 키워드를 한 개 이상 입력하세요.', 'warning');
       return;
     }
 
     if (patternDraft.staffGroups.length === 0) {
-      alert('직원 그룹을 한 개 이상 만들어 주세요.');
+      toast('직원 그룹을 한 개 이상 만들어 주세요.');
       return;
     }
 
     if (patternDraft.staffGroups.some((group) => group.shiftIds.length === 0)) {
-      alert('각 그룹마다 연결할 근무유형을 한 개 이상 선택하세요.');
+      toast('각 그룹마다 연결할 근무유형을 한 개 이상 선택하세요.', 'warning');
       return;
     }
 
@@ -4232,7 +4233,7 @@ export default function AutoRosterPlanner({
     });
     setSelectedPatternProfileId(nextProfile.id);
     resetPatternDraft();
-    alert(`"${nextName}" 교대방식 패턴을 저장했습니다.`);
+    toast(`"${nextName}" 교대방식 패턴을 저장했습니다.`, 'success');
   };
 
   const deletePatternProfile = (profileId: string) => {
@@ -4259,12 +4260,12 @@ export default function AutoRosterPlanner({
   const saveGenerationRule = () => {
     const nextName = generationRuleDraft.name.trim();
     if (!nextName) {
-      alert('근무규칙 이름을 입력해 주세요.');
+      toast('근무규칙 이름을 입력해 주세요.', 'warning');
       return;
     }
 
     if (generationRuleDraft.teamKeywords.length === 0) {
-      alert('적용할 팀 키워드를 한 개 이상 입력해 주세요.');
+      toast('적용할 팀 키워드를 한 개 이상 입력해 주세요.', 'warning');
       return;
     }
 
@@ -4312,7 +4313,7 @@ export default function AutoRosterPlanner({
     });
     setSelectedGenerationRuleId(nextRule.id);
     resetGenerationRuleDraft();
-    alert(`"${nextName}" 근무규칙을 저장했습니다.`);
+    toast(`"${nextName}" 근무규칙을 저장했습니다.`, 'success');
   };
 
   const deleteGenerationRule = (ruleId: string) => {
@@ -4331,28 +4332,28 @@ export default function AutoRosterPlanner({
 
   const requestGeminiRecommendation = async () => {
     if (!selectedCompany) {
-      alert('사업체를 먼저 선택하세요.');
+      toast('사업체를 먼저 선택하세요.', 'warning');
       return;
     }
     if (!selectedDepartment) {
-      alert('팀을 먼저 선택하세요.');
+      toast('팀을 먼저 선택하세요.', 'warning');
       return;
     }
     if (workingShifts.length === 0) {
-      alert('추천에 사용할 근무유형이 없습니다. 먼저 근무형태를 등록하세요.');
+      toast('추천에 사용할 근무유형이 없습니다. 먼저 근무형태를 등록하세요.', 'success');
       return;
     }
     if (selectedAiShifts.length === 0) {
-      alert('AI 생성에 사용할 근무유형을 한 개 이상 선택하세요.');
+      toast('AI 생성에 사용할 근무유형을 한 개 이상 선택하세요.', 'warning');
       return;
     }
     if (enabledTargetStaffs.length === 0) {
-      alert('추천할 팀 직원이 없습니다.');
+      toast('추천할 팀 직원이 없습니다.');
       return;
     }
 
     if (enabledTargetStaffs.length === 0) {
-      alert('자동 생성에 포함된 직원이 없습니다. 제외 설정을 확인하세요.');
+      toast('자동 생성에 포함된 직원이 없습니다. 제외 설정을 확인하세요.', 'warning');
       return;
     }
 
@@ -4454,10 +4455,10 @@ export default function AutoRosterPlanner({
         );
       }
       setGeminiAppliedAt(new Date().toLocaleString('ko-KR'));
-      alert('Gemini가 팀 특성을 분석해 월간 근무표 초안을 만들었습니다. 아래 미리보기에서 확인하세요.');
+      toast('Gemini가 팀 특성을 분석해 월간 근무표 초안을 만들었습니다. 아래 미리보기에서 확인하세요.', 'warning');
     } catch (error: unknown) {
       console.error('Gemini 팀 추천 실패:', error);
-      alert(`Gemini 팀 추천 중 오류가 발생했습니다.\n${(error as Error)?.message || '알 수 없는 오류'}`);
+      toast(`Gemini 팀 추천 중 오류가 발생했습니다.\n${(error as Error)?.message || '알 수 없는 오류'}`, 'error');
     } finally {
       setGeminiLoading(false);
     }
@@ -4465,23 +4466,23 @@ export default function AutoRosterPlanner({
 
   const generatePatternDraft = async () => {
     if (!selectedCompany) {
-      alert('사업체를 먼저 선택하세요.');
+      toast('사업체를 먼저 선택하세요.', 'warning');
       return;
     }
     if (!selectedDepartment) {
-      alert('팀을 먼저 선택하세요.');
+      toast('팀을 먼저 선택하세요.', 'warning');
       return;
     }
     if (workingShifts.length === 0) {
-      alert('생성에 사용할 근무유형이 없습니다. 먼저 근무형태를 등록하세요.');
+      toast('생성에 사용할 근무유형이 없습니다. 먼저 근무형태를 등록하세요.', 'success');
       return;
     }
     if (selectedAiShifts.length === 0) {
-      alert('자동 생성에 사용할 근무유형을 한 개 이상 선택하세요.');
+      toast('자동 생성에 사용할 근무유형을 한 개 이상 선택하세요.', 'warning');
       return;
     }
     if (targetStaffs.length === 0) {
-      alert('생성할 대상 직원이 없습니다.');
+      toast('생성할 대상 직원이 없습니다.');
       return;
     }
 
@@ -4777,10 +4778,10 @@ export default function AutoRosterPlanner({
         recommendation.summary?.trim() || `${selectedDepartment} 팀 패턴 기반 초안이 적용되었습니다.`
       );
       setGeminiAppliedAt(new Date().toLocaleString('ko-KR'));
-      alert('저장된 교대방식 패턴과 선택한 근무유형을 기준으로 월간 초안을 생성했습니다. 아래 미리보기에서 확인하세요.');
+      toast('저장된 교대방식 패턴과 선택한 근무유형을 기준으로 월간 초안을 생성했습니다. 아래 미리보기에서 확인하세요.', 'success');
     } catch (error: unknown) {
       console.error('패턴 기반 근무표 생성 실패:', error);
-      alert(`패턴 기반 근무표 생성 중 오류가 발생했습니다.\n${(error as Error)?.message || '알 수 없는 오류'}`);
+      toast(`패턴 기반 근무표 생성 중 오류가 발생했습니다.\n${(error as Error)?.message || '알 수 없는 오류'}`, 'error');
     } finally {
       setGeminiLoading(false);
     }
@@ -5040,7 +5041,7 @@ export default function AutoRosterPlanner({
       workingShifts
     );
     if (resolvedShiftIds.length === 0) {
-      alert('적용할 근무유형이 없습니다. 먼저 근무유형을 등록하세요.');
+      toast('적용할 근무유형이 없습니다. 먼저 근무유형을 등록하세요.', 'success');
       return;
     }
 
@@ -5093,11 +5094,11 @@ export default function AutoRosterPlanner({
   const savePlannerPreset = () => {
     const nextName = plannerPresetName.trim();
     if (!nextName) {
-      alert('자동생성 형식 이름을 입력하세요.');
+      toast('자동생성 형식 이름을 입력하세요.', 'warning');
       return;
     }
     if (plannerShiftIds.length === 0) {
-      alert('형식으로 저장할 근무유형이 없습니다.');
+      toast('형식으로 저장할 근무유형이 없습니다.', 'success');
       return;
     }
     if (
@@ -5105,7 +5106,7 @@ export default function AutoRosterPlanner({
       (effectivePlannerCustomPatternSequence.length === 0 ||
         !effectivePlannerCustomPatternSequence.some((token) => token !== OFF_SHIFT_TOKEN))
     ) {
-      alert('커스텀 순환 순서를 만든 뒤 저장하세요.');
+      toast('커스텀 순환 순서를 만든 뒤 저장하세요.', 'success');
       return;
     }
     if (
@@ -5114,7 +5115,7 @@ export default function AutoRosterPlanner({
         (week) => Boolean(week.shiftId) && week.activeWeekdays.length > 0
       )
     ) {
-      alert('주차 템플릿에는 근무가 들어가는 요일이 한 번 이상 포함되어야 합니다.');
+      toast('주차 템플릿에는 근무가 들어가는 요일이 한 번 이상 포함되어야 합니다.');
       return;
     }
 
@@ -5149,7 +5150,7 @@ export default function AutoRosterPlanner({
 
     setSavedWizardPresets((prev) => [nextPreset, ...prev.filter((preset) => preset.id !== nextPreset.id)]);
     setPlannerPresetName('');
-    alert(`"${nextName}" 자동생성 형식을 저장했습니다.`);
+    toast(`"${nextName}" 자동생성 형식을 저장했습니다.`, 'success');
   };
 
   const applyPlannerPreset = (preset: RosterWizardPreset) => {
@@ -5164,7 +5165,7 @@ export default function AutoRosterPlanner({
       workingShifts
     );
     if (resolvedShiftIds.length === 0) {
-      alert('적용할 근무유형이 없습니다. 먼저 근무유형을 등록하세요.');
+      toast('적용할 근무유형이 없습니다. 먼저 근무유형을 등록하세요.', 'success');
       return;
     }
 
@@ -5251,26 +5252,26 @@ export default function AutoRosterPlanner({
   };
 
   const applyWizard = () => {
-    if (!selectedCompany) return alert('사업체를 먼저 선택하세요.');
+    if (!selectedCompany) return toast('사업체를 먼저 선택하세요.', 'warning');
     if (!selectedDepartment || selectedDepartment === '전체 부서') {
-      return alert('근무표를 생성할 팀을 선택하세요.');
+      return toast('근무표를 생성할 팀을 선택하세요.', 'warning');
     }
-    if (!wizardSelectedStaffIds.length) return alert('근무표를 생성할 직원을 한 명 이상 선택하세요.');
+    if (!wizardSelectedStaffIds.length) return toast('근무표를 생성할 직원을 한 명 이상 선택하세요.', 'warning');
     if (!wizardUsesCustomPattern && !wizardUsesWeeklyTemplate && orderedWizardShiftIds.length < wizardRequiredShiftCount) {
-      return alert(`${wizardPattern} 패턴에 필요한 근무유형 ${wizardRequiredShiftCount}개를 선택하세요.`);
+      return toast(`${wizardPattern} 패턴에 필요한 근무유형 ${wizardRequiredShiftCount}개를 선택하세요.`, 'warning');
     }
     if (wizardUsesCustomPattern && orderedWizardShiftIds.length === 0) {
-      return alert('커스텀 패턴에 사용할 근무유형을 1개 이상 선택하세요.');
+      return toast('커스텀 패턴에 사용할 근무유형을 1개 이상 선택하세요.', 'warning');
     }
     if (wizardUsesWeeklyTemplate && orderedWizardShiftIds.length === 0) {
-      return alert('주차 템플릿에 사용할 근무유형을 1개 이상 선택하세요.');
+      return toast('주차 템플릿에 사용할 근무유형을 1개 이상 선택하세요.', 'warning');
     }
     if (
       wizardUsesCustomPattern &&
       (effectiveWizardCustomPatternSequence.length === 0 ||
         !effectiveWizardCustomPatternSequence.some((token) => token !== OFF_SHIFT_TOKEN))
     ) {
-      return alert('커스텀 패턴 순서를 만들고, 실제 근무유형을 1개 이상 포함해 주세요.');
+      return toast('커스텀 패턴 순서를 만들고, 실제 근무유형을 1개 이상 포함해 주세요.');
     }
     if (
       wizardUsesWeeklyTemplate &&
@@ -5278,13 +5279,13 @@ export default function AutoRosterPlanner({
         (week) => Boolean(week.shiftId) && week.activeWeekdays.length > 0
       )
     ) {
-      return alert('주차 템플릿에는 근무가 들어가는 요일을 최소 1일 이상 지정하세요.');
+      return toast('주차 템플릿에는 근무가 들어가는 요일을 최소 1일 이상 지정하세요.');
     }
 
     const primaryShiftId = orderedWizardShiftIds[0] || '';
     const secondaryShiftId = orderedWizardShiftIds[1] || primaryShiftId;
     const tertiaryShiftId = orderedWizardShiftIds[2] || secondaryShiftId || primaryShiftId;
-    if (!primaryShiftId) return alert('근무유형을 한 개 이상 선택하세요.');
+    if (!primaryShiftId) return toast('근무유형을 한 개 이상 선택하세요.', 'warning');
     const nextCustomPatternSequence = wizardUsesCustomPattern ? effectiveWizardCustomPatternSequence : [];
     const nextWeeklyTemplateWeeks = wizardUsesWeeklyTemplate ? effectiveWizardWeeklyTemplateWeeks : [];
 
@@ -5346,7 +5347,7 @@ export default function AutoRosterPlanner({
 
     setManualAssignments(nextManualAssignments);
     closeWizard();
-    alert(`${selectedDepartment} 팀 ${wizardSelectedStaffIds.length}명의 근무표 초안을 생성했습니다. 아래에서 임의 수정 후 저장하세요.`);
+    toast(`${selectedDepartment} 팀 ${wizardSelectedStaffIds.length}명의 근무표 초안을 생성했습니다. 아래에서 임의 수정 후 저장하세요.`, 'success');
   };
 
   const ensureOffShift = async () => {
@@ -5380,9 +5381,9 @@ export default function AutoRosterPlanner({
 
   const saveAssignments = async () => {
     const enabledRows = previewRows;
-    if (!selectedCompany) return alert('사업체를 먼저 선택하세요.');
-    if (!selectedDepartment) return alert('팀을 먼저 선택하세요.');
-    if (!enabledRows.length) return alert('저장할 대상 직원이 없습니다.');
+    if (!selectedCompany) return toast('사업체를 먼저 선택하세요.', 'warning');
+    if (!selectedDepartment) return toast('팀을 먼저 선택하세요.', 'warning');
+    if (!enabledRows.length) return toast('저장할 대상 직원이 없습니다.', 'success');
     if (!confirm(`${selectedMonth} ${selectedDepartment} 근무표를 저장하시겠습니까?\n기존 월간 편성은 덮어씁니다.`)) return;
 
     setSaving(true);
@@ -5419,10 +5420,10 @@ export default function AutoRosterPlanner({
         if (error) throw error;
       }
 
-      alert(`${selectedDepartment} 팀 ${enabledRows.length}명의 ${selectedMonth} 근무표를 저장했습니다.`);
+      toast(`${selectedDepartment} 팀 ${enabledRows.length}명의 ${selectedMonth} 근무표를 저장했습니다.`, 'success');
     } catch (error: unknown) {
       console.error('근무표 저장 실패:', error);
-      alert(`근무표 저장에 실패했습니다.\n${(error as Error)?.message || '알 수 없는 오류'}`);
+      toast(`근무표 저장에 실패했습니다.\n${(error as Error)?.message || '알 수 없는 오류'}`, 'error');
     } finally {
       setSaving(false);
     }
@@ -7945,11 +7946,11 @@ export default function AutoRosterPlanner({
                       type="button"
                       onClick={() => {
                         if (wizardStep === 1 && (!selectedCompany || !selectedDepartment)) {
-                          alert('사업체와 팀을 먼저 선택하세요.');
+                          toast('사업체와 팀을 먼저 선택하세요.', 'warning');
                           return;
                         }
                         if (wizardStep === 2 && wizardSelectedStaffIds.length === 0) {
-                          alert('직원을 한 명 이상 선택하세요.');
+                          toast('직원을 한 명 이상 선택하세요.', 'warning');
                           return;
                         }
                         if (
@@ -7958,15 +7959,15 @@ export default function AutoRosterPlanner({
                           wizardStep === 3 &&
                           orderedWizardShiftIds.length < wizardRequiredShiftCount
                         ) {
-                          alert(`${wizardPattern} 패턴에 필요한 근무유형 ${wizardRequiredShiftCount}개를 선택하세요.`);
+                          toast(`${wizardPattern} 패턴에 필요한 근무유형 ${wizardRequiredShiftCount}개를 선택하세요.`, 'warning');
                           return;
                         }
                         if (wizardUsesCustomPattern && wizardStep === 3 && orderedWizardShiftIds.length === 0) {
-                          alert('커스텀 패턴에 사용할 근무유형을 1개 이상 선택하세요.');
+                          toast('커스텀 패턴에 사용할 근무유형을 1개 이상 선택하세요.', 'warning');
                           return;
                         }
                         if (wizardUsesWeeklyTemplate && wizardStep === 3 && orderedWizardShiftIds.length === 0) {
-                          alert('주차 템플릿에 사용할 근무유형을 1개 이상 선택하세요.');
+                          toast('주차 템플릿에 사용할 근무유형을 1개 이상 선택하세요.', 'warning');
                           return;
                         }
                         if (
@@ -7975,7 +7976,7 @@ export default function AutoRosterPlanner({
                           (effectiveWizardCustomPatternSequence.length === 0 ||
                             !effectiveWizardCustomPatternSequence.some((token) => token !== OFF_SHIFT_TOKEN))
                         ) {
-                          alert('커스텀 패턴 순서를 만들고, 실제 근무유형을 1개 이상 포함해 주세요.');
+                          toast('커스텀 패턴 순서를 만들고, 실제 근무유형을 1개 이상 포함해 주세요.');
                           return;
                         }
                         if (
@@ -7985,7 +7986,7 @@ export default function AutoRosterPlanner({
                             (week) => Boolean(week.shiftId) && week.activeWeekdays.length > 0
                           )
                         ) {
-                          alert('주차 템플릿에는 근무가 들어가는 요일을 최소 1일 이상 지정하세요.');
+                          toast('주차 템플릿에는 근무가 들어가는 요일을 최소 1일 이상 지정하세요.');
                           return;
                         }
                         setWizardStep((prev) => (prev + 1) as WizardStep);

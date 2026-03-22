@@ -1,4 +1,5 @@
-﻿'use client';
+'use client';
+import { toast } from '@/lib/toast';
 import { useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -18,7 +19,7 @@ export default function PhotoModule({ user, inventory, fetchInventory }: Record<
         setIsCameraActive(true);
       }
     } catch (err) {
-      alert('카메라 접근 권한이 필요합니다.');
+      toast('카메라 접근 권한이 필요합니다.', 'warning');
     }
   };
 
@@ -71,13 +72,13 @@ export default function PhotoModule({ user, inventory, fetchInventory }: Record<
           expiry_date: recognizedData.expiry_date,
           lot_number: recognizedData.lot_number
         }).eq('id', item.id);
-        alert(`${item.item_name} 1개 입고 완료`);
+        toast(`${item.item_name} 1개 입고 완료`, 'success');
         _fetchInventory();
         setRecognizedData(null);
         setShowConfirmDialog(false);
         stopCamera();
       } else {
-        alert('등록되지 않은 품목입니다.');
+        toast('등록되지 않은 품목입니다.', 'success');
       }
     } finally {
       setLoading(false);

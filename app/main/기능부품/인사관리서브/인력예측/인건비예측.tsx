@@ -1,5 +1,5 @@
-﻿'use client';
-import { useMemo } from 'react';
+'use client';
+﻿import { useMemo } from 'react';
 
 export default function LaborCostSimulation({ staffs, selectedCo }: Record<string, unknown>) {
   const filtered = selectedCo === '전체' ? (staffs as any[]) : (staffs as any[]).filter((s: any) => s.company === selectedCo);

@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { Suspense, useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -188,7 +189,6 @@ function MainPageContent() {
       // ignore
     }
     try {
-      localStorage.removeItem('user_session');
       localStorage.removeItem('erp_user');
       localStorage.removeItem('erp_login_at');
       persistSupabaseAccessToken(null);
@@ -210,7 +210,6 @@ function MainPageContent() {
 
     try {
       localStorage.setItem('erp_user', JSON.stringify(normalizedUser));
-      localStorage.setItem('user_session', JSON.stringify(normalizedUser));
     } catch {
       // ignore
     }
@@ -414,7 +413,7 @@ function MainPageContent() {
 
         const forceLogoutAt = payload.new.force_logout_at;
         if (forceLogoutAt && new Date(forceLogoutAt).getTime() > new Date(loginAt).getTime()) {
-          alert('관리자에 의해 강제 로그아웃 되었습니다. 다시 로그인해 주세요.');
+          toast('관리자에 의해 강제 로그아웃 되었습니다. 다시 로그인해 주세요.');
           void clearClientSession();
           window.location.href = '/';
         }
@@ -439,7 +438,7 @@ function MainPageContent() {
           const loginAtMs = loginAtStr ? new Date(loginAtStr).getTime() : 0;
 
           if (loginAtMs < minAuthTime) {
-            alert("보안 정책 또는 시스템 업데이트로 인해 모든 세션이 만료되었습니다. 다시 로그인해 주세요.");
+            toast("보안 정책 또는 시스템 업데이트로 인해 모든 세션이 만료되었습니다. 다시 로그인해 주세요.");
             await clearClientSession();
             router.replace('/');
           }

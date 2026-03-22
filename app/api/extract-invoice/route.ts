@@ -53,6 +53,10 @@ export async function POST(req: NextRequest) {
         if (!session) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
+        const perms = (session.user as any)?.permissions ?? {};
+        if (!perms.inventory && !perms.admin && !perms.mso) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
 
         const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
         if (!apiKey) {
@@ -91,7 +95,6 @@ export async function POST(req: NextRequest) {
 `;
 
         const text = await extractWithGemini(prompt, base64Data, mimeType);
-        console.log('Gemini Raw Result:', text);
 
         // JSON 부분만 정규식으로 안전하게 추출
         const jsonMatch = text.match(/\[\s*\{[\s\S]*\}\s*\]/);
@@ -102,10 +105,9 @@ export async function POST(req: NextRequest) {
         const parsedData = JSON.parse(jsonMatch[0]);
 
         return NextResponse.json({ success: true, data: parsedData });
-    } catch (error: any) {
-        console.error('Invoice Extraction Error:', error);
+    } catch {
         return NextResponse.json(
-            { error: error?.message || '명세서 정보 추출에 실패했습니다.' },
+            { error: '명세서 정보 추출에 실패했습니다.' },
             { status: 500 }
         );
     }

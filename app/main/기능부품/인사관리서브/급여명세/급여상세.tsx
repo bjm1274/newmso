@@ -111,6 +111,7 @@ interface StaffInfo {
   childcare_allowance?: number;
   research_allowance?: number;
   other_taxfree?: number;
+  working_hours_per_week?: number;
 }
 
 export default function SalaryDetail({ record, staff }: { record?: SalaryRecord; staff?: StaffInfo }) {
@@ -225,7 +226,9 @@ export default function SalaryDetail({ record, staff }: { record?: SalaryRecord;
   const monthLabel = `${year}년 ${Number(month || '1')}월`;
   const advancePayAmount = Number(record?.advance_pay || 0);
   const isAdvancePay = advancePayAmount > 0;
-  const hourlyRate = Math.floor(Number(data.base_salary || 0) / 209);
+  const wphForPayslip = staff?.working_hours_per_week || 40;
+  const monthlyHoursForPayslip = Math.round((wphForPayslip * 52) / 12);
+  const hourlyRate = monthlyHoursForPayslip > 0 ? Math.floor(Number(data.base_salary || 0) / monthlyHoursForPayslip) : 0;
 
   return (
     <div
