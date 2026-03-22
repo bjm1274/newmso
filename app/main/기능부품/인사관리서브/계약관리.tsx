@@ -47,6 +47,20 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: Record<s
         : activeTab === '신규/변경계약서' ? (contractSubType === '신규' ? '신규계약서' : '변경계약서')
           : '표준근로계약서';
 
+      // 선택된 직원들의 shift_id로 근무형태 데이터 일괄 조회
+      const shiftIds = [...new Set(checkedIds.map((staffId: number) => {
+        const s = (staffs as any[])?.find((x: any) => x.id === staffId);
+        return s?.shift_id;
+      }).filter(Boolean))];
+      let shiftMap: Record<string, any> = {};
+      if (shiftIds.length > 0) {
+        const { data: shiftRows } = await supabase
+          .from('work_shifts')
+          .select('id, start_time, end_time, break_start_time, break_end_time')
+          .in('id', shiftIds);
+        if (shiftRows) shiftMap = Object.fromEntries(shiftRows.map((sh: any) => [sh.id, sh]));
+      }
+
       const requests = checkedIds.map((staffId: number) => {
         const s = (staffs as any[])?.find((x: any) => x.id === staffId);
         const probationMonths = s?.permissions?.probation_months || 0;
@@ -59,6 +73,9 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: Record<s
           d.setMonth(d.getMonth() + probationMonths);
           conditionsAppDate = d.toISOString().split('T')[0];
         }
+
+        // 직원에게 지정된 근무형태 데이터 (없으면 salaryInfo 폼 값 사용)
+        const staffShift = shiftMap[s?.shift_id];
 
         const pay = includeTaxFree
           ? {
@@ -86,12 +103,13 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: Record<s
           status: '서명대기',
           requested_at: new Date().toISOString(),
           contract_type: contractType,
-          working_hours_per_week: salaryInfo.working_hours_per_week ?? s?.working_hours_per_week ?? 40,
-          working_days_per_week: salaryInfo.working_days_per_week ?? s?.working_days_per_week ?? 5,
-          shift_start_time: salaryInfo.shift_start_time ?? '09:00',
-          shift_end_time: salaryInfo.shift_end_time ?? '18:00',
-          break_start_time: salaryInfo.break_start_time ?? '12:00',
-          break_end_time: salaryInfo.break_end_time ?? '13:00',
+          working_hours_per_week: s?.working_hours_per_week || salaryInfo.working_hours_per_week || 40,
+          working_days_per_week: s?.working_days_per_week || salaryInfo.working_days_per_week || 5,
+          shift_id: s?.shift_id || null,
+          shift_start_time: staffShift ? String(staffShift.start_time).slice(0, 5) : salaryInfo.shift_start_time,
+          shift_end_time: staffShift ? String(staffShift.end_time).slice(0, 5) : salaryInfo.shift_end_time,
+          break_start_time: staffShift ? String(staffShift.break_start_time || '12:00').slice(0, 5) : salaryInfo.break_start_time,
+          break_end_time: staffShift ? String(staffShift.break_end_time || '13:00').slice(0, 5) : salaryInfo.break_end_time,
           probation_months: probationMonths,
           contract_start_date: joinDate,
           conditions_applied_at: conditionsAppDate,
