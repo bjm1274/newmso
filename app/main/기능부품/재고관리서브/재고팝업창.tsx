@@ -1,4 +1,5 @@
-﻿'use client';
+'use client';
+import { toast } from '@/lib/toast';
 import React, { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import SmartDatePicker from '../공통/SmartDatePicker';
@@ -16,7 +17,7 @@ export function AddItemModal({ isOpen, onClose: _onClose, onComplete: _onComplet
 
   const handleAddItem = async () => {
     if (!newItem.name || !newItem.spec || !newItem.supplier) {
-      return alert("필수 입력 항목을 확인해주세요.\n(품목명, 규격, 공급사는 필수입니다)");
+      return toast("필수 입력 항목을 확인해주세요.\n(품목명, 규격, 공급사는 필수입니다)", 'warning');
     }
 
     const { error } = await supabase.from('inventory').insert([{
@@ -26,11 +27,11 @@ export function AddItemModal({ isOpen, onClose: _onClose, onComplete: _onComplet
     }]);
 
     if (!error) {
-      alert("등록되었습니다.");
+      toast("등록되었습니다.", 'success');
       setNewItem({ name: '', spec: '', quantity: 0, safety_stock: 10, supplier: '', barcode: '', expiration_date: '', price: 0 });
       onComplete();
     } else {
-      alert("등록 실패: " + error.message);
+      toast("등록 실패: " + error.message, 'error');
     }
   };
 
@@ -94,12 +95,12 @@ export function StockProcessModal({ isOpen: _isOpen, onClose: _onClose, onComple
   const handleStockProcess = async () => {
     if (!modalData.item || qtyInput <= 0) return;
     const newQty = modalData.type === 'in' ? (modalItem.quantity as number) + qtyInput : (modalItem.quantity as number) - qtyInput;
-    if (modalData.type === 'out') { if ((modalItem.quantity as number) < qtyInput) return alert("재고가 부족합니다."); if (!targetDept) return alert("사용 부서를 선택해주세요."); }
+    if (modalData.type === 'out') { if ((modalItem.quantity as number) < qtyInput) return toast("재고가 부족합니다."); if (!targetDept) return toast("사용 부서를 선택해주세요.", 'warning'); }
     const logData: any = { item_id: modalItem.id, type: modalData.type === 'in' ? '입고' : '출고', amount: qtyInput, worker_id: user.id, department_id: modalData.type === 'out' ? targetDept : null };
     if (modalData.type === 'in') { logData.lot_number = lotInput || null; logData.expiration_date = expInput || null; }
     await supabase.from('inventory').update({ quantity: newQty, ...(modalData.type === 'in' && expInput ? { expiration_date: expInput } : {}) }).eq('id', modalItem.id);
     await supabase.from('inventory_logs').insert([logData]);
-    alert("처리 완료"); setQtyInput(1); setLotInput(''); setExpInput(''); setTargetDept(''); onComplete();
+    toast("처리 완료", 'success'); setQtyInput(1); setLotInput(''); setExpInput(''); setTargetDept(''); onComplete();
   };
 
   if (!isOpen || !modalData.item) return null;

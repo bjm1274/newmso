@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -818,16 +819,16 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
 
   const handleAdd = async () => {
     const name = addName.trim();
-    if (!name) return alert('양식 이름을 입력해 주세요.');
+    if (!name) return toast('양식 이름을 입력해 주세요.', 'warning');
 
     const baseTemplate = builtinTemplates.find((template) => template.slug === addBaseSlug) ?? builtinTemplates[0];
     const slug = (addSlug.trim() || slugFromName(name)).slice(0, 50);
 
     if (builtinTemplates.some((template) => template.slug === slug || template.name === name)) {
-      return alert('기본양식과 같은 이름이나 코드로는 추가할 수 없습니다.');
+      return toast('기본양식과 같은 이름이나 코드로는 추가할 수 없습니다.');
     }
     if (list.some((row) => row.slug === slug || row.name === name)) {
-      return alert('같은 이름 또는 코드의 추가 양식이 이미 있습니다.');
+      return toast('같은 이름 또는 코드의 추가 양식이 이미 있습니다.', 'warning');
     }
 
     const nextDesigns = {
@@ -840,7 +841,7 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
 
     const { error: designError } = await persistDesigns(nextDesigns);
     if (designError) {
-      return alert('기본양식 복제에 실패했습니다: ' + designError.message);
+      return toast('기본양식 복제에 실패했습니다: ' + designError.message, 'error');
     }
 
     const nextRows = [
@@ -875,13 +876,13 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
     if (!editingId) return;
 
     const name = editName.trim();
-    if (!name) return alert('양식 이름을 입력해 주세요.');
+    if (!name) return toast('양식 이름을 입력해 주세요.', 'warning');
 
     const slug = (editSlug.trim() || slugFromName(name)).slice(0, 50);
     const currentRow = list.find((row) => row.id === editingId);
     if (!currentRow) return;
     if (list.some((row) => row.id !== editingId && (row.slug === slug || row.name === name))) {
-      return alert('같은 이름 또는 코드의 추가 양식이 이미 있습니다.');
+      return toast('같은 이름 또는 코드의 추가 양식이 이미 있습니다.', 'warning');
     }
 
     const previousSlug = currentRow.slug || currentRow.id;
@@ -890,7 +891,7 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
       delete nextDesigns[previousSlug];
       const { error } = await persistDesigns(nextDesigns);
       if (error) {
-        return alert('양식 디자인 이동에 실패했습니다: ' + error.message);
+        return toast('양식 디자인 이동에 실패했습니다: ' + error.message, 'error');
       }
       setDesigns(nextDesigns);
     }
@@ -923,7 +924,7 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
       delete nextDesigns[key];
       const { error } = await persistDesigns(nextDesigns);
       if (error) {
-        return alert('양식 디자인 정리에 실패했습니다: ' + error.message);
+        return toast('양식 디자인 정리에 실패했습니다: ' + error.message, 'error');
       }
       setDesigns(nextDesigns);
     }

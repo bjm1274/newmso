@@ -1,5 +1,5 @@
-﻿'use client';
-import { useState, useEffect } from 'react';
+'use client';
+﻿import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
 export default function BusinessDashboard({ staffs = [], inventory = [] }: Record<string, unknown>) {

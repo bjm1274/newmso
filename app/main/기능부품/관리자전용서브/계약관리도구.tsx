@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -98,8 +99,8 @@ export default function ContractManager() {
       { onConflict: 'company_name', ignoreDuplicates: false }
     );
     setSaving(false);
-    if (error) alert('저장 중 오류가 발생했습니다.');
-    else alert(`${selectedCo} 계약서 표준 양식이 저장되었습니다. 인사관리에서 발송하는 계약서에 적용됩니다.`);
+    if (error) toast('저장 중 오류가 발생했습니다.', 'error');
+    else toast(`${selectedCo} 계약서 표준 양식이 저장되었습니다. 인사관리에서 발송하는 계약서에 적용됩니다.`, 'success');
   };
 
   return (
@@ -174,7 +175,7 @@ export default function ContractManager() {
                     key={tkn}
                     onClick={() => {
                       navigator.clipboard.writeText(tkn);
-                      alert(`${tkn} 토큰이 복사되었습니다.`);
+                      toast(`${tkn} 토큰이 복사되었습니다.`);
                     }}
                     className="px-2.5 py-1 rounded-lg bg-[var(--muted)] border border-[var(--border)] font-mono text-[10px] text-[var(--toss-gray-4)] hover:border-[var(--accent)]/30 hover:bg-[var(--card)] transition-all"
                   >
@@ -215,7 +216,7 @@ export default function ContractManager() {
                       const { data: urlData } = supabase.storage.from('company-seals').getPublicUrl(fileName);
                       setSealUrl(urlData.publicUrl);
                     } catch (err) {
-                      alert('직인 업로드에 실패했습니다. (Storage 설정을 확인하세요)');
+                      toast('직인 업로드에 실패했습니다. (Storage 설정을 확인하세요)', 'error');
                     } finally {
                       setUploadingSeal(false);
                       e.target.value = '';

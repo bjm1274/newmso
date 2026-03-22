@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -117,13 +118,13 @@ export default function CompanyPnL({ staffs, selectedCo, user }: Props) {
       } else {
         await supabase.from('company_expenses').insert(expenseForm);
       }
-      alert('비용이 저장되었습니다.');
+      toast('비용이 저장되었습니다.', 'success');
       setExpenseModal(null);
       // 재조회
       const { data } = await supabase.from('company_expenses').select('*').eq('year_month', yearMonth);
       setExpensesData(data || []);
     } catch {
-      alert('저장에 실패했습니다.');
+      toast('저장에 실패했습니다.', 'error');
     } finally {
       setSaving(false);
     }

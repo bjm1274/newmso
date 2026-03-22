@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import SmartDatePicker from '../공통/SmartDatePicker';
@@ -34,12 +35,12 @@ export default function PersonnelAppointment({ staffs = [], selectedCo, user }: 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const staff = _staffs.find((s: any) => s.id === form.staff_id);
-        if (!staff) return alert('직원을 선택해주세요.');
+        if (!staff) return toast('직원을 선택해주세요.', 'warning');
         const newRec = { ...form, staff_name: staff.name as string, company: staff.company as string, status: '발령완료', issued_by: (user as Record<string, unknown>)?.name as string || '관리자', issued_at: new Date().toISOString() };
         const { data, error } = await supabase.from('personnel_appointments').insert([newRec]).select();
         if (error || !data?.[0]) {
             console.error('personnel_appointments insert failed:', error);
-            alert('인사발령 저장에 실패했습니다.');
+            toast('인사발령 저장에 실패했습니다.', 'error');
             return;
         }
         setRecords([data[0], ...records]);
@@ -51,7 +52,7 @@ export default function PersonnelAppointment({ staffs = [], selectedCo, user }: 
             const { error: staffUpdateError } = await supabase.from('staff_members').update(updates).eq('id', form.staff_id);
             if (staffUpdateError) {
                 console.error('staff_members update failed after appointment insert:', staffUpdateError);
-                alert('인사발령 기록은 저장됐지만 직원 정보 반영에는 실패했습니다.');
+                toast('인사발령 기록은 저장됐지만 직원 정보 반영에는 실패했습니다.', 'error');
             }
         }
         setShowForm(false);
@@ -65,11 +66,11 @@ export default function PersonnelAppointment({ staffs = [], selectedCo, user }: 
             const now = new Date();
             return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
         });
-        if (thisMonth.length === 0) return alert('이번 달 발령 내역이 없습니다.');
+        if (thisMonth.length === 0) return toast('이번 달 발령 내역이 없습니다.');
         const lines = thisMonth.map((r: any) => `▸ ${r.staff_name} | ${r.order_type} | ${r.before_dept}${r.before_position ? `(${r.before_position})` : ''} → ${r.after_dept}${r.after_position ? `(${r.after_position})` : ''} | 발령일: ${r.effective_date}`);
         const text = `═══ 인사발령 관보 ═══\n발행일: ${new Date().toLocaleDateString()}\n\n${lines.join('\n')}\n\n위와 같이 인사발령 합니다.\n${(user as Record<string, unknown>)?.company as string || ''} 대표`;
         navigator.clipboard?.writeText(text);
-        alert('관보 내용이 클립보드에 복사되었습니다!\n게시판에 붙여넣기 해주세요.');
+        toast('관보 내용이 클립보드에 복사되었습니다!\n게시판에 붙여넣기 해주세요.');
     };
 
     return (

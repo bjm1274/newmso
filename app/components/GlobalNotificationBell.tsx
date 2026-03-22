@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
@@ -54,13 +54,12 @@ export default function GlobalNotificationBell({ user, onOpenFull }: { user: any
         // 브라우저 네이티브 푸시 알림 발생 (웹/모바일 호환)
         if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
           try {
-            const iconRef = TYPE_ICONS[newNoti.type] || TYPE_ICONS.default;
             new Notification(newNoti.title || '새로운 알림', {
               body: newNoti.body || '확인하지 않은 시스템 알림이 있습니다.',
-              icon: '/sy-logo.png', // 기본 알림 아이콘
+              icon: '/sy-logo.png',
             });
-          } catch (e) {
-            console.error('Notification display failed:', e);
+          } catch {
+            // 브라우저 알림 권한 거부 또는 미지원 환경 - 앱 내 토스트로 대체
           }
         }
 
@@ -88,13 +87,13 @@ export default function GlobalNotificationBell({ user, onOpenFull }: { user: any
     return () => document.removeEventListener('click', onOutside);
   }, []);
 
-  const markRead = async (id: string) => {
+  const markRead = useCallback(async (id: string) => {
     await supabase.from('notifications').update({ is_read: true }).eq('id', id);
     setList(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
     setUnreadCount(prev => Math.max(0, prev - 1));
-  };
+  }, []);
 
-  const handleNotificationClick = (n: any) => {
+  const handleNotificationClick = useCallback((n: any) => {
     if (!n.is_read) markRead(n.id);
     setOpen(false);
     setToastNoti(null);
@@ -114,7 +113,7 @@ export default function GlobalNotificationBell({ user, onOpenFull }: { user: any
         router.push(`/main?open_menu=게시판`);
       }
     }
-  };
+  }, [markRead, router]);
 
   return (
     <>

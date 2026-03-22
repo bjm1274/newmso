@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { StaffMember } from '@/types';
@@ -381,7 +382,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
       const tempNo2 = targetStaff.employee_no;
 
       const { error } = await supabase.from('staff_members').update({ employee_no: tempNo2 }).eq('id', staff.id);
-      if (error) return alert('정렬 실패: ' + error.message);
+      if (error) return toast('정렬 실패: ' + error.message, 'error');
       await supabase.from('staff_members').update({ employee_no: tempNo1 }).eq('id', targetStaff.id);
 
       window.location.reload();
@@ -448,7 +449,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                 <button
                   onClick={() => {
                     if (selectedCo === '전체') {
-                      alert('특정 병원이나 회사를 선택해야 수정이 가능합니다.');
+                      toast('특정 병원이나 회사를 선택해야 수정이 가능합니다.', 'success');
                       return;
                     }
                     setIsEditMode(!isEditMode);
@@ -614,7 +615,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                                           if (!draggedStaff || draggedStaff.department === team.teamName) return;
                                           if (confirm(`${draggedStaff.name}님을 [${team.teamName}] (으)로 이동하시겠습니까?`)) {
                                             await supabase.from('staff_members').update({ department: team.teamName }).eq('id', draggedStaff.id);
-                                            alert('이동되었습니다.');
+                                            toast('이동되었습니다.');
                                             window.location.reload();
                                           }
                                         } : undefined}
@@ -759,7 +760,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                                   if (!draggedStaff || draggedStaff.department === team.teamName) return;
                                   if (confirm(`${draggedStaff.name}님을 [${team.teamName}] (으)로 이동하시겠습니까?`)) {
                                     await supabase.from('staff_members').update({ department: team.teamName }).eq('id', draggedStaff.id);
-                                    alert('이동되었습니다.');
+                                    toast('이동되었습니다.');
                                     window.location.reload();
                                   }
                                 } : undefined}
@@ -826,7 +827,7 @@ export default function OrgChart({ user, staffs = [], selectedCo, setSelectedCo 
                                 if (!draggedStaff || draggedStaff.department === t.teamName) return;
                                 if (confirm(`${draggedStaff.name}님을 [${t.teamName}] (으)로 이동하시겠습니까?`)) {
                                   await supabase.from('staff_members').update({ department: t.teamName }).eq('id', draggedStaff.id);
-                                  alert('이동되었습니다.');
+                                  toast('이동되었습니다.');
                                   window.location.reload();
                                 }
                               } : undefined}
@@ -954,7 +955,7 @@ function StaffCardRow({ staff, onClick, isEditMode, setDraggedStaff, draggedStaf
           const tempNo2 = draggedStaff.employee_no;
           await supabase.from('staff_members').update({ employee_no: tempNo2 }).eq('id', staff.id);
           await supabase.from('staff_members').update({ employee_no: tempNo1 }).eq('id', draggedStaff.id);
-          alert('변경되었습니다.');
+          toast('변경되었습니다.');
           window.location.reload();
         }
       } : undefined}

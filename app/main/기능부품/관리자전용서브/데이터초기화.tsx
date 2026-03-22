@@ -1,4 +1,5 @@
-﻿'use client';
+'use client';
+import { toast } from '@/lib/toast';
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -16,9 +17,9 @@ export default function DataReseter({ onRefresh }: { onRefresh: () => void }) {
     const data = await res.json().catch(() => ({ ok: false }));
     if (data.ok) {
       setIsUnlocked(true);
-      alert("보안 잠금이 해제되었습니다. 모든 초기화 기능이 활성화됩니다.");
+      toast("보안 잠금이 해제되었습니다. 모든 초기화 기능이 활성화됩니다.");
     } else {
-      alert("보안 암호가 일치하지 않습니다.");
+      toast("보안 암호가 일치하지 않습니다.");
     }
   };
 
@@ -58,7 +59,7 @@ export default function DataReseter({ onRefresh }: { onRefresh: () => void }) {
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
-        alert((data?.message || '삭제 완료') + " 페이지를 새로고침합니다.");
+        toast((data?.message || '삭제 완료') + " 페이지를 새로고침합니다.", 'success');
         window.location.reload();
         return;
       }
@@ -83,11 +84,11 @@ export default function DataReseter({ onRefresh }: { onRefresh: () => void }) {
           .upsert({ key: 'min_auth_time', value: now, description: '전체 로그아웃 시점' }, { onConflict: 'key' });
       }
 
-      alert("선택하신 데이터 초기화 작업이 성공적으로 완료되었습니다.");
+      toast("선택하신 데이터 초기화 작업이 성공적으로 완료되었습니다.", 'success');
       onRefresh();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      alert("데이터 삭제 중 오류가 발생했습니다.\n\n" + msg + "\n\nSupabase 대시보드에서 RLS 정책 또는 API 권한을 확인해 주세요.");
+      toast("데이터 삭제 중 오류가 발생했습니다.\n\n" + msg + "\n\nSupabase 대시보드에서 RLS 정책 또는 API 권한을 확인해 주세요.", 'error');
     }
   };
 

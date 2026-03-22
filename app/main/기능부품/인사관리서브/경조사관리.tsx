@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import SmartDatePicker from '../공통/SmartDatePicker';
@@ -29,7 +30,7 @@ export default function CongratulationsCondolences({ staffs = [], selectedCo }: 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const staff = _staffs.find((s: any) => s.id === form.staff_id);
-        if (!staff) return alert('직원을 선택해주세요.');
+        if (!staff) return toast('직원을 선택해주세요.', 'warning');
         const newRec = { ...form, staff_name: staff.name, company: staff.company, department: staff.department || '', status: '지급완료' };
         const { data, error } = await supabase.from('congratulations_condolences').insert([newRec]).select();
         if (error) { setRecords([{ ...newRec, id: crypto.randomUUID(), created_at: new Date().toISOString() }, ...records]); }

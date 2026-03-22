@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import SmartDatePicker from '../공통/SmartDatePicker';
@@ -22,7 +23,7 @@ export default function AssetLoanManager({ staffs = [], selectedCo }: Record<str
   }, [selectedCo]);
 
   const handleAdd = async () => {
-    if (!form.staffId || !form.loanedAt) return alert('직원과 대여일을 선택하세요.');
+    if (!form.staffId || !form.loanedAt) return toast('직원과 대여일을 선택하세요.', 'warning');
     await supabase.from('asset_loans').insert({
       staff_id: form.staffId,
       asset_type: form.assetType,

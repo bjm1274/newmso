@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { StaffMember } from '@/types';
 import { supabase } from '@/lib/supabase';
@@ -9,10 +10,10 @@ import CertTransferPanel from './교육자격인사이동패널';
 import SmartDatePicker from '../공통/SmartDatePicker';
 
 function createEmptyStaffForm(selectedCompany?: string) {
-  const company = selectedCompany && selectedCompany !== '전체' ? selectedCompany : '박철홍정형외과';
+  const company = selectedCompany && selectedCompany !== '전체' ? selectedCompany : '';
 
   return {
-    성명: '', 전화번호: '', 내선번호: '', 사업체: company, 팀: '원무팀', 직함: '', 입사일: '', 퇴사일: '',
+    성명: '', 전화번호: '', 내선번호: '', 사업체: company, 팀: '', 직함: '', 입사일: '', 퇴사일: '',
     주민번호: '', 이메일: '', 주소: '', 면허사항: '', 면허번호: '', 취득일자: '', 면허기타내용: '', 계좌정보: '', 임금정보: '', 상태: '재직',
     연차총개수: 0, 연차사용개수: 0, 근무형태ID: '',
     고용형태: '정규직' as string, 계약종료일: '' as string,
@@ -74,9 +75,17 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   const [선택된직원ID, 선택된직원ID설정] = useState<string | number | null>(null);
   const [근무형태목록, 근무형태목록설정] = useState<any[]>([]);
   const [팀목록캐시, 팀목록캐시설정] = useState<Record<string, string[]>>({});
+  const [새근무형태표시, 새근무형태표시설정] = useState(false);
+  const [새근무형태, 새근무형태설정] = useState({ name: '', start_time: '09:00', end_time: '18:00', break_start_time: '12:00', break_end_time: '13:00' });
   const [activeTab, setActiveTab] = useState('기본'); // '기본', '소속', '급여'
   const [신규직원, 신규직원설정] = useState(() => createEmptyStaffForm(선택사업체 ?? undefined));
   const previousModalOpenRef = useRef(false);
+  // 직원목록에서 회사 목록 동적 생성
+  const 회사목록 = useMemo(
+    () => Array.from(new Set(직원목록.map((s) => s.company).filter(Boolean))).sort() as string[],
+    [직원목록],
+  );
+
   const taxableSalaryTotal = useMemo(
     () =>
       TAXABLE_SALARY_FIELDS.reduce(
@@ -154,11 +163,11 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       // 2. 요청 상태 변경
       await supabase.from('audit_logs').update({ target_type: 'ESS_PROFILE_UPDATE_APPROVED' }).eq('id', request.id);
 
-      alert('승인되었습니다.');
+      toast('승인되었습니다.');
       setEssRequests(prev => prev.filter(r => r.id !== request.id));
       새로고침?.();
     } catch (error) {
-      alert('승인 처리 중 오류 발생');
+      toast('승인 처리 중 오류 발생', 'error');
     }
   };
 
@@ -166,10 +175,10 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     if (!confirm(`${request.user_name}님의 정보 변경 요청을 반려하시겠습니까?`)) return;
     try {
       await supabase.from('audit_logs').update({ target_type: 'ESS_PROFILE_UPDATE_REJECTED' }).eq('id', request.id);
-      alert('반려되었습니다.');
+      toast('반려되었습니다.');
       setEssRequests(prev => prev.filter(r => r.id !== request.id));
     } catch (error) {
-      alert('반려 처리 중 오류 발생');
+      toast('반려 처리 중 오류 발생', 'error');
     }
   };
 
@@ -259,7 +268,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
     if (!justOpened || 편집모드) return;
 
-    const defaultCompany = 선택사업체 && 선택사업체 !== '전체' ? 선택사업체 : '박철홍정형외과';
+    const defaultCompany = 선택사업체 && 선택사업체 !== '전체' ? 선택사업체 : '';
     const defaultTeam = 팀목록가져오기(defaultCompany)[0] ?? '원무팀';
 
     신규직원설정({
@@ -269,7 +278,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   }, [창상태, 편집모드, 선택사업체, 팀목록캐시]);
 
   const 정보저장 = async () => {
-    if (!신규직원.성명 || !신규직원.입사일 || 신규직원.입사일 === '0000-00-00' || 신규직원.입사일 === '') return alert('성함과 실제 입사일은 필수 입력 사항입니다.');
+    if (!신규직원.성명 || !신규직원.입사일 || 신규직원.입사일 === '0000-00-00' || 신규직원.입사일 === '') return toast('성함과 실제 입사일은 필수 입력 사항입니다.', 'warning');
     try {
       const actor = readClientAuditActor();
       const dateOrNull = (val: string) => (val === '0000-00-00' || val === '0000-00' || !val || val === '') ? null : val;
@@ -352,7 +361,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           actor.userId,
           actor.userName
         );
-        alert('직원 정보가 수정되었습니다.');
+        toast('직원 정보가 수정되었습니다.', 'success');
       } else {
         // 사번 부여 로직: 박철홍이면 1, 아니면 기존 숫자 사번의 최대값 다음 번호 사용
         let newEmployeeNo = '';
@@ -394,7 +403,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           .select()
           .single();
         if (insertErr) {
-          return alert('직원 등록 실패: ' + (insertErr.message || 'DB 오류'));
+          return toast('직원 등록 실패: ' + (insertErr.message || 'DB 오류'), 'error');
         }
 
         await logAudit(
@@ -409,11 +418,11 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           actor.userId,
           actor.userName
         );
-        alert(`직원 등록 완료!\n로그인 아이디: 사번 ${newEmployeeNo} 또는 이름 ${신규직원.성명}\n(동명이인이 있으면 사번으로 로그인하세요)`);
+        toast(`직원 등록 완료!\n로그인 아이디: 사번 ${newEmployeeNo} 또는 이름 ${신규직원.성명}\n(동명이인이 있으면 사번으로 로그인하세요)`, 'success');
       }
       닫기함수(); 새로고침?.();
     } catch (error: unknown) {
-      alert('처리 중 오류가 발생했습니다: ' + (((error as Error)?.message ?? String(error)) || 'Unknown error'));
+      toast('처리 중 오류가 발생했습니다: ' + (((error as Error)?.message ?? String(error)) || 'Unknown error'), 'error');
     }
   };
 
@@ -460,7 +469,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
   const 닫기함수 = () => {
     편집모드설정(false); 선택된직원ID설정(null);
-    const defaultCompany = 선택사업체 && 선택사업체 !== '전체' ? 선택사업체 : '박철홍정형외과';
+    const defaultCompany = 선택사업체 && 선택사업체 !== '전체' ? 선택사업체 : '';
     신규직원설정({
       ...createEmptyStaffForm(defaultCompany),
       팀: 팀목록가져오기(defaultCompany)[0] ?? '원무팀',
@@ -498,13 +507,13 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         actor.userId,
         actor.userName
       );
-      alert('직원이 삭제(퇴사 처리)되었습니다.');
+      toast('직원이 삭제(퇴사 처리)되었습니다.', 'success');
       if (선택된직원ID === 직원.id) {
         닫기함수();
       }
       새로고침?.();
     } catch (e: unknown) {
-      alert('직원 삭제 중 오류가 발생했습니다.');
+      toast('직원 삭제 중 오류가 발생했습니다.', 'error');
     }
   };
 
@@ -779,7 +788,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                                 const genderDigit = parseInt(raw.slice(6, 7), 10);
                                 const birthYear = (genderDigit === 1 || genderDigit === 2) ? 1900 + yearPrefix : 2000 + yearPrefix;
                                 const age = new Date().getFullYear() - birthYear;
-                                if (age >= 60 && 신규직원.ins_national) alert(`만 ${age}세는 국민연금 의무 가입 대상이 아닙니다.\n국민연금 체크를 해제해 주세요.`);
+                                if (age >= 60 && 신규직원.ins_national) toast(`만 ${age}세는 국민연금 의무 가입 대상이 아닙니다.\n국민연금 체크를 해제해 주세요.`);
                               }
                               신규직원설정({ ...신규직원, 주민번호: formatted });
                             }}
@@ -879,9 +888,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                         <div className="space-y-2">
                           <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">사업체</label>
                           <select value={신규직원.사업체} onChange={e => 신규직원설정({ ...신규직원, 사업체: e.target.value, 팀: 팀목록가져오기(e.target.value)[0] ?? '', 근무형태ID: '' })} className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-lg)] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--accent)]/30 appearance-none" data-testid="new-staff-company-select">
-                            <option value="박철홍정형외과">박철홍정형외과</option>
-                            <option value="수연의원">수연의원</option>
-                            <option value="SY INC.">SY INC.</option>
+                            <option value="">사업체 선택</option>
+                            {회사목록.map(c => <option key={c} value={c}>{c}</option>)}
                           </select>
                         </div>
                         <div className="space-y-2">
@@ -993,7 +1001,16 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                         </div>
                       )}
                       <div className="space-y-2">
-                        <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">지정 스케줄 (근무형태)</label>
+                        <div className="flex items-center justify-between">
+                          <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">지정 스케줄 (근무형태)</label>
+                          <button
+                            type="button"
+                            onClick={() => { 새근무형태표시설정(v => !v); 새근무형태설정({ name: '', start_time: '09:00', end_time: '18:00', break_start_time: '12:00', break_end_time: '13:00' }); }}
+                            className="text-[11px] font-bold text-[var(--accent)] flex items-center gap-0.5 hover:underline"
+                          >
+                            + 새 유형 추가
+                          </button>
+                        </div>
                         <select value={신규직원.근무형태ID} onChange={e => 신규직원설정({ ...신규직원, 근무형태ID: e.target.value })} className="w-full p-4 bg-[var(--toss-blue-light)] rounded-[var(--radius-lg)] border-none outline-none font-bold text-sm text-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/30 appearance-none" data-testid="new-staff-shift-select">
                           <option value="">근무형태 선택</option>
                           {getVisibleShiftOptions(신규직원.사업체).map((s: StaffMember) => (
@@ -1002,6 +1019,64 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                             </option>
                           ))}
                         </select>
+                        {새근무형태표시 && (
+                          <div className="bg-blue-50 border border-blue-100 rounded-[var(--radius-lg)] p-3 space-y-2 animate-in fade-in slide-in-from-top-2">
+                            <p className="text-[11px] font-bold text-blue-700">새 근무형태 추가</p>
+                            <input
+                              type="text"
+                              placeholder="근무형태명 (예: 주간, 야간, 오전)"
+                              value={새근무형태.name}
+                              onChange={e => 새근무형태설정(v => ({ ...v, name: e.target.value }))}
+                              className="w-full p-2.5 text-xs font-bold bg-white rounded-[var(--radius-md)] border border-blue-100 outline-none"
+                            />
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <p className="text-[10px] font-bold text-blue-600 mb-1">출근</p>
+                                <input type="time" value={새근무형태.start_time} onChange={e => 새근무형태설정(v => ({ ...v, start_time: e.target.value }))} className="w-full p-2 text-xs bg-white rounded-[var(--radius-md)] border border-blue-100 outline-none" />
+                              </div>
+                              <div>
+                                <p className="text-[10px] font-bold text-blue-600 mb-1">퇴근</p>
+                                <input type="time" value={새근무형태.end_time} onChange={e => 새근무형태설정(v => ({ ...v, end_time: e.target.value }))} className="w-full p-2 text-xs bg-white rounded-[var(--radius-md)] border border-blue-100 outline-none" />
+                              </div>
+                              <div>
+                                <p className="text-[10px] font-bold text-blue-600 mb-1">휴게 시작</p>
+                                <input type="time" value={새근무형태.break_start_time} onChange={e => 새근무형태설정(v => ({ ...v, break_start_time: e.target.value }))} className="w-full p-2 text-xs bg-white rounded-[var(--radius-md)] border border-blue-100 outline-none" />
+                              </div>
+                              <div>
+                                <p className="text-[10px] font-bold text-blue-600 mb-1">휴게 종료</p>
+                                <input type="time" value={새근무형태.break_end_time} onChange={e => 새근무형태설정(v => ({ ...v, break_end_time: e.target.value }))} className="w-full p-2 text-xs bg-white rounded-[var(--radius-md)] border border-blue-100 outline-none" />
+                              </div>
+                            </div>
+                            <div className="flex gap-2 pt-1">
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (!새근무형태.name.trim()) return toast('근무형태명을 입력하세요.', 'warning');
+                                  const { data: created, error } = await supabase.from('work_shifts').insert({
+                                    name: 새근무형태.name.trim(),
+                                    company_name: 신규직원.사업체 || null,
+                                    start_time: 새근무형태.start_time,
+                                    end_time: 새근무형태.end_time,
+                                    break_start_time: 새근무형태.break_start_time,
+                                    break_end_time: 새근무형태.break_end_time,
+                                    is_active: true,
+                                  }).select().single();
+                                  if (error || !created) { toast('근무형태 저장에 실패했습니다.', 'error'); return; }
+                                  근무형태목록설정(prev => [...prev, created]);
+                                  신규직원설정(prev => ({ ...prev, 근무형태ID: created.id }));
+                                  새근무형태표시설정(false);
+                                  toast(`'${created.name}' 근무형태가 추가되었습니다.`);
+                                }}
+                                className="flex-1 py-2 bg-[var(--accent)] text-white text-[11px] font-bold rounded-[var(--radius-md)]"
+                              >
+                                저장 후 선택
+                              </button>
+                              <button type="button" onClick={() => 새근무형태표시설정(false)} className="px-3 py-2 bg-white text-[11px] font-bold text-[var(--toss-gray-3)] rounded-[var(--radius-md)] border border-blue-100">
+                                취소
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1111,7 +1186,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                                     const genderDigit = parseInt(raw.slice(6, 7), 10);
                                     const birthYear = (genderDigit === 1 || genderDigit === 2) ? 1900 + yearPrefix : 2000 + yearPrefix;
                                     const age = new Date().getFullYear() - birthYear;
-                                    if (age >= 60) return alert('만 60세 이상은 국민연금 가입 대상이 아닙니다.');
+                                    if (age >= 60) return toast('만 60세 이상은 국민연금 가입 대상이 아닙니다.');
                                   }
                                   신규직원설정({ ...신규직원, [item.key]: e.target.checked });
                                 }}
@@ -1152,7 +1227,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                           <label className="flex items-center gap-3 cursor-pointer">
                             <input type="checkbox" checked={신규직원.is_basic_living} onChange={e => {
                               if (e.target.checked && 신규직원.ins_health) {
-                                alert('기초생활수급 및 의료급여 수급자는 건강보험 가입 제외 대상일 수 있습니다.\n건강보험 체크 상태를 확인 및 해제해 주세요.');
+                                toast('기초생활수급 및 의료급여 수급자는 건강보험 가입 제외 대상일 수 있습니다.\n건강보험 체크 상태를 확인 및 해제해 주세요.', 'warning');
                               }
                               신규직원설정({ ...신규직원, is_basic_living: e.target.checked });
                             }} className="w-4 h-4 rounded text-emerald-600" />

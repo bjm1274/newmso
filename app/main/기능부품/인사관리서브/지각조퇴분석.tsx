@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -117,7 +118,7 @@ export default function LatenessPatternAnalysis({ staffs, selectedCo }: Props) {
   const handleSendAlert = async () => {
     const targets = stats.filter((item) => item.lateCount >= 3);
     if (targets.length === 0) {
-      alert('3회 이상 지각한 직원이 없습니다.');
+      toast('3회 이상 지각한 직원이 없습니다.');
       return;
     }
 
@@ -136,10 +137,10 @@ export default function LatenessPatternAnalysis({ staffs, selectedCo }: Props) {
         })),
       );
 
-      alert('알림을 발송했습니다.');
+      toast('알림을 발송했습니다.', 'success');
     } catch (error) {
       console.error('지각 경고 알림 발송 실패:', error);
-      alert('알림 발송에 실패했습니다.');
+      toast('알림 발송에 실패했습니다.', 'error');
     } finally {
       setSending(false);
     }

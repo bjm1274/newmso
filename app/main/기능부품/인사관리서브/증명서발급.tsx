@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -182,7 +183,7 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
 
   const handleIssue = async () => {
     if (!selectedStaff) {
-      alert('발급할 직원을 선택해 주세요.');
+      toast('발급할 직원을 선택해 주세요.', 'warning');
       return;
     }
 

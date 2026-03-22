@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -26,17 +27,17 @@ export default function FormRequest({ user: _user, staffs: _staffs }: Record<str
 
   const handleSubmit = async () => {
     if (!user?.id) {
-      alert('로그인 정보가 올바르지 않습니다. 다시 로그인한 뒤 이용해 주세요.');
+      toast('로그인 정보가 올바르지 않습니다. 다시 로그인한 뒤 이용해 주세요.', 'warning');
       return;
     }
 
     if (!selectedForm) {
-      alert('신청할 양식을 선택해 주세요.');
+      toast('신청할 양식을 선택해 주세요.', 'warning');
       return;
     }
 
     if (!purpose.trim()) {
-      alert('신청 용도를 입력해 주세요.');
+      toast('신청 용도를 입력해 주세요.', 'warning');
       return;
     }
 
@@ -77,13 +78,13 @@ export default function FormRequest({ user: _user, staffs: _staffs }: Record<str
 
       if (error) throw error;
 
-      alert('양식 신청이 완료되었습니다. 결재자의 확인을 기다려 주세요.');
+      toast('양식 신청이 완료되었습니다. 결재자의 확인을 기다려 주세요.', 'success');
       setPurpose('');
       setUrgency('일반');
       setSelectedForm(forms[0]?.id ?? '');
     } catch (error) {
       console.error('양식 신청 실패:', describeError(error));
-      alert('양식 신청 중 오류가 발생했습니다.');
+      toast('양식 신청 중 오류가 발생했습니다.', 'error');
     } finally {
       setSubmitting(false);
     }

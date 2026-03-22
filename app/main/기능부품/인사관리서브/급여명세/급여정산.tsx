@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import type { StaffMember } from '@/types';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -78,16 +79,14 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
   };
 
   const handleNextStep = async () => {
-    if (selectedStaffs.length === 0) return alert("정산 대상을 선택해 주세요.");
+    if (selectedStaffs.length === 0) return toast("정산 대상을 선택해 주세요.", 'warning');
 
     // 기본급여가 설정되지 않은 직원은 명세서를 생성하지 못하도록 1단계에서 차단
     const noBase = selectedStaffs.filter((s: StaffMember) => !Number(s.base_salary) || Number(s.base_salary) <= 0);
     if (noBase.length > 0) {
       const names = noBase.map((s: StaffMember) => s.name).join(', ');
-      alert(
-        `기본급(연봉)이 0원으로 설정된 직원이 포함되어 있어 급여 정산을 진행할 수 없습니다.\n\n` +
-        `기본급을 먼저 직원 등록 화면에서 입력해 주세요.\n\n문제 대상: ${names}`
-      );
+      toast(`기본급(연봉)이 0원으로 설정된 직원이 포함되어 있어 급여 정산을 진행할 수 없습니다.\n\n` +
+        `기본급을 먼저 직원 등록 화면에서 입력해 주세요.\n\n문제 대상: ${names}`, 'success');
       return;
     }
     setLoading(true);
@@ -160,7 +159,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
       setStep(2);
     } catch (e) {
       console.error(e);
-      alert('근태 데이터 로드 실패');
+      toast('근태 데이터 로드 실패', 'error');
     } finally {
       setLoading(false);
     }
@@ -268,10 +267,8 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
 
     const needsExactIncomeTax = selectedStaffs.some((staff: StaffMember) => settlementData[staff.id]?.apply_tax);
     if (needsExactIncomeTax && !hasExactIncomeTaxBracket(taxInsuranceRates)) {
-      alert(
-        '근로소득세 간이세액표가 설정되지 않아 급여를 안전하게 확정할 수 없습니다.\n\n' +
-        '세율·보험요율 관리에서 income_tax_bracket을 먼저 설정한 뒤 다시 진행해 주세요.'
-      );
+      toast('근로소득세 간이세액표가 설정되지 않아 급여를 안전하게 확정할 수 없습니다.\n\n' +
+        '세율·보험요율 관리에서 income_tax_bracket을 먼저 설정한 뒤 다시 진행해 주세요.');
       return;
     }
 
@@ -347,12 +344,12 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
         console.error('payroll audit log failed:', auditError);
       }
 
-      alert("급여 정산 및 명세서 생성이 완료되었습니다. 법적 비과세 한도가 자동 적용되었습니다.");
+      toast("급여 정산 및 명세서 생성이 완료되었습니다. 법적 비과세 한도가 자동 적용되었습니다.", 'success');
       setStep(3);
       if (onRefresh) onRefresh();
     } catch (err) {
       console.error('payroll finalize failed:', err);
-      alert("정산 처리 중 오류가 발생했습니다.");
+      toast("정산 처리 중 오류가 발생했습니다.", 'error');
     } finally {
       setLoading(false);
     }

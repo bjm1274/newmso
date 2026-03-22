@@ -1,4 +1,5 @@
-﻿'use client';
+'use client';
+import { toast } from '@/lib/toast';
 import { useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -24,12 +25,12 @@ export default function DataBackup() {
           await supabase.from(table).upsert(rows, { onConflict: 'id' });
         }
       }
-      alert('복원 완료');
+      toast('복원 완료', 'success');
       setRestoreFile(null);
       if (fileRef.current) fileRef.current.value = '';
     } catch (err) {
       console.error(err);
-      alert('복원 실패');
+      toast('복원 실패', 'error');
     } finally {
       setLoading(false);
     }
@@ -59,7 +60,7 @@ export default function DataBackup() {
       setLastExport(new Date().toLocaleString());
     } catch (e) {
       console.error(e);
-      alert('백업 실패');
+      toast('백업 실패', 'error');
     } finally {
       setLoading(false);
     }

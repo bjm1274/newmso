@@ -1,4 +1,5 @@
-﻿'use client';
+'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -39,9 +40,9 @@ export default function AttendanceDeductionRules({ selectedCo = '전체' }: Reco
         absent_use_daily_rate: rules.absent_use_daily_rate !== false,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'company_name' });
-      alert('저장되었습니다.');
+      toast('저장되었습니다.', 'success');
     } catch (e) {
-      alert('저장 실패');
+      toast('저장 실패', 'error');
     }
     setSaving(false);
   };

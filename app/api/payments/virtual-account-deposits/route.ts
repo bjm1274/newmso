@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await query;
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: '입금 목록을 불러오는 중 오류가 발생했습니다.' }, { status: 500 });
     }
 
     let rows = (data || []) as Array<Record<string, unknown>>;
@@ -79,10 +79,8 @@ export async function GET(request: NextRequest) {
     rows = applyStateFilter(rows, 'match_status', url.searchParams.get('matchStatus'));
 
     return NextResponse.json({ deposits: rows });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to load deposits.';
-    console.error('virtual account deposit list failed:', error);
-    return NextResponse.json({ error: message }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: '입금 목록을 불러오는 중 오류가 발생했습니다.' }, { status: 500 });
   }
 }
 
@@ -114,7 +112,7 @@ export async function PATCH(request: NextRequest) {
 
     const existing = await existingQuery.limit(1).maybeSingle();
     if (existing.error) {
-      return NextResponse.json({ error: existing.error.message }, { status: 500 });
+      return NextResponse.json({ error: '입금 내역 조회 중 오류가 발생했습니다.' }, { status: 500 });
     }
 
     if (!existing.data) {
@@ -132,13 +130,11 @@ export async function PATCH(request: NextRequest) {
       .single();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: '입금 내역 수정 중 오류가 발생했습니다.' }, { status: 500 });
     }
 
     return NextResponse.json({ deposit: data });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to update deposit.';
-    console.error('virtual account deposit patch failed:', error);
-    return NextResponse.json({ error: message }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: '입금 내역 수정 중 오류가 발생했습니다.' }, { status: 500 });
   }
 }

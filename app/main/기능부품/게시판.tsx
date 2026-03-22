@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useDeferredValue, useState, useEffect, useMemo, useRef } from 'react';
 import { canAccessBoard } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
@@ -427,7 +428,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   // 수술·MRI 일정 카드 → 관련 채팅방 열기
   const openChatForSchedule = async (post: BoardPost) => {
     if (!user?.id) {
-      alert('직원 계정으로 로그인한 경우에만 채팅을 사용할 수 있습니다.');
+      toast('직원 계정으로 로그인한 경우에만 채팅을 사용할 수 있습니다.');
       return;
     }
     const baseName = post.patient_name || post.title || '수술/검사 일정';
@@ -453,7 +454,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
           .select()
           .single();
         if (error || !created) {
-          alert('관련 채팅방 생성 중 오류가 발생했습니다.');
+          toast('관련 채팅방 생성 중 오류가 발생했습니다.', 'error');
           return;
         }
         roomId = created.id;
@@ -467,7 +468,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       setMainMenu?.('채팅');
     } catch (e) {
       console.error('openChatForSchedule error', e);
-      alert('관련 채팅방을 여는 중 오류가 발생했습니다.');
+      toast('관련 채팅방을 여는 중 오류가 발생했습니다.', 'error');
     }
   };
 
@@ -481,7 +482,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   const handleAddComment = async (postId: string, parentCommentId?: string | null) => {
     if (!newComment.trim()) return;
     if (!user?.id) {
-      alert('로그인한 후 댓글을 등록할 수 있습니다.');
+      toast('로그인한 후 댓글을 등록할 수 있습니다.', 'success');
       return;
     }
     const { data, error } = await supabase
@@ -497,7 +498,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       .maybeSingle();
     if (error) {
       console.error('댓글 등록 실패:', error);
-      alert(`댓글 등록에 실패했습니다.\n\n${error.message || ''}`);
+      toast(`댓글 등록에 실패했습니다.\n\n${error.message || ''}`, 'error');
       return;
     }
     if (data) {
@@ -505,7 +506,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       setNewComment('');
       setReplyParentId(null);
     } else {
-      alert('댓글 등록 후 응답을 받지 못했습니다. 다시 시도해 주세요.');
+      toast('댓글 등록 후 응답을 받지 못했습니다. 다시 시도해 주세요.', 'success');
     }
   };
 
@@ -516,14 +517,14 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     if (!comment) return;
     const isAdmin = user.permissions?.mso || user.role === 'admin';
     if (String(comment.author_id) !== String(user.id) && !isAdmin) {
-      alert('본인이 작성한 댓글만 삭제할 수 있습니다.');
+      toast('본인이 작성한 댓글만 삭제할 수 있습니다.', 'success');
       return;
     }
     if (!confirm('이 댓글을 삭제할까요?')) return;
     const { error } = await supabase.from('board_post_comments').delete().eq('id', commentId);
     if (error) {
       console.error('댓글 삭제 실패:', error);
-      alert(`댓글 삭제에 실패했습니다.\n\n${error.message || ''}`);
+      toast(`댓글 삭제에 실패했습니다.\n\n${error.message || ''}`, 'error');
       return;
     }
     setComments((prev) => {
@@ -642,16 +643,16 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
         }
       );
       if (error) throw error;
-      alert(`해당 일정의 ${actionType} 처리를 위해 부서장/관리자에게 승인 요청 문서가 상신되었습니다.`);
+      toast(`해당 일정의 ${actionType} 처리를 위해 부서장/관리자에게 승인 요청 문서가 상신되었습니다.`, 'success');
     } catch (err) {
       console.error(err);
-      alert('승인 요청 중 오류가 발생했습니다.');
+      toast('승인 요청 중 오류가 발생했습니다.', 'error');
     }
   };
 
   const handleDeletePost = async (post: BoardPost) => {
     if (!canEditPost(post)) {
-      alert('이 게시물을 삭제할 권한이 없습니다.');
+      toast('이 게시물을 삭제할 권한이 없습니다.', 'error');
       return;
     }
 
@@ -664,17 +665,17 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     if (!confirm('이 게시물을 정말 삭제하시겠습니까?')) return;
     const { error } = await supabase.from('board_posts').delete().eq('id', post.id);
     if (error) {
-      alert('게시물 삭제 중 오류가 발생했습니다.');
+      toast('게시물 삭제 중 오류가 발생했습니다.', 'error');
       return;
     }
     setPosts((prev) => prev.filter((p) => p.id !== post.id));
     setSelectedPostId((prev) => (prev === post.id ? null : prev));
-    alert('게시물이 삭제되었습니다.');
+    toast('게시물이 삭제되었습니다.', 'success');
   };
 
   const handleEditPostStart = (post: BoardPost) => {
     if (!canEditPost(post)) {
-      alert('수정 권한이 없습니다.');
+      toast('수정 권한이 없습니다.', 'error');
       return;
     }
     setEditingPostId(post.id);
@@ -747,7 +748,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
 
   const handleNewPost = async () => {
     if (!canCreatePost) {
-      alert('이 게시판에 글을 작성할 권한이 없습니다.');
+      toast('이 게시판에 글을 작성할 권한이 없습니다.', 'error');
       return;
     }
 
@@ -759,11 +760,11 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     const normalizedScheduleChartNo = scheduleChartNo.trim();
     const resolvedScheduleTime = buildScheduleTimeValue(schedulePeriod, scheduleHour, scheduleMinute) || scheduleTime;
 
-    if (!normalizedTitle) return alert('제목을 입력해주세요.');
+    if (!normalizedTitle) return toast('제목을 입력해주세요.', 'warning');
     if (isScheduleBoard) {
-      if (!scheduleDate || !resolvedScheduleTime) return alert('필수 정보를 입력해주세요.');
+      if (!scheduleDate || !resolvedScheduleTime) return toast('필수 정보를 입력해주세요.', 'warning');
     } else if (!normalizedContent && attachmentFiles.length === 0) {
-      return alert('내용을 입력해주세요.');
+      return toast('내용을 입력해주세요.', 'warning');
     }
 
     setLoading(true);
@@ -829,11 +830,9 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
           }
         }
         if (uploaded.length === 0 && attachmentFiles.length > 0) {
-          alert(
-            '첨부파일 업로드에 실패했습니다.\n\n' +
+          toast('첨부파일 업로드에 실패했습니다.\n\n' +
             (lastUploadError ? `원인: ${lastUploadError}\n\n` : '') +
-            'Supabase 대시보드 → SQL Editor에서 storage_board_attachments.sql 내용을 실행했는지 확인해 주세요.'
-          );
+            'Supabase 대시보드 → SQL Editor에서 storage_board_attachments.sql 내용을 실행했는지 확인해 주세요.', 'error');
           setLoading(false);
           return;
         }
@@ -862,13 +861,13 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
           postData
         );
         if (!updateError) {
-          alert('게시물이 수정되었습니다.');
+          toast('게시물이 수정되었습니다.', 'success');
           setPosts((prev) => prev.map(p => p.id === editingPostId ? { ...p, ...persistedPostData } : p));
           setSelectedPostId(editingPostId);
           resetForm();
           setShowNewPost(false);
         } else {
-          alert('게시물 수정 중 오류가 발생했습니다.');
+          toast('게시물 수정 중 오류가 발생했습니다.', 'error');
         }
         setLoading(false);
         return;
@@ -882,7 +881,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
         if (attachmentFiles.length > 0 && (!insertedPost.attachments || (Array.isArray(insertedPost.attachments) && insertedPost.attachments.length === 0))) {
           console.warn('첨부파일이 저장되지 않았을 수 있습니다. Supabase에 board_posts_attachments.sql 적용 및 board-attachments 버킷 생성 여부를 확인하세요.');
         }
-        alert('게시물이 등록되었습니다.');
+        toast('게시물이 등록되었습니다.', 'success');
         resetForm();
         setShowNewPost(false);
         setPosts((prev) => [insertedPost, ...prev]);
@@ -910,7 +909,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
         const hint = (activeBoard === '수술일정' || activeBoard === 'MRI일정') && (((error as Record<string, unknown>)?.message as string || "").includes('column') || ((error as Record<string, unknown>)?.code) === '42703')
           ? '\n\n수술일정/MRI일정용 컬럼이 없을 수 있습니다. Supabase에 board_posts_schedule_columns.sql 마이그레이션을 적용해 주세요.'
           : '';
-        alert(`게시물 등록에 실패했습니다.\n\n${(error as Record<string, unknown>)?.message || ''}${hint}`);
+        toast(`게시물 등록에 실패했습니다.\n\n${(error as Record<string, unknown>)?.message || ''}${hint}`, 'error');
       }
     } catch (error: unknown) {
       console.error('게시물 등록 실패:', error);
@@ -919,7 +918,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       const hint = (activeBoard === '수술일정' || activeBoard === 'MRI일정') && (msg.includes('column') || ((error as Record<string, unknown>)?.code) === '42703')
         ? '\n\n수술일정/MRI일정용 컬럼이 없을 수 있습니다. Supabase에 board_posts_schedule_columns.sql 마이그레이션을 적용해 주세요.'
         : '';
-      alert(`게시물 등록에 실패했습니다.\n\n${msg}${hint}`);
+      toast(`게시물 등록에 실패했습니다.\n\n${msg}${hint}`, 'error');
     } finally {
       setLoading(false);
     }

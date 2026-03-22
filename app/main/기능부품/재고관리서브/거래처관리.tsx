@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -39,7 +40,7 @@ export default function SupplierManagement({ user }: { user: any }) {
   };
 
   const handleSave = async () => {
-    if (!form.name.trim()) return alert('거래처명을 입력하세요.');
+    if (!form.name.trim()) return toast('거래처명을 입력하세요.', 'warning');
     setSaving(true);
     try {
       if (editTarget) {
@@ -50,7 +51,7 @@ export default function SupplierManagement({ user }: { user: any }) {
       setShowModal(false);
       fetchSuppliers();
     } catch (err) {
-      alert('저장 중 오류가 발생했습니다.');
+      toast('저장 중 오류가 발생했습니다.', 'error');
     } finally {
       setSaving(false);
     }

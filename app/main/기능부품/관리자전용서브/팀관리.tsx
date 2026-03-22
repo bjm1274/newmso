@@ -1,14 +1,15 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 
 const HOSPITAL_DIVISIONS = ['진료부', '간호부', '총무부'];
 const MSO_DIVISIONS = ['운영본부', '전략기획본부'];
-const COMPANIES = ['박철홍정형외과', '수연의원', 'SY INC.'];
 
 export default function TeamManager({ onRefresh }: { onRefresh?: () => void }) {
   const [teams, setTeams] = useState<any[]>([]);
-  const [company, setCompany] = useState('박철홍정형외과');
+  const [companies, setCompanies] = useState<string[]>([]);
+  const [company, setCompany] = useState('');
   const [adding, setAdding] = useState(false);
   const [newTeam, setNewTeam] = useState({ division: '진료부', team_name: '' });
 
@@ -16,6 +17,7 @@ export default function TeamManager({ onRefresh }: { onRefresh?: () => void }) {
     company === 'SY INC.' ? MSO_DIVISIONS : HOSPITAL_DIVISIONS;
 
   const fetchTeams = useCallback(async () => {
+    if (!company) return;
     const { data } = await supabase
       .from('org_teams')
       .select('*')
@@ -24,6 +26,18 @@ export default function TeamManager({ onRefresh }: { onRefresh?: () => void }) {
       .order('sort_order');
     setTeams(data || []);
   }, [company]);
+
+  useEffect(() => {
+    // 회사 목록 DB에서 동적 조회
+    supabase
+      .from('staff_members')
+      .select('company')
+      .then(({ data }) => {
+        const names = Array.from(new Set((data || []).map((r: any) => r.company).filter(Boolean))).sort() as string[];
+        setCompanies(names);
+        if (names.length > 0 && !company) setCompany(names[0]);
+      });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     // 회사 변경 시 Division 기본값도 회사 유형에 맞게 변경
@@ -35,7 +49,7 @@ export default function TeamManager({ onRefresh }: { onRefresh?: () => void }) {
   }, [company, fetchTeams]);
 
   const handleAdd = async () => {
-    if (!newTeam.team_name.trim()) return alert('팀명을 입력하세요.');
+    if (!newTeam.team_name.trim()) return toast('팀명을 입력하세요.', 'warning');
     const { error } = await supabase.from('org_teams').insert({
       company_name: company,
       division: company === 'SY INC.' ? (newTeam.division === '운영본부' ? '총무부' : '진료부') : newTeam.division,
@@ -52,7 +66,7 @@ export default function TeamManager({ onRefresh }: { onRefresh?: () => void }) {
       fetchTeams();
       onRefresh?.();
     } else {
-      alert('이미 존재하는 팀명이거나 오류가 발생했습니다.');
+      toast('이미 존재하는 팀명이거나 오류가 발생했습니다.', 'error');
     }
   };
 
@@ -79,7 +93,7 @@ export default function TeamManager({ onRefresh }: { onRefresh?: () => void }) {
         </div>
         <div className="flex gap-2">
           <select data-testid="team-manager-company-select" value={company} onChange={(e) => setCompany(e.target.value)} className="p-2 border rounded-[var(--radius-lg)] text-sm font-bold">
-            {COMPANIES.map((c) => (
+            {companies.map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}
           </select>

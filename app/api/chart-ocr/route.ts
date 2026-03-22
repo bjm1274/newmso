@@ -31,7 +31,6 @@ async function callGeminiVision(prompt: string, imageBase64: string, mimeType: s
             const text = response.text();
             if (text) return text;
         } catch (err: any) {
-            console.error(`Vision model ${modelName} failed:`, err.message);
             if (err.message?.includes('404')) continue;
             throw err;
         }
@@ -44,6 +43,11 @@ export async function POST(req: Request) {
         const session = await readSessionFromRequest(req);
         if (!session) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+        const perms = (session.user as any)?.permissions ?? {};
+        const hasAccess = perms.admin || perms.mso || perms.hr || perms.inventory;
+        if (!hasAccess) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
         const body = await req.json();
@@ -69,7 +73,10 @@ export async function POST(req: Request) {
         return NextResponse.json({ text: result });
     } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        console.error('Chart OCR API error:', msg);
-        return NextResponse.json({ error: msg }, { status: 500 });
+        const isUserFacingError = msg.includes('API 키') || msg.includes('모델') || msg.includes('Gemini');
+        return NextResponse.json(
+          { error: isUserFacingError ? msg : '차트 OCR 처리 중 오류가 발생했습니다.' },
+          { status: 500 }
+        );
     }
 }

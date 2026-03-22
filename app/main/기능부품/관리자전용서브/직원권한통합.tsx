@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -113,7 +114,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
 
   const setPassword = async () => {
     if (!selectedStaff?.id || !newPassword.trim()) {
-      alert('새 비밀번호를 입력해주세요.');
+      toast('새 비밀번호를 입력해주세요.', 'warning');
       return;
     }
 
@@ -132,7 +133,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
     setPasswordSaving(false);
 
     if (!response.ok || !payload?.ok) {
-      alert('비밀번호 변경 중 오류가 발생했습니다.');
+      toast('비밀번호 변경 중 오류가 발생했습니다.', 'error');
       return;
     }
 
@@ -149,7 +150,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
       actor.userId,
       actor.userName
     );
-    alert('비밀번호가 변경되었습니다.');
+    toast('비밀번호가 변경되었습니다.');
   };
 
   const handleRoleChange = async (staffId: string, newRole: string) => {
@@ -157,7 +158,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
     const beforeStaff = staffs.find((staff) => staff.id === staffId);
     const { error } = await updateStaffRecord(staffId, { role: newRole });
     if (error) {
-      alert('역할 변경 중 오류가 발생했습니다.');
+      toast('역할 변경 중 오류가 발생했습니다.', 'error');
       return;
     }
 
@@ -180,7 +181,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
       const beforeStaff = staffs.find((staff) => staff.id === staffId);
       const { error } = await updateStaffRecord(staffId, { permissions: nextPermissions });
       if (error) {
-        alert('권한 변경 중 오류가 발생했습니다.');
+        toast('권한 변경 중 오류가 발생했습니다.', 'error');
         return false;
       }
 
@@ -225,11 +226,11 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
 
   const copyPermissionsToStaff = async () => {
     if (!copySourceId || !selectedStaff?.id) {
-      alert('복사할 직원(A)과 적용할 직원(B)을 모두 선택해주세요.');
+      toast('복사할 직원(A)과 적용할 직원(B)을 모두 선택해주세요.', 'warning');
       return;
     }
     if (copySourceId === selectedStaff.id) {
-      alert('복사할 직원과 적용할 직원은 같을 수 없습니다.');
+      toast('복사할 직원과 적용할 직원은 같을 수 없습니다.');
       return;
     }
 
@@ -250,11 +251,11 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
     setCopying(false);
 
     if (error) {
-      alert('권한 복사 중 오류가 발생했습니다.');
+      toast('권한 복사 중 오류가 발생했습니다.', 'error');
       return;
     }
 
-    alert(`[${source.name}]의 권한${copyRoleToo ? '과 역할' : ''}이 [${target.name}]에게 적용되었습니다.`);
+    toast(`[${source.name}]의 권한${copyRoleToo ? '과 역할' : ''}이 [${target.name}]에게 적용되었습니다.`);
     await logAudit(
       '권한복사',
       'staff_permission',
@@ -523,8 +524,8 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                         .from('staff_members')
                         .update({ force_logout_at: new Date().toISOString() })
                         .eq('id', selectedStaff.id);
-                      if (!error) alert('강제 로그아웃 명령이 전송되었습니다.');
-                      else alert('처리 중 오류가 발생했습니다.');
+                      if (!error) toast('강제 로그아웃 명령이 전송되었습니다.', 'success');
+                      else toast('처리 중 오류가 발생했습니다.', 'error');
                     }}
                     className="w-full py-2 bg-red-600 text-white rounded-[var(--radius-md)] text-[10px] font-bold hover:bg-red-700 transition-colors shadow-sm"
                   >

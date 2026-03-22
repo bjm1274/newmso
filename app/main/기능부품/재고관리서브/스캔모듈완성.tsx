@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -70,7 +71,7 @@ export default function ScanModule({ user, inventory, fetchInventory }: ScanModu
     });
 
     if (!match) {
-      alert(`등록되지 않은 의료기기 코드입니다.\n(${code})`);
+      toast(`등록되지 않은 의료기기 코드입니다.\n(${code})`, 'success');
       setCodeInput('');
       if (inputRef.current) inputRef.current.focus();
       return;
@@ -116,7 +117,7 @@ export default function ScanModule({ user, inventory, fetchInventory }: ScanModu
 
   const handleConfirmScan = async () => {
     if (!scannedItems.length) {
-      alert('입고할 스캔 항목이 없습니다.');
+      toast('입고할 스캔 항목이 없습니다.');
       return;
     }
 
@@ -155,13 +156,13 @@ export default function ScanModule({ user, inventory, fetchInventory }: ScanModu
         ]);
       }
 
-      alert('스캔된 의료기기 입고 처리가 완료되었습니다.');
+      toast('스캔된 의료기기 입고 처리가 완료되었습니다.', 'success');
       setScannedItems([]);
       fetchInventory();
       if (inputRef.current) inputRef.current.focus();
     } catch (err) {
       console.error('스캔 입고 처리 오류:', err);
-      alert('입고 처리 중 오류가 발생했습니다.');
+      toast('입고 처리 중 오류가 발생했습니다.', 'error');
     } finally {
       setLoading(false);
     }

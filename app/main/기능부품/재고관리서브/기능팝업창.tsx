@@ -1,8 +1,9 @@
 'use client';
+import { toast } from '@/lib/toast';
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 
-const PRESET_A = { reg_num: '000-00-00000', sangho: '박철홍정형외과', ceo: '박철홍', addr: '전라남도 목포시', phone: '061-000-0000', status: '보건업', type: '정형외과' };
+const PRESET_A = { reg_num: '', sangho: '', ceo: '', addr: '', phone: '', status: '', type: '' };
 const PRESET_B = { reg_num: '', sangho: '', ceo: '', addr: '', phone: '', status: '', type: '' };
 
 // [모달 3] 발주서 (기존 유지)
@@ -15,7 +16,7 @@ export function POModal({ isOpen, onClose: _onClose, inventory: _inventory }: Re
   return (
     <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-5" onClick={onClose}>
       <div className="bg-[var(--card)] w-full max-w-2xl rounded-2xl p-5 shadow-sm overflow-y-auto max-h-full" onClick={e => e.stopPropagation()}>
-        <div className="flex justify-between items-center border-b-2 border-black pb-4 mb-4"><h1 className="text-3xl font-semibold text-black">발 주 서</h1><div className="text-right"><p className="text-sm font-bold">발행일: {new Date().toISOString().split('T')[0]}</p><p className="text-sm font-bold">발신: 박철홍정형외과</p></div></div>
+        <div className="flex justify-between items-center border-b-2 border-black pb-4 mb-4"><h1 className="text-3xl font-semibold text-black">발 주 서</h1><div className="text-right"><p className="text-sm font-bold">발행일: {new Date().toISOString().split('T')[0]}</p><p className="text-sm font-bold">발신: {new Date().toLocaleDateString('ko-KR')}</p></div></div>
         {lowStockItems.length > 0 ? (
           <table className="w-full text-sm border-collapse border border-black mb-5">
             <thead><tr className="bg-[var(--muted)]"><th className="border p-2">품목</th><th className="border p-2">현재고</th><th className="border p-2">최소유지</th><th className="border p-2">권장량</th><th className="border p-2">공급사</th></tr></thead>
@@ -44,9 +45,9 @@ export function BillModal({ isOpen, onClose: _onClose, inventory: _inventory }: 
 
   // 업체 등록 로직
   const handleSavePartner = () => {
-    if (!newPartner.alias || !newPartner.sangho) return alert("별칭과 상호는 필수입니다.");
+    if (!newPartner.alias || !newPartner.sangho) return toast("별칭과 상호는 필수입니다.");
     const updated = [...customPresets, newPartner]; setCustomPresets(updated); localStorage.setItem('my_partners', JSON.stringify(updated));
-    alert("등록되었습니다."); setIsRegisterMode(false); setNewPartner({ alias: '', reg_num: '', sangho: '', ceo: '', addr: '', phone: '' });
+    toast("등록되었습니다.", 'success'); setIsRegisterMode(false); setNewPartner({ alias: '', reg_num: '', sangho: '', ceo: '', addr: '', phone: '' });
   };
   const applyPreset = (role: string, data: any) => setBillData(prev => ({ ...prev, [role]: { ...data } }));
   const addRow = () => setBillData(prev => ({ ...prev, items: [...prev.items, { name: '', qty: 0, price: 0, supply_price: 0, tax: 0 }] }));
@@ -190,12 +191,12 @@ export function ScanModals({ isOpen, onClose: _onClose, onComplete: _onComplete,
   /* 이전 코드와 동일 (생략 없음) */
   const [isScanning, setIsScanning] = useState(false);
   const [scannedItems, setScannedItems] = useState<any[]>([]);
-  useEffect(() => { if (isOpen && mode === 'camera') { const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); if (!isMobile) { alert("📷 카메라는 모바일 기기(핸드폰)에서만 사용 가능합니다."); onClose(); } } }, [isOpen, mode, onClose]);
+  useEffect(() => { if (isOpen && mode === 'camera') { const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent); if (!isMobile) { toast("📷 카메라는 모바일 기기(핸드폰)에서만 사용 가능합니다."); onClose(); } } }, [isOpen, mode, onClose]);
   const handleCapture = () => {
     setIsScanning(true);
     setTimeout(() => {
       setIsScanning(false);
-      alert('AI 분석(OCR) 서비스 준비 중입니다. 현재는 수동 입력 기능을 이용해 주세요.');
+      toast('AI 분석(OCR) 서비스 준비 중입니다. 현재는 수동 입력 기능을 이용해 주세요.', 'warning');
     }, 1500);
   };
   const confirm = async () => { onComplete(scannedItems); setScannedItems([]); };
@@ -232,7 +233,7 @@ export function UDIModal({ isOpen, onClose: _onClose, inventory: _inventory, use
   const [barcodeInput, setBarcodeInput] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const handleScan = (e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Enter') { const f = inventory.find((i: Record<string, unknown>) => i.barcode === barcodeInput); if (f) setUdiItems(p => [{ ...f, report_qty: 1, lot_number: '', expiration_date: '' }, ...p]); setBarcodeInput(''); } };
-  const submit = async () => { if (!confirm("전송하시겠습니까?")) return; await supabase.from('inventory_logs').insert(udiItems.map(i => ({ item_id: i.id, type: '출고', amount: i.report_qty, worker_id: user.id, lot_number: i.lot_number, expiration_date: i.expiration_date }))); alert("완료"); setUdiItems([]); onRefresh(); onClose(); };
+  const submit = async () => { if (!confirm("전송하시겠습니까?")) return; await supabase.from('inventory_logs').insert(udiItems.map(i => ({ item_id: i.id, type: '출고', amount: i.report_qty, worker_id: user.id, lot_number: i.lot_number, expiration_date: i.expiration_date }))); toast("완료", 'success'); setUdiItems([]); onRefresh(); onClose(); };
   if (!isOpen) return null;
   return (
     <div className="absolute inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>

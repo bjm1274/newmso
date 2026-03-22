@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useEffect, useState } from 'react';
 import { initNotificationService } from './알림시스템';
 
@@ -29,7 +30,7 @@ export default function PermissionPromptModal() {
 
   const requestNotification = async () => {
     if (!('Notification' in window)) {
-      alert('이 브라우저는 알림을 지원하지 않습니다.');
+      toast('이 브라우저는 알림을 지원하지 않습니다.');
       return;
     }
     setNotifying(true);
@@ -41,10 +42,10 @@ export default function PermissionPromptModal() {
           const u = raw ? JSON.parse(raw) : null;
           await initNotificationService(u?.id);
         } catch (_) { }
-        alert('알림이 허용되었습니다. 채팅·결재 등 푸시 알림을 받을 수 있습니다.');
+        toast('알림이 허용되었습니다. 채팅·결재 등 푸시 알림을 받을 수 있습니다.');
         setActionDone(true);
       } else if (permission === 'denied') {
-        alert('알림이 거부되었습니다. 채팅 알림은 앱 내 배너로만 표시됩니다. 브라우저 설정에서 변경할 수 있습니다.');
+        toast('알림이 거부되었습니다. 채팅 알림은 앱 내 배너로만 표시됩니다. 브라우저 설정에서 변경할 수 있습니다.');
         setActionDone(true);
       }
     } catch (e) {
@@ -56,19 +57,19 @@ export default function PermissionPromptModal() {
 
   const requestLocation = () => {
     if (!navigator.geolocation) {
-      alert('이 기기는 위치(GPS) 기능을 지원하지 않습니다.');
+      toast('이 기기는 위치(GPS) 기능을 지원하지 않습니다.');
       return;
     }
     setGpsing(true);
     navigator.geolocation.getCurrentPosition(
       () => {
-        alert('위치 권한이 허용되었습니다. 출퇴근 시 GPS 인증을 사용할 수 있습니다.');
+        toast('위치 권한이 허용되었습니다. 출퇴근 시 GPS 인증을 사용할 수 있습니다.');
         setGpsing(false);
         setActionDone(true);
       },
       (err) => {
-        if (err.code === 1) alert('위치 권한이 거부되었습니다. 출퇴근 시 브라우저에서 다시 허용할 수 있습니다.');
-        else alert('위치를 가져오지 못했습니다: ' + (err.message || '알 수 없는 오류'));
+        if (err.code === 1) toast('위치 권한이 거부되었습니다. 출퇴근 시 브라우저에서 다시 허용할 수 있습니다.');
+        else toast('위치를 가져오지 못했습니다: ' + (err.message || '알 수 없는 오류'), 'error');
         setGpsing(false);
         setActionDone(true);
       },

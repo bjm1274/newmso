@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -86,7 +87,7 @@ export default function DailyClosurePage({ user }: { user: any }) {
 
     const saveClosure = async () => {
         if (items.length === 0) {
-            alert('수납 내역을 최소 하나 이상 입력해주세요.');
+            toast('수납 내역을 최소 하나 이상 입력해주세요.', 'warning');
             return;
         }
 
@@ -132,11 +133,11 @@ export default function DailyClosurePage({ user }: { user: any }) {
                 if (insErr2) throw insErr2;
             }
 
-            alert('마감 보고가 저장되었습니다.');
+            toast('마감 보고가 저장되었습니다.', 'success');
             setView('list');
             loadClosures();
         } catch (err: unknown) {
-            alert('저장 중 오류가 발생했습니다: ' + ((err as Error)?.message ?? String(err)));
+            toast('저장 중 오류가 발생했습니다: ' + ((err as Error)?.message ?? String(err)), 'error');
         } finally {
             setLoading(false);
         }

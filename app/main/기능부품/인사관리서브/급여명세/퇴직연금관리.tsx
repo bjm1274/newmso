@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -67,7 +68,7 @@ export default function RetirementPensionManager({ staffs = [], selectedCo, user
   };
 
   const handleSave = async () => {
-    if (!form.staff_id) return alert('직원을 선택하세요.');
+    if (!form.staff_id) return toast('직원을 선택하세요.', 'warning');
     setSaving(true);
     try {
       const staff = filteredStaffs.find(s => String(s.id) === String(form.staff_id));
@@ -79,7 +80,7 @@ export default function RetirementPensionManager({ staffs = [], selectedCo, user
       }
       setShowModal(false);
       fetchPensions();
-    } catch { alert('저장 실패'); } finally { setSaving(false); }
+    } catch { toast('저장 실패', 'error'); } finally { setSaving(false); }
   };
 
   return (

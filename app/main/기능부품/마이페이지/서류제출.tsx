@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { jsPDF } from 'jspdf';
@@ -115,10 +116,10 @@ export default function MyDocuments(props: Record<string, unknown>) {
 
             if (dbError) throw dbError;
 
-            alert(`${docType} 업로드가 완료되었습니다.`);
+            toast(`${docType} 업로드가 완료되었습니다.`, 'success');
             fetchDocuments();
         } catch (error: unknown) {
-            alert(`업로드 실패: ${((error as Error)?.message ?? String(error))}`);
+            toast(`업로드 실패: ${((error as Error)?.message ?? String(error))}`, 'error');
         } finally {
             setUploading(false);
         }
@@ -265,7 +266,7 @@ function CameraScanner(scannerProps: Record<string, unknown>) {
                 setIsLoading(false);
             } catch (err) {
                 console.error("Camera access denied:", err);
-                alert("카메라 권한이 필요합니다. 모바일 브라우저 설정을 확인해 주세요.");
+                toast("카메라 권한이 필요합니다. 모바일 브라우저 설정을 확인해 주세요.", 'warning');
                 onClose();
             }
         }

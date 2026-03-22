@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -158,7 +159,7 @@ export default function TaxAutoReport({ selectedCo = '전체' }: Record<string, 
 
   const submitTaxReport = async () => {
     if (!taxData.length) {
-      alert('신고할 급여 데이터가 없습니다.');
+      toast('신고할 급여 데이터가 없습니다.');
       return;
     }
 
@@ -177,15 +178,15 @@ export default function TaxAutoReport({ selectedCo = '전체' }: Record<string, 
       console.error('tax auto report submit failed:', error);
       if (isMissingSchemaError(error)) {
         setReportStatus('저장소 미설정');
-        alert('tax_reports 저장소가 설정되지 않아 자동신고 결과를 저장할 수 없습니다. CSV를 내려받아 별도 신고해 주세요.');
+        toast('tax_reports 저장소가 설정되지 않아 자동신고 결과를 저장할 수 없습니다. CSV를 내려받아 별도 신고해 주세요.', 'success');
         return;
       }
-      alert(`세금 신고 저장 중 오류가 발생했습니다: ${error.message}`);
+      toast(`세금 신고 저장 중 오류가 발생했습니다: ${error.message}`, 'error');
       return;
     }
 
     setReportStatus('신고완료');
-    alert('세금 자동신고 데이터를 저장했습니다.');
+    toast('세금 자동신고 데이터를 저장했습니다.', 'success');
   };
 
   const downloadTaxReport = () => {

@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -91,7 +92,7 @@ export default function DocumentRepository({
   });
 
   const handleSave = async () => {
-    if (!form.title.trim()) return alert('제목을 입력하세요.');
+    if (!form.title.trim()) return toast('제목을 입력하세요.', 'warning');
     setSaving(true);
     try {
       // 모든 문서는 PDF로도 보관: 내용 기반으로 PDF 생성 후 Storage 업로드
@@ -128,7 +129,7 @@ export default function DocumentRepository({
             .upload(filePath, blob, { contentType: 'application/pdf', upsert: true });
           if (upErr) {
             console.warn('document pdf upload error', upErr);
-            alert(`PDF 생성 또는 업로드 중 오류가 발생했습니다.\n\n${upErr.message || ''}\n\nSupabase Storage에 document-pdfs 버킷이 있고, anon 역할에 INSERT/SELECT 권한이 있는지 확인해주세요.`);
+            toast(`PDF 생성 또는 업로드 중 오류가 발생했습니다.\n\n${upErr.message || ''}\n\nSupabase Storage에 document-pdfs 버킷이 있고, anon 역할에 INSERT/SELECT 권한이 있는지 확인해주세요.`, 'error');
             return null;
           }
           const { data: urlData } = supabase.storage.from('document-pdfs').getPublicUrl(filePath);
@@ -142,7 +143,7 @@ export default function DocumentRepository({
       const pdfUrl = await generatePdf();
 
       const isContract = selected?.category === '근로계약서';
-      if (isContract) return alert('근로계약서 카테고리의 문서는 법적 효력 유지를 위해 수정이 불가능합니다.');
+      if (isContract) return toast('근로계약서 카테고리의 문서는 법적 효력 유지를 위해 수정이 불가능합니다.', 'success');
 
       if (selected) {
         const newVersion = (Number(selected.version) || 1) + 1;
@@ -176,8 +177,8 @@ export default function DocumentRepository({
       fetchDocs();
       setSelected(null);
       setForm({ title: '', category: '규정', content: '' });
-      alert('저장되었습니다.');
-    } catch (e) { alert('저장 중 오류가 발생했습니다.'); } finally { setSaving(false); }
+      toast('저장되었습니다.', 'success');
+    } catch (e) { toast('저장 중 오류가 발생했습니다.', 'error'); } finally { setSaving(false); }
   };
 
   const handleEdit = (d: any) => {
@@ -196,9 +197,9 @@ export default function DocumentRepository({
         setForm({ title: '', category: '규정', content: '' });
       }
       await fetchDocs();
-      alert('문서가 삭제되었습니다.');
+      toast('문서가 삭제되었습니다.', 'success');
     } catch (e) {
-      alert('문서 삭제 중 오류가 발생했습니다.');
+      toast('문서 삭제 중 오류가 발생했습니다.', 'error');
     }
   };
 
@@ -258,7 +259,7 @@ export default function DocumentRepository({
         .upload(filePath, blob, { contentType: 'application/pdf', upsert: true });
       if (upErr) {
         console.warn('document pdf upload error', upErr);
-        alert(`PDF 생성 또는 업로드 중 오류가 발생했습니다.\n\n${upErr.message || ''}\n\nSupabase Storage에 document-pdfs 버킷이 있고, anon 역할에 INSERT/SELECT 권한이 있는지 확인해주세요.`);
+        toast(`PDF 생성 또는 업로드 중 오류가 발생했습니다.\n\n${upErr.message || ''}\n\nSupabase Storage에 document-pdfs 버킷이 있고, anon 역할에 INSERT/SELECT 권한이 있는지 확인해주세요.`, 'error');
         return;
       }
       const { data: urlData } = supabase.storage.from('document-pdfs').getPublicUrl(filePath);
@@ -273,7 +274,7 @@ export default function DocumentRepository({
       window.open(url, '_blank');
     } catch (e) {
       console.warn('handleOpenPdf error', e);
-      alert('PDF를 여는 중 오류가 발생했습니다.');
+      toast('PDF를 여는 중 오류가 발생했습니다.', 'error');
     }
   };
 

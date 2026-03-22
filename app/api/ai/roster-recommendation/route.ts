@@ -2,6 +2,23 @@ import { GoogleGenerativeAI, type ResponseSchema, SchemaType } from '@google/gen
 import { NextRequest, NextResponse } from 'next/server';
 import { readSessionFromRequest } from '@/lib/server-session';
 
+// 유저별 AI 근무표 생성 요청 횟수 제한 (인스턴스 내 메모리 기반)
+const rosterRateLimit = new Map<string, { count: number; resetAt: number }>();
+const ROSTER_MAX_PER_HOUR = 10;
+const ROSTER_WINDOW_MS = 60 * 60 * 1000;
+
+function checkRosterRateLimit(userId: string): boolean {
+  const now = Date.now();
+  const entry = rosterRateLimit.get(userId);
+  if (!entry || now > entry.resetAt) {
+    rosterRateLimit.set(userId, { count: 1, resetAt: now + ROSTER_WINDOW_MS });
+    return true;
+  }
+  if (entry.count >= ROSTER_MAX_PER_HOUR) return false;
+  entry.count++;
+  return true;
+}
+
 const MODELS = ['gemini-2.5-pro', 'gemini-2.5-flash'] as const;
 const OFF_SHIFT_TOKEN = '__OFF__';
 
@@ -400,6 +417,10 @@ export async function POST(request: NextRequest) {
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const userId = String((session.user as any)?.id || (session.user as any)?.name || 'unknown');
+    if (!checkRosterRateLimit(userId)) {
+      return NextResponse.json({ error: '1시간에 최대 10회까지 AI 근무표 생성이 가능합니다.' }, { status: 429 });
+    }
 
     const body = (await request.json()) as Partial<RequestBody>;
     const payload: RequestBody = {
@@ -435,14 +456,11 @@ export async function POST(request: NextRequest) {
       recommendation = await requestRecommendation(payload);
     } catch (error: any) {
       const message = error?.message || String(error);
-      console.error('Gemini roster recommendation fallback:', message);
       recommendation = buildFallbackRecommendation(payload, message);
     }
 
     return NextResponse.json(recommendation);
   } catch (error: any) {
-    const message = error?.message || String(error);
-    console.error('Gemini roster recommendation API error:', message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: '근무표 추천 중 오류가 발생했습니다.' }, { status: 500 });
   }
 }
