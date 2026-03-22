@@ -1,5 +1,5 @@
+'use client';
 import { toast } from '@/lib/toast';
-﻿'use client';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import AnnualLeavePromotion from './연차촉진시스템';

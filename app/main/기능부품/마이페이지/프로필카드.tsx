@@ -1,5 +1,5 @@
+'use client';
 import { toast } from '@/lib/toast';
-﻿'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { persistSupabaseAccessToken } from '@/lib/supabase-bridge';
