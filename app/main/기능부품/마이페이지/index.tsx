@@ -1,5 +1,5 @@
+'use client';
 import { toast } from '@/lib/toast';
-﻿'use client';
 import { useState, useEffect } from 'react';
 
 // 기능 컴포넌트 불러오기

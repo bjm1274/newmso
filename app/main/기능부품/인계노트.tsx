@@ -1,5 +1,5 @@
+'use client';
 import { toast } from '@/lib/toast';
-﻿'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
