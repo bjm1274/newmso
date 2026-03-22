@@ -12,7 +12,7 @@ function mapEcountRow(r: any) {
   const qty = parseInt(r['수량'] ?? r['재고'] ?? r['재고수량'] ?? r['Quantity'] ?? r['quantity'] ?? 0, 10) || 0;
   const unitPrice = parseInt(r['단가'] ?? r['UnitPrice'] ?? r['unit_price'] ?? r['원가'] ?? 0, 10) || 0;
   const category = String(r['품목그룹'] ?? r['분류'] ?? r['Category'] ?? r['category'] ?? r['규격'] ?? '').trim();
-  const company = String(r['회사'] ?? r['Company'] ?? r['company'] ?? '박철홍정형외과').trim() || '박철홍정형외과';
+  const company = String(r['회사'] ?? r['Company'] ?? r['company'] ?? '').trim();
   const minQty = parseInt(r['최소재고'] ?? r['안전재고'] ?? r['MinStock'] ?? r['min_quantity'] ?? 5, 10) || 5;
   return { itemName, qty, unitPrice, category, company, minQty };
 }
@@ -21,7 +21,7 @@ export default function ExcelBulkUpload({ onRefresh }: Record<string, unknown>) 
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<UploadMode>('staff');
   const [preview, setPreview] = useState<any[]>([]);
-  const [defaultCompany, setDefaultCompany] = useState('박철홍정형외과');
+  const [defaultCompany, setDefaultCompany] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
