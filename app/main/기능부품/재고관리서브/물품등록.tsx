@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
@@ -56,7 +57,7 @@ export default function ProductRegistration({ user: _user, suppliers: _suppliers
   }, []);
 
   const handleRegisterProduct = async () => {
-    if (!productForm.item_name || !productForm.category) return alert('제품명과 분류를 입력해주세요.');
+    if (!productForm.item_name || !productForm.category) return toast('제품명과 분류를 입력해주세요.', 'warning');
     setLoading(true);
     try {
       // 선택적 필드 처리: 빈 문자열은 null로 변환하여 저장
@@ -84,7 +85,7 @@ export default function ProductRegistration({ user: _user, suppliers: _suppliers
         ['department'],
       );
       if (error) throw error;
-      alert(`${productForm.item_name} 등록이 완료되었습니다.`);
+      toast(`${productForm.item_name} 등록이 완료되었습니다.`, 'success');
       fetchInventory?.();
       // 폼 초기화
       setProductForm({
@@ -109,7 +110,7 @@ export default function ProductRegistration({ user: _user, suppliers: _suppliers
         typeof errObj?.message === 'string'
           ? errObj.message
           : (errObj?.error_description || errObj?.details || '').toString();
-      alert(`등록 실패\n\n${message || '데이터베이스 제약 조건 때문에 저장에 실패했습니다. 필수 항목을 다시 확인해 주세요.'}`);
+      toast(`등록 실패\n\n${message || '데이터베이스 제약 조건 때문에 저장에 실패했습니다. 필수 항목을 다시 확인해 주세요.'}`, 'error');
     } finally {
       setLoading(false);
     }

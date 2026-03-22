@@ -1,3 +1,4 @@
+import { toast } from '@/lib/toast';
 import { useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnsFallback } from '@/lib/supabase-compat';
@@ -33,7 +34,7 @@ export default function InvoiceAutoExtraction({ onRefresh, user }: Record<string
 
     const handleExtract = async () => {
         if (!file) {
-            alert('추출할 명세서/PDF 파일을 먼저 선택해주세요.');
+            toast('추출할 명세서/PDF 파일을 먼저 선택해주세요.', 'warning');
             return;
         }
 
@@ -60,13 +61,13 @@ export default function InvoiceAutoExtraction({ onRefresh, user }: Record<string
                     is_udi: false,
                 }));
                 setExtractedItems(defaultItems);
-                alert('추출이 완료되었습니다. 내용을 확인 후 등록해주세요.');
+                toast('추출이 완료되었습니다. 내용을 확인 후 등록해주세요.', 'success');
             } else {
-                alert('추출된 데이터 형식이 올바르지 않습니다.');
+                toast('추출된 데이터 형식이 올바르지 않습니다.', 'warning');
             }
         } catch (error: unknown) {
             console.error(error);
-            alert(((error as Error)?.message ?? String(error)) || '추출에 실패했습니다. API 키 설정 등을 확인해보세요.');
+            toast(((error as Error)?.message ?? String(error)) || '추출에 실패했습니다. API 키 설정 등을 확인해보세요.', 'error');
         } finally {
             setIsLoading(false);
         }
@@ -121,12 +122,12 @@ export default function InvoiceAutoExtraction({ onRefresh, user }: Record<string
             if (error) throw error;
 
             successCount = payloads.length;
-            alert(`${successCount}개의 품목이 성공적으로 입고(등록)되었습니다.`);
+            toast(`${successCount}개의 품목이 성공적으로 입고(등록)되었습니다.`, 'success');
             clearFile();
             if (onRefresh) (onRefresh as () => void)();
         } catch (err: unknown) {
             console.error('일괄 등록 에러:', err);
-            alert('일부 품목 파싱 중 오류가 발생했거나, DB 등록에 실패했습니다.\n\n' + ((err as Error)?.message ?? String(err)));
+            toast('일부 품목 파싱 중 오류가 발생했거나, DB 등록에 실패했습니다.\n\n' + ((err as Error)?.message ?? String(err)), 'error');
         } finally {
             setIsLoading(false);
         }

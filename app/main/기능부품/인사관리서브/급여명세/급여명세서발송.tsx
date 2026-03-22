@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -67,7 +68,7 @@ export default function PayrollEmailSender({ staffs = [], yearMonth }: Record<st
 
   const handleSendAll = async () => {
     if (!_staffs?.length) {
-      alert('발송 가능한 직원이 없습니다.');
+      toast('발송 가능한 직원이 없습니다.', 'success');
       return;
     }
 
@@ -82,13 +83,13 @@ export default function PayrollEmailSender({ staffs = [], yearMonth }: Record<st
 
     if (error) {
       console.error('payroll email sender fetch failed:', error);
-      alert(`정산 완료 급여명세서를 조회하지 못했습니다: ${error.message}`);
+      toast(`정산 완료 급여명세서를 조회하지 못했습니다: ${error.message}`, 'error');
       return;
     }
 
     const targetRecords = records || [];
     if (targetRecords.length === 0) {
-      alert('해당 월에 정산이 확정된 급여명세서가 없습니다.');
+      toast('해당 월에 정산이 확정된 급여명세서가 없습니다.');
       return;
     }
 
@@ -169,12 +170,10 @@ export default function PayrollEmailSender({ staffs = [], yearMonth }: Record<st
       const fallbackMessage = emailFallback
         ? '\n이메일 큐가 설정되지 않아 사내 알림만 발송했습니다.'
         : '';
-      alert(
-        `급여명세서 발송을 마쳤습니다.\n사내 알림 ${notificationCount}건\n이메일 큐 ${emailCount}건\n실패 ${failureCount}건${fallbackMessage}`
-      );
+      toast(`급여명세서 발송을 마쳤습니다.\n사내 알림 ${notificationCount}건\n이메일 큐 ${emailCount}건\n실패 ${failureCount}건${fallbackMessage}`, 'error');
     } catch (sendError) {
       console.error('payroll email sender failed:', sendError);
-      alert('급여명세서 발송 중 오류가 발생했습니다.');
+      toast('급여명세서 발송 중 오류가 발생했습니다.', 'error');
     } finally {
       setLoading(false);
     }

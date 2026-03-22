@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { jsPDF } from 'jspdf';
@@ -119,11 +120,11 @@ export default function DocumentScanner({ user, staffs, selectedCo = '전체' }:
                 file_url: urlData.publicUrl
             }]);
 
-            alert(`${docType} 업로드가 완료되었습니다.`);
+            toast(`${docType} 업로드가 완료되었습니다.`, 'success');
             fetchDocs();
         } catch (error) {
             console.error(error);
-            alert("업로드 중 오류가 발생했습니다.");
+            toast("업로드 중 오류가 발생했습니다.", 'error');
         } finally {
             setUploadLoading(false);
         }
@@ -250,9 +251,9 @@ export default function DocumentScanner({ user, staffs, selectedCo = '전체' }:
                                         const staffDocs = allDocs.filter(d => d.created_by === s.id);
                                         return joinDate < weekAgo && staffDocs.length < REQUIRED_DOCS.length;
                                     });
-                                    if (lazyStaff.length === 0) return alert("독촉 대상자가 없습니다.");
+                                    if (lazyStaff.length === 0) return toast("독촉 대상자가 없습니다.");
                                     if (confirm(`${lazyStaff.length}명의 미제출자에게 독촉 알림을 발송할까요?`)) {
-                                        alert("독촉 알림이 전송되었습니다.");
+                                        toast("독촉 알림이 전송되었습니다.", 'success');
                                     }
                                 }}
                                 className="px-4 py-2 bg-rose-500 text-white text-[11px] font-bold rounded-lg hover:scale-105 transition-transform shadow-sm flex items-center gap-1"
@@ -343,7 +344,7 @@ function CameraScanner({ doc, onCapture, onClose }: CameraScannerProps) {
                 setIsLoading(false);
             } catch (err) {
                 console.error("Camera access denied:", err);
-                alert("카메라 권한이 필요합니다.");
+                toast("카메라 권한이 필요합니다.", 'warning');
                 onClose();
             }
         }

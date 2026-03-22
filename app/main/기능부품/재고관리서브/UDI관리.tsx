@@ -1,4 +1,5 @@
-﻿'use client';
+'use client';
+import { toast } from '@/lib/toast';
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -21,7 +22,7 @@ export default function UDIManagement({ user, inventory, fetchInventory }: Recor
   };
 
   const generateUDIReport = async () => {
-    if (selectedItems.length === 0) return alert('보고할 품목을 선택해주세요.');
+    if (selectedItems.length === 0) return toast('보고할 품목을 선택해주세요.', 'warning');
     setLoading(true);
     try {
       const reportItems = udiItems.filter((item: any) => selectedItems.includes(item.id));
@@ -52,10 +53,10 @@ export default function UDIManagement({ user, inventory, fetchInventory }: Recor
       link.download = `UDI_공급내역보고_${new Date().toISOString().split('T')[0]}.csv`;
       link.click();
 
-      alert(`UDI 공급내역 보고서가 생성되었습니다.\n대상 품목: ${reportItems.length}개`);
+      toast(`UDI 공급내역 보고서가 생성되었습니다.\n대상 품목: ${reportItems.length}개`);
       setSelectedItems([]);
     } catch (err) {
-      alert('보고서 생성 중 오류가 발생했습니다.');
+      toast('보고서 생성 중 오류가 발생했습니다.', 'error');
     } finally {
       setLoading(false);
     }

@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -213,7 +214,7 @@ export default function AttendanceCorrectionForm({
 
   const handleSubmitCorrection = async () => {
     if (selectedDates.length === 0 || !reason.trim()) {
-      alert('정정할 날짜를 선택하고 사유를 입력해주세요.');
+      toast('정정할 날짜를 선택하고 사유를 입력해주세요.', 'warning');
       return;
     }
 
@@ -242,7 +243,7 @@ export default function AttendanceCorrectionForm({
       );
       if (error) throw error;
 
-      alert('출결 정정 신청이 완료되었습니다.');
+      toast('출결 정정 신청이 완료되었습니다.', 'success');
       setSelectedDates([]);
       setReason('');
       setCorrectionType(DEFAULT_CORRECTION_TYPE);
@@ -251,7 +252,7 @@ export default function AttendanceCorrectionForm({
       fetchProblemDates();
     } catch (error) {
       console.error('출결 정정 신청 실패:', error);
-      alert('출결 정정 신청 중 오류가 발생했습니다.');
+      toast('출결 정정 신청 중 오류가 발생했습니다.', 'error');
     } finally {
       setLoading(false);
     }
@@ -313,7 +314,7 @@ export default function AttendanceCorrectionForm({
     );
 
     if (error) {
-      alert('처리 중 오류가 발생했습니다.');
+      toast('처리 중 오류가 발생했습니다.', 'error');
       return;
     }
 
@@ -325,7 +326,7 @@ export default function AttendanceCorrectionForm({
       );
     }
 
-    alert(newStatus === '승인' ? '승인되었으며 근태에 반영되었습니다.' : '처리되었습니다.');
+    toast(newStatus === '승인' ? '승인되었으며 근태에 반영되었습니다.' : '처리되었습니다.', 'success');
     fetchCorrections();
     fetchProblemDates();
   };

@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import type { StaffMember } from '@/types';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -449,7 +450,7 @@ export default function PayrollAdvancedCenter({
       await addApprovalLog(step === 'step1' ? '1차 승인 업데이트' : '2차 승인 업데이트', comment || status);
     } catch (error) {
       console.error('급여 승인 상태 저장 실패:', error);
-      alert('급여 승인 상태 저장에 실패했습니다.');
+      toast('급여 승인 상태 저장에 실패했습니다.', 'error');
     } finally {
       setSavingKey(null);
     }
@@ -466,7 +467,7 @@ export default function PayrollAdvancedCenter({
       setCalendarItems((prev) => prev.map((item) => (item.id === id ? { ...item, status: nextStatus } : item)));
     } catch (error) {
       console.error('급여 캘린더 상태 저장 실패:', error);
-      alert('급여 캘린더 상태 저장에 실패했습니다.');
+      toast('급여 캘린더 상태 저장에 실패했습니다.', 'error');
     } finally {
       setSavingKey(null);
     }
@@ -492,7 +493,7 @@ export default function PayrollAdvancedCenter({
       setBonusForm({ staffId: '', category: '상여', amount: 0, note: '' });
     } catch (error) {
       console.error('상여/인센티브 저장 실패:', error);
-      alert('상여/인센티브 저장에 실패했습니다.');
+      toast('상여/인센티브 저장에 실패했습니다.', 'error');
     } finally {
       setSavingKey(null);
     }
@@ -519,7 +520,7 @@ export default function PayrollAdvancedCenter({
       if (data) setRetroItems((prev) => [mapRetroRow(data), ...prev]);
     } catch (error) {
       console.error('소급 급여 저장 실패:', error);
-      alert('소급 급여 저장에 실패했습니다.');
+      toast('소급 급여 저장에 실패했습니다.', 'error');
     } finally {
       setSavingKey(null);
     }
@@ -546,7 +547,7 @@ export default function PayrollAdvancedCenter({
       setDeductionForm({ staffId: '', type: '가압류', monthlyAmount: 0, balance: 0, note: '' });
     } catch (error) {
       console.error('가압류/상계 저장 실패:', error);
-      alert('가압류/상계 저장에 실패했습니다.');
+      toast('가압류/상계 저장에 실패했습니다.', 'error');
     } finally {
       setSavingKey(null);
     }
@@ -575,7 +576,7 @@ export default function PayrollAdvancedCenter({
       setFreelancerForm({ vendorName: '', workType: '', paymentDate: `${yearMonth}-10`, supplyAmount: 0, taxRate: 3.3 });
     } catch (error) {
       console.error('프리랜서 지급 저장 실패:', error);
-      alert('프리랜서 지급 저장에 실패했습니다.');
+      toast('프리랜서 지급 저장에 실패했습니다.', 'error');
     } finally {
       setSavingKey(null);
     }

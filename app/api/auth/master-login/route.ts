@@ -1,4 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
+
+// 인스턴스 내 IP별 로그인 시도 횟수 추적 (서버리스 환경에서 인스턴스 재시작 시 초기화됨)
+const loginAttempts = new Map<string, { count: number; resetAt: number }>();
+const MAX_ATTEMPTS = 10;
+const WINDOW_MS = 15 * 60 * 1000; // 15분
+
+function checkRateLimit(ip: string): { allowed: boolean } {
+  const now = Date.now();
+  const entry = loginAttempts.get(ip);
+  if (!entry || now > entry.resetAt) {
+    loginAttempts.set(ip, { count: 1, resetAt: now + WINDOW_MS });
+    return { allowed: true };
+  }
+  if (entry.count >= MAX_ATTEMPTS) {
+    return { allowed: false };
+  }
+  entry.count++;
+  return { allowed: true };
+}
+
+function recordFailedAttempt(ip: string) {
+  const now = Date.now();
+  const entry = loginAttempts.get(ip);
+  if (!entry || now > entry.resetAt) {
+    loginAttempts.set(ip, { count: 1, resetAt: now + WINDOW_MS });
+  } else {
+    entry.count++;
+  }
+}
 import { createClient } from '@supabase/supabase-js';
 import { getAdminCredentialConfig, getRuntimeEnv, verifyPrivilegedLogin } from '@/lib/admin-credentials';
 import { createSupabaseAccessToken } from '@/lib/server-supabase-bridge';
@@ -50,6 +79,11 @@ function failureResponse(error?: string, status = 200) {
 }
 
 export async function POST(request: NextRequest) {
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+  if (!checkRateLimit(ip)) {
+    return failureResponse('로그인 시도 횟수를 초과했습니다. 15분 후 다시 시도해주세요.', 429);
+  }
+
   let loginId = '';
   let password = '';
 
@@ -247,6 +281,7 @@ export async function POST(request: NextRequest) {
           });
         }
 
+        recordFailedAttempt(ip);
         return failureResponse('비밀번호가 일치하지 않습니다.');
       }
 
@@ -257,7 +292,6 @@ export async function POST(request: NextRequest) {
 
     return successResponse(userRow, notice);
   } catch (error) {
-    console.error('[auth] login error', error);
     return failureResponse('시스템 접속 중 오류가 발생했습니다.', 500);
   }
 }

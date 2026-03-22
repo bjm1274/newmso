@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -181,18 +182,18 @@ export default function DischargeReviewPage({ user }: { user: any }) {
     };
 
     const handleSaveTemplate = () => {
-        if (!editTmplTitle.trim()) { alert('항목 제목을 입력하세요.'); return; }
-        if (!editTmplData.trim()) { alert('차트 데이터를 붙여넣기 하세요.'); return; }
+        if (!editTmplTitle.trim()) { toast('항목 제목을 입력하세요.', 'warning'); return; }
+        if (!editTmplData.trim()) { toast('차트 데이터를 붙여넣기 하세요.'); return; }
         saveTemplate({ id: editTmplId!, title: editTmplTitle.trim(), data: editTmplData });
         setEditTmplId(null); setEditTmplTitle(''); setEditTmplData('');
     };
 
     // 새 심사 생성
     const createReview = async () => {
-        if (!patientName.trim()) { alert('환자명을 입력하세요.'); return; }
-        if (!department.trim()) { alert('진료과를 입력하세요.'); return; }
-        if (!admissionDate) { alert('입원일을 입력하세요.'); return; }
-        if (parsedNewChart.length === 0) { alert('차트 데이터를 붙여넣기 하세요.'); return; }
+        if (!patientName.trim()) { toast('환자명을 입력하세요.', 'warning'); return; }
+        if (!department.trim()) { toast('진료과를 입력하세요.', 'warning'); return; }
+        if (!admissionDate) { toast('입원일을 입력하세요.', 'warning'); return; }
+        if (parsedNewChart.length === 0) { toast('차트 데이터를 붙여넣기 하세요.'); return; }
 
         const items = chartLinesToCheckItems(parsedNewChart);
         const diagnosisLabel = selectedTemplate?.title || '';
@@ -269,7 +270,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
         if (!selectedReview) return;
         // 심사에 저장된 template_id 사용하거나 목록에서 선택
         const tmpl = templates.find(t => t.id === selectedReview.template_id) || templates[0];
-        if (!tmpl) { alert('기본 항목 설정이 필요합니다.'); return; }
+        if (!tmpl) { toast('기본 항목 설정이 필요합니다.', 'warning'); return; }
         runAutoCompare(selectedReview, tmpl);
     };
 
@@ -360,7 +361,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
             setIsEditing(false);
         } catch (err) {
             console.error(err);
-            alert('수정 중 오류가 발생했습니다.');
+            toast('수정 중 오류가 발생했습니다.', 'error');
         }
     };
 

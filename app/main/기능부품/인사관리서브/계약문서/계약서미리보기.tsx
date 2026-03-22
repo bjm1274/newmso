@@ -1,5 +1,5 @@
-﻿'use client';
-import React, { useEffect, useState } from 'react';
+'use client';
+﻿import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
 type Props = {
@@ -154,18 +154,44 @@ export default function ContractPreview({ staff, contract }: Props) {
       childcare_allowance: formatWon(salarySource.childcare_allowance),
       research_allowance: formatWon(salarySource.research_allowance),
       other_taxfree: formatWon(salarySource.other_taxfree),
-      shift_start: shift?.start_time ? String(shift.start_time).slice(0, 5) : '',
-      shift_end: shift?.end_time ? String(shift.end_time).slice(0, 5) : '',
-      break_start: shift?.break_start_time ? String(shift.break_start_time).slice(0, 5) : '',
-      break_end: shift?.break_end_time ? String(shift.break_end_time).slice(0, 5) : '',
-      probation_months: String(contract?.probation_months || '3'),
+      shift_name: shift?.name || '',
+      shift_start: shift?.start_time ? String(shift.start_time).slice(0, 5) : (contract?.shift_start_time || '').slice(0, 5),
+      shift_end: shift?.end_time ? String(shift.end_time).slice(0, 5) : (contract?.shift_end_time || '').slice(0, 5),
+      break_start: shift?.break_start_time ? String(shift.break_start_time).slice(0, 5) : (contract?.break_start_time || '').slice(0, 5),
+      break_end: shift?.break_end_time ? String(shift.break_end_time).slice(0, 5) : (contract?.break_end_time || '').slice(0, 5),
+      working_hours_per_week: String(salarySource.working_hours_per_week || user?.working_hours_per_week || 40),
+      working_days_per_week: String(salarySource.working_days_per_week || user?.working_days_per_week || 5),
+      contract_type: user?.employment_type || salarySource.contract_type || user?.고용형태 || '정규직',
+      probation_months: String(contract?.probation_months ?? user?.probation_months ?? '3'),
       probation_percent: String(contract?.probation_percent || '90'),
       payment_day: String(contract?.payment_day || '7'),
       contract_start: formatDate(contract?.contract_start_date || user?.joined_at || salarySource?.join_date),
       contract_end: contract?.contract_end_date ? formatDate(contract.contract_end_date) : '정년도달시',
       conditions_applied_at: formatDate(contract?.conditions_applied_at || salarySource?.effective_date),
+      resident_no: user?.resident_no ? user.resident_no.replace(/(\d{6})-?(\d{7})/, '$1-$2') : '',
       today: formatDate(new Date().toISOString()),
     };
+
+    // 임금 합계 변수는 renderSalaryTable과 동일 로직으로 계산
+    const salaryItems = [
+      Number(salarySource.base_salary || 0),
+      Number(salarySource.position_allowance || user?.position_allowance || 0),
+      Number(salarySource.meal_allowance || user?.meal_allowance || 0),
+      Number(salarySource.vehicle_allowance || user?.vehicle_allowance || 0),
+      Number(salarySource.childcare_allowance || user?.childcare_allowance || 0),
+      Number(salarySource.research_allowance || user?.research_allowance || 0),
+      Number(salarySource.other_taxfree || user?.other_taxfree || 0),
+    ];
+    const totalMonthlyWage = salaryItems.reduce((s, n) => s + n, 0);
+    // 과세 항목: 기본급 + 직책수당 (index 0, 1) — renderSalaryTable과 동일 기준
+    const taxableTotal = salaryItems[0] + salaryItems[1];
+    const wph = Number(salarySource.working_hours_per_week || user?.working_hours_per_week || 40);
+    const mwh = Math.round((wph * 52) / 12);
+    const hwage = mwh > 0 ? Math.round(taxableTotal / mwh) : 0; // 과세합계 기준 통상임금 시급
+    vars.total_monthly = formatWon(totalMonthlyWage);
+    vars.annual_salary = formatWon(totalMonthlyWage * 12);
+    vars.hourly_wage = formatWon(hwage);
+    vars.monthly_work_hours = String(mwh);
 
     let result = template;
 
@@ -239,7 +265,9 @@ export default function ContractPreview({ staff, contract }: Props) {
     const totalMonthly = items.reduce((sum, i) => sum + i.amount, 0);
     const taxableTotal = items.filter(i => i.taxable).reduce((sum, i) => sum + i.amount, 0);
     const taxFreeTotal = items.filter(i => !i.taxable).reduce((sum, i) => sum + i.amount, 0);
-    const hourlyWage = Math.round(taxableTotal / 209);
+    const wph = Number(src.working_hours_per_week || staff?.working_hours_per_week || 40);
+    const monthlyWorkHours = Math.round((wph * 52) / 12);
+    const hourlyWage = monthlyWorkHours > 0 ? Math.round(taxableTotal / monthlyWorkHours) : 0;
 
     return (
       <div className="mt-4 mb-2 bg-[var(--tab-bg)]/80 border border-[var(--border)] rounded-xl p-4">
@@ -275,7 +303,7 @@ export default function ContractPreview({ staff, contract }: Props) {
         <div className="grid grid-cols-12 gap-1 mt-1">
           <span className="col-span-4 text-[10px] font-bold text-[var(--toss-gray-4)]">시급 환산 (통상임금)</span>
           <span className="col-span-3 text-[11px] font-black text-emerald-700 text-right">{hourlyWage.toLocaleString()}</span>
-          <span className="col-span-5 text-[10px] text-[var(--toss-gray-3)] text-right">= 과세합계 ÷ 209시간</span>
+          <span className="col-span-5 text-[10px] text-[var(--toss-gray-3)] text-right">= 과세합계 ÷ {monthlyWorkHours}시간 (주{wph}h 기준)</span>
         </div>
       </div>
     );
@@ -366,175 +394,215 @@ export default function ContractPreview({ staff, contract }: Props) {
   const sig = contract?.status === '서명완료' ? (contract?.signature_data as string | undefined) : undefined;
   const sections = parseContractSections(text);
 
+  const companyName = (company?.name as string) || staff.company || '';
+  const isHospital = companyName.match(/병원|의원|정형외과|내과|소아과|치과/);
+  const ceoTitle = isHospital ? '대표원장' : '대표이사';
+
   return (
-    <div className="bg-[var(--muted)] md:p-4 flex flex-col h-[900px] overflow-y-auto rounded-2xl border border-[var(--border)] relative custom-scrollbar print:bg-white print:p-0 print:border-none print:h-auto print:overflow-visible">
-      <div className="flex items-center justify-between px-4 py-4 mb-4 bg-white/50 backdrop-blur-md border-b border-[var(--border)] sticky top-0 z-20 print:hidden">
-        <div>
-          <h1 className="text-sm font-bold text-[var(--foreground)] mt-0.5">{staff.name} 근로계약서</h1>
-        </div>
+    <div className="flex flex-col h-[900px] overflow-y-auto rounded-2xl border border-[var(--border)] relative custom-scrollbar bg-slate-100 print:bg-white print:border-none print:h-auto print:overflow-visible">
+      {/* 상단 툴바 */}
+      <div className="sticky top-0 z-20 flex items-center justify-between px-5 py-3 bg-white/80 backdrop-blur-md border-b border-slate-200 print:hidden">
         <div className="flex items-center gap-3">
+          <div className="w-2 h-2 rounded-full bg-blue-500" />
+          <span className="text-[13px] font-bold text-slate-800">{staff.name}</span>
+          <span className="text-[11px] text-slate-400">근로계약서</span>
+        </div>
+        <div className="flex items-center gap-2">
           {contract?.status && (
-            <span className={`px-3 py-1 text-[11px] font-bold rounded-full border ${contract.status === '서명완료'
-              ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
-              : 'bg-orange-50 text-orange-600 border-orange-100'
-              }`}>
+            <span className={`px-2.5 py-1 text-[10px] font-black rounded-full ${
+              contract.status === '서명완료'
+                ? 'bg-emerald-100 text-emerald-700'
+                : 'bg-amber-100 text-amber-700'
+            }`}>
               {contract.status}
             </span>
           )}
-          <button onClick={() => window.print()} className="p-2 rounded-xl bg-white border border-[var(--border)] hover:bg-[var(--muted)] transition-colors">
-            <span className="text-sm">🖨️</span>
+          <button
+            onClick={() => window.print()}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+          >
+            <span>🖨️</span> 인쇄
           </button>
         </div>
       </div>
 
-      <div className="flex-1 p-4 md:p-5 flex justify-center">
-        <div className="w-full max-w-[720px] bg-white shadow-sm rounded-sm border border-[var(--border)] min-h-[960px] flex flex-col p-[40px] md:p-[60px] relative overflow-hidden print:shadow-none print:border-none print:p-0">
-          {/* Watermark */}
-          <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-[0.02] select-none">
-            <span className="text-[120px] font-black rotate-[-45deg] text-black">CONFIDENTIAL</span>
-          </div>
-
+      {/* A4 용지 */}
+      <div className="flex-1 p-6 flex justify-center">
+        <div className="w-full max-w-[700px] bg-white shadow-[0_4px_24px_rgba(0,0,0,0.10)] min-h-[980px] flex flex-col print:shadow-none print:max-w-full">
           {loading ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-[var(--toss-gray-3)] gap-3">
-              <div className="w-8 h-8 border-4 border-[var(--accent)] border-t-transparent rounded-full animate-spin"></div>
-              <p className="text-xs font-bold">계약서 데이터를 구성 중입니다...</p>
+            <div className="flex-1 flex flex-col items-center justify-center gap-3 text-slate-400">
+              <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              <p className="text-xs font-bold">계약서 구성 중...</p>
             </div>
           ) : (
-            <div className="relative z-10 w-full">
-              {/* 계약서 제목 */}
-              <h1 className="text-[26px] font-black text-center mb-14 tracking-[0.2em] text-[var(--foreground)]" style={{ fontFamily: 'serif' }}>
-                근 로 계 약 서
-              </h1>
+            <div className="flex flex-col flex-1 px-[52px] py-[48px]">
 
-              {/* 상단 정보 테이블: 사용자 / 근로자 */}
-              <div className="grid grid-cols-2 gap-3 mb-10">
-                {/* 사용자(회사) 정보 */}
-                <div className="w-full">
-                  <h3 className="text-[11px] font-black text-[var(--foreground)] border-b-2 border-slate-800 pb-1 mb-0">「사용자」</h3>
-                  <div className="grid grid-cols-12 border-l border-[var(--border)] text-[10.5px]">
-                    <div className="col-span-4 bg-[var(--tab-bg)] border-r border-b border-[var(--border)] p-2 font-bold text-center text-[var(--toss-gray-4)]">회사명</div>
-                    <div className="col-span-8 border-r border-b border-[var(--border)] p-2 font-black text-[var(--foreground)]">{(company?.name as string) || staff.company}</div>
+              {/* ── 계약서 제목 ── */}
+              <div className="text-center mb-10">
+                <div className="inline-flex flex-col items-center gap-2">
+                  <p className="text-[11px] font-semibold text-slate-400 tracking-[0.3em] uppercase">Employment Agreement</p>
+                  <h1 className="text-[28px] font-black tracking-[0.35em] text-slate-900" style={{ fontFamily: 'Georgia, "Noto Serif KR", serif' }}>
+                    근 로 계 약 서
+                  </h1>
+                  <div className="flex items-center gap-2 mt-1">
+                    <div className="w-16 h-px bg-slate-800" />
+                    <div className="w-2 h-2 rotate-45 bg-slate-800" />
+                    <div className="w-16 h-px bg-slate-800" />
+                  </div>
+                </div>
+              </div>
 
-                    <div className="col-span-4 bg-[var(--tab-bg)] border-r border-b border-[var(--border)] p-2 font-bold text-center text-[var(--toss-gray-4)]">사업자번호</div>
-                    <div className="col-span-8 border-r border-b border-[var(--border)] p-2 font-semibold text-[var(--toss-gray-5)]">{(company?.business_no as string) || '-'}</div>
-
-                    <div className="col-span-4 bg-[var(--tab-bg)] border-r border-b border-[var(--border)] p-2 font-bold text-center text-[var(--toss-gray-4)]">주소</div>
-                    <div className="col-span-8 border-r border-b border-[var(--border)] p-2 font-semibold text-[var(--toss-gray-5)] leading-tight">{(company?.address as string) || '-'}</div>
-
-                    <div className="col-span-4 bg-[var(--tab-bg)] border-r border-b border-[var(--border)] p-2 font-bold text-center text-[var(--toss-gray-4)]">연락처</div>
-                    <div className="col-span-8 border-r border-b border-[var(--border)] p-2 font-semibold text-[var(--toss-gray-5)]">{(company?.phone as string) || '-'}</div>
+              {/* ── 당사자 정보 표 ── */}
+              <div className="grid grid-cols-2 gap-4 mb-8">
+                {/* 사용자 */}
+                <div className="rounded-xl overflow-hidden border border-slate-200">
+                  <div className="px-3 py-2 bg-slate-800 text-white">
+                    <span className="text-[10px] font-black tracking-widest uppercase">사 용 자</span>
+                  </div>
+                  <div className="divide-y divide-slate-100">
+                    {[
+                      { label: '상 호', value: companyName },
+                      { label: '사업자번호', value: (company?.business_no as string) || '-' },
+                      { label: '소 재 지', value: (company?.address as string) || '-' },
+                      { label: '연 락 처', value: (company?.phone as string) || '-' },
+                      { label: '대 표 자', value: (company?.ceo_name as string) || '-' },
+                    ].map(({ label, value }) => (
+                      <div key={label} className="flex text-[10.5px]">
+                        <span className="w-[72px] shrink-0 px-3 py-2 bg-slate-50 text-slate-500 font-bold">{label}</span>
+                        <span className="flex-1 px-3 py-2 text-slate-800 font-semibold leading-snug">{value}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
-                {/* 근로자 정보 */}
-                <div className="w-full">
-                  <h3 className="text-[11px] font-black text-[var(--foreground)] border-b-2 border-slate-800 pb-1 mb-0">「근로자」</h3>
-                  <div className="grid grid-cols-12 border-l border-[var(--border)] text-[10.5px]">
-                    <div className="col-span-4 bg-[var(--tab-bg)] border-r border-b border-[var(--border)] p-2 font-bold text-center text-[var(--toss-gray-4)]">성명</div>
-                    <div className="col-span-8 border-r border-b border-[var(--border)] p-2 font-black text-[var(--foreground)]">{staff.name}</div>
-
-                    <div className="col-span-4 bg-[var(--tab-bg)] border-r border-b border-[var(--border)] p-2 font-bold text-center text-[var(--toss-gray-4)]">생년월일</div>
-                    <div className="col-span-8 border-r border-b border-[var(--border)] p-2 font-semibold text-[var(--toss-gray-5)]">{staff.resident_no ? staff.resident_no.slice(0, 6) : '-'}</div>
-
-                    <div className="col-span-4 bg-[var(--tab-bg)] border-r border-b border-[var(--border)] p-2 font-bold text-center text-[var(--toss-gray-4)]">주소</div>
-                    <div className="col-span-8 border-r border-b border-[var(--border)] p-2 font-semibold text-[var(--toss-gray-5)] leading-tight">{staff.address || '-'}</div>
-
-                    <div className="col-span-4 bg-[var(--tab-bg)] border-r border-b border-[var(--border)] p-2 font-bold text-center text-[var(--toss-gray-4)]">연락처</div>
-                    <div className="col-span-8 border-r border-b border-[var(--border)] p-2 font-semibold text-[var(--toss-gray-5)]">{staff.phone || '-'}</div>
+                {/* 근로자 */}
+                <div className="rounded-xl overflow-hidden border border-slate-200">
+                  <div className="px-3 py-2 bg-blue-600 text-white">
+                    <span className="text-[10px] font-black tracking-widest uppercase">근 로 자</span>
+                  </div>
+                  <div className="divide-y divide-slate-100">
+                    {[
+                      { label: '성 명', value: staff.name },
+                      { label: '생년월일', value: staff.resident_no ? staff.resident_no.slice(0, 6) : '-' },
+                      { label: '주 소', value: staff.address || '-' },
+                      { label: '연 락 처', value: staff.phone || '-' },
+                      { label: '부서/직위', value: [staff.department, staff.position].filter(Boolean).join(' · ') || '-' },
+                    ].map(({ label, value }) => (
+                      <div key={label} className="flex text-[10.5px]">
+                        <span className="w-[72px] shrink-0 px-3 py-2 bg-blue-50 text-blue-700 font-bold">{label}</span>
+                        <span className="flex-1 px-3 py-2 text-slate-800 font-semibold leading-snug">{value}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
 
               {/* 구분선 */}
-              <div className="border-t-2 border-slate-800 mb-4" />
+              <div className="flex items-center gap-3 mb-7">
+                <div className="flex-1 h-px bg-slate-200" />
+                <div className="text-[10px] font-black text-slate-400 tracking-widest uppercase">Terms &amp; Conditions</div>
+                <div className="flex-1 h-px bg-slate-200" />
+              </div>
 
-              {/* 계약 조항 섹션들 */}
-              <div className="space-y-4">
+              {/* ── 계약 조항 ── */}
+              <div className="space-y-5">
                 {sections.length > 0 ? sections.map((section, idx) => (
-                  <div key={idx}>
-                    <h4 className="text-[13px] font-black text-[var(--foreground)] mb-2 flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 bg-blue-600 rounded-full shrink-0" />
-                      {section.title}
-                    </h4>
-                    <div className="pl-4 border-l-2 border-[var(--border-subtle)]">
+                  <div key={idx} className="group">
+                    {/* 조 제목 */}
+                    <div className="flex items-center gap-2.5 mb-2.5">
+                      <span className="shrink-0 w-5 h-5 rounded-full bg-slate-800 text-white text-[9px] font-black flex items-center justify-center">{idx + 1}</span>
+                      <h4 className="text-[12.5px] font-black text-slate-800">{section.title}</h4>
+                    </div>
+                    {/* 조 내용 */}
+                    <div className="ml-[30px] space-y-0.5">
                       {renderSectionBody(section.body)}
                     </div>
                   </div>
                 )) : (
-                  <p className="text-[13px] text-[var(--toss-gray-4)]">설정된 계약서 본문이 없습니다.</p>
+                  <div className="py-16 text-center">
+                    <p className="text-[13px] text-slate-400">계약서 양식이 설정되지 않았습니다.</p>
+                    <p className="text-[11px] text-slate-300 mt-1">"양식 편집" 탭에서 내용을 작성하세요.</p>
+                  </div>
                 )}
               </div>
 
-              {/* 동의 문구 */}
-              <div className="mt-10 py-4 text-center">
-                <p className="text-[12px] font-bold text-[var(--toss-gray-4)] leading-relaxed">
-                  「상기 내용을 충분히 이해하고 이에 동의하여 근로계약을 체결한다.」
+              {/* ── 동의 문구 ── */}
+              <div className="mt-12 mb-8">
+                <div className="border border-slate-200 rounded-xl px-6 py-4 bg-slate-50 text-center">
+                  <p className="text-[11.5px] font-bold text-slate-600 leading-relaxed">
+                    상기 근로계약의 내용을 충분히 이해하고 이에 동의하여 본 계약을 체결합니다.
+                  </p>
+                </div>
+              </div>
+
+              {/* ── 날짜 ── */}
+              <div className="text-center mb-8">
+                <p className="text-[13px] font-bold tracking-[0.25em] text-slate-700">
+                  {contract?.requested_at
+                    ? `${new Date(contract.requested_at as string).getFullYear()}년 ${String(new Date(contract.requested_at as string).getMonth() + 1).padStart(2, '0')}월 ${String(new Date(contract.requested_at as string).getDate()).padStart(2, '0')}일`
+                    : `${new Date().getFullYear()}년 ${String(new Date().getMonth() + 1).padStart(2, '0')}월 ${String(new Date().getDate()).padStart(2, '0')}일`
+                  }
                 </p>
               </div>
 
-              {/* 하단 서명란 */}
-              <div className="mt-12 pt-8 border-t border-dotted border-[var(--border)] flex flex-col items-center">
-                <div className="mb-10">
-                  <p className="text-[14px] font-bold tracking-[0.3em] text-[var(--foreground)]">
-                    {new Date().getFullYear()}년 {String(new Date().getMonth() + 1).padStart(2, '0')}월 {String(new Date().getDate()).padStart(2, '0')}일
-                  </p>
-                </div>
-
-                <div className="w-full flex justify-between items-start mt-4">
-                  {/* 사업주 (사용자) */}
-                  <div className="flex flex-col gap-3 w-1/2">
-                    <span className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">「사용자」</span>
-                    <div className="space-y-1">
-                      <p className="font-bold text-[13px] text-[var(--foreground)]">{(company?.name as string) || staff.company}</p>
-                      <div className="relative inline-block w-fit">
-                        {(() => {
-                          const isHosp = ((company?.name as string) || staff.company || '').match(/병원|의원|정형외과|내과|소아과|치과/);
-                          const title = isHosp ? '대표원장' : '대표이사';
-                          return <p className="font-bold text-[13px] text-[var(--foreground)]">{title} {(company?.ceo_name as string) || '(인)'}</p>;
-                        })()}
-                        {company?.seal_url ? (
-                          <img
-                            src={company.seal_url as string}
-                            className="absolute -top-6 -right-12 w-16 h-16 object-contain opacity-90 select-none pointer-events-none"
-                            style={{ mixBlendMode: 'multiply' }}
-                            alt="직인"
-                          />
-                        ) : (
-                          <div className="absolute -top-4 -right-10 w-12 h-12 border-2 border-red-500/40 rounded-full flex items-center justify-center rotate-12 opacity-50">
-                            <span className="text-[10px] text-red-500/60 font-bold">인</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
+              {/* ── 서명란 ── */}
+              <div className="grid grid-cols-2 gap-6 mt-2">
+                {/* 사용자 서명 */}
+                <div className="rounded-xl border border-slate-200 overflow-hidden">
+                  <div className="px-4 py-2 bg-slate-800 text-white text-center">
+                    <span className="text-[10px] font-black tracking-[0.2em]">사 용 자</span>
                   </div>
-
-                  <div className="flex flex-col gap-3 w-1/2 items-end">
-                    <span className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest">「근로자」</span>
-                    <div className="space-y-1 text-right">
-                      <div className="flex items-center gap-3 justify-end relative h-10">
-                        {sig ? (
-                          <>
-                            <p className="font-bold text-[13px] text-[var(--foreground)]">{staff.name} (인)</p>
-                            {sig.startsWith('data:image') ? (
-                              <img src={sig} alt="signature" className="absolute -top-8 -right-8 h-20 w-auto object-contain mix-blend-multiply" />
-                            ) : (
-                              <span className="absolute -top-4 -right-4 px-4 py-2 border border-black font-bold rotate-[-2deg] bg-white/50">{sig}</span>
-                            )}
-                          </>
-                        ) : (
-                          <>
-                            <p className="font-bold text-[13px] text-[var(--foreground)]">{staff.name} (서명)</p>
-                            <div className="absolute -top-2 -right-4 w-24 h-10 border border-dashed border-[var(--border)] flex items-center justify-center text-[9px] text-[var(--toss-gray-3)] bg-[var(--tab-bg)]/30 rounded-lg">서명 대기</div>
-                          </>
-                        )}
+                  <div className="p-4 space-y-1.5 relative min-h-[96px]">
+                    <p className="text-[11px] font-bold text-slate-700">{companyName}</p>
+                    <p className="text-[11px] text-slate-600">{ceoTitle} &nbsp;
+                      <span className="font-bold">{(company?.ceo_name as string) || '　　　　'}</span>
+                    </p>
+                    {company?.seal_url ? (
+                      <img
+                        src={company.seal_url as string}
+                        className="absolute bottom-2 right-3 w-14 h-14 object-contain opacity-90 select-none pointer-events-none"
+                        style={{ mixBlendMode: 'multiply' }}
+                        alt="직인"
+                      />
+                    ) : (
+                      <div className="absolute bottom-2 right-3 w-12 h-12 border-2 border-red-400/50 rounded-full flex items-center justify-center rotate-[-8deg] opacity-40">
+                        <span className="text-[11px] text-red-500 font-black">인</span>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
 
-                <div className="mt-16 text-[9px] text-[var(--toss-gray-3)] text-center w-full border-t border-[var(--border-subtle)] pt-3 print:hidden">
-                  본 문서는 SY INC. 인사관리 시스템을 통해 체결된 전자문서입니다.
+                {/* 근로자 서명 */}
+                <div className="rounded-xl border border-blue-200 overflow-hidden">
+                  <div className="px-4 py-2 bg-blue-600 text-white text-center">
+                    <span className="text-[10px] font-black tracking-[0.2em]">근 로 자</span>
+                  </div>
+                  <div className="p-4 space-y-1.5 relative min-h-[96px]">
+                    <p className="text-[11px] font-bold text-slate-700">{staff.name}</p>
+                    <p className="text-[11px] text-slate-500">서명 &nbsp;
+                      {sig ? (
+                        sig.startsWith('data:image') ? (
+                          <img src={sig} alt="서명" className="inline-block h-8 w-auto object-contain mix-blend-multiply" />
+                        ) : (
+                          <span className="font-bold border-b border-slate-400 pb-px">{sig}</span>
+                        )
+                      ) : (
+                        <span className="text-blue-400 font-bold">서명 대기중</span>
+                      )}
+                    </p>
+                    {!sig && (
+                      <div className="absolute bottom-2 right-3 w-14 h-7 border border-dashed border-blue-300 rounded flex items-center justify-center">
+                        <span className="text-[9px] text-blue-300 font-bold">SIGN</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
+              </div>
+
+              {/* 하단 여백 + 문서 식별 */}
+              <div className="mt-8 pt-4 border-t border-slate-100 flex items-center justify-between print:hidden">
+                <span className="text-[9px] text-slate-300 font-medium">본 문서는 전자인사관리 시스템을 통해 작성된 전자계약서입니다.</span>
+                {contract?.id && <span className="text-[9px] text-slate-300 font-mono">ID: {contract.id}</span>}
               </div>
             </div>
           )}

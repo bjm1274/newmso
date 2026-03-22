@@ -45,7 +45,7 @@ export default function TaxFileGenerator({ staffs, selectedCo }: { staffs: any[]
                     <label className="text-[10px] font-bold text-[var(--toss-gray-4)] uppercase tracking-wider mb-1.5 block">귀속 연월</label>
                     <div className="flex gap-2">
                         <select value={selectedYear} onChange={e => setSelectedYear(e.target.value)} className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] px-3 py-2 text-xs font-bold outline-none w-1/2">
-                            {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}년</option>)}
+                            {Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - 1 + i).map(y => <option key={y} value={y}>{y}년</option>)}
                         </select>
                         <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] px-3 py-2 text-xs font-bold outline-none w-1/2">
                             {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map(m => <option key={m} value={m}>{m}월</option>)}

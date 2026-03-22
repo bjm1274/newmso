@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import SmartDatePicker from '../공통/SmartDatePicker';
@@ -21,7 +22,7 @@ export default function OffboardingView({ staffs, selectedCo = '전체', onRefre
     );
 
     const handleStartOffboarding = async () => {
-        if (!selectedStaff || !exitDate) return alert('대상자와 퇴사 예정일을 선택해주세요.');
+        if (!selectedStaff || !exitDate) return toast('대상자와 퇴사 예정일을 선택해주세요.', 'warning');
         const staff = _staffs.find((s: any) => s.id === selectedStaff);
         if (!staff) return;
 
@@ -34,13 +35,13 @@ export default function OffboardingView({ staffs, selectedCo = '전체', onRefre
 
             // 2. Offboarding checklist tracking (create a new record in a custom table if exists, else we simulate it)
             // For this UI, we can just visually update or rely on '퇴사예정' status
-            alert(`${staff.name} 오프보딩 파이프라인이 생성되었습니다.`);
+            toast(`${staff.name} 오프보딩 파이프라인이 생성되었습니다.`);
             _onRefresh();
             setSelectedStaff('');
             setExitDate('');
         } catch (e) {
             console.error(e);
-            alert('처리 중 오류가 발생했습니다.');
+            toast('처리 중 오류가 발생했습니다.', 'error');
         } finally {
             setLoading(false);
         }
@@ -59,7 +60,7 @@ export default function OffboardingView({ staffs, selectedCo = '전체', onRefre
         if (!confirm(`${name} 님의 모든 체크리스트가 완료되었습니다.\n최종 퇴사 처리하시겠습니까?`)) return;
         try {
             await supabase.from('staff_members').update({ status: '퇴사' }).eq('id', id);
-            alert('최종 퇴사 처리 되었습니다.');
+            toast('최종 퇴사 처리 되었습니다.', 'success');
             _onRefresh();
         } catch (e) {
             console.error(e);

@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import type { StaffMember } from '@/types';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -137,7 +138,7 @@ export default function LicenseTracking({ staffs, selectedCo }: Record<string, u
 
   const handleCsvDownload = () => {
     if (filtered.length === 0) {
-      alert('다운로드할 자격면허 데이터가 없습니다.');
+      toast('다운로드할 자격면허 데이터가 없습니다.');
       return;
     }
 
@@ -172,7 +173,7 @@ export default function LicenseTracking({ staffs, selectedCo }: Record<string, u
 
   const handleOpenCopy = (item: LicenseItem) => {
     if (!item.copyUrl) {
-      alert('등록된 사본 파일이 없습니다. 면허·자격증 관리 화면에서 사본 링크를 등록해 주세요.');
+      toast('등록된 사본 파일이 없습니다. 면허·자격증 관리 화면에서 사본 링크를 등록해 주세요.', 'success');
       return;
     }
 
@@ -199,11 +200,11 @@ export default function LicenseTracking({ staffs, selectedCo }: Record<string, u
 
     if (error) {
       console.error('자격면허 알림 발송 실패:', error);
-      alert('알림 발송 중 오류가 발생했습니다.');
+      toast('알림 발송 중 오류가 발생했습니다.', 'error');
       return;
     }
 
-    alert(`${item.staff?.name}님에게 갱신 안내를 발송했습니다.`);
+    toast(`${item.staff?.name}님에게 갱신 안내를 발송했습니다.`, 'success');
   };
 
   return (

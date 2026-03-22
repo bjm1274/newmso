@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useDeferredValue, useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { getProfilePhotoUrl, normalizeProfileUser } from '@/lib/profile-photo';
@@ -1663,7 +1664,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         setUnreadUsers(nonReaders.sort(sorter));
       } catch (e) {
         console.error('loadReadStatusForMessage error', e);
-        alert('읽음 현황을 불러오지 못했습니다.');
+        toast('읽음 현황을 불러오지 못했습니다.');
       } finally {
         setUnreadLoading(false);
       }
@@ -1674,7 +1675,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   const handleLeaveRoom = async () => {
     if (!selectedRoom) return;
     if (selectedRoom.id === NOTICE_ROOM_ID && !isMso) {
-      alert('공지 메시지 방은 관리자 확인 없이 직원 임의로 나갈 수 없습니다.');
+      toast('공지 메시지 방은 관리자 확인 없이 직원 임의로 나갈 수 없습니다.', 'warning');
       return;
     }
     if (!confirm('이 채팅방에서 나가시겠습니까? 나간 뒤에는 다시 초대를 받아야 입장할 수 있습니다.')) return;
@@ -1702,9 +1703,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       });
       setRoom(null);
       setMessages([]);
-      alert('채팅방에서 나갔습니다.');
+      toast('채팅방에서 나갔습니다.');
     } catch {
-      alert('채팅방 나가기 중 오류가 발생했습니다.');
+      toast('채팅방 나가기 중 오류가 발생했습니다.', 'error');
     }
   };
 
@@ -1755,10 +1756,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         )
       );
       await fetchData();
-      alert('참여자를 제거했습니다.');
+      toast('참여자를 제거했습니다.');
     } catch (error) {
       console.error('remove member error', error);
-      alert('참여자 제거 중 오류가 발생했습니다.');
+      toast('참여자 제거 중 오류가 발생했습니다.', 'error');
     }
   };
 
@@ -1815,7 +1816,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     }
     if (roomId === NOTICE_ROOM_ID) {
       if (!canWriteNotice) {
-        alert('공지 메시지 방에는 부서장 이상만 작성할 수 있습니다.');
+        toast('공지 메시지 방에는 부서장 이상만 작성할 수 있습니다.');
         return;
       }
     }
@@ -1957,11 +1958,11 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
   const processFileUpload = async (file: File) => {
     if (file.type.startsWith('video/')) {
-      alert('동영상 파일은 업로드할 수 없습니다.\n(사진, 문서, 일반 파일만 가능합니다.)');
+      toast('동영상 파일은 업로드할 수 없습니다.\n(사진, 문서, 일반 파일만 가능합니다.)');
       return;
     }
     if (file.size > MAX_FILE_SIZE_BYTES) {
-      alert('파일 크기는 20MB 이하여야 합니다.');
+      toast('파일 크기는 20MB 이하여야 합니다.');
       return;
     }
     setFileUploading(true);
@@ -1982,7 +1983,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         : msg.includes('policy') || msg.includes('RLS')
           ? 'Storage 버킷 pchos-files의 RLS 정책에서 INSERT를 허용해 주세요.'
           : '버킷 생성 여부와 RLS 정책을 확인해 주세요.';
-      alert(`파일 업로드에 실패했습니다.\n\n${hint}`);
+      toast(`파일 업로드에 실패했습니다.\n\n${hint}`, 'error');
     } finally {
       setFileUploading(false);
     }
@@ -1999,7 +2000,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     if (!activeActionMsg) return;
     if (type === 'task') {
       if (!effectiveTodoUserId) {
-        alert('연결된 직원 계정을 찾지 못했습니다.');
+        toast('연결된 직원 계정을 찾지 못했습니다.');
         setActiveActionMsg(null);
         return;
       }
@@ -2013,17 +2014,17 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         source_room_id: activeActionMsg.room_id,
       }]);
       if (!error) {
-        alert('할 일 등록 완료');
+        toast('할 일 등록 완료', 'success');
         if (onRefresh) onRefresh();
       } else {
-        alert('할 일 등록 중 오류가 발생했습니다.');
+        toast('할 일 등록 중 오류가 발생했습니다.', 'error');
       }
     }
     setActiveActionMsg(null);
   };
 
   const createGroupChat = async () => {
-    if (!groupName.trim() || selectedMembers.length === 0) return alert('방 이름과 멤버를 선택해 주세요.');
+    if (!groupName.trim() || selectedMembers.length === 0) return toast('방 이름과 멤버를 선택해 주세요.', 'warning');
     const { data: room, error } = await supabase.from('chat_rooms').insert([{
       name: groupName,
       type: 'group',
@@ -2056,7 +2057,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   const openDirectChat = useCallback(async ( staff: StaffMember) => {
     const otherId = String(staff?.id || '').trim();
     if (!effectiveChatUserId || !otherId) {
-      alert('채팅 상대를 찾지 못했습니다.');
+      toast('채팅 상대를 찾지 못했습니다.');
       return;
     }
 
@@ -2111,7 +2112,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       setViewMode('chat');
     } catch (error) {
       console.error('openDirectChat failed', error);
-      alert('채팅방을 여는 중 오류가 발생했습니다.');
+      toast('채팅방을 여는 중 오류가 발생했습니다.', 'error');
     }
   }, [effectiveChatUserId, fetchData, repairDirectRooms]);
 
@@ -2154,9 +2155,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   }, [showMentionList, mentionQuery, roomMembers, staffs]);
 
   const handleCreatePoll = async () => {
-    if (!pollQuestion.trim()) { alert('질문을 입력해 주세요.'); return; }
+    if (!pollQuestion.trim()) { toast('질문을 입력해 주세요.', 'warning'); return; }
     const options = pollOptions.map((o) => o.trim()).filter(Boolean);
-    if (options.length < 2) { alert('선택지는 최소 2개 이상 입력해 주세요.'); return; }
+    if (options.length < 2) { toast('선택지는 최소 2개 이상 입력해 주세요.', 'warning'); return; }
     try {
       const { data: poll, error } = await supabase.from('polls').insert([{
         room_id: selectedRoomId, creator_id: user?.id, question: pollQuestion, options
@@ -2230,7 +2231,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       await fetchData();
     } catch (error) {
       console.error('공지 등록 상태 변경 실패:', error);
-      alert(isPinned ? '공지 해제에 실패했습니다.' : '공지 등록에 실패했습니다.');
+      toast(isPinned ? '공지 해제에 실패했습니다.' : '공지 등록에 실패했습니다.', 'error');
     }
   };
 
@@ -2376,7 +2377,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
   const deleteMessage = async (msg: ChatMessage) => {
     if (selectedRoom?.id === NOTICE_ROOM_ID && !isMso) {
-      alert('공지 채널 메시지는 삭제할 수 없습니다.');
+      toast('공지 채널 메시지는 삭제할 수 없습니다.', 'success');
       return;
     }
     if (msg.sender_id !== user?.id && !isMso) return;
@@ -2898,7 +2899,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                   </a>
                                   <div className="absolute opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity inset-0 flex items-center justify-center bg-black/40 rounded-[var(--radius-md)] gap-2 pointer-events-none">
                                     <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(furl, '_blank') }} className="pointer-events-auto p-1.5 bg-[var(--card)]/20 hover:bg-[var(--card)]/40 rounded-[var(--radius-md)] text-white" title="미리보기">보기</button>
-                                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigator.clipboard.writeText(furl).then(() => alert('공유 링크를 복사했습니다.')) }} className="pointer-events-auto p-1.5 bg-[var(--card)]/20 hover:bg-[var(--card)]/40 rounded-[var(--radius-md)] text-white" title="공유">공유</button>
+                                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigator.clipboard.writeText(furl).then(() => toast('공유 링크를 복사했습니다.')) }} className="pointer-events-auto p-1.5 bg-[var(--card)]/20 hover:bg-[var(--card)]/40 rounded-[var(--radius-md)] text-white" title="공유">공유</button>
                                     <a href={furl} download target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="pointer-events-auto p-1.5 bg-[var(--card)]/20 hover:bg-[var(--card)]/40 rounded-full text-white" title="다운로드">저장</a>
                                   </div>
                                 </div>
@@ -2915,7 +2916,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                     <p className={`font-bold text-[12px] truncate mb-1`}>첨부 파일</p>
                                     <div className="flex items-center gap-1.5 mt-2">
                                       <button onClick={() => window.open(furl, '_blank')} className="text-[10px] font-bold text-[var(--accent)] hover:text-blue-600 px-2 py-1 bg-blue-50 dark:bg-blue-900/30 rounded-md">미리보기</button>
-                                      <button onClick={() => { navigator.clipboard.writeText(furl).then(() => alert('공유 링크를 복사했습니다.')) }} className="text-[10px] font-bold text-[var(--toss-gray-4)] hover:text-[var(--toss-gray-4)] px-2 py-1 bg-[var(--tab-bg)] dark:bg-zinc-800 rounded-md">공유</button>
+                                      <button onClick={() => { navigator.clipboard.writeText(furl).then(() => toast('공유 링크를 복사했습니다.')) }} className="text-[10px] font-bold text-[var(--toss-gray-4)] hover:text-[var(--toss-gray-4)] px-2 py-1 bg-[var(--tab-bg)] dark:bg-zinc-800 rounded-md">공유</button>
                                   <a href={furl} download target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 px-2 py-1 bg-emerald-50 dark:bg-emerald-900/30 rounded-md inline-block">다운로드</a>
                                     </div>
                                   </div>
@@ -3262,7 +3263,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     <span className="text-xl">🔖</span>
                     <span className="text-sm font-bold">{bookmarkedIds.has(String(activeActionMsg.id)) ? '북마크 해제' : '북마크 등록'}</span>
                   </button>
-                  <button onClick={async () => { await navigator.clipboard?.writeText(activeActionMsg.content || ''); alert('복사했습니다.'); setActiveActionMsg(null); }} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
+                  <button onClick={async () => { await navigator.clipboard?.writeText(activeActionMsg.content || ''); toast('복사했습니다.'); setActiveActionMsg(null); }} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
                     <span className="text-xl">📋</span>
                     <span className="text-sm font-bold">복사</span>
                   </button>
@@ -3329,8 +3330,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     다른 채팅방으로 전달
                   </button>
                   <button data-testid="chat-message-action-thread" onClick={() => { openThreadPanel(activeActionMsg); }} className="w-full p-3 text-left hover:bg-[var(--toss-blue-light)] rounded-[var(--radius-md)] text-xs font-semibold text-[var(--accent)] transition-colors">이 메시지 스레드 보기</button>
-                  <button onClick={async () => { try { const base = `[채팅] ${(activeActionMsg.staff as { name?: string } | null | undefined)?.name || '이름 없음'} (${new Date(activeActionMsg.created_at || 0).toLocaleString('ko-KR')})\n${activeActionMsg.content || ''}${activeActionMsg.file_url ? `\n파일: ${activeActionMsg.file_url}` : ''}`; await navigator.clipboard?.writeText(`[전자결재 메모]\n${base}`); alert('전자결재용으로 복사했습니다.'); } catch { alert('복사 실패'); } setActiveActionMsg(null); }} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">전자결재용 내용 복사</button>
-                  <button onClick={async () => { try { const base = `[채팅] ${(activeActionMsg.staff as { name?: string } | null | undefined)?.name || '이름 없음'} (${new Date(activeActionMsg.created_at || 0).toLocaleString('ko-KR')})\n${activeActionMsg.content || ''}${activeActionMsg.file_url ? `\n파일: ${activeActionMsg.file_url}` : ''}`; await navigator.clipboard?.writeText(`[게시판 메모]\n${base}`); alert('게시판용으로 복사했습니다.'); } catch { alert('복사 실패'); } setActiveActionMsg(null); }} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">게시판용 내용 복사</button>
+                  <button onClick={async () => { try { const base = `[채팅] ${(activeActionMsg.staff as { name?: string } | null | undefined)?.name || '이름 없음'} (${new Date(activeActionMsg.created_at || 0).toLocaleString('ko-KR')})\n${activeActionMsg.content || ''}${activeActionMsg.file_url ? `\n파일: ${activeActionMsg.file_url}` : ''}`; await navigator.clipboard?.writeText(`[전자결재 메모]\n${base}`); toast('전자결재용으로 복사했습니다.'); } catch { toast('복사 실패', 'error'); } setActiveActionMsg(null); }} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">전자결재용 내용 복사</button>
+                  <button onClick={async () => { try { const base = `[채팅] ${(activeActionMsg.staff as { name?: string } | null | undefined)?.name || '이름 없음'} (${new Date(activeActionMsg.created_at || 0).toLocaleString('ko-KR')})\n${activeActionMsg.content || ''}${activeActionMsg.file_url ? `\n파일: ${activeActionMsg.file_url}` : ''}`; await navigator.clipboard?.writeText(`[게시판 메모]\n${base}`); toast('게시판용으로 복사했습니다.'); } catch { toast('복사 실패', 'error'); } setActiveActionMsg(null); }} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">게시판용 내용 복사</button>
                   <button data-testid="chat-message-action-bookmark" onClick={() => { void toggleBookmark(activeActionMsg.id); setActiveActionMsg(null); }} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">{bookmarkedIds.has(String(activeActionMsg.id)) ? '북마크 해제' : '중요 메시지 북마크'}</button>
                 </div>
               </div>
@@ -3515,7 +3516,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     type="button"
                     onClick={async () => {
                       if (!slashForm.startDate || !slashForm.endDate) {
-                        alert('시작일과 종료일을 입력해 주세요.');
+                        toast('시작일과 종료일을 입력해 주세요.', 'warning');
                         return;
                       }
                       try {
@@ -3538,9 +3539,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                             status: '대기',
                           },
                         ]);
-                        alert('연차/휴가 전자결재 초안을 생성했습니다. 전자결재 메뉴에서 내용을 확인 후 제출해 주세요.');
+                        toast('연차/휴가 전자결재 초안을 생성했습니다. 전자결재 메뉴에서 내용을 확인 후 제출해 주세요.', 'warning');
                       } catch {
-                        alert('연차 초안 생성 중 오류가 발생했습니다.');
+                        toast('연차 초안 생성 중 오류가 발생했습니다.', 'error');
                       } finally {
                         setShowSlashModal(false);
                       }
@@ -3602,7 +3603,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     type="button"
                     onClick={async () => {
                       if (!slashForm.itemName || !slashForm.quantity) {
-                        alert('품목명과 수량을 입력해 주세요.');
+                        toast('품목명과 수량을 입력해 주세요.', 'warning');
                         return;
                       }
                       try {
@@ -3626,9 +3627,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                             status: '대기',
                           },
                         ]);
-                        alert('비품구매 전자결재 초안을 생성했습니다. 전자결재 메뉴에서 내용을 확인 후 제출해 주세요.');
+                        toast('비품구매 전자결재 초안을 생성했습니다. 전자결재 메뉴에서 내용을 확인 후 제출해 주세요.', 'warning');
                       } catch {
-                        alert('발주 초안 생성 중 오류가 발생했습니다.');
+                        toast('발주 초안 생성 중 오류가 발생했습니다.', 'error');
                       } finally {
                         setShowSlashModal(false);
                       }
@@ -3831,9 +3832,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                         if (forwardedMessage?.id && forwardedMessage?.room_id) {
                           await triggerChatPush(String(forwardedMessage.room_id), String(forwardedMessage.id));
                         }
-                        alert(`"${room.name || '채팅방'}"으로 메시지를 전달했습니다.`);
+                        toast(`"${room.name || '채팅방'}"으로 메시지를 전달했습니다.`);
                       } catch {
-                        alert('메시지 전달 중 오류가 발생했습니다.');
+                        toast('메시지 전달 중 오류가 발생했습니다.', 'error');
                       } finally {
                         setShowForwardModal(false);
                         setForwardSourceMsg(null);
@@ -3999,10 +4000,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     setShowAddMemberModal(false);
                     setAddMemberSelectingIds([]);
                     fetchData();
-                    alert('참여자가 추가되었습니다.');
+                    toast('참여자가 추가되었습니다.');
                   } catch (e) {
                     console.error('add members error', e);
-                    alert('참여자 추가 중 오류가 발생했습니다.');
+                    toast('참여자 추가 중 오류가 발생했습니다.', 'error');
                   }
                 }}
                 className="flex-1 py-3 rounded-[var(--radius-lg)] text-[11px] font-semibold text-white bg-[var(--accent)] disabled:bg-[var(--toss-gray-3)] hover:bg-[var(--accent)]"

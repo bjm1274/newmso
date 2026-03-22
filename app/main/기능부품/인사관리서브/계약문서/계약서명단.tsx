@@ -1,5 +1,5 @@
-﻿'use client';
-import { useState } from 'react';
+'use client';
+﻿import { useState } from 'react';
 
 type Staff = { id: number; name: string; employee_no?: string; company?: string; department?: string; position?: string };
 type Contract = { staff_id: number; status?: string };

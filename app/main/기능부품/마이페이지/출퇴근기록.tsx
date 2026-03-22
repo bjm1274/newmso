@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { WORKPLACE_LOCATION, ALLOWED_DISTANCE_M } from '@/lib/location';
@@ -73,7 +74,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
   const getCurrentLocation = (): Promise<boolean> => {
     return new Promise((resolve) => {
       if (typeof navigator === 'undefined' || !navigator.geolocation) {
-        alert('이 브라우저는 위치 정보를 지원하지 않습니다.');
+        toast('이 브라우저는 위치 정보를 지원하지 않습니다.');
         resolve(false);
         return;
       }
@@ -92,13 +93,13 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
           if (dist <= ALLOWED_RADIUS_METER) {
             resolve(true); // 100m 이내 (성공)
           } else {
-            alert(`🏥 병원과 거리가 너무 멉니다! (현재 거리: ${Math.floor(dist)}m)\n병원 내(300m)에서만 출퇴근이 가능합니다.`);
+            toast(`🏥 병원과 거리가 너무 멉니다! (현재 거리: ${Math.floor(dist)}m)\n병원 내(300m)에서만 출퇴근이 가능합니다.`);
             resolve(false); // 100m 밖 (실패)
           }
         },
         (error) => {
           console.warn('위치 확인 실패:', error && (error as any).message ? (error as any).message : error);
-          alert('위치 정보를 정확히 가져올 수 없습니다. 다시 시도하거나 브라우저 위치 권한을 확인해 주세요.');
+          toast('위치 정보를 정확히 가져올 수 없습니다. 다시 시도하거나 브라우저 위치 권한을 확인해 주세요.', 'error');
           resolve(false);
         },
         { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 } // GPS 정밀 모드 + 시간초과 + 캐시사용안함
@@ -179,7 +180,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
         if (error) throw error;
         await syncToAttendances(today, timeString, null, isLate ? '지각' : '정상');
         setTodayLog(data);
-        alert(isLate ? `지각 처리되었습니다. (기준: ${lateThreshold}:${lateMinute})` : '정상 출근되었습니다. 오늘도 화이팅!');
+        toast(isLate ? `지각 처리되었습니다. (기준: ${lateThreshold}:${lateMinute})` : '정상 출근되었습니다. 오늘도 화이팅!', 'success');
 
       } else {
         if (!todayLog) return;
@@ -195,11 +196,11 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
         if (error) throw error;
         await syncToAttendances(today, todayLog.check_in as string | null, timeString, (todayLog.status as string) || '정상');
         setTodayLog(data);
-        alert('퇴근 처리되었습니다. 고생하셨습니다!');
+        toast('퇴근 처리되었습니다. 고생하셨습니다!', 'success');
       }
       fetchMonthlyLogs();
     } catch (error: unknown) {
-      alert('오류 발생: ' + ((error as Error)?.message ?? String(error)));
+      toast('오류 발생: ' + ((error as Error)?.message ?? String(error)), 'error');
     } finally {
       setIsProcessing(false);
     }

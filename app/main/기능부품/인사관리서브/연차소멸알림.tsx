@@ -1,4 +1,5 @@
 'use client';
+import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -101,10 +102,10 @@ export default function AnnualLeaveExpiryAlert({ staffs, selectedCo }: Props) {
         created_at: new Date().toISOString(),
       });
 
-      alert('알림을 발송했습니다.');
+      toast('알림을 발송했습니다.', 'success');
     } catch (error) {
       console.error('연차 소멸 알림 발송 실패:', error);
-      alert('알림 발송에 실패했습니다.');
+      toast('알림 발송에 실패했습니다.', 'error');
     } finally {
       setSendingId(null);
     }

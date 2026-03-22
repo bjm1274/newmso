@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { existsSync, readFileSync } from 'fs';
-import path from 'path';
 import { createSupabaseAccessToken } from '@/lib/server-supabase-bridge';
 import {
   clearSessionCookie,
@@ -12,46 +10,8 @@ import {
   SESSION_COOKIE_NAME,
 } from '@/lib/server-session';
 
-function readEnvFileValue(key: string) {
-  const envFiles = ['.env.local', '.env'];
-
-  for (const envFile of envFiles) {
-    const envPath = path.join(process.cwd(), envFile);
-    if (!existsSync(envPath)) continue;
-
-    const content = readFileSync(envPath, 'utf8');
-    const lines = content.split(/\r?\n/);
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#')) continue;
-
-      const normalized = trimmed.startsWith('export ') ? trimmed.slice(7).trim() : trimmed;
-      const separatorIndex = normalized.indexOf('=');
-      if (separatorIndex === -1) continue;
-
-      const name = normalized.slice(0, separatorIndex).trim();
-      if (name !== key) continue;
-
-      const rawValue = normalized.slice(separatorIndex + 1).trim();
-      if (!rawValue) return '';
-
-      if (
-        (rawValue.startsWith('"') && rawValue.endsWith('"')) ||
-        (rawValue.startsWith("'") && rawValue.endsWith("'"))
-      ) {
-        return rawValue.slice(1, -1);
-      }
-
-      return rawValue;
-    }
-  }
-
-  return '';
-}
-
 function getRuntimeEnv(key: string) {
-  return process.env[key] || readEnvFileValue(key);
+  return process.env[key] ?? '';
 }
 
 function getAdminClient() {
@@ -126,8 +86,8 @@ export async function GET(request: NextRequest) {
 
   try {
     freshSessionUser = await readLatestSessionUser(currentSessionUser);
-  } catch (error) {
-    console.error('세션 사용자 동기화 실패:', error);
+  } catch {
+    // 동기화 실패 시 기존 세션 사용자 유지
   }
 
   const supabaseAccessToken = await createSupabaseAccessToken(freshSessionUser);
