@@ -30,7 +30,9 @@
       "Bash(perl -i -pe 's/modalData\\\\.item\\\\./modalItem./g' \"C:/Users/baek_/newmso/app/main/기능부품/재고관리서브/재고팝업창.tsx\")",
       "Bash(npm run:*)",
       "Bash(xargs file:*)",
-      "Bash(xargs wc:*)"
+      "Bash(xargs wc:*)",
+      "Bash(node -e \"const bcrypt = require\\(''bcryptjs''\\); bcrypt.hash\\(''ghemrdk1!!'', 12\\).then\\(h => console.log\\(h\\)\\);\")",
+      "Bash(node -e \":*)"
     ]
   }
 }

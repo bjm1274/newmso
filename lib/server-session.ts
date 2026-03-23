@@ -195,6 +195,7 @@ function createSessionUserSnapshot(input: any): SessionUser {
     phone: normalizedUser.phone ?? null,
     auth_user_id: String(normalizedUser.auth_user_id ?? '').trim() || null,
     is_system_master: normalizedUser.is_system_master === true,
+    login_id: (normalizedUser as any).login_id ?? null,
     permissions: compactSessionPermissions(normalizedUser.permissions || {}),
   };
 }

@@ -124,15 +124,13 @@ export async function POST(request: NextRequest) {
         return failureResponse('등록된 사용자 조회 중 오류가 발생했습니다.', 500);
       }
 
-      if (!byName?.length) {
-        return failureResponse('등록된 사번 또는 이름이 없습니다.');
-      }
-
       if (byName.length > 1) {
         return failureResponse('동명이인이 있습니다. 로그인 아이디에 사번을 입력해 주세요.');
       }
 
-      userRow = byName[0];
+      if (byName?.length === 1) {
+        userRow = byName[0];
+      }
     }
 
     if (!userRow) {
@@ -198,6 +196,7 @@ export async function POST(request: NextRequest) {
         return successResponse({
           id: null,
           employee_no: '0',
+          login_id: loginId,
           name: '시스템관리자',
           role: 'admin',
           is_system_master: true,
@@ -263,6 +262,7 @@ export async function POST(request: NextRequest) {
           return successResponse({
             id: null,
             employee_no: '0',
+            login_id: loginId,
             name: '시스템관리자',
             role: 'admin',
             is_system_master: true,
