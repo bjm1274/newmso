@@ -19,10 +19,21 @@ type DepartmentGroup = {
   members: StaffMember[];
 };
 
+type DivisionGroup = {
+  name: string;
+  headerClass: string;
+  borderClass: string;
+  bgClass: string;
+  departments: DepartmentGroup[];
+};
+
 type CompanyTree = {
   company: string;
   leader: StaffMember | null;
+  managers: StaffMember[];
+  divisions: DivisionGroup[];
   departments: DepartmentGroup[];
+  isHospital: boolean;
   activeCount: number;
 };
 
@@ -38,17 +49,45 @@ const DEPARTMENT_ACCENTS = [
   'from-slate-500 to-slate-400',
 ];
 
-// 직급 키워드: 높은 직급 순서, 긴 키워드를 앞에 배치해 부분 문자열 오매칭 방지
+// 병원 진료부서별 팀 매핑
+const HOSPITAL_DIVISION_MAP: { name: string; teams: string[]; headerClass: string; borderClass: string; bgClass: string }[] = [
+  {
+    name: '진료부',
+    teams: ['진료팀'],
+    headerClass: 'bg-blue-600 text-white',
+    borderClass: 'border-blue-200',
+    bgClass: 'bg-blue-50',
+  },
+  {
+    name: '간호부',
+    teams: ['병동팀', '외래팀', '수술팀', '검사팀'],
+    headerClass: 'bg-emerald-600 text-white',
+    borderClass: 'border-emerald-200',
+    bgClass: 'bg-emerald-50',
+  },
+  {
+    name: '행정관리부',
+    teams: ['영양팀', '관리팀', '원무팀', '총무팀'],
+    headerClass: 'bg-amber-600 text-white',
+    borderClass: 'border-amber-200',
+    bgClass: 'bg-amber-50',
+  },
+];
+
+// 직급 키워드: 높은 직급 순서
 const LEADER_KEYWORDS = [
   '대표이사', '이사장', '병원장', '대표원장', '부원장', '원장',
-  '본부장', '센터장', '사장', '대표',
+  '본부장', '센터장', '사장', '대표', '이사',
 ];
 
 const POSITION_RANK_KEYWORDS = [
-  '대표이사', '이사장', '병원장', '대표원장', '부원장', '원장',
-  '본부장', '센터장', '실장', '부장', '대표', '과장', '팀장',
-  '주임', '선임', '사원',
+  '대표이사', '이사장', '병원장', '대표원장', '부원장', '원장', '이사',
+  '본부장', '센터장', '실장', '부장', '대표', '차장', '과장', '팀장',
+  '대리', '주임', '선임', '사원',
 ];
+
+// 팀장 인덱스까지 = 부서장 이상
+const MANAGER_MAX_IDX = POSITION_RANK_KEYWORDS.indexOf('팀장');
 
 let orgChartDirectoryCache: StaffMember[] | null = null;
 let orgChartDirectoryPromise: Promise<StaffMember[]> | null = null;
@@ -60,10 +99,8 @@ function normalizeText(value: unknown) {
 function isResignedStaff(staff: StaffMember) {
   const status = normalizeText(staff.status);
   if (status.includes('퇴사') || status.includes('퇴직')) return true;
-
   const resignDate = normalizeText(staff.resign_date);
   if (!resignDate) return false;
-
   const resignTime = Date.parse(resignDate);
   return Number.isFinite(resignTime) && resignTime <= Date.now();
 }
@@ -85,7 +122,6 @@ function getDepartmentName(staff: StaffMember) {
   return normalizeText(staff.department) || '부서 미지정';
 }
 
-// 가장 긴(가장 구체적인) 키워드를 매칭해 부분 문자열 오매칭 방지
 function findBestKeywordIndex(position: string, keywords: string[]) {
   let bestIndex = -1;
   let bestLen = 0;
@@ -109,19 +145,16 @@ function getPositionScore(staff: StaffMember) {
 function compareStaff(a: StaffMember, b: StaffMember) {
   const scoreDiff = getPositionScore(b) - getPositionScore(a);
   if (scoreDiff !== 0) return scoreDiff;
-
   const employeeA = Number.parseInt(normalizeText(a.employee_no), 10);
   const employeeB = Number.parseInt(normalizeText(b.employee_no), 10);
   if (Number.isFinite(employeeA) && Number.isFinite(employeeB) && employeeA !== employeeB) {
     return employeeA - employeeB;
   }
-
   return normalizeText(a.name).localeCompare(normalizeText(b.name), 'ko-KR');
 }
 
 function pickLeader(staffs: StaffMember[]) {
   if (!staffs.length) return null;
-
   const sorted = [...staffs].sort((a, b) => {
     const posA = normalizeText(a.position);
     const posB = normalizeText(b.position);
@@ -132,8 +165,17 @@ function pickLeader(staffs: StaffMember[]) {
     if (scoreB !== scoreA) return scoreB - scoreA;
     return compareStaff(a, b);
   });
-
   return sorted[0] ?? null;
+}
+
+function isManagerStaff(staff: StaffMember) {
+  const pos = normalizeText(staff.position);
+  const idx = findBestKeywordIndex(pos, POSITION_RANK_KEYWORDS);
+  return idx >= 0 && idx <= MANAGER_MAX_IDX;
+}
+
+function isHospitalCompany(name: string) {
+  return ['병원', '의원', '의료', '클리닉', '한의원', '치과'].some((kw) => name.includes(kw));
 }
 
 function compareDepartment(a: DepartmentGroup, b: DepartmentGroup) {
@@ -144,7 +186,6 @@ function compareDepartment(a: DepartmentGroup, b: DepartmentGroup) {
 
 async function fetchOrgChartDirectory() {
   if (orgChartDirectoryCache) return orgChartDirectoryCache;
-
   if (!orgChartDirectoryPromise) {
     orgChartDirectoryPromise = (async () => {
       try {
@@ -154,7 +195,6 @@ async function fetchOrgChartDirectory() {
           .order('company', { ascending: true })
           .order('department', { ascending: true })
           .order('employee_no', { ascending: true });
-
         if (error) throw error;
         const next = dedupeStaffs((data as StaffMember[]) ?? []);
         orgChartDirectoryCache = next;
@@ -164,24 +204,29 @@ async function fetchOrgChartDirectory() {
       }
     })();
   }
-
   return orgChartDirectoryPromise;
 }
 
-function buildCompanyTree(company: string, staffs: StaffMember[]) {
+function buildCompanyTree(company: string, staffs: StaffMember[]): CompanyTree {
+  const hospital = isHospitalCompany(company);
   const activeStaffs = staffs.filter((s) => !isResignedStaff(s)).sort(compareStaff);
   const leader = pickLeader(activeStaffs);
-  const memberPool = leader ? activeStaffs.filter((s) => s.id !== leader.id) : activeStaffs;
+  const nonLeader = leader ? activeStaffs.filter((s) => s.id !== leader.id) : activeStaffs;
 
+  // 부서장 이상 관리자 분리
+  const managers = nonLeader.filter(isManagerStaff);
+  const regularStaffs = nonLeader.filter((s) => !isManagerStaff(s));
+
+  // 부서별 그룹
   const departmentMap = new Map<string, StaffMember[]>();
-  for (const staff of memberPool) {
+  for (const staff of regularStaffs) {
     const dept = getDepartmentName(staff);
     const bucket = departmentMap.get(dept) ?? [];
     bucket.push(staff);
     departmentMap.set(dept, bucket);
   }
 
-  const departments = Array.from(departmentMap.entries())
+  const departments: DepartmentGroup[] = Array.from(departmentMap.entries())
     .map(([name, members], index) => ({
       name,
       members: members.sort(compareStaff),
@@ -189,7 +234,41 @@ function buildCompanyTree(company: string, staffs: StaffMember[]) {
     }))
     .sort(compareDepartment);
 
-  return { company, leader, departments, activeCount: activeStaffs.length } satisfies CompanyTree;
+  // 병원 계열사: 진료부/간호부/행정관리부로 묶기
+  let divisions: DivisionGroup[] = [];
+  if (hospital) {
+    const deptByName = new Map(departments.map((d) => [d.name, d]));
+    const assigned = new Set<string>();
+
+    for (const div of HOSPITAL_DIVISION_MAP) {
+      const divDepts = div.teams
+        .map((t) => deptByName.get(t))
+        .filter((d): d is DepartmentGroup => !!d);
+      divDepts.forEach((d) => assigned.add(d.name));
+      // 팀이 없어도 빈 Division 구조는 표시 (팀 추가 전에도 보이도록)
+      divisions.push({
+        name: div.name,
+        headerClass: div.headerClass,
+        borderClass: div.borderClass,
+        bgClass: div.bgClass,
+        departments: divDepts,
+      });
+    }
+
+    // 매핑에 없는 부서는 기타로
+    const unassigned = departments.filter((d) => !assigned.has(d.name));
+    if (unassigned.length > 0) {
+      divisions.push({
+        name: '기타',
+        headerClass: 'bg-slate-500 text-white',
+        borderClass: 'border-slate-200',
+        bgClass: 'bg-slate-50',
+        departments: unassigned,
+      });
+    }
+  }
+
+  return { company, leader, managers, divisions, departments, isHospital: hospital, activeCount: activeStaffs.length };
 }
 
 // ─── 서브 컴포넌트 ────────────────────────────────────────────────────────────
@@ -230,13 +309,7 @@ function StaffChip({ staff, onSelect }: { staff: StaffMember; onSelect: (s: Staf
   );
 }
 
-function DepartmentColumn({
-  department,
-  onSelect,
-}: {
-  department: DepartmentGroup;
-  onSelect: (s: StaffMember) => void;
-}) {
+function DepartmentColumn({ department, onSelect }: { department: DepartmentGroup; onSelect: (s: StaffMember) => void }) {
   return (
     <section className="w-[200px] shrink-0 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-sm">
       <div className={`bg-gradient-to-r ${department.accentClass} px-4 py-3`}>
@@ -244,9 +317,13 @@ function DepartmentColumn({
         <p className="mt-0.5 text-xs font-medium text-white/80">{department.members.length}명</p>
       </div>
       <div className="space-y-2 p-3">
-        {department.members.map((staff) => (
-          <StaffChip key={staff.id} staff={staff} onSelect={onSelect} />
-        ))}
+        {department.members.length > 0 ? (
+          department.members.map((staff) => (
+            <StaffChip key={staff.id} staff={staff} onSelect={onSelect} />
+          ))
+        ) : (
+          <p className="py-3 text-center text-xs text-[var(--toss-gray-3)]">–</p>
+        )}
       </div>
     </section>
   );
@@ -268,13 +345,61 @@ function LeaderCard({ leader, onSelect }: { leader: StaffMember; onSelect: (s: S
   );
 }
 
-function CompanyPyramid({
-  tree,
-  onSelect,
-}: {
-  tree: CompanyTree;
-  onSelect: (s: StaffMember) => void;
-}) {
+function ManagerRow({ managers, onSelect }: { managers: StaffMember[]; onSelect: (s: StaffMember) => void }) {
+  if (managers.length === 0) return null;
+  return (
+    <div className="mx-auto w-full max-w-3xl overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-sm">
+      <div className="border-b border-[var(--border)] bg-[var(--muted)] px-4 py-2">
+        <p className="text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">관리자</p>
+      </div>
+      <div className="flex flex-wrap justify-center gap-2 p-4">
+        {managers.map((staff) => (
+          <button
+            key={staff.id}
+            type="button"
+            onClick={() => onSelect(staff)}
+            className="flex items-center gap-2.5 rounded-xl border border-[var(--border)] bg-[var(--page-bg)] px-3 py-2.5 transition hover:border-[var(--accent)]/30 hover:bg-[var(--toss-blue-light)]/60 hover:shadow-sm active:scale-[0.98]"
+          >
+            <Avatar staff={staff} size="sm" />
+            <div className="text-left">
+              <p className="text-sm font-bold text-[var(--foreground)]">{normalizeText(staff.name)}</p>
+              <p className="text-xs text-[var(--toss-gray-3)]">
+                {normalizeText(staff.position)} · {getDepartmentName(staff)}
+              </p>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DivisionSection({ division, onSelect }: { division: DivisionGroup; onSelect: (s: StaffMember) => void }) {
+  const totalMembers = division.departments.reduce((sum, d) => sum + d.members.length, 0);
+  return (
+    <div className={`overflow-hidden rounded-2xl border ${division.borderClass} ${division.bgClass}`}>
+      <div className={`${division.headerClass} px-4 py-2.5`}>
+        <p className="text-sm font-bold">{division.name}</p>
+        <p className="text-xs font-medium opacity-80">{division.departments.length}개 팀 · {totalMembers}명</p>
+      </div>
+      {division.departments.length > 0 ? (
+        <div className="no-scrollbar overflow-x-auto p-3">
+          <div className="flex items-start gap-3" style={{ minWidth: 'max-content' }}>
+            {division.departments.map((dept) => (
+              <DepartmentColumn key={dept.name} department={dept} onSelect={onSelect} />
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="px-4 py-6 text-center text-xs font-medium text-[var(--toss-gray-3)]">
+          소속 팀원이 없습니다.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CompanyPyramid({ tree, onSelect }: { tree: CompanyTree; onSelect: (s: StaffMember) => void }) {
   return (
     <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--page-bg)] shadow-sm">
       {/* 회사 헤더 */}
@@ -284,12 +409,12 @@ function CompanyPyramid({
           <p className="mt-0.5 text-xs font-medium text-[var(--toss-gray-3)]">재직 {tree.activeCount}명</p>
         </div>
         <span className="rounded-full bg-[var(--muted)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">
-          Org
+          ORG
         </span>
       </div>
 
-      {/* 대표 */}
-      <div className="flex flex-col items-center px-5 py-5">
+      <div className="flex flex-col items-center gap-0 px-5 py-5">
+        {/* 대표/원장 */}
         {tree.leader ? (
           <LeaderCard leader={tree.leader} onSelect={onSelect} />
         ) : (
@@ -297,27 +422,43 @@ function CompanyPyramid({
             대표자 정보가 없습니다.
           </div>
         )}
-        {tree.departments.length > 0 && (
-          <div className="mt-3 h-8 w-px bg-[var(--border)]" />
-        )}
-      </div>
 
-      {/* 부서 목록 — 가로 스크롤 */}
-      {tree.departments.length > 0 ? (
-        <div className="no-scrollbar overflow-x-auto px-5 pb-5">
-          <div className="flex items-start gap-3" style={{ minWidth: 'max-content' }}>
-            {tree.departments.map((dept) => (
-              <DepartmentColumn key={dept.name} department={dept} onSelect={onSelect} />
+        {/* 연결선 */}
+        <div className="h-8 w-px bg-[var(--border)]" />
+
+        {/* 관리자 영역 */}
+        <div className="w-full">
+          <ManagerRow managers={tree.managers} onSelect={onSelect} />
+        </div>
+
+        {/* 연결선 (관리자 있을 때) */}
+        {tree.managers.length > 0 && <div className="h-8 w-px bg-[var(--border)]" />}
+
+        {/* 부서 영역 */}
+        {tree.isHospital ? (
+          // 병원: 진료부 / 간호부 / 행정관리부로 구분
+          <div className="w-full space-y-3">
+            {tree.divisions.map((div) => (
+              <DivisionSection key={div.name} division={div} onSelect={onSelect} />
             ))}
           </div>
-        </div>
-      ) : (
-        <div className="px-5 pb-5">
-          <div className="rounded-2xl border border-dashed border-[var(--border)] px-5 py-10 text-center text-sm font-medium text-[var(--toss-gray-3)]">
-            표시할 부서 정보가 없습니다.
-          </div>
-        </div>
-      )}
+        ) : (
+          // 일반 회사: 평면 부서 목록
+          tree.departments.length > 0 ? (
+            <div className="no-scrollbar w-full overflow-x-auto">
+              <div className="flex items-start gap-3" style={{ minWidth: 'max-content' }}>
+                {tree.departments.map((dept) => (
+                  <DepartmentColumn key={dept.name} department={dept} onSelect={onSelect} />
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="w-full rounded-2xl border border-dashed border-[var(--border)] px-5 py-10 text-center text-sm font-medium text-[var(--toss-gray-3)]">
+              표시할 부서 정보가 없습니다.
+            </div>
+          )
+        )}
+      </div>
     </section>
   );
 }
@@ -353,7 +494,6 @@ export default function OrgChart({
 
   useEffect(() => {
     let ignore = false;
-
     const load = async () => {
       if (orgChartDirectoryCache) {
         setAllStaffs((prev) => dedupeStaffs([...(orgChartDirectoryCache ?? []), ...prev, ...staffs]));
@@ -370,7 +510,6 @@ export default function OrgChart({
         if (!ignore) setIsLoadingDirectory(false);
       }
     };
-
     void load();
     return () => { ignore = true; };
   }, [staffs]);
@@ -444,14 +583,10 @@ export default function OrgChart({
   );
 
   return (
-    <div
-      data-testid="org-chart-pyramid-view"
-      className="flex flex-col bg-[var(--page-bg)]"
-    >
+    <div data-testid="org-chart-pyramid-view" className="flex flex-col bg-[var(--page-bg)]">
       {/* 헤더 */}
       <div className="sticky top-0 z-10 border-b border-[var(--border)] bg-[var(--card)] px-4 py-3 shadow-sm md:px-6">
         <div className="mx-auto w-full max-w-7xl space-y-3">
-          {/* 타이틀 */}
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-black tracking-tight text-[var(--foreground)]">조직도</h2>
@@ -466,7 +601,6 @@ export default function OrgChart({
             </div>
           </div>
 
-          {/* 회사 탭 + 검색 */}
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div className="no-scrollbar flex gap-1.5 overflow-x-auto pb-0.5">
               {companyOptions.map((company) => {
@@ -576,7 +710,6 @@ export default function OrgChart({
                 <p className="truncate text-sm font-semibold text-[var(--toss-gray-3)]">{normalizeText(selectedStaff.position) || '직급 미지정'}</p>
               </div>
             </div>
-
             <div className="mt-4 divide-y divide-[var(--border)] rounded-2xl border border-[var(--border)] bg-[var(--page-bg)] px-4">
               <InfoRow label="회사" value={getCompanyName(selectedStaff)} />
               <InfoRow label="부서" value={getDepartmentName(selectedStaff)} />
@@ -585,7 +718,6 @@ export default function OrgChart({
               <InfoRow label="이메일" value={normalizeText(selectedStaff.email) || '-'} />
               <InfoRow label="내선" value={normalizeText(selectedStaff.extension) || '-'} />
             </div>
-
             <button
               type="button"
               onClick={() => setSelectedStaff(null)}
