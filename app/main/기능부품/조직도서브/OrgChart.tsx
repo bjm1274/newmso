@@ -37,6 +37,9 @@ type CompanyTree = {
   activeCount: number;
 };
 
+// company → Map<team_name, division_name>
+type OrgTeamIndex = Map<string, Map<string, string>>;
+
 const COMPANY_ALL = '전체';
 
 const DEPARTMENT_ACCENTS = [
@@ -49,32 +52,15 @@ const DEPARTMENT_ACCENTS = [
   'from-slate-500 to-slate-400',
 ];
 
-// 병원 진료부서별 팀 매핑
-const HOSPITAL_DIVISION_MAP: { name: string; teams: string[]; headerClass: string; borderClass: string; bgClass: string }[] = [
-  {
-    name: '진료부',
-    teams: ['진료팀'],
-    headerClass: 'bg-blue-600 text-white',
-    borderClass: 'border-blue-200',
-    bgClass: 'bg-blue-50',
-  },
-  {
-    name: '간호부',
-    teams: ['병동팀', '외래팀', '수술팀', '검사팀'],
-    headerClass: 'bg-emerald-600 text-white',
-    borderClass: 'border-emerald-200',
-    bgClass: 'bg-emerald-50',
-  },
-  {
-    name: '행정관리부',
-    teams: ['영양팀', '관리팀', '원무팀', '총무팀'],
-    headerClass: 'bg-amber-600 text-white',
-    borderClass: 'border-amber-200',
-    bgClass: 'bg-amber-50',
-  },
+const DIVISION_STYLES = [
+  { headerClass: 'bg-blue-600 text-white', borderClass: 'border-blue-200', bgClass: 'bg-blue-50' },
+  { headerClass: 'bg-emerald-600 text-white', borderClass: 'border-emerald-200', bgClass: 'bg-emerald-50' },
+  { headerClass: 'bg-amber-500 text-white', borderClass: 'border-amber-200', bgClass: 'bg-amber-50' },
+  { headerClass: 'bg-violet-600 text-white', borderClass: 'border-violet-200', bgClass: 'bg-violet-50' },
+  { headerClass: 'bg-rose-500 text-white', borderClass: 'border-rose-200', bgClass: 'bg-rose-50' },
+  { headerClass: 'bg-slate-500 text-white', borderClass: 'border-slate-200', bgClass: 'bg-slate-50' },
 ];
 
-// 직급 키워드: 높은 직급 순서
 const LEADER_KEYWORDS = [
   '대표이사', '이사장', '병원장', '대표원장', '부원장', '원장',
   '본부장', '센터장', '사장', '대표', '이사',
@@ -86,11 +72,12 @@ const POSITION_RANK_KEYWORDS = [
   '대리', '주임', '선임', '사원',
 ];
 
-// 팀장 인덱스까지 = 부서장 이상
 const MANAGER_MAX_IDX = POSITION_RANK_KEYWORDS.indexOf('팀장');
 
 let orgChartDirectoryCache: StaffMember[] | null = null;
 let orgChartDirectoryPromise: Promise<StaffMember[]> | null = null;
+let orgTeamsCache: OrgTeamIndex | null = null;
+let orgTeamsPromise: Promise<OrgTeamIndex> | null = null;
 
 function normalizeText(value: unknown) {
   return String(value ?? '').trim();
@@ -175,7 +162,12 @@ function isManagerStaff(staff: StaffMember) {
 }
 
 function isHospitalCompany(name: string) {
-  return ['병원', '의원', '의료', '클리닉', '한의원', '치과'].some((kw) => name.includes(kw));
+  return [
+    '병원', '의원', '의료', '클리닉', '한의원', '치과',
+    '외과', '내과', '이비인후과', '소아과', '산부인과',
+    '안과', '피부과', '비뇨기과', '정형외과', '신경외과',
+    '흉부외과', '성형외과', '재활의학과', '정신건강의학과',
+  ].some((kw) => name.includes(kw));
 }
 
 function compareDepartment(a: DepartmentGroup, b: DepartmentGroup) {
@@ -207,17 +199,91 @@ async function fetchOrgChartDirectory() {
   return orgChartDirectoryPromise;
 }
 
-function buildCompanyTree(company: string, staffs: StaffMember[]): CompanyTree {
+async function fetchOrgTeams(): Promise<OrgTeamIndex> {
+  if (orgTeamsCache) return orgTeamsCache;
+  if (!orgTeamsPromise) {
+    orgTeamsPromise = (async () => {
+      try {
+        const { data } = await supabase
+          .from('org_teams')
+          .select('company_name, division, team_name, sort_order')
+          .order('division')
+          .order('sort_order');
+
+        const index: OrgTeamIndex = new Map();
+        for (const row of (data || []) as any[]) {
+          const co = normalizeText(row.company_name);
+          const div = normalizeText(row.division);
+          const team = normalizeText(row.team_name);
+          if (!co || !div || !team) continue;
+          if (!index.has(co)) index.set(co, new Map());
+          index.get(co)!.set(team, div);
+        }
+        orgTeamsCache = index;
+        return index;
+      } finally {
+        orgTeamsPromise = null;
+      }
+    })();
+  }
+  return orgTeamsPromise;
+}
+
+function buildDivisionsFromIndex(
+  company: string,
+  departments: DepartmentGroup[],
+  teamIndex: OrgTeamIndex,
+): DivisionGroup[] {
+  const coMap = teamIndex.get(company); // team_name → division_name
+  if (!coMap || coMap.size === 0) return [];
+
+  // division_name → 순서 유지를 위해 insertion order 사용
+  const divisionOrder: string[] = [];
+  const divisionTeams = new Map<string, string[]>();
+
+  for (const [teamName, divName] of coMap) {
+    if (!divisionTeams.has(divName)) {
+      divisionOrder.push(divName);
+      divisionTeams.set(divName, []);
+    }
+    divisionTeams.get(divName)!.push(teamName);
+  }
+
+  const deptByName = new Map(departments.map((d) => [d.name, d]));
+  const assigned = new Set<string>();
+  const result: DivisionGroup[] = [];
+
+  divisionOrder.forEach((divName, divIdx) => {
+    const style = DIVISION_STYLES[divIdx % DIVISION_STYLES.length];
+    const teamNames = divisionTeams.get(divName) ?? [];
+    const divDepts = teamNames.map((t) => deptByName.get(t)).filter((d): d is DepartmentGroup => !!d);
+    divDepts.forEach((d) => assigned.add(d.name));
+    result.push({ name: divName, ...style, departments: divDepts });
+  });
+
+  // org_teams에 없는 부서는 기타로
+  const unassigned = departments.filter((d) => !assigned.has(d.name));
+  if (unassigned.length > 0) {
+    const style = DIVISION_STYLES[result.length % DIVISION_STYLES.length];
+    result.push({ name: '기타', ...style, departments: unassigned });
+  }
+
+  return result;
+}
+
+function buildCompanyTree(
+  company: string,
+  staffs: StaffMember[],
+  teamIndex: OrgTeamIndex,
+): CompanyTree {
   const hospital = isHospitalCompany(company);
   const activeStaffs = staffs.filter((s) => !isResignedStaff(s)).sort(compareStaff);
   const leader = pickLeader(activeStaffs);
   const nonLeader = leader ? activeStaffs.filter((s) => s.id !== leader.id) : activeStaffs;
 
-  // 부서장 이상 관리자 분리
   const managers = nonLeader.filter(isManagerStaff);
   const regularStaffs = nonLeader.filter((s) => !isManagerStaff(s));
 
-  // 부서별 그룹
   const departmentMap = new Map<string, StaffMember[]>();
   for (const staff of regularStaffs) {
     const dept = getDepartmentName(staff);
@@ -234,39 +300,8 @@ function buildCompanyTree(company: string, staffs: StaffMember[]): CompanyTree {
     }))
     .sort(compareDepartment);
 
-  // 병원 계열사: 진료부/간호부/행정관리부로 묶기
-  let divisions: DivisionGroup[] = [];
-  if (hospital) {
-    const deptByName = new Map(departments.map((d) => [d.name, d]));
-    const assigned = new Set<string>();
-
-    for (const div of HOSPITAL_DIVISION_MAP) {
-      const divDepts = div.teams
-        .map((t) => deptByName.get(t))
-        .filter((d): d is DepartmentGroup => !!d);
-      divDepts.forEach((d) => assigned.add(d.name));
-      // 팀이 없어도 빈 Division 구조는 표시 (팀 추가 전에도 보이도록)
-      divisions.push({
-        name: div.name,
-        headerClass: div.headerClass,
-        borderClass: div.borderClass,
-        bgClass: div.bgClass,
-        departments: divDepts,
-      });
-    }
-
-    // 매핑에 없는 부서는 기타로
-    const unassigned = departments.filter((d) => !assigned.has(d.name));
-    if (unassigned.length > 0) {
-      divisions.push({
-        name: '기타',
-        headerClass: 'bg-slate-500 text-white',
-        borderClass: 'border-slate-200',
-        bgClass: 'bg-slate-50',
-        departments: unassigned,
-      });
-    }
-  }
+  // 병원: org_teams DB에서 division 구조 읽기
+  const divisions = hospital ? buildDivisionsFromIndex(company, departments, teamIndex) : [];
 
   return { company, leader, managers, divisions, departments, isHospital: hospital, activeCount: activeStaffs.length };
 }
@@ -402,7 +437,6 @@ function DivisionSection({ division, onSelect }: { division: DivisionGroup; onSe
 function CompanyPyramid({ tree, onSelect }: { tree: CompanyTree; onSelect: (s: StaffMember) => void }) {
   return (
     <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--page-bg)] shadow-sm">
-      {/* 회사 헤더 */}
       <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--card)] px-5 py-4">
         <div>
           <h3 className="font-bold text-[var(--foreground)]">{tree.company}</h3>
@@ -414,7 +448,6 @@ function CompanyPyramid({ tree, onSelect }: { tree: CompanyTree; onSelect: (s: S
       </div>
 
       <div className="flex flex-col items-center gap-0 px-5 py-5">
-        {/* 대표/원장 */}
         {tree.leader ? (
           <LeaderCard leader={tree.leader} onSelect={onSelect} />
         ) : (
@@ -423,40 +456,32 @@ function CompanyPyramid({ tree, onSelect }: { tree: CompanyTree; onSelect: (s: S
           </div>
         )}
 
-        {/* 연결선 */}
         <div className="h-8 w-px bg-[var(--border)]" />
 
-        {/* 관리자 영역 */}
         <div className="w-full">
           <ManagerRow managers={tree.managers} onSelect={onSelect} />
         </div>
 
-        {/* 연결선 (관리자 있을 때) */}
         {tree.managers.length > 0 && <div className="h-8 w-px bg-[var(--border)]" />}
 
-        {/* 부서 영역 */}
-        {tree.isHospital ? (
-          // 병원: 진료부 / 간호부 / 행정관리부로 구분
+        {tree.isHospital && tree.divisions.length > 0 ? (
           <div className="w-full space-y-3">
             {tree.divisions.map((div) => (
               <DivisionSection key={div.name} division={div} onSelect={onSelect} />
             ))}
           </div>
+        ) : tree.departments.length > 0 ? (
+          <div className="no-scrollbar w-full overflow-x-auto">
+            <div className="flex items-start gap-3" style={{ minWidth: 'max-content' }}>
+              {tree.departments.map((dept) => (
+                <DepartmentColumn key={dept.name} department={dept} onSelect={onSelect} />
+              ))}
+            </div>
+          </div>
         ) : (
-          // 일반 회사: 평면 부서 목록
-          tree.departments.length > 0 ? (
-            <div className="no-scrollbar w-full overflow-x-auto">
-              <div className="flex items-start gap-3" style={{ minWidth: 'max-content' }}>
-                {tree.departments.map((dept) => (
-                  <DepartmentColumn key={dept.name} department={dept} onSelect={onSelect} />
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="w-full rounded-2xl border border-dashed border-[var(--border)] px-5 py-10 text-center text-sm font-medium text-[var(--toss-gray-3)]">
-              표시할 부서 정보가 없습니다.
-            </div>
-          )
+          <div className="w-full rounded-2xl border border-dashed border-[var(--border)] px-5 py-10 text-center text-sm font-medium text-[var(--toss-gray-3)]">
+            표시할 부서 정보가 없습니다.
+          </div>
         )}
       </div>
     </section>
@@ -486,6 +511,7 @@ export default function OrgChart({
   const [allStaffs, setAllStaffs] = useState<StaffMember[]>(() =>
     dedupeStaffs([...(orgChartDirectoryCache ?? []), ...staffs]),
   );
+  const [teamIndex, setTeamIndex] = useState<OrgTeamIndex>(() => orgTeamsCache ?? new Map());
   const [isLoadingDirectory, setIsLoadingDirectory] = useState(() => !orgChartDirectoryCache);
 
   useEffect(() => {
@@ -495,17 +521,18 @@ export default function OrgChart({
   useEffect(() => {
     let ignore = false;
     const load = async () => {
-      if (orgChartDirectoryCache) {
-        setAllStaffs((prev) => dedupeStaffs([...(orgChartDirectoryCache ?? []), ...prev, ...staffs]));
-        setIsLoadingDirectory(false);
-        return;
-      }
       setIsLoadingDirectory(true);
       try {
-        const directory = await fetchOrgChartDirectory();
-        if (!ignore) setAllStaffs((prev) => dedupeStaffs([...directory, ...prev, ...staffs]));
+        const [directory, teams] = await Promise.all([
+          fetchOrgChartDirectory(),
+          fetchOrgTeams(),
+        ]);
+        if (!ignore) {
+          setAllStaffs((prev) => dedupeStaffs([...directory, ...prev, ...staffs]));
+          setTeamIndex(teams);
+        }
       } catch (error) {
-        if (!ignore) console.error('조직도 전체 직원 로드 실패:', error);
+        if (!ignore) console.error('조직도 로드 실패:', error);
       } finally {
         if (!ignore) setIsLoadingDirectory(false);
       }
@@ -559,9 +586,9 @@ export default function OrgChart({
     }
 
     return Array.from(grouped.entries())
-      .map(([co, members]) => buildCompanyTree(co, members))
+      .map(([co, members]) => buildCompanyTree(co, members, teamIndex))
       .filter((t) => t.activeCount > 0);
-  }, [activeCompany, directoryStaffs]);
+  }, [activeCompany, directoryStaffs, teamIndex]);
 
   const searchResults = useMemo(() => {
     const term = normalizeText(searchTerm);
@@ -584,7 +611,6 @@ export default function OrgChart({
 
   return (
     <div data-testid="org-chart-pyramid-view" className="flex flex-col bg-[var(--page-bg)]">
-      {/* 헤더 */}
       <div className="sticky top-0 z-10 border-b border-[var(--border)] bg-[var(--card)] px-4 py-3 shadow-sm md:px-6">
         <div className="mx-auto w-full max-w-7xl space-y-3">
           <div className="flex items-center justify-between">
@@ -643,7 +669,6 @@ export default function OrgChart({
         </div>
       </div>
 
-      {/* 본문 */}
       <div className={`px-4 py-4 md:px-6 ${compact ? 'pb-4' : 'pb-6'}`}>
         <div className="mx-auto w-full max-w-7xl space-y-4">
           {searchTerm ? (
@@ -693,7 +718,6 @@ export default function OrgChart({
         </div>
       </div>
 
-      {/* 직원 상세 모달 */}
       {selectedStaff && (
         <div
           className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/45 backdrop-blur-sm md:items-center md:p-6"
