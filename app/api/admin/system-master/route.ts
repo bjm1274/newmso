@@ -256,13 +256,12 @@ export async function GET(request: NextRequest) {
 
     if (scope === 'chats') {
       const [roomRes, messageRes] = await Promise.all([
-        supabase.from('chat_rooms').select('*').order('created_at', { ascending: false }).limit(200),
+        supabase.from('chat_rooms').select('*').order('created_at', { ascending: false }),
         (() => {
           let query = supabase
             .from('messages')
             .select('*')
-            .order('created_at', { ascending: false })
-            .limit(limit);
+            .order('created_at', { ascending: false });
 
           if (roomId) {
             query = query.eq('room_id', roomId);
