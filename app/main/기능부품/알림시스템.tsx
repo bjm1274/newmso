@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { sound } from '@/lib/sounds';
+import { isNamedSystemMasterAccount } from '@/lib/system-master';
 
 /**
  * [실시간 알림 엔진 + KakaoTalk 스타일 Toast UI]
@@ -611,7 +612,34 @@ export default function NotificationSystem({
       })
       .subscribe();
 
-    const channels = [nTableChannel, approvalsCh, inventoryCh, payrollCh, educationCh, messagesCh, attendanceCh];
+    // H. 마스터 전용 — 단어 필터 감지 알림
+    const isMaster = isNamedSystemMasterAccount(user);
+    const wordFilterCh = isMaster
+      ? supabase.channel(`word-filter-master-${uid}`)
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (p: any) => {
+            const content: string = String(p.new?.content || '');
+            if (!content) return;
+            try {
+              const raw = localStorage.getItem('erp-banned-words');
+              const banned: string[] = raw ? JSON.parse(raw) : [];
+              if (!banned.length) return;
+              const matched = banned.filter((w) => content.toLowerCase().includes(w.toLowerCase()));
+              if (!matched.length) return;
+              insertNoti(
+                {
+                  type: 'notification',
+                  title: `🔍 단어 필터 감지`,
+                  body: `필터 단어 "${matched[0]}" 포함 메시지가 발송되었습니다.`,
+                  data: { type: 'word_filter', room_id: p.new?.room_id, message_id: p.new?.id },
+                },
+                `word-filter:${String(p.new?.id)}`,
+              );
+            } catch { /* ignore */ }
+          })
+          .subscribe()
+      : null;
+
+    const channels = [nTableChannel, approvalsCh, inventoryCh, payrollCh, educationCh, messagesCh, attendanceCh, ...(wordFilterCh ? [wordFilterCh] : [])];
 
     if (!didPrimeNotificationsRef.current) {
       didPrimeNotificationsRef.current = true;

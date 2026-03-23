@@ -385,11 +385,11 @@ function LeaderCard({ leader, onSelect }: { leader: StaffMember; onSelect: (s: S
 function ManagerRow({ managers, onSelect }: { managers: StaffMember[]; onSelect: (s: StaffMember) => void }) {
   if (managers.length === 0) return null;
   return (
-    <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card)] shadow-sm">
-      <div className="border-b border-[var(--border)] bg-[var(--muted)] px-3 py-1">
+    <div className="inline-flex flex-col items-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card)] shadow-sm">
+      <div className="w-full border-b border-[var(--border)] bg-[var(--muted)] px-3 py-1 text-center">
         <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">관리자</p>
       </div>
-      <div className="flex flex-wrap gap-1.5 p-2">
+      <div className="flex flex-wrap justify-center gap-1.5 px-3 py-2">
         {managers.map((staff) => (
           <button
             key={staff.id}
@@ -458,7 +458,7 @@ function CompanyPyramid({ tree, onSelect }: { tree: CompanyTree; onSelect: (s: S
         )}
         {tree.managers.length > 0 && (
           <>
-            <div className="w-full max-w-2xl">
+            <div className="flex justify-center w-full">
               <ManagerRow managers={tree.managers} onSelect={onSelect} />
             </div>
             <div className="h-3 w-px bg-[var(--border)]" />
@@ -734,8 +734,6 @@ export default function OrgChart({
               <InfoRow label="회사" value={getCompanyName(selectedStaff)} />
               <InfoRow label="부서" value={getDepartmentName(selectedStaff)} />
               <InfoRow label="사번" value={normalizeText(selectedStaff.employee_no) || '-'} />
-              <InfoRow label="연락처" value={normalizeText(selectedStaff.phone) || '-'} />
-              <InfoRow label="이메일" value={normalizeText(selectedStaff.email) || '-'} />
               <InfoRow label="내선" value={normalizeText(selectedStaff.extension) || '-'} />
             </div>
             <button
