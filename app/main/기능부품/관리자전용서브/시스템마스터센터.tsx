@@ -1,8 +1,69 @@
 'use client';
-﻿
-import { useCallback, useEffect, useMemo, useState } from 'react';
+
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import AnnualLeaveManualGrant from './연차수동부여';
 import { SYSTEM_MASTER_ACCOUNT_ID, isNamedSystemMasterAccount } from '@/lib/system-master';
+import { supabase } from '@/lib/supabase';
+import { toast } from '@/lib/toast';
+
+// ── 금지어 관리 ────────────────────────────────────────────────────────
+const BANNED_WORDS_KEY = 'erp-banned-words';
+const DEFAULT_BANNED = ['씨발', '개새끼', '병신', '지랄', '미친놈', '꺼져', '죽어', '쓰레기', '찐따', 'ㅅㅂ', 'ㅂㅅ', 'ㅈㄹ'];
+
+function loadBannedWords(): string[] {
+  if (typeof window === 'undefined') return DEFAULT_BANNED;
+  try { const r = localStorage.getItem(BANNED_WORDS_KEY); return r ? JSON.parse(r) : DEFAULT_BANNED; } catch { return DEFAULT_BANNED; }
+}
+function saveBannedWords(words: string[]) { localStorage.setItem(BANNED_WORDS_KEY, JSON.stringify(words)); }
+function hasBanned(content: string, banned: string[]) { const l = content.toLowerCase(); return banned.some((w) => l.includes(w.toLowerCase())); }
+function highlightBanned(content: string, banned: string[]): React.ReactNode[] {
+  if (!banned.length) return [content];
+  const pattern = banned.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+  const regex = new RegExp(`(${pattern})`, 'gi');
+  return content.split(regex).map((part, i) =>
+    banned.some((w) => part.toLowerCase() === w.toLowerCase())
+      ? <mark key={i} className="bg-red-400 text-white rounded px-0.5">{part}</mark>
+      : part
+  );
+}
+
+function BannedWordModal({ onClose }: { onClose: () => void }) {
+  const [words, setWords] = useState<string[]>(loadBannedWords);
+  const [input, setInput] = useState('');
+  const add = () => {
+    const w = input.trim(); if (!w) return;
+    if (words.includes(w)) { toast('이미 등록된 단어입니다.', 'warning'); return; }
+    const next = [...words, w]; setWords(next); saveBannedWords(next); setInput(''); toast(`"${w}" 등록 완료`, 'success');
+  };
+  const remove = (w: string) => { const next = words.filter((x) => x !== w); setWords(next); saveBannedWords(next); };
+  const reset = () => { if (!confirm('기본 금지어로 초기화하시겠습니까?')) return; setWords(DEFAULT_BANNED); saveBannedWords(DEFAULT_BANNED); toast('초기화 완료', 'success'); };
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] shadow-xl w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-bold text-[var(--foreground)]">🔍 단어 필터</h3>
+          <button onClick={onClose} className="text-[var(--toss-gray-3)] hover:text-[var(--foreground)] text-lg">×</button>
+        </div>
+        <div className="flex gap-2 mb-3">
+          <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} placeholder="금지어 입력 후 Enter" className="flex-1 px-3 py-1.5 text-sm border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--page-bg)] text-[var(--foreground)] outline-none focus:border-[var(--accent)]" />
+          <button onClick={add} className="px-3 py-1.5 bg-[var(--accent)] text-white text-xs font-bold rounded-[var(--radius-md)]">추가</button>
+        </div>
+        <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto mb-4 p-2 bg-[var(--page-bg)] rounded-[var(--radius-md)] border border-[var(--border)]">
+          {words.length === 0 && <p className="text-xs text-[var(--toss-gray-3)]">등록된 금지어 없음</p>}
+          {words.map((w) => (
+            <span key={w} className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs font-semibold rounded-full">
+              {w}<button onClick={() => remove(w)} className="hover:text-red-900 font-bold">×</button>
+            </span>
+          ))}
+        </div>
+        <div className="flex gap-2 justify-end">
+          <button onClick={reset} className="px-3 py-1.5 text-xs text-[var(--toss-gray-3)] border border-[var(--border)] rounded-[var(--radius-md)] hover:bg-[var(--muted)]">기본값으로 초기화</button>
+          <button onClick={onClose} className="px-3 py-1.5 bg-[var(--accent)] text-white text-xs font-bold rounded-[var(--radius-md)]">확인</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 type MasterTabId = '개요' | '변경이력' | '전체채팅' | '연차수동부여';
 
@@ -67,6 +128,10 @@ export default function SystemMasterCenter({
   const [showSensitiveRaw, setShowSensitiveRaw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [bannedWords, setBannedWords] = useState<string[]>(loadBannedWords);
+  const [showBannedModal, setShowBannedModal] = useState(false);
+  const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);
+  const [deletingMsgId, setDeletingMsgId] = useState<string | null>(null);
 
   const isSystemMaster = isNamedSystemMasterAccount(user);
 
@@ -411,6 +476,10 @@ export default function SystemMasterCenter({
         </section>
       )}
 
+      {showBannedModal && (
+        <BannedWordModal onClose={() => { setBannedWords(loadBannedWords()); setShowBannedModal(false); }} />
+      )}
+
       {activeTab === '전체채팅' && (
         <section className="grid gap-3 xl:grid-cols-[300px_minmax(0,1fr)]">
           <article className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
@@ -447,17 +516,37 @@ export default function SystemMasterCenter({
                     : '전체 최근 대화'}
                 </p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2 items-center">
+                {(() => {
+                  const flagged = chatMessages.filter((m: any) => m.content && hasBanned(m.content, bannedWords)).length;
+                  return flagged > 0 ? (
+                    <span className="text-[11px] font-bold text-red-600 bg-red-50 border border-red-200 px-2.5 py-1 rounded-full">🔍 필터 단어 {flagged}건</span>
+                  ) : null;
+                })()}
+                <button
+                  type="button"
+                  onClick={() => setShowFlaggedOnly((v) => !v)}
+                  className={`h-9 px-3 text-xs font-bold rounded-[var(--radius-md)] border transition ${showFlaggedOnly ? 'bg-red-500 text-white border-red-500' : 'border-[var(--border)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)]'}`}
+                >
+                  선택검색
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowBannedModal(true)}
+                  className="h-9 px-3 text-xs font-bold rounded-[var(--radius-md)] border border-[var(--border)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)] transition"
+                >
+                  단어 필터
+                </button>
                 <input
                   value={chatKeyword}
                   onChange={(event) => setChatKeyword(event.target.value)}
                   placeholder="대화 내용 검색"
-                  className="h-11 min-w-[220px] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 text-sm font-medium text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+                  className="h-9 min-w-[180px] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-4 text-sm font-medium text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
                 />
                 <button
                   type="button"
                   onClick={() => void loadChats()}
-                  className="h-11 rounded-[var(--radius-lg)] bg-[var(--foreground)] px-5 text-sm font-bold text-white"
+                  className="h-9 rounded-[var(--radius-lg)] bg-[var(--foreground)] px-4 text-sm font-bold text-white"
                 >
                   조회
                 </button>
@@ -473,38 +562,63 @@ export default function SystemMasterCenter({
                     <th className="px-3 py-3">발신자</th>
                     <th className="px-3 py-3">내용</th>
                     <th className="px-3 py-3">첨부</th>
+                    <th className="px-3 py-3">삭제</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {chatMessages.map((message: any) => (
-                    <tr key={message.id} className="border-t border-[var(--border)] align-top">
-                      <td className="px-3 py-3 text-[var(--toss-gray-4)]">{new Date(message.created_at).toLocaleString('ko-KR')}</td>
-                      <td className="px-3 py-3">
-                        <p className="font-semibold text-[var(--foreground)]">{message.room_label}</p>
-                        {message.edited_at && <p className="mt-1 text-[11px] text-amber-600">수정됨</p>}
-                        {message.is_deleted && <p className="mt-1 text-[11px] text-red-500">삭제 처리</p>}
-                      </td>
-                      <td className="px-3 py-3">
-                        <p className="font-semibold text-[var(--foreground)]">{message.sender_name}</p>
-                        <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{message.sender_company || '-'}</p>
-                      </td>
-                      <td className="px-3 py-3 text-[var(--foreground)]">{message.content || '(내용 없음)'}</td>
-                      <td className="px-3 py-3">
-                        {message.file_url ? (
-                          <a
-                            href={message.file_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-[var(--accent)] underline"
-                          >
-                            첨부 보기
-                          </a>
-                        ) : (
-                          <span className="text-[var(--toss-gray-3)]">-</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                  {chatMessages
+                    .filter((message: any) => !showFlaggedOnly || (message.content && hasBanned(message.content, bannedWords)))
+                    .map((message: any) => {
+                      const flagged = message.content && hasBanned(message.content, bannedWords);
+                      return (
+                        <tr key={message.id} className={`border-t border-[var(--border)] align-top ${flagged ? 'bg-red-50' : ''}`}>
+                          <td className="px-3 py-3 text-[var(--toss-gray-4)] whitespace-nowrap">{new Date(message.created_at).toLocaleString('ko-KR')}</td>
+                          <td className="px-3 py-3">
+                            <p className="font-semibold text-[var(--foreground)]">{message.room_label}</p>
+                            {message.edited_at && <p className="mt-1 text-[11px] text-amber-600">수정됨</p>}
+                            {message.is_deleted && <p className="mt-1 text-[11px] text-red-500">삭제 처리</p>}
+                          </td>
+                          <td className="px-3 py-3">
+                            <p className="font-semibold text-[var(--foreground)]">{message.sender_name}</p>
+                            <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">{message.sender_company || '-'}</p>
+                          </td>
+                          <td className="px-3 py-3 text-[var(--foreground)]">
+                            {message.content
+                              ? (flagged ? <span>{highlightBanned(message.content, bannedWords)}</span> : message.content)
+                              : <span className="text-[var(--toss-gray-3)]">(내용 없음)</span>}
+                            {flagged && <span className="ml-1 text-red-500 font-bold text-[11px]">●</span>}
+                          </td>
+                          <td className="px-3 py-3">
+                            {message.file_url ? (
+                              <a href={message.file_url} target="_blank" rel="noreferrer" className="text-[var(--accent)] underline">첨부 보기</a>
+                            ) : (
+                              <span className="text-[var(--toss-gray-3)]">-</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-3">
+                            <button
+                              type="button"
+                              disabled={deletingMsgId === message.id}
+                              onClick={async () => {
+                                if (!confirm('이 메시지를 삭제하시겠습니까?')) return;
+                                setDeletingMsgId(message.id);
+                                const { error: delErr } = await supabase.from('messages').delete().eq('id', message.id);
+                                if (delErr) { toast('삭제 실패: ' + delErr.message, 'error'); }
+                                else { setChatMessages((prev: any[]) => prev.filter((m: any) => m.id !== message.id)); toast('삭제 완료', 'success'); }
+                                setDeletingMsgId(null);
+                              }}
+                              className={`px-2 py-1 text-[11px] font-bold rounded-[var(--radius-md)] transition ${
+                                flagged
+                                  ? 'bg-red-500 text-white hover:bg-red-600'
+                                  : 'border border-[var(--border)] text-[var(--toss-gray-3)] hover:bg-red-500 hover:text-white hover:border-red-500'
+                              }`}
+                            >
+                              {deletingMsgId === message.id ? '…' : '삭제'}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                 </tbody>
               </table>
             </div>
