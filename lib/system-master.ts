@@ -1,4 +1,4 @@
-const SYSTEM_MASTER_ACCOUNT_ID = 'bjm127';
+const SYSTEM_MASTER_ACCOUNT_ID = '9999';
 
 function normalizeIdentifier(value: unknown) {
   return String(value ?? '').trim().toLowerCase();
