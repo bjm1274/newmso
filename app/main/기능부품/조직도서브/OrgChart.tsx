@@ -142,17 +142,19 @@ function compareStaff(a: StaffMember, b: StaffMember) {
 
 function pickLeader(staffs: StaffMember[]) {
   if (!staffs.length) return null;
-  const sorted = [...staffs].sort((a, b) => {
-    const posA = normalizeText(a.position);
-    const posB = normalizeText(b.position);
-    const idxA = findBestKeywordIndex(posA, LEADER_KEYWORDS);
-    const idxB = findBestKeywordIndex(posB, LEADER_KEYWORDS);
-    const scoreA = idxA >= 0 ? LEADER_KEYWORDS.length - idxA : 0;
-    const scoreB = idxB >= 0 ? LEADER_KEYWORDS.length - idxB : 0;
+  // LEADER_KEYWORDS에 매칭되는 사람만 후보로
+  const candidates = staffs.filter(
+    (s) => findBestKeywordIndex(normalizeText(s.position), LEADER_KEYWORDS) >= 0,
+  );
+  if (!candidates.length) return null;
+  return candidates.sort((a, b) => {
+    const idxA = findBestKeywordIndex(normalizeText(a.position), LEADER_KEYWORDS);
+    const idxB = findBestKeywordIndex(normalizeText(b.position), LEADER_KEYWORDS);
+    const scoreA = LEADER_KEYWORDS.length - idxA;
+    const scoreB = LEADER_KEYWORDS.length - idxB;
     if (scoreB !== scoreA) return scoreB - scoreA;
     return compareStaff(a, b);
-  });
-  return sorted[0] ?? null;
+  })[0] ?? null;
 }
 
 function isManagerStaff(staff: StaffMember) {
@@ -310,7 +312,7 @@ function buildCompanyTree(
 
 function Avatar({ staff, size = 'md' }: { staff: StaffMember; size?: 'sm' | 'md' | 'lg' }) {
   const sizeClass =
-    size === 'lg' ? 'h-12 w-12 text-base' : size === 'sm' ? 'h-8 w-8 text-xs' : 'h-10 w-10 text-sm';
+    size === 'lg' ? 'h-8 w-8 text-xs' : size === 'sm' ? 'h-6 w-6 text-[10px]' : 'h-7 w-7 text-[11px]';
   const palette = [
     'bg-sky-100 text-sky-700',
     'bg-emerald-100 text-emerald-700',
@@ -333,12 +335,12 @@ function StaffChip({ staff, onSelect }: { staff: StaffMember; onSelect: (s: Staf
     <button
       type="button"
       onClick={() => onSelect(staff)}
-      className="flex w-full items-center gap-2.5 rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-left transition hover:border-[var(--accent)]/30 hover:bg-[var(--toss-blue-light)]/60 hover:shadow-sm active:scale-[0.98]"
+      className="flex w-full items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--card)] px-2 py-1.5 text-left transition hover:border-[var(--accent)]/30 hover:bg-[var(--toss-blue-light)]/60 active:scale-[0.98]"
     >
       <Avatar staff={staff} size="sm" />
       <div className="min-w-0">
-        <p className="truncate text-sm font-bold text-[var(--foreground)]">{normalizeText(staff.name)}</p>
-        <p className="truncate text-xs text-[var(--toss-gray-3)]">{normalizeText(staff.position) || '직급 미지정'}</p>
+        <p className="truncate text-xs font-bold text-[var(--foreground)]">{normalizeText(staff.name)}</p>
+        <p className="truncate text-[10px] text-[var(--toss-gray-3)]">{normalizeText(staff.position) || '직급 미지정'}</p>
       </div>
     </button>
   );
@@ -346,18 +348,18 @@ function StaffChip({ staff, onSelect }: { staff: StaffMember; onSelect: (s: Staf
 
 function DepartmentColumn({ department, onSelect }: { department: DepartmentGroup; onSelect: (s: StaffMember) => void }) {
   return (
-    <section className="w-[200px] shrink-0 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-sm">
-      <div className={`bg-gradient-to-r ${department.accentClass} px-4 py-3`}>
-        <p className="text-sm font-bold text-white">{department.name}</p>
-        <p className="mt-0.5 text-xs font-medium text-white/80">{department.members.length}명</p>
+    <section className="w-[110px] shrink-0 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card)] shadow-sm">
+      <div className={`bg-gradient-to-r ${department.accentClass} px-2.5 py-1.5`}>
+        <p className="text-xs font-bold text-white truncate">{department.name}</p>
+        <p className="text-[10px] font-medium text-white/80">{department.members.length}명</p>
       </div>
-      <div className="space-y-2 p-3">
+      <div className="space-y-1 p-1.5">
         {department.members.length > 0 ? (
           department.members.map((staff) => (
             <StaffChip key={staff.id} staff={staff} onSelect={onSelect} />
           ))
         ) : (
-          <p className="py-3 text-center text-xs text-[var(--toss-gray-3)]">–</p>
+          <p className="py-2 text-center text-[10px] text-[var(--toss-gray-3)]">–</p>
         )}
       </div>
     </section>
@@ -369,12 +371,12 @@ function LeaderCard({ leader, onSelect }: { leader: StaffMember; onSelect: (s: S
     <button
       type="button"
       onClick={() => onSelect(leader)}
-      className="flex items-center gap-3 rounded-2xl border border-[var(--accent)]/20 bg-[var(--card)] px-5 py-4 shadow-md transition hover:border-[var(--accent)]/40 hover:shadow-lg active:scale-[0.98]"
+      className="flex items-center gap-2 rounded-xl border border-[var(--accent)]/20 bg-[var(--card)] px-3 py-2 shadow-sm transition hover:border-[var(--accent)]/40 hover:shadow-md active:scale-[0.98]"
     >
       <Avatar staff={leader} size="lg" />
       <div className="text-left">
-        <p className="text-lg font-black tracking-tight text-[var(--foreground)]">{normalizeText(leader.name)}</p>
-        <p className="text-sm font-semibold text-[var(--toss-gray-3)]">{normalizeText(leader.position) || '대표'}</p>
+        <p className="text-sm font-black tracking-tight text-[var(--foreground)]">{normalizeText(leader.name)}</p>
+        <p className="text-xs font-semibold text-[var(--toss-gray-3)]">{normalizeText(leader.position) || '대표'}</p>
       </div>
     </button>
   );
@@ -383,22 +385,22 @@ function LeaderCard({ leader, onSelect }: { leader: StaffMember; onSelect: (s: S
 function ManagerRow({ managers, onSelect }: { managers: StaffMember[]; onSelect: (s: StaffMember) => void }) {
   if (managers.length === 0) return null;
   return (
-    <div className="mx-auto w-full max-w-3xl overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-sm">
-      <div className="border-b border-[var(--border)] bg-[var(--muted)] px-4 py-2">
-        <p className="text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">관리자</p>
+    <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card)] shadow-sm">
+      <div className="border-b border-[var(--border)] bg-[var(--muted)] px-3 py-1">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">관리자</p>
       </div>
-      <div className="flex flex-wrap justify-center gap-2 p-4">
+      <div className="flex flex-wrap gap-1.5 p-2">
         {managers.map((staff) => (
           <button
             key={staff.id}
             type="button"
             onClick={() => onSelect(staff)}
-            className="flex items-center gap-2.5 rounded-xl border border-[var(--border)] bg-[var(--page-bg)] px-3 py-2.5 transition hover:border-[var(--accent)]/30 hover:bg-[var(--toss-blue-light)]/60 hover:shadow-sm active:scale-[0.98]"
+            className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--page-bg)] px-2 py-1.5 transition hover:border-[var(--accent)]/30 hover:bg-[var(--toss-blue-light)]/60 active:scale-[0.98]"
           >
             <Avatar staff={staff} size="sm" />
             <div className="text-left">
-              <p className="text-sm font-bold text-[var(--foreground)]">{normalizeText(staff.name)}</p>
-              <p className="text-xs text-[var(--toss-gray-3)]">
+              <p className="text-xs font-bold text-[var(--foreground)]">{normalizeText(staff.name)}</p>
+              <p className="text-[10px] text-[var(--toss-gray-3)]">
                 {normalizeText(staff.position)} · {getDepartmentName(staff)}
               </p>
             </div>
@@ -412,22 +414,22 @@ function ManagerRow({ managers, onSelect }: { managers: StaffMember[]; onSelect:
 function DivisionSection({ division, onSelect }: { division: DivisionGroup; onSelect: (s: StaffMember) => void }) {
   const totalMembers = division.departments.reduce((sum, d) => sum + d.members.length, 0);
   return (
-    <div className={`overflow-hidden rounded-2xl border ${division.borderClass} ${division.bgClass}`}>
-      <div className={`${division.headerClass} px-4 py-2.5`}>
-        <p className="text-sm font-bold">{division.name}</p>
-        <p className="text-xs font-medium opacity-80">{division.departments.length}개 팀 · {totalMembers}명</p>
+    <div className="shrink-0 flex flex-col">
+      {/* 부 헤더 */}
+      <div className={`${division.headerClass} rounded-t-xl px-2.5 py-1.5`}>
+        <p className="text-xs font-bold whitespace-nowrap">{division.name}</p>
+        <p className="text-[10px] font-medium opacity-80">{division.departments.length}팀 · {totalMembers}명</p>
       </div>
+      {/* 팀 컬럼들 (가로 배열) */}
       {division.departments.length > 0 ? (
-        <div className="no-scrollbar overflow-x-auto p-3">
-          <div className="flex items-start gap-3" style={{ minWidth: 'max-content' }}>
-            {division.departments.map((dept) => (
-              <DepartmentColumn key={dept.name} department={dept} onSelect={onSelect} />
-            ))}
-          </div>
+        <div className={`flex items-start gap-1.5 rounded-b-xl border-x border-b ${division.borderClass} ${division.bgClass} p-1.5`}>
+          {division.departments.map((dept) => (
+            <DepartmentColumn key={dept.name} department={dept} onSelect={onSelect} />
+          ))}
         </div>
       ) : (
-        <div className="px-4 py-6 text-center text-xs font-medium text-[var(--toss-gray-3)]">
-          소속 팀원이 없습니다.
+        <div className={`rounded-b-xl border-x border-b ${division.borderClass} ${division.bgClass} px-3 py-4 text-center text-[10px] text-[var(--toss-gray-3)]`}>
+          팀원 없음
         </div>
       )}
     </div>
@@ -436,50 +438,50 @@ function DivisionSection({ division, onSelect }: { division: DivisionGroup; onSe
 
 function CompanyPyramid({ tree, onSelect }: { tree: CompanyTree; onSelect: (s: StaffMember) => void }) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--page-bg)] shadow-sm">
-      <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--card)] px-5 py-4">
+    <section className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--page-bg)] shadow-sm">
+      {/* 헤더 */}
+      <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--card)] px-4 py-2.5">
         <div>
-          <h3 className="font-bold text-[var(--foreground)]">{tree.company}</h3>
-          <p className="mt-0.5 text-xs font-medium text-[var(--toss-gray-3)]">재직 {tree.activeCount}명</p>
+          <h3 className="text-sm font-bold text-[var(--foreground)]">{tree.company}</h3>
+          <p className="text-[10px] font-medium text-[var(--toss-gray-3)]">재직 {tree.activeCount}명</p>
         </div>
-        <span className="rounded-full bg-[var(--muted)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">
-          ORG
-        </span>
+        <span className="rounded-full bg-[var(--muted)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">ORG</span>
       </div>
 
-      <div className="flex flex-col items-center gap-0 px-5 py-5">
-        {tree.leader ? (
-          <LeaderCard leader={tree.leader} onSelect={onSelect} />
-        ) : (
-          <div className="rounded-2xl border border-dashed border-[var(--border)] px-8 py-5 text-sm font-medium text-[var(--toss-gray-3)]">
-            대표자 정보가 없습니다.
-          </div>
+      {/* 상단: 대표 → 관리자 (중앙 정렬) */}
+      <div className="flex flex-col items-center gap-2 px-4 pt-4 pb-2">
+        {tree.leader && (
+          <>
+            <LeaderCard leader={tree.leader} onSelect={onSelect} />
+            <div className="h-3 w-px bg-[var(--border)]" />
+          </>
         )}
+        {tree.managers.length > 0 && (
+          <>
+            <div className="w-full max-w-2xl">
+              <ManagerRow managers={tree.managers} onSelect={onSelect} />
+            </div>
+            <div className="h-3 w-px bg-[var(--border)]" />
+          </>
+        )}
+      </div>
 
-        <div className="h-8 w-px bg-[var(--border)]" />
-
-        <div className="w-full">
-          <ManagerRow managers={tree.managers} onSelect={onSelect} />
-        </div>
-
-        {tree.managers.length > 0 && <div className="h-8 w-px bg-[var(--border)]" />}
-
+      {/* 하단: 부서/부 — 가운데 정렬 + 넘치면 좌우 슬라이드 */}
+      <div className="no-scrollbar overflow-x-auto pb-4">
         {tree.isHospital && tree.divisions.length > 0 ? (
-          <div className="w-full space-y-3">
+          <div className="flex justify-center gap-3 px-4" style={{ minWidth: 'max-content' }}>
             {tree.divisions.map((div) => (
               <DivisionSection key={div.name} division={div} onSelect={onSelect} />
             ))}
           </div>
         ) : tree.departments.length > 0 ? (
-          <div className="no-scrollbar w-full overflow-x-auto">
-            <div className="flex items-start gap-3" style={{ minWidth: 'max-content' }}>
-              {tree.departments.map((dept) => (
-                <DepartmentColumn key={dept.name} department={dept} onSelect={onSelect} />
-              ))}
-            </div>
+          <div className="flex justify-center gap-2 px-4" style={{ minWidth: 'max-content' }}>
+            {tree.departments.map((dept) => (
+              <DepartmentColumn key={dept.name} department={dept} onSelect={onSelect} />
+            ))}
           </div>
         ) : (
-          <div className="w-full rounded-2xl border border-dashed border-[var(--border)] px-5 py-10 text-center text-sm font-medium text-[var(--toss-gray-3)]">
+          <div className="mx-4 rounded-xl border border-dashed border-[var(--border)] px-5 py-8 text-center text-xs font-medium text-[var(--toss-gray-3)]">
             표시할 부서 정보가 없습니다.
           </div>
         )}
@@ -611,66 +613,60 @@ export default function OrgChart({
 
   return (
     <div data-testid="org-chart-pyramid-view" className="flex flex-col bg-[var(--page-bg)]">
-      <div className="sticky top-0 z-10 border-b border-[var(--border)] bg-[var(--card)] px-4 py-3 shadow-sm md:px-6">
-        <div className="mx-auto w-full max-w-7xl space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-black tracking-tight text-[var(--foreground)]">조직도</h2>
-              <p className="text-xs font-medium text-[var(--toss-gray-3)]">
-                전체 재직 {activeCount}명
-                {isLoadingDirectory && (
-                  <span className="ml-2 rounded-full bg-[var(--muted)] px-2 py-0.5 text-[10px] font-semibold">
-                    불러오는 중…
-                  </span>
-                )}
-              </p>
-            </div>
+      <div className="sticky top-0 z-10 border-b border-[var(--border)] bg-[var(--card)] px-3 py-1.5 shadow-sm">
+        <div className="flex items-center gap-3">
+          {/* 타이틀 */}
+          <div className="shrink-0 flex items-baseline gap-1.5">
+            <h2 className="text-sm font-black tracking-tight text-[var(--foreground)]">조직도</h2>
+            <span className="text-[10px] font-medium text-[var(--toss-gray-3)]">
+              {activeCount}명{isLoadingDirectory && ' …'}
+            </span>
           </div>
 
-          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <div className="no-scrollbar flex gap-1.5 overflow-x-auto pb-0.5">
-              {companyOptions.map((company) => {
-                const active = activeCompany === company;
-                return (
-                  <button
-                    key={company}
-                    type="button"
-                    onClick={() => setSelectedCo?.(company === COMPANY_ALL ? null : company)}
-                    className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
-                      active
-                        ? 'bg-[var(--accent)] text-white shadow-sm'
-                        : 'border border-[var(--border)] bg-[var(--card)] text-[var(--toss-gray-3)] hover:border-[var(--accent)]/30 hover:text-[var(--foreground)]'
-                    }`}
-                  >
-                    {company}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="relative w-full md:max-w-xs">
-              <input
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="이름, 직급, 부서, 회사 검색"
-                className="w-full rounded-xl border border-[var(--border)] bg-[var(--card)] px-3.5 py-2 text-sm font-medium text-[var(--foreground)] outline-none transition placeholder:text-[var(--toss-gray-3)] focus:border-[var(--accent)]/50 focus:ring-2 focus:ring-[var(--accent)]/20"
-              />
-              {searchTerm && (
+          {/* 회사 탭 */}
+          <div className="no-scrollbar flex flex-1 gap-1 overflow-x-auto">
+            {companyOptions.map((company) => {
+              const active = activeCompany === company;
+              return (
                 <button
+                  key={company}
                   type="button"
-                  onClick={() => setSearchTerm('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-base leading-none text-[var(--toss-gray-3)] hover:text-[var(--foreground)]"
+                  onClick={() => setSelectedCo?.(company === COMPANY_ALL ? null : company)}
+                  className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold transition ${
+                    active
+                      ? 'bg-[var(--accent)] text-white'
+                      : 'border border-[var(--border)] bg-[var(--card)] text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'
+                  }`}
                 >
-                  ×
+                  {company}
                 </button>
-              )}
-            </div>
+              );
+            })}
+          </div>
+
+          {/* 검색 */}
+          <div className="relative shrink-0">
+            <input
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="검색"
+              className="w-28 rounded-lg border border-[var(--border)] bg-[var(--card)] px-2 py-1 text-[11px] text-[var(--foreground)] outline-none transition placeholder:text-[var(--toss-gray-3)] focus:border-[var(--accent)]/50 focus:w-44 focus:ring-1 focus:ring-[var(--accent)]/20"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-sm leading-none text-[var(--toss-gray-3)] hover:text-[var(--foreground)]"
+              >
+                ×
+              </button>
+            )}
           </div>
         </div>
       </div>
 
-      <div className={`px-4 py-4 md:px-6 ${compact ? 'pb-4' : 'pb-6'}`}>
-        <div className="mx-auto w-full max-w-7xl space-y-4">
+      <div className={`px-2 py-3 md:px-4 ${compact ? 'pb-4' : 'pb-6'}`}>
+        <div className="w-full space-y-4">
           {searchTerm ? (
             <section className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
               <div className="mb-3 flex items-center gap-2">
