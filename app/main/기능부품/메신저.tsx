@@ -165,8 +165,9 @@ function getKoreanTodayString() {
 function getRoomDisplayName(room: ChatRoom | null | undefined, staffs: StaffMember[], currentUserId: string | null | undefined): string {
   if (!room) return '채팅방';
   if (room.id === NOTICE_ROOM_ID) return NOTICE_ROOM_NAME;
-  if (room.type === 'direct') {
-    const members = normalizeMemberIds(room.members);
+  // 2명 초과(그룹화된 방)면 room.name 우선 사용
+  const members = normalizeMemberIds(room.members);
+  if (room.type === 'direct' && members.length <= 2) {
     const otherStaff = staffs.find(
       ( staff: StaffMember) =>
         members.includes(String(staff.id)) &&
@@ -766,6 +767,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   const [addMemberSearch, setAddMemberSearch] = useState('');
   const deferredAddMemberSearch = useDeferredValue(addMemberSearch);
   const [addMemberSelectingIds, setAddMemberSelectingIds] = useState<string[]>([]);
+  // 기본 접힌 상태 — 펼쳐진 팀만 별도 추적
+  const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set());
+  const toggleDept = (key: string) =>
+    setExpandedDepts((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
 
   const [threadRoot, setThreadRoot] = useState<any | null>(null);
 
@@ -1493,7 +1502,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         ? selectedRoom.members.map((id: unknown) => String(id))
         : []
     );
-    return staffs
+    return allKnownStaffs
+      .filter(( s: StaffMember) => s.status !== '퇴사' && s.status !== '퇴직')
       .filter(( s: StaffMember) => !currentMemberIds.has(String(s.id)))
       .filter(( s: StaffMember) => {
         if (!deferredAddMemberSearch.trim()) return true;
@@ -1504,7 +1514,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           s.position?.includes(key)
         );
       });
-  }, [selectedRoom, staffs, deferredAddMemberSearch]);
+  }, [selectedRoom, allKnownStaffs, deferredAddMemberSearch]);
 
   const visibleRooms = useMemo(
     () => {
@@ -1674,8 +1684,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
   const handleLeaveRoom = async () => {
     if (!selectedRoom) return;
-    if (selectedRoom.id === NOTICE_ROOM_ID && !isMso) {
-      toast('공지 메시지 방은 관리자 확인 없이 직원 임의로 나갈 수 없습니다.', 'warning');
+    if (selectedRoom.id === NOTICE_ROOM_ID) {
+      toast('공지 메시지 방은 나갈 수 없습니다.', 'warning');
       return;
     }
     if (!confirm('이 채팅방에서 나가시겠습니까? 나간 뒤에는 다시 초대를 받아야 입장할 수 있습니다.')) return;
@@ -2044,7 +2054,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
   const groupedStaffs = useMemo(() => {
     const grouped: Record<string, Record<string, any[]>> = {};
-    staffs.forEach(( s: StaffMember) => {
+    allKnownStaffs.forEach(( s: StaffMember) => {
+      if (s.status === '퇴사' || s.status === '퇴직') return;
       const company = s.company || '기타';
       const dept = s.department || '미지정';
       if (!grouped[company]) grouped[company] = {};
@@ -2052,7 +2063,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       grouped[company][dept].push(s);
     });
     return grouped;
-  }, [staffs]);
+  }, [allKnownStaffs]);
 
   const openDirectChat = useCallback(async ( staff: StaffMember) => {
     const otherId = String(staff?.id || '').trim();
@@ -2289,17 +2300,23 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         setGlobalSearchResults([]);
         return;
       }
+      const q = globalSearchQuery.trim();
+      // 대화내용 + 파일URL(파일명·사진명) 통합 OR 검색
       const { data, error } = await supabase
         .from('messages')
         .select('*')
         .in('room_id', visibleRoomIds)
-        .ilike('content', `%${globalSearchQuery}%`)
+        .or(`content.ilike.%${q}%,file_url.ilike.%${q}%`)
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(100);
 
       if (error) throw error;
       const messageRows = Array.isArray(data) ? data : [];
       const relatedRoomIds = Array.from(new Set(messageRows.map(( message: ChatMessage) => String(message.room_id)).filter(Boolean)));
+      if (relatedRoomIds.length === 0) {
+        setGlobalSearchResults([]);
+        return;
+      }
       const { data: roomRows, error: roomError } = await supabase
         .from('chat_rooms')
         .select('id, name, type, members')
@@ -2480,55 +2497,42 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     <div data-testid="chat-view" className="flex flex-1 min-h-0 overflow-hidden relative font-sans bg-[var(--background)] md:h-[100dvh] md:max-h-[100dvh] md:bg-[var(--card)]">
       <aside className={`${selectedRoomId ? 'hidden md:flex' : 'flex'} w-full md:w-80 border-r border-[var(--border)] dark:border-zinc-800 bg-[var(--card)] dark:bg-zinc-950 flex-col shrink-0 z-50 transition-all`}>
         <div className="p-4 md:p-4 space-y-4 flex flex-col min-h-0">
-          <div className="flex gap-1 bg-[var(--tab-bg)] dark:bg-zinc-800 p-1 rounded-xl glass">
+          <div className="flex items-center gap-1">
+            <div className="flex flex-1 gap-1 bg-[var(--tab-bg)] dark:bg-zinc-800 p-1 rounded-xl glass">
+              <button
+                data-testid="chat-tab-chat"
+                onClick={() => setViewMode('chat')}
+                className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all ${viewMode === 'chat'
+                  ? 'bg-[var(--card)] dark:bg-zinc-700 text-foreground shadow-premium'
+                  : 'text-[var(--toss-gray-4)] hover:text-[var(--toss-gray-5)] dark:hover:text-[var(--toss-gray-3)]'
+                  }`}
+              >
+                채팅
+              </button>
+              <button
+                data-testid="chat-tab-org"
+                onClick={() => setViewMode('org')}
+                className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all ${viewMode === 'org'
+                  ? 'bg-[var(--card)] dark:bg-zinc-700 text-foreground shadow-premium'
+                  : 'text-[var(--toss-gray-4)] hover:text-[var(--toss-gray-5)] dark:hover:text-[var(--toss-gray-3)]'
+                  }`}
+              >
+                조직도
+              </button>
+            </div>
+            {/* 통합 검색 버튼 — 항상 노출 */}
             <button
-              data-testid="chat-tab-chat"
-              onClick={() => setViewMode('chat')}
-              className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all ${viewMode === 'chat'
-                ? 'bg-[var(--card)] dark:bg-zinc-700 text-foreground shadow-premium'
-                : 'text-[var(--toss-gray-4)] hover:text-[var(--toss-gray-5)] dark:hover:text-[var(--toss-gray-3)]'
-                }`}
+              data-testid="chat-open-global-search"
+              onClick={() => setShowGlobalSearch(true)}
+              title="대화내용·파일·사진 통합 검색"
+              className="shrink-0 flex items-center justify-center w-8 h-8 rounded-xl bg-[var(--tab-bg)] dark:bg-zinc-800 text-[var(--toss-gray-4)] hover:text-[var(--accent)] hover:bg-[var(--toss-blue-light)] transition-all"
             >
-              채팅
-            </button>
-            <button
-              data-testid="chat-tab-org"
-              onClick={() => setViewMode('org')}
-              className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all ${viewMode === 'org'
-                ? 'bg-[var(--card)] dark:bg-zinc-700 text-foreground shadow-premium'
-                : 'text-[var(--toss-gray-4)] hover:text-[var(--toss-gray-5)] dark:hover:text-[var(--toss-gray-3)]'
-                }`}
-            >
-              조직도
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="9" cy="9" r="6"/><line x1="15" y1="15" x2="19" y2="19"/>
+              </svg>
             </button>
           </div>
 
-          <div className="flex items-center justify-between px-1">
-            <span className="text-[10px] font-bold text-[var(--toss-gray-3)] uppercase tracking-widest leading-none">
-              {viewMode === 'chat' ? '최근 대화' : '조직도'}
-            </span>
-            {viewMode === 'chat' && (
-              <>
-              <button
-                type="button"
-                data-testid="chat-open-group-modal"
-                onClick={() => setShowGroupModal(true)}
-                className="text-[12px] text-[var(--toss-gray-3)] hover:text-emerald-500 transition-colors p-1 flex items-center justify-center shrink-0"
-                title="새 그룹 채팅방 만들기"
-              >
-                +
-              </button>
-              <button
-                data-testid="chat-open-global-search"
-                onClick={() => setShowGlobalSearch(true)}
-                className="text-[12px] text-[var(--toss-gray-3)] hover:text-blue-500 transition-colors p-1 flex items-center justify-center shrink-0"
-                title="채팅 내용 전체 검색"
-              >
-                검색
-              </button>
-              </>
-            )}
-          </div>
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-6 space-y-2 custom-scrollbar">
@@ -2620,44 +2624,60 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 })}
             </>
           ) : (
-            <div data-testid="chat-org-list" className="space-y-4">
+            <div data-testid="chat-org-list" className="space-y-3">
               {Object.entries(groupedStaffs).map(([company, depts]) => (
-                <div key={company} className="space-y-4">
-                  <div className="flex items-center gap-2 px-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                    <h3 className="text-[11px] font-black text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)] uppercase tracking-wider">{company}</h3>
-                    <div className="flex-1 h-[1px] bg-[var(--tab-bg)] dark:bg-zinc-800/50"></div>
+                <div key={company} className="space-y-1">
+                  {/* 회사 헤더 */}
+                  <div className="flex items-center gap-2 px-1 py-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                    <h3 className="text-[11px] font-black text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)] uppercase tracking-wider truncate">{company}</h3>
+                    <div className="flex-1 h-[1px] bg-[var(--tab-bg)] dark:bg-zinc-800/50" />
                   </div>
-                  <div className="space-y-5 pl-1">
-                    {Object.entries(depts).map(([dept, members]) => (
-                      <div key={dept} className="space-y-2">
-                        <p className="text-[10px] font-bold text-[var(--toss-gray-3)] dark:text-[var(--toss-gray-4)] ml-1">{dept}</p>
-                        <div className="space-y-1">
-                          {members.map(( s: StaffMember) => (
-                            <div key={s.id} className="flex items-center gap-3 p-2.5 bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border-subtle)] dark:border-zinc-800/50 rounded-xl hover:border-blue-400/50 dark:hover:border-blue-500/50 cursor-pointer transition-all group">
-                              <div className="w-8 h-8 bg-[var(--tab-bg)] dark:bg-zinc-800 rounded-lg flex items-center justify-center text-xs font-bold text-[var(--toss-gray-3)] overflow-hidden shrink-0">
-                                {s.photo_url ? <img src={s.photo_url} alt={s.name} className="w-full h-full object-cover" /> : s.name[0]}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-1.5">
-                                  <p className="text-xs font-bold text-foreground truncate">{s.name}</p>
-                                  <span className="text-[10px] font-medium text-[var(--toss-gray-3)]">{s.position}</span>
+                  {/* 팀(부서) — 클릭 시 접기/펼치기 */}
+                  <div className="space-y-0.5 pl-1">
+                    {Object.entries(depts as Record<string, StaffMember[]>).map(([dept, members]) => {
+                      const key = `${company}::${dept}`;
+                      const collapsed = !expandedDepts.has(key);
+                      return (
+                        <div key={dept}>
+                          {/* 팀 헤더 (토글 버튼) */}
+                          <button
+                            type="button"
+                            onClick={() => toggleDept(key)}
+                            className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800/60 transition-colors text-left"
+                          >
+                            <span className={`text-[9px] text-[var(--toss-gray-3)] transition-transform duration-200 ${collapsed ? '-rotate-90' : 'rotate-0'}`}>▼</span>
+                            <span className="text-[10px] font-bold text-[var(--toss-gray-3)] dark:text-[var(--toss-gray-4)] flex-1 truncate">{dept}</span>
+                            <span className="text-[9px] font-semibold text-[var(--toss-gray-3)] shrink-0">{(members as StaffMember[]).length}명</span>
+                          </button>
+                          {/* 팀원 목록 (접힐 때 숨김) */}
+                          {!collapsed && (
+                            <div className="space-y-0.5 pl-2 pt-0.5 pb-1">
+                              {(members as StaffMember[]).map((s: StaffMember) => (
+                                <div key={s.id} className="flex items-center gap-2.5 px-2 py-2 bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border-subtle)] dark:border-zinc-800/50 rounded-xl hover:border-blue-400/50 dark:hover:border-blue-500/50 transition-all group cursor-default">
+                                  <div className="w-7 h-7 bg-[var(--tab-bg)] dark:bg-zinc-800 rounded-lg flex items-center justify-center text-[11px] font-bold text-[var(--toss-gray-3)] overflow-hidden shrink-0">
+                                    {s.photo_url ? <img src={s.photo_url} alt={s.name} className="w-full h-full object-cover" /> : s.name?.[0]}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-1">
+                                      <p className="text-[11px] font-bold text-foreground truncate">{s.name}</p>
+                                      <span className="text-[9px] font-medium text-[var(--toss-gray-3)] shrink-0">{s.position}</span>
+                                    </div>
+                                  </div>
+                                  <button
+                                    data-testid={`chat-direct-${s.id}`}
+                                    onClick={() => void openDirectChat(s)}
+                                    className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-md text-[9px] font-bold opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-all border border-blue-100 dark:border-blue-800/50 shrink-0"
+                                  >
+                                    대화
+                                  </button>
                                 </div>
-                              </div>
-                              <button
-                                data-testid={`chat-direct-${s.id}`}
-                                onClick={() => {
-                                  void openDirectChat(s);
-                                }}
-                                className="px-3 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg text-[10px] font-bold opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-all border border-blue-100 dark:border-blue-800/50"
-                              >
-                                대화
-                              </button>
+                              ))}
                             </div>
-                          ))}
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               ))}
@@ -3230,9 +3250,53 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 </div>
               </div>
 
-              <div className="p-4 bg-[var(--tab-bg)] dark:bg-zinc-800/50 border-t border-[var(--border)] flex gap-2">
-            <button onClick={() => { setShowDrawer(false); handleLeaveRoom(); }} className="flex-1 py-3 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-xl text-[11px] font-bold hover:bg-red-100 transition-colors">방 나가기</button>
-                <button onClick={() => { setEditingRoomName(true); setRoomNameDraft(selectedRoom?.name || ''); }} className="flex-1 py-3 bg-[var(--muted)] text-foreground rounded-xl text-[11px] font-bold hover:bg-[var(--toss-gray-2)] transition-colors">이름 수정</button>
+              <div className="p-4 bg-[var(--tab-bg)] dark:bg-zinc-800/50 border-t border-[var(--border)] flex flex-col gap-2">
+                {/* 이름 수정 인라인 폼 */}
+                {editingRoomName ? (
+                  <div className="flex gap-2">
+                    <input
+                      autoFocus
+                      value={roomNameDraft}
+                      onChange={e => setRoomNameDraft(e.target.value)}
+                      onKeyDown={async e => {
+                        if (e.key === 'Enter') {
+                          const name = roomNameDraft.trim();
+                          if (!name || !selectedRoom) return;
+                          await supabase.from('chat_rooms').update({ name }).eq('id', selectedRoom.id);
+                          setChatRooms(prev => prev.map((r: ChatRoom) => r.id === selectedRoom.id ? { ...r, name } : r));
+                          setEditingRoomName(false);
+                          toast('채팅방 이름이 변경되었습니다.');
+                        }
+                        if (e.key === 'Escape') setEditingRoomName(false);
+                      }}
+                      placeholder="새 채팅방 이름"
+                      className="flex-1 px-3 py-2 rounded-xl border border-[var(--border)] bg-[var(--card)] text-sm font-bold outline-none focus:border-[var(--accent)]"
+                    />
+                    <button
+                      onClick={async () => {
+                        const name = roomNameDraft.trim();
+                        if (!name || !selectedRoom) return;
+                        await supabase.from('chat_rooms').update({ name }).eq('id', selectedRoom.id);
+                        setChatRooms(prev => prev.map((r: ChatRoom) => r.id === selectedRoom.id ? { ...r, name } : r));
+                        setEditingRoomName(false);
+                        toast('채팅방 이름이 변경되었습니다.');
+                      }}
+                      className="px-3 py-2 bg-[var(--accent)] text-white rounded-xl text-xs font-bold"
+                    >저장</button>
+                    <button onClick={() => setEditingRoomName(false)} className="px-3 py-2 bg-[var(--muted)] rounded-xl text-xs font-bold">취소</button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    {selectedRoom?.id !== NOTICE_ROOM_ID && (
+                      <button onClick={() => { setShowDrawer(false); handleLeaveRoom(); }} className="flex-1 py-2.5 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-xl text-[11px] font-bold hover:bg-red-100 transition-colors">방 나가기</button>
+                    )}
+                    {/* 이름 수정: 그룹방 or 멤버 3명 이상(direct→그룹 전환) */}
+                    {selectedRoom?.id !== NOTICE_ROOM_ID &&
+                      (selectedRoom?.type !== 'direct' || (Array.isArray(selectedRoom?.members) && selectedRoom.members.length > 2)) && (
+                      <button onClick={() => { setEditingRoomName(true); setRoomNameDraft(selectedRoom?.name || ''); }} className="flex-1 py-2.5 bg-[var(--muted)] text-foreground rounded-xl text-[11px] font-bold hover:bg-[var(--toss-gray-2)] transition-colors">이름 수정</button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </>
@@ -4069,36 +4133,47 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       )}
 
       {showGlobalSearch && (
-        <div data-testid="chat-global-search-modal" className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-start md:items-center justify-center p-4 pt-12 md:p-4 animate-in fade-in" onClick={() => setShowGlobalSearch(false)}>
+        <div data-testid="chat-global-search-modal" className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-start md:items-center justify-center p-4 pt-12 md:p-4 animate-in fade-in" onClick={() => { setShowGlobalSearch(false); setGlobalSearchQuery(''); setGlobalSearchResults([]); }}>
           <div className="bg-[var(--card)] dark:bg-zinc-900 w-full max-w-2xl rounded-2xl shadow-sm overflow-hidden flex flex-col max-h-[80vh] md:max-h-[85vh] border border-[var(--border)] dark:border-zinc-800" onClick={e => e.stopPropagation()}>
-            <div className="p-4 md:p-4 border-b border-[var(--border-subtle)] dark:border-zinc-800 flex items-center gap-3">
-              <span className="text-xl">🔎</span>
+            {/* 검색 헤더 */}
+            <div className="p-3 border-b border-[var(--border)] dark:border-zinc-800 flex items-center gap-2">
+              <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-[var(--toss-gray-3)]">
+                <circle cx="9" cy="9" r="6"/><line x1="15" y1="15" x2="19" y2="19"/>
+              </svg>
               <input
                 data-testid="chat-global-search-input"
                 autoFocus
                 value={globalSearchQuery}
                 onChange={e => setGlobalSearchQuery(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleGlobalSearch()}
-                placeholder="전체 채팅방 내용 검색..."
-                className="flex-1 bg-transparent text-foreground text-sm font-bold outline-none placeholder:text-[var(--toss-gray-3)]"
+                placeholder="대화내용, 파일명, 사진명 통합 검색..."
+                className="flex-1 bg-transparent text-foreground text-sm font-bold outline-none placeholder:text-[var(--toss-gray-3)] placeholder:font-normal"
               />
               <button
                 data-testid="chat-global-search-submit"
                 onClick={handleGlobalSearch}
-                className="px-4 py-2 bg-[var(--accent)] text-white font-bold text-xs rounded-xl shadow-sm hover:opacity-90 transition-opacity whitespace-nowrap"
+                className="px-3 py-1.5 bg-[var(--accent)] text-white font-bold text-xs rounded-lg hover:opacity-90 transition-opacity whitespace-nowrap"
               >
-                {globalSearchLoading ? '검색중...' : '검색'}
+                {globalSearchLoading ? '검색중…' : '검색'}
               </button>
-              <button onClick={() => setShowGlobalSearch(false)} className="ml-2 text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] text-lg font-bold">닫기</button>
+              <button onClick={() => { setShowGlobalSearch(false); setGlobalSearchQuery(''); setGlobalSearchResults([]); }} className="text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] text-lg font-bold leading-none px-1">×</button>
             </div>
-            <div className="flex-1 overflow-y-auto custom-scrollbar bg-[var(--tab-bg)] dark:bg-zinc-950 p-4 md:p-4">
+
+            {/* 결과 목록 */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar bg-[var(--tab-bg)] dark:bg-zinc-950 p-3">
+              {globalSearchLoading && (
+                <div className="h-40 flex items-center justify-center text-sm text-[var(--toss-gray-3)] font-bold">검색 중…</div>
+              )}
               {!globalSearchLoading && globalSearchResults.length === 0 && globalSearchQuery.trim() && (
                 <div className="h-40 flex flex-col items-center justify-center text-[var(--toss-gray-3)]">
-                  <span className="text-3xl mb-2">무</span>
                   <p className="text-sm font-bold">검색 결과가 없습니다.</p>
+                  <p className="text-xs mt-1 text-[var(--toss-gray-3)]">대화내용, 파일명, 사진명으로 검색됩니다.</p>
                 </div>
               )}
-              <div className="space-y-3">
+              {!globalSearchLoading && globalSearchResults.length > 0 && (
+                <p className="text-[10px] font-bold text-[var(--toss-gray-3)] mb-2 px-1">{globalSearchResults.length}건 검색됨</p>
+              )}
+              <div className="space-y-2">
                 {globalSearchResults.map((msg: ChatMessage) => {
                   type SearchRoom = { name?: string; type?: string; members?: string[] };
                   const msgRoom = (msg.chat_rooms as SearchRoom | null | undefined);
@@ -4107,30 +4182,40 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     const otherStaff = allKnownStaffs.find(( s: StaffMember) => msgRoom.members!.includes(String(s.id)) && String(s.id) !== effectiveChatUserId);
                     if (otherStaff) roomName = otherStaff.name;
                   }
+                  const fileUrl = msg.file_url || '';
+                  const isImage = /\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(fileUrl);
+                  const isFile = !!fileUrl && !isImage;
+                  const fileName = fileUrl ? decodeURIComponent(fileUrl.split('/').pop()?.split('?')[0] || '') : '';
                   return (
                     <div
                       data-testid={`chat-global-search-result-${msg.id}`}
                       key={msg.id}
-                      onClick={() => {
-                        setRoom(msg.room_id);
-                        setShowGlobalSearch(false);
-                      }}
-                      className="group p-4 bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border)] dark:border-zinc-800 rounded-2xl cursor-pointer hover:border-[var(--accent)] hover:shadow-md transition-all"
+                      onClick={() => { setRoom(msg.room_id); setShowGlobalSearch(false); setGlobalSearchQuery(''); setGlobalSearchResults([]); }}
+                      className="group p-3 bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border)] dark:border-zinc-800 rounded-xl cursor-pointer hover:border-[var(--accent)] hover:shadow-sm transition-all"
                     >
-                      <div className="flex items-center justify-between mb-2 gap-4">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="px-2 py-0.5 bg-[var(--tab-bg)] dark:bg-zinc-800 text-[var(--toss-gray-4)] rounded text-[10px] font-bold truncate shrink-0 max-w-[120px]">
+                      <div className="flex items-center justify-between mb-1.5 gap-3">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="px-1.5 py-0.5 bg-[var(--muted)] dark:bg-zinc-800 text-[var(--toss-gray-4)] rounded text-[10px] font-bold truncate shrink-0 max-w-[110px]">
                             {roomName}
                           </span>
-                          <span className="text-[11px] font-bold text-foreground truncate">{(msg.staff as { name?: string } | null | undefined)?.name || '이름 없음'}</span>
+                          <span className="text-[11px] font-bold text-foreground truncate">{(msg.staff as { name?: string } | null | undefined)?.name || '알 수 없음'}</span>
+                          {isImage && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold shrink-0">사진</span>}
+                          {isFile && <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-bold shrink-0">파일</span>}
                         </div>
-                        <span className="text-[10px] font-bold text-[var(--toss-gray-3)] shrink-0">
-                          {new Date(msg.created_at || 0).toLocaleDateString()} {new Date(msg.created_at || 0).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        <span className="text-[10px] font-medium text-[var(--toss-gray-3)] shrink-0">
+                          {new Date(msg.created_at || 0).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })} {new Date(msg.created_at || 0).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
-                      <p className="text-[12px] font-semibold text-[var(--toss-gray-5)] dark:text-[var(--toss-gray-3)] line-clamp-2 leading-relaxed">
-                        {msg.content || (msg.file_url ? '첨부 파일' : '')}
-                      </p>
+                      {msg.content && (
+                        <p className="text-[12px] font-semibold text-[var(--toss-gray-5)] dark:text-[var(--toss-gray-3)] line-clamp-2 leading-relaxed">
+                          {msg.content}
+                        </p>
+                      )}
+                      {fileName && (
+                        <p className="text-[11px] font-semibold text-[var(--toss-gray-4)] truncate mt-0.5">
+                          📎 {fileName}
+                        </p>
+                      )}
                     </div>
                   );
                 })}
