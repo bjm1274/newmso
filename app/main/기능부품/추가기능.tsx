@@ -6,6 +6,56 @@ import { canAccessExtraFeature } from '@/lib/access-control';
 import ThemeToggle from '@/app/components/ThemeToggle';
 import GlobalSearch from '@/app/components/GlobalSearch';
 
+// ─── 글씨 크기 조절 ────────────────────────────────────────────────────────────
+const FONT_SIZES = [
+  { label: '기본', value: 15 },
+  { label: '하', value: 17 },
+  { label: '중', value: 19 },
+  { label: '대', value: 21 },
+];
+const FONT_SIZE_KEY = 'erp-font-size';
+
+function applyFontSize(px: number) {
+  document.documentElement.style.fontSize = `${px}px`;
+}
+
+function FontSizeControl() {
+  const [current, setCurrent] = useState<number>(() => {
+    if (typeof window === 'undefined') return 15;
+    return Number(localStorage.getItem(FONT_SIZE_KEY) || 15);
+  });
+
+  useEffect(() => {
+    applyFontSize(current);
+  }, [current]);
+
+  const change = (px: number) => {
+    setCurrent(px);
+    localStorage.setItem(FONT_SIZE_KEY, String(px));
+    applyFontSize(px);
+  };
+
+  return (
+    <div className="inline-flex h-8 items-center gap-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 shadow-sm">
+      <span className="text-[10px] font-semibold text-[var(--toss-gray-3)] mr-0.5">글씨</span>
+      {FONT_SIZES.map((s) => (
+        <button
+          key={s.value}
+          type="button"
+          onClick={() => change(s.value)}
+          className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-all ${
+            current === s.value
+              ? 'bg-[var(--accent)] text-white'
+              : 'text-[var(--toss-gray-4)] hover:bg-[var(--muted)]'
+          }`}
+        >
+          {s.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 const DepartmentInventoryView = dynamic(() => import('./재고관리서브/부서별물품장비현황'), {
   ssr: false,
   loading: () => <SubviewLoading label="부서별 재고" />,
@@ -239,12 +289,13 @@ export default function ExtraFeatures({
 
   const compactToolbar = (
     <div className="flex items-center gap-2">
-      <div className="inline-flex items-center gap-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 py-1 shadow-sm">
+      <FontSizeControl />
+      <div className="inline-flex h-8 items-center gap-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 shadow-sm">
         <span className="text-[10px] font-semibold text-[var(--toss-gray-3)]">모드</span>
         <ThemeToggle compact />
       </div>
       {onSearchSelect ? (
-        <div className="inline-flex items-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-1 py-1 shadow-sm">
+        <div className="inline-flex h-8 items-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-1 shadow-sm">
           <GlobalSearch
             user={user}
             staffs={staffs}
