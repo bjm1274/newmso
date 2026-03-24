@@ -1,0 +1,827 @@
+{
+  "generated_at": "2026-03-24T08:16:00.072Z",
+  "apply": true,
+  "scanned_rows": 335,
+  "duplicate_group_count": 18,
+  "duplicate_row_count": 36,
+  "duplicate_groups": [
+    {
+      "groupKey": "4796a0b0-f593-47a5-82e0-8db8f036d546::message:3c768bda-1570-4694-827a-fa5ca44c18ac",
+      "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+      "type": "message",
+      "dedupe_key": "message:3c768bda-1570-4694-827a-fa5ca44c18ac",
+      "count": 2,
+      "canonical_id": "56615986-d5f3-4150-aa67-174bfe584ed2",
+      "canonical_created_at": "2026-03-24T08:15:46.303+00:00",
+      "canonical_read_at": null,
+      "merged_read_at": null,
+      "delete_ids": [
+        "81286d00-9bb1-49d0-bd7e-7c5329122b29"
+      ],
+      "rows": [
+        {
+          "id": "56615986-d5f3-4150-aa67-174bfe584ed2",
+          "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+          "type": "message",
+          "title": "김이지",
+          "body": "대단한 능력을",
+          "metadata": {
+            "id": "3c768bda-1570-4694-827a-fa5ca44c18ac",
+            "room_id": "f617317c-f7fd-4152-9708-a00bcb57167e",
+            "dedupe_key": "message:3c768bda-1570-4694-827a-fa5ca44c18ac",
+            "sender_name": "김이지"
+          },
+          "created_at": "2026-03-24T08:15:46.303+00:00",
+          "read_at": null
+        },
+        {
+          "id": "81286d00-9bb1-49d0-bd7e-7c5329122b29",
+          "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+          "type": "message",
+          "title": "김이지",
+          "body": "대단한 능력을",
+          "metadata": {
+            "id": "3c768bda-1570-4694-827a-fa5ca44c18ac",
+            "room_id": "f617317c-f7fd-4152-9708-a00bcb57167e",
+            "dedupe_key": "message:3c768bda-1570-4694-827a-fa5ca44c18ac",
+            "sender_name": "김이지"
+          },
+          "created_at": "2026-03-24T08:15:46.3+00:00",
+          "read_at": null
+        }
+      ]
+    },
+    {
+      "groupKey": "4796a0b0-f593-47a5-82e0-8db8f036d546::message:1fcb0416-610a-41ae-b4d4-9a72d22d804b",
+      "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+      "type": "message",
+      "dedupe_key": "message:1fcb0416-610a-41ae-b4d4-9a72d22d804b",
+      "count": 2,
+      "canonical_id": "450e120c-4b2b-4dc7-b087-19702c557352",
+      "canonical_created_at": "2026-03-24T08:15:44.011+00:00",
+      "canonical_read_at": null,
+      "merged_read_at": null,
+      "delete_ids": [
+        "8b9be56a-54a4-41ee-82fd-66fbd58fa345"
+      ],
+      "rows": [
+        {
+          "id": "450e120c-4b2b-4dc7-b087-19702c557352",
+          "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+          "type": "message",
+          "title": "김이지",
+          "body": "모두가 알아줬음 좋겠다",
+          "metadata": {
+            "id": "1fcb0416-610a-41ae-b4d4-9a72d22d804b",
+            "room_id": "f617317c-f7fd-4152-9708-a00bcb57167e",
+            "dedupe_key": "message:1fcb0416-610a-41ae-b4d4-9a72d22d804b",
+            "sender_name": "김이지"
+          },
+          "created_at": "2026-03-24T08:15:44.011+00:00",
+          "read_at": null
+        },
+        {
+          "id": "8b9be56a-54a4-41ee-82fd-66fbd58fa345",
+          "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+          "type": "message",
+          "title": "김이지",
+          "body": "모두가 알아줬음 좋겠다",
+          "metadata": {
+            "id": "1fcb0416-610a-41ae-b4d4-9a72d22d804b",
+            "room_id": "f617317c-f7fd-4152-9708-a00bcb57167e",
+            "dedupe_key": "message:1fcb0416-610a-41ae-b4d4-9a72d22d804b",
+            "sender_name": "김이지"
+          },
+          "created_at": "2026-03-24T08:15:44.011+00:00",
+          "read_at": null
+        }
+      ]
+    },
+    {
+      "groupKey": "4796a0b0-f593-47a5-82e0-8db8f036d546::message:fd66a664-116a-4bd0-8100-ab8db7a17a84",
+      "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+      "type": "message",
+      "dedupe_key": "message:fd66a664-116a-4bd0-8100-ab8db7a17a84",
+      "count": 2,
+      "canonical_id": "29f14a24-c44e-4e50-b395-0c2d81b62a5a",
+      "canonical_created_at": "2026-03-24T08:15:33.958+00:00",
+      "canonical_read_at": null,
+      "merged_read_at": null,
+      "delete_ids": [
+        "477974d8-a71c-4dbd-bf2b-e57e4e748e1c"
+      ],
+      "rows": [
+        {
+          "id": "29f14a24-c44e-4e50-b395-0c2d81b62a5a",
+          "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+          "type": "message",
+          "title": "김이지",
+          "body": "똑또기.. 최고의 상사",
+          "metadata": {
+            "id": "fd66a664-116a-4bd0-8100-ab8db7a17a84",
+            "room_id": "f617317c-f7fd-4152-9708-a00bcb57167e",
+            "dedupe_key": "message:fd66a664-116a-4bd0-8100-ab8db7a17a84",
+            "sender_name": "김이지"
+          },
+          "created_at": "2026-03-24T08:15:33.958+00:00",
+          "read_at": null
+        },
+        {
+          "id": "477974d8-a71c-4dbd-bf2b-e57e4e748e1c",
+          "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+          "type": "message",
+          "title": "김이지",
+          "body": "똑또기.. 최고의 상사",
+          "metadata": {
+            "id": "fd66a664-116a-4bd0-8100-ab8db7a17a84",
+            "room_id": "f617317c-f7fd-4152-9708-a00bcb57167e",
+            "dedupe_key": "message:fd66a664-116a-4bd0-8100-ab8db7a17a84",
+            "sender_name": "김이지"
+          },
+          "created_at": "2026-03-24T08:15:33.948+00:00",
+          "read_at": null
+        }
+      ]
+    },
+    {
+      "groupKey": "4796a0b0-f593-47a5-82e0-8db8f036d546::message:5eb9eee2-1304-48bf-ad22-0731029a192d",
+      "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+      "type": "message",
+      "dedupe_key": "message:5eb9eee2-1304-48bf-ad22-0731029a192d",
+      "count": 2,
+      "canonical_id": "ccbf33b3-fe63-4081-960b-7b57cf5d03cb",
+      "canonical_created_at": "2026-03-24T08:15:02.958+00:00",
+      "canonical_read_at": null,
+      "merged_read_at": null,
+      "delete_ids": [
+        "7d39287d-ebce-4a54-9f26-7c027a90a21b"
+      ],
+      "rows": [
+        {
+          "id": "ccbf33b3-fe63-4081-960b-7b57cf5d03cb",
+          "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+          "type": "message",
+          "title": "김이지",
+          "body": "수정되면 다 해결될거같아요",
+          "metadata": {
+            "id": "5eb9eee2-1304-48bf-ad22-0731029a192d",
+            "room_id": "f617317c-f7fd-4152-9708-a00bcb57167e",
+            "dedupe_key": "message:5eb9eee2-1304-48bf-ad22-0731029a192d",
+            "sender_name": "김이지"
+          },
+          "created_at": "2026-03-24T08:15:02.958+00:00",
+          "read_at": null
+        },
+        {
+          "id": "7d39287d-ebce-4a54-9f26-7c027a90a21b",
+          "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+          "type": "message",
+          "title": "김이지",
+          "body": "수정되면 다 해결될거같아요",
+          "metadata": {
+            "id": "5eb9eee2-1304-48bf-ad22-0731029a192d",
+            "room_id": "f617317c-f7fd-4152-9708-a00bcb57167e",
+            "dedupe_key": "message:5eb9eee2-1304-48bf-ad22-0731029a192d",
+            "sender_name": "김이지"
+          },
+          "created_at": "2026-03-24T08:15:02.955+00:00",
+          "read_at": null
+        }
+      ]
+    },
+    {
+      "groupKey": "4796a0b0-f593-47a5-82e0-8db8f036d546::message:525c9b97-6b42-4957-9473-4905b975b9c0",
+      "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+      "type": "message",
+      "dedupe_key": "message:525c9b97-6b42-4957-9473-4905b975b9c0",
+      "count": 2,
+      "canonical_id": "6e3c3bab-3ba6-4cfc-b17b-c24529d9d5fb",
+      "canonical_created_at": "2026-03-24T08:15:00.143+00:00",
+      "canonical_read_at": null,
+      "merged_read_at": null,
+      "delete_ids": [
+        "c3735958-0d04-4755-bed1-e2fd31f38730"
+      ],
+      "rows": [
+        {
+          "id": "6e3c3bab-3ba6-4cfc-b17b-c24529d9d5fb",
+          "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+          "type": "message",
+          "title": "김이지",
+          "body": "메시지 읽는 기능이",
+          "metadata": {
+            "id": "525c9b97-6b42-4957-9473-4905b975b9c0",
+            "room_id": "f617317c-f7fd-4152-9708-a00bcb57167e",
+            "dedupe_key": "message:525c9b97-6b42-4957-9473-4905b975b9c0",
+            "sender_name": "김이지"
+          },
+          "created_at": "2026-03-24T08:15:00.143+00:00",
+          "read_at": null
+        },
+        {
+          "id": "c3735958-0d04-4755-bed1-e2fd31f38730",
+          "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+          "type": "message",
+          "title": "김이지",
+          "body": "메시지 읽는 기능이",
+          "metadata": {
+            "id": "525c9b97-6b42-4957-9473-4905b975b9c0",
+            "room_id": "f617317c-f7fd-4152-9708-a00bcb57167e",
+            "dedupe_key": "message:525c9b97-6b42-4957-9473-4905b975b9c0",
+            "sender_name": "김이지"
+          },
+          "created_at": "2026-03-24T08:15:00.07+00:00",
+          "read_at": null
+        }
+      ]
+    },
+    {
+      "groupKey": "4796a0b0-f593-47a5-82e0-8db8f036d546::message:935cf0aa-48f4-423d-91a6-92bf84582182",
+      "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+      "type": "message",
+      "dedupe_key": "message:935cf0aa-48f4-423d-91a6-92bf84582182",
+      "count": 2,
+      "canonical_id": "76a70a83-3137-467b-8922-422f02bc4e6d",
+      "canonical_created_at": "2026-03-24T08:12:33.583+00:00",
+      "canonical_read_at": "2026-03-24T08:13:20.522+00:00",
+      "merged_read_at": "2026-03-24T08:13:20.522+00:00",
+      "delete_ids": [
+        "cf79f513-5d48-4f44-8422-d20e932a2fca"
+      ],
+      "rows": [
+        {
+          "id": "76a70a83-3137-467b-8922-422f02bc4e6d",
+          "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+          "type": "message",
+          "title": "김이지",
+          "body": "123",
+          "metadata": {
+            "id": "935cf0aa-48f4-423d-91a6-92bf84582182",
+            "room_id": "f617317c-f7fd-4152-9708-a00bcb57167e",
+            "dedupe_key": "message:935cf0aa-48f4-423d-91a6-92bf84582182",
+            "sender_name": "김이지"
+          },
+          "created_at": "2026-03-24T08:12:33.583+00:00",
+          "read_at": "2026-03-24T08:13:20.522+00:00"
+        },
+        {
+          "id": "cf79f513-5d48-4f44-8422-d20e932a2fca",
+          "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+          "type": "message",
+          "title": "김이지",
+          "body": "123",
+          "metadata": {
+            "id": "935cf0aa-48f4-423d-91a6-92bf84582182",
+            "room_id": "f617317c-f7fd-4152-9708-a00bcb57167e",
+            "dedupe_key": "message:935cf0aa-48f4-423d-91a6-92bf84582182",
+            "sender_name": "김이지"
+          },
+          "created_at": "2026-03-24T08:12:33.579+00:00",
+          "read_at": "2026-03-24T08:13:20.522+00:00"
+        }
+      ]
+    },
+    {
+      "groupKey": "38bd18fa-36ce-46d5-bb51-b9c55ac166e7::message:e6f95c16-ba29-44e3-81c2-fb9daefcd9cd",
+      "user_id": "38bd18fa-36ce-46d5-bb51-b9c55ac166e7",
+      "type": "message",
+      "dedupe_key": "message:e6f95c16-ba29-44e3-81c2-fb9daefcd9cd",
+      "count": 2,
+      "canonical_id": "63e8daf4-9ed9-4d6c-a09a-d9cf5f3ffc23",
+      "canonical_created_at": "2026-03-24T08:05:44.07+00:00",
+      "canonical_read_at": null,
+      "merged_read_at": null,
+      "delete_ids": [
+        "0df56fca-f72a-4afb-9b70-2eff46eebe7d"
+      ],
+      "rows": [
+        {
+          "id": "63e8daf4-9ed9-4d6c-a09a-d9cf5f3ffc23",
+          "user_id": "38bd18fa-36ce-46d5-bb51-b9c55ac166e7",
+          "type": "message",
+          "title": "김이지",
+          "body": "ㅇ",
+          "metadata": {
+            "id": "e6f95c16-ba29-44e3-81c2-fb9daefcd9cd",
+            "room_id": "1d9d11ba-d7d2-48a3-b412-77f6baacee13",
+            "dedupe_key": "message:e6f95c16-ba29-44e3-81c2-fb9daefcd9cd",
+            "sender_name": "김이지"
+          },
+          "created_at": "2026-03-24T08:05:44.07+00:00",
+          "read_at": null
+        },
+        {
+          "id": "0df56fca-f72a-4afb-9b70-2eff46eebe7d",
+          "user_id": "38bd18fa-36ce-46d5-bb51-b9c55ac166e7",
+          "type": "message",
+          "title": "김이지",
+          "body": "ㅇ",
+          "metadata": {
+            "id": "e6f95c16-ba29-44e3-81c2-fb9daefcd9cd",
+            "room_id": "1d9d11ba-d7d2-48a3-b412-77f6baacee13",
+            "dedupe_key": "message:e6f95c16-ba29-44e3-81c2-fb9daefcd9cd",
+            "sender_name": "김이지"
+          },
+          "created_at": "2026-03-24T08:05:43.001+00:00",
+          "read_at": null
+        }
+      ]
+    },
+    {
+      "groupKey": "fad75292-64f8-453a-b45d-9ea0baa42971::attendance:62693a48-9a76-4516-8cd0-7a06197201b1:late",
+      "user_id": "fad75292-64f8-453a-b45d-9ea0baa42971",
+      "type": "attendance",
+      "dedupe_key": "attendance:62693a48-9a76-4516-8cd0-7a06197201b1:late",
+      "count": 2,
+      "canonical_id": "44934922-56c7-4002-9681-f5babdc7ea97",
+      "canonical_created_at": "2026-03-24T05:26:56.35+00:00",
+      "canonical_read_at": null,
+      "merged_read_at": null,
+      "delete_ids": [
+        "4e03eed0-581f-486f-9fde-e1592048138e"
+      ],
+      "rows": [
+        {
+          "id": "44934922-56c7-4002-9681-f5babdc7ea97",
+          "user_id": "fad75292-64f8-453a-b45d-9ea0baa42971",
+          "type": "attendance",
+          "title": "⏰ 지각 등록",
+          "body": "오늘 출근이 지각으로 기록되었습니다.",
+          "metadata": {
+            "id": "62693a48-9a76-4516-8cd0-7a06197201b1",
+            "type": "attendance",
+            "dedupe_key": "attendance:62693a48-9a76-4516-8cd0-7a06197201b1:late"
+          },
+          "created_at": "2026-03-24T05:26:56.35+00:00",
+          "read_at": null
+        },
+        {
+          "id": "4e03eed0-581f-486f-9fde-e1592048138e",
+          "user_id": "fad75292-64f8-453a-b45d-9ea0baa42971",
+          "type": "attendance",
+          "title": "⏰ 지각 등록",
+          "body": "오늘 출근이 지각으로 기록되었습니다.",
+          "metadata": {
+            "id": "62693a48-9a76-4516-8cd0-7a06197201b1",
+            "type": "attendance",
+            "dedupe_key": "attendance:62693a48-9a76-4516-8cd0-7a06197201b1:late"
+          },
+          "created_at": "2026-03-24T05:26:55.683+00:00",
+          "read_at": null
+        }
+      ]
+    },
+    {
+      "groupKey": "76ddb717-6f2f-46ee-aa76-1db2ae11f359::attendance:d7605d74-3595-4646-9f92-6f41e88c6a70:late",
+      "user_id": "76ddb717-6f2f-46ee-aa76-1db2ae11f359",
+      "type": "attendance",
+      "dedupe_key": "attendance:d7605d74-3595-4646-9f92-6f41e88c6a70:late",
+      "count": 2,
+      "canonical_id": "918e0b73-5f8a-48be-bab5-75a9eb0eb64f",
+      "canonical_created_at": "2026-03-24T05:23:54.768+00:00",
+      "canonical_read_at": "2026-03-24T05:24:41.249+00:00",
+      "merged_read_at": "2026-03-24T05:24:41.249+00:00",
+      "delete_ids": [
+        "1be8fe2c-6997-4867-b347-f3ef3f5fdf3f"
+      ],
+      "rows": [
+        {
+          "id": "918e0b73-5f8a-48be-bab5-75a9eb0eb64f",
+          "user_id": "76ddb717-6f2f-46ee-aa76-1db2ae11f359",
+          "type": "attendance",
+          "title": "⏰ 지각 등록",
+          "body": "오늘 출근이 지각으로 기록되었습니다.",
+          "metadata": {
+            "id": "d7605d74-3595-4646-9f92-6f41e88c6a70",
+            "type": "attendance",
+            "dedupe_key": "attendance:d7605d74-3595-4646-9f92-6f41e88c6a70:late"
+          },
+          "created_at": "2026-03-24T05:23:54.768+00:00",
+          "read_at": "2026-03-24T05:24:41.249+00:00"
+        },
+        {
+          "id": "1be8fe2c-6997-4867-b347-f3ef3f5fdf3f",
+          "user_id": "76ddb717-6f2f-46ee-aa76-1db2ae11f359",
+          "type": "attendance",
+          "title": "⏰ 지각 등록",
+          "body": "오늘 출근이 지각으로 기록되었습니다.",
+          "metadata": {
+            "id": "d7605d74-3595-4646-9f92-6f41e88c6a70",
+            "type": "attendance",
+            "dedupe_key": "attendance:d7605d74-3595-4646-9f92-6f41e88c6a70:late"
+          },
+          "created_at": "2026-03-24T05:23:48.307+00:00",
+          "read_at": "2026-03-24T05:24:41.249+00:00"
+        }
+      ]
+    },
+    {
+      "groupKey": "4796a0b0-f593-47a5-82e0-8db8f036d546::message:b4982b01-d0d7-41eb-bb42-a21a78c8627d",
+      "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+      "type": "message",
+      "dedupe_key": "message:b4982b01-d0d7-41eb-bb42-a21a78c8627d",
+      "count": 2,
+      "canonical_id": "559d0945-4665-4b0d-870d-2da8bd586f5e",
+      "canonical_created_at": "2026-03-24T05:23:02.354+00:00",
+      "canonical_read_at": "2026-03-24T05:23:51.825+00:00",
+      "merged_read_at": "2026-03-24T05:23:51.825+00:00",
+      "delete_ids": [
+        "bd195f82-c9d0-4105-bbc8-fb2876e0c276"
+      ],
+      "rows": [
+        {
+          "id": "559d0945-4665-4b0d-870d-2da8bd586f5e",
+          "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+          "type": "message",
+          "title": "김이지",
+          "body": "ㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋ",
+          "metadata": {
+            "id": "b4982b01-d0d7-41eb-bb42-a21a78c8627d",
+            "room_id": "a866308f-8d69-4a39-8db6-88a71e9b8fd9",
+            "dedupe_key": "message:b4982b01-d0d7-41eb-bb42-a21a78c8627d",
+            "sender_name": "김이지"
+          },
+          "created_at": "2026-03-24T05:23:02.354+00:00",
+          "read_at": "2026-03-24T05:23:51.825+00:00"
+        },
+        {
+          "id": "bd195f82-c9d0-4105-bbc8-fb2876e0c276",
+          "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+          "type": "message",
+          "title": "김이지",
+          "body": "ㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋ",
+          "metadata": {
+            "id": "b4982b01-d0d7-41eb-bb42-a21a78c8627d",
+            "room_id": "a866308f-8d69-4a39-8db6-88a71e9b8fd9",
+            "dedupe_key": "message:b4982b01-d0d7-41eb-bb42-a21a78c8627d",
+            "sender_name": "김이지"
+          },
+          "created_at": "2026-03-24T05:23:01.615+00:00",
+          "read_at": "2026-03-24T05:23:51.825+00:00"
+        }
+      ]
+    },
+    {
+      "groupKey": "4796a0b0-f593-47a5-82e0-8db8f036d546::message:48227c1c-5546-4c3e-b46a-c9edcc6a5e5c",
+      "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+      "type": "message",
+      "dedupe_key": "message:48227c1c-5546-4c3e-b46a-c9edcc6a5e5c",
+      "count": 2,
+      "canonical_id": "2aaa3eec-d80a-404d-9728-9c5b69a74b7e",
+      "canonical_created_at": "2026-03-24T05:22:53.097+00:00",
+      "canonical_read_at": "2026-03-24T05:23:51.825+00:00",
+      "merged_read_at": "2026-03-24T05:23:51.825+00:00",
+      "delete_ids": [
+        "d63b66fd-f4d3-484c-b599-e680cb81fbb7"
+      ],
+      "rows": [
+        {
+          "id": "2aaa3eec-d80a-404d-9728-9c5b69a74b7e",
+          "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+          "type": "message",
+          "title": "김이지",
+          "body": "ㅠㅠ",
+          "metadata": {
+            "id": "48227c1c-5546-4c3e-b46a-c9edcc6a5e5c",
+            "room_id": "a866308f-8d69-4a39-8db6-88a71e9b8fd9",
+            "dedupe_key": "message:48227c1c-5546-4c3e-b46a-c9edcc6a5e5c",
+            "sender_name": "김이지"
+          },
+          "created_at": "2026-03-24T05:22:53.097+00:00",
+          "read_at": "2026-03-24T05:23:51.825+00:00"
+        },
+        {
+          "id": "d63b66fd-f4d3-484c-b599-e680cb81fbb7",
+          "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+          "type": "message",
+          "title": "김이지",
+          "body": "ㅠㅠ",
+          "metadata": {
+            "id": "48227c1c-5546-4c3e-b46a-c9edcc6a5e5c",
+            "room_id": "a866308f-8d69-4a39-8db6-88a71e9b8fd9",
+            "dedupe_key": "message:48227c1c-5546-4c3e-b46a-c9edcc6a5e5c",
+            "sender_name": "김이지"
+          },
+          "created_at": "2026-03-24T05:22:52.344+00:00",
+          "read_at": "2026-03-24T05:23:51.825+00:00"
+        }
+      ]
+    },
+    {
+      "groupKey": "4796a0b0-f593-47a5-82e0-8db8f036d546::message:f96f61a1-9dba-4d88-9fd6-93aac83b5b43",
+      "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+      "type": "message",
+      "dedupe_key": "message:f96f61a1-9dba-4d88-9fd6-93aac83b5b43",
+      "count": 2,
+      "canonical_id": "9ca806f4-d495-45ee-a14a-ec8e1c17f217",
+      "canonical_created_at": "2026-03-24T05:22:49.172+00:00",
+      "canonical_read_at": "2026-03-24T05:23:51.825+00:00",
+      "merged_read_at": "2026-03-24T05:23:51.825+00:00",
+      "delete_ids": [
+        "a12e45d6-1eb8-4f01-a747-9a94015cf976"
+      ],
+      "rows": [
+        {
+          "id": "9ca806f4-d495-45ee-a14a-ec8e1c17f217",
+          "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+          "type": "message",
+          "title": "김이지",
+          "body": "아이폰은..나도 몰라 ..",
+          "metadata": {
+            "id": "f96f61a1-9dba-4d88-9fd6-93aac83b5b43",
+            "room_id": "a866308f-8d69-4a39-8db6-88a71e9b8fd9",
+            "dedupe_key": "message:f96f61a1-9dba-4d88-9fd6-93aac83b5b43",
+            "sender_name": "김이지"
+          },
+          "created_at": "2026-03-24T05:22:49.172+00:00",
+          "read_at": "2026-03-24T05:23:51.825+00:00"
+        },
+        {
+          "id": "a12e45d6-1eb8-4f01-a747-9a94015cf976",
+          "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+          "type": "message",
+          "title": "김이지",
+          "body": "아이폰은..나도 몰라 ..",
+          "metadata": {
+            "id": "f96f61a1-9dba-4d88-9fd6-93aac83b5b43",
+            "room_id": "a866308f-8d69-4a39-8db6-88a71e9b8fd9",
+            "dedupe_key": "message:f96f61a1-9dba-4d88-9fd6-93aac83b5b43",
+            "sender_name": "김이지"
+          },
+          "created_at": "2026-03-24T05:22:48.279+00:00",
+          "read_at": "2026-03-24T05:23:51.825+00:00"
+        }
+      ]
+    },
+    {
+      "groupKey": "4796a0b0-f593-47a5-82e0-8db8f036d546::message:0fad4395-22fc-4fae-b125-150cf5454f81",
+      "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+      "type": "message",
+      "dedupe_key": "message:0fad4395-22fc-4fae-b125-150cf5454f81",
+      "count": 2,
+      "canonical_id": "b8d3e640-1717-4f58-ad7f-a21002d649a3",
+      "canonical_created_at": "2026-03-24T05:22:45.581+00:00",
+      "canonical_read_at": "2026-03-24T05:23:51.825+00:00",
+      "merged_read_at": "2026-03-24T05:23:51.825+00:00",
+      "delete_ids": [
+        "ce2b410c-896b-441c-a58b-0ae89df30e92"
+      ],
+      "rows": [
+        {
+          "id": "b8d3e640-1717-4f58-ad7f-a21002d649a3",
+          "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+          "type": "message",
+          "title": "김이지",
+          "body": "안드로이드는. 알림이 따로 뜨는 것 같드라고요",
+          "metadata": {
+            "id": "0fad4395-22fc-4fae-b125-150cf5454f81",
+            "room_id": "a866308f-8d69-4a39-8db6-88a71e9b8fd9",
+            "dedupe_key": "message:0fad4395-22fc-4fae-b125-150cf5454f81",
+            "sender_name": "김이지"
+          },
+          "created_at": "2026-03-24T05:22:45.581+00:00",
+          "read_at": "2026-03-24T05:23:51.825+00:00"
+        },
+        {
+          "id": "ce2b410c-896b-441c-a58b-0ae89df30e92",
+          "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+          "type": "message",
+          "title": "김이지",
+          "body": "안드로이드는. 알림이 따로 뜨는 것 같드라고요",
+          "metadata": {
+            "id": "0fad4395-22fc-4fae-b125-150cf5454f81",
+            "room_id": "a866308f-8d69-4a39-8db6-88a71e9b8fd9",
+            "dedupe_key": "message:0fad4395-22fc-4fae-b125-150cf5454f81",
+            "sender_name": "김이지"
+          },
+          "created_at": "2026-03-24T05:22:44.979+00:00",
+          "read_at": "2026-03-24T05:23:51.825+00:00"
+        }
+      ]
+    },
+    {
+      "groupKey": "4796a0b0-f593-47a5-82e0-8db8f036d546::message:bae580e6-6461-4543-b5d1-979e4e3ae6c1",
+      "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+      "type": "message",
+      "dedupe_key": "message:bae580e6-6461-4543-b5d1-979e4e3ae6c1",
+      "count": 2,
+      "canonical_id": "d848d48f-f04f-4cc0-bd20-f3be7af09aa5",
+      "canonical_created_at": "2026-03-24T05:21:57.555+00:00",
+      "canonical_read_at": "2026-03-24T05:23:51.825+00:00",
+      "merged_read_at": "2026-03-24T05:23:51.825+00:00",
+      "delete_ids": [
+        "8ee21caa-5210-4824-b0ff-f5aa875bbf82"
+      ],
+      "rows": [
+        {
+          "id": "d848d48f-f04f-4cc0-bd20-f3be7af09aa5",
+          "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+          "type": "message",
+          "title": "김이지",
+          "body": "다른 페이지 열고있을 땐, 알림이 안보이네용? 따로 이 페이지를 띄워놔야겠어요",
+          "metadata": {
+            "id": "bae580e6-6461-4543-b5d1-979e4e3ae6c1",
+            "room_id": "a866308f-8d69-4a39-8db6-88a71e9b8fd9",
+            "dedupe_key": "message:bae580e6-6461-4543-b5d1-979e4e3ae6c1",
+            "sender_name": "김이지"
+          },
+          "created_at": "2026-03-24T05:21:57.555+00:00",
+          "read_at": "2026-03-24T05:23:51.825+00:00"
+        },
+        {
+          "id": "8ee21caa-5210-4824-b0ff-f5aa875bbf82",
+          "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+          "type": "message",
+          "title": "김이지",
+          "body": "다른 페이지 열고있을 땐, 알림이 안보이네용? 따로 이 페이지를 띄워놔야겠어요",
+          "metadata": {
+            "id": "bae580e6-6461-4543-b5d1-979e4e3ae6c1",
+            "room_id": "a866308f-8d69-4a39-8db6-88a71e9b8fd9",
+            "dedupe_key": "message:bae580e6-6461-4543-b5d1-979e4e3ae6c1",
+            "sender_name": "김이지"
+          },
+          "created_at": "2026-03-24T05:21:56.663+00:00",
+          "read_at": "2026-03-24T05:23:51.825+00:00"
+        }
+      ]
+    },
+    {
+      "groupKey": "4796a0b0-f593-47a5-82e0-8db8f036d546::message:227b6ee3-0f67-458d-96ea-8116b4bb8979",
+      "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+      "type": "message",
+      "dedupe_key": "message:227b6ee3-0f67-458d-96ea-8116b4bb8979",
+      "count": 2,
+      "canonical_id": "8d64eb59-fb38-41e7-9c4b-c90b5f311bf1",
+      "canonical_created_at": "2026-03-24T05:21:43.506+00:00",
+      "canonical_read_at": "2026-03-24T05:23:51.825+00:00",
+      "merged_read_at": "2026-03-24T05:23:51.825+00:00",
+      "delete_ids": [
+        "0aa541ab-499b-4bfa-b6c9-d528d95ecc53"
+      ],
+      "rows": [
+        {
+          "id": "8d64eb59-fb38-41e7-9c4b-c90b5f311bf1",
+          "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+          "type": "message",
+          "title": "김이지",
+          "body": "그거는 말씀드렸는데, 3인 이상이 되면 채팅방이름을 변경하라고 하셨어융",
+          "metadata": {
+            "id": "227b6ee3-0f67-458d-96ea-8116b4bb8979",
+            "room_id": "a866308f-8d69-4a39-8db6-88a71e9b8fd9",
+            "dedupe_key": "message:227b6ee3-0f67-458d-96ea-8116b4bb8979",
+            "sender_name": "김이지"
+          },
+          "created_at": "2026-03-24T05:21:43.506+00:00",
+          "read_at": "2026-03-24T05:23:51.825+00:00"
+        },
+        {
+          "id": "0aa541ab-499b-4bfa-b6c9-d528d95ecc53",
+          "user_id": "4796a0b0-f593-47a5-82e0-8db8f036d546",
+          "type": "message",
+          "title": "김이지",
+          "body": "그거는 말씀드렸는데, 3인 이상이 되면 채팅방이름을 변경하라고 하셨어융",
+          "metadata": {
+            "id": "227b6ee3-0f67-458d-96ea-8116b4bb8979",
+            "room_id": "a866308f-8d69-4a39-8db6-88a71e9b8fd9",
+            "dedupe_key": "message:227b6ee3-0f67-458d-96ea-8116b4bb8979",
+            "sender_name": "김이지"
+          },
+          "created_at": "2026-03-24T05:21:43.038+00:00",
+          "read_at": "2026-03-24T05:23:51.825+00:00"
+        }
+      ]
+    },
+    {
+      "groupKey": "38bd18fa-36ce-46d5-bb51-b9c55ac166e7::attendance:981ffdb1-6cee-48c3-b53b-cc069dbc4865:checkin",
+      "user_id": "38bd18fa-36ce-46d5-bb51-b9c55ac166e7",
+      "type": "attendance",
+      "dedupe_key": "attendance:981ffdb1-6cee-48c3-b53b-cc069dbc4865:checkin",
+      "count": 2,
+      "canonical_id": "b1987dc6-bfea-411d-a72f-2fcb09cfbb42",
+      "canonical_created_at": "2026-03-20T01:07:07.342+00:00",
+      "canonical_read_at": "2026-03-21T10:14:59.729+00:00",
+      "merged_read_at": "2026-03-19T23:24:16.541+00:00",
+      "delete_ids": [
+        "36221c42-2405-4ddf-8ba5-41cf35222859"
+      ],
+      "rows": [
+        {
+          "id": "b1987dc6-bfea-411d-a72f-2fcb09cfbb42",
+          "user_id": "38bd18fa-36ce-46d5-bb51-b9c55ac166e7",
+          "type": "attendance",
+          "title": "⏰ 출근 처리됨",
+          "body": "정상 출근이 기록되었습니다.",
+          "metadata": {
+            "id": "981ffdb1-6cee-48c3-b53b-cc069dbc4865",
+            "type": "attendance",
+            "dedupe_key": "attendance:981ffdb1-6cee-48c3-b53b-cc069dbc4865:checkin"
+          },
+          "created_at": "2026-03-20T01:07:07.342+00:00",
+          "read_at": "2026-03-21T10:14:59.729+00:00"
+        },
+        {
+          "id": "36221c42-2405-4ddf-8ba5-41cf35222859",
+          "user_id": "38bd18fa-36ce-46d5-bb51-b9c55ac166e7",
+          "type": "attendance",
+          "title": "⏰ 출근 처리됨",
+          "body": "정상 출근이 기록되었습니다.",
+          "metadata": {
+            "id": "981ffdb1-6cee-48c3-b53b-cc069dbc4865",
+            "type": "attendance",
+            "dedupe_key": "attendance:981ffdb1-6cee-48c3-b53b-cc069dbc4865:checkin"
+          },
+          "created_at": "2026-03-19T23:23:29.283+00:00",
+          "read_at": "2026-03-19T23:24:16.541+00:00"
+        }
+      ]
+    },
+    {
+      "groupKey": "38bd18fa-36ce-46d5-bb51-b9c55ac166e7::approval:insert:ed5b0324-aff3-4729-b4d0-febb66894338:38bd18fa-36ce-46d5-bb51-b9c55ac166e7",
+      "user_id": "38bd18fa-36ce-46d5-bb51-b9c55ac166e7",
+      "type": "approval",
+      "dedupe_key": "approval:insert:ed5b0324-aff3-4729-b4d0-febb66894338:38bd18fa-36ce-46d5-bb51-b9c55ac166e7",
+      "count": 2,
+      "canonical_id": "eed4f66f-2cd0-491b-975f-de7f282129e4",
+      "canonical_created_at": "2026-03-19T23:32:20.16+00:00",
+      "canonical_read_at": "2026-03-20T00:57:28.21+00:00",
+      "merged_read_at": "2026-03-20T00:57:28.21+00:00",
+      "delete_ids": [
+        "7ebb0e81-fecd-4e13-af38-5b6b6f66af15"
+      ],
+      "rows": [
+        {
+          "id": "eed4f66f-2cd0-491b-975f-de7f282129e4",
+          "user_id": "38bd18fa-36ce-46d5-bb51-b9c55ac166e7",
+          "type": "approval",
+          "title": "📋 새 결재 요청: 1",
+          "body": "백정민님이 결재를 요청했습니다.",
+          "metadata": {
+            "id": "ed5b0324-aff3-4729-b4d0-febb66894338",
+            "type": "approval",
+            "dedupe_key": "approval:insert:ed5b0324-aff3-4729-b4d0-febb66894338:38bd18fa-36ce-46d5-bb51-b9c55ac166e7"
+          },
+          "created_at": "2026-03-19T23:32:20.16+00:00",
+          "read_at": "2026-03-20T00:57:28.21+00:00"
+        },
+        {
+          "id": "7ebb0e81-fecd-4e13-af38-5b6b6f66af15",
+          "user_id": "38bd18fa-36ce-46d5-bb51-b9c55ac166e7",
+          "type": "approval",
+          "title": "📋 새 결재 요청: 1",
+          "body": "백정민님이 결재를 요청했습니다.",
+          "metadata": {
+            "id": "ed5b0324-aff3-4729-b4d0-febb66894338",
+            "type": "approval",
+            "dedupe_key": "approval:insert:ed5b0324-aff3-4729-b4d0-febb66894338:38bd18fa-36ce-46d5-bb51-b9c55ac166e7"
+          },
+          "created_at": "2026-03-19T23:32:16.934+00:00",
+          "read_at": "2026-03-20T00:57:28.21+00:00"
+        }
+      ]
+    },
+    {
+      "groupKey": "38bd18fa-36ce-46d5-bb51-b9c55ac166e7::approval:insert:4e30f9de-10d0-4ce3-adf2-9de8a415f791:38bd18fa-36ce-46d5-bb51-b9c55ac166e7",
+      "user_id": "38bd18fa-36ce-46d5-bb51-b9c55ac166e7",
+      "type": "approval",
+      "dedupe_key": "approval:insert:4e30f9de-10d0-4ce3-adf2-9de8a415f791:38bd18fa-36ce-46d5-bb51-b9c55ac166e7",
+      "count": 2,
+      "canonical_id": "16d29d5a-7da5-42eb-a4f6-d0737b34f0ef",
+      "canonical_created_at": "2026-03-19T23:23:21.593+00:00",
+      "canonical_read_at": "2026-03-19T23:24:16.541+00:00",
+      "merged_read_at": "2026-03-19T23:24:16.541+00:00",
+      "delete_ids": [
+        "116989b6-2882-4804-9aa6-55a6911fdb0b"
+      ],
+      "rows": [
+        {
+          "id": "16d29d5a-7da5-42eb-a4f6-d0737b34f0ef",
+          "user_id": "38bd18fa-36ce-46d5-bb51-b9c55ac166e7",
+          "type": "approval",
+          "title": "📋 새 결재 요청: 1",
+          "body": "백정민님이 결재를 요청했습니다.",
+          "metadata": {
+            "id": "4e30f9de-10d0-4ce3-adf2-9de8a415f791",
+            "type": "approval",
+            "dedupe_key": "approval:insert:4e30f9de-10d0-4ce3-adf2-9de8a415f791:38bd18fa-36ce-46d5-bb51-b9c55ac166e7"
+          },
+          "created_at": "2026-03-19T23:23:21.593+00:00",
+          "read_at": "2026-03-19T23:24:16.541+00:00"
+        },
+        {
+          "id": "116989b6-2882-4804-9aa6-55a6911fdb0b",
+          "user_id": "38bd18fa-36ce-46d5-bb51-b9c55ac166e7",
+          "type": "approval",
+          "title": "📋 새 결재 요청: 1",
+          "body": "백정민님이 결재를 요청했습니다.",
+          "metadata": {
+            "id": "4e30f9de-10d0-4ce3-adf2-9de8a415f791",
+            "type": "approval",
+            "dedupe_key": "approval:insert:4e30f9de-10d0-4ce3-adf2-9de8a415f791:38bd18fa-36ce-46d5-bb51-b9c55ac166e7"
+          },
+          "created_at": "2026-03-19T23:23:17.989+00:00",
+          "read_at": "2026-03-19T23:24:16.541+00:00"
+        }
+      ]
+    }
+  ]
+}
