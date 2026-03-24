@@ -76,6 +76,7 @@ export const fakeUser = {
     approval_결재함: true,
     approval_참조문서함: true,
     approval_작성하기: true,
+    hr_직원등록: true,
     hr_구성원: true,
     hr_근태: true,
     hr_교대근무: true,

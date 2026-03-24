@@ -128,7 +128,6 @@ const ADMIN_PERMISSION_KEYS: Record<string, string> = {
 };
 
 const LEGACY_PERMISSION_ALIASES: Record<string, string[]> = {
-  hr_직원등록: ['admin', 'hr'],
   menu_전자결재: ['approval'],
   menu_인사관리: ['hr'],
   menu_재고관리: ['inventory'],
