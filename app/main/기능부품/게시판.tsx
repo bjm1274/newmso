@@ -25,6 +25,20 @@ const BOARD_POST_OPTIONAL_COLUMNS = [
   'surgery_caregiver',
   'surgery_transfusion',
 ];
+const SCHEDULE_META_PREFIX = '[[SCHEDULE_META]]';
+const SCHEDULE_META_SUFFIX = '[[/SCHEDULE_META]]';
+
+type ScheduleMetaPayload = {
+  date?: string;
+  time?: string;
+  room?: string;
+  patient?: string;
+  fasting?: boolean;
+  inpatient?: boolean;
+  guardian?: boolean;
+  caregiver?: boolean;
+  transfusion?: boolean;
+};
 
 function buildScheduleTimeValue(period: string, hour: string, minute: string) {
   if (!period || !hour) return '';
@@ -68,13 +82,49 @@ function normalizeScheduleTimeValue(value: unknown) {
   return matched ? matched[1] : raw;
 }
 
+function extractScheduleMetaFromContent(value: unknown) {
+  const raw = String(value ?? '');
+  const start = raw.indexOf(SCHEDULE_META_PREFIX);
+  const end = raw.indexOf(SCHEDULE_META_SUFFIX);
+  if (start < 0 || end < 0 || end <= start) {
+    return {
+      displayContent: raw.trim(),
+      meta: null as ScheduleMetaPayload | null,
+    };
+  }
+
+  const displayContent = `${raw.slice(0, start)}${raw.slice(end + SCHEDULE_META_SUFFIX.length)}`.trim();
+  const metaText = raw.slice(start + SCHEDULE_META_PREFIX.length, end).trim();
+
+  try {
+    const parsed = JSON.parse(metaText) as ScheduleMetaPayload;
+    return { displayContent, meta: parsed };
+  } catch {
+    return { displayContent, meta: null as ScheduleMetaPayload | null };
+  }
+}
+
+function buildScheduleMetaContent(chartNo: string, meta: ScheduleMetaPayload) {
+  const visibleContent = chartNo.trim();
+  return `${visibleContent}${visibleContent ? '\n' : ''}${SCHEDULE_META_PREFIX}${JSON.stringify(meta)}${SCHEDULE_META_SUFFIX}`;
+}
+
 function normalizeBoardPost<T extends Partial<BoardPost>>(post: T): T {
   if (!post) return post;
+  const { displayContent, meta } = extractScheduleMetaFromContent(post.content ?? '');
 
   return {
     ...post,
-    schedule_date: normalizeScheduleDateValue(post.schedule_date ?? ''),
-    schedule_time: normalizeScheduleTimeValue(post.schedule_time ?? ''),
+    content: displayContent,
+    schedule_date: normalizeScheduleDateValue(post.schedule_date ?? meta?.date ?? ''),
+    schedule_time: normalizeScheduleTimeValue(post.schedule_time ?? meta?.time ?? ''),
+    schedule_room: String(post.schedule_room ?? meta?.room ?? '').trim(),
+    patient_name: String(post.patient_name ?? meta?.patient ?? '').trim(),
+    surgery_fasting: typeof post.surgery_fasting === 'boolean' ? post.surgery_fasting : Boolean(meta?.fasting),
+    surgery_inpatient: typeof post.surgery_inpatient === 'boolean' ? post.surgery_inpatient : Boolean(meta?.inpatient),
+    surgery_guardian: typeof post.surgery_guardian === 'boolean' ? post.surgery_guardian : Boolean(meta?.guardian),
+    surgery_caregiver: typeof post.surgery_caregiver === 'boolean' ? post.surgery_caregiver : Boolean(meta?.caregiver),
+    surgery_transfusion: typeof post.surgery_transfusion === 'boolean' ? post.surgery_transfusion : Boolean(meta?.transfusion),
   };
 }
 
@@ -860,7 +910,19 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       const postData: Partial<BoardPost> & Record<string, unknown> = {
         board_type: activeBoard,
         title: normalizedTitle,
-        content: isScheduleBoard ? normalizedScheduleChartNo || null : normalizedContent || null,
+        content: isScheduleBoard
+          ? buildScheduleMetaContent(normalizedScheduleChartNo, {
+              date: normalizedScheduleDate,
+              time: normalizedScheduleTime,
+              room: normalizedScheduleRoom,
+              patient: normalizedSchedulePatient,
+              fasting: scheduleFasting,
+              inpatient: scheduleInpatient,
+              guardian: scheduleGuardian,
+              caregiver: scheduleCaregiver,
+              transfusion: scheduleTransfusion,
+            }) || null
+          : normalizedContent || null,
         company: user?.company || null,
         tags: tags,
         author_name: useAnonymous ? '익명' : (user?.name || '익명'),
