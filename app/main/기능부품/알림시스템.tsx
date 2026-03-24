@@ -1,8 +1,9 @@
 'use client';
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { sound } from '@/lib/sounds';
 import { isNamedSystemMasterAccount } from '@/lib/system-master';
+import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
 
 /**
  * [실시간 알림 엔진 + KakaoTalk 스타일 Toast UI]
@@ -345,7 +346,9 @@ function ToastCard({ notif, onClose, onAction }: { notif: ToastItem; onClose: (i
 // ─── User 타입 ───
 interface UserLike {
   id?: string | number;
+  employee_no?: string | number;
   name?: string;
+  auth_user_id?: string | number;
   department?: string;
   permissions?: Record<string, unknown>;
   [key: string]: unknown;
@@ -353,7 +356,7 @@ interface UserLike {
 
 // ─── 메인 컴포넌트 ───
 export default function NotificationSystem({
-  user, onOpenChatRoom, onOpenMessage, onOpenApproval, onOpenInventory, onOpenBoard, onOpenPost,
+  user: rawUser, onOpenChatRoom, onOpenMessage, onOpenApproval, onOpenInventory, onOpenBoard, onOpenPost,
 }: {
   user: UserLike | null | undefined;
   onOpenChatRoom?: (roomId: string) => void;
@@ -376,6 +379,44 @@ export default function NotificationSystem({
       ? crypto.randomUUID()
       : `${Date.now()}-${Math.random().toString(16).slice(2)}`
   );
+  const normalizedUser = useMemo(
+    () => normalizeStaffLike((rawUser ?? {}) as Record<string, unknown>) as UserLike,
+    [rawUser]
+  );
+  const [resolvedUser, setResolvedUser] = useState<UserLike | null>(() => {
+    const directId = getStaffLikeId(normalizedUser as Record<string, unknown>);
+    return directId ? normalizedUser : null;
+  });
+  const effectiveUser = (resolvedUser || normalizedUser) as UserLike;
+  const effectiveUserId = getStaffLikeId(effectiveUser as Record<string, unknown>);
+  const user = effectiveUser;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const syncUserIdentity = async () => {
+      const directId = getStaffLikeId(normalizedUser as Record<string, unknown>);
+      if (directId) {
+        setResolvedUser(normalizedUser);
+        return;
+      }
+
+      if (!normalizedUser?.name && !normalizedUser?.employee_no && !normalizedUser?.auth_user_id) {
+        setResolvedUser(normalizedUser);
+        return;
+      }
+
+      const recoveredUser = await resolveStaffLike(normalizedUser as Record<string, unknown>);
+      if (!cancelled) {
+        setResolvedUser(recoveredUser as UserLike);
+      }
+    };
+
+    void syncUserIdentity();
+    return () => {
+      cancelled = true;
+    };
+  }, [normalizedUser?.id, normalizedUser?.name, normalizedUser?.employee_no, normalizedUser?.auth_user_id]);
 
   // 탭 타이틀 배지
   useEffect(() => {
@@ -386,10 +427,10 @@ export default function NotificationSystem({
 
   // 배지 카운트 DB 동기화
   const syncBadge = useCallback(async () => {
-    if (!user?.id) return;
-    const { count } = await supabase.from('notifications').select('*', { count: 'exact', head: true }).eq('user_id', String(user.id)).is('read_at', null);
+    if (!effectiveUserId) return;
+    const { count } = await supabase.from('notifications').select('*', { count: 'exact', head: true }).eq('user_id', effectiveUserId).is('read_at', null);
     if (count !== null) { setUnreadCount(count); setAppBadge(count); }
-  }, [user?.id]);
+  }, [effectiveUserId]);
 
   const removeToast = useCallback((id: string) => {
     setToasts(prev => prev.map(t => t.id === id ? { ...t, exiting: true } : t));
@@ -405,13 +446,13 @@ export default function NotificationSystem({
   }, [removeToast]);
 
   const claimCrossTabNotification = useCallback((scope: string, dedupeKey: string, ttlMs: number) => {
-    if (!user?.id) return true;
+    if (!effectiveUserId) return true;
     return claimNotificationSlot(
-      `erp_notification_${scope}:${String(user.id)}:${dedupeKey}`,
+      `erp_notification_${scope}:${effectiveUserId}:${dedupeKey}`,
       tabIdRef.current,
       ttlMs
     );
-  }, [user?.id]);
+  }, [effectiveUserId]);
 
   const emitIncomingNotification = useCallback((row: Record<string, unknown>) => {
     if (!row?.id) return;
@@ -457,11 +498,11 @@ export default function NotificationSystem({
 
     const isChatType = type === 'message' || type === 'mention';
     const canShowNativeNotification = claimCrossTabNotification('display', rowId, 5000);
-    if (canShowNativeNotification && (!isChatType || !hasPushSubscriptionActive(String(user?.id ?? '')))) {
+    if (canShowNativeNotification && (!isChatType || !hasPushSubscriptionActive(effectiveUserId))) {
       sendNotification(String(row.title || '알림'), { body: String(row.body || ''), tag: type, data: rowMetadata });
     }
     void syncBadge();
-  }, [addToast, claimCrossTabNotification, syncBadge, user?.id]);
+  }, [addToast, claimCrossTabNotification, effectiveUserId, syncBadge]);
 
   useEffect(() => {
     onActionRef.current = (notif: ToastItem) => {
@@ -494,9 +535,9 @@ export default function NotificationSystem({
 
   // ─── Supabase Realtime 구독 ───
   useEffect(() => {
-    if (!user?.id) return;
-    initNotificationService(String(user.id));
-    const uid = String(user.id);
+    if (!effectiveUserId) return;
+    initNotificationService(effectiveUserId);
+    const uid = effectiveUserId;
     const mountedAt = mountedAtRef.current;
     void syncBadge();
 
@@ -759,15 +800,15 @@ export default function NotificationSystem({
       clearInterval(fallbackPoll);
       channels.forEach(ch => supabase.removeChannel(ch));
     };
-  }, [user?.department, user?.id, user?.name, user?.permissions?.inventory, claimCrossTabNotification, emitIncomingNotification, syncBadge]);
+  }, [user?.department, user?.name, user?.permissions?.inventory, claimCrossTabNotification, effectiveUserId, emitIncomingNotification, syncBadge]);
 
   // 백그라운드 복귀 시 놓친 알림 재조회
   useEffect(() => {
     const onVis = () => {
       if (document.visibilityState === 'hidden') { lastHiddenRef.current = Date.now(); return; }
-      if (!user?.id || Date.now() - lastHiddenRef.current < 2000) return;
+      if (!effectiveUserId || Date.now() - lastHiddenRef.current < 2000) return;
       const since = new Date(Date.now() - 90 * 1000).toISOString();
-      supabase.from('notifications').select('id,title,body,type,metadata,created_at').eq('user_id', String(user.id)).gte('created_at', since).order('created_at', { ascending: false }).limit(20)
+      supabase.from('notifications').select('id,title,body,type,metadata,created_at').eq('user_id', effectiveUserId).gte('created_at', since).order('created_at', { ascending: false }).limit(20)
         .then(({ data: rows }) => {
           rows?.forEach((row: Record<string, unknown>) => {
             emitIncomingNotification(row);
@@ -777,7 +818,7 @@ export default function NotificationSystem({
     };
     document.addEventListener('visibilitychange', onVis);
     return () => document.removeEventListener('visibilitychange', onVis);
-  }, [emitIncomingNotification, syncBadge, user?.id]);
+  }, [effectiveUserId, emitIncomingNotification, syncBadge]);
 
   useEffect(() => () => { timersRef.current.forEach(t => clearTimeout(t)); timersRef.current.clear(); }, []);
 
