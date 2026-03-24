@@ -174,7 +174,10 @@ export default function ContractTemplateEditor({ selectedCo }: TemplateEditorPro
   const filteredVars = activeVarCategory === '전체' ? VARIABLES : VARIABLES.filter(v => v.category === activeVarCategory);
 
   // 에디터에서 {{변수}} 를 하이라이트 표시하기 위해 미리보기 생성
-  const highlightedPreview = templateContent.replace(
+  // XSS 방지: HTML 특수문자를 먼저 이스케이프 후 변수만 하이라이트
+  const escapeHtml = (str: string) =>
+    str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+  const highlightedPreview = escapeHtml(templateContent).replace(
     /\{\{([^}]+)\}\}/g,
     (_, key) => `<mark class="bg-blue-100 text-blue-800 px-0.5 rounded text-[11px] font-semibold not-italic">{{${key}}}</mark>`
   );
