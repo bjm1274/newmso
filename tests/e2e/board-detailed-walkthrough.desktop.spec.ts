@@ -118,3 +118,40 @@ test('board detailed walkthrough clicks through each board menu in practical ord
 
   expect(runtimeErrors).toEqual([]);
 });
+
+test('schedule post appears on the calendar immediately after registration', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+
+  await mockSupabase(page, {
+    boardPosts: [],
+    boardPostComments: [],
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: '게시판',
+      erp_last_subview: '수술일정',
+    },
+  });
+
+  await page.goto(`/main?open_menu=${encodeURIComponent('게시판')}`);
+
+  await expect(page.getByTestId('board-view')).toBeVisible();
+  await openBoardMenu(page, '수술일정');
+
+  await page.getByTestId('board-toggle-new-post').click();
+  await expect(page.getByTestId('board-new-post-form')).toBeVisible();
+  await page.getByTestId('board-schedule-title').fill('무릎 관절경');
+  await page.getByTestId('board-schedule-date').fill('2026-04-15');
+  await page.getByTestId('board-schedule-period').selectOption('오전');
+  await page.getByTestId('board-schedule-hour').selectOption('09');
+  await page.getByTestId('board-schedule-minute').selectOption('30');
+  await page.getByTestId('board-new-post-submit').click();
+
+  await expect(page.getByTestId('board-post-detail')).toBeVisible();
+  await page.getByTestId('board-post-detail-close').click();
+  await expect(page.getByText('2026년 4월')).toBeVisible();
+  await expect(page.getByTestId('board-calendar-day-count-2026-04-15')).toHaveText('1건');
+
+  expect(runtimeErrors).toEqual([]);
+});

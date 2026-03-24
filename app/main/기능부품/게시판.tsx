@@ -46,6 +46,38 @@ function buildScheduleTimeValue(period: string, hour: string, minute: string) {
   return `${hh}:${mm}`;
 }
 
+function normalizeScheduleDateValue(value: unknown) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+
+  const matched = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (matched) return matched[1];
+
+  const parsed = new Date(raw);
+  if (!Number.isNaN(parsed.getTime())) {
+    return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+  }
+
+  return raw;
+}
+
+function normalizeScheduleTimeValue(value: unknown) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+  const matched = raw.match(/^(\d{2}:\d{2})/);
+  return matched ? matched[1] : raw;
+}
+
+function normalizeBoardPost<T extends Partial<BoardPost>>(post: T): T {
+  if (!post) return post;
+
+  return {
+    ...post,
+    schedule_date: normalizeScheduleDateValue(post.schedule_date ?? ''),
+    schedule_time: normalizeScheduleTimeValue(post.schedule_time ?? ''),
+  };
+}
+
 function getMissingBoardPostColumn(error: unknown) {
   if (!error) return null;
   const e = error as Record<string, unknown>;
@@ -236,7 +268,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
 
     const eventsByDate: Record<string, BoardPost[]> = {};
     filteredPosts.forEach((post: BoardPost) => {
-      const dateKey = post.schedule_date;
+      const dateKey = normalizeScheduleDateValue(post.schedule_date);
       if (!dateKey) return;
       if (!eventsByDate[dateKey]) {
         eventsByDate[dateKey] = [];
@@ -312,10 +344,10 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
         if (!isAdmin) {
           setPosts([]);
         } else {
-          setPosts(data as BoardPost[]);
+          setPosts((data as BoardPost[]).map((post) => normalizeBoardPost(post)));
         }
       } else {
-        setPosts(data as BoardPost[]);
+        setPosts((data as BoardPost[]).map((post) => normalizeBoardPost(post)));
       }
     }
   };
@@ -608,7 +640,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     }
     (async () => {
       const { data } = await supabase.from('board_posts').select('*').eq('id', selectedPostId).maybeSingle();
-      if (data) setSelectedPostDetail(data);
+      if (data) setSelectedPostDetail(normalizeBoardPost(data));
       else setSelectedPostDetail(null);
     })();
   }, [selectedPostId]);
@@ -729,11 +761,12 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       } else {
         setScheduleSide('');
       }
-      setScheduleDate(post.schedule_date || '');
-      setScheduleTime(post.schedule_time || '');
+      setScheduleDate(normalizeScheduleDateValue(post.schedule_date));
+      setScheduleTime(normalizeScheduleTimeValue(post.schedule_time));
       // 시간 파싱 (오전/오후 분기)
       if (post.schedule_time) {
-        const [hh, mm] = post.schedule_time.split(':');
+        const normalizedExistingTime = normalizeScheduleTimeValue(post.schedule_time);
+        const [hh, mm] = normalizedExistingTime.split(':');
         const h = parseInt(hh, 10);
         if (!isNaN(h)) {
           if (h >= 12) {
@@ -805,13 +838,19 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     const normalizedScheduleRoom = scheduleRoom.trim();
     const normalizedSchedulePatient = schedulePatient.trim();
     const normalizedScheduleChartNo = scheduleChartNo.trim();
+    const normalizedScheduleDate = normalizeScheduleDateValue(scheduleDate);
     const resolvedScheduleTime = buildScheduleTimeValue(schedulePeriod, scheduleHour, scheduleMinute) || scheduleTime;
+    const normalizedScheduleTime = normalizeScheduleTimeValue(resolvedScheduleTime);
 
     if (!normalizedTitle) return toast('제목을 입력해주세요.', 'warning');
     if (isScheduleBoard) {
       if (!scheduleDate || !resolvedScheduleTime) return toast('필수 정보를 입력해주세요.', 'warning');
     } else if (!normalizedContent && attachmentFiles.length === 0) {
       return toast('내용을 입력해주세요.', 'warning');
+    }
+
+    if (isScheduleBoard && (!normalizedScheduleDate || !normalizedScheduleTime)) {
+      return toast('필수 정보를 입력해 주세요.', 'warning');
     }
 
     setLoading(true);
@@ -851,8 +890,8 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
 
       // 수술/검사 일정의 경우 수술 관련 체크값을 함께 저장
       if (isScheduleBoard) {
-        postData.schedule_date = scheduleDate || null;
-        postData.schedule_time = resolvedScheduleTime || null;
+        postData.schedule_date = normalizedScheduleDate || null;
+        postData.schedule_time = normalizedScheduleTime || null;
         postData.schedule_room = normalizedScheduleRoom || null;
         postData.patient_name = normalizedSchedulePatient || null;
         postData.surgery_fasting = scheduleFasting;
@@ -926,8 +965,12 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
         );
         if (!updateError) {
           toast('게시물이 수정되었습니다.', 'success');
-          setPosts((prev) => prev.map(p => p.id === editingPostId ? { ...p, ...persistedPostData } : p));
+          const normalizedUpdatedPost = normalizeBoardPost({ ...persistedPostData });
+          setPosts((prev) => prev.map(p => p.id === editingPostId ? { ...p, ...normalizedUpdatedPost } : p));
           setSelectedPostId(editingPostId);
+          if (isScheduleBoard && normalizedScheduleDate) {
+            setCalendarMonth(new Date(`${normalizedScheduleDate}T00:00:00`));
+          }
           resetForm();
           setShowNewPost(false);
         } else {
@@ -945,18 +988,22 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
         if (attachmentFiles.length > 0 && (!insertedPost.attachments || (Array.isArray(insertedPost.attachments) && insertedPost.attachments.length === 0))) {
           console.warn('첨부파일이 저장되지 않았을 수 있습니다. Supabase에 board_posts_attachments.sql 적용 및 board-attachments 버킷 생성 여부를 확인하세요.');
         }
+        const normalizedInsertedPost = normalizeBoardPost(insertedPost);
         toast('게시물이 등록되었습니다.', 'success');
         resetForm();
         setShowNewPost(false);
-        setPosts((prev) => [insertedPost, ...prev]);
-        setSelectedPostId(insertedPost.id);
+        setPosts((prev) => [normalizedInsertedPost, ...prev]);
+        setSelectedPostId(normalizedInsertedPost.id);
+        if (isScheduleBoard && normalizedScheduleDate) {
+          setCalendarMonth(new Date(`${normalizedScheduleDate}T00:00:00`));
+        }
         if (activeBoard === '공지사항' || activeBoard === '경조사') {
           try {
             const { data: staffList } = await supabase.from('staff_members').select('id');
             const staffIds = (staffList || []).map((s: { id: string }) => s.id).filter(Boolean);
             if (staffIds.length > 0) {
               const label = activeBoard === '공지사항' ? '📢 새 공지사항' : '🎉 새 경조사';
-              const body = (insertedPost.title || '(제목 없음)').slice(0, 80);
+              const body = (normalizedInsertedPost.title || '(제목 없음)').slice(0, 80);
               const rows = staffIds.map((userId: string) => ({
                 user_id: userId,
                 type: 'board',
@@ -1073,6 +1120,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                       </select>
                       <div className="flex gap-2 items-stretch">
                         <input
+                          data-testid="board-schedule-title"
                           value={title}
                           onChange={(e) => setTitle(e.target.value)}
                           placeholder={
@@ -1120,6 +1168,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                       <div>
                         <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">날짜 (YYYY-MM-DD)</label>
                         <SmartDatePicker
+                          data-testid="board-schedule-date"
                           value={scheduleDate}
                           onChange={setScheduleDate}
                           placeholder="0000-00-00"
@@ -1130,6 +1179,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                         <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">시간</label>
                         <div className="grid grid-cols-3 gap-2">
                           <select
+                            data-testid="board-schedule-period"
                             value={schedulePeriod}
                             onChange={(e) => {
                               const v = e.target.value;
@@ -1143,6 +1193,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                             <option value="오후">오후</option>
                           </select>
                           <select
+                            data-testid="board-schedule-hour"
                             value={scheduleHour}
                             onChange={(e) => {
                               const v = e.target.value;
@@ -1161,6 +1212,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                             })}
                           </select>
                           <select
+                            data-testid="board-schedule-minute"
                             value={scheduleMinute}
                             onChange={(e) => {
                               const v = e.target.value;
@@ -1604,6 +1656,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                         return (
                           <div
                             key={key + idx}
+                            data-testid={`board-calendar-day-${key}`}
                             className={`min-h-[80px] border border-[var(--border)] p-1.5 align-top ${inMonth ? 'bg-[var(--card)]' : 'bg-[var(--tab-bg)]'
                               }`}
                           >
@@ -1620,6 +1673,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                               </span>
                               {events.length > 0 && (
                                 <button
+                                  data-testid={`board-calendar-day-count-${key}`}
                                   type="button"
                                   onClick={() => events[0] && setSelectedPostId(events[0].id)}
                                   className="text-[11px] font-semibold text-[var(--accent)] px-1 py-0.5 rounded-[var(--radius-md)] hover:bg-[var(--toss-blue-light)]"
@@ -1962,7 +2016,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                           .filter(
                             (p: BoardPost) =>
                               p.board_type === selectedPost.board_type &&
-                              p.schedule_date === selectedPost.schedule_date
+                              normalizeScheduleDateValue(p.schedule_date) === normalizeScheduleDateValue(selectedPost.schedule_date)
                           )
                           .map((p: BoardPost) => (
                             <button
