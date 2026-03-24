@@ -1,6 +1,7 @@
 'use client';
 ﻿import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
 
 function escapeHtml(value: string) {
   return value
@@ -49,26 +50,64 @@ function sanitizeFilename(value: string) {
 }
 
 export default function MyCertificates({ user }: Record<string, unknown>) {
-  const _user = (user ?? {}) as Record<string, unknown>;
+  const _user = normalizeStaffLike((user ?? {}) as Record<string, unknown>);
+  const [resolvedUser, setResolvedUser] = useState<Record<string, unknown>>(_user);
   const [approvedDocs, setApprovedDocs] = useState<any[]>([]);
   const [issuedCerts, setIssuedCerts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const effectiveUserId = getStaffLikeId(resolvedUser);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const syncUserIdentity = async () => {
+      const directId = getStaffLikeId(_user);
+      if (directId) {
+        setResolvedUser(_user);
+        return;
+      }
+      if (!_user?.name && !_user?.employee_no && !_user?.auth_user_id) {
+        setResolvedUser(_user);
+        return;
+      }
+      const recoveredUser = await resolveStaffLike(_user);
+      if (!cancelled) {
+        setResolvedUser(recoveredUser);
+      }
+    };
+
+    void syncUserIdentity();
+    return () => {
+      cancelled = true;
+    };
+  }, [_user?.id, _user?.name, _user?.employee_no, _user?.auth_user_id]);
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!_user.id) {
+      if (!effectiveUserId) {
         setLoading(false);
         return;
       }
-      const approvalRes = await supabase.from('approvals').select('*').eq('sender_id', _user.id as string).eq('status', '승인').eq('type', '양식신청').order('created_at', { ascending: false });
+      const approvalRes = await supabase
+        .from('approvals')
+        .select('*')
+        .eq('sender_id', effectiveUserId)
+        .eq('status', '승인')
+        .eq('type', '양식신청')
+        .order('created_at', { ascending: false });
       setApprovedDocs(approvalRes.data || []);
-      const certRes = await supabase.from('certificate_issuances').select('*, staff_members(name)').eq('staff_id', _user.id as string).order('issued_at', { ascending: false }).limit(20);
+      const certRes = await supabase
+        .from('certificate_issuances')
+        .select('*, staff_members(name)')
+        .eq('staff_id', effectiveUserId)
+        .order('issued_at', { ascending: false })
+        .limit(20);
       setIssuedCerts(certRes.error ? [] : (certRes.data || []));
       setLoading(false);
     };
 
     fetchData();
-  }, [_user.id]);
+  }, [effectiveUserId]);
 
   // 간단한 인쇄 기능 (브라우저 기본 인쇄창 호출)
   const handlePrint = (doc: any) => {

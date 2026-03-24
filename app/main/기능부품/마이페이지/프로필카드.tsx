@@ -11,6 +11,7 @@ import {
   normalizeProfileUser,
   withProfilePhotoMetadata,
 } from '@/lib/profile-photo';
+import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
 
 export default function MyProfileCard({
   user: initialUser,
@@ -23,13 +24,14 @@ export default function MyProfileCard({
   setIsEditing: setControlledIsEditing,
 }: Record<string, unknown>) {
   const MASKED_TEXT = '********';
-  const _iu = (initialUser ?? {}) as Record<string, unknown>;
+  const _iu = normalizeStaffLike((initialUser ?? {}) as Record<string, unknown>);
   const [user, setUser] = useState<Record<string, unknown>>(normalizeProfileUser(_iu));
   const [avatarUrl, setAvatarUrl] = useState<string | null>(getProfilePhotoUrl((_iu)));
   const [uploading, setUploading] = useState(false);
   const [internalShowSecret, setInternalShowSecret] = useState(false);
   const [debugMsg, setDebugMsg] = useState(''); // 디버깅용 메시지
   const [internalIsEditing, setInternalIsEditing] = useState(false);
+  const effectiveUserId = getStaffLikeId(user);
   const [editForm, setEditForm] = useState<{ email: string; phone: string; extension: string; address: string; bank_name: string; bank_account: string }>({
     email: ((_iu)?.email as string) || '',
     phone: ((_iu)?.phone as string) || '',
@@ -70,14 +72,24 @@ export default function MyProfileCard({
     );
   };
 
+  useEffect(() => {
+    const normalizedUser = normalizeProfileUser(_iu);
+    setUser(normalizedUser);
+    setAvatarUrl(getProfilePhotoUrl(normalizedUser));
+  }, [_iu?.id, _iu?.name, _iu?.photo_url, _iu?.avatar_url, _iu?.profile_photo_updated_at]);
+
   // [핵심] 페이지 로드 시 ID가 없으면 '이름'으로 ID를 찾아내는 복구 로직
   useEffect(() => {
-    if (!(_iu)?.id && (_iu)?.name) {
-      recoverUserIdentity((_iu).name as string);
+    if (getStaffLikeId(_iu)) {
+      setDebugMsg('');
+      return;
+    }
+    if ((_iu)?.name || (_iu)?.employee_no || (_iu)?.auth_user_id) {
+      void recoverUserIdentity(_iu);
     } else {
       setDebugMsg("초기 사용자 이름조차 없습니다. 재로그인 필요.");
     }
-  }, [(_iu)?.id, (_iu)?.name]);
+  }, [_iu?.id, _iu?.name, _iu?.employee_no, _iu?.auth_user_id]);
 
   // 편집 폼은 user 정보가 바뀔 때 동기화
   useEffect(() => {
@@ -93,22 +105,16 @@ export default function MyProfileCard({
     }
   }, [user]);
 
-  const recoverUserIdentity = async (name: string) => {
+  const recoverUserIdentity = async (source: Record<string, unknown>) => {
     try {
-      // 1. 이름으로 DB 조회
-      const { data, error } = await supabase
-        .from('staff_members')
-        .select('*')
-        .eq('name', name)
-        .single();
-
-      if (error || !data) {
-        // setDebugMsg(`ID 복구 실패: ${name}을 찾을 수 없음.`);
+      const resolvedUser = await resolveStaffLike(source);
+      const resolvedUserId = getStaffLikeId(resolvedUser);
+      if (!resolvedUserId) {
         return;
       }
 
       // 2. 찾아낸 진짜 정보로 상태 업데이트
-      const normalizedUser = normalizeProfileUser(data);
+      const normalizedUser = normalizeProfileUser(resolvedUser);
       setUser(normalizedUser);
       setAvatarUrl(getProfilePhotoUrl(normalizedUser));
 
@@ -153,7 +159,7 @@ export default function MyProfileCard({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           password: input,
-          userId: user?.id || (_iu)?.id,
+          userId: effectiveUserId || getStaffLikeId(_iu) || undefined,
           name: user?.name || (_iu)?.name,
           employeeNo: user?.employee_no || (_iu)?.employee_no,
         }),
@@ -184,14 +190,14 @@ export default function MyProfileCard({
       setUploading(true);
 
       let currentUser = user;
-      if (!currentUser?.id && (_iu)?.name) {
-        await recoverUserIdentity((_iu).name as string);
+      if (!getStaffLikeId(currentUser) && ((_iu)?.name || (_iu)?.employee_no || (_iu)?.auth_user_id)) {
+        await recoverUserIdentity(_iu);
         try {
           const stored = localStorage.getItem('erp_user');
           if (stored) currentUser = JSON.parse(stored);
         } catch (_) { }
       }
-      if (!currentUser?.id) {
+      if (!getStaffLikeId(currentUser)) {
         toast('사진 등록은 직원 계정(이름으로 로그인)으로 이용해 주세요. MSO 관리자 계정에는 프로필 사진 기능을 사용할 수 없습니다.', 'success');
         setUploading(false);
         return;
@@ -405,14 +411,14 @@ export default function MyProfileCard({
   const handleSaveProfile = async () => {
     try {
       let currentUser = user;
-      if (!currentUser?.id && (_iu)?.name) {
-        await recoverUserIdentity((_iu).name as string);
+      if (!getStaffLikeId(currentUser) && ((_iu)?.name || (_iu)?.employee_no || (_iu)?.auth_user_id)) {
+        await recoverUserIdentity(_iu);
         try {
           const stored = localStorage.getItem('erp_user');
           if (stored) currentUser = JSON.parse(stored);
         } catch (_) { }
       }
-      if (!currentUser?.id) {
+      if (!getStaffLikeId(currentUser)) {
         toast('내 정보 수정은 직원 계정(이름으로 로그인)에서만 가능합니다.', 'success');
         return;
       }
@@ -738,31 +744,34 @@ function LeaveAndCommuteSummary({ user: _rawUser, onOpenApproval }: Record<strin
 
   useEffect(() => {
     const load = async () => {
-      if (!user?.id && !user?.name) return;
+      if (!user?.id && !user?.name && !user?.employee_no && !user?.auth_user_id) return;
+
+      const resolvedUser = await resolveStaffLike(user as Record<string, unknown>);
+      const resolvedStaffId = getStaffLikeId(resolvedUser);
 
       let staff: { id?: string; annual_leave_total?: number; annual_leave_used?: number } | null = null;
-      if (user?.id) {
+      if (resolvedStaffId) {
         const res = await supabase
           .from('staff_members')
           .select('id, annual_leave_total, annual_leave_used')
-          .eq('id', user.id)
+          .eq('id', resolvedStaffId)
           .maybeSingle();
         staff = res.data;
       }
-      if (!staff && user?.name) {
+      if (!staff && resolvedUser?.name) {
         const res = await supabase
           .from('staff_members')
           .select('*')
-          .eq('name', user.name)
+          .eq('name', resolvedUser.name)
           .maybeSingle();
         const row = res.data as any;
         if (row) staff = { id: row.id, annual_leave_total: row.annual_leave_total, annual_leave_used: row.annual_leave_used };
       }
 
-      const total = Number(staff?.annual_leave_total ?? user?.annual_leave_total ?? 0);
-      const used = Number(staff?.annual_leave_used ?? user?.annual_leave_used ?? 0);
+      const total = Number(staff?.annual_leave_total ?? resolvedUser?.annual_leave_total ?? user?.annual_leave_total ?? 0);
+      const used = Number(staff?.annual_leave_used ?? resolvedUser?.annual_leave_used ?? user?.annual_leave_used ?? 0);
       const remaining = Math.max(0, total - used);
-      const staffId = staff?.id ?? user?.id;
+      const staffId = staff?.id ?? resolvedStaffId;
 
       const { data: commute } = staffId
         ? await supabase
@@ -796,7 +805,7 @@ function LeaveAndCommuteSummary({ user: _rawUser, onOpenApproval }: Record<strin
     };
 
     load();
-  }, [user?.id, user?.name]);
+  }, [user?.id, user?.name, user?.employee_no, user?.auth_user_id]);
 
   if (!summary) {
     return (

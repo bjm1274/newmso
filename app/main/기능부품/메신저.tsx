@@ -342,6 +342,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   const typingPeersTimeoutRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const syncChannelRef = useRef<BroadcastChannel | null>(null);
   const readWriteInFlightRef = useRef<Set<string>>(new Set());
+  const incomingRealtimeMessageIdsRef = useRef<Map<string, number>>(new Map());
   const isNearBottomRef = useRef(true);
   const selectedRoomIdRef = useRef<string | null>(null);
   const fetchDataRef = useRef<(() => Promise<void>) | null>(null);
@@ -425,7 +426,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     ( room: ChatRoom, memberId: string) => {
       const knownStaff = resolveStaffProfile(memberId);
       if (knownStaff) return knownStaff;
-      if (room?.type === 'direct' && String(memberId) !== String(user?.id)) {
+      if (room?.type === 'direct' && String(memberId) !== String(effectiveChatUserId || user?.id || '')) {
         return {
           id: memberId,
           name: room?.name || '이름 없음',
@@ -788,18 +789,18 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   }, []);
 
   const emitTypingState = useCallback((isTyping: boolean) => {
-    if (!typingChannelRef.current || !selectedRoomId || !user?.id) return;
+    if (!typingChannelRef.current || !selectedRoomId || !effectiveChatUserId) return;
     typingChannelRef.current.send({
       type: 'broadcast',
       event: 'typing',
       payload: {
         roomId: selectedRoomId,
-        userId: String(user.id),
-        name: user.name || 'Unknown',
+        userId: String(effectiveChatUserId),
+        name: user?.name || 'Unknown',
         isTyping,
       },
     });
-  }, [selectedRoomId, user?.id, user?.name]);
+  }, [selectedRoomId, effectiveChatUserId, user?.name]);
 
   const handleComposerChange = useCallback((value: string, caret: number) => {
     setInputMsg(value);
@@ -943,6 +944,109 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     await updateUnreadForRooms(list);
     return list;
   }, [repairDirectRooms, updateUnreadForRooms]);
+
+  const claimIncomingRealtimeMessage = useCallback((messageId: string | null | undefined) => {
+    const nextId = String(messageId || '').trim();
+    if (!nextId) return false;
+
+    const now = Date.now();
+    const seen = incomingRealtimeMessageIdsRef.current;
+    seen.forEach((timestamp, key) => {
+      if (now - timestamp > 15000) {
+        seen.delete(key);
+      }
+    });
+
+    const previous = seen.get(nextId);
+    if (previous && now - previous < 5000) {
+      return false;
+    }
+
+    seen.set(nextId, now);
+    return true;
+  }, []);
+
+  const handleIncomingRealtimeMessage = useCallback(async (row: ChatMessage) => {
+    if (!row?.id || !row.room_id) return;
+    if (!claimIncomingRealtimeMessage(row.id)) return;
+
+    const roomId = String(row.room_id);
+    const currentRooms = chatRoomsRef.current;
+    const currentRoom = currentRooms.find((room: ChatRoom) => String(room.id) === roomId) || null;
+    if (currentRoom && !isRoomAccessibleToCurrentUser(currentRoom)) return;
+
+    const isCurrentRoom = String(selectedRoomIdRef.current || '') === roomId;
+    const isOwnMessage = String(row.sender_id || '') === String(effectiveChatUserId || '');
+    const previewText = row.content || (row.file_url ? '첨부 파일' : currentRoom?.last_message_preview || currentRoom?.last_message || '');
+
+    setChatRooms((prev) => {
+      if (!prev.some((room: ChatRoom) => String(room.id) === roomId)) return prev;
+      return sortChatRoomsWithNoticeFirst(
+        prev.map((room: ChatRoom) =>
+          String(room.id) === roomId
+            ? {
+                ...room,
+                last_message: previewText || room.last_message,
+                last_message_preview: previewText || room.last_message_preview,
+                last_message_at: row.created_at || new Date().toISOString(),
+              }
+            : room
+        )
+      );
+    });
+
+    if (isCurrentRoom) {
+      pendingBottomAlignRoomIdRef.current = roomId;
+      setMessages((prev) => {
+        if (prev.some((message: ChatMessage) => String(message.id) === String(row.id))) return prev;
+        const newMsg = {
+          ...row,
+          staff: resolveStaffProfile(row.sender_id, row.sender_name) || { name: '이름 없음', photo_url: null },
+        };
+        const optimisticIndex = prev.findIndex((message: ChatMessage) => {
+          if (!String(message.id || '').startsWith('temp-')) return false;
+          if (String(message.room_id || '') !== String(row.room_id || '')) return false;
+          if (String(message.sender_id || '') !== String(row.sender_id || '')) return false;
+          return (
+            (message.content || '') === (row.content || '') &&
+            (message.file_url || null) === (row.file_url || null)
+          );
+        });
+        if (optimisticIndex >= 0) {
+          return prev.map((message: ChatMessage, index: number) =>
+            index === optimisticIndex ? newMsg : message
+          );
+        }
+        return [...prev, newMsg];
+      });
+
+      if (!isOwnMessage && user?.id) {
+        const readAt = new Date().toISOString();
+        void persistMessageReads([String(row.id)])
+          .then(async () => {
+            await persistRoomReadCursor(roomId, readAt);
+            broadcastChatSync('message-read', roomId);
+          })
+          .catch(() => {});
+        setRoomUnreadCounts((prev) => ({ ...prev, [roomId]: 0 }));
+      }
+      return;
+    }
+
+    if (!isOwnMessage && currentRooms.length > 0) {
+      void updateUnreadForRooms(currentRooms);
+    }
+  }, [
+    broadcastChatSync,
+    claimIncomingRealtimeMessage,
+    effectiveChatUserId,
+    isRoomAccessibleToCurrentUser,
+    persistMessageReads,
+    persistRoomReadCursor,
+    resolveStaffProfile,
+    updateUnreadForRooms,
+    user?.id,
+  ]);
 
   const syncNoticeRoomMembers = useCallback(async (rooms?: ChatRoom[]) => {
     const sourceRooms = Array.isArray(rooms) ? rooms : chatRoomsRef.current;
@@ -1297,10 +1401,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   }, [syncChatRoomsState]);
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!(effectiveChatUserId || user?.id)) return;
 
     const channel = supabase.channel('chat-presence-hub', {
-      config: { presence: { key: String(user.id) } },
+      config: { presence: { key: String(effectiveChatUserId || user?.id) } },
     });
 
     const syncPresence = () => {
@@ -1326,8 +1430,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         if (status !== 'SUBSCRIBED') return;
         presenceChannelRef.current = channel;
         await channel.track({
-          userId: String(user.id),
-          name: user.name || 'Unknown',
+          userId: String(effectiveChatUserId || user?.id),
+          name: user?.name || 'Unknown',
           roomId: selectedRoomId || null,
           onlineAt: new Date().toISOString(),
         });
@@ -1339,17 +1443,17 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       }
       supabase.removeChannel(channel);
     };
-  }, [user?.id, user?.name]);
+  }, [effectiveChatUserId, selectedRoomId, user?.id, user?.name]);
 
   useEffect(() => {
-    if (!presenceChannelRef.current || !user?.id) return;
+    if (!presenceChannelRef.current || !(effectiveChatUserId || user?.id)) return;
     presenceChannelRef.current.track({
-      userId: String(user.id),
-      name: user.name || 'Unknown',
+      userId: String(effectiveChatUserId || user?.id),
+      name: user?.name || 'Unknown',
       roomId: selectedRoomId || null,
       onlineAt: new Date().toISOString(),
     });
-  }, [selectedRoomId, user?.id, user?.name]);
+  }, [selectedRoomId, effectiveChatUserId, user?.id, user?.name]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1373,10 +1477,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         { event: 'INSERT', schema: 'public', table: 'messages' },
         async (payload: Record<string, unknown>) => {
           const msg = payload.new as ChatMessage;
-          if (!msg || String(msg.sender_id) === effectiveChatUserId) return;
-          if (chatRoomsRef.current.length) {
-            await updateUnreadForRooms(chatRoomsRef.current);
-          }
+          if (!msg) return;
+          await handleIncomingRealtimeMessage(msg);
         }
       )
       .subscribe();
@@ -1385,7 +1487,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       supabase.removeChannel(channel);
     };
     // selectedRoomId는 의도적으로 제외 — 전역 메시지 채널은 user 기준으로만 구독
-  }, [user?.id, updateUnreadForRooms]);
+  }, [handleIncomingRealtimeMessage, user?.id]);
 
   useEffect(() => {
     if (!selectedRoomId) return;
@@ -1394,50 +1496,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${selectedRoomId}` }, (payload: Record<string, unknown>) => {
         const row = payload.new as ChatMessage;
         if (!row?.id) return;
-        setMessages((prev) => {
-          if (prev.some(( m: ChatMessage) => m.id === row.id)) return prev;
-          const newMsg = {
-            ...row,
-            staff: resolveStaffProfile(row.sender_id, row.sender_name) || { name: '이름 없음', photo_url: null },
-          };
-          const optimisticIndex = prev.findIndex(( message: ChatMessage) => {
-            if (!String(message.id || '').startsWith('temp-')) return false;
-            if (String(message.room_id || '') !== String(row.room_id || '')) return false;
-            if (String(message.sender_id || '') !== String(row.sender_id || '')) return false;
-            return (
-              (message.content || '') === (row.content || '') &&
-              (message.file_url || null) === (row.file_url || null)
-            );
-          });
-          if (optimisticIndex >= 0) {
-            return prev.map((message: ChatMessage, index: number) =>
-              index === optimisticIndex ? newMsg : message
-            );
-          }
-          return [...prev, newMsg];
-        });
-        // 내가 보낸 메시지가 아니면 즉시 읽음 처리
-        if (String(row.sender_id) !== effectiveChatUserId && user?.id) {
-          persistMessageReads([row.id]).then(() => {
-            void persistRoomReadCursor(selectedRoomId, new Date().toISOString());
-            broadcastChatSync('message-read', selectedRoomId);
-          }).catch(() => {});
-          setRoomUnreadCounts((prev) => ({ ...prev, [selectedRoomId]: 0 }));
-        }
-        setChatRooms((prev) =>
-          sortChatRoomsWithNoticeFirst(
-            prev.map(( room: ChatRoom) =>
-              room.id === row.room_id
-                ? {
-                    ...room,
-                    last_message: row.content || (row.file_url ? '첨부파일' : room.last_message),
-                    last_message_preview: row.content || (row.file_url ? '첨부파일' : room.last_message_preview),
-                    last_message_at: row.created_at || new Date().toISOString(),
-                  }
-                : room
-            )
-          )
-        );
+        void handleIncomingRealtimeMessage(row);
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `room_id=eq.${selectedRoomId}` }, () => fetchData())
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages', filter: `room_id=eq.${selectedRoomId}` }, () => fetchData())
@@ -1445,13 +1504,13 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       .on('postgres_changes', { event: '*', schema: 'public', table: 'room_read_cursors', filter: `room_id=eq.${selectedRoomId}` }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reads' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, () => fetchData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_bookmarks', filter: `user_id=eq.${user?.id}` }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_bookmarks', filter: `user_id=eq.${effectiveTodoUserId || user?.id}` }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pinned_messages' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'polls' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'poll_votes' }, () => fetchData())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [selectedRoomId, fetchData, user?.id, resolveStaffProfile, effectiveChatUserId, persistMessageReads, persistRoomReadCursor, broadcastChatSync]);
+  }, [selectedRoomId, fetchData, effectiveTodoUserId, user?.id, handleIncomingRealtimeMessage]);
 
   useEffect(() => {
     if (!selectedRoomId) {
@@ -1468,7 +1527,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
     channel
       .on('broadcast', { event: 'typing' }, ({ payload }: { payload: Record<string, unknown> }) => {
-        if (!payload || payload.roomId !== selectedRoomId || payload.userId === String(user?.id)) return;
+          if (!payload || payload.roomId !== selectedRoomId || payload.userId === String(effectiveChatUserId || user?.id || '')) return;
 
         const peerId = String(payload.userId);
         if (typingPeersTimeoutRef.current[peerId]) {
@@ -1518,7 +1577,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       }
       supabase.removeChannel(channel);
     };
-  }, [selectedRoomId, user?.id, emitTypingState]);
+  }, [selectedRoomId, effectiveChatUserId, user?.id, emitTypingState]);
 
   useEffect(() => {
     const onFocus = () => { isFocusedRef.current = true; };
@@ -1578,14 +1637,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     const lastMessage = messages[messages.length - 1];
     const shouldStick =
       isNearBottomRef.current ||
-      String(lastMessage?.sender_id) === String(user?.id) ||
+      String(lastMessage?.sender_id) === String(effectiveChatUserId || user?.id || '') ||
       String(lastMessage?.id || '').startsWith('temp-');
     if (shouldStick) {
-      requestAnimationFrame(() => scrollToBottom(String(lastMessage?.sender_id) === String(user?.id) ? 'smooth' : 'auto'));
+      requestAnimationFrame(() => scrollToBottom(String(lastMessage?.sender_id) === String(effectiveChatUserId || user?.id || '') ? 'smooth' : 'auto'));
     } else {
       setShowScrollToLatest(true);
     }
-  }, [messages, selectedRoomId, scrollToBottom, user?.id]);
+  }, [messages, selectedRoomId, scrollToBottom, effectiveChatUserId, user?.id]);
 
   useEffect(() => {
     if (!selectedRoomId) return;
@@ -1716,6 +1775,15 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     });
     return sortRoomsForSidebar(filtered, roomPrefs);
   }, [visibleRooms, deferredOmniSearch, roomPrefs, showHiddenRooms, roomLabelMap]);
+  const forwardTargetRooms = useMemo(
+    () =>
+      visibleRooms.filter(( room: ChatRoom) => {
+        if (String(room.id) === String(selectedRoomId || '')) return false;
+        if (roomPrefs[room.id]?.hidden === true) return false;
+        return true;
+      }),
+    [roomPrefs, selectedRoomId, visibleRooms]
+  );
   const sidebarRoomItems = useMemo(() => {
     return sidebarRooms.map((room: ChatRoom) => {
       const roomId = String(room.id);
@@ -1837,7 +1905,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         ? selectedRoom.members
         : [];
       const newMembers = currentMembers.filter(
-        (id: unknown) => String(id) !== String(user?.id)
+        (id: unknown) => String(id) !== String(effectiveChatUserId || user?.id || '')
       );
 
       await supabase
@@ -1855,7 +1923,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           .insert([
             {
               room_id: selectedRoom.id,
-              sender_id: user?.id,
+              sender_id: effectiveChatUserId || user?.id,
               content: leaveContent,
             },
           ])
@@ -1892,8 +1960,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
   const removeRoomMember = async (memberId: string) => {
     if (!selectedRoom) return;
-    if (selectedRoom?.created_by !== user?.id) return;
-    if (String(memberId) === String(user?.id)) return;
+    if (selectedRoom?.created_by !== (effectiveChatUserId || user?.id)) return;
+    if (String(memberId) === String(effectiveChatUserId || user?.id || '')) return;
     if (!confirm('이 참여자를 채팅방에서 제거하시겠습니까?')) return;
 
     try {
@@ -1920,7 +1988,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         .insert([
           {
             room_id: selectedRoom.id,
-            sender_id: user?.id,
+            sender_id: effectiveChatUserId || user?.id,
             content: systemContent,
           },
         ])
@@ -2020,7 +2088,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     const optimisticMessage = {
       id: optimisticId,
       room_id: roomId,
-      sender_id: user!.id,
+      sender_id: effectiveChatUserId || user!.id,
       content,
       file_url: resolvedFileUrl,
       file_size_bytes: resolvedFileSizeBytes,
@@ -2063,7 +2131,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
     const payload: Record<string, unknown> = {
       room_id: roomId,
-      sender_id: user!.id,
+      sender_id: effectiveChatUserId || user!.id,
       content,
       file_url: resolvedFileUrl,
       file_size_bytes: resolvedFileSizeBytes,
@@ -2249,11 +2317,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
   const createGroupChat = async () => {
     if (!groupName.trim() || selectedMembers.length === 0) return toast('방 이름과 멤버를 선택해 주세요.', 'warning');
+    if (!effectiveChatUserId) return toast('연결된 직원 계정을 찾지 못했습니다.', 'error');
     const { data: room, error } = await supabase.from('chat_rooms').insert([{
       name: groupName,
       type: 'group',
-      created_by: user?.id,
-      members: [user?.id, ...selectedMembers]
+      created_by: effectiveChatUserId,
+      members: [effectiveChatUserId, ...selectedMembers]
     }]).select().single();
 
     if (!error && room) {
@@ -2384,8 +2453,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     const options = pollOptions.map((o) => o.trim()).filter(Boolean);
     if (options.length < 2) { toast('선택지는 최소 2개 이상 입력해 주세요.', 'warning'); return; }
     try {
-      const { data: poll, error } = await supabase.from('polls').insert([{
-        room_id: selectedRoomId, creator_id: user?.id, question: pollQuestion, options
+        const { data: poll, error } = await supabase.from('polls').insert([{
+        room_id: selectedRoomId, creator_id: effectiveChatUserId || user?.id, question: pollQuestion, options
       }]).select().single();
       if (!error && poll) {
         setPolls((p) => [...p, poll as PollItem]);
@@ -2409,12 +2478,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         .from('poll_votes')
         .select('option_index')
         .eq('poll_id', pollId)
-        .eq('user_id', user?.id)
+        .eq('user_id', effectiveChatUserId || user?.id)
         .maybeSingle();
       const prevOptionIndex = prevVote?.option_index as number | null | undefined;
 
       const { error } = await supabase.from('poll_votes').upsert(
-        { poll_id: pollId, user_id: user?.id, option_index: optionIndex },
+        { poll_id: pollId, user_id: effectiveChatUserId || user?.id, option_index: optionIndex },
         { onConflict: 'poll_id,user_id' }
       );
       if (!error) {
@@ -2436,11 +2505,11 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
   const toggleReaction = async (messageId: string, emoji: string) => {
     try {
-      const { data: myReact } = await supabase.from('message_reactions').select('id').eq('message_id', messageId).eq('user_id', user!.id).eq('emoji', emoji).maybeSingle();
+      const { data: myReact } = await supabase.from('message_reactions').select('id').eq('message_id', messageId).eq('user_id', effectiveChatUserId || user!.id).eq('emoji', emoji).maybeSingle();
       if (myReact) {
-        await supabase.from('message_reactions').delete().eq('message_id', messageId).eq('user_id', user!.id).eq('emoji', emoji);
+        await supabase.from('message_reactions').delete().eq('message_id', messageId).eq('user_id', effectiveChatUserId || user!.id).eq('emoji', emoji);
       } else {
-        await supabase.from('message_reactions').insert([{ message_id: messageId, user_id: user!.id, emoji }]);
+        await supabase.from('message_reactions').insert([{ message_id: messageId, user_id: effectiveChatUserId || user!.id, emoji }]);
       }
       await fetchData();
     } catch (error) {
@@ -2466,7 +2535,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         if (clearError) throw clearError;
         const { error: insertError } = await supabase
           .from('pinned_messages')
-          .insert([{ room_id: selectedRoomId, message_id: normalizedMessageId, pinned_by: user?.id }]);
+          .insert([{ room_id: selectedRoomId, message_id: normalizedMessageId, pinned_by: effectiveChatUserId || user?.id }]);
         if (insertError) throw insertError;
         setPinnedIds([normalizedMessageId]);
         writeStoredPinnedIds(selectedRoomId, [normalizedMessageId]);
@@ -2576,11 +2645,11 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   }, [globalSearchQuery, resolveStaffProfile, visibleRoomIds]);
 
   const visibleTimelineMessages = useMemo(() => {
-    const msgs = messages.filter(( m: ChatMessage) => !m.is_deleted);
+    const msgs = messages;
     if (deferredChatSearch.trim()) {
       const q = deferredChatSearch.toLowerCase();
       return msgs.filter((m) =>
-        (m.content || '').toLowerCase().includes(q) ||
+        ((m.is_deleted ? '삭제된 메시지입니다' : (m.content || ''))).toLowerCase().includes(q) ||
         ((m.staff as { name?: string } | null | undefined)?.name || '').toLowerCase().includes(q)
       );
     }
@@ -2601,14 +2670,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
   useEffect(() => {
     const load = async () => {
-      if (!user?.id || !selectedRoomId) {
+      if (!(effectiveChatUserId || user?.id) || !selectedRoomId) {
         setRoomNotifyOn(true);
         return;
       }
       const { data, error } = await supabase
         .from('room_notification_settings')
         .select('notifications_enabled')
-        .eq('user_id', user?.id)
+        .eq('user_id', effectiveChatUserId || user?.id)
         .eq('room_id', selectedRoomId)
         .maybeSingle();
       if (error) {
@@ -2618,11 +2687,11 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       setRoomNotifyOn(data?.notifications_enabled !== false);
     };
     load();
-  }, [selectedRoomId, user?.id]);
+  }, [selectedRoomId, effectiveChatUserId, user?.id]);
   const toggleRoomNotify = async () => {
-    if (!user?.id || !selectedRoomId) return;
+    if (!(effectiveChatUserId || user?.id) || !selectedRoomId) return;
     setRoomNotifyOn((p) => !p);
-    await supabase.from('room_notification_settings').upsert({ user_id: user.id, room_id: selectedRoomId, notifications_enabled: !roomNotifyOn }, { onConflict: 'user_id,room_id' });
+    await supabase.from('room_notification_settings').upsert({ user_id: effectiveChatUserId || user?.id, room_id: selectedRoomId, notifications_enabled: !roomNotifyOn }, { onConflict: 'user_id,room_id' });
   };
 
   const deleteMessage = async (msg: ChatMessage) => {
@@ -2630,8 +2699,18 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       toast('공지 채널 메시지는 삭제할 수 없습니다.', 'success');
       return;
     }
-    if (msg.sender_id !== user?.id && !isMso) return;
+    if (String(msg.sender_id) !== String(effectiveChatUserId || user?.id || '') && !isMso) return;
     if (!confirm('이 메시지를 삭제하시겠습니까?')) return;
+    setMessages((prev) =>
+      prev.map((message: ChatMessage) =>
+        String(message.id) === String(msg.id)
+          ? {
+              ...message,
+              is_deleted: true,
+            }
+          : message
+      )
+    );
     await supabase.from('messages').update({ is_deleted: true }).eq('id', msg.id);
     // 媛먯궗 濡쒓렇 湲곕줉
     try {
@@ -3007,6 +3086,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 type MsgItem = ChatMessage & { staff?: { name?: string; position?: string; photo_url?: string | null } | null; reply_to_id?: string | null };
                 const msg = item as unknown as MsgItem;
                 const isMine = String(msg.sender_id) === effectiveChatUserId;
+                const isDeletedMessage = Boolean(msg.is_deleted);
                 const msgReacts = reactions[msg.id] || {};
                 const hasReacts = Object.keys(msgReacts).some(e => (msgReacts[e] || 0) > 0);
 
@@ -3071,19 +3151,36 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                         <div
                           data-testid={`chat-message-${msg.id}`}
                           onClick={(e) => {
+                            if (isDeletedMessage) return;
                             e.stopPropagation();
                             openMessageActions(msg);
                           }}
-                          className={`group relative ${!msg.content ? 'p-0 bg-transparent shadow-none border-none' : 'px-3 py-2 shadow-sm border'} rounded-[var(--radius-md)] text-[13px] md:text-sm cursor-pointer transition-all max-w-[75%] md:max-w-[70%] ${!msg.content ? '' : isMine
-                            ? 'bg-emerald-600 text-white border-transparent rounded-tr-none'
-                            : 'bg-[var(--card)] dark:bg-zinc-800 border-[var(--border)] dark:border-zinc-700 rounded-tl-none hover:border-emerald-400 text-foreground'
-                            }`}
+                          className={`group relative ${
+                            isDeletedMessage
+                              ? 'px-3 py-2 border border-dashed border-[var(--border)] bg-[var(--muted)] text-[var(--toss-gray-3)] italic'
+                              : !msg.content
+                                ? 'p-0 bg-transparent shadow-none border-none'
+                                : 'px-3 py-2 shadow-sm border'
+                          } rounded-[var(--radius-md)] text-[13px] md:text-sm ${isDeletedMessage ? 'cursor-default' : 'cursor-pointer'} transition-all max-w-[75%] md:max-w-[70%] ${
+                            isDeletedMessage
+                              ? isMine
+                                ? 'rounded-tr-none'
+                                : 'rounded-tl-none'
+                              : !msg.content
+                                ? ''
+                                : isMine
+                                  ? 'bg-emerald-600 text-white border-transparent rounded-tr-none'
+                                  : 'bg-[var(--card)] dark:bg-zinc-800 border-[var(--border)] dark:border-zinc-700 rounded-tl-none hover:border-emerald-400 text-foreground'
+                          }`}
                           role="button"
-                          tabIndex={0}
-                          onKeyDown={(e) => e.key === 'Enter' && markMessageRead(msg)}
-                          aria-label={`${msg.staff?.name || '이름 없음'} 메시지`}
+                          tabIndex={isDeletedMessage ? -1 : 0}
+                          onKeyDown={(e) => {
+                            if (isDeletedMessage) return;
+                            if (e.key === 'Enter') markMessageRead(msg);
+                          }}
+                          aria-label={`${msg.staff?.name || '이름 없음'} ${isDeletedMessage ? '삭제된 메시지' : '메시지'}`}
                         >
-                          {msg.reply_to_id && (() => {
+                          {!isDeletedMessage && msg.reply_to_id && (() => {
                             const parent = messages.find(( m: ChatMessage) => m.id === msg.reply_to_id);
                             return parent ? (
                               <div
@@ -3099,10 +3196,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                               </div>
                             ) : null;
                           })()}
-                          <div className={`leading-relaxed ${msg.content ? 'mb-1' : ''}`}>
-                            {renderMessageContent(msg.content || '')}
+                          <div className={`leading-relaxed ${(msg.content && !isDeletedMessage) ? 'mb-1' : ''}`}>
+                            {isDeletedMessage ? '삭제된 메시지입니다.' : renderMessageContent(msg.content || '')}
                           </div>
-                          {msg.file_url && (() => { const furl = msg.file_url!; return (
+                          {!isDeletedMessage && msg.file_url && (() => { const furl = msg.file_url!; return (
                             <div className="space-y-1 mt-2" onClick={(e) => e.stopPropagation()}>
                               {isImageUrl(furl) ? (
                                 <div className="relative group inline-block">
@@ -3141,7 +3238,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                             </div>
                           ); })()}
 
-                          {hasReacts && (
+                          {!isDeletedMessage && hasReacts && (
                             <div className="mt-2 flex items-center gap-2 text-[11px] flex-wrap">
                               <span className="flex gap-1 flex-wrap">
                                 {Object.entries(msgReacts).map(([emoji, cnt]) =>
@@ -3289,11 +3386,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             </div>
           )}
 
-          {typingNoticeText && (
-            <div className="mb-2 px-1 text-[11px] font-medium text-blue-500">
-              {typingNoticeText}
-            </div>
-          )}
+          <div
+            aria-live="polite"
+            className="mb-2 min-h-[18px] px-1 text-[11px] font-medium"
+          >
+            {typingNoticeText ? (
+              <span className="text-blue-500">{typingNoticeText}</span>
+            ) : null}
+          </div>
 
           <div className={`flex items-center md:items-end gap-3 p-3 rounded-[var(--radius-lg)] border transition-all ${selectedRoomId === NOTICE_ROOM_ID && !canWriteNotice
             ? 'bg-[var(--muted)] border-[var(--border)] opacity-80 pointer-events-none'
@@ -3455,7 +3555,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                         selectedRoom?.id === NOTICE_ROOM_ID
                           ? member
                           : resolveRoomMemberProfile(selectedRoom!, memberId);
-                      const isOwner = selectedRoom?.id !== NOTICE_ROOM_ID && selectedRoom?.created_by === user?.id;
+                      const isOwner = selectedRoom?.id !== NOTICE_ROOM_ID && selectedRoom?.created_by === (effectiveChatUserId || user?.id);
                       return (
                         <div data-testid={`chat-room-member-${memberId}`} key={memberId} className="flex items-center justify-between group">
                           <div className="flex items-center gap-3">
@@ -3467,7 +3567,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                               <p className="text-[10px] text-[var(--toss-gray-4)] font-medium">{[s?.department, s?.position].filter(Boolean).join(' · ')}</p>
                             </div>
                           </div>
-                          {isOwner && String(memberId) !== String(user?.id) && (
+                          {isOwner && String(memberId) !== String(effectiveChatUserId || user?.id || '') && (
                             <button data-testid={`chat-remove-member-${memberId}`} onClick={() => { void removeRoomMember(String(memberId)); }} className="opacity-0 group-hover:opacity-100 p-1 text-red-500 text-[10px] font-bold hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-all">내보내기</button>
                           )}
                         </div>
@@ -3558,7 +3658,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     <span className="text-xl">📋</span>
                     <span className="text-sm font-bold">복사</span>
                   </button>
-                  {activeActionMsg.sender_id === user?.id && (
+                  {String(activeActionMsg.sender_id) === String(effectiveChatUserId || user?.id || '') && (
                     <button onClick={() => { void deleteMessageFromActions(activeActionMsg); }} className="w-full flex items-center gap-4 p-4 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-[var(--radius-md)] transition-colors text-red-500">
                       <span className="text-xl">🗑️</span>
                       <span className="text-sm font-bold">삭제</span>
@@ -3598,7 +3698,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   >
                     답글 달기
                   </button>
-                  {activeActionMsg.sender_id === user?.id && (
+                  {String(activeActionMsg.sender_id) === String(effectiveChatUserId || user?.id || '') && (
                     <button data-testid="chat-message-action-delete" onClick={() => { void deleteMessageFromActions(activeActionMsg); }} className="w-full p-3 text-left hover:bg-red-50 rounded-[var(--radius-md)] text-xs font-semibold text-red-600 transition-colors">메시지 삭제</button>
                   )}
                   <button data-testid="chat-message-action-pin" onClick={() => { void togglePin(activeActionMsg.id); setActiveActionMsg(null); }} className={`w-full p-3 text-left rounded-[var(--radius-md)] text-xs font-semibold transition-colors ${pinnedIds.includes(String(activeActionMsg.id)) ? 'hover:bg-[var(--muted)] text-[var(--toss-gray-3)]' : 'hover:bg-orange-50 text-orange-500'}`}>{pinnedIds.includes(String(activeActionMsg.id)) ? '공지 해제' : '공지로 등록'}</button>
@@ -3640,7 +3740,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 <div className="space-y-2">
                   <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest ml-1">멤버 선택 ({selectedMembers.length}명)</label>
                   <div className="h-48 overflow-y-auto border border-[var(--border)] rounded-[var(--radius-md)] p-4 space-y-2 custom-scrollbar bg-[var(--muted)]/30">
-                    {staffs.filter(( s: StaffMember) => s.id !== user?.id).map(( s: StaffMember) => (
+                    {staffs.filter(( s: StaffMember) => String(s.id) !== String(effectiveChatUserId || user?.id || '')).map(( s: StaffMember) => (
                       <label key={s.id} className="flex items-center gap-3 p-3 bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] cursor-pointer hover:border-[var(--accent)] transition-all">
                         <input type="checkbox" checked={selectedMembers.includes(s.id)} onChange={e => {
                           if (e.target.checked) setSelectedMembers([...selectedMembers, s.id]);
@@ -3806,7 +3906,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                         ].filter(Boolean);
                         await supabase.from('approvals').insert([
                           {
-                            sender_id: user?.id,
+                            sender_id: effectiveChatUserId || user?.id,
                             sender_name: user?.name,
                             sender_company: user?.company,
                             type: '연차/휴가',
@@ -3894,7 +3994,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                         ].filter(Boolean);
                         await supabase.from('approvals').insert([
                           {
-                            sender_id: user?.id,
+                            sender_id: effectiveChatUserId || user?.id,
                             sender_name: user?.name,
                             sender_company: user?.company,
                             type: '비품구매',
@@ -4085,9 +4185,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
               선택한 메시지를 전달할 채팅방을 선택하세요.
             </p>
             <div className="max-h-64 overflow-y-auto custom-scrollbar space-y-2">
-              {chatRooms
-                .filter(( r: ChatRoom) => r.id !== selectedRoomId)
-                .map(( room: ChatRoom) => (
+              {forwardTargetRooms.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-[var(--border)] px-4 py-6 text-center text-sm text-[var(--toss-gray-3)]">
+                  전달할 수 있는 채팅방이 없습니다.
+                </div>
+              ) : (
+                forwardTargetRooms.map(( room: ChatRoom) => (
                   <button
                     data-testid={`chat-forward-target-${room.id}`}
                     key={room.id}
@@ -4097,7 +4200,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                         const { data: forwardedMessage, error } = await supabase.from('messages').insert([
                           {
                             room_id: room.id,
-                            sender_id: user?.id,
+                            sender_id: effectiveChatUserId || user?.id,
                             content:
                               `[전달] ${(forwardSourceMsg.staff as { name?: string } | null | undefined)?.name || '이름 없음'}: ` +
                               (forwardSourceMsg.content || '첨부 파일'),
@@ -4126,7 +4229,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       {roomUnreadCounts[room.id] ? String(roomUnreadCounts[room.id]) : ''}
                     </span>
                   </button>
-                ))}
+                ))
+              )}
             </div>
             <div className="flex gap-2 pt-2">
               <button
@@ -4258,7 +4362,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     const systemContent = `[초대] ${inviterName}님이 ${invitedNames}님을 초대했습니다.`;
                     const { data: inviteMessage, error: inviteMessageError } = await supabase.from('messages').insert([{
                       room_id: selectedRoom.id,
-                      sender_id: user?.id,
+                      sender_id: effectiveChatUserId || user?.id,
                       content: systemContent,
                     }]).select('id, room_id').single();
                     if (inviteMessageError) throw inviteMessageError;

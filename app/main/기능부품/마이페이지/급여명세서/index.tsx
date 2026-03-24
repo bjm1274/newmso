@@ -1,6 +1,7 @@
 'use client';
 ﻿import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
 import SalaryDetail from '../../인사관리서브/급여명세/급여상세';
 
 interface StaffInfo {
@@ -49,17 +50,44 @@ interface SalaryRecord {
 }
 
 export default function SalarySlipContainer({ user }: Record<string, unknown>) {
-  const _user = (user ?? {}) as Record<string, unknown>;
+  const _user = normalizeStaffLike((user ?? {}) as Record<string, unknown>);
+  const [resolvedUser, setResolvedUser] = useState<Record<string, unknown>>(_user);
   const [unlocked, setUnlocked] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [verifyError, setVerifyError] = useState('');
   const [verifying, setVerifying] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [salaryData, setSalaryData] = useState<Record<string, unknown> | null>(null);
+  const effectiveUserId = getStaffLikeId(resolvedUser);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const syncUserIdentity = async () => {
+      const directId = getStaffLikeId(_user);
+      if (directId) {
+        setResolvedUser(_user);
+        return;
+      }
+      if (!_user?.name && !_user?.employee_no && !_user?.auth_user_id) {
+        setResolvedUser(_user);
+        return;
+      }
+      const recoveredUser = await resolveStaffLike(_user);
+      if (!cancelled) {
+        setResolvedUser(recoveredUser);
+      }
+    };
+
+    void syncUserIdentity();
+    return () => {
+      cancelled = true;
+    };
+  }, [_user?.id, _user?.name, _user?.employee_no, _user?.auth_user_id]);
 
   const handlePasswordVerify = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!_user.id) {
+    if (!effectiveUserId) {
       setVerifyError('직원 계정으로 로그인한 뒤 이용해 주세요.');
       return;
     }
@@ -78,9 +106,9 @@ export default function SalarySlipContainer({ user }: Record<string, unknown>) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           password: pwd,
-          userId: _user.id as string,
-          name: _user.name as string,
-          employeeNo: _user.employee_no as string,
+          userId: effectiveUserId,
+          name: (resolvedUser.name || _user.name) as string,
+          employeeNo: (resolvedUser.employee_no || _user.employee_no) as string,
         }),
       });
       const payload = await response.json().catch(() => null);
@@ -116,13 +144,13 @@ export default function SalarySlipContainer({ user }: Record<string, unknown>) {
   const selectedYearMonth = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
 
   useEffect(() => {
-    if (!_user.id) return;
+    if (!effectiveUserId) return;
 
     const fetchSalaryRecord = async () => {
       const { data, error } = await supabase
         .from('payroll_records')
         .select('*')
-        .eq('staff_id', _user.id as string)
+        .eq('staff_id', effectiveUserId)
         .eq('year_month', selectedYearMonth)
         .maybeSingle();
 
@@ -135,7 +163,7 @@ export default function SalarySlipContainer({ user }: Record<string, unknown>) {
     };
 
     fetchSalaryRecord();
-  }, [selectedYearMonth, _user.id]);
+  }, [effectiveUserId, selectedYearMonth]);
 
   const handlePrint = () => { window.print(); };
 
@@ -226,7 +254,7 @@ export default function SalarySlipContainer({ user }: Record<string, unknown>) {
         <div className="flex-1 overflow-auto bg-[var(--muted)] p-4 sm:p-5 lg:p-5 flex justify-center custom-scrollbar">
           <div id="print-section" className="w-full max-w-7xl print:max-w-none print:w-full mx-auto shadow-sm print:shadow-none bg-[var(--card)] print:bg-transparent overflow-visible">
             <SalaryDetail
-              staff={_user as StaffInfo | undefined}
+              staff={(resolvedUser || _user) as StaffInfo | undefined}
               record={salaryData as SalaryRecord | undefined}
             />
           </div>
