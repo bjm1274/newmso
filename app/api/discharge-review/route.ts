@@ -1,86 +1,135 @@
 /**
  * 퇴원심사 AI 분석 API
- * 차트 데이터와 기본 템플릿을 비교 분석합니다.
+ * 차트 데이터와 기본 템플릿, 규정 기반 점검 결과를 함께 분석한다.
  */
 import { NextResponse } from 'next/server';
 import { readSessionFromRequest } from '@/lib/server-session';
+import {
+  analyzeDischargeReviewRules,
+  formatDischargeRuleAnalysisForPrompt,
+} from '@/lib/discharge-review-rules';
 
-const MODELS = [
-    'gemini-2.5-pro',
-    'gemini-2.5-flash',
-];
+const MODELS = ['gemini-2.5-pro', 'gemini-2.5-flash'];
 
 async function callGemini(prompt: string): Promise<string> {
-    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-    if (!apiKey) {
-        throw new Error('Gemini API 키가 설정되지 않았습니다. .env.local 파일에 GEMINI_API_KEY가 있는지 확인해주세요.');
-    }
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      'Gemini API 키가 설정되지 않았습니다. .env.local 파일에 GEMINI_API_KEY가 있는지 확인해 주세요.'
+    );
+  }
 
-    let lastError = '';
-    for (const model of MODELS) {
-        try {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-            const res = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }],
-                    // Gemini 3.x: temperature 기본값 1.0 권장, 무료 한도 내 토큰 설정
-                    generationConfig: { temperature: 1.0, maxOutputTokens: 2048 },
-                }),
-            });
-            const data = await res.json();
+  let lastError = '';
 
-            if (res.ok) {
-                const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-                if (text) return text;
-                lastError = `[${model}] 응답 텍스트 없음: ${JSON.stringify(data).substring(0, 100)}`;
-            } else {
-                const errMsg = data?.error?.message || JSON.stringify(data).substring(0, 150);
-                lastError = `[${model}] API 오류 (${res.status}): ${errMsg}`;
-                // API 키 만료/잘못된 키는 즉시 중단
-                if (res.status === 403 || errMsg.includes('expired') || errMsg.includes('invalid')) {
-                    throw new Error(`API 키 오류: ${errMsg}. Google AI Studio에서 새 키를 발급하세요.`);
-                }
-                // 429(쿼터 초과), 404(모델 미지원)는 다음 모델로 시도
-            }
-        } catch (err) {
-            if (err instanceof Error && (err.message.includes('API 키 오류') || err.message.includes('상태'))) throw err;
-            lastError = String(err);
+  for (const model of MODELS) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.4, maxOutputTokens: 2048 },
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) {
+          return text;
         }
+        lastError = `[${model}] 응답 텍스트가 비어 있습니다.`;
+        continue;
+      }
+
+      const errMsg = data?.error?.message || JSON.stringify(data).slice(0, 200);
+      lastError = `[${model}] API 오류 (${res.status}): ${errMsg}`;
+
+      if (res.status === 403 || /expired|invalid/i.test(errMsg)) {
+        throw new Error(`API 키 오류: ${errMsg}. Google AI Studio에서 키를 다시 확인해 주세요.`);
+      }
+    } catch (error) {
+      if (error instanceof Error && /API 키 오류/i.test(error.message)) {
+        throw error;
+      }
+      lastError = error instanceof Error ? error.message : String(error);
     }
-    const isQuotaError = lastError.includes('429') || lastError.includes('RESOURCE_EXHAUSTED') || lastError.includes('quota');
-    if (isQuotaError) {
-        throw new Error('Gemini 무료 쿼터 초과. Google AI Studio (aistudio.google.com/apikey) 에서 새 API 키를 발급해주세요.');
-    }
-    throw new Error(`Gemini 분석 실패: ${lastError}`);
+  }
+
+  if (/429|RESOURCE_EXHAUSTED|quota/i.test(lastError)) {
+    throw new Error(
+      'Gemini 무료 쿼터를 초과했습니다. Google AI Studio에서 API 사용량을 확인해 주세요.'
+    );
+  }
+
+  throw new Error(`Gemini 분석 실패: ${lastError}`);
 }
 
 export async function POST(req: Request) {
-    try {
-        const session = await readSessionFromRequest(req);
-        if (!session) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
+  try {
+    const session = await readSessionFromRequest(req);
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-        const body = await req.json();
-        const { patientName, birthDate, gender, department, admissionDate, dischargeDate, diagnosis,
-            insuranceType, surgeryName, surgeryDate, roomGrade, doctorName, comorbidities,
-            admissionRoute, dischargeType, drgCode, diseaseCodes,
-            checkedItems, allItems, chartData, templateData } = body;
+    const body = await req.json();
+    const {
+      patientName,
+      birthDate,
+      gender,
+      department,
+      admissionDate,
+      dischargeDate,
+      diagnosis,
+      insuranceType,
+      surgeryName,
+      surgeryDate,
+      roomGrade,
+      doctorName,
+      comorbidities,
+      admissionRoute,
+      dischargeType,
+      drgCode,
+      diseaseCodes,
+      checkedItems,
+      allItems,
+      chartData,
+      templateData,
+    } = body;
 
-        const admDate = new Date(admissionDate);
-        const disDate = new Date(dischargeDate);
-        const stayDays = Math.ceil((disDate.getTime() - admDate.getTime()) / (1000 * 60 * 60 * 24));
-        const age = birthDate ? Math.floor((Date.now() - new Date(birthDate).getTime()) / 31557600000) : null;
+    const admDate = new Date(admissionDate);
+    const disDate = new Date(dischargeDate);
+    const stayDays = Math.ceil((disDate.getTime() - admDate.getTime()) / (1000 * 60 * 60 * 24));
+    const age = birthDate
+      ? Math.floor((Date.now() - new Date(birthDate).getTime()) / 31557600000)
+      : null;
 
-        const checkedLabels = (checkedItems || []).map((i: any) => `✅ ${i.code ? `[${i.code}] ` : ''}${i.label}`).join('\n');
-        const uncheckedLabels = (allItems || [])
-            .filter((i: any) => !(checkedItems || []).find((c: any) => c.id === i.id))
-            .map((i: any) => `❌ ${i.code ? `[${i.code}] ` : ''}${i.label}`)
-            .join('\n');
+    const checkedLabels = (checkedItems || [])
+      .map((item: any) => `☑ ${item.code ? `[${item.code}] ` : ''}${item.label}`)
+      .join('\n');
+    const uncheckedLabels = (allItems || [])
+      .filter((item: any) => !(checkedItems || []).find((checked: any) => checked.id === item.id))
+      .map((item: any) => `☐ ${item.code ? `[${item.code}] ` : ''}${item.label}`)
+      .join('\n');
 
-        let prompt = `당신은 한국 병원의 퇴원심사 및 의료비 청구 전문가입니다. 아래 환자의 퇴원 심사를 분석해주세요.
+    const ruleAnalysis = analyzeDischargeReviewRules({
+      diagnosis,
+      surgeryName,
+      surgeryDate,
+      admissionDate,
+      dischargeDate,
+      dischargeType,
+      drgCode,
+      diseaseCodes,
+      chartData,
+      templateData,
+      allItems,
+      checkedItems,
+    });
+    const rulePromptContext = formatDischargeRuleAnalysisForPrompt(ruleAnalysis);
+
+    let prompt = `당신은 상급종합병원 퇴원심사와 진료비 청구 심사 전문가입니다. 아래 환자의 퇴원심사를 분석해 주세요.
 
 ## 환자 정보
 - 환자명: ${patientName}
@@ -88,20 +137,20 @@ export async function POST(req: Request) {
 - 성별: ${gender || '미입력'}
 - 진료과: ${department}
 - 입원일: ${admissionDate}
-- 퇴원 예정일: ${dischargeDate}
+- 퇴원일: ${dischargeDate}
 - 입원 기간: ${stayDays}일
 - 진단명: ${diagnosis || '미입력'}
-- 보험 구분: ${insuranceType || '미입력'}
+- 보험 유형: ${insuranceType || '미입력'}
 - 주치의: ${doctorName || '미입력'}
 - 병실 등급: ${roomGrade || '미입력'}
-- 수술명: ${surgeryName || '없음'}${surgeryDate ? ` (수술일: ${surgeryDate})` : ''}
+- 수술명: ${surgeryName || '없음'}${surgeryDate ? ` (수술일 ${surgeryDate})` : ''}
 - 동반 질환: ${comorbidities || '없음'}
 - 입원 경로: ${admissionRoute || '미입력'}
 - 퇴원 유형: ${dischargeType || '미입력'}
 - DRG 코드: ${drgCode || '미입력'}
-${diseaseCodes ? `
-## 상병명 (의사 입력 진단코드)
-${diseaseCodes}` : ''}
+${diseaseCodes ? `- 진단코드: ${diseaseCodes}` : ''}`;
+
+    prompt += `
 
 ## 확인 완료 항목
 ${checkedLabels || '(없음)'}
@@ -109,53 +158,72 @@ ${checkedLabels || '(없음)'}
 ## 미확인 항목
 ${uncheckedLabels || '(없음)'}`;
 
-        if (chartData && chartData.trim()) {
-            prompt += `
+    if (chartData && String(chartData).trim()) {
+      prompt += `
 
-## 환자 차트 데이터 (원본)
+## 환자 차트 원문
 \`\`\`
 ${chartData}
 \`\`\``;
-        }
+    }
 
-        if (templateData && templateData.trim()) {
-            prompt += `
+    if (templateData && String(templateData).trim()) {
+      prompt += `
 
-## 기본 항목 템플릿 (표준 퇴원 항목)
-아래는 병원에서 설정한 표준 퇴원 항목입니다. 환자 차트 데이터와 비교하여 누락된 항목을 찾아주세요.
+## 병원 기본 퇴원심사 템플릿
+아래 항목은 병원에서 기본적으로 확인하는 퇴원심사 기준입니다.
 \`\`\`
 ${templateData}
 \`\`\``;
-        }
-
-        prompt += `
-
-## 분석 요청
-아래 항목을 점검하고, **간결한 단답형**으로 핵심만 전달하세요. 불필요한 설명 없이 짧게 작성하세요.
-
-**출력 형식 (반드시 이 형식을 따르세요):**
-🔴 [항목] — 점검 필요 (이유 한 줄)
-🟡 [항목] — 확인 필요 (이유 한 줄)
-🟢 [항목] — 적절함
-
-**점검 항목:**
-- 누락 항목 (미확인 항목 중 필수 확인 필요한 것)
-${templateData ? '- 템플릿 대비 누락/추가 항목\n' : ''}- ${insuranceType || '건강보험'} 기준 급여/비급여 적절성
-- ${stayDays}일 입원 기간 대비 처방 적절성
-- 중복/과잉/누락 청구
-${diseaseCodes ? '- 상병명-처방 연관성 (상병에 맞지 않는 처방 여부)\n' : ''}${age !== null && age >= 65 ? '- 만 ' + age + '세 노인 가산 항목\n' : ''}${surgeryName ? '- ' + surgeryName + ' 수술 후 표준 처방 누락 여부\n' : ''}${comorbidities ? '- ' + comorbidities + ' 관련 추가 처방\n' : ''}${roomGrade ? '- ' + roomGrade + ' 병실료 적절성\n' : ''}
-**총평** 한 줄로 마무리. 한국어로 답변.`;
-
-        const raw = await callGemini(prompt);
-        const analysis = raw.trim();
-        return NextResponse.json({ analysis });
-    } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        // Gemini API 키 오류나 쿼터 초과는 사용자에게 직접 안내
-        const isUserFacingError = msg.includes('API 키') || msg.includes('쿼터') || msg.includes('Gemini');
-        return NextResponse.json(
-          { error: isUserFacingError ? msg : '퇴원심사 분석 중 오류가 발생했습니다.' },
-          { status: 500 }
-        );
     }
+
+    prompt += `
+
+## 규정 기반 사전점검
+${rulePromptContext}
+
+## 분석 지시
+- 규정 기반 사전점검의 Critical / Warning 항목을 최우선으로 반영하세요.
+- 템플릿 누락, 과잉청구, DRG 적용 위험, 기록 보완 필요사항을 구분하세요.
+- 근거가 약하면 “확인 필요”로 표현하세요.
+- 답변은 아래 형식을 그대로 따르세요.
+
+요약:
+- 한 줄 총평
+
+필수 누락 가능:
+- 항목명: 이유
+
+과잉/중복 가능:
+- 항목명: 이유
+
+DRG 위험:
+- 항목명: 이유
+
+기록 보완 필요:
+- 항목명: 이유
+
+권장 조치:
+- 항목명: 이유
+
+규칙 기반 점검과 AI 판단이 다르면 그 차이를 짧게 설명해 주세요.`;
+
+    const raw = await callGemini(prompt);
+    const analysis = raw.trim();
+
+    return NextResponse.json({ analysis, ruleAnalysis });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const isUserFacingError =
+      /API 키 오류|쿼터|Gemini|Unauthorized/i.test(message);
+
+    return NextResponse.json(
+      {
+        error: isUserFacingError
+          ? message
+          : '퇴원심사 분석 중 오류가 발생했습니다.',
+      },
+      { status: 500 }
+    );
+  }
 }

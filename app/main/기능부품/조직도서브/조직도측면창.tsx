@@ -44,6 +44,7 @@ export const SUB_MENUS: Record<string, SubMenuItem[]> = {
   전자결재: [
     { id: '기안함', label: '기안함', icon: '📝' },
     { id: '결재함', label: '결재함', icon: '✅' },
+    { id: '참조 문서함', label: '참조 문서함', icon: '📎' },
     { id: '작성하기', label: '작성하기', icon: '✍️' },
   ],
   인사관리: [

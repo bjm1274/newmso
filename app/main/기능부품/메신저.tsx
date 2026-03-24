@@ -528,6 +528,14 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       setPinnedIds([]);
       setPersistedPinnedMessages([]);
       setBookmarkedIds(new Set());
+      // sent 상태 메시지의 deliveryState 정리 (메모리 누적 방지)
+      setDeliveryStates((prev) => {
+        const next: Record<string, DeliveryState> = {};
+        for (const [k, v] of Object.entries(prev)) {
+          if (v.status !== 'sent') next[k] = v;
+        }
+        return next;
+      });
     }
     setSelectedRoomId(roomId);
     if (typeof window === 'undefined') return;
@@ -1285,6 +1293,17 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           }
           return [...prev, newMsg];
         });
+        // 내가 보낸 메시지가 아니면 즉시 읽음 처리
+        if (String(row.sender_id) !== effectiveChatUserId && user?.id) {
+          persistMessageReads([row.id]).then(() => {
+            supabase.from('room_read_cursors').upsert(
+              { user_id: user!.id, room_id: selectedRoomId, last_read_at: new Date().toISOString() },
+              { onConflict: 'user_id,room_id' }
+            );
+            broadcastChatSync('message-read', selectedRoomId);
+          }).catch(() => {});
+          setRoomUnreadCounts((prev) => ({ ...prev, [selectedRoomId]: 0 }));
+        }
         setChatRooms((prev) =>
           sortChatRoomsWithNoticeFirst(
             prev.map(( room: ChatRoom) =>
@@ -2190,16 +2209,34 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
   const handleVote = async (pollId: string, optionIndex: number) => {
     try {
+      // 이전 투표 옵션 확인
+      const { data: prevVote } = await supabase
+        .from('poll_votes')
+        .select('option_index')
+        .eq('poll_id', pollId)
+        .eq('user_id', user?.id)
+        .maybeSingle();
+      const prevOptionIndex = prevVote?.option_index as number | null | undefined;
+
       const { error } = await supabase.from('poll_votes').upsert(
         { poll_id: pollId, user_id: user?.id, option_index: optionIndex },
         { onConflict: 'poll_id,user_id' }
       );
-      if (!error) fetchData();
+      if (!error) {
+        // 낙관적 업데이트: 이전 옵션 -1, 새 옵션 +1
+        setPollVotes((prev) => {
+          const ex = { ...(prev[pollId] || {}) };
+          if (prevOptionIndex != null && prevOptionIndex !== optionIndex) {
+            ex[prevOptionIndex] = Math.max((ex[prevOptionIndex] || 0) - 1, 0);
+          }
+          if (prevOptionIndex !== optionIndex) {
+            ex[optionIndex] = (ex[optionIndex] || 0) + 1;
+          }
+          return { ...prev, [pollId]: ex };
+        });
+        fetchData();
+      }
     } catch (_) { }
-    setPollVotes((prev) => {
-      const ex = prev[pollId] || {};
-      return { ...prev, [pollId]: { ...ex, [optionIndex]: (ex[optionIndex] || 0) + 1 } };
-    });
   };
 
   const toggleReaction = async (messageId: string, emoji: string) => {

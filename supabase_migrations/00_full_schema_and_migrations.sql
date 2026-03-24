@@ -547,5 +547,34 @@ WHERE NOT EXISTS (SELECT 1 FROM chat_rooms WHERE id = '00000000-0000-0000-0000-0
 -- ALTER TABLE staff_members ENABLE ROW LEVEL SECURITY;
 -- ... 각 테이블별 정책 설정
 
+-- 13-1. 게시판 익명/투표 컬럼 추가
+-- ============================================================================
+ALTER TABLE board_posts ADD COLUMN IF NOT EXISTS is_anonymous BOOLEAN DEFAULT FALSE;
+ALTER TABLE board_posts ADD COLUMN IF NOT EXISTS poll JSONB DEFAULT NULL;
+ALTER TABLE board_posts ADD COLUMN IF NOT EXISTS poll_votes JSONB DEFAULT '{}'::jsonb;
+
+-- 14. RPC 함수
+-- ============================================================================
+
+-- 연차 사용일수 원자적 증감
+CREATE OR REPLACE FUNCTION increment_annual_leave_used(p_staff_id UUID, p_days NUMERIC)
+RETURNS VOID AS $$
+BEGIN
+  UPDATE staff_members
+  SET annual_leave_used = COALESCE(annual_leave_used, 0) + p_days
+  WHERE id = p_staff_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 게시판 조회수 원자적 증가
+CREATE OR REPLACE FUNCTION increment_post_views(p_post_id UUID)
+RETURNS VOID AS $$
+BEGIN
+  UPDATE board_posts
+  SET views = COALESCE(views, 0) + 1
+  WHERE id = p_post_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- 완료
 SELECT 'MSO 전체 스키마 마이그레이션 완료' AS status;

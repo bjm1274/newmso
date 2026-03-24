@@ -66,6 +66,80 @@ function sortStaffRows(a: any, b: any) {
 const STAFF_LIST_SELECT =
   'id, employee_no, name, company, department, position, role, permissions';
 
+const APPROVAL_REFERENCE_DEFAULTS_PERMISSION_KEY = 'approval_reference_defaults';
+const APPROVAL_REFERENCE_TARGETS = [
+  { key: 'all', label: '모든 문서' },
+  { key: 'leave', label: '연차/휴가' },
+  { key: 'annual_plan', label: '연차계획서' },
+  { key: 'overtime', label: '연장근무' },
+  { key: 'purchase', label: '물품신청' },
+  { key: 'repair_request', label: '수리요청서' },
+  { key: 'draft_business', label: '업무기안' },
+  { key: 'cooperation', label: '업무협조' },
+  { key: 'generic', label: '양식신청' },
+  { key: 'attendance_fix', label: '출결정정' },
+  { key: 'personnel_order', label: '인사명령' },
+] as const;
+
+type ApprovalReferenceSettingUser = {
+  id: string;
+  name: string;
+  position?: string | null;
+  department?: string | null;
+  company?: string | null;
+};
+
+function normalizeApprovalReferenceUser(entry: any, staffs: any[] = []): ApprovalReferenceSettingUser | null {
+  if (entry == null) return null;
+
+  if (typeof entry === 'string' || typeof entry === 'number') {
+    const matched = staffs.find((staff) => String(staff?.id) === String(entry));
+    if (!matched) return null;
+    return {
+      id: String(matched.id),
+      name: String(matched.name || '이름 없음'),
+      position: matched.position ?? null,
+      department: matched.department ?? null,
+      company: matched.company ?? null,
+    };
+  }
+
+  if (typeof entry === 'object') {
+    const rawId = entry.id;
+    if (rawId == null) return null;
+    const matched = staffs.find((staff) => String(staff?.id) === String(rawId));
+    return {
+      id: String(rawId),
+      name: String(entry.name || matched?.name || '이름 없음'),
+      position: typeof entry.position === 'string' ? entry.position : matched?.position ?? null,
+      department: typeof entry.department === 'string' ? entry.department : matched?.department ?? null,
+      company: typeof entry.company === 'string' ? entry.company : matched?.company ?? null,
+    };
+  }
+
+  return null;
+}
+
+function normalizeApprovalReferenceDefaults(value: unknown, staffs: any[] = []) {
+  if (!value || typeof value !== 'object') return {} as Record<string, ApprovalReferenceSettingUser[]>;
+
+  return Object.entries(value as Record<string, unknown>).reduce<Record<string, ApprovalReferenceSettingUser[]>>((acc, [key, entries]) => {
+    if (!Array.isArray(entries)) return acc;
+    const normalized = Array.from(
+      new Map(
+        entries
+          .map((entry) => normalizeApprovalReferenceUser(entry, staffs))
+          .filter(Boolean)
+          .map((entry) => [String(entry!.id), entry!])
+      ).values()
+    );
+    if (normalized.length > 0) {
+      acc[String(key)] = normalized;
+    }
+    return acc;
+  }, {});
+}
+
 export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () => void }) {
   const [staffs, setStaffs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,6 +149,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
   const [copySourceId, setCopySourceId] = useState<string>('');
   const [copyRoleToo, setCopyRoleToo] = useState(true);
   const [copying, setCopying] = useState(false);
+  const [selectedApprovalReferenceFormKey, setSelectedApprovalReferenceFormKey] = useState<string>('all');
 
   const fetchStaffs = useCallback(async () => {
     setLoading(true);
@@ -315,6 +390,26 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
   }, [staffs]);
 
   const selectedPermissions: Record<string, unknown> = (selectedStaff?.permissions as Record<string, unknown>) || {};
+  const selectedApprovalReferenceDefaults = useMemo(
+    () =>
+      normalizeApprovalReferenceDefaults(
+        selectedPermissions[APPROVAL_REFERENCE_DEFAULTS_PERMISSION_KEY],
+        staffs
+      ),
+    [selectedPermissions, staffs]
+  );
+  const currentApprovalReferenceUsers = useMemo(
+    () => selectedApprovalReferenceDefaults[selectedApprovalReferenceFormKey] || [],
+    [selectedApprovalReferenceDefaults, selectedApprovalReferenceFormKey]
+  );
+  const approvalReferenceCandidateStaffs = useMemo(
+    () =>
+      staffs.filter((staff) => {
+        if (String(staff?.id) === String(selectedStaff?.id || '')) return false;
+        return !currentApprovalReferenceUsers.some((referenceUser) => String(referenceUser.id) === String(staff?.id));
+      }),
+    [currentApprovalReferenceUsers, selectedStaff?.id, staffs]
+  );
   const permissionStats = useMemo(() => {
     return FEATURE_PERMISSION_GROUPS.map((group) => ({
       id: group.id,
@@ -322,6 +417,63 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
       active: group.items.filter((item) => selectedPermissions?.[item.key] === true).length,
     }));
   }, [selectedPermissions]);
+
+  const updateApprovalReferenceDefaults = useCallback(
+    async (formKey: string, nextUsers: ApprovalReferenceSettingUser[]) => {
+      if (!selectedStaff?.id) return false;
+      const nextReferenceDefaults = { ...selectedApprovalReferenceDefaults };
+      if (nextUsers.length > 0) {
+        nextReferenceDefaults[formKey] = nextUsers.map((staff) => ({
+          id: String(staff.id),
+          name: staff.name,
+          position: staff.position ?? null,
+          department: staff.department ?? null,
+          company: staff.company ?? null,
+        }));
+      } else {
+        delete nextReferenceDefaults[formKey];
+      }
+
+      const nextPermissions = {
+        ...selectedPermissions,
+        [APPROVAL_REFERENCE_DEFAULTS_PERMISSION_KEY]: nextReferenceDefaults,
+      };
+
+      return setPermissions(String(selectedStaff.id), nextPermissions);
+    },
+    [selectedApprovalReferenceDefaults, selectedPermissions, selectedStaff?.id, setPermissions]
+  );
+
+  const addApprovalReferenceRecipient = useCallback(
+    async (staffId: string) => {
+      if (!staffId) return;
+      const matched = staffs.find((staff) => String(staff.id) === String(staffId));
+      if (!matched) return;
+      if (currentApprovalReferenceUsers.some((staff) => String(staff.id) === String(matched.id))) return;
+
+      await updateApprovalReferenceDefaults(selectedApprovalReferenceFormKey, [
+        ...currentApprovalReferenceUsers,
+        {
+          id: String(matched.id),
+          name: String(matched.name || '이름 없음'),
+          position: matched.position ?? null,
+          department: matched.department ?? null,
+          company: matched.company ?? null,
+        },
+      ]);
+    },
+    [currentApprovalReferenceUsers, selectedApprovalReferenceFormKey, staffs, updateApprovalReferenceDefaults]
+  );
+
+  const removeApprovalReferenceRecipient = useCallback(
+    async (staffId: string) => {
+      await updateApprovalReferenceDefaults(
+        selectedApprovalReferenceFormKey,
+        currentApprovalReferenceUsers.filter((staff) => String(staff.id) !== String(staffId))
+      );
+    },
+    [currentApprovalReferenceUsers, selectedApprovalReferenceFormKey, updateApprovalReferenceDefaults]
+  );
 
   if (loading) {
     return <div className="p-5 text-center text-[var(--toss-gray-3)] font-bold">로딩 중...</div>;
@@ -506,6 +658,71 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                       {passwordSaving ? '변경 중...' : '변경'}
                     </button>
                   </div>
+                </div>
+
+                <div className="bg-[var(--card)] p-3 rounded-[var(--radius-md)] shadow-sm border border-[var(--border)] space-y-3">
+                  <div>
+                    <p className="text-[13px] font-semibold text-[var(--foreground)]">문서별 기본 참조자</p>
+                    <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">
+                      전자결재 문서 작성 시 이 직원에게 자동으로 들어갈 참조자를 문서 종류별로 설정합니다.
+                    </p>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <select
+                      data-testid="staff-approval-default-form-select"
+                      value={selectedApprovalReferenceFormKey}
+                      onChange={(e) => setSelectedApprovalReferenceFormKey(e.target.value)}
+                      className="w-full px-2.5 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-[11px] font-bold bg-[var(--input-bg)]"
+                    >
+                      {APPROVAL_REFERENCE_TARGETS.map((target) => (
+                        <option key={target.key} value={target.key}>{target.label}</option>
+                      ))}
+                    </select>
+
+                    <select
+                      data-testid="staff-approval-default-recipient-select"
+                      defaultValue=""
+                      onChange={(e) => {
+                        void addApprovalReferenceRecipient(e.target.value);
+                        e.currentTarget.value = '';
+                      }}
+                      className="w-full px-2.5 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-[11px] font-bold bg-[var(--input-bg)]"
+                    >
+                      <option value="">참조자 추가...</option>
+                      {approvalReferenceCandidateStaffs.map((staff) => (
+                        <option key={staff.id} value={staff.id}>
+                          {staff.name} {staff.position ? `(${staff.position})` : ''} {staff.company ? `· ${staff.company}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {currentApprovalReferenceUsers.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {currentApprovalReferenceUsers.map((staff) => (
+                        <span
+                          key={`${selectedApprovalReferenceFormKey}-${staff.id}`}
+                          className="inline-flex items-center gap-1 rounded-[var(--radius-md)] border border-yellow-200 bg-yellow-50 px-2.5 py-1.5 text-[10px] font-bold text-yellow-800"
+                        >
+                          {staff.name}
+                          {staff.position ? ` ${staff.position}` : ''}
+                          <button
+                            type="button"
+                            data-testid={`staff-approval-default-recipient-remove-${staff.id}`}
+                            onClick={() => void removeApprovalReferenceRecipient(staff.id)}
+                            className="text-yellow-500 hover:text-red-500"
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--border)] px-3 py-3 text-[10px] font-semibold text-[var(--toss-gray-3)]">
+                      현재 선택한 문서 종류에 자동 참조자가 없습니다.
+                    </div>
+                  )}
                 </div>
 
                 <div className="bg-red-50 p-3 rounded-[var(--radius-md)] shadow-sm border border-red-200">

@@ -80,7 +80,7 @@ function failureResponse(error?: string, status = 200) {
 
 export async function POST(request: NextRequest) {
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-  if (!checkRateLimit(ip)) {
+  if (!checkRateLimit(ip).allowed) {
     return failureResponse('로그인 시도 횟수를 초과했습니다. 15분 후 다시 시도해주세요.', 429);
   }
 

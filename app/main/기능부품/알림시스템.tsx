@@ -334,7 +334,7 @@ export default function NotificationSystem({
   user: UserLike | null | undefined;
   onOpenChatRoom?: (roomId: string) => void;
   onOpenMessage?: (roomId: string, messageId: string) => void;
-  onOpenApproval?: () => void;
+  onOpenApproval?: (intent?: Record<string, unknown>) => void;
   onOpenInventory?: (intent?: { view?: string | null; approvalId?: string | null }) => void;
   onOpenBoard?: (boardId?: string) => void;
   onOpenPost?: (boardId: string, postId: string) => void;
@@ -446,7 +446,13 @@ export default function NotificationSystem({
       if ((t === 'message' || t === 'mention') && notif.data?.room_id) {
         if (notif.data.id && onOpenMessage) onOpenMessage(notif.data.room_id, notif.data.id);
         else if (onOpenChatRoom) onOpenChatRoom(notif.data.room_id);
-      } else if (t === 'approval' && onOpenApproval) onOpenApproval();
+      } else if (t === 'approval' && onOpenApproval) {
+        const approvalView =
+          typeof notif.data?.approval_view === 'string' && notif.data.approval_view.trim()
+            ? notif.data.approval_view
+            : undefined;
+        onOpenApproval(approvalView ? { viewMode: approvalView } : undefined);
+      }
       else if (t === 'inventory' && onOpenInventory) {
         onOpenInventory({
           view: notif.data?.approval_id ? '현황' : null,

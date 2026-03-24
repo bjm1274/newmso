@@ -220,7 +220,17 @@ export default function NotificationInbox({ user: _rawUser, onRefresh }: Record<
     if (!n.read_at) markAsRead(n.id);
     const meta = n.metadata || {};
     if (n.type === 'message' || n.type === 'mention') router.push(meta.room_id ? `/main?open_chat_room=${meta.room_id}` : '/main?open_menu=채팅');
-    else if (n.type === 'approval') router.push('/main?open_menu=전자결재');
+    else if (n.type === 'approval') {
+      const approvalView =
+        typeof meta.approval_view === 'string' && meta.approval_view.trim()
+          ? encodeURIComponent(meta.approval_view)
+          : null;
+      router.push(
+        approvalView
+          ? `/main?open_menu=전자결재&open_subview=${approvalView}`
+          : '/main?open_menu=전자결재'
+      );
+    }
     else if (n.type === 'board' || n.type === 'notice') router.push('/main?open_menu=게시판');
     else if (n.type === '인사' || n.type === 'payroll' || n.type === 'education' || n.type === 'attendance') router.push('/main?open_menu=내정보');
     else if (n.type === 'inventory') router.push('/main?open_menu=재고관리');
