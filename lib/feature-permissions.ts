@@ -55,6 +55,7 @@ export const APPROVAL_PERMISSION_ITEMS: FeaturePermissionItem[] = [
 ];
 
 export const HR_PERMISSION_ITEMS: FeaturePermissionItem[] = [
+  { key: 'hr_직원등록', label: '직원 등록' },
   { key: 'hr_구성원', label: '구성원' },
   { key: 'hr_인사발령', label: '인사발령' },
   { key: 'hr_포상징계', label: '포상 / 징계' },

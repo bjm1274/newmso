@@ -13,6 +13,20 @@ export default function OffboardingView({ staffs, selectedCo = '전체', onRefre
     const [reason, setReason] = useState<string>('개인 사유');
     const [offboardings, setOffboardings] = useState<any[]>([]); // mock or fetch from DB
     const [loading, setLoading] = useState(false);
+    const [checklist, setChecklist] = useState<Record<string, Record<string, boolean>>>({});
+
+    const toggleCheck = (staffId: string, item: string) => {
+        setChecklist(prev => ({
+            ...prev,
+            [staffId]: { ...(prev[staffId] || {}), [item]: !(prev[staffId]?.[item]) }
+        }));
+    };
+    const isChecked = (staffId: string, item: string) => !!checklist[staffId]?.[item];
+    const allChecked = (staffId: string) => {
+        const items = checklist[staffId];
+        if (!items) return false;
+        return ['계정파기', '비품회수', '서약서징구', '퇴직금정산'].every(k => items[k]);
+    };
 
     // Filter active staffs who are NOT currently offboarding
     // Filter active staffs who are NOT currently offboarding, respect company filter
@@ -58,12 +72,47 @@ export default function OffboardingView({ staffs, selectedCo = '전체', onRefre
 
     const concludeOffboarding = async (id: string, name: string) => {
         if (!confirm(`${name} 님의 모든 체크리스트가 완료되었습니다.\n최종 퇴사 처리하시겠습니까?`)) return;
+        setLoading(true);
         try {
-            await supabase.from('staff_members').update({ status: '퇴사' }).eq('id', id);
-            toast('최종 퇴사 처리 되었습니다.', 'success');
+            // 1. 직원 상태 변경 + 권한 비활성화
+            await supabase.from('staff_members').update({
+                status: '퇴사',
+                permissions: {},
+                role: 'inactive',
+            }).eq('id', id);
+
+            // 2. 채팅방 멤버에서 제거
+            await supabase.from('chat_participants').delete().eq('user_id', id);
+
+            // 3. 알림 구독 해제 (push_subscriptions)
+            await supabase.from('push_subscriptions').delete().eq('user_id', id);
+
+            // 4. 미읽은 알림 정리 (일괄 읽음 처리)
+            await supabase.from('notifications')
+                .update({ read_at: new Date().toISOString() })
+                .eq('user_id', id)
+                .is('read_at', null);
+
+            // 5. 활성 세션 무효화 (force_logout)
+            await supabase.from('staff_members').update({
+                force_logout_at: new Date().toISOString(),
+            }).eq('id', id);
+
+            // 6. 감사 로그 기록
+            await supabase.from('audit_logs').insert({
+                action: '퇴사처리완료',
+                target_type: 'staff_member',
+                target_id: id,
+                details: { name, completed_at: new Date().toISOString() },
+            });
+
+            toast(`${name} 님의 최종 퇴사 처리가 완료되었습니다.`, 'success');
             _onRefresh();
         } catch (e) {
             console.error(e);
+            toast('퇴사 처리 중 일부 오류가 발생했습니다.', 'error');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -145,27 +194,40 @@ export default function OffboardingView({ staffs, selectedCo = '전체', onRefre
                                     <span className="bg-orange-100 text-orange-600 px-2 py-1 rounded text-[10px] font-black">D-{(new Date(s.resigned_at || new Date()).getTime() - new Date().getTime()) / (1000 * 3600 * 24) | 0}</span>
                                 </div>
 
-                                {/* Checklist */}
+                                {/* Checklist - 실제 상태 추적 */}
                                 <div className="space-y-3 mb-4">
                                     <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-[var(--tab-bg)] cursor-pointer transition-colors">
-                                        <input type="checkbox" className="w-5 h-5 accent-[var(--accent)]" />
-                                        <span className="text-xs font-bold text-[var(--toss-gray-5)]">사내 시스템 계정 파기</span>
+                                        <input type="checkbox" className="w-5 h-5 accent-[var(--accent)]" checked={isChecked(s.id, '계정파기')} onChange={() => toggleCheck(s.id, '계정파기')} />
+                                        <span className={`text-xs font-bold ${isChecked(s.id, '계정파기') ? 'text-green-500 line-through' : 'text-[var(--toss-gray-5)]'}`}>사내 시스템 계정 파기</span>
                                     </label>
                                     <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-[var(--tab-bg)] cursor-pointer transition-colors">
-                                        <input type="checkbox" className="w-5 h-5 accent-[var(--accent)]" />
-                                        <span className="text-xs font-bold text-[var(--toss-gray-5)]">대여 비품 (노트북 등) 회수</span>
+                                        <input type="checkbox" className="w-5 h-5 accent-[var(--accent)]" checked={isChecked(s.id, '비품회수')} onChange={() => toggleCheck(s.id, '비품회수')} />
+                                        <span className={`text-xs font-bold ${isChecked(s.id, '비품회수') ? 'text-green-500 line-through' : 'text-[var(--toss-gray-5)]'}`}>대여 비품 (노트북 등) 회수</span>
                                     </label>
                                     <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-[var(--tab-bg)] cursor-pointer transition-colors">
-                                        <input type="checkbox" className="w-5 h-5 accent-[var(--accent)]" />
-                                        <span className="text-xs font-bold text-[var(--toss-gray-5)]">보안 서약서 및 사직서 징구</span>
+                                        <input type="checkbox" className="w-5 h-5 accent-[var(--accent)]" checked={isChecked(s.id, '서약서징구')} onChange={() => toggleCheck(s.id, '서약서징구')} />
+                                        <span className={`text-xs font-bold ${isChecked(s.id, '서약서징구') ? 'text-green-500 line-through' : 'text-[var(--toss-gray-5)]'}`}>보안 서약서 및 사직서 징구</span>
                                     </label>
                                     <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-[var(--tab-bg)] cursor-pointer transition-colors">
-                                        <input type="checkbox" className="w-5 h-5 accent-[var(--accent)]" />
-                                        <span className="text-[11px] font-bold text-[var(--accent)] underline underline-offset-2">퇴직금 정산 시작하기 💸</span>
+                                        <input type="checkbox" className="w-5 h-5 accent-[var(--accent)]" checked={isChecked(s.id, '퇴직금정산')} onChange={() => toggleCheck(s.id, '퇴직금정산')} />
+                                        <span className={`text-[11px] font-bold ${isChecked(s.id, '퇴직금정산') ? 'text-green-500 line-through' : 'text-[var(--accent)]'} underline underline-offset-2`}>퇴직금 정산 시작하기 💸</span>
                                     </label>
                                 </div>
 
-                                <button data-testid={`offboarding-finalize-${s.id}`} onClick={() => concludeOffboarding(s.id, s.name)} className="w-full py-3 bg-slate-900 text-white text-[11px] font-black rounded-xl hover:bg-slate-800 transition-colors">최종 퇴사 처리 (계정 비활성화)</button>
+                                <button
+                                    data-testid={`offboarding-finalize-${s.id}`}
+                                    onClick={() => {
+                                        if (!allChecked(s.id)) {
+                                            toast('모든 체크리스트 항목을 완료해주세요.', 'warning');
+                                            return;
+                                        }
+                                        concludeOffboarding(s.id, s.name);
+                                    }}
+                                    disabled={loading}
+                                    className={`w-full py-3 text-white text-[11px] font-black rounded-xl transition-colors disabled:opacity-50 ${allChecked(s.id) ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-900 hover:bg-slate-800 opacity-60'}`}
+                                >
+                                    {allChecked(s.id) ? '최종 퇴사 처리 (계정 비활성화)' : '체크리스트를 먼저 완료해주세요'}
+                                </button>
                             </div>
                         ))}
                     </div>

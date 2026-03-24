@@ -576,5 +576,76 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- 재고 수량 원자적 증감 (race condition 방지)
+CREATE OR REPLACE FUNCTION atomic_stock_update(
+  p_item_id UUID,
+  p_delta INTEGER,
+  p_min_allowed INTEGER DEFAULT 0
+)
+RETURNS TABLE(prev_qty INTEGER, next_qty INTEGER) AS $$
+DECLARE
+  v_prev INTEGER;
+  v_next INTEGER;
+BEGIN
+  SELECT COALESCE(quantity, stock, 0)::INTEGER INTO v_prev
+  FROM inventory WHERE id = p_item_id FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'ITEM_NOT_FOUND';
+  END IF;
+
+  v_next := v_prev + p_delta;
+
+  IF v_next < p_min_allowed THEN
+    RAISE EXCEPTION 'INSUFFICIENT_STOCK: prev=%, delta=%, next=%', v_prev, p_delta, v_next;
+  END IF;
+
+  UPDATE inventory
+  SET quantity = v_next, stock = v_next
+  WHERE id = p_item_id;
+
+  RETURN QUERY SELECT v_prev, v_next;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 재고 이관 원자적 처리 (출발지 차감 + 목적지 증가를 단일 트랜잭션으로)
+CREATE OR REPLACE FUNCTION atomic_stock_transfer(
+  p_source_id UUID,
+  p_dest_id UUID,
+  p_quantity INTEGER
+)
+RETURNS TABLE(src_prev INTEGER, src_next INTEGER, dst_prev INTEGER, dst_next INTEGER) AS $$
+DECLARE
+  v_src_prev INTEGER;
+  v_src_next INTEGER;
+  v_dst_prev INTEGER;
+  v_dst_next INTEGER;
+BEGIN
+  -- 출발지 차감 (FOR UPDATE 잠금)
+  SELECT COALESCE(quantity, stock, 0)::INTEGER INTO v_src_prev
+  FROM inventory WHERE id = p_source_id FOR UPDATE;
+
+  IF NOT FOUND THEN RAISE EXCEPTION 'SOURCE_NOT_FOUND'; END IF;
+
+  v_src_next := v_src_prev - p_quantity;
+  IF v_src_next < 0 THEN
+    RAISE EXCEPTION 'INSUFFICIENT_STOCK: prev=%, qty=%', v_src_prev, p_quantity;
+  END IF;
+
+  UPDATE inventory SET quantity = v_src_next, stock = v_src_next WHERE id = p_source_id;
+
+  -- 목적지 증가
+  SELECT COALESCE(quantity, stock, 0)::INTEGER INTO v_dst_prev
+  FROM inventory WHERE id = p_dest_id FOR UPDATE;
+
+  IF NOT FOUND THEN RAISE EXCEPTION 'DEST_NOT_FOUND'; END IF;
+
+  v_dst_next := v_dst_prev + p_quantity;
+  UPDATE inventory SET quantity = v_dst_next, stock = v_dst_next WHERE id = p_dest_id;
+
+  RETURN QUERY SELECT v_src_prev, v_src_next, v_dst_prev, v_dst_next;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- 완료
 SELECT 'MSO 전체 스키마 마이그레이션 완료' AS status;

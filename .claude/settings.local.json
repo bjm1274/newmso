@@ -41,7 +41,13 @@
       "Bash(find C:/Users/baek_/newmso/app/main/기능부품 -type f -name *.tsx -o -name *.ts)",
       "Bash(find C:/Users/baek_/newmso/app/api -type f -name *.ts -o -name *.tsx)",
       "Bash(find C:/Users/baek_/newmso/supabase -type f -name *.sql)",
-      "Bash(find C:/Users/baek_/newmso/supabase_migrations -type f -name *.sql)"
+      "Bash(find C:/Users/baek_/newmso/supabase_migrations -type f -name *.sql)",
+      "Bash(find /c/Users/baek_/newmso/app -type f \\\\\\(-name *.ts -o -name *.tsx -o -name *.js \\\\\\) -path */api/*)",
+      "Bash(find /c/Users/baek_/newmso -type f \\\\\\(-name *.ts -o -name *.tsx \\\\\\) ! -path */node_modules/* ! -path */.next/* ! -path */tmp_*)",
+      "Bash(find /c/Users/baek_/newmso -name *.env* -type f ! -path */node_modules/* ! -path */.next/* ! -path */tmp_*)",
+      "Bash(find /c/Users/baek_/newmso/lib -name *.ts ! -path */node_modules/* -exec grep -l \"\\\\.query\\\\|\\\\.raw\\\\|sql\\\\`\" {})",
+      "Bash(2)",
+      "Bash(find /c/Users/baek_/newmso/app/api -name route.ts -type f ! -path */node_modules/* -exec sh -c \"echo \"\"=== {} ===\"\" && head -30 \"\"{}\"\"\")"
     ]
   }
 }

@@ -665,41 +665,64 @@ export default function IntegratedInventoryManagement({
 
   const handleStockUpdate = async (item: InventoryItem, type: 'in' | 'out', amount: number, targetCompany: string, targetDept: string) => {
     if (amount <= 0) return toast("수량은 0보다 커야 합니다.");
-    const currentQty = item.quantity ?? (item as Record<string, unknown>).stock as number ?? 0;
-    const newStock = type === 'in' ? currentQty + amount : currentQty - amount;
-    if (type === 'out' && newStock < 0) return toast("재고가 부족하여 출고할 수 없습니다.");
+    const delta = type === 'in' ? amount : -amount;
     try {
-      // 해당 물품의 귀속 회사/부서를 완전히 변경하는 것이 아니라면 inventory 테이블의 소속 구조는 유지하고 로그에만 사유를 기록
-      const { error } = await supabase.from('inventory').update({ quantity: newStock, stock: newStock }).eq('id', item.id);
-      if (!error) {
-        const logRows: Record<string, unknown>[] = [{
-          item_id: item.id,
-          inventory_id: item.id,
-          type: type === 'in' ? '입고' : '출고',
-          change_type: type === 'in' ? '입고' : '출고',
-          quantity: amount,
-          prev_quantity: currentQty,
-          next_quantity: newStock,
-          actor_name: targetDept && targetDept !== '전체' ? `${user?.name} (${targetDept})` : user?.name,
-          company: targetCompany || item.company
-        }];
-        if (item.company_id || user?.company_id || selectedCompanyId) {
-          logRows[0].company_id = item.company_id ?? (user?.company === 'SY INC.' ? selectedCompanyId : user?.company_id);
+      // 원자적 RPC로 race condition 방지
+      const { data: rpcResult, error: rpcError } = await supabase.rpc('atomic_stock_update', {
+        p_item_id: item.id,
+        p_delta: delta,
+        p_min_allowed: 0,
+      });
+
+      let prevQty: number;
+      let nextQty: number;
+
+      if (rpcError) {
+        if (String(rpcError.message).includes('INSUFFICIENT_STOCK')) {
+          return toast("재고가 부족하여 출고할 수 없습니다.");
         }
-        await withMissingColumnFallback(
-          () => supabase.from('inventory_logs').insert(logRows),
-          () => {
-            const legacyRows = logRows.map(({ company_id: _cid, ...rest }) => rest);
-            return supabase.from('inventory_logs').insert(legacyRows);
-          }
-        );
-        toast(`${type === 'in' ? '입고' : '출고'} 처리가 완료되었습니다.`, 'success');
-        refreshCurrentInventory();
-        void fetchLogs();
-        if (onRefresh) onRefresh();
+        // RPC 미등록 시 fallback (레거시 호환)
+        const currentQty = item.quantity ?? (item as Record<string, unknown>).stock as number ?? 0;
+        const newStock = currentQty + delta;
+        if (newStock < 0) return toast("재고가 부족하여 출고할 수 없습니다.");
+        const { error } = await supabase.from('inventory').update({ quantity: newStock, stock: newStock }).eq('id', item.id);
+        if (error) throw error;
+        prevQty = currentQty;
+        nextQty = newStock;
+      } else {
+        const row = Array.isArray(rpcResult) ? rpcResult[0] : rpcResult;
+        prevQty = row?.prev_qty ?? 0;
+        nextQty = row?.next_qty ?? 0;
       }
+
+      const logRows: Record<string, unknown>[] = [{
+        item_id: item.id,
+        inventory_id: item.id,
+        type: type === 'in' ? '입고' : '출고',
+        change_type: type === 'in' ? '입고' : '출고',
+        quantity: amount,
+        prev_quantity: prevQty,
+        next_quantity: nextQty,
+        actor_name: targetDept && targetDept !== '전체' ? `${user?.name} (${targetDept})` : user?.name,
+        company: targetCompany || item.company
+      }];
+      if (item.company_id || user?.company_id || selectedCompanyId) {
+        logRows[0].company_id = item.company_id ?? (user?.company === 'SY INC.' ? selectedCompanyId : user?.company_id);
+      }
+      await withMissingColumnFallback(
+        () => supabase.from('inventory_logs').insert(logRows),
+        () => {
+          const legacyRows = logRows.map(({ company_id: _cid, ...rest }) => rest);
+          return supabase.from('inventory_logs').insert(legacyRows);
+        }
+      );
+      toast(`${type === 'in' ? '입고' : '출고'} 처리가 완료되었습니다.`, 'success');
+      await refreshCurrentInventory();
+      void fetchLogs();
+      if (onRefresh) onRefresh();
     } catch (err) {
       console.error('입출고 처리 실패:', err);
+      toast('입출고 처리 중 오류가 발생했습니다.', 'error');
     }
   };
 

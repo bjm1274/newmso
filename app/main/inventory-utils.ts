@@ -371,7 +371,7 @@ export async function processInventoryIssue({
     throw new Error('INSUFFICIENT_STOCK');
   }
 
-  const sourceNextQty = sourceCurrentQty - transferQuantity;
+  let sourceNextQty = sourceCurrentQty - transferQuantity;
   const isSameLocation =
     normalizeInventoryText(sourceCompany) === normalizeInventoryText(destinationCompany) &&
     normalizeInventoryText(sourceDept) === normalizeInventoryText(destinationDept);
@@ -379,18 +379,10 @@ export async function processInventoryIssue({
   const sourceNotes = `to ${destinationCompany}${destinationDept ? ` ${destinationDept}` : ''}${reason ? ` (${reason})` : ''}`;
   const destinationNotes = `${sourceCompany}${sourceDept ? ` ${sourceDept}` : ''} -> ${destinationCompany}${destinationDept ? ` ${destinationDept}` : ''}${reason ? ` (${reason})` : ''}`;
 
-  const { error: sourceUpdateError } = await supabase
-    .from('inventory')
-    .update({ quantity: sourceNextQty, stock: sourceNextQty })
-    .eq('id', sourceItem.id);
-
-  if (sourceUpdateError) {
-    throw sourceUpdateError;
-  }
-
   let destinationInventoryId: string | null = null;
   let destinationPrevQty = 0;
   let destinationNextQty = 0;
+  let sourcePrevQty = sourceCurrentQty;
 
   if (!isSameLocation && destinationCompany) {
     let destinationItem = findDestinationInventoryItem(inventoryRows, sourceItem, destinationCompany, destinationDept);
@@ -398,7 +390,7 @@ export async function processInventoryIssue({
     if (!destinationItem) {
       const { data: remoteRows } = await supabase
         .from('inventory')
-        .select('*')
+        .select('id, item_name, name, quantity, stock, company, department, category, spec, min_quantity, min_stock')
         .eq('company', destinationCompany)
         .eq('item_name', getItemName(sourceItem));
 
@@ -406,20 +398,70 @@ export async function processInventoryIssue({
     }
 
     if (destinationItem) {
-      destinationPrevQty = getItemQuantity(destinationItem);
-      destinationNextQty = destinationPrevQty + transferQuantity;
+      // 원자적 이관 RPC 시도 (출발지 차감 + 목적지 증가를 단일 트랜잭션으로)
+      const { data: transferResult, error: transferRpcError } = await supabase.rpc('atomic_stock_transfer', {
+        p_source_id: sourceItem.id,
+        p_dest_id: destinationItem.id,
+        p_quantity: transferQuantity,
+      });
 
-      const { error: destinationUpdateError } = await supabase
-        .from('inventory')
-        .update({ quantity: destinationNextQty, stock: destinationNextQty })
-        .eq('id', destinationItem.id);
+      if (transferRpcError) {
+        if (String(transferRpcError.message).includes('INSUFFICIENT_STOCK')) {
+          throw new Error('INSUFFICIENT_STOCK');
+        }
+        // RPC 미등록 시 fallback (순차 업데이트)
+        const { error: sourceUpdateError } = await supabase
+          .from('inventory')
+          .update({ quantity: sourceNextQty, stock: sourceNextQty })
+          .eq('id', sourceItem.id);
+        if (sourceUpdateError) throw sourceUpdateError;
 
-      if (destinationUpdateError) {
-        throw destinationUpdateError;
+        destinationPrevQty = getItemQuantity(destinationItem);
+        destinationNextQty = destinationPrevQty + transferQuantity;
+
+        const { error: destinationUpdateError } = await supabase
+          .from('inventory')
+          .update({ quantity: destinationNextQty, stock: destinationNextQty })
+          .eq('id', destinationItem.id);
+
+        if (destinationUpdateError) {
+          // 롤백: 출발지 원상 복구
+          await supabase.from('inventory')
+            .update({ quantity: sourceCurrentQty, stock: sourceCurrentQty })
+            .eq('id', sourceItem.id);
+          throw destinationUpdateError;
+        }
+      } else {
+        const row = Array.isArray(transferResult) ? transferResult[0] : transferResult;
+        sourcePrevQty = row?.src_prev ?? sourceCurrentQty;
+        sourceNextQty = row?.src_next ?? sourceNextQty;
+        destinationPrevQty = row?.dst_prev ?? 0;
+        destinationNextQty = row?.dst_next ?? transferQuantity;
       }
 
       destinationInventoryId = String(destinationItem.id);
     } else {
+      // 목적지에 품목이 없는 경우 - 출발지만 원자적 차감
+      const { data: srcResult, error: srcRpcError } = await supabase.rpc('atomic_stock_update', {
+        p_item_id: sourceItem.id,
+        p_delta: -transferQuantity,
+        p_min_allowed: 0,
+      });
+      if (srcRpcError) {
+        if (String(srcRpcError.message).includes('INSUFFICIENT_STOCK')) {
+          throw new Error('INSUFFICIENT_STOCK');
+        }
+        // fallback
+        const { error: sourceUpdateError } = await supabase
+          .from('inventory')
+          .update({ quantity: sourceNextQty, stock: sourceNextQty })
+          .eq('id', sourceItem.id);
+        if (sourceUpdateError) throw sourceUpdateError;
+      } else {
+        const row = Array.isArray(srcResult) ? srcResult[0] : srcResult;
+        sourcePrevQty = row?.prev_qty ?? sourceCurrentQty;
+        sourceNextQty = row?.next_qty ?? sourceNextQty;
+      }
       const baseDestinationPayload: Record<string, any> = {
         item_name: getItemName(sourceItem),
         category: sourceItem?.category || null,
@@ -471,6 +513,27 @@ export async function processInventoryIssue({
       destinationPrevQty = 0;
       destinationNextQty = transferQuantity;
     }
+  } else {
+    // isSameLocation이거나 목적지 미지정: 출발지만 원자적 차감
+    const { data: srcOnlyResult, error: srcOnlyError } = await supabase.rpc('atomic_stock_update', {
+      p_item_id: sourceItem.id,
+      p_delta: -transferQuantity,
+      p_min_allowed: 0,
+    });
+    if (srcOnlyError) {
+      if (String(srcOnlyError.message).includes('INSUFFICIENT_STOCK')) {
+        throw new Error('INSUFFICIENT_STOCK');
+      }
+      // fallback
+      const { error: fbErr } = await supabase.from('inventory')
+        .update({ quantity: sourceNextQty, stock: sourceNextQty })
+        .eq('id', sourceItem.id);
+      if (fbErr) throw fbErr;
+    } else {
+      const row = Array.isArray(srcOnlyResult) ? srcOnlyResult[0] : srcOnlyResult;
+      sourcePrevQty = row?.prev_qty ?? sourceCurrentQty;
+      sourceNextQty = row?.next_qty ?? sourceNextQty;
+    }
   }
 
   if (!isSameLocation && destinationCompany) {
@@ -502,7 +565,7 @@ export async function processInventoryIssue({
       type: '이관',
       change_type: isSameLocation ? '불출' : '이관출고',
       quantity: transferQuantity,
-      prev_quantity: sourceCurrentQty,
+      prev_quantity: sourcePrevQty,
       next_quantity: sourceNextQty,
       actor_name: user?.name,
       company: sourceCompany,

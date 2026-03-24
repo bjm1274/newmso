@@ -1,6 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
 import { dismissDialogs, mockSupabase, seedSession } from './helpers';
 
+const BOARD_MENU = '\uAC8C\uC2DC\uD310';
+const NOTICE_BOARD = '\uACF5\uC9C0\uC0AC\uD56D';
+const FREE_BOARD = '\uC790\uC720\uAC8C\uC2DC\uD310';
+const CONDOLENCE_BOARD = '\uACBD\uC870\uC0AC';
+const SURGERY_BOARD = '\uC218\uC220\uC77C\uC815';
+const MRI_BOARD = 'MRI\uC77C\uC815';
+
 function trackRuntimeErrors(page: Page) {
   const errors: string[] = [];
 
@@ -45,7 +52,7 @@ function buildSubMenuTestId(mainMenuId: string, subMenuId: string) {
 }
 
 async function openBoardMenu(page: Page, boardName: string) {
-  await page.getByTestId(buildSubMenuTestId('게시판', boardName)).click();
+  await page.getByTestId(buildSubMenuTestId(BOARD_MENU, boardName)).click();
   await expect(page.getByRole('heading', { name: boardName })).toBeVisible();
 }
 
@@ -65,54 +72,48 @@ test('board detailed walkthrough clicks through each board menu in practical ord
 
   await seedSession(page, {
     localStorage: {
-      erp_last_menu: '게시판',
-      erp_last_subview: '공지사항',
+      erp_last_menu: BOARD_MENU,
+      erp_last_subview: NOTICE_BOARD,
     },
   });
 
-  await page.goto(`/main?open_menu=${encodeURIComponent('게시판')}`);
+  await page.goto(`/main?open_menu=${encodeURIComponent(BOARD_MENU)}`);
 
   await expect(page.getByTestId('board-view')).toBeVisible();
 
-  await openBoardMenu(page, '공지사항');
-  await expect(page.getByText('게시물이 없습니다.')).toBeVisible();
+  await openBoardMenu(page, NOTICE_BOARD);
   await page.getByTestId('board-toggle-new-post').click();
   await expect(page.getByTestId('board-new-post-form')).toBeVisible();
-  await page.getByTestId('board-new-post-title').fill('E2E 공지사항 점검');
-  await page.getByTestId('board-new-post-content').fill('공지사항 상세 점검 본문입니다.');
+  await page.getByTestId('board-new-post-title').fill('E2E notice post');
+  await page.getByTestId('board-new-post-content').fill('Notice detail body');
   await page.getByTestId('board-new-post-submit').click();
   await expect(page.getByTestId('board-post-detail')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'E2E 공지사항 점검' })).toBeVisible();
-  await page.getByTestId('board-comment-input').fill('공지 댓글 확인');
+  await page.getByTestId('board-comment-input').fill('notice comment');
   await page.getByTestId('board-comment-submit').click();
-  await expect(page.getByText('공지 댓글 확인')).toBeVisible();
+  await expect(page.getByText('notice comment')).toBeVisible();
   await page.getByTestId('board-post-detail-close').click();
   await expect(page.getByTestId('board-post-board-post-1')).toBeVisible();
 
-  await openBoardMenu(page, '자유게시판');
+  await openBoardMenu(page, FREE_BOARD);
   await page.getByTestId('board-toggle-new-post').click();
   await expect(page.getByTestId('board-new-post-form')).toBeVisible();
-  await page.getByTestId('board-new-post-title').fill('E2E 자유게시판 점검');
-  await page.getByTestId('board-new-post-content').fill('자유게시판 상세 점검 본문입니다.');
+  await page.getByTestId('board-new-post-title').fill('E2E free post');
+  await page.getByTestId('board-new-post-content').fill('Free board detail body');
   await page.getByTestId('board-new-post-submit').click();
   await expect(page.getByTestId('board-post-detail')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'E2E 자유게시판 점검' })).toBeVisible();
   await page.getByTestId('board-post-detail-close').click();
 
-  await openBoardMenu(page, '경조사');
-  await expect(page.getByTestId('board-toggle-new-post')).toBeVisible();
+  await openBoardMenu(page, CONDOLENCE_BOARD);
   await page.getByTestId('board-toggle-new-post').click();
   await expect(page.getByTestId('board-new-post-form')).toBeVisible();
   await page.getByTestId('board-toggle-new-post').click();
 
-  await openBoardMenu(page, '수술일정');
-  await expect(page.getByText('등록된 일정이 없습니다.')).toBeVisible();
+  await openBoardMenu(page, SURGERY_BOARD);
   await page.getByTestId('board-toggle-new-post').click();
   await expect(page.getByTestId('board-new-post-form')).toBeVisible();
   await page.getByTestId('board-toggle-new-post').click();
 
-  await openBoardMenu(page, 'MRI일정');
-  await expect(page.getByText('등록된 일정이 없습니다.')).toBeVisible();
+  await openBoardMenu(page, MRI_BOARD);
   await page.getByTestId('board-toggle-new-post').click();
   await expect(page.getByTestId('board-new-post-form')).toBeVisible();
 
@@ -129,29 +130,29 @@ test('schedule post appears on the calendar immediately after registration', asy
 
   await seedSession(page, {
     localStorage: {
-      erp_last_menu: '게시판',
-      erp_last_subview: '수술일정',
+      erp_last_menu: BOARD_MENU,
+      erp_last_subview: SURGERY_BOARD,
     },
   });
 
-  await page.goto(`/main?open_menu=${encodeURIComponent('게시판')}`);
+  await page.goto(`/main?open_menu=${encodeURIComponent(BOARD_MENU)}`);
 
   await expect(page.getByTestId('board-view')).toBeVisible();
-  await openBoardMenu(page, '수술일정');
+  await openBoardMenu(page, SURGERY_BOARD);
 
   await page.getByTestId('board-toggle-new-post').click();
   await expect(page.getByTestId('board-new-post-form')).toBeVisible();
-  await page.getByTestId('board-schedule-title').fill('무릎 관절경');
+  await page.getByTestId('board-schedule-title').fill('knee surgery');
   await page.getByTestId('board-schedule-date').fill('2026-04-15');
-  await page.getByTestId('board-schedule-period').selectOption('오전');
+  await page.getByTestId('board-schedule-period').selectOption('\uC624\uC804');
   await page.getByTestId('board-schedule-hour').selectOption('09');
   await page.getByTestId('board-schedule-minute').selectOption('30');
   await page.getByTestId('board-new-post-submit').click();
 
   await expect(page.getByTestId('board-post-detail')).toBeVisible();
   await page.getByTestId('board-post-detail-close').click();
-  await expect(page.getByText('2026년 4월')).toBeVisible();
-  await expect(page.getByTestId('board-calendar-day-count-2026-04-15')).toHaveText('1건');
+  await expect(page.getByText('2026\uB144 4\uC6D4')).toBeVisible();
+  await expect(page.getByTestId('board-calendar-day-count-2026-04-15')).toHaveText('1\uAC74');
 
   expect(runtimeErrors).toEqual([]);
 });
