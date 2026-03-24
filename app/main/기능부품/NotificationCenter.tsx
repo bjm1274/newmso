@@ -64,17 +64,24 @@ export default function NotificationCenter({
   const fetchNotifications = useCallback(async () => {
     if (!user?.id) return;
 
+    // unread count는 전체 기준으로 정확하게 계산
+    const { count: totalUnread } = await supabase
+      .from('notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .is('read_at', null);
+
     const { data } = await supabase
       .from('notifications')
       .select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
-      .limit(20);
+      .limit(50);
 
     const list = data || [];
     setNotifications(list);
 
-    const unread = list.filter((notification: any) => !notification.read_at).length;
+    const unread = totalUnread ?? list.filter((notification: any) => !notification.read_at).length;
     setUnreadCount(unread);
     return unread;
   }, [user?.id]);
@@ -104,6 +111,7 @@ export default function NotificationCenter({
     document.addEventListener('touchstart', handleClickOutside, { passive: true });
 
     const fallbackPoll = window.setInterval(() => {
+      if (document.hidden) return; // 비활성 탭이면 폴링 스킵
       void fetchNotifications();
     }, 10000);
 
@@ -182,7 +190,15 @@ export default function NotificationCenter({
     }
 
     if (notification.type === 'approval') {
-      router.push('/main?open_menu=전자결재');
+      const approvalView =
+        typeof meta.approval_view === 'string' && meta.approval_view.trim()
+          ? encodeURIComponent(meta.approval_view)
+          : null;
+      router.push(
+        approvalView
+          ? `/main?open_menu=전자결재&open_subview=${approvalView}`
+          : '/main?open_menu=전자결재'
+      );
       return;
     }
 

@@ -74,6 +74,7 @@ export const fakeUser = {
     board_수술일정_write: true,
     approval_기안함: true,
     approval_결재함: true,
+    approval_참조문서함: true,
     approval_작성하기: true,
     hr_구성원: true,
     hr_근태: true,
