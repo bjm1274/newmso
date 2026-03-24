@@ -47,7 +47,8 @@
       "Bash(find /c/Users/baek_/newmso -name *.env* -type f ! -path */node_modules/* ! -path */.next/* ! -path */tmp_*)",
       "Bash(find /c/Users/baek_/newmso/lib -name *.ts ! -path */node_modules/* -exec grep -l \"\\\\.query\\\\|\\\\.raw\\\\|sql\\\\`\" {})",
       "Bash(2)",
-      "Bash(find /c/Users/baek_/newmso/app/api -name route.ts -type f ! -path */node_modules/* -exec sh -c \"echo \"\"=== {} ===\"\" && head -30 \"\"{}\"\"\")"
+      "Bash(find /c/Users/baek_/newmso/app/api -name route.ts -type f ! -path */node_modules/* -exec sh -c \"echo \"\"=== {} ===\"\" && head -30 \"\"{}\"\"\")",
+      "Bash(node -e \"const crypto = require\\(''crypto''\\); console.log\\(crypto.randomBytes\\(32\\).toString\\(''hex''\\)\\);\")"
     ]
   }
 }

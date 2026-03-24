@@ -2457,38 +2457,6 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     fetchData();
     setActiveActionMsg(null);
   };
-  const [editingMsg, setEditingMsg] = useState<ChatMessage | null>(null);
-  const [editContent, setEditContent] = useState('');
-  const saveEditMessage = async () => {
-    if (!editingMsg || editingMsg.sender_id !== user?.id) return;
-    const before = editingMsg.content;
-    await supabase
-      .from('messages')
-      .update({ content: editContent, edited_at: new Date().toISOString() })
-      .eq('id', editingMsg.id);
-    // 媛먯궗 濡쒓렇 湲곕줉
-    try {
-      await supabase.from('audit_logs').insert([
-        {
-          user_id: user?.id,
-          user_name: user?.name,
-          action: 'message_edit',
-          target_type: 'message',
-          target_id: editingMsg.id,
-          details: {
-            room_id: selectedRoomId,
-            before,
-            after: editContent,
-          },
-        },
-      ]);
-    } catch {
-      // ignore
-    }
-    fetchData();
-    setEditingMsg(null);
-    setEditContent('');
-  };
 
   const openMessageActions = useCallback((msg: ChatMessage) => {
     markMessageRead(msg);
@@ -2504,11 +2472,6 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     });
   }, []);
 
-  const startEditMessage = useCallback((msg: ChatMessage) => {
-    setEditingMsg(msg);
-    setEditContent(msg.content || '');
-    setActiveActionMsg(null);
-  }, []);
 
   const startForwardMessage = useCallback((msg: ChatMessage) => {
     setForwardSourceMsg(msg);
@@ -3341,7 +3304,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
         {activeActionMsg && (
           <>
-            <div className="absolute inset-0 bg-black/10 z-30 animate-in fade-in duration-200" onClick={() => { setActiveActionMsg(null); setEditingMsg(null); }} aria-hidden="true" />
+            <div className="absolute inset-0 bg-black/10 z-30 animate-in fade-in duration-200" onClick={() => { setActiveActionMsg(null); }} aria-hidden="true" />
 
             <div className="md:hidden absolute left-0 right-0 bottom-0 bg-[var(--card)] dark:bg-zinc-900 rounded-t-[24px] shadow-sm z-40 flex flex-col animate-in slide-in-from-bottom duration-300 max-h-[85vh] overflow-hidden">
               <div className="w-12 h-1.5 bg-[var(--tab-bg)] dark:bg-zinc-800 rounded-full mx-auto my-3 shrink-0" />
@@ -3389,7 +3352,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             <div data-testid="chat-message-actions-panel" className="hidden md:flex absolute top-0 right-0 bottom-0 w-80 bg-[var(--card)] border-l border-[var(--border)] shadow-sm z-40 flex-col animate-in slide-in-from-right duration-300">
               <div className="p-4 border-b border-[var(--border)] flex items-center justify-between">
                 <span className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">메시지 작업</span>
-            <button onClick={() => { setActiveActionMsg(null); setEditingMsg(null) }} className="p-2 text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] rounded-[var(--radius-md)] hover:bg-[var(--muted)]">닫기</button>
+            <button onClick={() => { setActiveActionMsg(null); }} className="p-2 text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] rounded-[var(--radius-md)] hover:bg-[var(--muted)]">닫기</button>
               </div>
               <div className="p-4 space-y-4 overflow-y-auto flex-1">
                 <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">빠른 반응</p>
@@ -3409,10 +3372,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     답글 달기
                   </button>
                   {activeActionMsg.sender_id === user?.id && (
-                    <>
-                      <button data-testid="chat-message-action-edit" onClick={() => { startEditMessage(activeActionMsg); }} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">메시지 수정</button>
-                      <button data-testid="chat-message-action-delete" onClick={() => { void deleteMessageFromActions(activeActionMsg); }} className="w-full p-3 text-left hover:bg-red-50 rounded-[var(--radius-md)] text-xs font-semibold text-red-600 transition-colors">메시지 삭제</button>
-                    </>
+                    <button data-testid="chat-message-action-delete" onClick={() => { void deleteMessageFromActions(activeActionMsg); }} className="w-full p-3 text-left hover:bg-red-50 rounded-[var(--radius-md)] text-xs font-semibold text-red-600 transition-colors">메시지 삭제</button>
                   )}
                   <button data-testid="chat-message-action-pin" onClick={() => { void togglePin(activeActionMsg.id); setActiveActionMsg(null); }} className={`w-full p-3 text-left rounded-[var(--radius-md)] text-xs font-semibold transition-colors ${pinnedIds.includes(String(activeActionMsg.id)) ? 'hover:bg-[var(--muted)] text-[var(--toss-gray-3)]' : 'hover:bg-orange-50 text-orange-500'}`}>{pinnedIds.includes(String(activeActionMsg.id)) ? '공지 해제' : '공지로 등록'}</button>
                   <button onClick={() => { handleAction('task'); setActiveActionMsg(null) }} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">할 일로 등록</button>
@@ -3440,18 +3400,6 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           </>
         )}
 
-        {editingMsg && (
-          <div className="absolute inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-30" onClick={() => { setEditingMsg(null); setEditContent(''); }}>
-            <div className="bg-[var(--card)] p-4 rounded-[var(--radius-md)] w-80 shadow-sm" onClick={e => e.stopPropagation()}>
-              <p className="text-xs font-semibold text-[var(--toss-gray-3)] mb-2">메시지 수정</p>
-              <input data-testid="chat-message-edit-input" value={editContent} onChange={e => setEditContent(e.target.value)} className="w-full p-3 border rounded-[var(--radius-lg)] text-sm mb-4" />
-              <div className="flex gap-2">
-                <button onClick={() => { setEditingMsg(null); setEditContent(''); }} className="flex-1 py-2 bg-[var(--muted)] rounded-[var(--radius-lg)] text-xs font-semibold">취소</button>
-            <button data-testid="chat-message-edit-save" onClick={saveEditMessage} className="flex-1 py-2 bg-[var(--accent)] text-white rounded-[var(--radius-lg)] text-xs font-semibold">저장</button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {showGroupModal && (
           <div data-testid="chat-group-modal" className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-[110] p-4" onClick={() => setShowGroupModal(false)}>
