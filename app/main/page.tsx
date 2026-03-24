@@ -296,37 +296,26 @@ function MainPageContent() {
         }
 
         const savedCo = localStorage.getItem('erp_last_co');
-        const savedMenu = localStorage.getItem('erp_last_menu');
-        const savedSubView = localStorage.getItem('erp_last_subview');
-        const shouldRestoreMenu = !(
+        const shouldHonorNavigationIntent = !(
           navigationQuery?.openChatRoom ||
           navigationQuery?.openMessage ||
           navigationQuery?.openMenu ||
           navigationQuery?.openPost
         );
-        const shouldRestoreSubView = !(
+        const shouldHonorSubViewIntent = !(
           navigationQuery?.openChatRoom ||
           navigationQuery?.openMessage ||
           navigationQuery?.openPost ||
           navigationQuery?.openSubView
         );
 
-        if (shouldRestoreMenu) {
-          const normalizedNavigation = resolveLegacyNavigation(savedMenu, savedSubView, sessionUser);
-          const restoredMenu = normalizeMainMenuForUser(sessionUser, normalizedNavigation.menuId);
-
-          if (!ignore) {
-            setMainMenu(restoredMenu);
-            if (
-              shouldRestoreSubView &&
-              normalizedNavigation.subViewId &&
-              restoredMenu === normalizedNavigation.menuId
-            ) {
-              setSubView(normalizedNavigation.subViewId);
-            }
+        if (!ignore) {
+          if (shouldHonorNavigationIntent) {
+            setMainMenu(normalizeMainMenuForUser(sessionUser, '내정보'));
           }
-        } else if (!ignore && shouldRestoreSubView && savedSubView) {
-          setSubView(savedSubView);
+          if (shouldHonorSubViewIntent) {
+            setSubView('전체');
+          }
         }
 
         if (sessionUser.company !== 'SY INC.' && !sessionUser.permissions?.mso) {

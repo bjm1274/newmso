@@ -8,7 +8,7 @@ export function toast(message: string, type: ToastType = 'info') {
     container = document.createElement('div');
     container.id = '__toast_container__';
     container.style.cssText =
-      'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:99999;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;';
+      'position:fixed;top:calc(env(safe-area-inset-top, 0px) + 12px);left:50%;transform:translateX(-50%);z-index:99999;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;width:min(calc(100vw - 24px), 420px);';
     document.body.appendChild(container);
   }
 
@@ -30,7 +30,8 @@ export function toast(message: string, type: ToastType = 'info') {
     pointer-events:none;
     opacity:1;
     transition:opacity 0.3s;
-    max-width:320px;
+    width:fit-content;
+    max-width:min(calc(100vw - 24px), 420px);
     text-align:center;
     white-space:pre-line;
   `;

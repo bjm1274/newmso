@@ -3,6 +3,7 @@ import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { WORKPLACE_LOCATION, ALLOWED_DISTANCE_M } from '@/lib/location';
+import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
 
 const HOSPITAL_LOCATION = WORKPLACE_LOCATION;
 const ALLOWED_RADIUS_METER = ALLOWED_DISTANCE_M;
@@ -13,6 +14,8 @@ interface CommuteRecordProps {
 }
 
 export default function CommuteRecord({ user, onRequestCorrection }: CommuteRecordProps) {
+  const normalizedUser = normalizeStaffLike((user ?? {}) as Record<string, unknown>);
+  const [resolvedUser, setResolvedUser] = useState<Record<string, unknown>>(normalizedUser);
   const [logs, setLogs] = useState<any[]>([]);
   const [todayLog, setTodayLog] = useState<Record<string, unknown> | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -20,6 +23,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
   const [distance, setDistance] = useState<number | null>(null); // 병원과의 거리
   const [loading, setLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
+  const effectiveUserId = getStaffLikeId(resolvedUser);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -29,11 +33,35 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
   }, []);
 
   useEffect(() => {
-    const userId = (user as Record<string, unknown>)?.id;
-    if (userId) {
+    let cancelled = false;
+
+    const syncUserIdentity = async () => {
+      const directId = getStaffLikeId(normalizedUser);
+      if (directId) {
+        setResolvedUser(normalizedUser);
+        return;
+      }
+      if (!normalizedUser?.name && !normalizedUser?.employee_no && !normalizedUser?.auth_user_id) {
+        setResolvedUser(normalizedUser);
+        return;
+      }
+      const recoveredUser = await resolveStaffLike(normalizedUser);
+      if (!cancelled) {
+        setResolvedUser(recoveredUser);
+      }
+    };
+
+    void syncUserIdentity();
+    return () => {
+      cancelled = true;
+    };
+  }, [normalizedUser?.id, normalizedUser?.name, normalizedUser?.employee_no, normalizedUser?.auth_user_id]);
+
+  useEffect(() => {
+    if (effectiveUserId) {
       initCommuteData();
     }
-  }, [user, currentMonth]);
+  }, [effectiveUserId, currentMonth]);
 
   const initCommuteData = async () => {
     setLoading(true);
@@ -44,7 +72,8 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
 
   const fetchTodayLog = async () => {
     const today = new Date().toLocaleDateString('en-CA');
-    const userId = (user as Record<string, unknown>)?.id as string;
+    const userId = effectiveUserId;
+    if (!userId) return;
     const { data } = await supabase
       .from('attendance')
       .select('*')
@@ -57,7 +86,8 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
   const fetchMonthlyLogs = async () => {
     const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).toLocaleDateString('en-CA');
     const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).toLocaleDateString('en-CA');
-    const userId = (user as Record<string, unknown>)?.id as string;
+    const userId = effectiveUserId;
+    if (!userId) return;
 
     const { data } = await supabase
       .from('attendance')
@@ -131,7 +161,8 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
       const mins = checkIn && checkOut
         ? Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 60000)
         : null;
-      const userId = (user as Record<string, unknown>)?.id as string;
+      const userId = effectiveUserId;
+      if (!userId) return;
       await supabase.from('attendances').upsert({
         staff_id: userId,
         work_date: workDate,
@@ -159,8 +190,13 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     const now = new Date();
     const today = now.toLocaleDateString('en-CA');
     const timeString = now.toISOString();
-    const userId = (user as Record<string, unknown>)?.id as string;
-    const userDepartment = (user as Record<string, unknown>)?.department as string | undefined;
+    const userId = effectiveUserId;
+    const userDepartment = (resolvedUser as Record<string, unknown>)?.department as string | undefined;
+    if (!userId) {
+      toast('직원 계정 정보를 확인하는 중입니다. 잠시 후 다시 시도해 주세요.', 'warning');
+      setIsProcessing(false);
+      return;
+    }
 
     try {
       if (type === 'in') {
@@ -215,12 +251,14 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     <div data-testid="commute-record-view" className="bg-[var(--card)] border border-[var(--border)] shadow-sm rounded-2xl px-4 py-5 sm:p-5 h-full flex flex-col space-y-7">
 
       {/* 실시간 상태 카드 */}
-      <div className="flex justify-between items-center bg-[var(--foreground)] px-4 py-4 sm:px-5 sm:py-5 rounded-[var(--radius-lg)] text-white shadow-sm relative overflow-hidden">
+      <div className="flex justify-between items-center gap-3 bg-[var(--foreground)] px-4 py-4 sm:px-5 sm:py-5 rounded-[var(--radius-lg)] text-white shadow-sm relative overflow-hidden">
         {/* 배경 장식 */}
         <div className="absolute -right-10 -top-10 w-40 h-40 bg-[var(--card)] opacity-5 rounded-full blur-3xl"></div>
 
-        <div className="space-y-2 z-10">
-          <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight">{currentTime.toLocaleTimeString('ko-KR')}</h2>
+        <div className="space-y-2 z-10 min-w-0">
+          <h2 className="text-2xl sm:text-4xl font-semibold tracking-tight tabular-nums whitespace-nowrap leading-none">
+            {currentTime.toLocaleTimeString('ko-KR')}
+          </h2>
           <div className="flex flex-wrap items-center gap-2 mt-1">
             <span className={`w-2 h-2 rounded-full animate-pulse ${todayLog ? (todayLog.check_out ? 'bg-[var(--toss-gray-3)]' : 'bg-green-500') : 'bg-red-500'}`}></span>
             <span className="text-sm font-bold mr-1">
@@ -234,7 +272,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
           </div>
         </div>
 
-        <div className="flex gap-4 z-10">
+        <div className="flex gap-4 z-10 shrink-0">
           {!todayLog && (
             <button
               data-testid="commute-check-in-button"

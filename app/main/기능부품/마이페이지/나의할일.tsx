@@ -2,18 +2,16 @@
 import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-
-function isUuidLike(value: string | null | undefined) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
-}
+import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
 
 export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatNavigate }: Record<string, unknown>) {
   const onChatNavigate = _onChatNavigate as ((roomId: string, messageId: string) => void) | undefined;
-  const _iu = (initialUser ?? {}) as Record<string, unknown>;
+  const _iu = normalizeStaffLike((initialUser ?? {}) as Record<string, unknown>);
   const [user, setUser] = useState<Record<string, unknown>>(_iu);
   const [tasks, setTasks] = useState<any[]>([]);
   const [newTask, setNewTask] = useState('');
   const [recoverAttempted, setRecoverAttempted] = useState(false);
+  const effectiveUserId = getStaffLikeId(user);
   
   // 날짜 설정
   const getToday = () => {
@@ -28,26 +26,23 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
   // 1. 유저 ID 확인 및 자동 복구 로직 (user 변경 시에만 실행, selectedDate 변경 시 불필요한 재조회 방지)
   useEffect(() => {
     const checkAndRecoverUser = async () => {
-      if ((_iu)?.id && isUuidLike(_iu.id as string)) {
-        setUser((_iu));
-        fetchTasks(_iu.id as string);
+      const directId = getStaffLikeId(_iu);
+      if (directId) {
+        setUser(_iu);
+        fetchTasks(directId);
         setRecoverAttempted(true);
         return;
       }
 
-      if ((_iu)?.name) {
+      if ((_iu)?.name || (_iu)?.employee_no || (_iu)?.auth_user_id) {
         setRecoverAttempted(true);
         try {
-          const { data, error } = await supabase
-            .from('staff_members')
-            .select('*')
-            .eq('name', (_iu)?.name)
-            .maybeSingle();
-
-          if (data && !error) {
-            setUser(data);
-            localStorage.setItem('erp_user', JSON.stringify(data));
-            fetchTasks(data.id);
+          const resolvedUser = await resolveStaffLike(_iu);
+          const resolvedUserId = getStaffLikeId(resolvedUser);
+          if (resolvedUserId) {
+            setUser(resolvedUser);
+            localStorage.setItem('erp_user', JSON.stringify(resolvedUser));
+            fetchTasks(resolvedUserId);
           }
         } catch (_) {}
       } else {
@@ -56,22 +51,22 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
     };
 
     checkAndRecoverUser();
-  }, [(_iu)]);
+  }, [_iu?.id, _iu?.name, _iu?.employee_no, _iu?.auth_user_id]);
 
   useEffect(() => {
-    if (user?.id) fetchTasks(user.id as string);
-  }, [viewRange, selectedDate]);
+    if (effectiveUserId) fetchTasks(effectiveUserId);
+  }, [effectiveUserId, viewRange, selectedDate]);
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!effectiveUserId) return;
     const channel = supabase
-      .channel(`todos-realtime-${user.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'todos', filter: `user_id=eq.${user.id}` }, () => {
-        fetchTasks(user.id as string);
+      .channel(`todos-realtime-${effectiveUserId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'todos', filter: `user_id=eq.${effectiveUserId}` }, () => {
+        fetchTasks(effectiveUserId);
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [user?.id, selectedDate, viewRange]);
+  }, [effectiveUserId, selectedDate, viewRange]);
 
   // 일별: 해당일 포함 이전 할일. 주간별: 그 주 범위. 월별: 그 달 범위
   const getDateRange = () => {
@@ -130,7 +125,7 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
     if (!newTask.trim()) return;
     
     // 안전장치: ID가 없으면 한 번 더 확인
-    if (!user?.id) {
+    if (!effectiveUserId) {
       toast("잠시만 기다려주세요. 사용자 정보를 확인 중입니다.", 'warning');
       return;
     }
@@ -139,7 +134,7 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
       // 낙관적 업데이트
       const optimisticTask = {
         id: Date.now(),
-        user_id: user.id,
+        user_id: effectiveUserId,
         content: newTask,
         is_complete: false,
         task_date: selectedDate,
@@ -151,7 +146,7 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
       const { data, error } = await supabase
         .from('todos')
         .insert([{ 
-          user_id: user.id, 
+          user_id: effectiveUserId, 
           content: newTask, 
           is_complete: false,
           task_date: selectedDate
@@ -164,7 +159,7 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
 
     } catch (error: unknown) {
       toast('저장 실패: ' + ((error as Error)?.message ?? String(error)), 'error');
-      fetchTasks(user.id as string);
+      if (effectiveUserId) fetchTasks(effectiveUserId);
     }
   };
 
@@ -173,7 +168,7 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
       setTasks(tasks.map(t => t.id === taskId ? { ...t, is_complete: !currentStatus } : t));
       await supabase.from('todos').update({ is_complete: !currentStatus }).eq('id', taskId);
     } catch (error) {
-      if(user?.id) fetchTasks(user.id as string);
+      if (effectiveUserId) fetchTasks(effectiveUserId);
     }
   };
 
@@ -183,7 +178,7 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
       setTasks(tasks.filter(t => t.id !== taskId));
       await supabase.from('todos').delete().eq('id', taskId);
     } catch (error) {
-      if(user?.id) fetchTasks(user.id as string);
+      if (effectiveUserId) fetchTasks(effectiveUserId);
     }
   };
 
@@ -236,13 +231,13 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
           value={newTask}
           onChange={(e) => setNewTask(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}
-          placeholder={user?.id ? `${selectedDate}의 할일을 입력하세요...` : (recoverAttempted ? "직원 계정으로 로그인하면 할일을 등록할 수 있습니다." : "사용자 정보 확인 중...")}
-          disabled={!user?.id}
+          placeholder={effectiveUserId ? `${selectedDate}의 할일을 입력하세요...` : (recoverAttempted ? "직원 계정으로 로그인하면 할일을 등록할 수 있습니다." : "사용자 정보 확인 중...")}
+          disabled={!effectiveUserId}
           className="flex-1 bg-[var(--input-bg)] border border-[var(--border)] rounded-[var(--radius-lg)] px-4 py-3 text-sm font-bold outline-none focus:bg-[var(--card)] focus:border-[var(--accent)] transition-all disabled:bg-[var(--muted)]"
         />
         <button
           onClick={handleAddTask}
-          disabled={!user?.id || !newTask.trim()}
+          disabled={!effectiveUserId || !newTask.trim()}
           className="bg-[var(--foreground)] text-white rounded-[var(--radius-lg)] px-4 py-3 text-sm font-semibold hover:opacity-90 transition-all shadow-md disabled:opacity-50"
         >
           등록
@@ -254,7 +249,7 @@ export default function MyTodoList({ user: initialUser, onChatNavigate: _onChatN
           <div className="flex justify-center py-20">
             <div className="w-8 h-8 border-4 border-[var(--border)] border-t-[var(--accent)] rounded-full animate-spin"></div>
           </div>
-        ) : !user?.id ? (
+        ) : !effectiveUserId ? (
            <div className="h-60 flex flex-col items-center justify-center text-[var(--toss-gray-3)] gap-3 px-4 text-center">
              <span className="text-3xl">📋</span>
              <p className="text-xs font-bold">할일은 직원 계정(이름으로 로그인)으로 이용해 주세요.</p>
