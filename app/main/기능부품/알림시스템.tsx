@@ -169,6 +169,30 @@ function claimNotificationSlot(key: string, ownerId: string, ttlMs: number) {
   }
 }
 
+async function buildDeterministicNotificationId(userId: string, dedupeKey: string) {
+  const source = `erp-notification:${userId}:${dedupeKey}`;
+  try {
+    if (typeof crypto !== 'undefined' && crypto.subtle) {
+      const bytes = new Uint8Array(
+        await crypto.subtle.digest('SHA-256', new TextEncoder().encode(source))
+      ).slice(0, 16);
+      bytes[6] = (bytes[6] & 0x0f) | 0x50;
+      bytes[8] = (bytes[8] & 0x3f) | 0x80;
+      const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+      return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+    }
+  } catch {
+    // ignore and use fallback
+  }
+
+  let hash = 0;
+  for (let index = 0; index < source.length; index += 1) {
+    hash = ((hash << 5) - hash + source.charCodeAt(index)) | 0;
+  }
+  const hex = Math.abs(hash).toString(16).padStart(32, '0').slice(0, 32);
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
+
 async function syncPushSubscriptionOnServer(staffId: string | undefined, subscription: PushSubscriptionJSON) {
   if (!staffId || !subscription.endpoint || !subscription.keys?.p256dh || !subscription.keys?.auth) return;
 
@@ -489,12 +513,44 @@ export default function NotificationSystem({
       const metadata = dedupeKey
         ? { ...(n.data || {}), dedupe_key: dedupeKey }
         : (n.data || null);
+      const deterministicId = dedupeKey
+        ? await buildDeterministicNotificationId(uid, dedupeKey)
+        : null;
 
-      const { data: inserted } = await supabase.from('notifications').insert([{
-        user_id: uid, type: n.type, title: n.title, body: n.body,
-        metadata, read_at: null, created_at: new Date().toISOString(),
-      }]).select().single();
-      return inserted;
+      const insertPayload = {
+        ...(deterministicId ? { id: deterministicId } : {}),
+        user_id: uid,
+        type: n.type,
+        title: n.title,
+        body: n.body,
+        metadata,
+        read_at: null,
+        created_at: new Date().toISOString(),
+      };
+
+      const { data: inserted, error } = await supabase
+        .from('notifications')
+        .insert([insertPayload])
+        .select()
+        .single();
+
+      if (!error) return inserted;
+
+      const duplicateInsert =
+        Boolean(deterministicId) &&
+        (String((error as { code?: string } | null)?.code || '') === '23505' ||
+          /duplicate key|unique constraint/i.test(String((error as { message?: string } | null)?.message || '')));
+
+      if (duplicateInsert && deterministicId) {
+        const { data: existing } = await supabase
+          .from('notifications')
+          .select('*')
+          .eq('id', deterministicId)
+          .maybeSingle();
+        return existing || null;
+      }
+
+      throw error;
     };
 
     // A. notifications 테이블 INSERT 수신 → Toast + 소리 + 진동
