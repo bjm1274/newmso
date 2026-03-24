@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { canAccessHrSection, canAccessMainMenu } from '@/lib/access-control';
+import { canAccessHrSection, canAccessMainMenu, isAdminUser } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
 import 구성원관리 from './인사관리서브/구성원현황';
 import CertificateGenerator from './인사관리서브/증명서발급';
@@ -360,6 +360,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
   const activeWorkspaceConfig = HR_WORKSPACES.find((workspace) => workspace.id === activeWorkspace) || HR_WORKSPACES[0];
   const workspaceTabs = visibleHrTabs.filter((tab) => activeWorkspaceConfig.groups.includes(tab.group));
   const visibleAttendanceTabs = ATTENDANCE_ANALYSIS_TABS.filter((tab) => canAccessHrSection(user, tab.perm));
+  const canRegisterNewStaff = isAdminUser(user) || canAccessHrSection(user, 'hr_직원등록');
   const activeAttendanceTab = normalizeAttendanceTabForUser(user, 근태분석탭);
   const 인사직원목록 = useMemo(
     () => (isMsoViewer && 전체직원목록.length > 0 ? 전체직원목록 : staffs || []),
@@ -647,11 +648,12 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
                   부서목록={인사부서목록}
                   선택사업체={선택사업체}
                   보기상태={직원상태필터}
+                  canRegisterNewStaff={canRegisterNewStaff}
                   onOpenDocumentRepoForStaff={인사서류보기}
                   새로고침={onRefresh}
                   창상태={등록창상태 ? '열기' : undefined}
                   창닫기={() => 창상태설정(false)}
-                  onOpenNewStaff={() => 창상태설정(true)}
+                  onOpenNewStaff={() => canRegisterNewStaff && 창상태설정(true)}
                 />
               </div>
             </div>

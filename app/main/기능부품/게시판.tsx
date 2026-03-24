@@ -24,6 +24,7 @@ const BOARD_POST_OPTIONAL_COLUMNS = [
   'surgery_guardian',
   'surgery_caregiver',
   'surgery_transfusion',
+  'mri_contrast_required',
 ];
 const SCHEDULE_META_PREFIX = '[[SCHEDULE_META]]';
 const SCHEDULE_META_SUFFIX = '[[/SCHEDULE_META]]';
@@ -38,6 +39,7 @@ type ScheduleMetaPayload = {
   guardian?: boolean;
   caregiver?: boolean;
   transfusion?: boolean;
+  contrast?: boolean;
 };
 
 function buildScheduleTimeValue(period: string, hour: string, minute: string) {
@@ -125,6 +127,10 @@ function normalizeBoardPost<T extends Partial<BoardPost>>(post: T): T {
     surgery_guardian: typeof post.surgery_guardian === 'boolean' ? post.surgery_guardian : Boolean(meta?.guardian),
     surgery_caregiver: typeof post.surgery_caregiver === 'boolean' ? post.surgery_caregiver : Boolean(meta?.caregiver),
     surgery_transfusion: typeof post.surgery_transfusion === 'boolean' ? post.surgery_transfusion : Boolean(meta?.transfusion),
+    mri_contrast_required:
+      typeof post.mri_contrast_required === 'boolean'
+        ? post.mri_contrast_required
+        : Boolean(meta?.contrast),
   };
 }
 
@@ -203,6 +209,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   const [scheduleGuardian, setScheduleGuardian] = useState(false);
   const [scheduleCaregiver, setScheduleCaregiver] = useState(false);
   const [scheduleTransfusion, setScheduleTransfusion] = useState(false);
+  const [scheduleContrastRequired, setScheduleContrastRequired] = useState(false);
   const [scheduleSide, setScheduleSide] = useState<'좌' | '우' | ''>('');
   const [searchKeyword, setSearchKeyword] = useState('');
   const deferredSearchKeyword = useDeferredValue(searchKeyword);
@@ -838,6 +845,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       setScheduleGuardian(!!post.surgery_guardian);
       setScheduleCaregiver(!!post.surgery_caregiver);
       setScheduleTransfusion(!!post.surgery_transfusion);
+      setScheduleContrastRequired(!!post.mri_contrast_required);
     } else {
       setContent(post.content || '');
       setTagsInput((post.tags || []).join(', '));
@@ -864,6 +872,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     setScheduleGuardian(false);
     setScheduleCaregiver(false);
     setScheduleTransfusion(false);
+    setScheduleContrastRequired(false);
     setScheduleSide('');
     setAttachmentFiles([]);
     setTagsInput('');
@@ -921,6 +930,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
               guardian: scheduleGuardian,
               caregiver: scheduleCaregiver,
               transfusion: scheduleTransfusion,
+              contrast: activeBoard === 'MRI일정' ? scheduleContrastRequired : false,
             }) || null
           : normalizedContent || null,
         company: user?.company || null,
@@ -961,6 +971,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
         postData.surgery_guardian = scheduleGuardian;
         postData.surgery_caregiver = scheduleCaregiver;
         postData.surgery_transfusion = scheduleTransfusion;
+        postData.mri_contrast_required = activeBoard === 'MRI일정' ? scheduleContrastRequired : null;
         const sidePrefix = scheduleSide === '좌' ? '좌측 ' : scheduleSide === '우' ? '우측 ' : '';
         postData.title = sidePrefix + (postData.title || '');
       }
@@ -1360,6 +1371,19 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                         </div>
                       </div>
                     )}
+                    {activeBoard === 'MRI일정' && (
+                      <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--page-bg)] px-4 py-3">
+                        <label className="inline-flex items-center gap-3 cursor-pointer text-sm font-bold text-[var(--foreground)]">
+                          <input
+                            type="checkbox"
+                            checked={scheduleContrastRequired}
+                            onChange={(e) => setScheduleContrastRequired(e.target.checked)}
+                            className="h-5 w-5 rounded border-[var(--border)]"
+                          />
+                          <span>조영제 필요</span>
+                        </label>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <>
@@ -1418,6 +1442,11 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                               />
                               {pollOptions.length > 2 && (
                                 <button type="button" onClick={() => setPollOptions((prev) => prev.filter((_, idx) => idx !== i))} className="text-red-500 text-xs font-bold hover:text-red-700">삭제</button>
+                              )}
+                              {false && (
+                                <span className="px-2 py-1 rounded-[var(--radius-md)] bg-violet-50 text-violet-700 text-[11px] font-semibold">
+                                  조영제
+                                </span>
                               )}
                             </div>
                           ))}
@@ -1859,6 +1888,11 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                             {(Array.isArray(post.attachments) ? post.attachments : []).length > 0 && (
                               <span className="shrink-0 text-[var(--toss-gray-3)]" title="첨부파일 있음">📎</span>
                             )}
+                            {false && (
+                              <span className="px-2 py-1 rounded-[var(--radius-md)] bg-violet-50 text-violet-700 text-[11px] font-semibold">
+                                조영제 필요
+                              </span>
+                            )}
                           </div>
                           <div className="hidden md:flex w-32 text-[11px] font-bold text-[var(--toss-gray-3)] justify-center shrink-0">
                             {post.author_name || '익명'}
@@ -2069,6 +2103,11 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                       )}
 
                     {/* 같은 날짜의 전체 일정 목록 */}
+                    {selectedPost.mri_contrast_required && (
+                      <div className="rounded-[var(--radius-md)] border border-violet-200 bg-violet-50 px-3 py-2 text-[11px] font-semibold text-violet-700">
+                        조영제 필요
+                      </div>
+                    )}
                     <div className="bg-[var(--page-bg)] border border-[var(--border)] rounded-[var(--radius-md)] p-3 space-y-2">
                       <p className="text-[11px] font-semibold text-[var(--toss-gray-4)] flex items-center gap-2">
                         📅 {selectedPost.schedule_date || '날짜 미지정'} 의 전체 일정

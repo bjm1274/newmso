@@ -46,9 +46,22 @@ export default function DataBackup() {
         'shift_assignments', 'annual_leave_promotions'
       ];
       const data: Record<string, any[]> = {};
+      const PAGE_SIZE = 1000;
       for (const t of tables) {
-        const { data: rows } = await supabase.from(t).select('*');
-        data[t] = rows || [];
+        const allRows: any[] = [];
+        let offset = 0;
+        let hasMore = true;
+        while (hasMore) {
+          const { data: rows } = await supabase.from(t).select('*').range(offset, offset + PAGE_SIZE - 1);
+          if (rows && rows.length > 0) {
+            allRows.push(...rows);
+            offset += rows.length;
+            hasMore = rows.length === PAGE_SIZE;
+          } else {
+            hasMore = false;
+          }
+        }
+        data[t] = allRows;
       }
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);

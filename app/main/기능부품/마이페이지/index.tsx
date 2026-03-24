@@ -77,6 +77,7 @@ interface MyPageMainProps {
 }
 
 export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInitialTab, onOpenApproval, setMainMenu, onOpenChatMessage }: MyPageMainProps) {
+  const isRetired = user?.status === '퇴사';
   const [activeTab, setActiveTab] = useState<'profile' | 'records' | 'todo' | 'commute' | 'documents' | 'notifications'>('profile');
   const [recordsView, setRecordsView] = useState<'salary' | 'certificates'>('salary');
   const [favorites, setFavorites] = useState<FavoriteId[]>([]);
@@ -424,26 +425,32 @@ export default function MyPageMain({ user, initialMyPageTab, onConsumeMyPageInit
               onClick={() => setActiveTab('profile')}
               label="내 정보" icon="👤"
             />
-            <TabButton
-              isActive={activeTab === 'commute'}
-              onClick={() => setActiveTab('commute')}
-              label="출퇴근" icon="⏰"
-            />
-            <TabButton
-              isActive={activeTab === 'todo'}
-              onClick={() => setActiveTab('todo')}
-              label="할일" icon="✅"
-            />
+            {!isRetired && (
+              <TabButton
+                isActive={activeTab === 'commute'}
+                onClick={() => setActiveTab('commute')}
+                label="출퇴근" icon="⏰"
+              />
+            )}
+            {!isRetired && (
+              <TabButton
+                isActive={activeTab === 'todo'}
+                onClick={() => setActiveTab('todo')}
+                label="할일" icon="✅"
+              />
+            )}
             <TabButton
               isActive={activeTab === 'records'}
               onClick={() => { setActiveTab('records'); }}
               label="급여·증명서" icon="📑" ariaLabel="급여·증명서"
             />
-            <TabButton
-              isActive={activeTab === 'documents'}
-              onClick={() => setActiveTab('documents')}
-              label="서류제출" icon="📤"
-            />
+            {!isRetired && (
+              <TabButton
+                isActive={activeTab === 'documents'}
+                onClick={() => setActiveTab('documents')}
+                label="서류제출" icon="📤"
+              />
+            )}
             <TabButton
               isActive={activeTab === 'notifications'}
               onClick={() => setActiveTab('notifications')}

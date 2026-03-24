@@ -95,6 +95,7 @@ export interface BoardPost {
   surgery_guardian?: boolean | null;
   surgery_caregiver?: boolean | null;
   surgery_transfusion?: boolean | null;
+  mri_contrast_required?: boolean | null;
   [key: string]: unknown;
 }
 

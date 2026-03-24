@@ -68,9 +68,10 @@ interface StaffListManagerProps {
   창상태?: string;
   창닫기?: () => void;
   onOpenDocumentRepoForStaff?: (staff: StaffMember) => void;
+  canRegisterNewStaff?: boolean;
   onOpenNewStaff?: () => void;
 }
-export default function StaffListManager({ 직원목록 = [], 부서목록 = [], 선택사업체, 보기상태 = '재직', 새로고침, 창상태, 창닫기, onOpenDocumentRepoForStaff, onOpenNewStaff }: StaffListManagerProps) {
+export default function StaffListManager({ 직원목록 = [], 부서목록 = [], 선택사업체, 보기상태 = '재직', 새로고침, 창상태, 창닫기, onOpenDocumentRepoForStaff, canRegisterNewStaff = false, onOpenNewStaff }: StaffListManagerProps) {
   const [편집모드, 편집모드설정] = useState(false);
   const [선택된직원ID, 선택된직원ID설정] = useState<string | number | null>(null);
   const [근무형태목록, 근무형태목록설정] = useState<any[]>([]);
@@ -131,23 +132,30 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   useEffect(() => {
     const fetchEssRequests = async () => {
       // 1. 먼저 보류 중인 모든 요청을 가져옴
+      // 서버 사이드 필터: 해당 사업체 직원 ID 목록으로 직접 필터링 (N+1 제거)
+      const staffIdsInCompany = 직원목록
+        .filter((s: StaffMember) => s.company === 선택사업체)
+        .map((s: StaffMember) => s.id);
+
+      if (staffIdsInCompany.length === 0) {
+        setEssRequests([]);
+        return;
+      }
+
       const { data: logs } = await supabase
         .from('audit_logs')
         .select('*')
         .eq('target_type', 'ESS_PROFILE_UPDATE_PENDING')
-        .order('created_at', { ascending: false });
+        .in('target_id', staffIdsInCompany)
+        .order('created_at', { ascending: false })
+        .limit(200);
 
       if (!logs) {
         setEssRequests([]);
         return;
       }
 
-      // 2. 현재 선택된 사업체에 속한 직원의 요청만 필터링
-      // (성능 최적화를 위해 클라이언트 사이드 필터링 수행, 대규모 시 테이블 조인 고려)
-      const filtered = logs.filter((log: Record<string, unknown>) => {
-        const staff = 직원목록.find((s: StaffMember) => s.id === log.target_id);
-        return staff && staff.company === 선택사업체;
-      });
+      const filtered = logs;
 
       setEssRequests(filtered);
     };
@@ -278,6 +286,9 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   }, [창상태, 편집모드, 선택사업체, 팀목록캐시]);
 
   const 정보저장 = async () => {
+    if (!편집모드 && !canRegisterNewStaff) {
+      return toast('신규 직원 등록 권한이 없습니다.', 'error');
+    }
     if (!신규직원.성명 || !신규직원.입사일 || 신규직원.입사일 === '0000-00-00' || 신규직원.입사일 === '') return toast('성함과 실제 입사일은 필수 입력 사항입니다.', 'warning');
     try {
       const actor = readClientAuditActor();
@@ -558,8 +569,10 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           )}
           <button
             type="button"
-            onClick={() => onOpenNewStaff && onOpenNewStaff()}
+            onClick={() => canRegisterNewStaff && onOpenNewStaff && onOpenNewStaff()}
             className="bg-[var(--accent)] text-white px-5 py-2.5 text-[11px] font-bold rounded-[var(--radius-md)] shadow-md hover:opacity-95 transition-all"
+            style={{ display: canRegisterNewStaff ? undefined : 'none' }}
+            disabled={!canRegisterNewStaff}
             data-testid="new-staff-button"
           >
             신규 직원 등록

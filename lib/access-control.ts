@@ -3,6 +3,7 @@ import { isNamedSystemMasterAccount } from '@/lib/system-master';
 type UserLike = {
   role?: string | null;
   company?: string | null;
+  status?: string | null;
   permissions?: Record<string, any> | null;
 };
 
@@ -65,6 +66,7 @@ const APPROVAL_PERMISSION_KEYS: Record<string, string> = {
 };
 
 const HR_PERMISSION_KEYS: Record<string, string> = {
+  '직원등록': 'hr_직원등록',
   구성원: 'hr_구성원',
   인사발령: 'hr_인사발령',
   '포상/징계': 'hr_포상징계',
@@ -125,6 +127,7 @@ const ADMIN_PERMISSION_KEYS: Record<string, string> = {
 };
 
 const LEGACY_PERMISSION_ALIASES: Record<string, string[]> = {
+  hr_직원등록: ['admin', 'hr'],
   menu_전자결재: ['approval'],
   menu_인사관리: ['hr'],
   menu_재고관리: ['inventory'],
@@ -289,6 +292,10 @@ export function isPrivilegedUser(user: UserLike | null | undefined): boolean {
 }
 
 export function canAccessMainMenu(user: UserLike | null | undefined, menuId: string): boolean {
+  // 퇴사자는 내정보/알림만 접근 가능 (급여명세서 확인 등)
+  if (user?.status === '퇴사') {
+    return menuId === '내정보' || menuId === '알림';
+  }
   switch (menuId as MainMenuId) {
     case '내정보':
     case '알림':
