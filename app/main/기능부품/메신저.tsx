@@ -46,6 +46,29 @@ function isVideoUrl(url: string): boolean {
   return /^(mp4|webm|mov|m4v|avi|mkv)$/.test(ext || '');
 }
 
+function guessFileExtension(file: File): string {
+  const rawName = String(file.name || '').trim();
+  const lastDotIndex = rawName.lastIndexOf('.');
+  if (lastDotIndex > -1 && lastDotIndex < rawName.length - 1) {
+    return rawName.slice(lastDotIndex + 1).toLowerCase();
+  }
+
+  const mime = String(file.type || '').toLowerCase();
+  const mimeMap: Record<string, string> = {
+    'image/png': 'png',
+    'image/jpeg': 'jpg',
+    'image/jpg': 'jpg',
+    'image/webp': 'webp',
+    'image/gif': 'gif',
+    'image/bmp': 'bmp',
+    'image/svg+xml': 'svg',
+    'application/pdf': 'pdf',
+    'text/plain': 'txt',
+    'application/zip': 'zip',
+  };
+  return mimeMap[mime] || 'bin';
+}
+
 function normalizeMemberIds(members: unknown): string[] {
   return Array.isArray(members) ? members.map((id: unknown) => String(id)) : [];
 }
@@ -780,7 +803,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   const toggleDept = (key: string) =>
     setExpandedDepts((prev) => {
       const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
 
@@ -1722,6 +1746,31 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         .update({ members: newMembers })
         .eq('id', selectedRoom.id);
 
+      const leaverName = user?.name || '이름 없음';
+      const leaveContent = `[퇴장] ${leaverName}님이 채팅방을 나갔습니다.`;
+      let leaveNoticeFailed = false;
+
+      try {
+        const { data: leaveMessage, error: leaveMessageError } = await supabase
+          .from('messages')
+          .insert([
+            {
+              room_id: selectedRoom.id,
+              sender_id: user?.id,
+              content: leaveContent,
+            },
+          ])
+          .select('id, room_id')
+          .single();
+        if (leaveMessageError) throw leaveMessageError;
+        if (leaveMessage?.id && leaveMessage?.room_id) {
+          await triggerChatPush(String(leaveMessage.room_id), String(leaveMessage.id));
+        }
+      } catch (leaveNoticeError) {
+        leaveNoticeFailed = true;
+        console.error('leave room system message error', leaveNoticeError);
+      }
+
       const leftRoomId = selectedRoom.id;
       // 방 목록에서 즉시 제거 (실시간 재로드로 덮어쓰이기 전에)
       setChatRooms((prev) => prev.filter(( room: ChatRoom) => room.id !== leftRoomId));
@@ -1732,7 +1781,11 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       });
       setRoom(null);
       setMessages([]);
-      toast('채팅방에서 나갔습니다.');
+      toast(
+        leaveNoticeFailed
+          ? '채팅방에서 나갔지만 퇴장 안내 메시지 저장은 실패했습니다.'
+          : '채팅방에서 나갔습니다.'
+      );
     } catch {
       toast('채팅방 나가기 중 오류가 발생했습니다.', 'error');
     }
@@ -1996,7 +2049,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     }
     setFileUploading(true);
     try {
-      const ext = file.name.split('.').pop() || 'bin';
+      const ext = guessFileExtension(file);
       const uuid = crypto.randomUUID();
       const path = `chat/${Date.now()}_${uuid}.${ext}`;
       const { error } = await supabase.storage.from(CHAT_BUCKET).upload(path, file, { upsert: false });
@@ -2024,6 +2077,23 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     await processFileUpload(file);
     e.target.value = '';
   };
+
+  const handleComposerPaste = useCallback(async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const clipboardItems = Array.from(e.clipboardData?.items || []);
+    if (clipboardItems.length === 0) return;
+
+    const imageFiles = clipboardItems
+      .filter((item) => item.kind === 'file' && String(item.type || '').startsWith('image/'))
+      .map((item) => item.getAsFile())
+      .filter((file): file is File => !!file);
+
+    if (imageFiles.length === 0) return;
+
+    e.preventDefault();
+    for (const imageFile of imageFiles) {
+      await processFileUpload(imageFile);
+    }
+  }, [processFileUpload]);
 
   const handleAction = async (type: 'task') => {
     if (!activeActionMsg) return;
@@ -3094,6 +3164,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   const value = e.target.value;
                   handleComposerChange(value, e.target.selectionStart ?? value.length);
                 }}
+                onPaste={handleComposerPaste}
                 onKeyDown={e => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
