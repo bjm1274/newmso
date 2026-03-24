@@ -134,6 +134,7 @@ const LEGACY_PERMISSION_ALIASES: Record<string, string[]> = {
   menu_관리자: ['admin'],
   extra_조직도: ['menu_조직도'],
   extra_입금실시간조회: ['menu_추가기능'],
+  extra_수술상담: ['menu_추가기능'],
   extra_인계노트: ['handover_read'],
   approval_기안함: ['approval'],
   approval_결재함: ['approval'],
