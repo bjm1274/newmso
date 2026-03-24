@@ -66,7 +66,10 @@ function createDraft(row: VirtualAccountDepositRow): DepositDraft {
   };
 }
 
+const TOSS_BANK_ACCOUNT = '1002-4939-3286';
+
 export default function RealtimeDepositView({ user }: { user?: any }) {
+  const [activeTab, setActiveTab] = useState<'list' | 'manual' | 'guide'>('list');
   const [rows, setRows] = useState<VirtualAccountDepositRow[]>([]);
   const [drafts, setDrafts] = useState<Record<string, DepositDraft>>({});
   const [loading, setLoading] = useState(true);
@@ -75,6 +78,22 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [depositStatus, setDepositStatus] = useState('all');
+
+  // 수동 입금 등록 상태
+  const [manualForm, setManualForm] = useState({
+    depositor_name: '',
+    amount: '',
+    patient_name: '',
+    transaction_label: '',
+    matched_note: '',
+    deposited_at: new Date().toISOString().slice(0, 16),
+  });
+  const [manualSaving, setManualSaving] = useState(false);
+  const [manualError, setManualError] = useState('');
+
+  // 웹훅 테스트 상태
+  const [webhookTesting, setWebhookTesting] = useState(false);
+  const [webhookTestResult, setWebhookTestResult] = useState<{ok: boolean; msg: string} | null>(null);
   const [matchStatus, setMatchStatus] = useState('all');
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [origin, setOrigin] = useState('');
@@ -177,6 +196,89 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
     };
   }, [rows]);
 
+  // 수동 입금 등록
+  const handleManualSubmit = async () => {
+    setManualError('');
+    if (!manualForm.depositor_name.trim()) { setManualError('입금자명을 입력해주세요.'); return; }
+    if (!manualForm.amount || Number(manualForm.amount.replace(/,/g, '')) <= 0) { setManualError('금액을 올바르게 입력해주세요.'); return; }
+
+    setManualSaving(true);
+    try {
+      const res = await fetch('/api/payments/virtual-account-deposits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...manualForm,
+          deposited_at: manualForm.deposited_at ? new Date(manualForm.deposited_at).toISOString() : undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '등록 실패');
+      setManualForm({ depositor_name: '', amount: '', patient_name: '', transaction_label: '', matched_note: '', deposited_at: new Date().toISOString().slice(0, 16) });
+      await loadDeposits({ silent: true });
+      setActiveTab('list');
+    } catch (e: any) {
+      setManualError(e.message);
+    } finally {
+      setManualSaving(false);
+    }
+  };
+
+  // 수동 등록건 삭제
+  const handleDeleteDeposit = async (id: string) => {
+    if (!confirm('이 입금 내역을 삭제하시겠습니까?')) return;
+    const res = await fetch(`/api/payments/virtual-account-deposits?id=${id}`, { method: 'DELETE' });
+    if (res.ok) await loadDeposits({ silent: true });
+  };
+
+  // 웹훅 테스트 발송
+  const handleTestWebhook = async () => {
+    setWebhookTesting(true);
+    setWebhookTestResult(null);
+    try {
+      const testPayload = {
+        eventType: 'DEPOSIT_CALLBACK',
+        eventId: `test_${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        data: {
+          paymentKey: `test_paymentKey_${Date.now()}`,
+          orderId: `test_order_${Date.now()}`,
+          orderName: '테스트 입금',
+          status: 'DONE',
+          totalAmount: 10000,
+          currency: 'KRW',
+          method: '가상계좌',
+          virtualAccount: {
+            accountType: 'NORMAL',
+            accountNumber: TOSS_BANK_ACCOUNT.replace(/-/g, ''),
+            bankCode: 'TOSS',
+            bank: '토스뱅크',
+            customerName: '테스트입금자',
+            dueDate: new Date(Date.now() + 86400000).toISOString(),
+          },
+          approvedAt: new Date().toISOString(),
+        },
+      };
+
+      const res = await fetch(`/api/payments/virtual-account-webhook?provider=toss`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(testPayload),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setWebhookTestResult({ ok: true, msg: `✅ 테스트 성공! 입금 ID: ${data.depositId ?? '-'}` });
+        await loadDeposits({ silent: true });
+      } else {
+        setWebhookTestResult({ ok: false, msg: `❌ ${data.error || '테스트 실패'}` });
+      }
+    } catch (e: any) {
+      setWebhookTestResult({ ok: false, msg: `❌ ${e.message}` });
+    } finally {
+      setWebhookTesting(false);
+    }
+  };
+
   const handleCopyWebhookUrl = async () => {
     if (!webhookUrl) return;
     try {
@@ -247,13 +349,17 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
 
   return (
     <div data-testid="realtime-deposit-view" className="space-y-4">
+      {/* 헤더 */}
       <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-1">
-            <h2 className="text-lg font-bold text-[var(--foreground)]">가상계좌 입금 실시간 조회</h2>
-            <p className="text-sm text-[var(--toss-gray-3)]">
-              환자 또는 거래건 기준으로 입금 내역을 확인하고 수기로 매칭할 수 있습니다.
-            </p>
+            <h2 className="text-lg font-bold text-[var(--foreground)]">입금 실시간 조회</h2>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-bold text-[var(--toss-gray-3)]">정산 계좌</span>
+              <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs font-black rounded-md border border-blue-200">
+                🏦 토스뱅크 {TOSS_BANK_ACCOUNT}
+              </span>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button
@@ -268,6 +374,185 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
         </div>
       </div>
 
+      {/* 탭 */}
+      <div className="flex gap-1 bg-[var(--muted)] rounded-xl p-1 w-fit">
+        {[
+          { id: 'list' as const, icon: '📋', label: `입금 내역${rows.length > 0 ? ` (${rows.length})` : ''}` },
+          { id: 'manual' as const, icon: '✏️', label: '수동 등록' },
+          { id: 'guide' as const, icon: '🔧', label: '연동 설정' },
+        ].map((t) => (
+          <button key={t.id} type="button" onClick={() => setActiveTab(t.id)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[12px] font-bold transition-all ${
+              activeTab === t.id ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm' : 'text-[var(--toss-gray-3)] hover:text-[var(--foreground)]'
+            }`}>
+            <span>{t.icon}</span><span>{t.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* ── 수동 입금 등록 탭 ─────────────────────────────────────────── */}
+      {activeTab === 'manual' && (
+        <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm space-y-4 animate-in fade-in duration-300">
+          <div>
+            <h3 className="text-base font-bold text-[var(--foreground)]">수동 입금 등록</h3>
+            <p className="text-xs text-[var(--toss-gray-3)] mt-1">토스뱅크 앱에서 확인한 입금 내역을 직접 등록합니다. 등록 후 입금 내역 탭에서 확인할 수 있습니다.</p>
+          </div>
+          {manualError && (
+            <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">{manualError}</div>
+          )}
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="space-y-1 text-sm">
+              <span className="font-semibold text-[var(--foreground)]">입금자명 <span className="text-red-500">*</span></span>
+              <input value={manualForm.depositor_name} onChange={e => setManualForm(p => ({...p, depositor_name: e.target.value}))}
+                placeholder="홍길동" className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+            </label>
+            <label className="space-y-1 text-sm">
+              <span className="font-semibold text-[var(--foreground)]">금액 (원) <span className="text-red-500">*</span></span>
+              <input value={manualForm.amount} onChange={e => setManualForm(p => ({...p, amount: e.target.value}))}
+                placeholder="50000" type="number" className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+            </label>
+            <label className="space-y-1 text-sm">
+              <span className="font-semibold text-[var(--foreground)]">환자명</span>
+              <input value={manualForm.patient_name} onChange={e => setManualForm(p => ({...p, patient_name: e.target.value}))}
+                placeholder="홍길동" className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+            </label>
+            <label className="space-y-1 text-sm">
+              <span className="font-semibold text-[var(--foreground)]">거래 내용</span>
+              <input value={manualForm.transaction_label} onChange={e => setManualForm(p => ({...p, transaction_label: e.target.value}))}
+                placeholder="무릎 수술 수납금" className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+            </label>
+            <label className="space-y-1 text-sm md:col-span-2">
+              <span className="font-semibold text-[var(--foreground)]">입금 일시</span>
+              <input value={manualForm.deposited_at} onChange={e => setManualForm(p => ({...p, deposited_at: e.target.value}))}
+                type="datetime-local" className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+            </label>
+            <label className="space-y-1 text-sm md:col-span-2">
+              <span className="font-semibold text-[var(--foreground)]">메모</span>
+              <textarea value={manualForm.matched_note} onChange={e => setManualForm(p => ({...p, matched_note: e.target.value}))}
+                rows={2} placeholder="추가 메모" className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]" />
+            </label>
+          </div>
+          <button type="button" onClick={handleManualSubmit} disabled={manualSaving}
+            className="w-full py-3 bg-[var(--accent)] text-white font-bold text-sm rounded-xl hover:opacity-90 disabled:opacity-60 transition">
+            {manualSaving ? '등록 중...' : '✅ 입금 내역 등록'}
+          </button>
+        </div>
+      )}
+
+      {/* ── 연동 설정 탭 ──────────────────────────────────────────────── */}
+      {activeTab === 'guide' && (
+        <div className="space-y-4 animate-in fade-in duration-300">
+          {/* 웹훅 URL */}
+          <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
+            <p className="text-sm font-bold text-[var(--foreground)] mb-1">📡 웹훅 URL (토스페이먼츠 등록용)</p>
+            <p className="break-all text-xs text-[var(--toss-gray-3)] mb-3 bg-[var(--muted)] p-2 rounded-lg font-mono">
+              {webhookUrl || '브라우저 주소 불러오는 중...'}
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              <button type="button" onClick={handleCopyWebhookUrl}
+                className="px-3 py-2 bg-[var(--accent)] text-white text-sm font-semibold rounded-lg hover:opacity-90 transition">
+                {copied ? '✅ 복사됨' : '📋 URL 복사'}
+              </button>
+              <button type="button" onClick={handleTestWebhook} disabled={webhookTesting}
+                className="px-3 py-2 bg-emerald-500 text-white text-sm font-semibold rounded-lg hover:opacity-90 disabled:opacity-60 transition">
+                {webhookTesting ? '테스트 중...' : '🧪 웹훅 테스트'}
+              </button>
+            </div>
+            {webhookTestResult && (
+              <p className={`mt-2 text-sm font-semibold ${webhookTestResult.ok ? 'text-emerald-600' : 'text-red-600'}`}>
+                {webhookTestResult.msg}
+              </p>
+            )}
+            <div className="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800 leading-5">
+              ⚠️ <strong>DEPOSIT_CALLBACK</strong> 이벤트만 등록을 권장합니다. PAYMENT_STATUS_CHANGED를 함께 등록하면 중복 수신될 수 있습니다.
+            </div>
+          </div>
+
+          {/* 단계별 가이드 */}
+          <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm space-y-4">
+            <h3 className="text-sm font-bold text-[var(--foreground)]">🔧 토스페이먼츠 웹훅 연동 단계별 가이드</h3>
+
+            {[
+              {
+                step: 1,
+                title: '토스페이먼츠 가맹점 가입',
+                color: 'blue',
+                content: (
+                  <div className="space-y-1 text-xs">
+                    <p>👉 <a href="https://developers.tosspayments.com" target="_blank" rel="noopener noreferrer" className="text-[var(--accent)] underline">developers.tosspayments.com</a> 접속 → 가맹점 신청</p>
+                    <p>• 사업자등록증 / 통장사본 (토스뱅크 {TOSS_BANK_ACCOUNT}) 필요</p>
+                    <p>• 심사 후 <strong>시크릿 키(Secret Key)</strong>와 <strong>클라이언트 키</strong> 발급</p>
+                  </div>
+                ),
+              },
+              {
+                step: 2,
+                title: '웹훅 URL 등록',
+                color: 'violet',
+                content: (
+                  <div className="space-y-1 text-xs">
+                    <p>개발자센터 → 내 상점 → 웹훅 → URL 추가</p>
+                    <p className="font-mono bg-[var(--muted)] p-1.5 rounded text-[11px] break-all">{webhookUrl}</p>
+                    <p>• 이벤트: <strong>DEPOSIT_CALLBACK</strong> 선택</p>
+                    <p>• 웹훅 시크릿 발급 시 아래 토큰과 동일하게 설정</p>
+                    <p className="font-mono bg-yellow-50 border border-yellow-200 p-1.5 rounded text-[11px] break-all">
+                      a382ddced410e85277f311353a8eb8d930f8a78a28135b5000673320ae3e1b02
+                    </p>
+                  </div>
+                ),
+              },
+              {
+                step: 3,
+                title: 'Vercel 환경변수 등록',
+                color: 'teal',
+                content: (
+                  <div className="space-y-1 text-xs">
+                    <p>Vercel 대시보드 → Settings → Environment Variables</p>
+                    <div className="bg-[var(--muted)] p-2 rounded space-y-1 font-mono text-[11px]">
+                      <p><strong>VIRTUAL_ACCOUNT_WEBHOOK_TOKEN</strong></p>
+                      <p className="text-[var(--toss-gray-3)]">= a382ddced...b02 (위 토큰)</p>
+                      <p className="mt-1"><strong>TOSS_PAYMENTS_SECRET_KEY</strong></p>
+                      <p className="text-[var(--toss-gray-3)]">= 가맹점 가입 후 발급받은 시크릿 키</p>
+                    </div>
+                  </div>
+                ),
+              },
+              {
+                step: 4,
+                title: '가상계좌 발급 → 입금 자동 수신',
+                color: 'emerald',
+                content: (
+                  <div className="space-y-1 text-xs">
+                    <p>환자에게 결제 요청 시 <strong>가상계좌번호</strong>를 발급</p>
+                    <p>환자가 해당 가상계좌에 입금하면 → 토스페이먼츠 → 웹훅 발송 → 이 화면에 자동 표시</p>
+                    <p>정산금은 지정한 <strong>토스뱅크 {TOSS_BANK_ACCOUNT}</strong> 계좌로 입금</p>
+                    <p className="text-emerald-700 font-semibold">✅ 웹훅 테스트 버튼으로 미리 동작 확인 가능</p>
+                  </div>
+                ),
+              },
+            ].map(({ step, title, color, content }) => (
+              <div key={step} className={`rounded-xl border p-3.5 ${
+                color === 'blue' ? 'bg-blue-50 border-blue-200' :
+                color === 'violet' ? 'bg-violet-50 border-violet-200' :
+                color === 'teal' ? 'bg-teal-50 border-teal-200' :
+                'bg-emerald-50 border-emerald-200'
+              }`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={`w-5 h-5 rounded-full text-white text-[10px] font-black flex items-center justify-center ${
+                    color === 'blue' ? 'bg-blue-500' :
+                    color === 'violet' ? 'bg-violet-500' :
+                    color === 'teal' ? 'bg-teal-500' : 'bg-emerald-500'
+                  }`}>{step}</span>
+                  <span className="text-sm font-bold text-[var(--foreground)]">{title}</span>
+                </div>
+                {content}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'list' && <>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
           <p className="text-xs font-semibold text-[var(--toss-gray-3)]">전체 입금건</p>
@@ -287,34 +572,6 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
         </div>
       </div>
 
-      <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <div className="space-y-1">
-            <p className="text-sm font-semibold text-[var(--foreground)]">현재 회사 웹훅 URL</p>
-            <p className="break-all text-xs text-[var(--toss-gray-3)]">
-              {webhookUrl || '브라우저 주소를 불러오는 중입니다.'}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              data-testid="realtime-deposit-copy-webhook"
-              onClick={handleCopyWebhookUrl}
-              className="rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-2 text-sm font-semibold text-white transition hover:opacity-90"
-            >
-              URL 복사
-            </button>
-            {copied ? (
-              <span className="text-xs font-semibold text-emerald-600">복사됨</span>
-            ) : null}
-          </div>
-        </div>
-        <div className="mt-3 rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-3 text-xs leading-5 text-[var(--toss-gray-2)]">
-          토스 개발자센터에서는 가상계좌 웹훅으로 <span className="font-semibold text-[var(--foreground)]">DEPOSIT_CALLBACK</span>만
-          등록하는 것을 권장합니다. <span className="font-semibold text-[var(--foreground)]">PAYMENT_STATUS_CHANGED</span>까지
-          함께 등록하면 같은 결제건이 중복으로 들어올 수 있습니다.
-        </div>
-      </div>
 
       <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
         <div className="grid gap-3 lg:grid-cols-[1.4fr_0.8fr_0.8fr]">
@@ -529,12 +786,19 @@ export default function RealtimeDepositView({ user }: { user?: any }) {
                   >
                     {savingId === row.id ? '저장 중...' : '매칭 저장'}
                   </button>
+                  {row.provider === 'manual' && (
+                    <button type="button" onClick={() => handleDeleteDeposit(row.id)}
+                      className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-100">
+                      🗑️ 삭제
+                    </button>
+                  )}
                 </div>
               </article>
             );
           })}
         </div>
       )}
+      </>}
     </div>
   );
 }

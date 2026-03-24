@@ -84,6 +84,10 @@ function normalizeScheduleTimeValue(value: unknown) {
   return matched ? matched[1] : raw;
 }
 
+function isScheduleBoardType(boardType: unknown) {
+  return boardType === '수술일정' || boardType === 'MRI일정';
+}
+
 function extractScheduleMetaFromContent(value: unknown) {
   const raw = String(value ?? '');
   const start = raw.indexOf(SCHEDULE_META_PREFIX);
@@ -92,6 +96,7 @@ function extractScheduleMetaFromContent(value: unknown) {
     return {
       displayContent: raw.trim(),
       meta: null as ScheduleMetaPayload | null,
+      hasEmbeddedMeta: false,
     };
   }
 
@@ -100,9 +105,9 @@ function extractScheduleMetaFromContent(value: unknown) {
 
   try {
     const parsed = JSON.parse(metaText) as ScheduleMetaPayload;
-    return { displayContent, meta: parsed };
+    return { displayContent, meta: parsed, hasEmbeddedMeta: true };
   } catch {
-    return { displayContent, meta: null as ScheduleMetaPayload | null };
+    return { displayContent, meta: null as ScheduleMetaPayload | null, hasEmbeddedMeta: true };
   }
 }
 
@@ -113,13 +118,16 @@ function buildScheduleMetaContent(chartNo: string, meta: ScheduleMetaPayload) {
 
 function normalizeBoardPost<T extends Partial<BoardPost>>(post: T): T {
   if (!post) return post;
-  const { displayContent, meta } = extractScheduleMetaFromContent(post.content ?? '');
+  const { displayContent, meta, hasEmbeddedMeta } = extractScheduleMetaFromContent(post.content ?? '');
+  const normalizedScheduleDate = normalizeScheduleDateValue(post.schedule_date ?? meta?.date ?? '');
+  const normalizedScheduleTime = normalizeScheduleTimeValue(post.schedule_time ?? meta?.time ?? '');
+  const scheduleMetaLegacyMissing = isScheduleBoardType(post.board_type) && !normalizedScheduleDate && !hasEmbeddedMeta;
 
   return {
     ...post,
     content: displayContent,
-    schedule_date: normalizeScheduleDateValue(post.schedule_date ?? meta?.date ?? ''),
-    schedule_time: normalizeScheduleTimeValue(post.schedule_time ?? meta?.time ?? ''),
+    schedule_date: normalizedScheduleDate,
+    schedule_time: normalizedScheduleTime,
     schedule_room: String(post.schedule_room ?? meta?.room ?? '').trim(),
     patient_name: String(post.patient_name ?? meta?.patient ?? '').trim(),
     surgery_fasting: typeof post.surgery_fasting === 'boolean' ? post.surgery_fasting : Boolean(meta?.fasting),
@@ -131,6 +139,8 @@ function normalizeBoardPost<T extends Partial<BoardPost>>(post: T): T {
       typeof post.mri_contrast_required === 'boolean'
         ? post.mri_contrast_required
         : Boolean(meta?.contrast),
+    schedule_meta_embedded: hasEmbeddedMeta,
+    schedule_meta_legacy_missing: scheduleMetaLegacyMissing,
   };
 }
 
@@ -350,6 +360,21 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       toKey,
     };
   }, [activeBoard, posts, deferredSearchKeyword, calendarMonth]);
+
+  const legacySchedulePosts = useMemo(
+    () =>
+      activeBoard === '수술일정' || activeBoard === 'MRI일정'
+        ? posts.filter((post) => Boolean((post as Record<string, unknown>).schedule_meta_legacy_missing))
+        : [],
+    [activeBoard, posts]
+  );
+  const normalizedDraftScheduleDate = useMemo(() => normalizeScheduleDateValue(scheduleDate), [scheduleDate]);
+  const normalizedDraftScheduleTime = useMemo(
+    () => normalizeScheduleTimeValue(buildScheduleTimeValue(schedulePeriod, scheduleHour, scheduleMinute) || scheduleTime),
+    [scheduleHour, scheduleMinute, schedulePeriod, scheduleTime]
+  );
+  const isScheduleBoard = activeBoard === '수술일정' || activeBoard === 'MRI일정';
+  const isScheduleDraftReady = !isScheduleBoard || Boolean(title.trim() && normalizedDraftScheduleDate && normalizedDraftScheduleTime);
 
   // 오전/오후 + 시/분 드롭다운 값을 HH:MM 문자열로 변환
   const updateScheduleTime = (period: string, hour: string, minute: string) => {
@@ -1532,10 +1557,16 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                 )}
               </div>
 
+              {isScheduleBoard && !normalizedDraftScheduleDate && (
+                <p className="text-[11px] font-semibold text-red-500">
+                  날짜를 선택해야만 수술일정/MRI일정을 등록할 수 있습니다.
+                </p>
+              )}
+
               <button
                 data-testid="board-new-post-submit"
                 onClick={handleNewPost}
-                disabled={loading}
+                disabled={loading || !isScheduleDraftReady}
                 className="w-full py-4 bg-[var(--accent)] text-white rounded-[var(--radius-md)] font-bold text-sm shadow-sm hover:opacity-95 active:scale-[0.99] transition-all disabled:opacity-50"
               >
                 {loading ? '등록 중...' : '게시물 등록'}
@@ -1722,6 +1753,31 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                   </div>
                 </div>
               </div>
+
+              {legacySchedulePosts.length > 0 && (
+                <div
+                  data-testid="board-legacy-schedule-warning"
+                  className="rounded-[var(--radius-md)] border border-amber-200 bg-amber-50 px-3 py-3 text-[11px] text-amber-800"
+                >
+                  <p className="font-bold">일정 정보가 빠진 예전 게시물이 있어 달력에 표시되지 않습니다.</p>
+                  <p className="mt-1 font-semibold text-amber-700">
+                    아래 게시물은 날짜와 시간이 저장되지 않아 수정 후 다시 저장해야 합니다.
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {legacySchedulePosts.slice(0, 8).map((post) => (
+                      <button
+                        key={post.id}
+                        type="button"
+                        data-testid={`board-legacy-schedule-item-${post.id}`}
+                        onClick={() => setSelectedPostId(post.id)}
+                        className="rounded-[var(--radius-md)] border border-amber-200 bg-white px-2 py-1 text-[11px] font-bold text-amber-800 hover:bg-amber-100"
+                      >
+                        {post.title || '제목 없음'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {(() => {
                 const { filteredPosts, eventsByDate, days, month, toKey } = scheduleCalendarData;
@@ -2046,6 +2102,14 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
 
                 {(selectedPost.board_type === '수술일정' || selectedPost.board_type === 'MRI일정') && (
                   <div className="space-y-4 border-t border-[var(--border)] pt-4">
+                    {Boolean((selectedPost as Record<string, unknown>).schedule_meta_legacy_missing) && (
+                      <div
+                        data-testid="board-schedule-legacy-warning"
+                        className="rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-3 py-3 text-[11px] font-semibold text-red-700"
+                      >
+                        이 일정은 예전에 날짜/시간 없이 저장되어 달력에 표시되지 않습니다. 수정 버튼을 눌러 일정 정보를 다시 입력한 뒤 저장해 주세요.
+                      </div>
+                    )}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-[11px] font-bold text-[var(--toss-gray-4)]">
                       <div>
                         <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">수술/검사명</p>

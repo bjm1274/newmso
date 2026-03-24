@@ -84,6 +84,110 @@ export async function GET(request: NextRequest) {
   }
 }
 
+export async function POST(request: NextRequest) {
+  try {
+    const session = await readSessionFromRequest(request);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+    if (!body) return NextResponse.json({ error: '요청 데이터가 없습니다.' }, { status: 400 });
+
+    const amount = Number(String(body.amount || '0').replace(/,/g, ''));
+    if (!amount || amount <= 0) {
+      return NextResponse.json({ error: '금액을 올바르게 입력해주세요.' }, { status: 400 });
+    }
+
+    const depositorName = String(body.depositor_name || '').trim();
+    if (!depositorName) {
+      return NextResponse.json({ error: '입금자명을 입력해주세요.' }, { status: 400 });
+    }
+
+    const companyId = String(session.user.company_id || '').trim() || null;
+    const now = new Date().toISOString();
+    const dedupeKey = `manual:${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+    const supabase = getAdminClient();
+    const { data, error } = await supabase
+      .from('virtual_account_deposits')
+      .insert({
+        company_id: companyId,
+        provider: 'manual',
+        dedupe_key: dedupeKey,
+        provider_event_type: 'MANUAL_ENTRY',
+        order_id: String(body.order_id || '').trim() || null,
+        order_name: String(body.order_name || '').trim() || null,
+        payment_key: null,
+        transaction_key: null,
+        method: 'manual',
+        deposit_status: 'deposited',
+        match_status: 'unmatched',
+        amount,
+        currency: 'KRW',
+        depositor_name: depositorName,
+        customer_name: depositorName,
+        patient_name: String(body.patient_name || '').trim() || null,
+        patient_id: String(body.patient_id || '').trim() || null,
+        transaction_label: String(body.transaction_label || '').trim() || null,
+        bank_code: 'TOSS',
+        bank_name: '토스뱅크',
+        account_number: '1002-4939-3286',
+        due_date: null,
+        deposited_at: String(body.deposited_at || '').trim() || now,
+        matched_target_type: null,
+        matched_target_id: null,
+        matched_note: String(body.matched_note || '').trim() || null,
+        raw_payload: { source: 'manual', entered_by: session.user.id, ...body },
+        created_at: now,
+        updated_at: now,
+      })
+      .select('*')
+      .single();
+
+    if (error) {
+      return NextResponse.json({ error: '수동 입금 등록 중 오류가 발생했습니다.' }, { status: 500 });
+    }
+
+    return NextResponse.json({ deposit: data });
+  } catch {
+    return NextResponse.json({ error: '수동 입금 등록 중 오류가 발생했습니다.' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const session = await readSessionFromRequest(request);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const url = new URL(request.url);
+    const id = url.searchParams.get('id');
+    if (!id) return NextResponse.json({ error: 'ID가 필요합니다.' }, { status: 400 });
+
+    const supabase = getAdminClient();
+    const companyId = String(session.user.company_id || '').trim();
+
+    // 수동 등록된 건만 삭제 가능
+    let q = supabase.from('virtual_account_deposits')
+      .delete()
+      .eq('id', id)
+      .eq('provider', 'manual');
+
+    if (companyId && session.user.is_system_master !== true) {
+      q = q.eq('company_id', companyId) as typeof q;
+    }
+
+    const { error } = await q;
+    if (error) return NextResponse.json({ error: '삭제 중 오류가 발생했습니다.' }, { status: 500 });
+
+    return NextResponse.json({ ok: true });
+  } catch {
+    return NextResponse.json({ error: '삭제 중 오류가 발생했습니다.' }, { status: 500 });
+  }
+}
+
 export async function PATCH(request: NextRequest) {
   try {
     const session = await readSessionFromRequest(request);
