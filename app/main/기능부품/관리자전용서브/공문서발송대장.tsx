@@ -93,9 +93,23 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
     setSaving(true);
     setMessage(null);
     try {
+      // 신규 등록 시 문서번호 자동 채번
+      let docNumber = form.doc_number || '';
+      if (!editingDoc?.id && !docNumber) {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const prefix = `공문-${year}${month}`;
+        const { count } = await supabase
+          .from('official_doc_log')
+          .select('*', { count: 'exact', head: true })
+          .like('doc_number', `${prefix}%`);
+        const seq = String((count ?? 0) + 1).padStart(3, '0');
+        docNumber = `${prefix}-${seq}`;
+      }
       const payload = {
         sent_date: form.sent_date,
-        doc_number: form.doc_number || '',
+        doc_number: docNumber,
         title: form.title,
         recipient: form.recipient,
         manager: form.manager || '',
@@ -213,7 +227,7 @@ export default function OfficialDocumentLog({ staffs, selectedCo, user }: Props)
                 type="text"
                 value={form.doc_number ?? ''}
                 onChange={(e) => setForm((p) => ({ ...p, doc_number: e.target.value }))}
-                placeholder="예: 행정-2026-001"
+                placeholder="비워두면 자동 채번 (공문-202603-001)"
                 className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded-[var(--radius-md)] bg-[var(--card)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
               />
             </div>

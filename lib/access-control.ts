@@ -60,6 +60,7 @@ const BOARD_PERMISSION_KEYS: Record<string, { read: string; write: string }> = {
 const APPROVAL_PERMISSION_KEYS: Record<string, string> = {
   기안함: 'approval_기안함',
   결재함: 'approval_결재함',
+  '참조 문서함': 'approval_참조문서함',
   작성하기: 'approval_작성하기',
 };
 
@@ -133,6 +134,7 @@ const LEGACY_PERMISSION_ALIASES: Record<string, string[]> = {
   extra_인계노트: ['handover_read'],
   approval_기안함: ['approval'],
   approval_결재함: ['approval'],
+  approval_참조문서함: ['approval'],
   approval_작성하기: ['approval'],
   hr_구성원: ['hr'],
   hr_인사발령: ['hr_구성원', 'hr'],

@@ -327,6 +327,8 @@ test('discharge review can save a template, create a review, and approve it', as
   await page.getByTestId('discharge-create-review').click();
 
   await expect(page.getByTestId('discharge-review-detail')).toBeVisible();
+  await expect(page.getByTestId('discharge-rule-analysis')).toBeVisible();
+  await expect(page.getByTestId('discharge-rule-issue-0')).toBeVisible();
   await page.getByTestId('discharge-review-toggle-all').click();
   await page.getByTestId('discharge-review-approve').click();
   await expect(page.getByTestId('discharge-review-approve')).toBeHidden();

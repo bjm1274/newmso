@@ -32,7 +32,16 @@
       "Bash(xargs file:*)",
       "Bash(xargs wc:*)",
       "Bash(node -e \"const bcrypt = require\\(''bcryptjs''\\); bcrypt.hash\\(''ghemrdk1!!'', 12\\).then\\(h => console.log\\(h\\)\\);\")",
-      "Bash(node -e \":*)"
+      "Bash(node -e \":*)",
+      "Bash(/tmp/check_report.txt:*)",
+      "Read(//tmp/**)",
+      "Bash(find /c/Users/baek_/newmso -type f -name *메신저* -o -name *message* -o -name *chat*)",
+      "Bash(find /c/Users/baek_/newmso -name *.sql -type f)",
+      "Bash(find C:/Users/baek_/newmso/lib -type f -name *.ts -o -name *.tsx)",
+      "Bash(find C:/Users/baek_/newmso/app/main/기능부품 -type f -name *.tsx -o -name *.ts)",
+      "Bash(find C:/Users/baek_/newmso/app/api -type f -name *.ts -o -name *.tsx)",
+      "Bash(find C:/Users/baek_/newmso/supabase -type f -name *.sql)",
+      "Bash(find C:/Users/baek_/newmso/supabase_migrations -type f -name *.sql)"
     ]
   }
 }

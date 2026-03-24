@@ -126,6 +126,12 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   const deferredSearchKeyword = useDeferredValue(searchKeyword);
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
+  const [isAnonymous, setIsAnonymous] = useState(false);
+  const [hasPoll, setHasPoll] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
+  const [pollAnonymous, setPollAnonymous] = useState(false);
+  const [pollMultiple, setPollMultiple] = useState(false);
   const [schedulePeriod, setSchedulePeriod] = useState('');
   const [scheduleHour, setScheduleHour] = useState('');
   const [scheduleMinute, setScheduleMinute] = useState('');
@@ -133,6 +139,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
   const [comments, setComments] = useState<Record<string, Record<string, unknown>[]>>({});
   const [newComment, setNewComment] = useState('');
+  const [myLikedPostIds, setMyLikedPostIds] = useState<Set<string>>(new Set());
 
   // 수술/검사명 프리셋 (Supabase surgery_templates / mri_templates)
   const [surgeryTemplates, setSurgeryTemplates] = useState<Record<string, unknown>[]>([]);
@@ -389,6 +396,12 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
 
   useEffect(() => {
     fetchPosts();
+    // 내 좋아요 목록 로드
+    if (user?.id) {
+      supabase.from('board_post_likes').select('post_id').eq('user_id', user.id).then(({ data }) => {
+        setMyLikedPostIds(new Set((data || []).map((r: any) => r.post_id)));
+      });
+    }
     // 다른 게시판에서 다시 수술/MRI 일정으로 돌아올 때는 현재 월 기준으로 달력 리셋
     if (activeBoard === '수술일정' || activeBoard === 'MRI일정') {
       setCalendarMonth(new Date());
@@ -472,11 +485,33 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     }
   };
 
+  const [likingPostId, setLikingPostId] = useState<string | null>(null);
   const handleLike = async (post: BoardPost) => {
+    if (!user?.id || likingPostId) return;
     const postId = post.id;
-    const likes = (post.likes_count ?? 0) + 1;
-    await supabase.from('board_posts').update({ likes_count: likes }).eq('id', postId);
-    setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, likes_count: likes } : p)));
+    setLikingPostId(postId);
+    try {
+    const isLiked = myLikedPostIds.has(postId);
+    if (isLiked) {
+      // 이미 좋아요 → 취소
+      await supabase.from('board_post_likes').delete().eq('post_id', postId).eq('user_id', user.id);
+      const likes = Math.max((post.likes_count ?? 1) - 1, 0);
+      await supabase.from('board_posts').update({ likes_count: likes }).eq('id', postId);
+      setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, likes_count: likes } : p)));
+      setSelectedPostDetail((prev: BoardPost | null) => prev?.id === postId ? { ...prev, likes_count: likes } : prev);
+      setMyLikedPostIds((prev) => { const next = new Set(prev); next.delete(postId); return next; });
+    } else {
+      // 좋아요 추가
+      await supabase.from('board_post_likes').insert([{ post_id: postId, user_id: user.id }]);
+      const likes = (post.likes_count ?? 0) + 1;
+      await supabase.from('board_posts').update({ likes_count: likes }).eq('id', postId);
+      setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, likes_count: likes } : p)));
+      setSelectedPostDetail((prev: BoardPost | null) => prev?.id === postId ? { ...prev, likes_count: likes } : prev);
+      setMyLikedPostIds((prev) => new Set([...prev, postId]));
+    }
+    } finally {
+      setLikingPostId(null);
+    }
   };
 
   const handleAddComment = async (postId: string, parentCommentId?: string | null) => {
@@ -521,6 +556,8 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
       return;
     }
     if (!confirm('이 댓글을 삭제할까요?')) return;
+    // 자식 댓글 먼저 DB에서 삭제
+    await supabase.from('board_post_comments').delete().eq('parent_comment_id', commentId);
     const { error } = await supabase.from('board_post_comments').delete().eq('id', commentId);
     if (error) {
       console.error('댓글 삭제 실패:', error);
@@ -587,17 +624,21 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
 
     (async () => {
       try {
-        const { data: row } = await supabase.from('board_posts').select('views').eq('id', selectedPostId).maybeSingle();
-        const currentViews = (row?.views ?? 0) as number;
-        const nextViews = currentViews + 1;
-        await supabase.from('board_posts').update({ views: nextViews }).eq('id', selectedPostId);
-        setPosts((prev) =>
+        // 원자적 조회수 증가 (RPC fallback)
+        const { error: rpcErr } = await supabase.rpc('increment_post_views', { p_post_id: selectedPostId });
+        if (rpcErr) {
+          const { data: row } = await supabase.from('board_posts').select('views').eq('id', selectedPostId).maybeSingle();
+          const nextViews = ((row?.views ?? 0) as number) + 1;
+          await supabase.from('board_posts').update({ views: nextViews }).eq('id', selectedPostId);
+        }
+        // UI 낙관적 업데이트
+        const increment = (prev: BoardPost[]) =>
           prev.map((p: BoardPost) =>
-            p.id === selectedPostId ? { ...p, views: nextViews } : p
-          )
-        );
+            p.id === selectedPostId ? { ...p, views: ((p.views ?? 0) as number) + 1 } : p
+          );
+        setPosts(increment);
         setSelectedPostDetail((prev: BoardPost | null) =>
-          prev && prev.id === selectedPostId ? { ...prev, views: nextViews } : prev
+          prev && prev.id === selectedPostId ? { ...prev, views: ((prev.views ?? 0) as number) + 1 } : prev
         );
       } catch {
         // 조회수 업데이트 실패는 무시
@@ -743,6 +784,12 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     setScheduleSide('');
     setAttachmentFiles([]);
     setTagsInput('');
+    setIsAnonymous(false);
+    setHasPoll(false);
+    setPollQuestion('');
+    setPollOptions(['', '']);
+    setPollAnonymous(false);
+    setPollMultiple(false);
     setEditingPostId(null);
   };
 
@@ -770,17 +817,34 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     setLoading(true);
     try {
       const tags = tagsInput ? tagsInput.split(',').map((t) => t.trim()).filter(Boolean) : [];
+      const useAnonymous = activeBoard === '익명소리함' || isAnonymous;
       const postData: Partial<BoardPost> & Record<string, unknown> = {
         board_type: activeBoard,
         title: normalizedTitle,
         content: isScheduleBoard ? normalizedScheduleChartNo || null : normalizedContent || null,
         company: user?.company || null,
         tags: tags,
-        author_name: activeBoard === '익명소리함' ? '익명' : (user?.name || '익명'),
-        author_id: activeBoard === '익명소리함' ? null : user?.id,
+        author_name: useAnonymous ? '익명' : (user?.name || '익명'),
+        author_id: useAnonymous ? null : user?.id,
+        is_anonymous: useAnonymous,
         likes_count: 0,
         created_at: new Date().toISOString(),
       };
+      // 투표 데이터 포함
+      if (hasPoll) {
+        const validOptions = pollOptions.map((o) => o.trim()).filter(Boolean);
+        if (validOptions.length < 2) {
+          toast('투표 항목을 2개 이상 입력해주세요.', 'warning');
+          setLoading(false);
+          return;
+        }
+        postData.poll = {
+          question: pollQuestion.trim() || normalizedTitle,
+          options: validOptions,
+          anonymous: pollAnonymous,
+          multiple: pollMultiple,
+        };
+      }
       if (user?.company_id) {
         postData.company_id = user.company_id;
       }
@@ -1204,6 +1268,62 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                         className="w-full h-32 md:h-48 p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] border-none outline-none text-sm font-bold leading-relaxed focus:ring-2 focus:ring-[var(--accent)]/20 resize-none"
                       />
                     </div>
+                    {/* 익명 작성 + 투표 옵션 */}
+                    {activeBoard !== '익명소리함' && (
+                      <div className="flex flex-wrap gap-4 items-center py-2">
+                        <label className="inline-flex items-center gap-2 cursor-pointer text-sm font-bold text-[var(--toss-gray-4)]">
+                          <input type="checkbox" checked={isAnonymous} onChange={(e) => setIsAnonymous(e.target.checked)} className="w-4 h-4 rounded border-[var(--border)] accent-[var(--accent)]" />
+                          익명 작성
+                        </label>
+                        <label className="inline-flex items-center gap-2 cursor-pointer text-sm font-bold text-[var(--toss-gray-4)]">
+                          <input type="checkbox" checked={hasPoll} onChange={(e) => setHasPoll(e.target.checked)} className="w-4 h-4 rounded border-[var(--border)] accent-[var(--accent)]" />
+                          투표 추가
+                        </label>
+                      </div>
+                    )}
+
+                    {/* 투표 설정 폼 */}
+                    {hasPoll && (
+                      <div className="rounded-xl border border-[var(--accent)]/20 bg-[var(--toss-blue-light)]/30 p-4 space-y-3">
+                        <p className="text-xs font-bold text-[var(--accent)]">투표 설정</p>
+                        <input
+                          value={pollQuestion}
+                          onChange={(e) => setPollQuestion(e.target.value)}
+                          placeholder="투표 질문 (비워두면 게시글 제목 사용)"
+                          className="w-full p-3 bg-[var(--card)] rounded-lg border border-[var(--border)] outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20"
+                        />
+                        <div className="space-y-2">
+                          {pollOptions.map((opt, i) => (
+                            <div key={i} className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-[var(--toss-gray-3)] w-5 text-center">{i + 1}</span>
+                              <input
+                                value={opt}
+                                onChange={(e) => setPollOptions((prev) => prev.map((o, idx) => idx === i ? e.target.value : o))}
+                                placeholder={`항목 ${i + 1}`}
+                                className="flex-1 p-2.5 bg-[var(--card)] rounded-lg border border-[var(--border)] outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20"
+                              />
+                              {pollOptions.length > 2 && (
+                                <button type="button" onClick={() => setPollOptions((prev) => prev.filter((_, idx) => idx !== i))} className="text-red-500 text-xs font-bold hover:text-red-700">삭제</button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        {pollOptions.length < 10 && (
+                          <button type="button" onClick={() => setPollOptions((prev) => [...prev, ''])} className="text-xs font-bold text-[var(--accent)] hover:underline">+ 항목 추가</button>
+                        )}
+                        <div className="flex flex-wrap gap-4">
+                          <label className="inline-flex items-center gap-2 cursor-pointer text-xs font-bold text-[var(--toss-gray-4)]">
+                            <input type="checkbox" checked={pollAnonymous} onChange={(e) => setPollAnonymous(e.target.checked)} className="w-4 h-4 rounded accent-[var(--accent)]" />
+                            익명 투표
+                          </label>
+                          <label className="inline-flex items-center gap-2 cursor-pointer text-xs font-bold text-[var(--toss-gray-4)]">
+                            <input type="checkbox" checked={pollMultiple} onChange={(e) => setPollMultiple(e.target.checked)} className="w-4 h-4 rounded accent-[var(--accent)]" />
+                            복수 선택 허용
+                          </label>
+                        </div>
+                      </div>
+                    )}
+
                     <div>
                       <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">사진·동영상·파일 첨부</label>
                       <input
@@ -1633,6 +1753,13 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                           <div className="w-14 text-[11px] font-bold text-[var(--toss-gray-3)] text-center shrink-0">
                             조회 {(post.views as number) ?? 0}
                           </div>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleLike(post); }}
+                            className={`w-14 text-[11px] font-bold text-center shrink-0 transition ${myLikedPostIds.has(post.id) ? 'text-red-500' : 'text-[var(--toss-gray-3)] hover:text-red-400'}`}
+                          >
+                            {myLikedPostIds.has(post.id) ? '♥' : '♡'} {(post.likes_count as number) ?? 0}
+                          </button>
                         </div>
                       )}
                     </div>
@@ -1670,6 +1797,18 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleLike(selectedPost)}
+                      disabled={!!likingPostId}
+                      className={`px-3 py-1.5 rounded-[var(--radius-md)] border text-[11px] font-bold transition ${
+                        myLikedPostIds.has(selectedPost.id)
+                          ? 'border-red-200 text-red-500 bg-red-50 hover:bg-red-100'
+                          : 'border-[var(--border)] text-[var(--toss-gray-3)] hover:text-red-400 hover:border-red-200'
+                      }`}
+                    >
+                      {myLikedPostIds.has(selectedPost.id) ? '♥' : '♡'} 좋아요 {(selectedPost.likes_count as number) ?? 0}
+                    </button>
                     {canEditPost(selectedPost) && (
                       <>
                         <button
@@ -1698,6 +1837,62 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                     </button>
                   </div>
                 </div>
+
+                {/* 투표 표시 */}
+                {((selectedPost as Record<string, unknown>).poll ? (() => {
+                  const poll = (selectedPost as Record<string, unknown>).poll as { question?: string; options?: string[]; anonymous?: boolean; multiple?: boolean };
+                  const votes = ((selectedPost as Record<string, unknown>).poll_votes || {}) as Record<string, string[]>;
+                  const myId = user?.id;
+                  const hasVoted = Object.values(votes).some((arr) => Array.isArray(arr) && arr.includes(String(myId)));
+                  const totalVotes = Object.values(votes).reduce((sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0);
+
+                  const handlePostPollVote = async (optIdx: number) => {
+                    if (!myId) return;
+                    const key = String(optIdx);
+                    const currentVotes = { ...votes };
+                    // 이미 이 옵션에 투표했으면 취소
+                    if (Array.isArray(currentVotes[key]) && currentVotes[key].includes(String(myId))) {
+                      currentVotes[key] = currentVotes[key].filter((id: string) => id !== String(myId));
+                    } else {
+                      if (!poll.multiple) {
+                        // 단일 선택: 기존 투표 제거
+                        for (const k of Object.keys(currentVotes)) {
+                          if (Array.isArray(currentVotes[k])) {
+                            currentVotes[k] = currentVotes[k].filter((id: string) => id !== String(myId));
+                          }
+                        }
+                      }
+                      currentVotes[key] = [...(currentVotes[key] || []), String(myId)];
+                    }
+                    await supabase.from('board_posts').update({ poll_votes: currentVotes }).eq('id', selectedPost.id);
+                    setPosts((prev) => prev.map((p) => p.id === selectedPost.id ? { ...p, poll_votes: currentVotes } : p));
+                    setSelectedPostDetail((prev: BoardPost | null) => prev?.id === selectedPost.id ? { ...prev, poll_votes: currentVotes } : prev);
+                  };
+
+                  return (
+                    <div className="rounded-xl border border-[var(--accent)]/20 bg-[var(--toss-blue-light)]/20 p-4 space-y-3">
+                      <p className="text-sm font-bold text-[var(--foreground)]">{poll.question || selectedPost.title}</p>
+                      {poll.anonymous && <p className="text-[10px] font-semibold text-[var(--toss-gray-3)]">익명 투표</p>}
+                      <div className="space-y-2">
+                        {(poll.options || []).map((opt, i) => {
+                          const optVotes = Array.isArray(votes[String(i)]) ? votes[String(i)].length : 0;
+                          const pct = totalVotes > 0 ? Math.round((optVotes / totalVotes) * 100) : 0;
+                          const myVote = Array.isArray(votes[String(i)]) && votes[String(i)].includes(String(myId));
+                          return (
+                            <button key={i} type="button" onClick={() => handlePostPollVote(i)} className={`w-full text-left rounded-lg border p-3 transition relative overflow-hidden ${myVote ? 'border-[var(--accent)] bg-[var(--accent)]/5' : 'border-[var(--border)] bg-[var(--card)] hover:border-[var(--accent)]/30'}`}>
+                              <div className="absolute inset-y-0 left-0 bg-[var(--accent)]/10 transition-all" style={{ width: `${pct}%` }} />
+                              <div className="relative flex justify-between items-center">
+                                <span className="text-sm font-bold">{myVote ? '✓ ' : ''}{opt}</span>
+                                <span className="text-xs font-bold text-[var(--toss-gray-3)]">{optVotes}표 ({pct}%)</span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="text-[10px] text-[var(--toss-gray-3)] font-semibold">총 {totalVotes}표 · {poll.multiple ? '복수 선택' : '단일 선택'}</p>
+                    </div>
+                  );
+                })() : null) as React.ReactNode}
 
                 {(selectedPost.board_type === '수술일정' || selectedPost.board_type === 'MRI일정') && (
                   <div className="space-y-4 border-t border-[var(--border)] pt-4">

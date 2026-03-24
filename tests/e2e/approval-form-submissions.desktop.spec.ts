@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { dismissDialogs, fakeUser, mockSupabase, seedSession } from './helpers';
+import { dismissDialogs, fakeUser, mockSupabase, replaceSession, seedSession } from './helpers';
 
 const composeUser = {
   ...fakeUser,
@@ -43,6 +43,25 @@ const supportStaff = {
   role: 'manager',
 };
 
+const adminUser = {
+  ...fakeUser,
+  id: 'approval-admin-1',
+  employee_no: 'APR-900',
+  name: '권한 관리자',
+  company: 'SY INC.',
+  company_id: 'mso-company-id',
+  department: '경영지원팀',
+  team: '경영지원팀',
+  position: '부장',
+  role: 'admin',
+  permissions: {
+    ...fakeUser.permissions,
+    admin: true,
+    mso: true,
+    menu_관리자: true,
+  },
+};
+
 function trackRuntimeErrors(page: Page) {
   const errors: string[] = [];
 
@@ -78,6 +97,10 @@ async function selectApprover(page: Page) {
   await page.getByTestId('approval-approver-select').selectOption(approver.id);
 }
 
+async function selectReference(page: Page) {
+  await page.getByTestId('approval-cc-select').selectOption(supportStaff.id);
+}
+
 async function waitForApprovalInsert(page: Page) {
   return page.waitForRequest(
     (request) =>
@@ -89,6 +112,13 @@ async function waitForApprovalInsert(page: Page) {
 async function readApprovals(page: Page) {
   return page.evaluate(async () => {
     const response = await fetch('/rest/v1/approvals?select=*');
+    return response.json();
+  });
+}
+
+async function readNotifications(page: Page) {
+  return page.evaluate(async () => {
+    const response = await fetch('/rest/v1/notifications?select=*');
     return response.json();
   });
 }
@@ -162,6 +192,7 @@ test('shared approval forms submit with real field input', async ({ page }) => {
     await openCompose(page);
     await page.getByTestId('approval-form-type-0').click();
     await selectApprover(page);
+    await selectReference(page);
     await page.getByTestId('approval-title-input').fill('E2E 연차 신청');
     await page.getByTestId('approval-content-input').fill('연차 신청 사유를 작성합니다.');
     await page.getByTestId('approval-leave-type-select').selectOption({ index: 0 });
@@ -177,6 +208,11 @@ test('shared approval forms submit with real field input', async ({ page }) => {
     expect(row.meta_data.vType).toContain('연차');
     expect(row.meta_data.startDate).toBe('2026-03-18');
     expect(row.meta_data.endDate).toBe('2026-03-19');
+    expect(row.meta_data.cc_users).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: supportStaff.id, name: supportStaff.name }),
+      ])
+    );
   });
 
   await test.step('연차계획서를 일정 2건으로 상신한다', async () => {
@@ -318,6 +354,8 @@ test('form request submits through the dedicated flow', async ({ page }) => {
   });
 
   await openCompose(page);
+  await selectApprover(page);
+  await selectReference(page);
   await page.getByTestId('approval-form-type-7').click();
   await expect(page.getByTestId('form-request-view')).toBeVisible();
   await page.getByTestId('form-request-type-1').click();
@@ -330,8 +368,143 @@ test('form request submits through the dedicated flow', async ({ page }) => {
 
   const approvals = await readApprovals(page);
   expect(approvals).toHaveLength(1);
+  expect(approvals[0].meta_data.approver_line).toEqual([approver.id]);
+  expect(approvals[0].meta_data.cc_users).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ id: supportStaff.id, name: supportStaff.name }),
+    ])
+  );
   expect(approvals[0].type).toBe('양식신청');
   expect(approvals[0].meta_data.purpose).toBe('대출 제출용 증명서 발급 신청');
   expect(approvals[0].meta_data.urgency).toBe('긴급');
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('admin-configured default references auto-apply, notify recipients, and appear in the reference inbox', async ({
+  page,
+}) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+
+  await mockSupabase(page, {
+    staffMembers: [adminUser, composeUser, approver, supportStaff],
+    approvals: [],
+    notifications: [],
+    companies: [
+      { id: 'hospital-1', name: '테스트병원', type: 'HOSPITAL', is_active: true },
+      { id: 'mso-company-id', name: 'SY INC.', type: 'MSO', is_active: true },
+    ],
+    inventoryItems: [
+      {
+        id: 'inventory-item-default-ref-1',
+        item_name: '멸균 거즈',
+        quantity: 20,
+        stock: 20,
+        min_quantity: 5,
+        company: 'SY INC.',
+        company_id: 'mso-company-id',
+        department: '경영지원팀',
+        category: '소모품',
+        created_at: '2026-03-16T09:00:00.000Z',
+      },
+    ],
+  });
+
+  await seedSession(page, {
+    user: adminUser,
+    localStorage: {
+      erp_last_menu: '관리자',
+      erp_last_subview: '직원권한',
+      erp_permission_prompt_shown: '1',
+    },
+  });
+
+  await page.goto('/main?open_menu=관리자&open_subview=직원권한');
+  await expect(page.getByTestId('staff-permission-view')).toBeVisible();
+  await page.getByTestId(`staff-permission-row-${composeUser.id}`).click();
+  await page.getByTestId('staff-approval-default-form-select').selectOption('purchase');
+  await page.getByTestId('staff-approval-default-recipient-select').selectOption(supportStaff.id);
+  await expect(page.getByTestId(`staff-approval-default-recipient-remove-${supportStaff.id}`)).toBeVisible();
+
+  const staffs = await page.evaluate(async () => {
+    const response = await fetch('/rest/v1/staff_members?select=*');
+    return response.json();
+  });
+  const updatedComposeUser = staffs.find((staff: any) => staff.id === composeUser.id);
+  expect(updatedComposeUser?.permissions?.approval_reference_defaults?.purchase).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ id: supportStaff.id, name: supportStaff.name }),
+    ])
+  );
+
+  await replaceSession(page, {
+    user: {
+      ...composeUser,
+      permissions: updatedComposeUser.permissions,
+    },
+    localStorage: {
+      erp_last_menu: '전자결재',
+      erp_last_subview: '작성하기',
+      erp_permission_prompt_shown: '1',
+    },
+  });
+
+  await openCompose(page);
+  await page.getByTestId('approval-form-type-3').click();
+  await expect(page.getByText(`CC ${supportStaff.name}`)).toBeVisible();
+  await selectApprover(page);
+  await page.getByTestId('approval-title-input').fill('기본 참조자 물품신청');
+  await page.getByTestId('approval-content-input').fill('기본 참조자 자동 세팅 검증');
+  await page.getByTestId('supplies-item-name-0').fill('멸균 거즈');
+  await page.getByTestId('supplies-item-qty-0').fill('2');
+  await page.getByTestId('supplies-item-purpose-0').fill('병동 처치');
+  await page.getByTestId('supplies-item-dept-0').selectOption('병동팀');
+
+  const insert = waitForApprovalInsert(page);
+  await page.getByTestId('approval-submit-button').click();
+  await insert;
+
+  const approvals = await readApprovals(page);
+  const insertedApproval = approvals.find((item: any) => item.title === '기본 참조자 물품신청');
+  expect(insertedApproval?.meta_data?.cc_users).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ id: supportStaff.id, name: supportStaff.name }),
+    ])
+  );
+
+  const notifications = await readNotifications(page);
+  const referenceNotification = notifications.find(
+    (item: any) =>
+      item.user_id === supportStaff.id &&
+      item.metadata?.approval_id === insertedApproval.id &&
+      item.metadata?.approval_view === '참조 문서함'
+  );
+  expect(referenceNotification).toBeTruthy();
+
+  await replaceSession(page, {
+    user: {
+      ...supportStaff,
+      permissions: {
+        ...fakeUser.permissions,
+        approval_참조문서함: true,
+      },
+    },
+    localStorage: {
+      erp_last_menu: '전자결재',
+      erp_last_subview: '참조 문서함',
+      erp_permission_prompt_shown: '1',
+    },
+  });
+
+  await page.goto('/main?open_menu=전자결재&open_subview=참조 문서함');
+  await expect(page.getByTestId('approval-view')).toBeVisible();
+  const referenceCard = page.getByTestId(`approval-card-${insertedApproval.id}`);
+  await expect(referenceCard).toBeVisible();
+  await expect(referenceCard.getByText('참조 1명')).toBeVisible();
+  await page.getByTestId('approval-keyword-filter').fill('물품신청');
+  await expect(referenceCard).toBeVisible();
+  await page.getByTestId('approval-keyword-filter').fill('없는검색어');
+  await expect(referenceCard).toBeHidden();
+  await page.getByTestId('approval-keyword-filter').fill(insertedApproval.title);
+  await expect(referenceCard).toBeVisible();
   expect(runtimeErrors).toEqual([]);
 });

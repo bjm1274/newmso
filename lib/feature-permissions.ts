@@ -50,6 +50,7 @@ export const BOARD_PERMISSION_ITEMS: FeaturePermissionItem[] = [
 export const APPROVAL_PERMISSION_ITEMS: FeaturePermissionItem[] = [
   { key: 'approval_기안함', label: '기안함' },
   { key: 'approval_결재함', label: '결재함' },
+  { key: 'approval_참조문서함', label: '참조 문서함' },
   { key: 'approval_작성하기', label: '작성하기' },
 ];
 

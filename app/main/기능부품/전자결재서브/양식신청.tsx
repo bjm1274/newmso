@@ -7,6 +7,19 @@ import { CERTIFICATE_TYPES } from '@/lib/certificate-types';
 
 const URGENCY_LEVELS = ['일반', '긴급', '매우긴급'] as const;
 
+type FormRequestReferenceUser = {
+  id: string;
+  name: string;
+  position?: string | null;
+};
+
+type FormRequestProps = {
+  user?: Record<string, unknown> | null;
+  staffs?: Record<string, unknown>[];
+  approverLine?: Record<string, unknown>[];
+  ccLine?: FormRequestReferenceUser[];
+};
+
 function describeError(error: any) {
   return {
     message: error?.message ?? String(error),
@@ -16,9 +29,16 @@ function describeError(error: any) {
   };
 }
 
-export default function FormRequest({ user: _user, staffs: _staffs }: Record<string, unknown>) {
+export default function FormRequest({
+  user: _user,
+  staffs: _staffs,
+  approverLine: _approverLine,
+  ccLine: _ccLine,
+}: FormRequestProps) {
   const user = (_user ?? {}) as Record<string, unknown>;
   const staffs = (_staffs ?? []) as Record<string, unknown>[];
+  const approverLine = (Array.isArray(_approverLine) ? _approverLine : []) as Record<string, unknown>[];
+  const ccLine = (Array.isArray(_ccLine) ? _ccLine : []) as FormRequestReferenceUser[];
   const forms = CERTIFICATE_TYPES;
   const [selectedForm, setSelectedForm] = useState<string>(forms[0]?.id ?? '');
   const [purpose, setPurpose] = useState('');
@@ -46,6 +66,17 @@ export default function FormRequest({ user: _user, staffs: _staffs }: Record<str
     try {
       const approver =
         staffs?.find((staff: any) => staff.position === '원장' || staff.position === '부장') ?? null;
+      const selectedApproverIds = approverLine
+        .map((staff) => String(staff?.id || '').trim())
+        .filter(Boolean);
+      const currentApproverId = selectedApproverIds[0] ?? approver?.id ?? null;
+      const referenceUsers = ccLine
+        .map((staff) => ({
+          id: String(staff?.id || '').trim(),
+          name: String(staff?.name || '').trim(),
+          position: staff?.position ?? null,
+        }))
+        .filter((staff) => staff.id && staff.name);
       const selectedFormData = forms.find((form) => form.id === selectedForm);
       const formLabel = selectedFormData?.label ?? selectedForm;
 
@@ -53,7 +84,7 @@ export default function FormRequest({ user: _user, staffs: _staffs }: Record<str
         sender_id: user.id,
         sender_name: user.name,
         sender_company: user.company,
-        current_approver_id: approver?.id ?? null,
+        current_approver_id: currentApproverId,
         type: '양식신청',
         title: `${formLabel} 신청`,
         content: `신청자: ${user.name}\n대상자: ${user.name}\n용도: ${purpose}\n긴급도: ${urgency}`,
@@ -64,19 +95,49 @@ export default function FormRequest({ user: _user, staffs: _staffs }: Record<str
           purpose,
           urgency,
           auto_issue: true,
-          approver_line: approver?.id ? [approver.id] : [],
+          approver_line: selectedApproverIds.length > 0 ? selectedApproverIds : approver?.id ? [approver.id] : [],
+          cc_users: referenceUsers,
           cc_departments: ['행정팀'],
         },
         status: '대기',
       };
 
-      const { error } = await supabase
+      const { data: insertedApproval, error } = await supabase
         .from('approvals')
         .insert([payload])
         .select()
         .single();
 
       if (error) throw error;
+
+      const excludedIds = new Set<string>([
+        String(user.id || ''),
+        ...((payload.meta_data?.approver_line as string[] | undefined) || []).map((id) => String(id)),
+      ]);
+      const notificationRows = referenceUsers
+        .filter((staff) => staff.id && !excludedIds.has(String(staff.id)))
+        .map((staff) => ({
+          user_id: String(staff.id),
+          type: 'approval',
+          title: `📎 참조 문서 도착: ${payload.title}`,
+          body: `${String(user.name || '기안자')}님 문서가 참조로 공유되었습니다.`,
+          metadata: {
+            id: insertedApproval?.id || null,
+            approval_id: insertedApproval?.id || null,
+            type: 'approval',
+            approval_role: 'reference',
+            approval_view: '참조 문서함',
+            sender_name: user.name || null,
+            document_type: payload.type,
+          },
+        }));
+
+      if (notificationRows.length > 0) {
+        const { error: notificationError } = await supabase.from('notifications').insert(notificationRows);
+        if (notificationError) {
+          console.error('양식 신청 참조자 알림 생성 실패:', describeError(notificationError));
+        }
+      }
 
       toast('양식 신청이 완료되었습니다. 결재자의 확인을 기다려 주세요.', 'success');
       setPurpose('');

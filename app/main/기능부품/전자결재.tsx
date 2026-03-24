@@ -25,9 +25,11 @@ const DRAFT_STORAGE_KEY = 'erp_draft_approval';
 const LOCAL_APPROVAL_FORM_TYPES_KEY = 'erp_approval_form_types_custom';
 const LOCAL_FORM_TEMPLATE_DESIGNS_KEY = 'erp_form_template_designs';
 const APPROVAL_OPTIONAL_INSERT_COLUMNS = ['company_id', 'approver_line', 'doc_number'];
+const APPROVAL_REFERENCE_DEFAULTS_KEY = 'approval_reference_defaults';
+const APPROVAL_REFERENCE_ALL_KEY = 'all';
 const ALL_DOCUMENT_FILTER = '전체 문서';
 
-const APPROVAL_VIEWS = ['기안함', '결재함', '작성하기'] as const;
+const APPROVAL_VIEWS = ['기안함', '결재함', '참조 문서함', '작성하기'] as const;
 const BUILTIN_FORM_TYPE_DEFINITIONS = [
   { slug: 'leave', name: '연차/휴가' },
   { slug: 'annual_plan', name: '연차계획서' },
@@ -54,6 +56,96 @@ const DEFAULT_APPROVAL_TEMPLATE_DESIGN = {
   showSeal: true,
   sealLabel: 'SY INC. 직인',
 };
+
+type ApprovalCcUser = {
+  id: string;
+  name: string;
+  position?: string | null;
+};
+
+type ApprovalReferenceDefaultsMap = Record<string, ApprovalCcUser[]>;
+
+function resolveApprovalStaffLine(line: unknown, staffs: StaffMember[] = []) {
+  if (!Array.isArray(line)) return [] as StaffMember[];
+  const staffMap = new Map(staffs.map((staff) => [String(staff.id), staff]));
+  const resolved = line
+    .map((entry: unknown) => {
+      if (entry == null) return null;
+      if (typeof entry === 'string' || typeof entry === 'number') {
+        return staffMap.get(String(entry)) ?? null;
+      }
+      if (typeof entry === 'object' && entry !== null && 'id' in entry && (entry as Record<string, unknown>).id != null) {
+        return staffMap.get(String((entry as Record<string, unknown>).id)) ?? null;
+      }
+      return null;
+    })
+    .filter(Boolean) as StaffMember[];
+
+  return Array.from(new Map(resolved.map((staff) => [String(staff.id), staff])).values());
+}
+
+function normalizeApprovalCcUsers(line: unknown, staffs: StaffMember[] = []): ApprovalCcUser[] {
+  if (!Array.isArray(line)) return [];
+  const staffMap = new Map(staffs.map((staff) => [String(staff.id), staff]));
+  const resolved = line
+    .map((entry: unknown) => {
+      if (entry == null) return null;
+      if (typeof entry === 'string' || typeof entry === 'number') {
+        const matchedStaff = staffMap.get(String(entry));
+        if (!matchedStaff) return null;
+        return {
+          id: String(matchedStaff.id),
+          name: matchedStaff.name || '이름 없음',
+          position: matchedStaff.position ?? null,
+        } satisfies ApprovalCcUser;
+      }
+      if (typeof entry === 'object' && entry !== null) {
+        const record = entry as Record<string, unknown>;
+        const rawId = record.id;
+        if (rawId == null) return null;
+        const id = String(rawId);
+        const matchedStaff = staffMap.get(id);
+        return {
+          id,
+          name: String(record.name || matchedStaff?.name || '이름 없음'),
+          position:
+            typeof record.position === 'string'
+              ? record.position
+              : matchedStaff?.position ?? null,
+        } satisfies ApprovalCcUser;
+      }
+      return null;
+    })
+    .filter(Boolean) as ApprovalCcUser[];
+
+  return Array.from(new Map(resolved.map((staff) => [staff.id, staff])).values());
+}
+
+function mergeApprovalCcUsers(...groups: ApprovalCcUser[][]): ApprovalCcUser[] {
+  return Array.from(
+    new Map(
+      groups
+        .flat()
+        .filter((staff) => staff?.id && staff?.name)
+        .map((staff) => [String(staff.id), { ...staff, id: String(staff.id) }])
+    ).values()
+  );
+}
+
+function normalizeApprovalReferenceDefaultsMap(
+  value: unknown,
+  staffs: StaffMember[] = []
+): ApprovalReferenceDefaultsMap {
+  if (!value || typeof value !== 'object') return {};
+
+  return Object.entries(value as Record<string, unknown>).reduce<ApprovalReferenceDefaultsMap>((acc, [key, entries]) => {
+    const normalized = normalizeApprovalCcUsers(entries, staffs);
+    if (normalized.length > 0) {
+      acc[String(key)] = normalized;
+    }
+    return acc;
+  }, {});
+}
 
 function alphaColor(hexColor: string | undefined, alpha: number) {
   if (!hexColor) return `rgba(21, 94, 239, ${alpha})`;
@@ -154,7 +246,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const [formTitle, setFormTitle] = useState('');
   const [formContent, setFormContent] = useState('');
   const [approverLine, setApproverLine] = useState<StaffMember[]>([]);
-  const [ccLine, setCcLine] = useState<{ id: string; name: string; position?: string | null }[]>([]);
+  const [ccLine, setCcLine] = useState<ApprovalCcUser[]>([]);
   const [extraData, setExtraData] = useState<Record<string, unknown>>({});
   const [customFormTypes, setCustomFormTypes] = useState<{ name: string; slug: string }[]>([]);
   const [formTemplateDesigns, setFormTemplateDesigns] = useState<Record<string, Record<string, unknown>>>({});
@@ -163,6 +255,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const [selectedApprovalId, setSelectedApprovalId] = useState<string | null>(null);
   const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대기' | '승인' | '반려'>('전체');
   const [approvalDocumentFilter, setApprovalDocumentFilter] = useState(ALL_DOCUMENT_FILTER);
+  const [approvalKeyword, setApprovalKeyword] = useState('');
   const [approvalDateFrom, setApprovalDateFrom] = useState('');
   const [approvalDateTo, setApprovalDateTo] = useState('');
   const [savedApproverLine, setSavedApproverLine] = useState<StaffMember[]>([]);
@@ -205,6 +298,48 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const composeFormTabs = useMemo(
     () => [...BUILTIN_FORM_TYPES, ...customFormTypes.map((item) => item.slug)],
     [customFormTypes]
+  );
+  const approvalReferenceDefaults = useMemo(
+    () =>
+      normalizeApprovalReferenceDefaultsMap(
+        (user?.permissions as Record<string, unknown> | null | undefined)?.[APPROVAL_REFERENCE_DEFAULTS_KEY],
+        staffs
+      ),
+    [staffs, user?.permissions]
+  );
+  const resolveDefaultReferenceUsersForForm = useCallback(
+    (targetFormType: string) => {
+      const normalizedFormType = normalizeComposeFormType(targetFormType);
+      const builtInForm = BUILTIN_FORM_TYPE_DEFINITIONS.find(
+        (item) => item.slug === normalizedFormType || item.name === normalizedFormType
+      );
+      const customForm = customFormTypes.find(
+        (item) => item.slug === normalizedFormType || item.name === normalizedFormType
+      );
+      const candidateKeys = Array.from(
+        new Set(
+          [
+            APPROVAL_REFERENCE_ALL_KEY,
+            normalizedFormType,
+            builtInForm?.slug,
+            builtInForm?.name,
+            customForm?.slug,
+            customForm?.name,
+          ].filter(Boolean) as string[]
+        )
+      );
+
+      return mergeApprovalCcUsers(
+        ...candidateKeys.map((key) => approvalReferenceDefaults[key] || [])
+      );
+    },
+    [approvalReferenceDefaults, customFormTypes]
+  );
+  const applyDefaultReferenceUsers = useCallback(
+    (targetFormType: string) => {
+      setCcLine(resolveDefaultReferenceUsersForForm(targetFormType));
+    },
+    [resolveDefaultReferenceUsersForForm]
   );
   const resolveApprovalTemplateMeta = useCallback((item: Record<string, unknown>) => {
     const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
@@ -252,11 +387,16 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     const templateMeta = resolveApprovalTemplateMeta(item);
     const win = window.open('', '_blank');
     if (!win) return;
+    const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
+    const ccUsers = normalizeApprovalCcUsers(metaData?.cc_users, staffs);
 
     const approvalBoxes = Array.isArray(item?.approver_line)
       ? item.approver_line.map((_: string, index: number) => (
           `<div class="sig-box">${index + 1}단계<br><br><br>(인)</div>`
         )).join('')
+      : '';
+    const referenceSection = ccUsers.length > 0
+      ? `<div class="reference"><strong>참조자</strong><span>${ccUsers.map((user) => escapeHtml(user.position ? `${user.name} ${user.position}` : user.name)).join(', ')}</span></div>`
       : '';
 
     win.document.write(`<!DOCTYPE html>
@@ -280,6 +420,8 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     .body{padding:0 40px 24px}
     .doc-title{font-size:20px;font-weight:800;color:#111827;margin:0 0 12px}
     .content{border:1px solid ${escapeHtml(alphaColor(design.borderColor || '#d7e3ff', 0.9))};border-radius:20px;padding:18px 20px;min-height:220px;font-size:13px;line-height:1.75;white-space:pre-wrap}
+    .reference{display:flex;gap:12px;align-items:flex-start;margin:0 40px 24px;padding:14px 18px;border:1px solid ${escapeHtml(alphaColor(design.borderColor || '#d7e3ff', 0.9))};border-radius:18px;background:${escapeHtml(alphaColor(design.primaryColor, 0.05))};font-size:12px;line-height:1.7}
+    .reference strong{min-width:52px;color:${escapeHtml(design.primaryColor || '#155eef')}}
     .approval-line{display:flex;flex-wrap:wrap;gap:12px;padding:0 40px 28px}
     .sig-box{border:1px dashed ${escapeHtml(alphaColor(design.primaryColor || '#155eef', 0.45))};border-radius:18px;padding:12px 16px;min-width:110px;text-align:center;font-size:11px;color:#475569;background:#fff}
     .footer{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;padding:20px 40px 32px;border-top:1px solid ${escapeHtml(alphaColor(design.borderColor || '#d7e3ff', 0.9))};font-size:12px;color:#64748b}
@@ -307,6 +449,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       <div class="doc-title">${escapeHtml(item?.title || '(제목 없음)')}</div>
       <div class="content">${escapeHtml(item?.content || '-').replace(/\n/g, '<br>')}</div>
     </div>
+    ${referenceSection}
     ${design.showSignArea === false ? '' : `<div class="approval-line">${approvalBoxes}</div>`}
     <div class="footer">
       <div>
@@ -320,7 +463,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
 </body>
 </html>`);
     win.document.close();
-  }, [resolveApprovalTemplateDesign, resolveApprovalTemplateMeta]);
+  }, [resolveApprovalTemplateDesign, resolveApprovalTemplateMeta, staffs]);
 
   // 결재자 후보: 부서장 이상(팀장·부장·병원장 등)을 목록 상단에, 그 다음 나머지 직원 (staffs는 이미 메인에서 회사별로 불러옴)
   const APPROVER_POSITIONS = ['팀장', '간호과장', '실장', '부장', '이사', '병원장'];
@@ -360,7 +503,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     let candidateRow = { ...row };
 
     while (true) {
-      const result = await supabase.from('approvals').insert([candidateRow]);
+      const result = await supabase.from('approvals').insert([candidateRow]).select().single();
       const missingColumn = APPROVAL_OPTIONAL_INSERT_COLUMNS.find(
         (columnName) => columnName in candidateRow && isMissingColumnError(result.error, columnName)
       );
@@ -371,6 +514,48 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       candidateRow = legacyRow;
     }
   }, []);
+  const createApprovalReferenceNotifications = useCallback(async (item: Record<string, unknown>) => {
+    const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
+    const ccUsers = normalizeApprovalCcUsers(metaData?.cc_users, staffs);
+    if (!item?.id || ccUsers.length === 0) return;
+
+    const excludedIds = new Set<string>([
+      String(item.sender_id || ''),
+      ...resolveApprovalLineIds(item).map((id) => String(id)),
+    ]);
+
+    const notificationRows = Array.from(
+      new Map(
+        ccUsers
+          .filter((ccUser) => ccUser.id && !excludedIds.has(String(ccUser.id)))
+          .map((ccUser) => [
+            String(ccUser.id),
+            {
+              user_id: String(ccUser.id),
+              type: 'approval',
+              title: `📎 참조 문서 도착: ${String(item.title || '전자결재 문서')}`,
+              body: `${String(item.sender_name || '기안자')}님 문서가 참조로 공유되었습니다.`,
+              metadata: {
+                id: item.id,
+                approval_id: item.id,
+                type: 'approval',
+                approval_role: 'reference',
+                approval_view: '참조 문서함',
+                sender_name: item.sender_name || null,
+                document_type: item.type || null,
+              },
+            },
+          ])
+      ).values()
+    );
+
+    if (notificationRows.length === 0) return;
+
+    const { error } = await supabase.from('notifications').insert(notificationRows);
+    if (error) {
+      console.error('참조자 알림 생성 실패:', error);
+    }
+  }, [resolveApprovalLineIds, staffs]);
   const prepareSupplyApprovalInventoryWorkflow = useCallback(async (item: Record<string, unknown>) => {
     const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
     const requestedItems = Array.isArray(metaData?.items) ? metaData.items : [];
@@ -648,6 +833,15 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
 
     setViewMode(nextView);
     setFormType(nextFormType);
+    const requestedCcUsers = normalizeApprovalCcUsers(
+      initialComposeRequest?.cc_users ?? initialComposeRequest?.ccLine,
+      staffs
+    );
+    setCcLine(
+      requestedCcUsers.length > 0
+        ? requestedCcUsers
+        : resolveDefaultReferenceUsersForForm(nextFormType)
+    );
     try { window.localStorage.setItem(APPROVAL_VIEW_KEY, nextView); } catch { /* ignore */ }
 
     if (nextFormType === '출결정정') {
@@ -667,7 +861,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     }
 
     onConsumeComposeRequest?.();
-  }, [initialComposeRequest, onConsumeComposeRequest, resolveAccessibleView]);
+  }, [initialComposeRequest, onConsumeComposeRequest, resolveAccessibleView, resolveDefaultReferenceUsersForForm, staffs]);
 
   const fetchApprovals = useCallback(async () => {
     const scopedCompanyId = !isMso ? user?.company_id : selectedCompanyId;
@@ -715,6 +909,14 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     });
   }, [viewMode, formType, user?.id]);
 
+  useEffect(() => {
+    if (viewMode !== '작성하기' || ccLine.length > 0) return;
+    const defaults = resolveDefaultReferenceUsersForForm(formType);
+    if (defaults.length > 0) {
+      setCcLine(defaults);
+    }
+  }, [ccLine.length, formType, resolveDefaultReferenceUsersForForm, viewMode]);
+
   // 양식(연차/휴가, 연장근무 등) 탭을 바꿀 때마다 제목/내용/추가데이터는 새로 작성하도록 초기화
   // → 한 양식에서 쓰던 내용이 다른 탭으로 "따라가는" 현상 방지
   useEffect(() => {
@@ -736,14 +938,11 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       : Array.isArray(lastMeta?.approver_line)
         ? lastMeta.approver_line as unknown[]
         : [];
-    if (storedApproverLine.length > 0 && Array.isArray(staffs)) {
-      const line = storedApproverLine
-        .map((id) => staffs.find((s) => s.id === (id as string)))
-        .filter(Boolean);
-      if (line.length > 0) setApproverLine(line as StaffMember[]);
-    }
+    setApproverLine(resolveApprovalStaffLine(storedApproverLine, staffs));
+    const storedCcUsers = normalizeApprovalCcUsers(lastMeta?.cc_users, staffs);
+    setCcLine(storedCcUsers.length > 0 ? storedCcUsers : resolveDefaultReferenceUsersForForm(formType));
     if (formType === '물품신청' && (lastMeta?.items as unknown[] | null | undefined)?.length) setSuppliesLoadKey((k) => k + 1);
-  }, [lastDraftByType, formType, staffs]);
+  }, [formType, lastDraftByType, resolveDefaultReferenceUsersForForm, staffs]);
 
   // 물품신청은 같은 내용을 자주 쓰므로,
   // 작성하기 탭에서 '물품신청'으로 들어왔을 때 마지막 기안을 자동으로 한번 불러와 주고 수정해서 상신할 수 있게 처리
@@ -782,7 +981,22 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       try {
         const now = new Date();
         const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-        window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify({ formTitle, formContent, extraData, formType, savedAt: hhmm }));
+        window.localStorage.setItem(
+          DRAFT_STORAGE_KEY,
+          JSON.stringify({
+            formTitle,
+            formContent,
+            extraData,
+            formType,
+            approverLine: approverLine.map((approver) => ({
+              id: approver.id,
+              name: approver.name,
+              position: approver.position ?? null,
+            })),
+            ccLine,
+            savedAt: hhmm,
+          })
+        );
         setAutoSaveMsg(`임시저장됨 ${hhmm}`);
         if (autoSaveMsgTimer.current) clearTimeout(autoSaveMsgTimer.current);
         autoSaveMsgTimer.current = setTimeout(() => setAutoSaveMsg(null), 3000);
@@ -791,7 +1005,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     return () => {
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     };
-  }, [formTitle, formContent, extraData, viewMode]);
+  }, [approverLine, ccLine, extraData, formContent, formTitle, formType, viewMode]);
 
   // 임시저장 불러오기
   const loadDraftFromStorage = useCallback(() => {
@@ -802,10 +1016,14 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       if (parsed?.formTitle) setFormTitle(parsed.formTitle);
       if (parsed?.formContent) setFormContent(parsed.formContent);
       if (parsed?.extraData) setExtraData(parsed.extraData);
-      if (parsed?.formType) setFormType(normalizeComposeFormType(parsed.formType));
+      const nextFormType = parsed?.formType ? normalizeComposeFormType(parsed.formType) : formType;
+      if (parsed?.formType) setFormType(nextFormType);
+      setApproverLine(resolveApprovalStaffLine(parsed?.approverLine, staffs));
+      const storedCcUsers = normalizeApprovalCcUsers(parsed?.ccLine, staffs);
+      setCcLine(storedCcUsers.length > 0 ? storedCcUsers : resolveDefaultReferenceUsersForForm(nextFormType));
     } catch { /* ignore */ }
     setDraftBanner(false);
-  }, []);
+  }, [formType, resolveDefaultReferenceUsersForForm, staffs]);
 
   // 임시저장 삭제
   const clearDraftFromStorage = useCallback(() => {
@@ -817,24 +1035,21 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     const count = selectedApprovalIds.length;
     if (count === 0) return;
     if (!confirm(`선택된 ${count}건을 일괄 승인하시겠습니까?`)) return;
-    const results = await Promise.all(selectedApprovalIds.map(async (id) => {
+    let successCount = 0;
+    let failCount = 0;
+    for (const id of selectedApprovalIds) {
       const item = approvals.find((a) => a.id === id);
-      if (!item) return null;
-      const currentApproverId = resolveCurrentApproverId(item);
-      if (!currentApproverId || String(currentApproverId) !== String(user?.id)) return id;
-      const routingError = await syncApprovalRouting(item, currentApproverId);
-      if (routingError) return id;
-      const lineIds = resolveApprovalLineIds({ ...item, current_approver_id: currentApproverId, approver_line: normalizeApprovalLineIds(item.approver_line).length > 0 ? item.approver_line : [currentApproverId] });
-      const currentIndex = lineIds.findIndex((lid: string) => String(lid) === String(currentApproverId));
-      const isFinal = currentIndex === lineIds.length - 1 || currentIndex === -1;
-      const updateData: Record<string, unknown> = isFinal ? { status: '승인' } : { current_approver_id: lineIds[currentIndex + 1] };
-      const { error } = await supabase.from('approvals').update(updateData).eq('id', id);
-      return error ? id : null;
-    }));
-    const failedCount = results.filter(Boolean).length;
+      if (!item) { failCount++; continue; }
+      try {
+        await handleApproveAction(item);
+        successCount++;
+      } catch {
+        failCount++;
+      }
+    }
     setSelectedApprovalIds([]);
-    if (failedCount > 0) {
-      toast(`${count - failedCount}건 승인 완료, ${failedCount}건 실패했습니다.`, 'error');
+    if (failCount > 0) {
+      toast(`${successCount}건 승인 완료, ${failCount}건 실패했습니다.`, 'error');
     } else {
       toast(`${count}건이 일괄 승인 처리되었습니다.`, 'success');
     }
@@ -909,7 +1124,11 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
           : [currentApproverId],
     });
     const currentIndex = lineIds.findIndex((id: string) => String(id) === String(currentApproverId));
-    const isFinalApproval = currentIndex === lineIds.length - 1 || currentIndex === -1;
+    if (currentIndex === -1) {
+      toast('결재선에서 현재 결재자를 찾을 수 없습니다. 관리자에게 문의하세요.', 'error');
+      return;
+    }
+    const isFinalApproval = currentIndex === lineIds.length - 1;
 
     const updateData: Record<string, unknown> = {};
     if (isFinalApproval) {
@@ -1002,9 +1221,13 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
               status: '휴가',
             }, { onConflict: 'staff_id,date' });
           }
-          const { data: staff } = await supabase.from('staff_members').select('annual_leave_used').eq('id', item.sender_id).single();
-          const used = (Number(staff?.annual_leave_used) || 0) + days;
-          await supabase.from('staff_members').update({ annual_leave_used: used }).eq('id', item.sender_id);
+          // 원자적 증감: rpc가 없으면 fallback으로 read-then-write
+          const { error: rpcErr } = await supabase.rpc('increment_annual_leave_used', { p_staff_id: item.sender_id, p_days: days });
+          if (rpcErr) {
+            const { data: staff } = await supabase.from('staff_members').select('annual_leave_used').eq('id', item.sender_id).single();
+            const used = (Number(staff?.annual_leave_used) || 0) + days;
+            await supabase.from('staff_members').update({ annual_leave_used: used }).eq('id', item.sender_id);
+          }
         }
 
         if (item.type === '양식신청' && itemMetaData?.form_type && itemMetaData?.target_staff && itemMetaData?.auto_issue) {
@@ -1099,11 +1322,11 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     const extraCc = Array.isArray(extraData?.cc_departments) ? extraData.cc_departments as string[] : [];
     const cc_departments = Array.from(new Set([...extraCc, ...requiredCc]));
 
-    // 문서번호 자동 채번: 연도-월-순번
+    // 문서번호 자동 채번: 연도월-타임스탬프(충돌 방지)
     const now = new Date();
     const docPrefix = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const { count } = await supabase.from('approvals').select('id', { count: 'exact', head: true });
-    const docNumber = `${docPrefix}-${String((count || 0) + 1).padStart(4, '0')}`;
+    const docSeq = `${Date.now().toString(36).toUpperCase().slice(-6)}`;
+    const docNumber = `${docPrefix}-${docSeq}`;
     const selectedCustomForm = customFormTypes.find((item) => item.slug === formType);
     const builtInForm = BUILTIN_FORM_TYPE_DEFINITIONS.find((item) => item.slug === formType || item.name === formType);
     const resolvedFormSlug = selectedCustomForm?.slug || builtInForm?.slug || formType;
@@ -1133,14 +1356,16 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     const companyId = user.company_id ?? selectedCompanyId ?? null;
     if (companyId != null) row.company_id = companyId;
 
-    const { error } = await insertApprovalWithLegacyFallback(row);
+    const { error, data: insertedApproval } = await insertApprovalWithLegacyFallback(row);
 
     if (error) {
       console.error('기안 상신 실패:', error);
       toast("기안이 올라가지 않았습니다.\n\n" + (error.message || ""), 'error');
       return;
     }
+    await createApprovalReferenceNotifications((insertedApproval as Record<string, unknown> | null) ?? row);
     clearDraftFromStorage();
+    setCcLine(resolveDefaultReferenceUsersForForm(formType));
     toast("상신 완료!", 'success');
     const nextView = resolveAccessibleView('기안함');
     if (nextView) {
@@ -1168,9 +1393,23 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       return lineIds.some((id: string) => String(id) === uid) || String(currentApproverId || '') === uid;
     });
   }, [byCompany, resolveApprovalLineIds, resolveCurrentApproverId, user?.id]);
+  const referenceBaseList = useMemo(() => {
+    const uid = user?.id != null ? String(user.id) : '';
+    if (!uid) return [];
+    return byCompany.filter((item) => {
+      const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
+      const ccUsers = normalizeApprovalCcUsers(metaData?.cc_users, staffs);
+      return ccUsers.some((ccUser) => String(ccUser.id) === uid);
+    });
+  }, [byCompany, staffs, user?.id]);
 
   const documentTypeOptions = useMemo(() => {
-    const source = viewMode === '기안함' ? draftBaseList : approvalBaseList;
+    const source =
+      viewMode === '기안함'
+        ? draftBaseList
+        : viewMode === '참조 문서함'
+          ? referenceBaseList
+          : approvalBaseList;
     return Array.from(
       new Set(
         source
@@ -1178,7 +1417,25 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
           .filter(Boolean)
       )
     ).sort((a, b) => a.localeCompare(b, 'ko-KR'));
-  }, [approvalBaseList, draftBaseList, viewMode]);
+  }, [approvalBaseList, draftBaseList, referenceBaseList, viewMode]);
+
+  const buildApprovalSearchText = useCallback((item: Record<string, unknown>) => {
+    const metaData = item.meta_data as Record<string, unknown> | null | undefined;
+    const ccUsers = normalizeApprovalCcUsers(metaData?.cc_users, staffs);
+    return [
+      item.title,
+      item.content,
+      item.sender_name,
+      item.type,
+      item.doc_number,
+      metaData?.form_name,
+      metaData?.form_slug,
+      ccUsers.map((ccUser) => `${ccUser.name} ${ccUser.position || ''}`).join(' '),
+    ]
+      .map((value) => String(value ?? '').trim().toLocaleLowerCase('ko-KR'))
+      .filter(Boolean)
+      .join(' ');
+  }, [staffs]);
 
   const dateRangeInvalid = Boolean(approvalDateFrom && approvalDateTo && approvalDateFrom > approvalDateTo);
   const applyListFilters = useCallback((items: Record<string, unknown>[]) => {
@@ -1194,8 +1451,13 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       filtered = filtered.filter((item) => matchesCreatedDateRange(item.created_at as string | null, approvalDateFrom, approvalDateTo));
     }
 
+    const normalizedKeyword = approvalKeyword.trim().toLocaleLowerCase('ko-KR');
+    if (normalizedKeyword) {
+      filtered = filtered.filter((item) => buildApprovalSearchText(item).includes(normalizedKeyword));
+    }
+
     return filtered;
-  }, [approvalDateFrom, approvalDateTo, approvalDocumentFilter, approvalStatusFilter]);
+  }, [approvalDateFrom, approvalDateTo, approvalDocumentFilter, approvalKeyword, approvalStatusFilter, buildApprovalSearchText]);
 
   const draftBoxList = useMemo(() => {
     return applyListFilters(draftBaseList);
@@ -1204,8 +1466,16 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const approvalBoxList = useMemo(() => {
     return applyListFilters(approvalBaseList);
   }, [applyListFilters, approvalBaseList]);
+  const referenceBoxList = useMemo(() => {
+    return applyListFilters(referenceBaseList);
+  }, [applyListFilters, referenceBaseList]);
 
-  const listForView = viewMode === '기안함' ? draftBoxList : approvalBoxList;
+  const listForView =
+    viewMode === '기안함'
+      ? draftBoxList
+      : viewMode === '참조 문서함'
+        ? referenceBoxList
+        : approvalBoxList;
 
   // 결재함에서 일괄 처리 대상: status가 '대기'이며 내가 current_approver인 항목
   const bulkTargetList = useMemo(() => {
@@ -1313,7 +1583,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                       <option key={s.id} value={s.id}>{s.name} {s.position || ''} {s.company ? `(${s.company})` : ''}</option>
                     ))}
                   </select>
-                  <select onChange={e => {
+                  <select data-testid="approval-cc-select" onChange={e => {
                     const s = staffs.find((sf) => String(sf.id) === e.target.value);
                     if (s && !ccLine.find(c => c.id === s.id)) setCcLine(prev => [...prev, { id: s.id, name: s.name, position: s.position }]);
                     e.target.value = '';
@@ -1385,7 +1655,13 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                           type="button"
                           key={`${t}-${idx}`}
                           data-testid={`approval-form-type-${idx}`}
-                          onClick={() => setFormType(normalizeComposeFormType(t))}
+                          onClick={() => {
+                            const nextFormType = normalizeComposeFormType(t);
+                            setFormType(nextFormType);
+                            if (ccLine.length === 0) {
+                              applyDefaultReferenceUsers(nextFormType);
+                            }
+                          }}
                           className={`snap-start shrink-0 rounded-[var(--radius-md)] px-3 py-2 text-[11px] font-bold leading-tight whitespace-nowrap transition-all cursor-pointer touch-manipulation ${formType === t ? 'bg-[var(--card)] text-[var(--accent)] shadow-sm ring-1 ring-[var(--accent)]/10' : 'text-[var(--toss-gray-3)] hover:bg-[var(--card)]/80 hover:text-[var(--toss-gray-5)]'}`}
                         >
                           {label}
@@ -1419,7 +1695,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                 ) : formType === '수리요청서' ? (
                   <RepairRequestForm setExtraData={setExtraData} />
                 ) : formType === '양식신청' ? (
-                  <FormRequest user={user} staffs={staffs} />
+                  <FormRequest user={user} staffs={staffs} approverLine={approverLine} ccLine={ccLine} />
                 ) : formType === '출결정정' ? (
                   <AttendanceCorrectionForm
                     user={user}
@@ -1484,6 +1760,15 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                     ))}
                   </select>
                   <input
+                    type="search"
+                    value={approvalKeyword}
+                    onChange={(e) => setApprovalKeyword(e.target.value)}
+                    className="h-10 min-w-[180px] flex-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-sm font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+                    aria-label={viewMode === '참조 문서함' ? '참조 문서 검색' : '문서 검색'}
+                    placeholder={viewMode === '참조 문서함' ? '참조 문서 검색' : '문서 검색'}
+                    data-testid="approval-keyword-filter"
+                  />
+                  <input
                     type="date"
                     value={approvalDateFrom}
                     onChange={(e) => setApprovalDateFrom(e.target.value)}
@@ -1498,11 +1783,12 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                     className="h-10 min-w-[138px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-3 text-sm font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
                     aria-label="조회 종료일"
                   />
-                  {(approvalDocumentFilter !== ALL_DOCUMENT_FILTER || approvalDateFrom || approvalDateTo) && (
+                  {(approvalDocumentFilter !== ALL_DOCUMENT_FILTER || approvalKeyword || approvalDateFrom || approvalDateTo) && (
                     <button
                       type="button"
                       onClick={() => {
                         setApprovalDocumentFilter(ALL_DOCUMENT_FILTER);
+                        setApprovalKeyword('');
                         setApprovalDateFrom('');
                         setApprovalDateTo('');
                       }}
@@ -1519,7 +1805,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                   { value: '전체' as const, label: '전체' },
                   { value: '대기' as const, label: '대기중' },
                   { value: '승인' as const, label: '승인됨' },
-                  ...(viewMode === '기안함' ? [{ value: '반려' as const, label: '반려' }] : []),
+                    ...(viewMode !== '결재함' ? [{ value: '반려' as const, label: '반려' }] : []),
                 ].map(({ value, label }) => (
                   <button
                     type="button"
@@ -1533,7 +1819,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
               </div>
             </div>
 
-            {viewMode === '기안함' && approvalStatusFilter === '대기' && listForView.length > 0 && (
+            {(viewMode === '기안함' || viewMode === '참조 문서함') && approvalStatusFilter === '대기' && listForView.length > 0 && (
               <p className="text-xs text-[var(--toss-gray-3)]">대기중인 문서는 결재자가 <strong className="text-[var(--accent)]">결재함</strong>에서 승인·반려합니다. 내가 결재자이면 카드에 버튼이 표시됩니다.</p>
             )}
 
@@ -1583,7 +1869,11 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
               <div className="h-96 flex flex-col items-center justify-center opacity-20">
                 <span className="text-6xl mb-4">📄</span>
                 <p className="font-semibold text-base">
-                  {approvalStatusFilter === '전체' ? '조건에 맞는 결재 내역이 없습니다.' : `${approvalStatusFilter === '대기' ? '대기중' : approvalStatusFilter === '승인' ? '승인된' : '반려된'} 건이 없습니다.`}
+                  {approvalKeyword
+                    ? '검색 조건에 맞는 결재 내역이 없습니다.'
+                    : approvalStatusFilter === '전체'
+                      ? '조건에 맞는 결재 내역이 없습니다.'
+                      : `${approvalStatusFilter === '대기' ? '대기중' : approvalStatusFilter === '승인' ? '승인된' : '반려된'} 건이 없습니다.`}
                 </p>
               </div>
             ) : (
@@ -1610,6 +1900,8 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                   const isChecked = selectedApprovalIds.includes(itemId);
                   const templateMeta = resolveApprovalTemplateMeta(item);
                   const templateDesign = resolveApprovalTemplateDesign(item);
+                  const itemMetaData = item.meta_data as Record<string, unknown> | null | undefined;
+                  const cardCcUsers = normalizeApprovalCcUsers(itemMetaData?.cc_users, staffs);
                   return (
                     <div
                       key={itemId}
@@ -1660,6 +1952,17 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                               ) : currentStep ? (
                                 <span className="inline-flex items-center px-1.5 py-[2px] rounded-md text-[10px] font-semibold bg-amber-100 text-amber-700">현재 {currentStep.step}. {currentStep.name}</span>
                               ) : null}
+                            </div>
+                          )}
+                          {cardCcUsers.length > 0 && (
+                            <div className="mt-0.5 flex flex-wrap gap-0.5">
+                              <span className="inline-flex items-center px-1.5 py-[2px] rounded-md text-[10px] font-semibold bg-yellow-50 text-yellow-700 border border-yellow-200">
+                                참조 {cardCcUsers.length}명
+                              </span>
+                              <span className="inline-flex items-center px-1.5 py-[2px] rounded-md text-[10px] font-semibold bg-[var(--muted)] text-[var(--toss-gray-3)]">
+                                {cardCcUsers.slice(0, 2).map((user) => user.name).join(', ')}
+                                {cardCcUsers.length > 2 ? ` 외 ${cardCcUsers.length - 2}명` : ''}
+                              </span>
                             </div>
                           )}
                         </div>
@@ -1722,6 +2025,8 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
         const detailCreatedAt = item.created_at as string;
         const detailContent = item.content as string | null | undefined;
         const detailStatus = item.status as string | null | undefined;
+        const detailMetaData = item.meta_data as Record<string, unknown> | null | undefined;
+        const detailCcUsers = normalizeApprovalCcUsers(detailMetaData?.cc_users, staffs);
         const templateMeta = resolveApprovalTemplateMeta(item);
         const templateDesign = resolveApprovalTemplateDesign(item);
         return (
@@ -1754,6 +2059,20 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
               <div className="p-4 md:p-4 overflow-y-auto flex-1">
                 <h3 className="font-bold text-[var(--foreground)] text-lg mb-2">{detailTitle || '(제목 없음)'}</h3>
                 <p className="text-[11px] text-[var(--toss-gray-3)] mb-4">기안자: {detailSenderName} · {new Date(detailCreatedAt).toLocaleString('ko-KR')}</p>
+                {detailCcUsers.length > 0 && (
+                  <div className="mb-4 flex flex-wrap items-center gap-2 rounded-[var(--radius-md)] border border-yellow-200 bg-yellow-50 px-3 py-2">
+                    <span className="text-[11px] font-bold text-yellow-700">참조자</span>
+                    {detailCcUsers.map((ccUser) => (
+                      <span
+                        key={ccUser.id}
+                        className="inline-flex items-center rounded-full border border-yellow-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-yellow-800"
+                      >
+                        {ccUser.name}
+                        {ccUser.position ? ` ${ccUser.position}` : ''}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <div className="text-sm text-[var(--toss-gray-4)] whitespace-pre-wrap border-t border-[var(--border)] pt-4">{detailContent || '-'}</div>
               </div>
               {detailStatus === '대기' && (
