@@ -142,17 +142,111 @@ test('schedule post appears on the calendar immediately after registration', asy
 
   await page.getByTestId('board-toggle-new-post').click();
   await expect(page.getByTestId('board-new-post-form')).toBeVisible();
+  await expect(page.getByTestId('board-new-post-submit')).toBeDisabled();
   await page.getByTestId('board-schedule-title').fill('knee surgery');
   await page.getByTestId('board-schedule-date').fill('2026-04-15');
   await page.getByTestId('board-schedule-period').selectOption('\uC624\uC804');
   await page.getByTestId('board-schedule-hour').selectOption('09');
   await page.getByTestId('board-schedule-minute').selectOption('30');
+  await expect(page.getByTestId('board-new-post-submit')).toBeEnabled();
   await page.getByTestId('board-new-post-submit').click();
 
   await expect(page.getByTestId('board-post-detail')).toBeVisible();
   await page.getByTestId('board-post-detail-close').click();
   await expect(page.getByText('2026\uB144 4\uC6D4')).toBeVisible();
   await expect(page.getByTestId('board-calendar-day-count-2026-04-15')).toHaveText('1\uAC74');
+
+  await page.reload();
+  await expect(page.getByTestId('board-view')).toBeVisible();
+  await openBoardMenu(page, SURGERY_BOARD);
+  await page.getByRole('button', { name: '\uB2E4\uC74C\uB2EC' }).click();
+  await expect(page.getByText('2026\uB144 4\uC6D4')).toBeVisible();
+  await expect(page.getByTestId('board-calendar-day-count-2026-04-15')).toHaveText('1\uAC74');
+
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('mri schedule survives refresh and keeps contrast flag', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+
+  await mockSupabase(page, {
+    boardPosts: [],
+    boardPostComments: [],
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: BOARD_MENU,
+      erp_last_subview: MRI_BOARD,
+    },
+  });
+
+  await page.goto(`/main?open_menu=${encodeURIComponent(BOARD_MENU)}`);
+
+  await expect(page.getByTestId('board-view')).toBeVisible();
+  await openBoardMenu(page, MRI_BOARD);
+
+  await page.getByTestId('board-toggle-new-post').click();
+  await expect(page.getByTestId('board-new-post-form')).toBeVisible();
+  await page.getByTestId('board-schedule-title').fill('knee mri');
+  await page.getByTestId('board-schedule-date').fill('2026-04-18');
+  await page.getByTestId('board-schedule-period').selectOption('\uC624\uD6C4');
+  await page.getByTestId('board-schedule-hour').selectOption('02');
+  await page.getByTestId('board-schedule-minute').selectOption('00');
+  await page.getByLabel('\uC870\uC601\uC81C \uD544\uC694').check();
+  await page.getByTestId('board-new-post-submit').click();
+
+  await expect(page.getByTestId('board-post-detail')).toBeVisible();
+  await expect(page.getByText('\uC870\uC601\uC81C \uD544\uC694')).toBeVisible();
+  await page.getByTestId('board-post-detail-close').click();
+
+  await page.reload();
+  await expect(page.getByTestId('board-view')).toBeVisible();
+  await openBoardMenu(page, MRI_BOARD);
+  await page.getByRole('button', { name: '\uB2E4\uC74C\uB2EC' }).click();
+  await expect(page.getByText('2026\uB144 4\uC6D4')).toBeVisible();
+  await expect(page.getByTestId('board-calendar-day-count-2026-04-18')).toHaveText('1\uAC74');
+  await page.getByTestId('board-calendar-day-count-2026-04-18').click();
+  await expect(page.getByTestId('board-post-detail')).toBeVisible();
+  await expect(page.getByText('\uC870\uC601\uC81C \uD544\uC694')).toBeVisible();
+
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('legacy schedule posts without metadata are surfaced with a repair warning', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+
+  await mockSupabase(page, {
+    boardPosts: [
+      {
+        id: 'legacy-surgery-1',
+        board_type: SURGERY_BOARD,
+        title: '\uC88C\uCE21 \uBB34\uB98E \uC804\uCE58\uD658\uC220',
+        content: '33',
+        author_name: '\uC9C0\uBBFC\uC218',
+        company: 'SY INC.',
+        company_id: '22222222-2222-2222-2222-222222222222',
+        created_at: '2026-03-24T05:54:17.541+00:00',
+      },
+    ],
+    boardPostComments: [],
+  });
+
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: BOARD_MENU,
+      erp_last_subview: SURGERY_BOARD,
+    },
+  });
+
+  await page.goto(`/main?open_menu=${encodeURIComponent(BOARD_MENU)}`);
+
+  await expect(page.getByTestId('board-view')).toBeVisible();
+  await openBoardMenu(page, SURGERY_BOARD);
+  await expect(page.getByTestId('board-legacy-schedule-warning')).toBeVisible();
+  await page.getByTestId('board-legacy-schedule-item-legacy-surgery-1').click();
+  await expect(page.getByTestId('board-post-detail')).toBeVisible();
+  await expect(page.getByTestId('board-schedule-legacy-warning')).toBeVisible();
 
   expect(runtimeErrors).toEqual([]);
 });

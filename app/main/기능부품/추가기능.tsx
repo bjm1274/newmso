@@ -84,6 +84,10 @@ const RealtimeDepositView = dynamic(() => import('./입금실시간조회'), {
   ssr: false,
   loading: () => <SubviewLoading label="입금 실시간 조회" />,
 });
+const SurgeryConsultationView = dynamic(() => import('./수술상담'), {
+  ssr: false,
+  loading: () => <SubviewLoading label="수술상담 AI 분석" />,
+});
 const OrgChart = dynamic(() => import('./조직도서브/OrgChart'), {
   ssr: false,
   loading: () => <SubviewLoading label="조직도" />,
@@ -110,6 +114,7 @@ const FEATURE_CARDS: FeatureCard[] = [
   { id: '마감보고', label: '마감보고', icon: '💰', subView: '마감보고' },
   { id: '직원평가', label: '직원평가', icon: '✍️', subView: '직원평가' },
   { id: '입금실시간조회', label: '입금 실시간 조회', icon: '🏦', subView: '입금실시간조회' },
+  { id: '수술상담', label: '수술상담 AI 분석', icon: '🎙️', subView: '수술상담' },
 ];
 
 const FEATURE_CARD_TEST_IDS = [
@@ -424,6 +429,14 @@ export default function ExtraFeatures({
     return (
       <FeatureShell onBack={() => setSubView(null)} maxWidth="max-w-6xl">
         <RealtimeDepositView user={user || {}} />
+      </FeatureShell>
+    );
+  }
+
+  if (subView === '수술상담') {
+    return (
+      <FeatureShell onBack={() => setSubView(null)} maxWidth="max-w-4xl">
+        <SurgeryConsultationView user={user || {}} />
       </FeatureShell>
     );
   }
