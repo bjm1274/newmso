@@ -1,5 +1,5 @@
-'use client';
-﻿import React, { useEffect, useState } from 'react';
+﻿'use client';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
 type Props = {
@@ -521,7 +521,7 @@ export default function ContractPreview({ staff, contract }: Props) {
                 )) : (
                   <div className="py-16 text-center">
                     <p className="text-[13px] text-slate-400">계약서 양식이 설정되지 않았습니다.</p>
-                    <p className="text-[11px] text-slate-300 mt-1">"양식 편집" 탭에서 내용을 작성하세요.</p>
+                    <p className="text-[11px] text-slate-300 mt-1">&quot;양식 편집&quot; 탭에서 내용을 작성하세요.</p>
                   </div>
                 )}
               </div>
