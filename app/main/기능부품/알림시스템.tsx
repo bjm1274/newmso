@@ -194,7 +194,7 @@ async function buildDeterministicNotificationId(userId: string, dedupeKey: strin
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }
 
-async function syncPushSubscriptionOnServer(staffId: string | undefined, subscription: PushSubscriptionJSON) {
+async function syncPushSubscriptionOnServer(staffId: string | undefined, subscription: PushSubscriptionJSON & { fcm_token?: string | null }) {
   if (!staffId || !subscription.endpoint || !subscription.keys?.p256dh || !subscription.keys?.auth) return;
 
   const response = await fetch('/api/notifications/push-subscription', {
@@ -204,6 +204,7 @@ async function syncPushSubscriptionOnServer(staffId: string | undefined, subscri
       endpoint: subscription.endpoint,
       p256dh: subscription.keys.p256dh,
       auth: subscription.keys.auth,
+      fcm_token: subscription.fcm_token ?? null,
     }),
   });
 
@@ -266,7 +267,32 @@ export async function initNotificationService(staffId?: string) {
       if (sub) {
         const j: any = sub.toJSON();
         if (j.endpoint && j.keys?.p256dh && j.keys?.auth) {
-          await syncPushSubscriptionOnServer(staffId, j);
+          // FCM token도 함께 가져와서 저장
+          let fcmToken: string | null = null;
+          try {
+            const fcmVapidKey = process.env.NEXT_PUBLIC_FCM_VAPID_KEY?.trim();
+            if (fcmVapidKey) {
+              const { initializeApp, getApps } = await import('firebase/app');
+              const { getMessaging, getToken } = await import('firebase/messaging');
+              const firebaseConfig = {
+                apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+                authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+                projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+                storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+                messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+                appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+              };
+              const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+              const messaging = getMessaging(app);
+              fcmToken = await getToken(messaging, {
+                vapidKey: fcmVapidKey,
+                serviceWorkerRegistration: reg,
+              });
+            }
+          } catch (fcmErr) {
+            console.warn('[FCM] 토큰 발급 실패 (Web Push는 계속 사용):', fcmErr);
+          }
+          await syncPushSubscriptionOnServer(staffId, { ...j, fcm_token: fcmToken });
           window.localStorage.setItem(getPushVapidStorageKey(staffId), vapidKey);
           setPushSubscriptionActiveState(staffId, true);
         }

@@ -20,13 +20,15 @@ type PushSubscriptionPayload = {
   endpoint?: string;
   p256dh?: string;
   auth?: string;
+  fcm_token?: string;
 };
 
 function parsePayload(body: PushSubscriptionPayload | null) {
   const endpoint = String(body?.endpoint || '').trim();
   const p256dh = String(body?.p256dh || '').trim();
   const auth = String(body?.auth || '').trim();
-  return { endpoint, p256dh, auth };
+  const fcm_token = String(body?.fcm_token || '').trim() || null;
+  return { endpoint, p256dh, auth, fcm_token };
 }
 
 export async function POST(request: NextRequest) {
@@ -37,9 +39,13 @@ export async function POST(request: NextRequest) {
     }
 
     const body = (await request.json().catch(() => null)) as PushSubscriptionPayload | null;
-    const { endpoint, p256dh, auth } = parsePayload(body);
+    const { endpoint, p256dh, auth, fcm_token } = parsePayload(body);
 
-    if (!endpoint || !p256dh || !auth) {
+    // FCM token만 있는 경우도 허용 (Web Push 없이 FCM만 등록)
+    if (!endpoint && !fcm_token) {
+      return NextResponse.json({ error: 'Invalid push subscription payload.' }, { status: 400 });
+    }
+    if (endpoint && (!p256dh || !auth)) {
       return NextResponse.json({ error: 'Invalid push subscription payload.' }, { status: 400 });
     }
 
@@ -66,13 +72,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '구독 정보 처리 중 오류가 발생했습니다.' }, { status: 500 });
     }
 
+    // FCM token만 있는 경우 별도 upsert
+    if (fcm_token && !endpoint) {
+      await supabase.from('push_subscriptions').upsert(
+        { staff_id: staffId, endpoint: `fcm:${staffId}`, p256dh: '', auth: '', fcm_token },
+        { onConflict: 'staff_id,endpoint' }
+      );
+      return NextResponse.json({ ok: true });
+    }
+
     const { error: upsertError } = await supabase.from('push_subscriptions').upsert(
-      {
-        staff_id: staffId,
-        endpoint,
-        p256dh,
-        auth,
-      },
+      { staff_id: staffId, endpoint, p256dh, auth, fcm_token },
       { onConflict: 'staff_id,endpoint' }
     );
 
