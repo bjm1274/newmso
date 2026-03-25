@@ -289,7 +289,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     }
   };
 
-  const renderMessageContent = (content: string) => {
+  const renderMessageContent = (content: string, isMine = false) => {
     if (!content) return null;
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     const parts = content.split(urlRegex);
@@ -301,7 +301,11 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
             href={part}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-blue-500 underline hover:text-blue-600 break-words"
+            className={`underline break-words transition-colors ${
+              isMine
+                ? 'text-white decoration-white/70 hover:text-white/85'
+                : 'text-blue-500 decoration-blue-400/70 hover:text-blue-600'
+            }`}
             onClick={(e) => e.stopPropagation()}
           >
             {part}
@@ -3220,7 +3224,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                             ) : null;
                           })()}
                           <div className={`leading-relaxed ${(msg.content && !isDeletedMessage) ? 'mb-0.5' : ''}`}>
-                            {isDeletedMessage ? '삭제된 메시지입니다.' : renderMessageContent(msg.content || '')}
+                            {isDeletedMessage ? '삭제된 메시지입니다.' : renderMessageContent(msg.content || '', isMine)}
                           </div>
                           {!isDeletedMessage && msg.file_url && (() => { const furl = msg.file_url!; return (
                             <div className="space-y-1 mt-2" onClick={(e) => e.stopPropagation()}>
