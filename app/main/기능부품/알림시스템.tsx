@@ -284,9 +284,16 @@ export async function initNotificationService(staffId?: string) {
               };
               const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
               const messaging = getMessaging(app);
+              // FCM 전용 SW 별도 등록 (sw.js와 분리해야 토큰 발급 정상 작동)
+              let fcmSwReg: ServiceWorkerRegistration = reg;
+              try {
+                fcmSwReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+              } catch {
+                fcmSwReg = reg;
+              }
               fcmToken = await getToken(messaging, {
                 vapidKey: fcmVapidKey,
-                serviceWorkerRegistration: reg,
+                serviceWorkerRegistration: fcmSwReg,
               });
             }
           } catch (fcmErr) {
