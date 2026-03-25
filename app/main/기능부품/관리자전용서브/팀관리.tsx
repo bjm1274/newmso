@@ -37,7 +37,7 @@ export default function TeamManager({ onRefresh }: { onRefresh?: () => void }) {
         setCompanies(names);
         if (names.length > 0 && !company) setCompany(names[0]);
       });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [company]);
 
   useEffect(() => {
     // 회사 변경 시 Division 기본값도 회사 유형에 맞게 변경
