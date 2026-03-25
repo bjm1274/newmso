@@ -483,11 +483,23 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
     }
   }, [initialMenu, user?.id]);
 
+  const visibleHrTabIdsKey = visibleHrTabIds.join(',');
   useEffect(() => {
     if (!visibleHrTabIds.includes(activeMenu)) {
       메뉴설정(visibleHrTabs[0]?.id || '구성원');
     }
-  }, [activeMenu, visibleHrTabs]);
+  }, [activeMenu, visibleHrTabIdsKey]);
+
+  useEffect(() => {
+    if (workspaceTabs.some((tab) => tab.id === activeMenu)) {
+      return;
+    }
+
+    const fallbackTab = workspaceTabs[0]?.id;
+    if (fallbackTab && fallbackTab !== activeMenu) {
+      메뉴설정(fallbackTab);
+    }
+  }, [activeMenu, workspaceTabs]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

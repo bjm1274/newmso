@@ -540,6 +540,7 @@ export default function NotificationSystem({
     const uid = effectiveUserId;
     const mountedAt = mountedAtRef.current;
     void syncBadge();
+    const useServerSideChatNotifications = true;
 
     // insertNoti: 이벤트 → notifications 테이블 INSERT (그러면 nTableChannel이 toast 표시)
     const insertNoti = async (
@@ -676,6 +677,7 @@ export default function NotificationSystem({
     // F. 채팅 메시지
     const messagesCh = supabase.channel(`messages-trigger-${uid}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async (p: any) => {
+        if (useServerSideChatNotifications) return;
         const msg = p.new;
         if (String(msg.sender_id) === uid) return;
         const [roomRes, senderRes] = await Promise.all([

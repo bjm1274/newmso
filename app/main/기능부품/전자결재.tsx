@@ -3,6 +3,7 @@ import { toast } from '@/lib/toast';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { canAccessApprovalSection } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
+import { syncApprovalToDocumentRepository } from '@/lib/approval-document-archive';
 import { isMissingColumnError, withMissingColumnFallback } from '@/lib/supabase-compat';
 import type { StaffMember } from '@/types';
 import {
@@ -1362,6 +1363,12 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       console.error('기안 상신 실패:', error);
       toast("기안이 올라가지 않았습니다.\n\n" + (error.message || ""), 'error');
       return;
+    }
+    try {
+      await syncApprovalToDocumentRepository((insertedApproval as Record<string, unknown> | null) ?? row);
+    } catch (archiveError) {
+      console.error('결재 문서보관함 저장 실패:', archiveError);
+      toast('결재 문서는 상신됐지만 문서보관함 저장에는 실패했습니다.', 'warning');
     }
     await createApprovalReferenceNotifications((insertedApproval as Record<string, unknown> | null) ?? row);
     clearDraftFromStorage();

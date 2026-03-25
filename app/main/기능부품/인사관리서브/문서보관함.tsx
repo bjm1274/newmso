@@ -2,6 +2,7 @@
 import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { extractApprovalDocNumberFromDocument, mapApprovalToDocumentRepositoryEntry } from '@/lib/approval-document-archive';
 
 const DOCUMENT_PDF_BUCKET_CANDIDATES = ['document-pdfs', 'board-attachments'];
 
@@ -65,10 +66,33 @@ export default function DocumentRepository({
   const fetchDocs = async () => {
     setLoading(true);
     const companyFilter = selectedCo === '전체' ? undefined : selectedCo;
-    let q = supabase.from('document_repository').select('*').order('updated_at', { ascending: false });
-    if (companyFilter) q = q.eq('company_name', companyFilter);
-    const { data } = await q;
-    setDocs(data || []);
+    let repositoryQuery = supabase.from('document_repository').select('*').order('updated_at', { ascending: false });
+    let approvalsQuery = supabase.from('approvals').select('*').order('created_at', { ascending: false });
+    if (companyFilter) {
+      repositoryQuery = repositoryQuery.eq('company_name', companyFilter);
+      approvalsQuery = approvalsQuery.eq('sender_company', companyFilter);
+    }
+    const [{ data: repositoryDocs }, { data: approvalDocs }] = await Promise.all([repositoryQuery, approvalsQuery]);
+    const existingDocNumbers = new Set(
+      (repositoryDocs || [])
+        .map((doc) => extractApprovalDocNumberFromDocument(doc as Record<string, unknown>))
+        .filter(Boolean)
+    );
+    const approvalArchiveDocs = (approvalDocs || [])
+      .map((approval) => mapApprovalToDocumentRepositoryEntry(approval as Record<string, unknown>))
+      .filter((approvalDoc) => {
+        const approvalDocNumber = extractApprovalDocNumberFromDocument(approvalDoc);
+        if (approvalDocNumber && existingDocNumbers.has(approvalDocNumber)) return false;
+        return !(repositoryDocs || []).some((doc) =>
+          String(doc.title || '').trim() === String(approvalDoc.title || '').trim() &&
+          String(doc.created_by || '').trim() === String(approvalDoc.created_by || '').trim() &&
+          String(doc.company_name || '').trim() === String(approvalDoc.company_name || '').trim()
+        );
+      });
+    const mergedDocs = [...approvalArchiveDocs, ...(repositoryDocs || [])].sort((a, b) =>
+      String(b.updated_at || b.created_at || '').localeCompare(String(a.updated_at || a.created_at || ''))
+    );
+    setDocs(mergedDocs);
     setLoading(false);
   };
 
@@ -91,7 +115,12 @@ export default function DocumentRepository({
     return matchStaff && matchCategory;
   });
 
+  const isReadOnlySelected = Boolean(selected?.source_type === 'approval' || selected?.read_only);
+
   const handleSave = async () => {
+    if (isReadOnlySelected) {
+      return toast('전자결재 문서는 문서보관함에서 읽기 전용으로만 확인할 수 있습니다.', 'warning');
+    }
     if (!form.title.trim()) return toast('제목을 입력하세요.', 'warning');
     setSaving(true);
     try {
@@ -188,6 +217,10 @@ export default function DocumentRepository({
 
   const handleDelete = async (doc: any) => {
     if (!doc?.id) return;
+    if (doc?.source_type === 'approval' || doc?.read_only) {
+      toast('전자결재 문서는 문서보관함에서 삭제할 수 없습니다.', 'warning');
+      return;
+    }
     if (!window.confirm('해당 문서를 완전히 삭제하시겠습니까?\n삭제 후에는 되돌릴 수 없습니다.')) return;
     try {
       const { error } = await supabase.from('document_repository').delete().eq('id', doc.id);
@@ -448,7 +481,7 @@ export default function DocumentRepository({
             </div>
           ) : (
             /* 일반 문서 편집 폼 */
-            <div className="space-y-4">
+            <fieldset className="space-y-4" disabled={isReadOnlySelected}>
               <div>
                 <label className="block text-sm font-semibold text-[var(--toss-gray-4)] mb-2">제목</label>
                 <input type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full px-4 py-2 rounded-[var(--radius-md)] border border-[var(--border)] text-[var(--foreground)]" placeholder="문서 제목" />
@@ -464,13 +497,20 @@ export default function DocumentRepository({
                 <textarea value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} rows={12} className="w-full px-4 py-2 rounded-[var(--radius-md)] border border-[var(--border)] text-[var(--foreground)] font-mono text-sm" placeholder="규정, 양식, 계약서 본문 등을 입력하세요." />
               </div>
               {selected && selected.category !== '근로계약서' && <p className="text-xs text-[var(--toss-gray-3)]">* 수정 시 이전 버전이 자동으로 버전 이력에 저장됩니다.</p>}
-            </div>
+            </fieldset>
           )}
 
           {selected?.category === '근로계약서' && (
             <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-start gap-3">
               <span className="text-lg">🔒</span>
               <p className="text-[11px] font-bold text-amber-800 leading-relaxed pt-0.5">이 문서는 체결된 근로계약서 원본으로 법적 효력 유지를 위해 수정을 방지하고 있습니다. 내용 변경이 필요한 경우 신규 계약을 진행해 주시기 바랍니다.</p>
+            </div>
+          )}
+          {isReadOnlySelected && (
+            <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl">
+              <p className="text-[11px] font-bold text-blue-700 leading-relaxed">
+                전자결재에서 자동 보관된 문서입니다. 문서보관함에서는 읽기 전용으로만 확인할 수 있습니다.
+              </p>
             </div>
           )}
           <div className="flex gap-2">

@@ -10,13 +10,27 @@ export default function PayrollMonthlySummary({ selectedCo }: Record<string, unk
   useEffect(() => {
     const fetchRecords = async () => {
       setLoading(true);
-      const { data } = await supabase
+      // FK join 대신 payroll_records만 조회 (PostgREST 관계 캐시 오류 방지)
+      const { data: prData, error } = await supabase
         .from('payroll_records')
-        .select('*, staff_members(name, company, department, position)')
+        .select('*')
         .eq('year_month', yearMonth);
-      let list = data || [];
-      if (selectedCo && selectedCo !== '전체') {
-        list = list.filter((r: any) => r.staff_members?.company === selectedCo);
+      if (error) {
+        console.warn('payroll_records 조회 실패:', error.message);
+        setRecords([]);
+        setLoading(false);
+        return;
+      }
+      let list = prData || [];
+      // selectedCo 필터링: staff_id 기준으로 staff_members 별도 조회
+      if (selectedCo && selectedCo !== '전체' && list.length > 0) {
+        const staffIds = [...new Set(list.map((r: any) => r.staff_id))];
+        const { data: staffData } = await supabase
+          .from('staff_members')
+          .select('id, company')
+          .in('id', staffIds);
+        const staffCompanyMap = Object.fromEntries((staffData || []).map((s: any) => [String(s.id), s.company]));
+        list = list.filter((r: any) => staffCompanyMap[String(r.staff_id)] === selectedCo);
       }
       setRecords(list);
       setLoading(false);

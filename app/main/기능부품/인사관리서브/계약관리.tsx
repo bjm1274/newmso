@@ -118,7 +118,12 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: Record<s
         };
       });
 
-      await supabase.from('employment_contracts').upsert(requests, { onConflict: 'staff_id,contract_type,status' });
+      const { error: upsertError } = await supabase.from('employment_contracts').upsert(requests, { onConflict: 'staff_id,contract_type,status' });
+      if (upsertError) {
+        console.error('employment_contracts upsert failed:', upsertError);
+        toast(`계약서 발송 실패: ${upsertError.message || '저장 오류'}`, 'error');
+        return;
+      }
 
 
       if (includeTaxFree) {

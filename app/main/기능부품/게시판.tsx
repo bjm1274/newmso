@@ -513,7 +513,13 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     // 내 좋아요 목록 로드
     if (user?.id) {
       supabase.from('board_post_likes').select('post_id').eq('user_id', user.id).then(({ data }) => {
-        setMyLikedPostIds(new Set((data || []).map((r: any) => r.post_id)));
+        setMyLikedPostIds(
+          new Set(
+            (data || [])
+              .map((r: any) => String(r.post_id ?? '').trim())
+              .filter(Boolean)
+          )
+        );
       });
     }
     // 다른 게시판에서 다시 수술/MRI 일정으로 돌아올 때는 현재 월 기준으로 달력 리셋
@@ -602,28 +608,43 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   const [likingPostId, setLikingPostId] = useState<string | null>(null);
   const handleLike = async (post: BoardPost) => {
     if (!user?.id || likingPostId) return;
-    const postId = post.id;
+    const postId = String(post.id ?? '').trim();
+    if (!postId) return;
     setLikingPostId(postId);
     try {
     const isLiked = myLikedPostIds.has(postId);
     if (isLiked) {
       // 이미 좋아요 → 취소
-      await supabase.from('board_post_likes').delete().eq('post_id', postId).eq('user_id', user.id);
+      const { error: unlikeError } = await supabase.from('board_post_likes').delete().eq('post_id', post.id).eq('user_id', user.id);
+      if (unlikeError) throw unlikeError;
       const likes = Math.max((post.likes_count ?? 1) - 1, 0);
-      await supabase.from('board_posts').update({ likes_count: likes }).eq('id', postId);
-      setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, likes_count: likes } : p)));
-      setSelectedPostDetail((prev: BoardPost | null) => prev?.id === postId ? { ...prev, likes_count: likes } : prev);
+      const { error: unlikeCountError } = await supabase.from('board_posts').update({ likes_count: likes }).eq('id', post.id);
+      if (unlikeCountError) throw unlikeCountError;
+      setPosts((prev) => prev.map((p) => (String(p.id ?? '').trim() === postId ? { ...p, likes_count: likes } : p)));
+      setSelectedPostDetail((prev: BoardPost | null) => {
+        if (!prev || String(prev.id ?? '').trim() !== postId) return prev;
+        return { ...prev, likes_count: likes };
+      });
       setMyLikedPostIds((prev) => { const next = new Set(prev); next.delete(postId); return next; });
     } else {
       // 좋아요 추가
-      await supabase.from('board_post_likes').insert([{ post_id: postId, user_id: user.id }]);
+      const { error: likeError } = await supabase.from('board_post_likes').insert([{ post_id: post.id, user_id: user.id }]);
+      if (likeError) throw likeError;
       const likes = (post.likes_count ?? 0) + 1;
-      await supabase.from('board_posts').update({ likes_count: likes }).eq('id', postId);
-      setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, likes_count: likes } : p)));
-      setSelectedPostDetail((prev: BoardPost | null) => prev?.id === postId ? { ...prev, likes_count: likes } : prev);
+      const { error: likeCountError } = await supabase.from('board_posts').update({ likes_count: likes }).eq('id', post.id);
+      if (likeCountError) throw likeCountError;
+      setPosts((prev) => prev.map((p) => (String(p.id ?? '').trim() === postId ? { ...p, likes_count: likes } : p)));
+      setSelectedPostDetail((prev: BoardPost | null) => {
+        if (!prev || String(prev.id ?? '').trim() !== postId) return prev;
+        return { ...prev, likes_count: likes };
+      });
       setMyLikedPostIds((prev) => new Set([...prev, postId]));
     }
-    } finally {
+    } catch (error) {
+      console.error('좋아요 처리 실패:', error);
+      toast('좋아요 처리 중 오류가 발생했습니다.', 'error');
+    }
+    finally {
       setLikingPostId(null);
     }
   };
@@ -1962,9 +1983,9 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                           <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); handleLike(post); }}
-                            className={`w-14 text-[11px] font-bold text-center shrink-0 transition ${myLikedPostIds.has(post.id) ? 'text-red-500' : 'text-[var(--toss-gray-3)] hover:text-red-400'}`}
+                            className={`w-14 text-[11px] font-bold text-center shrink-0 transition ${myLikedPostIds.has(String(post.id ?? '').trim()) ? 'text-red-500' : 'text-[var(--toss-gray-3)] hover:text-red-400'}`}
                           >
-                            {myLikedPostIds.has(post.id) ? '♥' : '♡'} {(post.likes_count as number) ?? 0}
+                            {myLikedPostIds.has(String(post.id ?? '').trim()) ? '♥' : '♡'} {(post.likes_count as number) ?? 0}
                           </button>
                         </div>
                       )}
@@ -2008,12 +2029,12 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                       onClick={() => handleLike(selectedPost)}
                       disabled={!!likingPostId}
                       className={`px-3 py-1.5 rounded-[var(--radius-md)] border text-[11px] font-bold transition ${
-                        myLikedPostIds.has(selectedPost.id)
+                        myLikedPostIds.has(String(selectedPost.id ?? '').trim())
                           ? 'border-red-200 text-red-500 bg-red-50 hover:bg-red-100'
                           : 'border-[var(--border)] text-[var(--toss-gray-3)] hover:text-red-400 hover:border-red-200'
                       }`}
                     >
-                      {myLikedPostIds.has(selectedPost.id) ? '♥' : '♡'} 좋아요 {(selectedPost.likes_count as number) ?? 0}
+                      {myLikedPostIds.has(String(selectedPost.id ?? '').trim()) ? '♥' : '♡'} 좋아요 {(selectedPost.likes_count as number) ?? 0}
                     </button>
                     {canEditPost(selectedPost) && (
                       <>
