@@ -118,7 +118,16 @@ export default function ContractMain({ staffs, selectedCo, onRefresh }: Record<s
         };
       });
 
-      const { error: upsertError } = await supabase.from('employment_contracts').upsert(requests, { onConflict: 'staff_id,contract_type,status' });
+      // 기존 미발송/반려 상태 레코드를 먼저 서명대기로 업데이트, 없으면 신규 insert
+      const staffIdList = checkedIds.map((id: number) => id);
+      await supabase
+        .from('employment_contracts')
+        .update({ status: '서명대기', requested_at: new Date().toISOString() })
+        .in('staff_id', staffIdList)
+        .eq('contract_type', contractType)
+        .in('status', ['미발송', '반려']);
+
+      const { error: upsertError } = await supabase.from('employment_contracts').upsert(requests, { onConflict: 'staff_id,contract_type' });
       if (upsertError) {
         console.error('employment_contracts upsert failed:', upsertError);
         toast(`계약서 발송 실패: ${upsertError.message || '저장 오류'}`, 'error');
