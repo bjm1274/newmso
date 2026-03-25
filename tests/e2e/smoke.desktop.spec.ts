@@ -4,7 +4,6 @@ import {
   dismissDialogs,
   fakeUser,
   mockSupabase,
-  replaceSession,
   seedSession,
 } from "./helpers";
 test.beforeEach(async ({ page }) => {
@@ -14,13 +13,25 @@ test.beforeEach(async ({ page }) => {
 async function loginWithSession(
   page: import("@playwright/test").Page,
   user: Record<string, unknown>,
-  localStorage: Record<string, string> = {},
+  localStorage:
+    | Record<string, string>
+    | { localStorage?: Record<string, string> } = {},
 ) {
+  const resolvedLocalStorage: Record<string, string> =
+    typeof localStorage === "object" && localStorage !== null && "localStorage" in localStorage
+      ? (localStorage as { localStorage?: Record<string, string> }).localStorage ?? {}
+      : (localStorage as Record<string, string>);
   await page.goto("/login");
-  await replaceSession(page, {
-    user,
-    localStorage,
+  await page.context().clearCookies();
+  await page.evaluate(() => {
+    window.localStorage.clear();
   });
+  await seedSession(page, {
+    user,
+    localStorage: resolvedLocalStorage,
+  });
+  await page.goto("/main");
+  await expect(page.getByTestId("main-shell")).toBeVisible();
 }
 
 /* const lockedDownMsoUser = {
@@ -551,8 +562,7 @@ test("legacy HR org chart entry opens company manager for admin users", async ({
   };
 
   await mockSupabase(page, { staffMembers: [adminUser] });
-  await seedSession(page, {
-    user: adminUser,
+  await loginWithSession(page, adminUser, {
     localStorage: {
       erp_last_menu: "인사관리",
       erp_last_subview: "조직도",
@@ -1086,7 +1096,9 @@ test("inventory stock-out flow updates stock through the modal", async ({
 
   const inventoryUpdateRequest = page.waitForRequest(
     (request) =>
-      request.url().includes("/inventory") && request.method() === "PATCH",
+      (request.url().includes("/inventory") && request.method() === "PATCH") ||
+      (request.url().includes("/rpc/atomic_stock_update") &&
+        request.method() === "POST"),
   );
   const inventoryLogRequest = page.waitForRequest(
     (request) =>
@@ -1620,6 +1632,7 @@ test("payroll tax file utility triggers a browser download", async ({
     `/main?${new URLSearchParams({ open_menu: "인사관리" }).toString()}`,
   );
 
+  await page.getByTestId("payroll-utility-1").click();
   await expect(page.getByTestId("payroll-utility-tax-file")).toBeVisible();
   const downloadPromise = page.waitForEvent("download");
   await page.getByTestId("payroll-tax-download-button").click();
@@ -1644,6 +1657,7 @@ test("contract auto generator saves through the embedded HR utility", async ({
     `/main?${new URLSearchParams({ open_menu: "인사관리" }).toString()}`,
   );
 
+  await page.getByTestId("contract-utility-1").click();
   await expect(
     page.getByTestId("contract-utility-auto-generator"),
   ).toBeVisible();
@@ -2202,7 +2216,7 @@ test("employee and admin can complete a realistic monthly operations lifecycle",
     `/main?${new URLSearchParams({ open_menu: "채팅" }).toString()}`,
   );
   await expect(page.getByTestId("chat-view")).toBeVisible();
-  await page.getByText(groupRoom.name).click();
+  await page.getByTestId(`chat-room-${groupRoom.id}`).click();
   await expect(
     page.getByText("E2E 통합 테스트용 업무 메시지입니다.").first(),
   ).toBeVisible();
@@ -2241,7 +2255,9 @@ test("employee and admin can complete a realistic monthly operations lifecycle",
   await page.getByTestId("inventory-stock-amount-input").fill("9");
   const stockOutRequest = page.waitForRequest(
     (request) =>
-      request.url().includes("/inventory") && request.method() === "PATCH",
+      (request.url().includes("/inventory") && request.method() === "PATCH") ||
+      (request.url().includes("/rpc/atomic_stock_update") &&
+        request.method() === "POST"),
   );
   await page.getByTestId("inventory-stock-modal").locator("button").last().click();
   await stockOutRequest;
