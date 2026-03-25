@@ -3,6 +3,7 @@ import { toast } from '@/lib/toast';
 
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { syncApprovalToDocumentRepository } from '@/lib/approval-document-archive';
 import { CERTIFICATE_TYPES } from '@/lib/certificate-types';
 
 const URGENCY_LEVELS = ['일반', '긴급', '매우긴급'] as const;
@@ -109,6 +110,13 @@ export default function FormRequest({
         .single();
 
       if (error) throw error;
+
+      try {
+        await syncApprovalToDocumentRepository((insertedApproval as Record<string, unknown> | null) ?? payload);
+      } catch (archiveError) {
+        console.error('양식신청 문서보관함 저장 실패:', describeError(archiveError));
+        toast('양식 신청은 완료됐지만 문서보관함 저장에는 실패했습니다.', 'warning');
+      }
 
       const excludedIds = new Set<string>([
         String(user.id || ''),

@@ -22,9 +22,10 @@ export default function PayrollExport({ checkedIds = [], selectedCo, yearMonth: 
       setLoading(true);
       setErrorMessage('');
 
-      const { data, error } = await supabase
+      // FK join 대신 별도 쿼리로 조회 (PostgREST 관계 캐시 오류 방지)
+      const { data: prData, error } = await supabase
         .from('payroll_records')
-        .select('*, staff_members(name, company, department, bank_account, employee_no)')
+        .select('*')
         .eq('year_month', yearMonth)
         .neq('record_type', 'interim');
 
@@ -38,7 +39,17 @@ export default function PayrollExport({ checkedIds = [], selectedCo, yearMonth: 
         return;
       }
 
-      let list = data || [];
+      let list = prData || [];
+      // staff_members 별도 조회 후 병합
+      if (list.length > 0) {
+        const staffIds = [...new Set(list.map((r: any) => r.staff_id))];
+        const { data: staffData } = await supabase
+          .from('staff_members')
+          .select('id, name, company, department, bank_account, employee_no')
+          .in('id', staffIds);
+        const staffMap = Object.fromEntries((staffData || []).map((s: any) => [String(s.id), s]));
+        list = list.map((r: any) => ({ ...r, staff_members: staffMap[String(r.staff_id)] || null }));
+      }
       if (selectedCo && selectedCo !== '전체') {
         list = list.filter((record: any) => record.staff_members?.company === selectedCo);
       }
