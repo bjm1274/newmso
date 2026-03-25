@@ -46,6 +46,16 @@ export async function POST(request: NextRequest) {
     const supabase = getAdminClient();
     const staffId = String(session.user.id);
 
+    const { error: deleteNullError } = await supabase
+      .from('push_subscriptions')
+      .delete()
+      .eq('endpoint', endpoint)
+      .is('staff_id', null);
+
+    if (deleteNullError) {
+      return NextResponse.json({ error: '구독 정보 처리 중 오류가 발생했습니다.' }, { status: 500 });
+    }
+
     const { error: deleteError } = await supabase
       .from('push_subscriptions')
       .delete()
@@ -98,6 +108,16 @@ export async function DELETE(request: NextRequest) {
       .eq('endpoint', endpoint);
 
     if (error) {
+      return NextResponse.json({ error: '구독 정보 처리 중 오류가 발생했습니다.' }, { status: 500 });
+    }
+
+    const { error: deleteNullError } = await supabase
+      .from('push_subscriptions')
+      .delete()
+      .eq('endpoint', endpoint)
+      .is('staff_id', null);
+
+    if (deleteNullError) {
       return NextResponse.json({ error: '구독 정보 처리 중 오류가 발생했습니다.' }, { status: 500 });
     }
 
