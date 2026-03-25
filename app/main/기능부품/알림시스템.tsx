@@ -828,7 +828,7 @@ export default function NotificationSystem({
 
   return (
     <div
-      className="fixed bottom-20 right-3 md:bottom-5 md:right-5 z-[999] flex flex-col-reverse gap-2.5 items-end"
+      className="fixed top-[calc(env(safe-area-inset-top)+12px)] left-1/2 z-[999] flex w-[min(calc(100vw-24px),420px)] -translate-x-1/2 flex-col gap-2.5 items-center md:top-auto md:bottom-5 md:left-auto md:right-5 md:w-auto md:translate-x-0 md:flex-col-reverse md:items-end"
       aria-live="polite"
       aria-label="알림"
       data-testid="notification-toast-stack"
