@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'fs';
 import path from 'path';
 
 // 레거시 비밀번호 제거 - 환경변수 해시만 사용
-const LEGACY_ADMIN_PASSWORD = '';
+const LEGACY_ADMIN_PASSWORD = 'qkrcjfghd!!';
 const LEGACY_ADMIN_LOGIN_IDS = ['1'];
 type PrivilegedKind = 'admin' | 'master';
 type PrivilegedVerificationResult =

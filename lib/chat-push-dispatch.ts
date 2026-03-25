@@ -401,7 +401,7 @@ export async function dispatchChatPushForMessage(params: {
     const payload = JSON.stringify({
       title,
       body: previewBody,
-      tag: 'chat-message',
+      tag: `chat-msg-${params.messageId}`,
       data: {
         room_id: params.roomId,
         message_id: params.messageId,
@@ -411,6 +411,8 @@ export async function dispatchChatPushForMessage(params: {
     });
 
     for (const subscription of uniqueSubscriptions.values()) {
+      // FCM 토큰이 있는 구독은 FCM이 처리 — Web Push 중복 방지
+      if (subscription.fcm_token) continue;
       try {
         await sendWebPushNotification(subscription, payload);
         sent += 1;

@@ -245,9 +245,15 @@ function canAccessDetailedSection(
   sectionIdOrPermissionKey: string,
   map: Record<string, string>
 ) {
-  if (isPrivilegedUser(user) || isAdminUser(user)) return true;
+  if (isPrivilegedUser(user)) return true;
   if (!canAccessMainMenu(user, menuId)) return false;
-  return hasPermission(user, resolvePermissionKey(sectionIdOrPermissionKey, map));
+  const resolvedPermissionKey = resolvePermissionKey(sectionIdOrPermissionKey, map);
+  const explicitPermission = getExplicitPermissionState(user, resolvedPermissionKey);
+  if (explicitPermission !== null) {
+    return explicitPermission;
+  }
+  if (isAdminUser(user)) return true;
+  return hasPermission(user, resolvedPermissionKey);
 }
 
 function normalizeValue(value: any): any {
@@ -297,8 +303,53 @@ export function canAccessMainMenu(user: UserLike | null | undefined, menuId: str
   if (user?.status === '퇴사') {
     return menuId === '내정보' || menuId === '알림';
   }
-  if (isPrivilegedUser(user) || isAdminUser(user)) {
+  if (isPrivilegedUser(user)) {
     return true;
+  }
+  /*
+  const explicitMenuPermissionKeyByMenu: Partial<Record<MainMenuId, string>> = {
+    '異붽?湲곕뒫': 'menu_異붽?湲곕뒫',
+    '寃뚯떆??: 'menu_寃뚯떆??,
+    '?꾩옄寃곗옱': 'menu_?꾩옄寃곗옱',
+    '?몄궗愿由?: 'menu_?몄궗愿由?,
+    '?ш퀬愿由?: 'menu_?ш퀬愿由?,
+    '愿由ъ옄': 'menu_愿由ъ옄',
+  };
+  const explicitMenuPermissionKey = explicitMenuPermissionKeyByMenu[menuId as MainMenuId];
+  if (explicitMenuPermissionKey) {
+    const explicitPermission = getExplicitPermissionState(user, explicitMenuPermissionKey);
+    if (explicitPermission !== null) {
+      return explicitPermission;
+    }
+    if (isAdminUser(user)) {
+      return true;
+    }
+  }
+  }
+  */
+  const resolveExplicitMenuAccess = (permissionKey: string) => {
+    const explicitPermission = getExplicitPermissionState(user, permissionKey);
+    if (explicitPermission !== null) {
+      return explicitPermission;
+    }
+    return isAdminUser(user) || hasPermission(user, permissionKey);
+  };
+  const explicitMenuAccess =
+    menuId === '추가기능'
+      ? resolveExplicitMenuAccess('menu_추가기능')
+      : menuId === '게시판'
+        ? resolveExplicitMenuAccess('menu_게시판')
+        : menuId === '전자결재'
+          ? resolveExplicitMenuAccess('menu_전자결재')
+          : menuId === '인사관리'
+            ? resolveExplicitMenuAccess('menu_인사관리')
+            : menuId === '재고관리'
+              ? resolveExplicitMenuAccess('menu_재고관리')
+              : menuId === '관리자'
+                ? resolveExplicitMenuAccess('menu_관리자')
+                : null;
+  if (explicitMenuAccess !== null) {
+    return explicitMenuAccess;
   }
   switch (menuId as MainMenuId) {
     case '내정보':

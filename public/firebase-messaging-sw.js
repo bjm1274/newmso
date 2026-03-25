@@ -18,7 +18,7 @@ messaging.onBackgroundMessage((payload) => {
   const title = payload.notification?.title || '새 알림';
   const body = payload.notification?.body || '새 알림이 있습니다.';
   const data = payload.data || {};
-  const tag = 'fcm-' + (data.message_id || data.id || Date.now());
+  const tag = 'chat-msg-' + (data.message_id || data.id || Date.now());
 
   self.registration.showNotification(title, {
     body,

@@ -366,6 +366,10 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   const [unreadModalMsg, setUnreadModalMsg] = useState<any | null>(null);
   const [unreadUsers, setUnreadUsers] = useState<StaffMember[]>([]);
   const [unreadLoading, setUnreadLoading] = useState(false);
+
+  // 인앱 토스트 알림 (카카오톡 스타일)
+  const [inAppToasts, setInAppToasts] = useState<{ id: string; senderName: string; roomName: string; preview: string; roomId: string }[]>([]);
+  const inAppToastTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const [chatDirectoryStaffs, setChatDirectoryStaffs] = useState<StaffMember[]>([]);
   const [persistedPinnedMessages, setPersistedPinnedMessages] = useState<ChatMessage[]>([]);
 
@@ -1061,6 +1065,24 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
     if (!isOwnMessage && currentRooms.length > 0) {
       void updateUnreadForRooms(currentRooms);
+    }
+
+    // 인앱 토스트 알림: 다른 방 메시지 or 앱이 백그라운드 상태일 때
+    if (!isOwnMessage) {
+      const senderProfile = resolveStaffProfile(row.sender_id, row.sender_name);
+      const senderName = senderProfile?.name || row.sender_name || '알 수 없음';
+      const roomName = currentRoom ? getRoomDisplayName(currentRoom, [], effectiveChatUserId) : '채팅';
+      const preview = row.content || (row.file_url ? '📎 첨부파일' : '새 메시지');
+      const toastId = String(row.id);
+      setInAppToasts((prev) => {
+        if (prev.some((t) => t.id === toastId)) return prev;
+        return [...prev.slice(-2), { id: toastId, senderName, roomName, preview, roomId: String(row.room_id) }];
+      });
+      if (inAppToastTimerRef.current[toastId]) clearTimeout(inAppToastTimerRef.current[toastId]);
+      inAppToastTimerRef.current[toastId] = setTimeout(() => {
+        setInAppToasts((prev) => prev.filter((t) => t.id !== toastId));
+        delete inAppToastTimerRef.current[toastId];
+      }, 4000);
     }
   }, [
     broadcastChatSync,
@@ -2857,6 +2879,44 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
   return (
     <div data-testid="chat-view" className="flex flex-1 min-h-0 overflow-hidden relative font-sans bg-[var(--background)] md:h-[100dvh] md:max-h-[100dvh] md:bg-[var(--card)]">
+
+      {/* 카카오톡 스타일 인앱 토스트 알림 (모바일) */}
+      {inAppToasts.length > 0 && (
+        <div className="fixed top-3 left-0 right-0 z-[9999] flex flex-col gap-2 px-3 md:hidden pointer-events-none">
+          {inAppToasts.map((toast) => (
+            <button
+              key={toast.id}
+              type="button"
+              onClick={() => {
+                setRoom(toast.roomId);
+                setInAppToasts((prev) => prev.filter((t) => t.id !== toast.id));
+              }}
+              className="pointer-events-auto w-full flex items-center gap-3 px-4 py-3 rounded-2xl bg-zinc-900/95 backdrop-blur-md shadow-lg text-left animate-in slide-in-from-top-2 duration-300"
+            >
+              <div className="w-9 h-9 rounded-xl bg-[var(--accent)] flex items-center justify-center text-white text-base shrink-0">
+                💬
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2 mb-0.5">
+                  <span className="text-[12px] font-bold text-white truncate">{toast.senderName}</span>
+                  <span className="text-[10px] text-zinc-400 shrink-0">{toast.roomName}</span>
+                </div>
+                <p className="text-[12px] text-zinc-300 truncate">{toast.preview}</p>
+              </div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setInAppToasts((prev) => prev.filter((t) => t.id !== toast.id));
+                }}
+                className="shrink-0 text-zinc-500 hover:text-zinc-300 p-1"
+              >
+                ✕
+              </button>
+            </button>
+          ))}
+        </div>
+      )}
       <aside className={`${selectedRoomId ? 'hidden md:flex' : 'flex'} w-full md:w-80 border-r border-[var(--border)] dark:border-zinc-800 bg-[var(--card)] dark:bg-zinc-950 flex-col shrink-0 z-50 transition-all`}>
         <div className="p-3 md:p-3 space-y-3 flex flex-col min-h-0">
           <div className="flex items-center gap-1">
