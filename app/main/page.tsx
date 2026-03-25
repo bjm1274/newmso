@@ -476,9 +476,20 @@ function MainPageContent() {
     const openPost = navigationIntent.openPost;
     const openInventoryView = navigationIntent.openInventoryView;
     const openInventoryApproval = navigationIntent.openInventoryApproval;
+    if (!user) return;
     if (targetMenu || targetSubView || openMyPageTab || openPost || openInventoryView || openInventoryApproval) {
-      if (targetMenu) setMainMenu(targetMenu);
-      if (targetSubView) setSubView(targetSubView);
+      const savedSubView =
+        typeof window !== 'undefined' ? window.localStorage.getItem('erp_last_subview') : null;
+      const resolvedNavigation = targetMenu
+        ? resolveLegacyNavigation(targetMenu, targetSubView ?? savedSubView, user)
+        : null;
+      const resolvedMenu = resolvedNavigation?.menuId
+        ? normalizeMainMenuForUser(user, resolvedNavigation.menuId)
+        : targetMenu;
+      const resolvedSubView = targetSubView ?? resolvedNavigation?.subViewId ?? null;
+
+      if (resolvedMenu) setMainMenu(resolvedMenu);
+      if (resolvedSubView) setSubView(resolvedSubView);
       if (targetMenu === '내정보' && openMyPageTab) {
         setInitialMyPageTab(openMyPageTab);
       }
@@ -509,7 +520,9 @@ function MainPageContent() {
     navigationIntent.openMyPageTab,
     navigationIntent.openPost,
     navigationIntent.openSubView,
+    resolveLegacyNavigation,
     router,
+    user,
   ]);
 
   // 온라인 상태(Presence) 업데이트: 일정 주기로 last_seen_at 갱신

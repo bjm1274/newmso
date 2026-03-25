@@ -62,22 +62,30 @@ async function insertLiveNotification(
     const user = rawUser ? JSON.parse(rawUser) : null;
     if (!user?.id) throw new Error('seeded user missing');
 
+    const rows = [
+      {
+        id: notificationPayload.id,
+        user_id: user.id,
+        type: notificationPayload.type,
+        title: notificationPayload.title,
+        body: notificationPayload.body,
+        metadata: notificationPayload.metadata ?? {},
+        read_at: null,
+        created_at: new Date().toISOString(),
+      },
+    ];
+
     await fetch('/rest/v1/notifications', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify([
-        {
-          id: notificationPayload.id,
-          user_id: user.id,
-          type: notificationPayload.type,
-          title: notificationPayload.title,
-          body: notificationPayload.body,
-          metadata: notificationPayload.metadata ?? {},
-          read_at: null,
-          created_at: new Date().toISOString(),
-        },
-      ]),
+      body: JSON.stringify(rows),
     });
+
+    window.dispatchEvent(
+      new CustomEvent('erp-mock-notification-insert', {
+        detail: { rows },
+      })
+    );
   }, payload);
 }
 

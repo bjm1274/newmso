@@ -254,6 +254,34 @@ function normalizeWorkspaceId(workspaceId?: string | null): HrWorkspaceId | null
   return LEGACY_WORKSPACE_MAP[workspaceId] || null;
 }
 
+function getInitialHrMenuState(initialMenu?: string | null): HrMenuId {
+  if (initialMenu && HR_TABS.some((tab) => tab.id === initialMenu)) {
+    return initialMenu as HrMenuId;
+  }
+
+  if (typeof window !== 'undefined') {
+    const savedTab = window.localStorage.getItem(HR_TAB_KEY);
+    if (savedTab && HR_TABS.some((tab) => tab.id === savedTab)) {
+      return savedTab as HrMenuId;
+    }
+  }
+
+  return normalizeHrMenu(initialMenu);
+}
+
+function getInitialHrWorkspaceState(initialMenu?: string | null): HrWorkspaceId {
+  const hasExplicitInitialHrMenu = !!initialMenu && HR_TABS.some((tab) => tab.id === initialMenu);
+
+  if (!hasExplicitInitialHrMenu && typeof window !== 'undefined') {
+    const savedWorkspace = normalizeWorkspaceId(window.localStorage.getItem(HR_WORKSPACE_KEY));
+    if (savedWorkspace) {
+      return savedWorkspace;
+    }
+  }
+
+  return getWorkspaceForHrMenu(getInitialHrMenuState(initialMenu));
+}
+
 function normalizeAttendanceTabForUser(user: any, requestedTab: AttendanceAnalysisTabId): AttendanceAnalysisTabId {
   const visibleTabs = ATTENDANCE_ANALYSIS_TABS.filter((tab) => canAccessHrSection(user, tab.perm));
   if (visibleTabs.some((tab) => tab.id === requestedTab)) {
@@ -329,10 +357,8 @@ interface HRMainViewProps {
 }
 
 export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu, selectedCo: mainSelectedCo }: HRMainViewProps) {
-  const [현재메뉴, 메뉴설정] = useState<HrMenuId>(normalizeHrMenu(initialMenu));
-  const [선택워크스페이스, 워크스페이스설정] = useState<HrWorkspaceId>(
-    getWorkspaceForHrMenu(normalizeHrMenu(initialMenu))
-  );
+  const [현재메뉴, 메뉴설정] = useState<HrMenuId>(() => getInitialHrMenuState(initialMenu));
+  const [선택워크스페이스, 워크스페이스설정] = useState<HrWorkspaceId>(() => getInitialHrWorkspaceState(initialMenu));
   const [선택사업체, 사업체설정] = useState('전체');
   const [등록창상태, 창상태설정] = useState(false);
   const [직원상태필터, 직원상태필터설정] = useState<StaffStatus>('재직');
@@ -462,7 +488,9 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
       const savedStatus = window.localStorage.getItem(HR_STATUS_KEY) as StaffStatus | null;
       const savedWorkspace = normalizeWorkspaceId(window.localStorage.getItem(HR_WORKSPACE_KEY));
 
-      if (!initialMenu && savedTab) {
+      const hasExplicitInitialHrMenu = !!initialMenu && HR_TABS.some((tab) => tab.id === initialMenu);
+
+      if (!hasExplicitInitialHrMenu && savedTab) {
         적용입장메뉴(savedTab);
       }
 
