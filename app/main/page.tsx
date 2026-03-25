@@ -16,7 +16,7 @@ import {
   hasUserPayloadChanged,
   normalizeMainMenuForUser,
 } from '@/lib/access-control';
-import { isNamedSystemMasterAccount } from '@/lib/system-master';
+import { hasSystemMasterPermission } from '@/lib/system-master';
 
 import Sidebar, { SUB_MENUS } from './기능부품/조직도서브/조직도측면창';
 import MainContent from './기능부품/조직도서브/조직도본문';
@@ -296,6 +296,15 @@ function MainPageContent() {
         }
 
         const savedCo = localStorage.getItem('erp_last_co');
+        const savedMenu = localStorage.getItem('erp_last_menu');
+        const savedSubView = localStorage.getItem('erp_last_subview');
+        const navigationEntry =
+          typeof window !== 'undefined' && typeof window.performance?.getEntriesByType === 'function'
+            ? (window.performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined)
+            : undefined;
+        const navigationType = navigationEntry?.type ?? 'navigate';
+        const shouldRestoreSavedMenuState =
+          navigationType === 'reload' || navigationType === 'back_forward';
         const shouldHonorNavigationIntent = !(
           navigationQuery?.openChatRoom ||
           navigationQuery?.openMessage ||
@@ -309,12 +318,20 @@ function MainPageContent() {
           navigationQuery?.openSubView
         );
 
+        const restoredNavigation = resolveLegacyNavigation(savedMenu, savedSubView, sessionUser);
+        const preferredInitialMenu = shouldRestoreSavedMenuState
+          ? normalizeMainMenuForUser(sessionUser, restoredNavigation.menuId || '내정보')
+          : normalizeMainMenuForUser(sessionUser, '내정보');
+        const preferredInitialSubView = shouldRestoreSavedMenuState
+          ? restoredNavigation.subViewId || '전체'
+          : '전체';
+
         if (!ignore) {
           if (shouldHonorNavigationIntent) {
-            setMainMenu(normalizeMainMenuForUser(sessionUser, '내정보'));
+            setMainMenu(preferredInitialMenu);
           }
           if (shouldHonorSubViewIntent) {
-            setSubView('전체');
+            setSubView(preferredInitialSubView);
           }
         }
 
@@ -670,7 +687,7 @@ function MainPageContent() {
   }, [companyIdByName, persistClientUser, selectedCo, user]);
 
   // 현재 메인 메뉴에 해당하는 서브메뉴 목록
-  const isSystemMaster = isNamedSystemMasterAccount(user);
+  const isSystemMaster = hasSystemMasterPermission(user);
   const currentSubMenus = (mainMenu === '인사관리' ? [] : (SUB_MENUS[mainMenu] || []))
     .filter((subMenu) => {
       if (mainMenu === '게시판') {
