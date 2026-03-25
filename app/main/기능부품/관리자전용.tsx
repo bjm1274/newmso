@@ -23,7 +23,7 @@ import AccessAuditLog from './관리자전용서브/접근감사로그';
 import CompanyPnL from './관리자전용서브/법인손익현황';
 import OfficialDocumentLog from './관리자전용서브/공문서발송대장';
 import SystemMasterCenter from './관리자전용서브/시스템마스터센터';
-import { isNamedSystemMasterAccount } from '@/lib/system-master';
+import { hasSystemMasterPermission } from '@/lib/system-master';
 
 type AnalysisTabId = '경영대시보드' | '재무대시보드' | '예산관리' | '통합보고서' | '법인손익';
 type AuditTabId = '감사로그' | '접근감사로그';
@@ -205,7 +205,7 @@ export default function AdminView(props: Record<string, unknown>) {
   const [auditTab, setAuditTab] = useState<AuditTabId>(initialState.auditTab);
   const [inventory, setInventory] = useState<any[]>([]);
 
-  const isSystemMaster = isNamedSystemMasterAccount(user as any);
+  const isSystemMaster = hasSystemMasterPermission(user as any);
   const hasAdminMenuAccess = canAccessMainMenu(user as any, '관리자');
   const visibleAdminTabs = useMemo(() => {
     const tabs: AdminOuterTabId[] = [];

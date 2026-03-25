@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import AnnualLeaveManualGrant from './연차수동부여';
-import { SYSTEM_MASTER_ACCOUNT_ID, isNamedSystemMasterAccount } from '@/lib/system-master';
+import { SYSTEM_MASTER_ACCOUNT_ID, hasSystemMasterPermission } from '@/lib/system-master';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
 
@@ -133,7 +133,7 @@ export default function SystemMasterCenter({
   const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);
   const [deletingMsgId, setDeletingMsgId] = useState<string | null>(null);
 
-  const isSystemMaster = isNamedSystemMasterAccount(user);
+  const isSystemMaster = hasSystemMasterPermission(user);
 
   useEffect(() => {
     if (!initialTab || !isSystemMaster) return;
