@@ -42,7 +42,10 @@ type QueueJobRow = {
   id: string;
   message_id: string;
   room_id: string;
+  created_at?: string | null;
   attempt_count?: number | null;
+  next_attempt_at?: string | null;
+  dead_lettered_at?: string | null;
 };
 
 export type ChatPushDispatchResult = {
@@ -53,6 +56,9 @@ export type ChatPushDispatchResult = {
   pushDisabled: boolean;
   reason?: string;
 };
+
+const CHAT_PUSH_MAX_ATTEMPTS = 5;
+const CHAT_PUSH_RETRY_DELAYS_MINUTES = [1, 5, 15, 30, 60];
 
 function getAdminClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -71,6 +77,107 @@ function isMissingRelationError(error: any, relationName: string) {
   const message = String(error?.message || error?.details || '').toLowerCase();
   const target = relationName.toLowerCase();
   return code === '42P01' || message.includes(target);
+}
+
+function isMissingColumnError(error: any, columnName: string) {
+  if (!error) return false;
+  const code = String(error?.code || '');
+  const message = String(error?.message || error?.details || '').toLowerCase();
+  return code === '42703' && message.includes(columnName.toLowerCase());
+}
+
+function getRetryDelayMinutes(attemptCount: number) {
+  const index = Math.min(
+    Math.max(attemptCount - 1, 0),
+    CHAT_PUSH_RETRY_DELAYS_MINUTES.length - 1,
+  );
+  return CHAT_PUSH_RETRY_DELAYS_MINUTES[index];
+}
+
+function buildQueueFailurePatch(attemptCount: number, error: unknown, supportsRetryColumns: boolean) {
+  const message = String((error as any)?.message || error || 'unknown-error');
+  if (!supportsRetryColumns) {
+    return {
+      processing_started_at: null,
+      last_error: message,
+    };
+  }
+
+  const now = new Date();
+  const exhausted = attemptCount >= CHAT_PUSH_MAX_ATTEMPTS;
+  const retryAt = exhausted
+    ? now
+    : new Date(now.getTime() + getRetryDelayMinutes(attemptCount) * 60 * 1000);
+
+  return {
+    processing_started_at: null,
+    last_error: message,
+    next_attempt_at: retryAt.toISOString(),
+    dead_lettered_at: exhausted ? now.toISOString() : null,
+  };
+}
+
+async function selectPendingChatPushJobs(supabase: SupabaseClient, limit: number) {
+  const nowIso = new Date().toISOString();
+  const retryAwareSelection =
+    'id, message_id, room_id, created_at, attempt_count, next_attempt_at, dead_lettered_at';
+
+  const retryAwareRes = await supabase
+    .from('chat_push_jobs')
+    .select(retryAwareSelection)
+    .is('processed_at', null)
+    .is('dead_lettered_at', null)
+    .lte('next_attempt_at', nowIso)
+    .order('created_at', { ascending: true })
+    .limit(limit);
+
+  if (!retryAwareRes.error) {
+    return {
+      jobs: (retryAwareRes.data || []) as QueueJobRow[],
+      supportsRetryColumns: true,
+      missingQueueTable: false,
+    };
+  }
+
+  if (
+    isMissingColumnError(retryAwareRes.error, 'next_attempt_at') ||
+    isMissingColumnError(retryAwareRes.error, 'dead_lettered_at')
+  ) {
+    const fallbackRes = await supabase
+      .from('chat_push_jobs')
+      .select('id, message_id, room_id, created_at, attempt_count')
+      .is('processed_at', null)
+      .order('created_at', { ascending: true })
+      .limit(limit);
+
+    if (!fallbackRes.error) {
+      return {
+        jobs: (fallbackRes.data || []) as QueueJobRow[],
+        supportsRetryColumns: false,
+        missingQueueTable: false,
+      };
+    }
+
+    if (isMissingRelationError(fallbackRes.error, 'chat_push_jobs')) {
+      return {
+        jobs: [] as QueueJobRow[],
+        supportsRetryColumns: false,
+        missingQueueTable: true,
+      };
+    }
+
+    throw fallbackRes.error;
+  }
+
+  if (isMissingRelationError(retryAwareRes.error, 'chat_push_jobs')) {
+    return {
+      jobs: [] as QueueJobRow[],
+      supportsRetryColumns: false,
+      missingQueueTable: true,
+    };
+  }
+
+  throw retryAwareRes.error;
 }
 
 function buildPreview(message: MessageRow) {
@@ -336,30 +443,23 @@ export async function dispatchChatPushForMessage(params: {
 
 export async function processPendingChatPushJobs(limit = 25) {
   const supabase = getAdminClient();
-  const { data, error } = await supabase
-    .from('chat_push_jobs')
-    .select('id, message_id, room_id, attempt_count')
-    .is('processed_at', null)
-    .order('created_at', { ascending: true })
-    .limit(limit);
+  const queueSelection = await selectPendingChatPushJobs(supabase, limit);
 
-  if (error) {
-    if (isMissingRelationError(error, 'chat_push_jobs')) {
-      return { processed: 0, sent: 0, failed: 0, skipped: 0, reason: 'queue-table-missing' };
-    }
-    throw error;
+  if (queueSelection.missingQueueTable) {
+    return { processed: 0, sent: 0, failed: 0, skipped: 0, reason: 'queue-table-missing' };
   }
 
-  const jobs = (data || []) as QueueJobRow[];
+  const jobs = queueSelection.jobs;
   let processed = 0;
   let sent = 0;
   let failed = 0;
   let skipped = 0;
 
   for (const job of jobs) {
+    const nextAttemptCount = Number(job.attempt_count || 0) + 1;
     await updateChatPushJobById(supabase, job.id, {
       processing_started_at: new Date().toISOString(),
-      attempt_count: Number(job.attempt_count || 0) + 1,
+      attempt_count: nextAttemptCount,
       last_error: null,
     });
 
@@ -375,10 +475,11 @@ export async function processPendingChatPushJobs(limit = 25) {
       if (result.reason) skipped += 1;
     } catch (error: any) {
       failed += 1;
-      await updateChatPushJobById(supabase, job.id, {
-        processing_started_at: null,
-        last_error: String(error?.message || error || 'unknown-error'),
-      });
+      await updateChatPushJobById(
+        supabase,
+        job.id,
+        buildQueueFailurePatch(nextAttemptCount, error, queueSelection.supportsRetryColumns),
+      );
     }
   }
 

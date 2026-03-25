@@ -80,11 +80,17 @@ export default function ProductRegistration({ user: _user, suppliers: _suppliers
         return submissionData;
       };
 
-      const { error } = await withMissingColumnsFallback(
-        (omittedColumns) => supabase.from('inventory').insert([buildSubmissionData(omittedColumns)]),
+      const { error, data: insertedData } = await withMissingColumnsFallback(
+        (omittedColumns) => supabase.from('inventory').insert([buildSubmissionData(omittedColumns)]).select('id'),
         ['department'],
       );
-      if (error) throw error;
+      if (error) {
+        console.error('inventory insert error:', error);
+        throw error;
+      }
+      if (!insertedData || (Array.isArray(insertedData) && insertedData.length === 0)) {
+        throw new Error('저장에 실패했습니다. 테이블 권한을 확인해 주세요.');
+      }
       toast(`${productForm.item_name} 등록이 완료되었습니다.`, 'success');
       fetchInventory?.();
       // 폼 초기화

@@ -446,8 +446,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
   };
 
   const handleMenuSelect = (menuId: HrMenuId) => {
-    메뉴설정(menuId);
-    워크스페이스설정(getWorkspaceForHrMenu(menuId));
+    적용입장메뉴(menuId);
   };
 
   useEffect(() => {
