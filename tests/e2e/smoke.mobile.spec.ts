@@ -25,6 +25,7 @@ test('mobile admin can switch across the main tabs without a stuck loading overl
       ...fakeUser.permissions,
       mso: true,
       admin: true,
+      inventory: true,
     },
     role: 'admin',
   };
@@ -51,7 +52,9 @@ test('mobile admin can switch across the main tabs without a stuck loading overl
   ];
 
   for (const menu of menus) {
-    await page.getByTestId(menu.trigger).click({ force: true });
+    await page
+      .getByTestId(menu.trigger)
+      .evaluate((element) => (element as HTMLElement).click());
     await expect(page.getByTestId(menu.view)).toBeVisible();
     await expect(page.getByTestId('main-loading-overlay')).toHaveCount(0);
   }

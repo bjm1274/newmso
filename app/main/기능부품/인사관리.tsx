@@ -791,6 +791,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
                 tabs={[...PAYROLL_UTILITY_TABS]}
                 activeTab={급여내부탭}
                 onChange={(tabId) => 급여내부탭설정(tabId as PayrollEmbeddedTabId)}
+                testIdPrefix="payroll-utility"
               />
               <div className="min-h-0 flex-1 overflow-y-auto">
                 {급여내부탭 === '기본' && <PayrollMain staffs={인사직원목록} selectedCo={선택사업체} onRefresh={onRefresh} />}
@@ -833,6 +834,7 @@ export default function HRMainView({ user, staffs, depts, onRefresh, initialMenu
                 tabs={[...CONTRACT_UTILITY_TABS]}
                 activeTab={계약내부탭}
                 onChange={(tabId) => 계약내부탭설정(tabId as ContractEmbeddedTabId)}
+                testIdPrefix="contract-utility"
               />
               <div className="min-h-0 flex-1 overflow-y-auto">
                 {계약내부탭 === '기본' && (

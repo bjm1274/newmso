@@ -170,6 +170,28 @@ function claimNotificationSlot(key: string, ownerId: string, ttlMs: number) {
   }
 }
 
+async function claimNotificationSlotWithLock(key: string, ownerId: string, ttlMs: number) {
+  if (typeof window === 'undefined') return true;
+  try {
+    const lockManager = (navigator as Navigator & {
+      locks?: {
+        request?: (
+          name: string,
+          callback: () => Promise<boolean> | boolean
+        ) => Promise<boolean>;
+      };
+    }).locks;
+    if (lockManager?.request) {
+      return await lockManager.request(`erp-lock:${key}`, async () =>
+        claimNotificationSlot(key, ownerId, ttlMs)
+      );
+    }
+  } catch {
+    // fall back to localStorage-only coordination
+  }
+  return claimNotificationSlot(key, ownerId, ttlMs);
+}
+
 async function buildDeterministicNotificationId(userId: string, dedupeKey: string) {
   const source = `erp-notification:${userId}:${dedupeKey}`;
   try {
@@ -412,6 +434,8 @@ export default function NotificationSystem({
       ? crypto.randomUUID()
       : `${Date.now()}-${Math.random().toString(16).slice(2)}`
   );
+  const displayChannelRef = useRef<BroadcastChannel | null>(null);
+  const displayClaimWinnersRef = useRef<Map<string, { ownerId: string; expiresAt: number }>>(new Map());
   const normalizedUser = useMemo(
     () => normalizeStaffLike((rawUser ?? {}) as Record<string, unknown>) as UserLike,
     [rawUser]
@@ -478,14 +502,87 @@ export default function NotificationSystem({
     timersRef.current.set(item.id, setTimeout(() => removeToast(item.id), 7000));
   }, [removeToast]);
 
-  const claimCrossTabNotification = useCallback((scope: string, dedupeKey: string, ttlMs: number) => {
+  const pruneDisplayClaims = useCallback(() => {
+    const now = Date.now();
+    displayClaimWinnersRef.current.forEach((claim, key) => {
+      if (claim.expiresAt <= now) {
+        displayClaimWinnersRef.current.delete(key);
+      }
+    });
+  }, []);
+
+  const updateDisplayClaimWinner = useCallback((claimKey: string, ownerId: string, ttlMs: number) => {
+    pruneDisplayClaims();
+    const expiresAt = Date.now() + ttlMs;
+    const current = displayClaimWinnersRef.current.get(claimKey);
+    if (!current || current.expiresAt <= Date.now() || ownerId.localeCompare(current.ownerId) < 0) {
+      displayClaimWinnersRef.current.set(claimKey, { ownerId, expiresAt });
+      return;
+    }
+    displayClaimWinnersRef.current.set(claimKey, { ownerId: current.ownerId, expiresAt: Math.max(current.expiresAt, expiresAt) });
+  }, [pruneDisplayClaims]);
+
+  const claimCrossTabNotificationAsync = useCallback(async (scope: string, dedupeKey: string, ttlMs: number) => {
     if (!effectiveUserId) return true;
-    return claimNotificationSlot(
+    return claimNotificationSlotWithLock(
       `erp_notification_${scope}:${effectiveUserId}:${dedupeKey}`,
       tabIdRef.current,
       ttlMs
     );
   }, [effectiveUserId]);
+
+  const claimCrossTabDisplayNotificationAsync = useCallback(async (dedupeKey: string, ttlMs: number) => {
+    if (!effectiveUserId) return true;
+    const lockedWinner = await claimCrossTabNotificationAsync('display', dedupeKey, ttlMs);
+    if (!lockedWinner) {
+      return false;
+    }
+
+    const claimKey = `${effectiveUserId}:${dedupeKey}`;
+    const channel = displayChannelRef.current;
+    if (!channel) {
+      return true;
+    }
+
+    updateDisplayClaimWinner(claimKey, tabIdRef.current, ttlMs);
+    try {
+      channel.postMessage({
+        kind: 'candidate',
+        claimKey,
+        ownerId: tabIdRef.current,
+        ttlMs,
+      });
+    } catch {
+      return true;
+    }
+
+    await new Promise((resolve) => window.setTimeout(resolve, 120));
+    pruneDisplayClaims();
+    const winner = displayClaimWinnersRef.current.get(claimKey);
+    return !winner || winner.ownerId === tabIdRef.current;
+  }, [claimCrossTabNotificationAsync, effectiveUserId, pruneDisplayClaims, updateDisplayClaimWinner]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof BroadcastChannel === 'undefined') return;
+    const channel = new BroadcastChannel('erp-notification-display');
+    displayChannelRef.current = channel;
+    channel.onmessage = (event: MessageEvent) => {
+      const data = event.data as {
+        kind?: string;
+        claimKey?: string;
+        ownerId?: string;
+        ttlMs?: number;
+      } | null;
+      if (!data || data.kind !== 'candidate' || !data.claimKey || !data.ownerId) return;
+      updateDisplayClaimWinner(data.claimKey, data.ownerId, Number(data.ttlMs || 5000));
+    };
+    return () => {
+      if (displayChannelRef.current === channel) {
+        displayChannelRef.current = null;
+      }
+      channel.close();
+    };
+  }, [updateDisplayClaimWinner]);
 
   const emitIncomingNotification = useCallback((row: Record<string, unknown>) => {
     if (!row?.id) return;
@@ -530,12 +627,14 @@ export default function NotificationSystem({
     if (settings.vibration && !isDND) vibrateIfSupported();
 
     const isChatType = type === 'message' || type === 'mention';
-    const canShowNativeNotification = claimCrossTabNotification('display', rowId, 5000);
-    if (canShowNativeNotification && (!isChatType || !hasPushSubscriptionActive(effectiveUserId))) {
-      sendNotification(String(row.title || '알림'), { body: String(row.body || ''), tag: type, data: rowMetadata });
-    }
+    void (async () => {
+      const canShowNativeNotification = await claimCrossTabDisplayNotificationAsync(rowId, 5000);
+      if (canShowNativeNotification && (!isChatType || !hasPushSubscriptionActive(effectiveUserId))) {
+        sendNotification(String(row.title || '알림'), { body: String(row.body || ''), tag: type, data: rowMetadata });
+      }
+    })();
     void syncBadge();
-  }, [addToast, claimCrossTabNotification, effectiveUserId, syncBadge]);
+  }, [addToast, claimCrossTabDisplayNotificationAsync, effectiveUserId, syncBadge]);
 
   useEffect(() => {
     onActionRef.current = (notif: ToastItem) => {
@@ -581,7 +680,7 @@ export default function NotificationSystem({
       dedupeKey?: string,
       dedupeWindowMs = 15000
     ) => {
-      if (dedupeKey && !claimCrossTabNotification('write', dedupeKey, dedupeWindowMs)) {
+      if (dedupeKey && !(await claimCrossTabNotificationAsync('write', dedupeKey, dedupeWindowMs))) {
         return null;
       }
 
@@ -835,7 +934,7 @@ export default function NotificationSystem({
       clearInterval(fallbackPoll);
       channels.forEach(ch => supabase.removeChannel(ch));
     };
-  }, [user?.department, user?.name, user?.permissions?.inventory, claimCrossTabNotification, effectiveUserId, emitIncomingNotification, syncBadge]);
+  }, [user?.department, user?.name, user?.permissions?.inventory, claimCrossTabNotificationAsync, effectiveUserId, emitIncomingNotification, syncBadge]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !effectiveUserId) return;
