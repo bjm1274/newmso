@@ -81,10 +81,31 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   const [activeTab, setActiveTab] = useState('기본'); // '기본', '소속', '급여'
   const [신규직원, 신규직원설정] = useState(() => createEmptyStaffForm(선택사업체 ?? undefined));
   const previousModalOpenRef = useRef(false);
+  const [companySelectOptions, setCompanySelectOptions] = useState<string[]>([]);
   // 직원목록에서 회사 목록 동적 생성
   const 회사목록 = useMemo(
     () => Array.from(new Set(직원목록.map((s) => s.company).filter(Boolean))).sort() as string[],
     [직원목록],
+  );
+
+  /*
+  const availableCompanyOptions = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...companySelectOptions,
+          ...吏곸썝紐⑸줉.map((s) => s.company).filter(Boolean),
+        ]),
+      ).sort() as string[],
+    [companySelectOptions, 吏곸썝紐⑸줉],
+  );
+
+  );
+  */
+
+  const availableCompanyOptions = useMemo(
+    () => Array.from(new Set([...companySelectOptions, ...회사목록])).sort() as string[],
+    [companySelectOptions, 회사목록],
   );
 
   const taxableSalaryTotal = useMemo(
@@ -128,6 +149,24 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         return isActive && shiftCompany === companyName;
       })
       .sort((a: StaffMember, b: StaffMember) => 한글정렬(a?.name || '', b?.name || ''));
+
+  useEffect(() => {
+    const loadCompanyOptions = async () => {
+      const { data, error } = await supabase
+        .from('companies')
+        .select('name, is_active')
+        .eq('is_active', true)
+        .order('name');
+
+      if (!error && data) {
+        setCompanySelectOptions(
+          data.map((row: any) => row.name).filter(Boolean) as string[],
+        );
+      }
+    };
+
+    loadCompanyOptions();
+  }, []);
 
   useEffect(() => {
     const fetchEssRequests = async () => {
@@ -902,7 +941,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                           <label className="text-[11px] font-bold text-[var(--toss-gray-4)] ml-1">사업체</label>
                           <select value={신규직원.사업체} onChange={e => 신규직원설정({ ...신규직원, 사업체: e.target.value, 팀: 팀목록가져오기(e.target.value)[0] ?? '', 근무형태ID: '' })} className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-lg)] border-none outline-none font-bold text-sm focus:ring-2 focus:ring-[var(--accent)]/30 appearance-none" data-testid="new-staff-company-select">
                             <option value="">사업체 선택</option>
-                            {회사목록.map(c => <option key={c} value={c}>{c}</option>)}
+                            {availableCompanyOptions.map(c => <option key={c} value={c}>{c}</option>)}
                           </select>
                         </div>
                         <div className="space-y-2">

@@ -216,9 +216,21 @@ function applyQueryFilters(rows: any[], url: URL) {
       continue;
     }
 
+    if (rawValue.startsWith('gt.')) {
+      const expected = decodeURIComponent(rawValue.slice(3));
+      filtered = filtered.filter((row) => String(normalizeComparableValue(row[key]) ?? '') > expected);
+      continue;
+    }
+
     if (rawValue.startsWith('lte.')) {
       const expected = decodeURIComponent(rawValue.slice(4));
       filtered = filtered.filter((row) => String(normalizeComparableValue(row[key]) ?? '') <= expected);
+      continue;
+    }
+
+    if (rawValue.startsWith('lt.')) {
+      const expected = decodeURIComponent(rawValue.slice(3));
+      filtered = filtered.filter((row) => String(normalizeComparableValue(row[key]) ?? '') < expected);
       continue;
     }
 
@@ -770,6 +782,17 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
           ...payload,
         }));
         notifications = [...inserted, ...notifications];
+        try {
+          await page.evaluate((rows) => {
+            window.dispatchEvent(
+              new CustomEvent('erp-mock-notification-insert', {
+                detail: { rows },
+              })
+            );
+          }, inserted);
+        } catch {
+          // ignore mock realtime dispatch failures in tests
+        }
         return json(route, wantsObject ? inserted[0] : inserted);
       }
 

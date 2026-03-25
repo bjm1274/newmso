@@ -268,6 +268,8 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   const deferredChatSearch = useDeferredValue(chatSearch);
   const [inputMsg, setInputMsg] = useState('');
   const [activeActionMsg, setActiveActionMsg] = useState<ChatMessage | null>(null);
+  const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
+  const [editingMessageDraft, setEditingMessageDraft] = useState('');
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [deliveryStates, setDeliveryStates] = useState<Record<string, DeliveryState>>({});
   const [showScrollToLatest, setShowScrollToLatest] = useState(false);
@@ -2375,6 +2377,18 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     return grouped;
   }, [allKnownStaffs]);
 
+  useEffect(() => {
+    if (viewMode !== 'org') return;
+    setExpandedDepts((prev) => {
+      if (prev.size > 0) return prev;
+      return new Set(
+        Object.entries(groupedStaffs).flatMap(([company, depts]) =>
+          Object.keys(depts as Record<string, StaffMember[]>).map((dept) => `${company}::${dept}`)
+        )
+      );
+    });
+  }, [groupedStaffs, viewMode]);
+
   const openDirectChat = useCallback(async ( staff: StaffMember) => {
     const otherId = String(staff?.id || '').trim();
     if (!effectiveChatUserId || !otherId) {
@@ -2795,10 +2809,56 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     await deleteMessage(msg);
   }, [deleteMessage]);
 
+  const startEditMessage = useCallback((msg: ChatMessage) => {
+    if (String(msg.sender_id) !== String(effectiveChatUserId || user?.id || '') && !isMso) return;
+    setEditingMessage(msg);
+    setEditingMessageDraft(msg.content || '');
+    setActiveActionMsg(null);
+  }, [effectiveChatUserId, isMso, user?.id]);
+
+  const saveEditedMessage = useCallback(async () => {
+    if (!editingMessage) return;
+    const targetMessage = editingMessage;
+    const nextContent = editingMessageDraft.trim();
+    if (!nextContent) {
+      toast('메시지 내용을 입력해 주세요.', 'warning');
+      return;
+    }
+
+    const messageId = String(targetMessage.id);
+    setEditingMessage(null);
+    setEditingMessageDraft('');
+    setMessages((prev) =>
+      prev.map((message: ChatMessage) =>
+        String(message.id) === messageId
+          ? { ...message, content: nextContent }
+          : message
+      )
+    );
+    setPersistedPinnedMessages((prev) =>
+      prev.map((message: ChatMessage) =>
+        String(message.id) === messageId
+          ? { ...message, content: nextContent }
+          : message
+      )
+    );
+
+    const { error } = await supabase
+      .from('messages')
+      .update({ content: nextContent })
+      .eq('id', targetMessage.id);
+
+    if (error) {
+      toast('메시지 수정 실패', 'error');
+      fetchData();
+      return;
+    }
+  }, [editingMessage, editingMessageDraft, fetchData]);
+
   return (
     <div data-testid="chat-view" className="flex flex-1 min-h-0 overflow-hidden relative font-sans bg-[var(--background)] md:h-[100dvh] md:max-h-[100dvh] md:bg-[var(--card)]">
       <aside className={`${selectedRoomId ? 'hidden md:flex' : 'flex'} w-full md:w-80 border-r border-[var(--border)] dark:border-zinc-800 bg-[var(--card)] dark:bg-zinc-950 flex-col shrink-0 z-50 transition-all`}>
-        <div className="p-4 md:p-4 space-y-4 flex flex-col min-h-0">
+        <div className="p-3 md:p-3 space-y-3 flex flex-col min-h-0">
           <div className="flex items-center gap-1">
             <div className="flex flex-1 gap-1 bg-[var(--tab-bg)] dark:bg-zinc-800 p-1 rounded-xl glass">
               <button
@@ -2824,6 +2884,17 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             </div>
             {/* 통합 검색 버튼 — 항상 노출 */}
             <button
+              data-testid="chat-open-group-modal"
+              type="button"
+              onClick={() => setShowGroupModal(true)}
+              title="새 그룹 채팅방 만들기"
+              className="shrink-0 flex items-center justify-center w-8 h-8 rounded-xl bg-[var(--tab-bg)] dark:bg-zinc-800 text-[var(--toss-gray-4)] hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all"
+            >
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10 4v12"/><path d="M4 10h12"/>
+              </svg>
+            </button>
+            <button
               data-testid="chat-open-global-search"
               onClick={() => setShowGlobalSearch(true)}
               title="대화내용·파일·사진 통합 검색"
@@ -2837,7 +2908,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-6 space-y-2 custom-scrollbar">
+        <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-4 space-y-0.5 custom-scrollbar">
           {viewMode === 'chat' ? (
             <>
               <div className="flex items-center justify-between px-1 pb-2">
@@ -2859,7 +2930,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       key={roomId}
                       data-testid={`chat-room-${roomId}`}
                       onClick={() => setRoom(room.id)}
-                      className={`group p-3.5 rounded-xl cursor-pointer transition-all flex items-center justify-between gap-3 border relative overflow-hidden ${isSelected
+                      className={`group p-2.5 rounded-xl cursor-pointer transition-all flex items-center justify-between gap-2.5 border relative overflow-hidden ${isSelected
                         ? 'bg-zinc-800 border-zinc-700 shadow-sm'
                         : 'bg-[var(--card)] dark:bg-zinc-900 border-transparent hover:border-[var(--border)] dark:hover:border-zinc-800'
                         }`}
@@ -2969,7 +3040,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                   <button
                                     data-testid={`chat-direct-${s.id}`}
                                     onClick={() => void openDirectChat(s)}
-                                    className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-md text-[9px] font-bold opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-all border border-blue-100 dark:border-blue-800/50 shrink-0"
+                                    className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-md text-[9px] font-bold opacity-100 transition-all border border-blue-100 dark:border-blue-800/50 shrink-0"
                                   >
                                     대화
                                   </button>
@@ -2990,7 +3061,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
       <main className={`${!selectedRoomId ? 'hidden md:flex' : 'flex'} flex-1 min-h-0 flex-col overflow-hidden bg-[var(--muted)] relative`}>
         {selectedRoomId && selectedRoom && (
-          <header className="px-4 py-3.5 flex items-center justify-between border-b border-[var(--border)]/50 dark:border-zinc-800/50 glass glass-border shrink-0 z-40">
+          <header className="px-4 py-2.5 flex items-center justify-between border-b border-[var(--border)]/50 dark:border-zinc-800/50 glass glass-border shrink-0 z-40">
             <div className="flex items-center gap-3 min-w-0">
               <button onClick={() => setRoom(null)} className="md:hidden text-[var(--toss-gray-3)]">뒤로</button>
               <div className="w-9 h-9 rounded-lg bg-[var(--tab-bg)] dark:bg-zinc-800 flex items-center justify-center text-lg">
@@ -3060,7 +3131,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         <div
           ref={messageListRef}
           onScroll={updateScrollPositionState}
-          className="flex-1 min-h-0 overflow-y-auto px-3 py-2 pb-2 md:p-4 md:pb-4 space-y-2 custom-scrollbar"
+          className="flex-1 min-h-0 overflow-y-auto px-3 py-2 pb-2 md:px-4 md:py-3 md:pb-3 space-y-1 custom-scrollbar"
         >
           {!selectedRoomId ? (
             <div className="h-full flex flex-col items-center justify-center text-[var(--toss-gray-3)]">
@@ -3153,15 +3224,17 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 return (
                   <div key={msg.id} className="space-y-0.5">
                     {showDateDivider && (
-                      <div className="flex justify-center my-1.5">
-                        <span className="px-3 py-1 rounded-[var(--radius-md)] bg-[var(--muted)] text-[11px] font-bold text-[var(--toss-gray-3)]">
+                      <div className="flex justify-center my-1 items-center gap-2">
+                        <div className="flex-1 h-px bg-[var(--border)]" />
+                        <span className="px-2.5 py-0.5 rounded-full bg-[var(--muted)] text-[10px] font-semibold text-[var(--toss-gray-3)] shrink-0">
                           {dateLabel}
                         </span>
+                        <div className="flex-1 h-px bg-[var(--border)]" />
                       </div>
                     )}
                     {isSystemInvite ? (
-                      <div className="flex justify-center my-1.5">
-                        <span className="px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] text-[11px] font-bold text-[var(--accent)]">
+                      <div className="flex justify-center my-1">
+                        <span className="px-2.5 py-0.5 rounded-full bg-[var(--toss-blue-light)] text-[10px] font-semibold text-[var(--accent)]">
                           초대 {systemText}
                         </span>
                       </div>
@@ -3171,12 +3244,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                         className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}
                       >
                         {!isMine && (
-                          <span className="text-[11px] text-[var(--toss-gray-4)] px-2 mb-0.5 font-bold">
+                          <span className="text-[10px] text-[var(--toss-gray-3)] px-1.5 mb-0.5 font-semibold">
                             {msg.staff?.name} {msg.staff?.position}
                           </span>
                         )}
                         <div
-                          data-testid={`chat-message-${msg.id}`}
+                          data-testid={isDeletedMessage ? `chat-message-deleted-${msg.id}` : `chat-message-${msg.id}`}
                           onClick={(e) => {
                             if (isDeletedMessage) return;
                             e.stopPropagation();
@@ -3184,20 +3257,20 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                           }}
                           className={`group relative ${
                             isDeletedMessage
-                              ? 'px-3 py-2 border border-dashed border-[var(--border)] bg-[var(--muted)] text-[var(--toss-gray-3)] italic'
+                              ? 'px-3 py-1.5 border border-dashed border-[var(--border)] bg-[var(--muted)] text-[var(--toss-gray-3)] italic'
                               : !msg.content
                                 ? 'p-0 bg-transparent shadow-none border-none'
-                                : 'px-3 py-2 shadow-sm border'
-                          } rounded-[var(--radius-md)] text-[13px] md:text-sm ${isDeletedMessage ? 'cursor-default' : 'cursor-pointer'} transition-all max-w-[75%] md:max-w-[70%] ${
+                                : 'px-3 py-1.5 border'
+                          } rounded-[var(--radius-md)] text-[13px] md:text-sm ${isDeletedMessage ? 'cursor-default' : 'cursor-pointer'} transition-all max-w-[78%] md:max-w-[72%] ${
                             isDeletedMessage
                               ? isMine
-                                ? 'rounded-tr-none'
-                                : 'rounded-tl-none'
+                                ? 'rounded-tr-sm'
+                                : 'rounded-tl-sm'
                               : !msg.content
                                 ? ''
                                 : isMine
-                                  ? 'bg-emerald-600 text-white border-transparent rounded-tr-none'
-                                  : 'bg-[var(--card)] dark:bg-zinc-800 border-[var(--border)] dark:border-zinc-700 rounded-tl-none hover:border-emerald-400 text-foreground'
+                                  ? 'bg-[var(--accent)] text-white border-transparent rounded-tr-sm'
+                                  : 'bg-[var(--card)] dark:bg-zinc-800 border-[var(--border)] dark:border-zinc-700 rounded-tl-sm hover:border-blue-300 dark:hover:border-blue-700 text-foreground'
                           }`}
                           role="button"
                           tabIndex={isDeletedMessage ? -1 : 0}
@@ -3211,7 +3284,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                             const parent = messages.find(( m: ChatMessage) => m.id === msg.reply_to_id);
                             return parent ? (
                               <div
-                                className={`mb-2 p-2 rounded-[var(--radius-md)] text-[11px] border-l-2 cursor-pointer hover:opacity-80 transition-opacity ${isMine ? 'bg-[var(--card)]/10 border-white/30 text-white' : 'bg-[var(--muted)] border-[var(--border)] text-[var(--foreground)]'
+                                className={`mb-1.5 p-1.5 rounded-[var(--radius-md)] text-[11px] border-l-2 cursor-pointer hover:opacity-80 transition-opacity ${isMine ? 'bg-white/10 border-white/40 text-white/90' : 'bg-[var(--muted)] border-[var(--accent)]/40 text-[var(--foreground)]'
                                   }`}
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -3368,7 +3441,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
         <div
           data-testid="chat-upload-dropzone"
-          className={`relative px-2.5 py-1.5 md:p-3 bg-[var(--card)] shrink-0 transition-all z-10 ${isDragging ? 'border-t-2 border-[var(--accent)] border-dashed bg-blue-50 dark:bg-blue-900/20' : 'border-t border-[var(--border)]'}`}
+          className={`relative px-2 py-1.5 md:px-3 md:py-2 bg-[var(--card)] shrink-0 transition-all z-10 ${isDragging ? 'border-t-2 border-[var(--accent)] border-dashed bg-blue-50 dark:bg-blue-900/20' : 'border-t border-[var(--border)]'}`}
           onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
           onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }}
           onDrop={async (e) => {
@@ -3415,16 +3488,16 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
           <div
             aria-live="polite"
-            className="mb-1 min-h-[16px] px-1 text-[11px] font-medium"
+            className="mb-0.5 min-h-[14px] px-1 text-[10px] font-medium"
           >
             {typingNoticeText ? (
               <span className="text-blue-500">{typingNoticeText}</span>
             ) : null}
           </div>
 
-          <div className={`flex items-center md:items-end gap-2.5 px-3 py-2.5 md:gap-3 md:p-3 rounded-[var(--radius-lg)] border transition-all ${selectedRoomId === NOTICE_ROOM_ID && !canWriteNotice
+          <div className={`flex items-center md:items-end gap-2 px-2.5 py-2 md:gap-2.5 md:px-3 md:py-2.5 rounded-[var(--radius-lg)] border transition-all ${selectedRoomId === NOTICE_ROOM_ID && !canWriteNotice
             ? 'bg-[var(--muted)] border-[var(--border)] opacity-80 pointer-events-none'
-            : 'bg-[var(--muted)] border-[var(--border)] focus-within:bg-[var(--card)] focus-within:ring-4 focus-within:ring-[var(--accent)]'
+            : 'bg-[var(--muted)] border-[var(--border)] focus-within:bg-[var(--card)] focus-within:ring-2 focus-within:ring-[var(--accent)]/50'
             }`}>
             <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.hwp" />
             <button
@@ -3685,6 +3758,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     <span className="text-xl">📋</span>
                     <span className="text-sm font-bold">복사</span>
                   </button>
+                  {String(activeActionMsg.sender_id) === String(effectiveChatUserId || user?.id || '') && !activeActionMsg.is_deleted && (
+                    <button data-testid="chat-message-action-edit-mobile" onClick={() => { startEditMessage(activeActionMsg); }} className="w-full flex items-center gap-4 p-4 hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 rounded-[var(--radius-md)] transition-colors">
+                      <span className="text-xl">✏️</span>
+                      <span className="text-sm font-bold">수정</span>
+                    </button>
+                  )}
                   {String(activeActionMsg.sender_id) === String(effectiveChatUserId || user?.id || '') && (
                     <button onClick={() => { void deleteMessageFromActions(activeActionMsg); }} className="w-full flex items-center gap-4 p-4 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-[var(--radius-md)] transition-colors text-red-500">
                       <span className="text-xl">🗑️</span>
@@ -3725,6 +3804,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   >
                     답글 달기
                   </button>
+                  {String(activeActionMsg.sender_id) === String(effectiveChatUserId || user?.id || '') && !activeActionMsg.is_deleted && (
+                    <button data-testid="chat-message-action-edit" onClick={() => { startEditMessage(activeActionMsg); }} className="w-full p-3 text-left hover:bg-[var(--muted)] rounded-[var(--radius-md)] text-xs font-semibold transition-colors">메시지 수정</button>
+                  )}
                   {String(activeActionMsg.sender_id) === String(effectiveChatUserId || user?.id || '') && (
                     <button data-testid="chat-message-action-delete" onClick={() => { void deleteMessageFromActions(activeActionMsg); }} className="w-full p-3 text-left hover:bg-red-50 rounded-[var(--radius-md)] text-xs font-semibold text-red-600 transition-colors">메시지 삭제</button>
                   )}
@@ -3754,6 +3836,32 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           </>
         )}
 
+        {editingMessage && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[115] p-4" onClick={() => setEditingMessage(null)}>
+            <div className="bg-[var(--card)] w-full max-w-md rounded-2xl p-5 shadow-sm border border-[var(--border)] space-y-4" onClick={(e) => e.stopPropagation()}>
+              <div className="space-y-1">
+                <h3 className="text-lg font-bold text-foreground">메시지 수정</h3>
+                <p className="text-[11px] font-medium text-[var(--toss-gray-3)]">전송한 메시지를 수정한 뒤 다시 저장합니다.</p>
+              </div>
+              <textarea
+                data-testid="chat-message-edit-input"
+                value={editingMessageDraft}
+                onChange={(e) => setEditingMessageDraft(e.target.value)}
+                rows={4}
+                className="w-full p-3 bg-[var(--input-bg)] border border-[var(--border)] rounded-[var(--radius-lg)] text-sm font-medium outline-none resize-none focus:border-[var(--accent)]"
+                placeholder="수정할 메시지를 입력하세요."
+              />
+              <div className="flex gap-3">
+                <button type="button" onClick={() => setEditingMessage(null)} className="flex-1 py-3 bg-[var(--muted)] text-[var(--toss-gray-3)] rounded-[var(--radius-md)] font-semibold text-sm">
+                  취소
+                </button>
+                <button data-testid="chat-message-edit-save" type="button" onClick={() => { void saveEditedMessage(); }} className="flex-1 py-3 bg-[var(--accent)] text-white rounded-[var(--radius-md)] font-semibold text-sm shadow-sm">
+                  저장
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {showGroupModal && (
           <div data-testid="chat-group-modal" className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-[110] p-4" onClick={() => setShowGroupModal(false)}>
