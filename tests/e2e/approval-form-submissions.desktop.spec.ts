@@ -471,14 +471,17 @@ test('admin-configured default references auto-apply, notify recipients, and app
     ])
   );
 
-  const notifications = await readNotifications(page);
-  const referenceNotification = notifications.find(
-    (item: any) =>
-      item.user_id === supportStaff.id &&
-      item.metadata?.approval_id === insertedApproval.id &&
-      item.metadata?.approval_view === '참조 문서함'
-  );
-  expect(referenceNotification).toBeTruthy();
+  await expect
+    .poll(async () => {
+      const notifications = await readNotifications(page);
+      return notifications.find(
+        (item: any) =>
+          item.user_id === supportStaff.id &&
+          item.metadata?.approval_id === insertedApproval.id &&
+          item.metadata?.approval_view === '참조 문서함'
+      ) || null;
+    })
+    .toBeTruthy();
 
   await replaceSession(page, {
     user: {

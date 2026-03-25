@@ -16,6 +16,7 @@ export type IncomeTaxBracketEntry = {
   deduction?: number;
   base_tax?: number;
   monthly_tax?: number;
+  official?: boolean;
 };
 
 export const DEFAULT_INCOME_TAX_BRACKET: IncomeTaxBracketEntry[] = [
@@ -64,6 +65,7 @@ function normalizeIncomeTaxBracketEntry(entry: any): IncomeTaxBracketEntry | nul
     deduction: deduction ?? undefined,
     base_tax: baseTax ?? undefined,
     monthly_tax: monthlyTax ?? undefined,
+    official: entry.official === true,
   };
 }
 
