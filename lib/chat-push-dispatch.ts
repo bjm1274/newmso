@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { ensureWebPushConfigured, sendWebPushNotification } from '@/lib/web-push';
+import { sendFcmBatch } from '@/lib/firebase-admin';
 
 type MessageRow = {
   id: string;
@@ -25,6 +26,7 @@ type PushSubscriptionRow = {
   endpoint: string;
   p256dh: string;
   auth: string;
+  fcm_token?: string | null;
 };
 
 type NotificationInsertRow = {
@@ -326,7 +328,7 @@ export async function dispatchChatPushForMessage(params: {
   const [subscriptionRes, senderRes] = await Promise.all([
     supabase
       .from('push_subscriptions')
-      .select('id, staff_id, endpoint, p256dh, auth')
+      .select('id, staff_id, endpoint, p256dh, auth, fcm_token')
       .in('staff_id', targetIds),
     supabase
       .from('staff_members')
@@ -424,6 +426,35 @@ export async function dispatchChatPushForMessage(params: {
 
   if (expiredIds.length > 0) {
     await supabase.from('push_subscriptions').delete().in('id', expiredIds);
+  }
+
+  // FCM 전송 (Web Push와 병렬 — 모바일 백그라운드 알림)
+  try {
+    const fcmTokens = (subscriptionRes.data || [])
+      .filter((r: PushSubscriptionRow) => r.fcm_token && r.staff_id && r.staff_id !== senderId)
+      .map((r: PushSubscriptionRow) => r.fcm_token as string);
+
+    if (fcmTokens.length > 0) {
+      const fcmResult = await sendFcmBatch(fcmTokens, {
+        title,
+        body: previewBody,
+        data: {
+          room_id: params.roomId,
+          message_id: params.messageId,
+          type: 'message',
+        },
+      });
+      sent += fcmResult.success.length;
+      // 만료된 FCM 토큰 정리
+      if (fcmResult.expired.length > 0) {
+        await supabase
+          .from('push_subscriptions')
+          .update({ fcm_token: null })
+          .in('fcm_token', fcmResult.expired);
+      }
+    }
+  } catch (fcmErr) {
+    console.error('[FCM] 배치 전송 오류:', fcmErr);
   }
 
   await updateChatPushJobByMessageId(supabase, params.messageId, {
