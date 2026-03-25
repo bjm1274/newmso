@@ -448,7 +448,7 @@ test('saved ward pattern mixes day-fixed, night-fixed, and rotating staff in one
   await rotationGroup.getByRole('button', { name: /병동N/ }).click();
 
   await page.getByTestId('pattern-profile-save').click();
-  await expect(page.getByText('병동 혼합 3교대')).toBeVisible();
+  await expect(page.getByTestId('roster-pattern-manager').getByText('병동 혼합 3교대')).toBeVisible();
 
   await page.getByTestId('shift-suite-2').click();
   await expect(page.getByTestId('roster-rule-manager')).toBeVisible();
@@ -459,7 +459,9 @@ test('saved ward pattern mixes day-fixed, night-fixed, and rotating staff in one
   await page.getByTestId('generation-rule-night-block-size').fill('2');
   await page.getByTestId('generation-rule-off-days-after-night').fill('1');
   await page.getByTestId('generation-rule-save').click();
-  await expect(page.getByText('병동 안전규칙')).toBeVisible();
+  await expect(
+    page.getByTestId('roster-rule-manager').getByText('병동 안전규칙'),
+  ).toBeVisible();
 
   await page.getByTestId('shift-suite-1').click();
   await page.getByTestId('roster-pattern-profile-select').selectOption({ label: '병동 혼합 3교대' });

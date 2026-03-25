@@ -262,10 +262,11 @@ test('live notifications show only one native popup across two open tabs', async
     timeout: 10000,
   });
 
-  const totalNativePopups =
-    (await getNativeNotificationCount(firstPage)) + (await getNativeNotificationCount(secondPage));
-
-  expect(totalNativePopups).toBe(1);
+  await expect
+    .poll(async () =>
+      (await getNativeNotificationCount(firstPage)) + (await getNativeNotificationCount(secondPage))
+    )
+    .toBe(1);
 
   await firstPage.close();
   await secondPage.close();
