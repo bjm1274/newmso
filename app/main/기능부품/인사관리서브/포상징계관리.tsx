@@ -30,7 +30,7 @@ export default function RewardDisciplineManagement({ staffs = [], selectedCo, us
         const staff = _staffs.find((s: any) => s.id === form.staff_id);
         if (!staff) return toast('직원을 선택해주세요.', 'warning');
         const cat = activeTab === '포상' ? '포상' : '징계';
-        const newRec = { ...form, category: cat, staff_name: staff.name as string, company: staff.company, department: (staff.department as string) || '', issued_by: (user as any)?.name || '관리자' };
+        const newRec = { ...form, category: cat, staff_name: staff.name as string, company: staff.company, department: (staff.department as string) || '', issued_by: (user as any)?.name || '관리자', date: form.date || null, committee_date: form.committee_date || null };
         const { data, error } = await supabase.from('reward_discipline').insert([newRec]).select();
         if (error) {
             console.error('reward_discipline insert failed:', error);
