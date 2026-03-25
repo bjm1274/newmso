@@ -404,7 +404,11 @@ function buildFixtures(overrides: MockFixtures = {}) {
           health_insurance_rate: 0.0355,
           long_term_care_rate: 0.0046,
           employment_insurance_rate: 0.009,
-            income_tax_bracket: DEFAULT_INCOME_TAX_BRACKET,
+          configured: true,
+          income_tax_bracket: DEFAULT_INCOME_TAX_BRACKET.map((entry) => ({
+            ...entry,
+            official: true,
+          })),
         },
         {
           id: 'tax-rate-default-all',
@@ -414,7 +418,11 @@ function buildFixtures(overrides: MockFixtures = {}) {
           health_insurance_rate: 0.0355,
           long_term_care_rate: 0.0046,
           employment_insurance_rate: 0.009,
-            income_tax_bracket: DEFAULT_INCOME_TAX_BRACKET,
+          configured: true,
+          income_tax_bracket: DEFAULT_INCOME_TAX_BRACKET.map((entry) => ({
+            ...entry,
+            official: true,
+          })),
         },
       ],
     systemConfigs:

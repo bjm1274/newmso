@@ -433,10 +433,41 @@ export async function processInventoryIssue({
         }
       } else {
         const row = Array.isArray(transferResult) ? transferResult[0] : transferResult;
-        sourcePrevQty = row?.src_prev ?? sourceCurrentQty;
-        sourceNextQty = row?.src_next ?? sourceNextQty;
-        destinationPrevQty = row?.dst_prev ?? 0;
-        destinationNextQty = row?.dst_next ?? transferQuantity;
+        const hasTransferRow =
+          row != null &&
+          (row?.src_prev != null ||
+            row?.src_next != null ||
+            row?.dst_prev != null ||
+            row?.dst_next != null);
+
+        if (!hasTransferRow) {
+          const { error: sourceUpdateError } = await supabase
+            .from('inventory')
+            .update({ quantity: sourceNextQty, stock: sourceNextQty })
+            .eq('id', sourceItem.id);
+          if (sourceUpdateError) throw sourceUpdateError;
+
+          destinationPrevQty = getItemQuantity(destinationItem);
+          destinationNextQty = destinationPrevQty + transferQuantity;
+
+          const { error: destinationUpdateError } = await supabase
+            .from('inventory')
+            .update({ quantity: destinationNextQty, stock: destinationNextQty })
+            .eq('id', destinationItem.id);
+
+          if (destinationUpdateError) {
+            await supabase
+              .from('inventory')
+              .update({ quantity: sourceCurrentQty, stock: sourceCurrentQty })
+              .eq('id', sourceItem.id);
+            throw destinationUpdateError;
+          }
+        } else {
+          sourcePrevQty = row?.src_prev ?? sourceCurrentQty;
+          sourceNextQty = row?.src_next ?? sourceNextQty;
+          destinationPrevQty = row?.dst_prev ?? 0;
+          destinationNextQty = row?.dst_next ?? transferQuantity;
+        }
       }
 
       destinationInventoryId = String(destinationItem.id);
@@ -459,8 +490,16 @@ export async function processInventoryIssue({
         if (sourceUpdateError) throw sourceUpdateError;
       } else {
         const row = Array.isArray(srcResult) ? srcResult[0] : srcResult;
-        sourcePrevQty = row?.prev_qty ?? sourceCurrentQty;
-        sourceNextQty = row?.next_qty ?? sourceNextQty;
+        if (row == null || (row?.prev_qty == null && row?.next_qty == null)) {
+          const { error: sourceUpdateError } = await supabase
+            .from('inventory')
+            .update({ quantity: sourceNextQty, stock: sourceNextQty })
+            .eq('id', sourceItem.id);
+          if (sourceUpdateError) throw sourceUpdateError;
+        } else {
+          sourcePrevQty = row?.prev_qty ?? sourceCurrentQty;
+          sourceNextQty = row?.next_qty ?? sourceNextQty;
+        }
       }
       const baseDestinationPayload: Record<string, any> = {
         item_name: getItemName(sourceItem),
@@ -531,8 +570,16 @@ export async function processInventoryIssue({
       if (fbErr) throw fbErr;
     } else {
       const row = Array.isArray(srcOnlyResult) ? srcOnlyResult[0] : srcOnlyResult;
-      sourcePrevQty = row?.prev_qty ?? sourceCurrentQty;
-      sourceNextQty = row?.next_qty ?? sourceNextQty;
+      if (row == null || (row?.prev_qty == null && row?.next_qty == null)) {
+        const { error: fbErr } = await supabase
+          .from('inventory')
+          .update({ quantity: sourceNextQty, stock: sourceNextQty })
+          .eq('id', sourceItem.id);
+        if (fbErr) throw fbErr;
+      } else {
+        sourcePrevQty = row?.prev_qty ?? sourceCurrentQty;
+        sourceNextQty = row?.next_qty ?? sourceNextQty;
+      }
     }
   }
 

@@ -46,7 +46,8 @@ export default function DailyClosurePage({ user }: { user: any }) {
     const [checks, setChecks] = useState<CheckDoc[]>([]);
 
     const totalCalculated = useMemo(() => items.reduce((sum, item) => sum + item.amount, 0), [items]);
-    const balance = useMemo(() => (pettyCashStart + totalCalculated) - pettyCashEnd, [pettyCashStart, totalCalculated, pettyCashEnd]);
+    const cashTotal = useMemo(() => items.filter(item => item.payment_method === '현금').reduce((sum, item) => sum + item.amount, 0), [items]);
+    const balance = useMemo(() => (pettyCashStart + cashTotal) - pettyCashEnd, [pettyCashStart, cashTotal, pettyCashEnd]);
 
     useEffect(() => {
         loadClosures();
