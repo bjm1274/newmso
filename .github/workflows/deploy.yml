@@ -9,6 +9,13 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger Vercel Deploy Hook
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy via Vercel API
         run: |
-          curl -X POST "https://api.vercel.com/v1/integrations/deploy/prj_BQrXRjeBdbtTys6iz4gQJ8rbJpQ0/5biKUvtcEX"
+          SHA=$(git rev-parse HEAD)
+          curl -s -X POST "https://api.vercel.com/v13/deployments?teamId=team_RObCeKxMEEzMynHACMkzIT2H" \
+            -H "Authorization: Bearer ${{ secrets.VERCEL_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"name\":\"newmso\",\"gitSource\":{\"type\":\"github\",\"repoId\":1154454249,\"ref\":\"main\",\"sha\":\"$SHA\"},\"target\":\"production\"}"
