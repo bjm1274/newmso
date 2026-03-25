@@ -15,8 +15,17 @@ export default function LaborCostTrend({ selectedCo }: Record<string, unknown>) 
         const { data } = await supabase.from('payroll_records').select('net_pay').eq('year_month', ym).not('record_type', 'eq', 'interim');
         let rows = data || [];
         if (selectedCo && selectedCo !== '전체') {
-          const { data: r2 } = await supabase.from('payroll_records').select('*, staff_members(company)').eq('year_month', ym);
-          rows = (r2 || []).filter((r: any) => r.staff_members?.company === selectedCo);
+          // FK join 대신 staff_members 별도 조회 (PostgREST 관계 캐시 오류 방지)
+          const { data: r2 } = await supabase.from('payroll_records').select('*').eq('year_month', ym).not('record_type', 'eq', 'interim');
+          const allRows = r2 || [];
+          if (allRows.length > 0) {
+            const staffIds = [...new Set(allRows.map((r: any) => r.staff_id))];
+            const { data: staffData } = await supabase.from('staff_members').select('id, company').in('id', staffIds);
+            const staffCompanyMap = Object.fromEntries((staffData || []).map((s: any) => [String(s.id), s.company]));
+            rows = allRows.filter((r: any) => staffCompanyMap[String(r.staff_id)] === selectedCo);
+          } else {
+            rows = [];
+          }
         }
         list.push({
           ym,

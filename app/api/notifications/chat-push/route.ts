@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { readSessionFromRequest } from '@/lib/server-session';
@@ -33,6 +34,17 @@ type PushSubscriptionRow = {
   auth: string;
 };
 
+type NotificationInsertRow = {
+  id: string;
+  user_id: string;
+  type: string;
+  title: string;
+  body: string;
+  metadata: Record<string, unknown>;
+  read_at: null;
+  created_at: string;
+};
+
 function getAdminClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -51,6 +63,19 @@ function buildPreview(message: MessageRow) {
   if (message.file_kind === 'video') return '동영상을 보냈습니다.';
   if (message.file_url) return '파일을 보냈습니다.';
   return '새 메시지가 도착했습니다.';
+}
+
+function buildDeterministicNotificationId(userId: string, messageId: string) {
+  const bytes = createHash('sha256')
+    .update(`chat-notification:${userId}:${messageId}`)
+    .digest()
+    .subarray(0, 16);
+
+  bytes[6] = (bytes[6] & 0x0f) | 0x50;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
 }
 
 async function getMutedUserIds(supabase: ReturnType<typeof getAdminClient>, roomId: string) {
@@ -161,6 +186,33 @@ export async function POST(request: NextRequest) {
         type: 'message',
       },
     });
+    const previewBody = buildPreview(message);
+    const notificationRows: NotificationInsertRow[] = targetIds.map((targetId) => ({
+      id: buildDeterministicNotificationId(targetId, messageId),
+      user_id: targetId,
+      type: 'message',
+      title,
+      body: previewBody,
+      metadata: {
+        room_id: roomId,
+        id: messageId,
+        sender_name: senderName,
+        type: 'message',
+        created_at: message.created_at,
+      },
+      read_at: null,
+      created_at: message.created_at || new Date().toISOString(),
+    }));
+
+    if (notificationRows.length > 0) {
+      const { error: notificationInsertError } = await supabase
+        .from('notifications')
+        .upsert(notificationRows, { onConflict: 'id' });
+
+      if (notificationInsertError) {
+        console.error('chat notification insert failed', notificationInsertError);
+      }
+    }
 
     const uniqueSubscriptions = new Map<string, PushSubscriptionRow>();
     for (const row of (subscriptionRes.data || []) as PushSubscriptionRow[]) {
