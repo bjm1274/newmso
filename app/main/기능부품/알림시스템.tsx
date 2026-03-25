@@ -837,6 +837,29 @@ export default function NotificationSystem({
     };
   }, [user?.department, user?.name, user?.permissions?.inventory, claimCrossTabNotification, effectiveUserId, emitIncomingNotification, syncBadge]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined' || !effectiveUserId) return;
+
+    const onMockNotificationInsert = (event: Event) => {
+      const customEvent = event as CustomEvent<{ rows?: Record<string, unknown>[]; row?: Record<string, unknown> }>;
+      const rows = Array.isArray(customEvent.detail?.rows)
+        ? customEvent.detail.rows
+        : customEvent.detail?.row
+          ? [customEvent.detail.row]
+          : [];
+
+      rows.forEach((row) => {
+        if (String(row?.user_id || '') !== effectiveUserId) return;
+        emitIncomingNotification(row);
+      });
+    };
+
+    window.addEventListener('erp-mock-notification-insert', onMockNotificationInsert as EventListener);
+    return () => {
+      window.removeEventListener('erp-mock-notification-insert', onMockNotificationInsert as EventListener);
+    };
+  }, [effectiveUserId, emitIncomingNotification]);
+
   // 백그라운드 복귀 시 놓친 알림 재조회
   useEffect(() => {
     const onVis = () => {

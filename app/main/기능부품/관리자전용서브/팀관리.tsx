@@ -29,14 +29,31 @@ export default function TeamManager({ onRefresh }: { onRefresh?: () => void }) {
 
   useEffect(() => {
     // 회사 목록 DB에서 동적 조회
-    supabase
-      .from('staff_members')
-      .select('company')
-      .then(({ data }) => {
-        const names = Array.from(new Set((data || []).map((r: any) => r.company).filter(Boolean))).sort() as string[];
+    const fetchCompanies = async () => {
+      const { data: companyRows, error } = await supabase
+        .from('companies')
+        .select('name, is_active')
+        .eq('is_active', true)
+        .order('name');
+
+      if (!error && companyRows && companyRows.length > 0) {
+        const names = companyRows
+          .map((row: any) => row.name)
+          .filter(Boolean) as string[];
         setCompanies(names);
         if (names.length > 0 && !company) setCompany(names[0]);
-      });
+        return;
+      }
+
+      const { data: staffRows } = await supabase.from('staff_members').select('company');
+      const names = Array.from(
+        new Set((staffRows || []).map((row: any) => row.company).filter(Boolean)),
+      ).sort() as string[];
+      setCompanies(names);
+      if (names.length > 0 && !company) setCompany(names[0]);
+    };
+
+    fetchCompanies();
   }, [company]);
 
   useEffect(() => {

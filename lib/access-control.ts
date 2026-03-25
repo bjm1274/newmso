@@ -245,7 +245,7 @@ function canAccessDetailedSection(
   sectionIdOrPermissionKey: string,
   map: Record<string, string>
 ) {
-  if (isPrivilegedUser(user)) return true;
+  if (isPrivilegedUser(user) || isAdminUser(user)) return true;
   if (!canAccessMainMenu(user, menuId)) return false;
   return hasPermission(user, resolvePermissionKey(sectionIdOrPermissionKey, map));
 }
@@ -296,6 +296,9 @@ export function canAccessMainMenu(user: UserLike | null | undefined, menuId: str
   // 퇴사자는 내정보/알림만 접근 가능 (급여명세서 확인 등)
   if (user?.status === '퇴사') {
     return menuId === '내정보' || menuId === '알림';
+  }
+  if (isPrivilegedUser(user) || isAdminUser(user)) {
+    return true;
   }
   switch (menuId as MainMenuId) {
     case '내정보':
