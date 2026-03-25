@@ -1,0 +1,391 @@
+import { createHash } from 'node:crypto';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { ensureWebPushConfigured, sendWebPushNotification } from '@/lib/web-push';
+
+type MessageRow = {
+  id: string;
+  room_id: string;
+  sender_id: string | null;
+  content: string | null;
+  created_at: string;
+  file_url: string | null;
+  file_kind: string | null;
+};
+
+type ChatRoomRow = {
+  id: string;
+  name: string | null;
+  type: string | null;
+  members: string[] | null;
+};
+
+type PushSubscriptionRow = {
+  id: string;
+  staff_id: string | null;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+};
+
+type NotificationInsertRow = {
+  id: string;
+  user_id: string;
+  type: string;
+  title: string;
+  body: string;
+  metadata: Record<string, unknown>;
+  read_at: null;
+  created_at: string;
+};
+
+type QueueJobRow = {
+  id: string;
+  message_id: string;
+  room_id: string;
+  attempt_count?: number | null;
+};
+
+export type ChatPushDispatchResult = {
+  sent: number;
+  failed: number;
+  targets: number;
+  notificationsCreated: number;
+  pushDisabled: boolean;
+  reason?: string;
+};
+
+function getAdminClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceKey) {
+    throw new Error('Supabase service role configuration is missing.');
+  }
+
+  return createClient(supabaseUrl, serviceKey);
+}
+
+function isMissingRelationError(error: any, relationName: string) {
+  if (!error) return false;
+  const code = String(error?.code || '');
+  const message = String(error?.message || error?.details || '').toLowerCase();
+  const target = relationName.toLowerCase();
+  return code === '42P01' || message.includes(target);
+}
+
+function buildPreview(message: MessageRow) {
+  const content = String(message.content || '').trim();
+  if (content) return content.slice(0, 80);
+  if (message.file_kind === 'image') return '사진을 보냈습니다.';
+  if (message.file_kind === 'video') return '동영상을 보냈습니다.';
+  if (message.file_url) return '파일을 보냈습니다.';
+  return '새 메시지가 도착했습니다.';
+}
+
+function buildDeterministicNotificationId(userId: string, messageId: string) {
+  const bytes = createHash('sha256')
+    .update(`chat-notification:${userId}:${messageId}`)
+    .digest()
+    .subarray(0, 16);
+
+  bytes[6] = (bytes[6] & 0x0f) | 0x50;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+}
+
+async function getMutedUserIds(supabase: SupabaseClient, roomId: string) {
+  try {
+    const { data, error } = await supabase
+      .from('room_notification_settings')
+      .select('user_id')
+      .eq('room_id', roomId)
+      .eq('notifications_enabled', false);
+
+    if (error) return new Set<string>();
+    return new Set((data || []).map((row: { user_id: string }) => String(row.user_id)));
+  } catch {
+    return new Set<string>();
+  }
+}
+
+async function updateChatPushJobByMessageId(
+  supabase: SupabaseClient,
+  messageId: string,
+  patch: Record<string, unknown>,
+) {
+  const { error } = await supabase
+    .from('chat_push_jobs')
+    .update(patch)
+    .eq('message_id', messageId);
+
+  if (error && !isMissingRelationError(error, 'chat_push_jobs')) {
+    console.error('chat_push_jobs update failed', error);
+  }
+}
+
+async function updateChatPushJobById(
+  supabase: SupabaseClient,
+  jobId: string,
+  patch: Record<string, unknown>,
+) {
+  const { error } = await supabase
+    .from('chat_push_jobs')
+    .update(patch)
+    .eq('id', jobId);
+
+  if (error && !isMissingRelationError(error, 'chat_push_jobs')) {
+    console.error('chat_push_jobs update failed', error);
+  }
+}
+
+export async function dispatchChatPushForMessage(params: {
+  roomId: string;
+  messageId: string;
+  expectedSenderId?: string;
+  supabase?: SupabaseClient;
+}) {
+  const supabase = params.supabase || getAdminClient();
+
+  const [messageRes, roomRes] = await Promise.all([
+    supabase
+      .from('messages')
+      .select('id, room_id, sender_id, content, created_at, file_url, file_kind')
+      .eq('id', params.messageId)
+      .single(),
+    supabase
+      .from('chat_rooms')
+      .select('id, name, type, members')
+      .eq('id', params.roomId)
+      .single(),
+  ]);
+
+  if (messageRes.error || roomRes.error || !messageRes.data || !roomRes.data) {
+    return {
+      sent: 0,
+      failed: 0,
+      targets: 0,
+      notificationsCreated: 0,
+      pushDisabled: false,
+      reason: 'message-or-room-not-found',
+    } satisfies ChatPushDispatchResult;
+  }
+
+  const message = messageRes.data as MessageRow;
+  const room = roomRes.data as ChatRoomRow;
+  const senderId = String(message.sender_id || '');
+
+  if (params.expectedSenderId && senderId !== String(params.expectedSenderId)) {
+    throw new Error('Only the message sender can trigger chat push.');
+  }
+
+  const members = Array.isArray(room.members) ? room.members.map((id) => String(id)) : [];
+  if (members.length === 0) {
+    await updateChatPushJobByMessageId(supabase, params.messageId, {
+      processed_at: new Date().toISOString(),
+      processing_started_at: null,
+      last_error: null,
+    });
+    return {
+      sent: 0,
+      failed: 0,
+      targets: 0,
+      notificationsCreated: 0,
+      pushDisabled: false,
+      reason: 'no-room-members',
+    } satisfies ChatPushDispatchResult;
+  }
+
+  const mutedIds = await getMutedUserIds(supabase, params.roomId);
+  const targetIds = members.filter((id) => id && id !== senderId && !mutedIds.has(id));
+
+  if (targetIds.length === 0) {
+    await updateChatPushJobByMessageId(supabase, params.messageId, {
+      processed_at: new Date().toISOString(),
+      processing_started_at: null,
+      last_error: null,
+    });
+    return {
+      sent: 0,
+      failed: 0,
+      targets: 0,
+      notificationsCreated: 0,
+      pushDisabled: false,
+      reason: 'no-targets',
+    } satisfies ChatPushDispatchResult;
+  }
+
+  const [subscriptionRes, senderRes] = await Promise.all([
+    supabase
+      .from('push_subscriptions')
+      .select('id, staff_id, endpoint, p256dh, auth')
+      .in('staff_id', targetIds),
+    supabase
+      .from('staff_members')
+      .select('name')
+      .eq('id', senderId)
+      .maybeSingle(),
+  ]);
+
+  if (subscriptionRes.error) {
+    throw subscriptionRes.error;
+  }
+
+  const senderName = String((senderRes.data as { name?: string } | null)?.name || '새 메시지');
+  const title =
+    room.type === 'notice'
+      ? '공지 메시지'
+      : room.name
+        ? `${senderName} - ${room.name}`
+        : senderName;
+
+  const previewBody = buildPreview(message);
+  const notificationRows: NotificationInsertRow[] = targetIds.map((targetId) => ({
+    id: buildDeterministicNotificationId(targetId, params.messageId),
+    user_id: targetId,
+    type: 'message',
+    title,
+    body: previewBody,
+    metadata: {
+      room_id: params.roomId,
+      id: params.messageId,
+      sender_name: senderName,
+      type: 'message',
+      created_at: message.created_at,
+      dedupe_key: `chat:${params.messageId}:${targetId}`,
+    },
+    read_at: null,
+    created_at: message.created_at || new Date().toISOString(),
+  }));
+
+  if (notificationRows.length > 0) {
+    const { error: notificationInsertError } = await supabase
+      .from('notifications')
+      .upsert(notificationRows, { onConflict: 'id' });
+
+    if (notificationInsertError) {
+      console.error('chat notification insert failed', notificationInsertError);
+    }
+  }
+
+  let pushDisabled = false;
+  try {
+    ensureWebPushConfigured();
+  } catch {
+    pushDisabled = true;
+  }
+
+  const uniqueSubscriptions = new Map<string, PushSubscriptionRow>();
+  for (const row of (subscriptionRes.data || []) as PushSubscriptionRow[]) {
+    if (!row.endpoint || !row.staff_id || row.staff_id === senderId) continue;
+    if (!uniqueSubscriptions.has(row.endpoint)) {
+      uniqueSubscriptions.set(row.endpoint, row);
+    }
+  }
+
+  let sent = 0;
+  let failed = 0;
+  const expiredIds: string[] = [];
+
+  if (!pushDisabled) {
+    const payload = JSON.stringify({
+      title,
+      body: previewBody,
+      tag: 'chat-message',
+      data: {
+        room_id: params.roomId,
+        message_id: params.messageId,
+        created_at: message.created_at,
+        type: 'message',
+      },
+    });
+
+    for (const subscription of uniqueSubscriptions.values()) {
+      try {
+        await sendWebPushNotification(subscription, payload);
+        sent += 1;
+      } catch (error: any) {
+        failed += 1;
+        const statusCode = Number(error?.statusCode || error?.status || 0);
+        if (statusCode === 404 || statusCode === 410) {
+          expiredIds.push(subscription.id);
+        }
+      }
+    }
+  }
+
+  if (expiredIds.length > 0) {
+    await supabase.from('push_subscriptions').delete().in('id', expiredIds);
+  }
+
+  await updateChatPushJobByMessageId(supabase, params.messageId, {
+    processed_at: new Date().toISOString(),
+    processing_started_at: null,
+    last_error: pushDisabled ? 'web-push-disabled' : null,
+  });
+
+  return {
+    sent,
+    failed,
+    targets: targetIds.length,
+    notificationsCreated: notificationRows.length,
+    pushDisabled,
+  } satisfies ChatPushDispatchResult;
+}
+
+export async function processPendingChatPushJobs(limit = 25) {
+  const supabase = getAdminClient();
+  const { data, error } = await supabase
+    .from('chat_push_jobs')
+    .select('id, message_id, room_id, attempt_count')
+    .is('processed_at', null)
+    .order('created_at', { ascending: true })
+    .limit(limit);
+
+  if (error) {
+    if (isMissingRelationError(error, 'chat_push_jobs')) {
+      return { processed: 0, sent: 0, failed: 0, skipped: 0, reason: 'queue-table-missing' };
+    }
+    throw error;
+  }
+
+  const jobs = (data || []) as QueueJobRow[];
+  let processed = 0;
+  let sent = 0;
+  let failed = 0;
+  let skipped = 0;
+
+  for (const job of jobs) {
+    await updateChatPushJobById(supabase, job.id, {
+      processing_started_at: new Date().toISOString(),
+      attempt_count: Number(job.attempt_count || 0) + 1,
+      last_error: null,
+    });
+
+    try {
+      const result = await dispatchChatPushForMessage({
+        roomId: String(job.room_id),
+        messageId: String(job.message_id),
+        supabase,
+      });
+      processed += 1;
+      sent += result.sent;
+      failed += result.failed;
+      if (result.reason) skipped += 1;
+    } catch (error: any) {
+      failed += 1;
+      await updateChatPushJobById(supabase, job.id, {
+        processing_started_at: null,
+        last_error: String(error?.message || error || 'unknown-error'),
+      });
+    }
+  }
+
+  return {
+    processed,
+    sent,
+    failed,
+    skipped,
+  };
+}

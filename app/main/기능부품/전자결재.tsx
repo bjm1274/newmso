@@ -386,8 +386,6 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const openApprovalPrintView = useCallback((item: Record<string, unknown>) => {
     const design = resolveApprovalTemplateDesign(item);
     const templateMeta = resolveApprovalTemplateMeta(item);
-    const win = window.open('', '_blank');
-    if (!win) return;
     const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
     const ccUsers = normalizeApprovalCcUsers(metaData?.cc_users, staffs);
 
@@ -400,7 +398,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       ? `<div class="reference"><strong>참조자</strong><span>${ccUsers.map((user) => escapeHtml(user.position ? `${user.name} ${user.position}` : user.name)).join(', ')}</span></div>`
       : '';
 
-    win.document.write(`<!DOCTYPE html>
+    const html = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
@@ -462,7 +460,52 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   </div>
   <script>window.onload=()=>window.print()</script>
 </body>
-</html>`);
+</html>`;
+
+    const isMobilePrintFlow =
+      typeof navigator !== 'undefined' &&
+      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+
+    if (isMobilePrintFlow) {
+      const iframe = document.createElement('iframe');
+      iframe.setAttribute('aria-hidden', 'true');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      iframe.style.opacity = '0';
+
+      const cleanup = () => {
+        window.setTimeout(() => {
+          iframe.remove();
+        }, 1200);
+      };
+
+      iframe.onload = () => {
+        const frameWindow = iframe.contentWindow;
+        if (!frameWindow) {
+          cleanup();
+          toast('모바일 인쇄 미리보기를 여는 중 오류가 발생했습니다.', 'error');
+          return;
+        }
+        frameWindow.focus();
+        frameWindow.print();
+        cleanup();
+      };
+
+      iframe.srcdoc = html.replace('<script>window.onload=()=>window.print()</script>', '');
+      document.body.appendChild(iframe);
+      return;
+    }
+
+    const win = window.open('', '_blank');
+    if (!win) {
+      toast('PDF 미리보기를 열 수 없습니다. 팝업 차단을 확인해 주세요.', 'error');
+      return;
+    }
+    win.document.write(html);
     win.document.close();
   }, [resolveApprovalTemplateDesign, resolveApprovalTemplateMeta, staffs]);
 

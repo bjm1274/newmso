@@ -1,7 +1,7 @@
 'use client';
 import { toast } from '@/lib/toast';
 import { useDeferredValue, useState, useEffect, useMemo, useRef } from 'react';
-import { canAccessBoard } from '@/lib/access-control';
+import { canAccessBoard, isAdminUser, isPrivilegedUser } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnFallback } from '@/lib/supabase-compat';
 import SmartDatePicker from './공통/SmartDatePicker';
@@ -790,6 +790,13 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     return (post.author_id && String(post.author_id) === String(user.id)) || isDepartmentHead;
   };
 
+  const canDeletePost = (post: BoardPost) => {
+    if (!user) return false;
+    if (!canAccessBoard(user, (post?.board_type as string) || activeBoard, 'write')) return false;
+    const isAuthor = Boolean(post.author_id && String(post.author_id) === String(user.id));
+    return isAuthor || isAdminUser(user) || isPrivilegedUser(user);
+  };
+
   const sendScheduleApprovalRequest = async (post: BoardPost, actionType: '삭제' | '수정', updatedData?: Record<string, unknown>) => {
     if (!user) return;
     try {
@@ -827,14 +834,8 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
   };
 
   const handleDeletePost = async (post: BoardPost) => {
-    if (!canEditPost(post)) {
+    if (!canDeletePost(post)) {
       toast('이 게시물을 삭제할 권한이 없습니다.', 'error');
-      return;
-    }
-
-    if ((activeBoard === '수술일정' || activeBoard === 'MRI일정') && !isDepartmentHead) {
-      if (!confirm('부서장 이상 권한이 필요합니다. 관리자(간호과장 등)에게 삭제 승인 결재를 상신하시겠습니까?')) return;
-      await sendScheduleApprovalRequest(post, '삭제');
       return;
     }
 
@@ -2036,22 +2037,26 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                     >
                       {myLikedPostIds.has(String(selectedPost.id ?? '').trim()) ? '♥' : '♡'} 좋아요 {(selectedPost.likes_count as number) ?? 0}
                     </button>
-                    {canEditPost(selectedPost) && (
+                    {(canEditPost(selectedPost) || canDeletePost(selectedPost)) && (
                       <>
-                        <button
-                          type="button"
-                          onClick={() => handleEditPostStart(selectedPost)}
-                          className="px-3 py-1.5 rounded-[var(--radius-md)] border border-blue-100 text-[11px] font-bold text-blue-600 hover:bg-blue-50"
-                        >
-                          수정
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeletePost(selectedPost)}
-                          className="px-3 py-1.5 rounded-[var(--radius-md)] border border-red-100 text-[11px] font-bold text-red-600 hover:bg-red-50"
-                        >
-                          삭제
-                        </button>
+                        {canEditPost(selectedPost) && (
+                          <button
+                            type="button"
+                            onClick={() => handleEditPostStart(selectedPost)}
+                            className="px-3 py-1.5 rounded-[var(--radius-md)] border border-blue-100 text-[11px] font-bold text-blue-600 hover:bg-blue-50"
+                          >
+                            수정
+                          </button>
+                        )}
+                        {canDeletePost(selectedPost) && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeletePost(selectedPost)}
+                            className="px-3 py-1.5 rounded-[var(--radius-md)] border border-red-100 text-[11px] font-bold text-red-600 hover:bg-red-50"
+                          >
+                            삭제
+                          </button>
+                        )}
                       </>
                     )}
                     <button

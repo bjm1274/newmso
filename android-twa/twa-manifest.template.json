@@ -1,0 +1,19 @@
+{
+  "packageId": "kr.co.pchos.erp",
+  "host": "erp.pchos.kr",
+  "name": "SY INC. MSO 통합 시스템",
+  "launcherName": "SY INC. ERP",
+  "display": "standalone",
+  "themeColor": "#2563eb",
+  "backgroundColor": "#ffffff",
+  "navigationColor": "#2563eb",
+  "startUrl": "/main",
+  "iconUrl": "https://erp.pchos.kr/icon-512x512.png",
+  "maskableIconUrl": "https://erp.pchos.kr/icon-512x512.png",
+  "enableNotifications": true,
+  "fallbackType": "customtabs",
+  "features": {
+    "playBilling": false,
+    "locationDelegation": false
+  }
+}
