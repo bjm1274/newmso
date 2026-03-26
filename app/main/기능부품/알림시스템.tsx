@@ -909,12 +909,17 @@ export default function NotificationSystem({
         void syncBadge();
       });
 
+    // fallbackPoll: Realtime 누락 보완용. 마지막 폴링 이후 생성된 것만 조회하여 이중 알림 방지
+    let lastPolledAt = mountedAt;
     const fallbackPoll = setInterval(() => {
+      const since = lastPolledAt;
+      lastPolledAt = new Date().toISOString();
       supabase
         .from('notifications')
         .select('id,title,body,type,metadata,read_at,created_at')
         .eq('user_id', uid)
-        .order('created_at', { ascending: false })
+        .gte('created_at', since)
+        .order('created_at', { ascending: true })
         .limit(20)
         .then(({ data: rows }) => {
           rows?.forEach((row: Record<string, unknown>) => {
@@ -922,7 +927,7 @@ export default function NotificationSystem({
           });
           void syncBadge();
         });
-    }, 5000);
+    }, 30_000); // 5초 → 30초, Realtime이 주 경로이므로 보완용으로만
 
     // 30초 헬스체크
     const hc = setInterval(() => {

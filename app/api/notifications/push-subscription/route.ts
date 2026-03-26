@@ -74,11 +74,25 @@ export async function POST(request: NextRequest) {
 
     // FCM token만 있는 경우 별도 upsert
     if (fcm_token && !endpoint) {
+      // 기존 fcm_token 없는(Web Push 전용) 레코드 정리 → 이중 알림 방지
+      await supabase.from('push_subscriptions')
+        .delete()
+        .eq('staff_id', staffId)
+        .is('fcm_token', null);
       await supabase.from('push_subscriptions').upsert(
         { staff_id: staffId, endpoint: `fcm:${staffId}`, p256dh: '', auth: '', fcm_token },
         { onConflict: 'staff_id,endpoint' }
       );
       return NextResponse.json({ ok: true });
+    }
+
+    // FCM 토큰이 포함된 Web Push 구독 등록 시: 같은 staff의 fcm_token 없는 다른 레코드 정리
+    if (fcm_token && endpoint) {
+      await supabase.from('push_subscriptions')
+        .delete()
+        .eq('staff_id', staffId)
+        .is('fcm_token', null)
+        .neq('endpoint', endpoint);
     }
 
     const { error: upsertError } = await supabase.from('push_subscriptions').upsert(
