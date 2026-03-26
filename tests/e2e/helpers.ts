@@ -43,6 +43,19 @@ const defaultYearMonth = new Date().toISOString().slice(0, 7);
 const noticeRoomId = '00000000-0000-0000-0000-000000000000';
 
 function buildMockMonthlyWithholdingTable() {
+  const officialTablePath = path.join(
+    process.cwd(),
+    'data',
+    'payroll',
+    '2026_monthly_withholding_table.json'
+  );
+  if (fs.existsSync(officialTablePath)) {
+    return JSON.parse(fs.readFileSync(officialTablePath, 'utf8')).map((entry: any) => ({
+      ...entry,
+      official: true,
+    }));
+  }
+
   return DEFAULT_INCOME_TAX_BRACKET.map((entry) => ({
     ...entry,
     official: true,
@@ -51,6 +64,22 @@ function buildMockMonthlyWithholdingTable() {
       Math.floor(
         Math.max(0, entry.min * entry.rate - (entry.deduction ?? 0)) / 12
       )
+    ),
+    family_monthly_tax: Object.fromEntries(
+      Array.from({ length: 11 }, (_, index) => {
+        const familyCount = index + 1;
+        const baselineMonthlyTax = Math.max(
+          0,
+          Math.floor(
+            Math.max(0, entry.min * entry.rate - (entry.deduction ?? 0)) / 12
+          )
+        );
+        const syntheticFamilyTax = Math.max(
+          0,
+          baselineMonthlyTax - Math.max(0, familyCount - 1) * 12500
+        );
+        return [String(familyCount), syntheticFamilyTax];
+      })
     ),
   }));
 }

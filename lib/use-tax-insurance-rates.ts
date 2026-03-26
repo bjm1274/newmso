@@ -16,6 +16,10 @@ export type IncomeTaxBracketEntry = {
   deduction?: number;
   base_tax?: number;
   monthly_tax?: number;
+  family_monthly_tax?: Record<string, number>;
+  formula_base_income?: number;
+  formula_multiplier?: number;
+  formula_rate?: number;
   official?: boolean;
 };
 
@@ -53,8 +57,33 @@ function normalizeIncomeTaxBracketEntry(entry: any): IncomeTaxBracketEntry | nul
   const deduction = toFiniteNumber(entry.deduction ?? entry.quick_deduction ?? entry.quickDeduction ?? entry.누진공제);
   const baseTax = toFiniteNumber(entry.base_tax ?? entry.baseTax ?? entry.tax ?? entry.산출세액);
   const monthlyTax = toFiniteNumber(entry.monthly_tax ?? entry.monthlyTax ?? entry.month_tax ?? entry.월세액);
+  const formulaBaseIncome = toFiniteNumber(entry.formula_base_income ?? entry.formulaBaseIncome ?? entry.base_income ?? entry.threshold_income);
+  const formulaMultiplier = toFiniteNumber(entry.formula_multiplier ?? entry.formulaMultiplier ?? entry.excess_multiplier);
+  const formulaRate = toFiniteNumber(entry.formula_rate ?? entry.formulaRate ?? entry.excess_rate);
+  const familyMonthlyTaxSource =
+    entry.family_monthly_tax ??
+    entry.familyMonthlyTax ??
+    entry.monthly_tax_by_family ??
+    entry.monthlyTaxByFamily ??
+    entry.family_taxes ??
+    entry.familyTaxes;
+  const familyMonthlyTax = familyMonthlyTaxSource && typeof familyMonthlyTaxSource === 'object'
+    ? Object.fromEntries(
+        Object.entries(familyMonthlyTaxSource)
+          .map(([key, value]) => [String(key), toFiniteNumber(value)])
+          .filter(([, value]) => value !== null)
+      ) as Record<string, number>
+    : undefined;
 
-  if (min === null && max === null && rate === null && deduction === null && baseTax === null && monthlyTax === null) {
+  if (
+    min === null &&
+    max === null &&
+    rate === null &&
+    deduction === null &&
+    baseTax === null &&
+    monthlyTax === null &&
+    !familyMonthlyTax
+  ) {
     return null;
   }
 
@@ -65,6 +94,10 @@ function normalizeIncomeTaxBracketEntry(entry: any): IncomeTaxBracketEntry | nul
     deduction: deduction ?? undefined,
     base_tax: baseTax ?? undefined,
     monthly_tax: monthlyTax ?? undefined,
+    family_monthly_tax: familyMonthlyTax,
+    formula_base_income: formulaBaseIncome ?? undefined,
+    formula_multiplier: formulaMultiplier ?? undefined,
+    formula_rate: formulaRate ?? undefined,
     official: entry.official === true,
   };
 }
@@ -79,7 +112,18 @@ function isDetailedBracket(entries: IncomeTaxBracketEntry[]) {
 }
 
 function hasMonthlyWithholdingAmount(entry: IncomeTaxBracketEntry | null | undefined) {
-  return entry?.monthly_tax !== undefined && Number.isFinite(Number(entry.monthly_tax));
+  if (entry?.monthly_tax !== undefined && Number.isFinite(Number(entry.monthly_tax))) {
+    return true;
+  }
+
+  const familyTaxes = entry?.family_monthly_tax;
+  if (!familyTaxes || typeof familyTaxes !== 'object') return false;
+  for (let familyCount = 1; familyCount <= 11; familyCount += 1) {
+    if (!Number.isFinite(Number(familyTaxes[String(familyCount)]))) {
+      return false;
+    }
+  }
+  return true;
 }
 
 export function validateOfficialMonthlyIncomeTaxTable(brackets: any[] | null | undefined): string[] {
@@ -116,10 +160,6 @@ export function validateOfficialMonthlyIncomeTaxTable(brackets: any[] | null | u
       errors.push(`${index + 1}번 구간의 max 값이 min보다 작습니다.`);
     }
 
-    if (index === 0 && entry.min !== 0) {
-      errors.push('첫 구간은 min 0부터 시작해야 합니다.');
-    }
-
     if (previousMax !== null && entry.min < previousMax) {
       errors.push(`${index + 1}번 구간이 이전 구간과 겹칩니다.`);
     }
@@ -147,13 +187,45 @@ export function resolveIncomeTaxBracket(rates?: Partial<TaxInsuranceRates> | nul
 
 export function calculateMonthlyIncomeTax(
   taxableIncome: number,
-  rates?: Partial<TaxInsuranceRates> | null
+  rates?: Partial<TaxInsuranceRates> | null,
+  dependentCount: number = 0
 ): number {
   const monthlyTaxable = Math.max(0, Math.floor(Number(taxableIncome) || 0));
   if (monthlyTaxable <= 0) return 0;
 
-  const annualTaxable = monthlyTaxable * 12;
   const brackets = resolveIncomeTaxBracket(rates);
+  const hasFamilyTable = brackets.some((entry) => entry.family_monthly_tax && Object.keys(entry.family_monthly_tax).length > 0);
+  const familyCountForTable = Math.max(1, Math.floor(Number(dependentCount) || 0) + 1);
+
+  if (hasFamilyTable) {
+    const matched = brackets.find((entry) => monthlyTaxable >= entry.min && monthlyTaxable < (entry.max ?? Number.POSITIVE_INFINITY))
+      ?? brackets[brackets.length - 1];
+
+    if (!matched) return 0;
+
+    const familyTaxes = matched.family_monthly_tax || {};
+    const taxForFamily = (familyCount: number) => {
+      const cappedFamilyCount = Math.min(11, Math.max(1, familyCount));
+      const exact = Number(familyTaxes[String(cappedFamilyCount)] || 0);
+      if (familyCount <= 11) return exact;
+
+      const tax10 = Number(familyTaxes['10'] || 0);
+      const tax11 = Number(familyTaxes['11'] || 0);
+      return Math.max(0, Math.floor(tax11 - (tax10 - tax11) * (familyCount - 11)));
+    };
+
+    const baseTax = taxForFamily(familyCountForTable);
+    if (matched.max === null && matched.formula_rate !== undefined) {
+      const thresholdIncome = matched.formula_base_income ?? matched.min;
+      const excessIncome = Math.max(0, monthlyTaxable - thresholdIncome);
+      const multiplier = matched.formula_multiplier ?? 1;
+      return Math.max(0, Math.floor(baseTax + excessIncome * multiplier * matched.formula_rate));
+    }
+
+    return Math.max(0, Math.floor(baseTax));
+  }
+
+  const annualTaxable = monthlyTaxable * 12;
   const matched = brackets.find((entry) => annualTaxable >= entry.min && annualTaxable <= (entry.max ?? Number.POSITIVE_INFINITY))
     ?? brackets[brackets.length - 1];
 
@@ -225,16 +297,30 @@ export async function fetchTaxInsuranceRates(
     .eq('effective_year', year)
     .maybeSingle();
 
-  if (companyRes.data) {
-    return normalizeRates(companyRes.data, true);
-  }
-
   const fallbackRes = await supabase
     .from('tax_insurance_rates')
     .select('*')
     .eq('company_name', '전체')
     .eq('effective_year', year)
     .maybeSingle();
+
+  if (companyRes.data) {
+    const companyRates = normalizeRates(companyRes.data, true);
+    if (hasOfficialMonthlyIncomeTaxTable(companyRates.income_tax_bracket)) {
+      return companyRates;
+    }
+    if (fallbackRes.data) {
+      const fallbackRates = normalizeRates(fallbackRes.data, true);
+      if (hasOfficialMonthlyIncomeTaxTable(fallbackRates.income_tax_bracket)) {
+        return {
+          ...companyRates,
+          income_tax_bracket: fallbackRates.income_tax_bracket,
+          configured: true,
+        };
+      }
+    }
+    return companyRates;
+  }
 
   return normalizeRates(fallbackRes.data, Boolean(fallbackRes.data));
 }

@@ -331,9 +331,13 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
       employment_insurance = isDuruNuriActive ? Math.floor(full_employment * 0.2) : full_employment;
     }
     const dependentCount = Math.max(0, Number(data.dependent_count) || 0);
-    const dependentTaxCredit = dependentCount * 12500;
+    const baselineIncomeTax = calculateMonthlyIncomeTax(total_taxable, taxInsuranceRates, 0);
+    const exactIncomeTax = calculateMonthlyIncomeTax(total_taxable, taxInsuranceRates, dependentCount);
+    const dependentTaxCredit = hasExactWithholdingTable
+      ? Math.max(0, baselineIncomeTax - exactIncomeTax)
+      : dependentCount * 12500;
     if (data.apply_tax && hasExactWithholdingTable) {
-      income_tax = Math.max(0, calculateMonthlyIncomeTax(total_taxable, taxInsuranceRates) - dependentTaxCredit);
+      income_tax = Math.max(0, exactIncomeTax);
       local_tax = Math.floor(income_tax * 0.1 / 10) * 10; // 지방소득세 10%, 10원 단위 절사 (국고금관리법 제47조)
     }
     const custom_deduction = Number(data.custom_deduction) || 0;
