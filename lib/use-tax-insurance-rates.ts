@@ -23,6 +23,12 @@ export type IncomeTaxBracketEntry = {
   official?: boolean;
 };
 
+export interface MonthlyIncomeTaxOptions {
+  dependentCount?: number;
+  qualifyingChildCount?: number;
+  withholdingRatePercent?: number;
+}
+
 export const DEFAULT_INCOME_TAX_BRACKET: IncomeTaxBracketEntry[] = [
   { min: 0, max: 14_000_000, rate: 0.06, deduction: 0 },
   { min: 14_000_000, max: 50_000_000, rate: 0.15, deduction: 1_260_000 },
@@ -185,17 +191,43 @@ export function resolveIncomeTaxBracket(rates?: Partial<TaxInsuranceRates> | nul
   return isDetailedBracket(normalized) ? normalized : DEFAULT_INCOME_TAX_BRACKET;
 }
 
+export function normalizeWithholdingRatePercent(value: number | string | null | undefined): 80 | 100 | 120 {
+  const parsed = Number(value);
+  if (parsed === 80 || parsed === 120) return parsed;
+  return 100;
+}
+
+export function calculateQualifyingChildTaxCredit(value: number | string | null | undefined): number {
+  const childCount = Math.max(0, Math.floor(Number(value) || 0));
+  if (childCount <= 0) return 0;
+  if (childCount === 1) return 12_500;
+  if (childCount === 2) return 29_160;
+  return 29_160 + (childCount - 2) * 25_000;
+}
+
+function roundDownToTen(value: number) {
+  return Math.max(0, Math.floor(Math.max(0, value) / 10) * 10);
+}
+
 export function calculateMonthlyIncomeTax(
   taxableIncome: number,
   rates?: Partial<TaxInsuranceRates> | null,
-  dependentCount: number = 0
+  dependentCount: number = 0,
+  options?: MonthlyIncomeTaxOptions
 ): number {
   const monthlyTaxable = Math.max(0, Math.floor(Number(taxableIncome) || 0));
   if (monthlyTaxable <= 0) return 0;
 
   const brackets = resolveIncomeTaxBracket(rates);
   const hasFamilyTable = brackets.some((entry) => entry.family_monthly_tax && Object.keys(entry.family_monthly_tax).length > 0);
-  const familyCountForTable = Math.max(1, Math.floor(Number(dependentCount) || 0) + 1);
+  const normalizedDependentCount = Math.max(0, Math.floor(Number(options?.dependentCount ?? dependentCount) || 0));
+  const qualifyingChildCount = Math.min(
+    normalizedDependentCount,
+    Math.max(0, Math.floor(Number(options?.qualifyingChildCount) || 0)),
+  );
+  const withholdingRatePercent = normalizeWithholdingRatePercent(options?.withholdingRatePercent);
+  const familyCountForTable = Math.max(1, normalizedDependentCount + 1);
+  const childTaxCredit = calculateQualifyingChildTaxCredit(qualifyingChildCount);
 
   if (hasFamilyTable) {
     const matched = brackets.find((entry) => monthlyTaxable >= entry.min && monthlyTaxable < (entry.max ?? Number.POSITIVE_INFINITY))
@@ -215,14 +247,16 @@ export function calculateMonthlyIncomeTax(
     };
 
     const baseTax = taxForFamily(familyCountForTable);
+    let monthlyWithholdingTax = Math.max(0, Math.floor(baseTax));
     if (matched.max === null && matched.formula_rate !== undefined) {
       const thresholdIncome = matched.formula_base_income ?? matched.min;
       const excessIncome = Math.max(0, monthlyTaxable - thresholdIncome);
       const multiplier = matched.formula_multiplier ?? 1;
-      return Math.max(0, Math.floor(baseTax + excessIncome * multiplier * matched.formula_rate));
+      monthlyWithholdingTax = Math.max(0, Math.floor(baseTax + excessIncome * multiplier * matched.formula_rate));
     }
 
-    return Math.max(0, Math.floor(baseTax));
+    const taxAfterChildCredit = Math.max(0, monthlyWithholdingTax - childTaxCredit);
+    return roundDownToTen(taxAfterChildCredit * (withholdingRatePercent / 100));
   }
 
   const annualTaxable = monthlyTaxable * 12;
@@ -232,14 +266,17 @@ export function calculateMonthlyIncomeTax(
   if (!matched) return 0;
 
   if (matched.monthly_tax !== undefined) {
-    return Math.max(0, Math.floor(matched.monthly_tax));
+    const taxAfterChildCredit = Math.max(0, Math.floor(matched.monthly_tax) - childTaxCredit);
+    return roundDownToTen(taxAfterChildCredit * (withholdingRatePercent / 100));
   }
 
   const annualTax = matched.base_tax !== undefined
     ? matched.base_tax + Math.max(0, annualTaxable - matched.min) * matched.rate
     : Math.max(0, annualTaxable * matched.rate - (matched.deduction ?? 0));
 
-  return Math.max(0, Math.floor(annualTax / 12));
+  const monthlyTax = Math.max(0, Math.floor(annualTax / 12));
+  const taxAfterChildCredit = Math.max(0, monthlyTax - childTaxCredit);
+  return roundDownToTen(taxAfterChildCredit * (withholdingRatePercent / 100));
 }
 
 export function calculateAnnualIncomeTax(

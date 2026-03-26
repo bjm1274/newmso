@@ -664,6 +664,31 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
                         />
                       </div>
                       <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-emerald-700 ml-1">8~20세 자녀수</label>
+                        <input
+                          data-testid={`salary-settlement-child-count-${s.id}`}
+                          type="number"
+                          min={0}
+                          max={Number(data.dependent_count) || 0}
+                          value={Number(data.child_count_8_20) || 0}
+                          onChange={(e) => updateData(s.id, 'child_count_8_20', e.target.value)}
+                          className="w-full h-8 px-3 border border-emerald-200 bg-emerald-50/30 rounded-lg text-xs font-bold text-emerald-700 outline-none"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-sky-700 ml-1">원천징수 비율</label>
+                        <select
+                          data-testid={`salary-settlement-withholding-rate-${s.id}`}
+                          value={Number(data.withholding_rate_percent) || 100}
+                          onChange={(e) => updateData(s.id, 'withholding_rate_percent', parseInt(e.target.value, 10) || 100)}
+                          className="w-full h-8 px-3 border border-sky-200 bg-sky-50/30 rounded-lg text-xs font-bold text-sky-700 outline-none"
+                        >
+                          <option value={80}>80%</option>
+                          <option value={100}>100%</option>
+                          <option value={120}>120%</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1">
                         <label className="text-[10px] font-bold text-orange-600 ml-1">기타 추가차감</label>
                         <input
                           data-testid={`salary-settlement-custom-deduction-${s.id}`}
