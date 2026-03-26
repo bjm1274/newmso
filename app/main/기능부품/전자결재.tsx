@@ -1308,6 +1308,37 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
           }
         }
 
+        if (item.type === '출결정정' && Array.isArray(itemMetaData?.correction_dates) && itemMetaData.correction_dates.length > 0) {
+          try {
+            const requestedAt = new Date().toISOString();
+            const correctionRows = (itemMetaData.correction_dates as string[]).map((dateStr: string) => ({
+              staff_id: item.sender_id,
+              attendance_date: dateStr,
+              original_date: dateStr,
+              reason: String(itemMetaData?.correction_reason || item.content || ''),
+              correction_type: String(itemMetaData?.correction_type || '정상반영'),
+              requested_at: requestedAt,
+              approval_status: '승인',
+              status: '승인',
+              approved_by: user?.id,
+              approved_at: requestedAt,
+            }));
+            await supabase.from('attendance_corrections').upsert(correctionRows, { onConflict: 'staff_id,attendance_date' });
+            // attendance / attendances 상태 반영
+            const statusMap: Record<string, { att: string; atts: string }> = {
+              정상반영: { att: '정상', atts: 'present' },
+              지각처리: { att: '지각', atts: 'late' },
+              결근처리: { att: '결근', atts: 'absent' },
+            };
+            const corrType = String(itemMetaData?.correction_type || '정상반영');
+            const { att, atts } = statusMap[corrType] || statusMap['정상반영'];
+            for (const dateStr of itemMetaData.correction_dates as string[]) {
+              await supabase.from('attendance').upsert({ staff_id: item.sender_id, date: dateStr, status: att }, { onConflict: 'staff_id,date' });
+              await supabase.from('attendances').upsert({ staff_id: item.sender_id, work_date: dateStr, status: atts }, { onConflict: 'staff_id,work_date' });
+            }
+          } catch (_) { /* 출결정정 처리 실패 시 무시 */ }
+        }
+
         if (item.type === '양식신청' && itemMetaData?.form_type && itemMetaData?.target_staff && itemMetaData?.auto_issue) {
           try {
             const sn = `CERT-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(Date.now()).slice(-6)}`;
@@ -1786,6 +1817,8 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                     staffs={staffs}
                     initialSelectedDates={attendanceCorrectionSeedDates}
                     onConsumeInitialSelectedDates={() => setAttendanceCorrectionSeedDates([])}
+                    setExtraData={setExtraData}
+                    setFormTitle={setFormTitle}
                   />
                 ) : formType === '연차계획서' ? (
                   <AnnualLeavePlanForm user={user} staffs={staffs} setExtraData={setExtraData} setFormTitle={setFormTitle} />
