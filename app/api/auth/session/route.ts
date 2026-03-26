@@ -8,6 +8,7 @@ import {
   normalizeSessionUser,
   readSessionFromRequest,
   SESSION_COOKIE_NAME,
+  SESSION_MAX_AGE_SECONDS,
 } from '@/lib/server-session';
 
 function getRuntimeEnv(key: string) {
@@ -99,13 +100,17 @@ export async function GET(request: NextRequest) {
     supabaseAccessToken,
   });
 
-  if (JSON.stringify(currentSessionUser) !== JSON.stringify(freshSessionUser)) {
-    const remainingAgeSeconds = Math.max(1, session.exp - Math.floor(Date.now() / 1000));
-    const refreshedToken = await createSessionToken(freshSessionUser, remainingAgeSeconds);
+  const remainingAgeSeconds = Math.max(1, session.exp - Math.floor(Date.now() / 1000));
+  const userChanged = JSON.stringify(currentSessionUser) !== JSON.stringify(freshSessionUser);
+  // 남은 시간이 6시간 미만이거나 사용자 정보 변경 시 → 12시간 전체로 갱신
+  const shouldRefresh = userChanged || remainingAgeSeconds < SESSION_MAX_AGE_SECONDS / 2;
+  if (shouldRefresh) {
+    const newAgeSeconds = SESSION_MAX_AGE_SECONDS;
+    const refreshedToken = await createSessionToken(freshSessionUser, newAgeSeconds);
     response.cookies.set(
       SESSION_COOKIE_NAME,
       refreshedToken,
-      getSessionCookieOptions(remainingAgeSeconds)
+      getSessionCookieOptions(newAgeSeconds)
     );
   }
 

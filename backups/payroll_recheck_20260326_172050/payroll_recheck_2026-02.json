@@ -1,0 +1,76 @@
+﻿{
+  "generated_at": "2026-03-26T08:20:52.076Z",
+  "year_month": "2026-02",
+  "results": [
+    {
+      "id": "b8dfd097-5857-4585-a2dc-cb2d93b83ef8",
+      "staff_id": "34c27476-f1c6-4a13-a5e6-1af552cdc81d",
+      "taxable": 50000000,
+      "taxfree": 0,
+      "stored": {
+        "national_pension": 2250000,
+        "health_insurance": 1772500,
+        "long_term_care": 229538,
+        "employment_insurance": 449999,
+        "income_tax": 1500000,
+        "local_tax": 150000,
+        "total_deduction": 6352037,
+        "net_pay": 43647963,
+        "dependent_count": 0,
+        "child_count_8_20": 0,
+        "withholding_rate_percent": 100
+      },
+      "recomputed": {
+        "national_pension": 2375000,
+        "health_insurance": 1774999,
+        "long_term_care": 230000,
+        "employment_insurance": 449999,
+        "income_tax": 15122880,
+        "local_tax": 1512280,
+        "total_deduction": 21465158,
+        "net_pay": 28534842
+      },
+      "delta": {
+        "income_tax": 13622880,
+        "local_tax": 1362280,
+        "total_deduction": 15113121,
+        "net_pay": -15113121
+      }
+    },
+    {
+      "id": "3b6b09b5-824c-4838-bd4e-6014a95b7889",
+      "staff_id": "7f351f47-2dd2-4205-8c73-ca3acdd669e2",
+      "taxable": 4000000,
+      "taxfree": 400000,
+      "stored": {
+        "national_pension": 180000,
+        "health_insurance": 141800,
+        "long_term_care": 18363,
+        "employment_insurance": 36000,
+        "income_tax": 120000,
+        "local_tax": 12000,
+        "total_deduction": 508163,
+        "net_pay": 3891837,
+        "dependent_count": 0,
+        "child_count_8_20": 0,
+        "withholding_rate_percent": 100
+      },
+      "recomputed": {
+        "national_pension": 190000,
+        "health_insurance": 142000,
+        "long_term_care": 18400,
+        "employment_insurance": 36000,
+        "income_tax": 295150,
+        "local_tax": 29510,
+        "total_deduction": 711060,
+        "net_pay": 3688940
+      },
+      "delta": {
+        "income_tax": 175150,
+        "local_tax": 17510,
+        "total_deduction": 202897,
+        "net_pay": -202897
+      }
+    }
+  ]
+}

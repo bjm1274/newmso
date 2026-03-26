@@ -456,6 +456,30 @@ function MainPageContent() {
     checkForcedLogout();
   }, [clearClientSession, router]);
 
+  // 세션 자동 갱신 — 30분마다 GET /api/auth/session 호출 (남은 시간 < 6h이면 서버가 12h로 연장)
+  useEffect(() => {
+    if (!user) return;
+    const refreshSession = async () => {
+      try {
+        const response = await fetch('/api/auth/session', { method: 'GET', cache: 'no-store' });
+        if (!response.ok) {
+          await clearClientSession();
+          router.replace('/');
+          return;
+        }
+        const payload = await response.json();
+        if (payload?.supabaseAccessToken) {
+          persistSupabaseAccessToken(payload.supabaseAccessToken);
+          void supabase.realtime.setAuth(payload.supabaseAccessToken);
+        }
+      } catch {
+        // 갱신 실패 시 무시 (다음 주기에 재시도)
+      }
+    };
+    const interval = setInterval(refreshSession, 30 * 60 * 1000); // 30분마다
+    return () => clearInterval(interval);
+  }, [user, clearClientSession, router]);
+
   // 알림 클릭 시 open_chat_room 쿼리 처리 → 채팅 메뉴 + 해당 채팅방 연동 (웹/모바일 동일)
   useEffect(() => {
     const roomId = navigationIntent.openChatRoom;
