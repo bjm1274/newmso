@@ -26,7 +26,7 @@ messaging.onBackgroundMessage((payload) => {
     badge: '/badge-72x72.png',
     tag,
     requireInteraction: true,
-    renotify: true,
+    renotify: false,  // 같은 tag는 조용히 업데이트 (이중 알림 방지)
     silent: false,
     vibrate: [200, 100, 200],
     data,
