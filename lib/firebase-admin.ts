@@ -16,27 +16,29 @@ export async function sendFcmNotification(
 ): Promise<boolean> {
   try {
     const app = getAdminApp();
+    const messageData = {
+      ...(payload.data || {}),
+      title: payload.title,
+      body: payload.body,
+    };
+    // 같은 message_id의 알림은 collapseKey로 묶어 이중 표시 방지
+    const messageId = payload.data?.message_id || '';
+    const collapseKey = messageId ? `chat-msg-${messageId}` : undefined;
     await admin.messaging(app).send({
       token: fcmToken,
-      notification: { title: payload.title, body: payload.body },
-      data: payload.data,
+      data: messageData,
       webpush: {
-        notification: {
-          title: payload.title,
-          body: payload.body,
-          icon: '/sy-logo.png',
-          badge: '/badge-72x72.png',
-          requireInteraction: true,
-          vibrate: [200, 100, 200],
-        },
         fcmOptions: { link: '/main' },
       },
       android: {
         priority: 'high',
-        notification: { sound: 'default', priority: 'high', defaultVibrateTimings: true },
+        ...(collapseKey ? { collapseKey } : {}),
       },
       apns: {
-        headers: { 'apns-priority': '10' },
+        headers: {
+          'apns-priority': '10',
+          ...(collapseKey ? { 'apns-collapse-id': collapseKey } : {}),
+        },
         payload: { aps: { sound: 'default', badge: 1, contentAvailable: true } },
       },
     });
@@ -56,8 +58,9 @@ export async function sendFcmBatch(
   tokens: string[],
   payload: { title: string; body: string; data?: Record<string, string> },
 ): Promise<{ success: string[]; expired: string[] }> {
+  const uniqueTokens = Array.from(new Set(tokens.filter(Boolean)));
   const results = await Promise.allSettled(
-    tokens.map(async (token) => {
+    uniqueTokens.map(async (token) => {
       const ok = await sendFcmNotification(token, payload);
       return { token, ok };
     }),
