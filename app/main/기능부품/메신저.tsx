@@ -3262,7 +3262,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         <div
           ref={messageListRef}
           onScroll={updateScrollPositionState}
-          className="flex-1 min-h-0 overflow-y-auto px-3 py-2 pb-2 md:px-4 md:py-3 md:pb-3 space-y-1 custom-scrollbar"
+          className="flex-1 min-h-0 overflow-y-auto px-3 py-1 pb-2 md:px-4 md:py-2 md:pb-2 space-y-0 custom-scrollbar"
         >
           {!selectedRoomId ? (
             <div className="h-full flex flex-col items-center justify-center text-[var(--toss-gray-3)]">
@@ -3277,6 +3277,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           ) : (
             (() => {
               let lastDateLabel = '';
+              let lastSenderId = '';
               const totalRecipients = Math.max(
                 0,
                 roomMembers.filter((member: StaffMember) => String(member.id) !== effectiveChatUserId).length
@@ -3351,11 +3352,13 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
                 const isSystemInvite = typeof msg.content === 'string' && msg.content.startsWith('[초대]');
                 const systemText = isSystemInvite ? (msg.content as string).replace(/^\[초대\]\s*/, '') : '';
+                const isContinuous = !showDateDivider && !isSystemInvite && String(msg.sender_id) === lastSenderId;
+                lastSenderId = String(msg.sender_id);
 
                 return (
-                  <div key={msg.id} className="space-y-0.5">
+                  <div key={msg.id} className={isContinuous ? 'mt-0.5' : 'mt-2'}>
                     {showDateDivider && (
-                      <div className="flex justify-center my-1 items-center gap-2">
+                      <div className="flex justify-center my-2 items-center gap-2">
                         <div className="flex-1 h-px bg-[var(--border)]" />
                         <span className="px-2.5 py-0.5 rounded-full bg-[var(--muted)] text-[10px] font-semibold text-[var(--toss-gray-3)] shrink-0">
                           {dateLabel}
@@ -3374,7 +3377,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                         ref={el => { msgRefs.current[msg.id] = el; }}
                         className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}
                       >
-                        {!isMine && (
+                        {!isMine && !isContinuous && (
                           <span className="text-[10px] text-[var(--toss-gray-3)] px-1.5 mb-0.5 font-semibold">
                             {msg.staff?.name} {msg.staff?.position}
                           </span>
