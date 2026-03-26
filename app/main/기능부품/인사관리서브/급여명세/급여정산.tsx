@@ -105,6 +105,81 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
         .lte('work_date', endDate);
       if (attendanceError) throw attendanceError;
 
+      let attendanceRecordRows: Array<{
+        staff_id: string;
+        work_date: string;
+        late_minutes?: number | null;
+        early_leave_minutes?: number | null;
+      }> = [];
+
+      try {
+        const { data, error } = await supabase
+          .from('attendance_records')
+          .select('staff_id, work_date, late_minutes, early_leave_minutes')
+          .in('staff_id', staffIds)
+          .gte('work_date', startDate)
+          .lte('work_date', endDate);
+
+        if (!error && Array.isArray(data)) {
+          attendanceRecordRows = data;
+        }
+      } catch {
+        // Some environments do not expose attendance_records yet.
+      }
+
+      const scheduledWorkDaysByStaff: Record<string, number> = {};
+      try {
+        const { data: shiftAssignments, error: shiftAssignmentsError } = await supabase
+          .from('shift_assignments')
+          .select('staff_id, work_date, shift_id')
+          .in('staff_id', staffIds)
+          .gte('work_date', startDate)
+          .lte('work_date', endDate);
+
+        if (!shiftAssignmentsError && Array.isArray(shiftAssignments) && shiftAssignments.length > 0) {
+          const usedShiftIds = [...new Set(shiftAssignments.map((row) => String(row.shift_id || '')).filter(Boolean))];
+          let offLikeShiftIds = new Set<string>();
+          const scheduledWorkDateBuckets: Record<string, Set<string>> = {};
+
+          if (usedShiftIds.length > 0) {
+            try {
+              const { data: workShifts, error: workShiftsError } = await supabase
+                .from('work_shifts')
+                .select('id, name')
+                .in('id', usedShiftIds);
+
+              if (!workShiftsError && Array.isArray(workShifts)) {
+                offLikeShiftIds = new Set(
+                  workShifts
+                    .filter((shift) => /off|휴무|연차|leave/i.test(String(shift.name || '')))
+                    .map((shift) => String(shift.id))
+                );
+              }
+            } catch {
+              // work_shifts lookup is optional for divisor improvements.
+            }
+          }
+
+          shiftAssignments.forEach((row) => {
+            const shiftId = String(row.shift_id || '').trim();
+            if (!shiftId || offLikeShiftIds.has(shiftId)) return;
+
+            const workDate = String(row.work_date || '').slice(0, 10);
+            if (!workDate) return;
+
+            const existing = scheduledWorkDateBuckets[row.staff_id] || new Set<string>();
+            existing.add(workDate);
+            scheduledWorkDateBuckets[row.staff_id] = existing;
+          });
+
+          Object.entries(scheduledWorkDateBuckets).forEach(([staffId, dates]) => {
+            scheduledWorkDaysByStaff[staffId] = dates.size;
+          });
+        }
+      } catch {
+        // shift_assignments is optional for divisor improvements.
+      }
+
       const ruleCompany = selectedCo === '전체' ? '전체' : selectedCo;
       const { data: rule, error: ruleError } = await supabase
         .from('attendance_deduction_rules')
@@ -121,13 +196,37 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
       const r = rule || fallbackRule;
 
       const initialData: any = {};
+      const attendanceMinuteMap = new Map(
+        attendanceRecordRows.map((row) => [
+          `${row.staff_id}_${String(row.work_date || '').slice(0, 10)}`,
+          {
+            late_minutes: row.late_minutes ?? null,
+            early_leave_minutes: row.early_leave_minutes ?? null,
+          },
+        ])
+      );
+
       selectedStaffs.forEach((s: StaffMember) => {
-        const staffAtts = (attendances || []).filter((a: any) => a.staff_id === s.id);
+        const staffAtts = (attendances || [])
+          .filter((a: any) => a.staff_id === s.id)
+          .map((attendance: any) => ({
+            ...attendance,
+            ...(attendanceMinuteMap.get(`${attendance.staff_id}_${String(attendance.work_date || '').slice(0, 10)}`) || {}),
+          }));
         const { total, detail } = calculateAttendanceDeduction(
           Number(s.base_salary) || 0,
           yearMonth,
           staffAtts,
-          r ? { late_deduction_type: r.late_deduction_type, late_deduction_amount: r.late_deduction_amount, early_leave_deduction_type: r.early_leave_deduction_type, early_leave_deduction_amount: r.early_leave_deduction_amount } : undefined
+          r
+            ? {
+                late_deduction_type: r.late_deduction_type,
+                late_deduction_amount: r.late_deduction_amount,
+                early_leave_deduction_type: r.early_leave_deduction_type,
+                early_leave_deduction_amount: r.early_leave_deduction_amount,
+                absent_use_daily_rate: r.absent_use_daily_rate,
+              }
+            : undefined,
+          { scheduledWorkDays: scheduledWorkDaysByStaff[s.id] }
         );
         initialData[s.id] = {
           base_salary: s.base_salary || 0,
@@ -223,7 +322,8 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
       // 2. 건강보험 - 의료급여 수급자는 제외(0원)
       if (!isMedicalBenefit) {
         health_insurance = Math.floor(total_taxable * taxInsuranceRates.health_insurance_rate);
-        long_term_care = Math.floor(total_taxable * taxInsuranceRates.long_term_care_rate);
+        // 장기요양보험 = 건강보험료 × 12.95% (2026년 법적 기준, 국민건강보험법 시행령)
+        long_term_care = Math.floor(health_insurance * 0.1295);
       }
 
       // 3. 고용보험 - 두루누리 80% 지원 적용 시 20%만 부과

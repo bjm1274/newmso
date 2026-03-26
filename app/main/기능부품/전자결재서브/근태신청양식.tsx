@@ -43,7 +43,8 @@ export default function AttendanceForms({
     load();
   }, [_user.id]);
 
-  const calculateOT = (record: any) => {
+  /** 초과근무 분수를 10분 단위 내림으로 반환. 10분 미만이면 0 반환. */
+  const calculateOT = (record: any): number => {
     const staff = _staffs.find((item: any) => item.id === _user.id);
     const schedule = schedules.find((item: any) => item.id === staff?.schedule_id);
     if (!record?.check_out || !schedule?.end_time) return 0;
@@ -57,7 +58,17 @@ export default function AttendanceForms({
 
     if (actualOut <= scheduledOut) return 0;
 
-    return Math.floor(((actualOut.getTime() - scheduledOut.getTime()) / (1000 * 60 * 60)) * 2) / 2;
+    const diffMinutes = Math.floor((actualOut.getTime() - scheduledOut.getTime()) / (1000 * 60));
+    if (diffMinutes < 10) return 0;
+    return Math.floor(diffMinutes / 10) * 10; // 10분 단위 내림 (분 단위 반환)
+  };
+
+  const formatOTLabel = (minutes: number) => {
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    if (h > 0 && m > 0) return `${h}시간 ${m}분`;
+    if (h > 0) return `${h}시간`;
+    return `${m}분`;
   };
 
   return (
@@ -131,8 +142,8 @@ export default function AttendanceForms({
 
           <div className="grid max-h-60 grid-cols-1 gap-2 overflow-y-auto bg-[var(--tab-bg)]/30 p-3 pr-2 custom-scrollbar md:grid-cols-2 md:gap-3">
             {attendanceRows.map((row, index) => {
-              const overtimeHours = calculateOT(row);
-              if (overtimeHours <= 0) return null;
+              const overtimeMinutes = calculateOT(row);
+              if (overtimeMinutes <= 0) return null;
 
               return (
                 <button
@@ -143,10 +154,11 @@ export default function AttendanceForms({
                     setSelectedDate(row.date);
                     _setExtraData({
                       date: row.date,
-                      hours: overtimeHours,
-                      amount: overtimeHours * 15000,
+                      minutes: overtimeMinutes,
+                      hours: Math.round((overtimeMinutes / 60) * 100) / 100,
+                      amount: Math.floor((overtimeMinutes / 60) * 15000),
                     });
-                    _setFormTitle(`[추가수당청구] ${row.date} 연장근무 ${overtimeHours}시간`);
+                    _setFormTitle(`[추가수당청구] ${row.date} 연장근무 ${formatOTLabel(overtimeMinutes)}`);
                   }}
                   className={`flex items-center justify-between rounded-[var(--radius-lg)] border-2 p-3 text-left transition-all ${
                     selectedDate === row.date
@@ -163,7 +175,7 @@ export default function AttendanceForms({
                     </p>
                   </div>
                   <span className="rounded-[var(--radius-md)] bg-orange-50 px-2 py-1 text-[10px] font-bold text-orange-500 md:text-[11px]">
-                    +{overtimeHours}H
+                    +{formatOTLabel(overtimeMinutes)}
                   </span>
                 </button>
               );

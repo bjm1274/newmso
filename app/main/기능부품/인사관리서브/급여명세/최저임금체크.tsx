@@ -5,7 +5,7 @@ import { useState } from 'react';
 const MIN_WAGE_TABLE: Record<number, number> = {
   2024: 9860,
   2025: 10030,
-  2026: 10300,
+  2026: 10320,
 };
 
 const MONTHLY_HOURS = 209; // 월 소정근로시간 (주 40시간 기준)

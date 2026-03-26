@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { canAccessApprovalSection } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
 import { syncApprovalToDocumentRepository } from '@/lib/approval-document-archive';
+import { ensureApprovedAnnualLeaveRequest, isAnnualLeaveType, syncAnnualLeaveUsedForStaff } from '@/lib/annual-leave-ledger';
 import { isMissingColumnError, withMissingColumnFallback } from '@/lib/supabase-compat';
 import type { StaffMember } from '@/types';
 import {
@@ -1258,9 +1259,10 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
         }
 
         if (item.type === '연차/휴가') {
+          const senderId = String(item.sender_id || '');
           const startStr = String(itemMetaData?.startDate || itemMetaData?.start || '');
           const endStr = String(itemMetaData?.endDate || itemMetaData?.end || startStr);
-          if (!startStr) {
+          if (!senderId || !startStr) {
             toast("최종 승인 처리가 완료되었습니다.", 'success');
             fetchApprovals();
             return;
@@ -1273,17 +1275,16 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
             return;
           }
           const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+          const leaveType = String(itemMetaData?.leaveType || '연차');
 
           // 1. 인사관리 휴가신청 테이블(leave_requests) 동기화
           try {
-            await supabase.from('leave_requests').insert({
-              staff_id: item.sender_id,
-              leave_type: itemMetaData?.leaveType || '연차',
-              start_date: startStr,
-              end_date: endStr,
-              reason: item.title,
-              status: '승인',
-              approved_at: new Date().toISOString()
+            await ensureApprovedAnnualLeaveRequest({
+              staffId: senderId,
+              leaveType,
+              startDate: startStr,
+              endDate: endStr,
+              reason: String(item.title || ''),
             });
           } catch (e) { /* 테이블 부재 시 무시 */ }
 
@@ -1293,17 +1294,13 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
             dte.setDate(dte.getDate() + d);
             const dateStr = dte.toISOString().split('T')[0];
             await supabase.from('attendance').upsert({
-              staff_id: item.sender_id,
+              staff_id: senderId,
               date: dateStr,
               status: '휴가',
             }, { onConflict: 'staff_id,date' });
           }
-          // 원자적 증감: rpc가 없으면 fallback으로 read-then-write
-          const { error: rpcErr } = await supabase.rpc('increment_annual_leave_used', { p_staff_id: item.sender_id, p_days: days });
-          if (rpcErr) {
-            const { data: staff } = await supabase.from('staff_members').select('annual_leave_used').eq('id', item.sender_id).single();
-            const used = (Number(staff?.annual_leave_used) || 0) + days;
-            await supabase.from('staff_members').update({ annual_leave_used: used }).eq('id', item.sender_id);
+          if (isAnnualLeaveType(leaveType)) {
+            await syncAnnualLeaveUsedForStaff(senderId);
           }
         }
 
