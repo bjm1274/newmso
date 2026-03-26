@@ -3,7 +3,11 @@ import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { DEFAULT_INCOME_TAX_BRACKET, hasOfficialMonthlyIncomeTaxTable } from '@/lib/use-tax-insurance-rates';
+import {
+  DEFAULT_INCOME_TAX_BRACKET,
+  hasOfficialMonthlyIncomeTaxTable,
+  validateOfficialMonthlyIncomeTaxTable,
+} from '@/lib/use-tax-insurance-rates';
 
 const COMPANY_FILTER = '전체';
 
@@ -101,6 +105,28 @@ export default function TaxInsuranceRatesPanel({ companyName }: { companyName?: 
     }
   }, [form.income_tax_bracket_text, form.official_confirmed]);
 
+  const bracketValidationErrors = useMemo(() => {
+    if (!form.official_confirmed) return [] as string[];
+
+    try {
+      if (!form.income_tax_bracket_text.trim()) {
+        return ['월 근로소득 간이세액표를 입력해야 공식 확인 상태로 저장할 수 있습니다.'];
+      }
+      const parsed = JSON.parse(form.income_tax_bracket_text);
+      if (!Array.isArray(parsed)) {
+        return ['월 근로소득 간이세액표는 JSON 배열 형식이어야 합니다.'];
+      }
+      return validateOfficialMonthlyIncomeTaxTable(
+        parsed.map((entry) => ({
+          ...entry,
+          official: true,
+        }))
+      );
+    } catch (error: unknown) {
+      return [`월 근로소득 간이세액표 JSON이 올바르지 않습니다: ${(error as Error)?.message || error}`];
+    }
+  }, [form.income_tax_bracket_text, form.official_confirmed]);
+
   const handleSave = async () => {
     let parsedBracket: any[] = [];
     if (form.income_tax_bracket_text.trim()) {
@@ -115,6 +141,11 @@ export default function TaxInsuranceRatesPanel({ companyName }: { companyName?: 
         toast(`소득세 세율표 JSON이 올바르지 않습니다: ${(error as Error)?.message || error}`, 'error');
         return;
       }
+    }
+
+    if (form.official_confirmed && bracketValidationErrors.length > 0) {
+      toast(bracketValidationErrors[0], 'error');
+      return;
     }
 
     setSaving(true);
@@ -302,6 +333,16 @@ export default function TaxInsuranceRatesPanel({ companyName }: { companyName?: 
                 className="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-xs leading-5 text-[var(--foreground)]"
                 placeholder='[{"min":0,"max":14000000,"rate":0.06,"deduction":0}]'
               />
+              {bracketValidationErrors.length > 0 && (
+                <div className="rounded-[var(--radius-md)] border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
+                  <p className="font-semibold">월 원천징수표 확인 필요</p>
+                  <ul className="mt-1 list-disc space-y-1 pl-4">
+                    {bracketValidationErrors.map((error) => (
+                      <li key={error}>{error}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               <div className="space-y-1 text-[11px] text-[var(--toss-gray-4)]">
                 <p>월 원천징수표 확인 상태: {exactBracketConfigured ? '확인 완료' : '미확인'}</p>
                 <p>현재 상태: {bracketConfigured ? '세율표 입력됨' : '세율표 미입력'}</p>

@@ -14,7 +14,7 @@ export const TAX_FREE_LEGAL_LIMITS = {
 } as const;
 
 export const MINIMUM_WAGE_2025 = 10_030; // 시급
-export const MINIMUM_WAGE_2026 = 10_200; // 시급 (Placeholder)
+export const MINIMUM_WAGE_2026 = 10_320; // 시급 (2026년 확정)
 
 /** 근로·임금 정보 기본값: 미입력(0)일 때 적용 (학습 문서 §9·§14.2) */
 export const DAILY_STANDARD_HOURS = 8;   // 일 소정근로시간

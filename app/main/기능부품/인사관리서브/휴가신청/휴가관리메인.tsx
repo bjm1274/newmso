@@ -2,6 +2,7 @@
 import { toast } from '@/lib/toast';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { syncAnnualLeaveUsedForStaff } from '@/lib/annual-leave-ledger';
 import AnnualLeavePromotion from './연차촉진시스템';
 import LeaveDashboard from '../급여명세/연차종합대시보드';
 import HolidayCalendar from '../공휴일달력';
@@ -125,17 +126,13 @@ export default function LeaveManagement({
 
       if (error) throw error;
       setLeaves((prev) => prev.map((l) => (l.id === id ? { ...l, status } : l)));
-      toast(`신청이 ${status} 처리되었습니다.`, 'success');
       if (status === '승인') {
-        // 승인 시 연차 사용일수 반영 (staff_members annual_leave_used 업데이트)
         const leave = leaves.find((l) => l.id === id);
-        if (leave && leave.leave_type === '연차') {
-          const days = Math.ceil((new Date(leave.end_date).getTime() - new Date(leave.start_date).getTime()) / (1000 * 60 * 60 * 24)) + 1;
-          const { data: staff } = await supabase.from('staff_members').select('annual_leave_used').eq('id', leave.staff_id).single();
-          const used = (staff?.annual_leave_used || 0) + days;
-          await supabase.from('staff_members').update({ annual_leave_used: used }).eq('id', leave.staff_id);
+        if (leave) {
+          await syncAnnualLeaveUsedForStaff(leave.staff_id);
         }
       }
+      toast(`신청이 ${status} 처리되었습니다.`, 'success');
       if (onRefresh) (onRefresh as () => void)();
     } catch (err) {
       toast('처리에 실패했습니다.', 'error');
