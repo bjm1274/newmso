@@ -3936,13 +3936,13 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 <div className="space-y-2">
                   <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest ml-1">멤버 선택 ({selectedMembers.length}명)</label>
                   <div className="h-48 overflow-y-auto border border-[var(--border)] rounded-[var(--radius-md)] p-4 space-y-2 custom-scrollbar bg-[var(--muted)]/30">
-                    {staffs.filter(( s: StaffMember) => String(s.id) !== String(effectiveChatUserId || user?.id || '')).map(( s: StaffMember) => (
+                    {allKnownStaffs.filter(( s: StaffMember) => String(s.id) !== String(effectiveChatUserId || user?.id || '') && s.status !== '퇴사' && s.status !== '퇴직').map(( s: StaffMember) => (
                       <label key={s.id} className="flex items-center gap-3 p-3 bg-[var(--card)] rounded-[var(--radius-lg)] border border-[var(--border)] cursor-pointer hover:border-[var(--accent)] transition-all">
                         <input type="checkbox" checked={selectedMembers.includes(s.id)} onChange={e => {
                           if (e.target.checked) setSelectedMembers([...selectedMembers, s.id]);
                           else setSelectedMembers(selectedMembers.filter(id => id !== s.id));
                         }} className="w-4 h-4 rounded border-[var(--border)] text-[var(--accent)] focus:ring-[var(--accent)]" />
-                        <span className="text-xs font-bold text-[var(--foreground)]">{s.name} ({s.position})</span>
+                        <span className="text-xs font-bold text-[var(--foreground)]">{s.name} ({s.company ? `${s.company} · ` : ''}{s.position})</span>
                       </label>
                     ))}
                   </div>
