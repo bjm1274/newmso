@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { getPayrollGrossPay } from '@/lib/payroll-records';
 import { supabase } from '@/lib/supabase';
 
 interface Props {
@@ -41,7 +42,7 @@ export default function GrossNetComparison({ staffs, selectedCo, user }: Props) 
 
   const rows = filtered.map((staff: any) => {
     const rec = records.find((r: any) => String(r.staff_id) === String(staff.id));
-    const gross = rec?.gross_pay || 0;
+    const gross = getPayrollGrossPay(rec);
     const deduction = rec?.total_deduction || 0;
     const net = rec?.net_pay || gross - deduction;
     const deductionRate = gross > 0 ? ((deduction / gross) * 100).toFixed(1) : '0.0';
