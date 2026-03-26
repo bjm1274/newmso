@@ -824,11 +824,12 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       const readAt = new Date().toISOString();
       const { error } = await supabase.from('message_reads').upsert(
         candidateIds.map((id) => ({
+          reader_id: effectiveChatUserId,
           user_id: effectiveChatUserId,
           message_id: id,
           read_at: readAt,
         })),
-        { onConflict: 'user_id,message_id' }
+        { onConflict: 'message_id,reader_id' }
       );
       if (error && error.code !== '23503' && error.code !== '42P10') {
         console.warn('message_reads upsert skipped', error);
