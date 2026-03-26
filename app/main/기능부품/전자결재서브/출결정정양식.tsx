@@ -11,6 +11,8 @@ type ProblemDateItem = {
   date: string;
   reason: ProblemReason;
   label: string;
+  checkIn?: string | null;
+  checkOut?: string | null;
 };
 
 type AttendanceCorrectionFormProps = {
@@ -56,6 +58,13 @@ function getCorrectionStatus(correction: any) {
   return correction?.approval_status || correction?.status || DEFAULT_CORRECTION_STATUS;
 }
 
+const REASON_BADGE: Record<string, { bg: string; text: string; icon: string }> = {
+  결근:   { bg: 'bg-red-100 dark:bg-red-900/30',    text: 'text-red-600 dark:text-red-400',    icon: '🚫' },
+  지각:   { bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-700 dark:text-amber-400', icon: '⏰' },
+  미체크: { bg: 'bg-slate-100 dark:bg-slate-800',    text: 'text-slate-600 dark:text-slate-400', icon: '❓' },
+  미출근: { bg: 'bg-orange-100 dark:bg-orange-900/30',text: 'text-orange-600 dark:text-orange-400',icon: '⚠️' },
+};
+
 export default function AttendanceCorrectionForm({
   user,
   initialSelectedDates = [],
@@ -64,7 +73,6 @@ export default function AttendanceCorrectionForm({
   const [corrections, setCorrections] = useState<any[]>([]);
   const [problemDates, setProblemDates] = useState<ProblemDateItem[]>([]);
   const [problemDatesLoading, setProblemDatesLoading] = useState(false);
-  const [showNewCorrection, setShowNewCorrection] = useState(false);
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [reason, setReason] = useState('');
   const [correctionType, setCorrectionType] = useState(DEFAULT_CORRECTION_TYPE);
@@ -154,22 +162,22 @@ export default function AttendanceCorrectionForm({
         const status = attendances?.status;
 
         if (status === 'absent') {
-          nextProblemDates.set(dateStr, { date: dateStr, reason: '결근', label: '결근' });
+          nextProblemDates.set(dateStr, { date: dateStr, reason: '결근', label: '결근', checkIn: attendance?.check_in, checkOut: attendance?.check_out });
           continue;
         }
 
         if (status === 'late' || attendance?.status === '지각') {
-          nextProblemDates.set(dateStr, { date: dateStr, reason: '지각', label: '지각' });
+          nextProblemDates.set(dateStr, { date: dateStr, reason: '지각', label: '지각', checkIn: attendance?.check_in, checkOut: attendance?.check_out });
           continue;
         }
 
         if (!attendance) {
-          nextProblemDates.set(dateStr, { date: dateStr, reason: '미체크', label: '출퇴근 미체크' });
+          nextProblemDates.set(dateStr, { date: dateStr, reason: '미체크', label: '출퇴근 미체크', checkIn: null, checkOut: null });
           continue;
         }
 
         if (!attendance.check_in) {
-          nextProblemDates.set(dateStr, { date: dateStr, reason: '미출근', label: '출근 미기록' });
+          nextProblemDates.set(dateStr, { date: dateStr, reason: '미출근', label: '출근 미기록', checkIn: null, checkOut: attendance?.check_out });
         }
       }
 
@@ -201,7 +209,6 @@ export default function AttendanceCorrectionForm({
     if (nextDates.length === 0) return;
 
     setViewMode(REQUEST_VIEW);
-    setShowNewCorrection(true);
     setSelectedDates(nextDates);
     onConsumeInitialSelectedDates?.();
   }, [initialSelectedDates, onConsumeInitialSelectedDates]);
@@ -211,6 +218,9 @@ export default function AttendanceCorrectionForm({
       prev.includes(date) ? prev.filter((item) => item !== date) : [...prev, date]
     );
   };
+
+  const selectAll = () => setSelectedDates(problemDates.map((item) => item.date));
+  const clearAll = () => setSelectedDates([]);
 
   const handleSubmitCorrection = async () => {
     if (selectedDates.length === 0 || !reason.trim()) {
@@ -247,7 +257,6 @@ export default function AttendanceCorrectionForm({
       setSelectedDates([]);
       setReason('');
       setCorrectionType(DEFAULT_CORRECTION_TYPE);
-      setShowNewCorrection(false);
       fetchCorrections();
       fetchProblemDates();
     } catch (error) {
@@ -272,20 +281,12 @@ export default function AttendanceCorrectionForm({
     const { att, atts } = statusMap[correctionTypeValue] || statusMap[DEFAULT_CORRECTION_TYPE];
 
     await supabase.from('attendance').upsert(
-      {
-        staff_id: staffId,
-        date: dateStr,
-        status: att,
-      },
+      { staff_id: staffId, date: dateStr, status: att },
       { onConflict: 'staff_id,date' }
     );
 
     await supabase.from('attendances').upsert(
-      {
-        staff_id: staffId,
-        work_date: dateStr,
-        status: atts,
-      },
+      { staff_id: staffId, work_date: dateStr, status: atts },
       { onConflict: 'staff_id,work_date' }
     );
   };
@@ -297,19 +298,12 @@ export default function AttendanceCorrectionForm({
       () =>
         supabase
           .from('attendance_corrections')
-          .update({
-            approval_status: newStatus,
-            status: newStatus,
-            approved_by: user.id,
-            approved_at: approvedAt,
-          })
+          .update({ approval_status: newStatus, status: newStatus, approved_by: user.id, approved_at: approvedAt })
           .eq('id', correction.id),
       () =>
         supabase
           .from('attendance_corrections')
-          .update({
-            status: newStatus,
-          })
+          .update({ status: newStatus })
           .eq('id', correction.id)
     );
 
@@ -336,6 +330,20 @@ export default function AttendanceCorrectionForm({
     (item) => getCorrectionStatus(item) === DEFAULT_CORRECTION_STATUS
   );
 
+  /* ── 날짜 포맷 헬퍼 ── */
+  const fmtDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const days = ['일', '월', '화', '수', '목', '금', '토'];
+    return { short: `${mm}/${dd}`, day: days[d.getDay()] };
+  };
+
+  const fmtTime = (iso: string | null | undefined) => {
+    if (!iso) return null;
+    try { return new Date(iso).toTimeString().slice(0, 5); } catch { return null; }
+  };
+
   return (
     <div
       className="custom-scrollbar flex h-full flex-col overflow-y-auto bg-[var(--tab-bg)]/30 p-4"
@@ -351,201 +359,267 @@ export default function AttendanceCorrectionForm({
           </p>
         </header>
 
-        <div className="flex flex-wrap gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm">
-          <button
-            type="button"
-            onClick={() => setViewMode(REQUEST_VIEW)}
-            className={`rounded-[var(--radius-md)] px-4 py-2 text-xs font-semibold transition-all ${
-              viewMode === REQUEST_VIEW
-                ? 'bg-[var(--accent)] text-white shadow-sm'
-                : 'bg-[var(--muted)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)]/80'
-            }`}
-          >
-            신청하기
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode(STATUS_VIEW)}
-            className={`rounded-[var(--radius-md)] px-4 py-2 text-xs font-semibold transition-all ${
-              viewMode === STATUS_VIEW
-                ? 'bg-[var(--accent)] text-white shadow-sm'
-                : 'bg-[var(--muted)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)]/80'
-            }`}
-          >
-            신청 현황
-          </button>
-          {canApprove ? (
+        {/* 탭 */}
+        <div className="flex flex-wrap gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-2 shadow-sm">
+          {[
+            { id: REQUEST_VIEW, label: '신청하기' },
+            { id: STATUS_VIEW, label: '신청 현황' },
+            ...(canApprove ? [{ id: APPROVAL_VIEW, label: `결재 대기${pendingCorrections.length > 0 ? ` (${pendingCorrections.length})` : ''}` }] : []),
+          ].map(({ id, label }) => (
             <button
+              key={id}
               type="button"
-              onClick={() => setViewMode(APPROVAL_VIEW)}
+              onClick={() => setViewMode(id)}
               className={`rounded-[var(--radius-md)] px-4 py-2 text-xs font-semibold transition-all ${
-                viewMode === APPROVAL_VIEW
+                viewMode === id
                   ? 'bg-[var(--accent)] text-white shadow-sm'
                   : 'bg-[var(--muted)] text-[var(--toss-gray-3)] hover:bg-[var(--muted)]/80'
               }`}
             >
-              결재 대기
+              {label}
             </button>
-          ) : null}
+          ))}
         </div>
 
-        {viewMode === REQUEST_VIEW ? (
+        {/* ── 신청하기 탭 ── */}
+        {viewMode === REQUEST_VIEW && (
           <div className="space-y-4">
-            <button
-              type="button"
-              data-testid="attendance-correction-toggle"
-              onClick={() => setShowNewCorrection((prev) => !prev)}
-              className="rounded-[var(--radius-md)] bg-black px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:scale-[0.98]"
-            >
-              {showNewCorrection ? '✕ 취소' : '+ 새 신청'}
-            </button>
 
-            {showNewCorrection ? (
-              <div className="space-y-4 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-                <div>
-                  <h3 className="text-lg font-semibold text-[var(--foreground)]">출결 정정 신청</h3>
-                  <p className="mt-1 text-xs font-bold text-[var(--toss-gray-3)]">
-                    출퇴근 미체크, 지각, 결근이 있는 날짜를 선택한 뒤 정정 유형과 사유를 입력하세요.
+            {/* 비정상 출근 기록 자동 연동 */}
+            <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] shadow-sm overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-[var(--foreground)]">정정 필요 날짜</span>
+                  <span className="text-[10px] font-semibold text-[var(--toss-gray-3)]">최근 60일</span>
+                  {!problemDatesLoading && problemDates.length > 0 && (
+                    <span className="px-1.5 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-[10px] font-bold">
+                      {problemDates.length}건
+                    </span>
+                  )}
+                </div>
+                {problemDates.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={selectAll}
+                      className="text-[10px] font-bold text-[var(--accent)] hover:underline"
+                    >
+                      전체 선택
+                    </button>
+                    {selectedDates.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={clearAll}
+                        className="text-[10px] font-bold text-[var(--toss-gray-3)] hover:underline"
+                      >
+                        선택 해제
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {problemDatesLoading ? (
+                <div className="flex items-center gap-2 px-4 py-6 text-sm font-bold text-[var(--toss-gray-3)]">
+                  <span className="animate-spin text-base">⏳</span> 출퇴근 기록 불러오는 중...
+                </div>
+              ) : problemDates.length === 0 ? (
+                <div className="flex flex-col items-center gap-1 py-8 text-[var(--toss-gray-3)]">
+                  <span className="text-2xl">✅</span>
+                  <p className="text-sm font-bold">최근 60일 내 정정 대상 기록이 없습니다.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-[var(--border)]">
+                  {problemDates.map((item) => {
+                    const isSelected = selectedDates.includes(item.date);
+                    const badge = REASON_BADGE[item.reason] ?? REASON_BADGE['미체크'];
+                    const { short, day } = fmtDate(item.date);
+                    const checkInTime = fmtTime(item.checkIn);
+                    const checkOutTime = fmtTime(item.checkOut);
+                    return (
+                      <button
+                        key={item.date}
+                        type="button"
+                        data-testid={`attendance-correction-date-${item.date}`}
+                        onClick={() => toggleSelectedDate(item.date)}
+                        className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all ${
+                          isSelected
+                            ? 'bg-[var(--toss-blue-light)] dark:bg-blue-900/20'
+                            : 'hover:bg-[var(--muted)]'
+                        }`}
+                      >
+                        {/* 체크박스 */}
+                        <div className={`w-5 h-5 rounded flex items-center justify-center shrink-0 border-2 transition-all ${
+                          isSelected
+                            ? 'bg-[var(--accent)] border-[var(--accent)]'
+                            : 'border-[var(--border)] bg-[var(--card)]'
+                        }`}>
+                          {isSelected && (
+                            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                              <path d="M2 5l2.5 2.5L8 3" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          )}
+                        </div>
+
+                        {/* 날짜 */}
+                        <div className="w-12 shrink-0 text-center">
+                          <p className="text-sm font-black text-[var(--foreground)]">{short}</p>
+                          <p className={`text-[10px] font-bold ${day === '일' ? 'text-red-500' : day === '토' ? 'text-blue-500' : 'text-[var(--toss-gray-3)]'}`}>{day}요일</p>
+                        </div>
+
+                        {/* 사유 뱃지 */}
+                        <span className={`shrink-0 px-2 py-1 rounded-[var(--radius-md)] text-[11px] font-bold flex items-center gap-1 ${badge.bg} ${badge.text}`}>
+                          {badge.icon} {item.label}
+                        </span>
+
+                        {/* 출퇴근 시간 */}
+                        <div className="flex-1 flex items-center gap-2 text-[11px] text-[var(--toss-gray-3)] font-medium">
+                          {checkInTime && <span>출근 {checkInTime}</span>}
+                          {checkOutTime && <span>퇴근 {checkOutTime}</span>}
+                          {!checkInTime && !checkOutTime && (
+                            <span className="text-[var(--toss-gray-3)]">기록 없음</span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* 선택된 항목이 있을 때만 신청 양식 표시 */}
+            {selectedDates.length > 0 && (
+              <div className="rounded-[var(--radius-md)] border-2 border-[var(--accent)] bg-[var(--card)] p-4 shadow-sm space-y-4">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-[var(--accent)]" />
+                  <p className="text-sm font-bold text-[var(--foreground)]">
+                    선택한 날짜 <span className="text-[var(--accent)]">{selectedDates.length}건</span> 정정 신청
                   </p>
                 </div>
 
-                <div className="space-y-4">
-                  <div>
-                    <label className="mb-1 block text-[11px] font-semibold uppercase tracking-widest text-[var(--toss-gray-4)]">
-                      정정할 날짜 선택
-                    </label>
-                    {problemDatesLoading ? (
-                      <p className="py-4 text-sm font-bold text-[var(--toss-gray-3)]">조회 중...</p>
-                    ) : problemDates.length === 0 ? (
-                      <p className="rounded-[var(--radius-lg)] bg-[var(--muted)] px-4 py-4 text-sm font-bold text-[var(--toss-gray-3)]">
-                        최근 60일 이내 정정 대상 일자가 없습니다.
-                      </p>
-                    ) : (
-                      <div className="grid max-h-56 grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3">
-                        {problemDates.map((item) => (
-                          <button
-                            key={item.date}
-                            type="button"
-                            data-testid={`attendance-correction-date-${item.date}`}
-                            onClick={() => toggleSelectedDate(item.date)}
-                            className={`rounded-[var(--radius-lg)] border-2 p-3 text-left text-xs font-bold transition-all ${
-                              selectedDates.includes(item.date)
-                                ? 'border-[var(--accent)] bg-[var(--toss-blue-light)] text-[var(--accent)]'
-                                : 'border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)] hover:border-[var(--toss-gray-3)]'
-                            }`}
-                          >
-                            <span className="block text-[11px] text-[var(--toss-gray-3)]">{item.date}</span>
-                            <span
-                              className={`mt-1 inline-block rounded px-2 py-0.5 text-[11px] font-semibold ${
-                                item.reason === '결근'
-                                  ? 'bg-red-100 text-red-600'
-                                  : item.reason === '지각'
-                                    ? 'bg-amber-100 text-amber-700'
-                                    : 'bg-[var(--card)] text-[var(--toss-gray-4)]'
-                              }`}
-                            >
-                              {item.label}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    {selectedDates.length > 0 ? (
-                      <p className="mt-2 text-[11px] font-bold text-[var(--accent)]">
-                        선택한 날짜 {selectedDates.length}건
-                      </p>
-                    ) : null}
-                  </div>
+                {/* 선택된 날짜 요약 태그 */}
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedDates.sort().map((date) => {
+                    const { short, day } = fmtDate(date);
+                    const problemItem = problemDates.find((p) => p.date === date);
+                    const badge = problemItem ? (REASON_BADGE[problemItem.reason] ?? REASON_BADGE['미체크']) : REASON_BADGE['미체크'];
+                    return (
+                      <button
+                        key={date}
+                        type="button"
+                        onClick={() => toggleSelectedDate(date)}
+                        className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold border transition-all hover:opacity-70 ${badge.bg} ${badge.text} border-current/20`}
+                        title="클릭하여 선택 해제"
+                      >
+                        {short}({day}) ×
+                      </button>
+                    );
+                  })}
+                </div>
 
-                  <div>
-                    <label className="mb-1 block text-[11px] font-semibold uppercase tracking-widest text-[var(--toss-gray-4)]">
-                      정정 유형
-                    </label>
-                    <select
-                      value={correctionType}
-                      onChange={(event) => setCorrectionType(event.target.value)}
-                      className="w-full rounded-[var(--radius-md)] bg-[var(--muted)] p-3 text-sm font-bold outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
-                    >
-                      <option value="정상반영">정상 반영 (지각 아님)</option>
-                      <option value="지각처리">지각 처리 (인정)</option>
-                      <option value="결근처리">결근 처리 (인정)</option>
-                    </select>
+                {/* 정정 유형 */}
+                <div>
+                  <label className="mb-1 block text-[11px] font-semibold uppercase tracking-widest text-[var(--toss-gray-4)]">
+                    정정 유형
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { value: '정상반영', label: '정상 반영', desc: '지각·결근 아님' },
+                      { value: '지각처리', label: '지각 처리', desc: '지각 인정' },
+                      { value: '결근처리', label: '결근 처리', desc: '결근 인정' },
+                    ].map(({ value, label, desc }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setCorrectionType(value)}
+                        className={`flex flex-col items-start px-3 py-2 rounded-[var(--radius-md)] border-2 text-left transition-all text-xs font-bold ${
+                          correctionType === value
+                            ? 'border-[var(--accent)] bg-[var(--toss-blue-light)] dark:bg-blue-900/20 text-[var(--accent)]'
+                            : 'border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)] hover:border-[var(--toss-gray-3)]'
+                        }`}
+                      >
+                        {label}
+                        <span className={`text-[10px] font-medium mt-0.5 ${correctionType === value ? 'text-[var(--accent)]/70' : 'text-[var(--toss-gray-3)]'}`}>{desc}</span>
+                      </button>
+                    ))}
                   </div>
+                </div>
 
-                  <div>
-                    <label className="mb-1 block text-[11px] font-semibold uppercase tracking-widest text-[var(--toss-gray-4)]">
-                      사유
-                    </label>
-                    <textarea
-                      data-testid="attendance-correction-reason-input"
-                      value={reason}
-                      onChange={(event) => setReason(event.target.value)}
-                      placeholder="지각 또는 미기록 사유를 자세히 입력해주세요."
-                      className="h-28 w-full resize-none rounded-[var(--radius-md)] bg-[var(--muted)] p-3 text-sm font-bold leading-relaxed outline-none focus:ring-2 focus:ring-[var(--accent)]/20"
-                    />
-                  </div>
+                {/* 사유 입력 */}
+                <div>
+                  <label className="mb-1 block text-[11px] font-semibold uppercase tracking-widest text-[var(--toss-gray-4)]">
+                    사유 <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    data-testid="attendance-correction-reason-input"
+                    value={reason}
+                    onChange={(event) => setReason(event.target.value)}
+                    placeholder="예: 외근으로 인해 출근 체크가 누락되었습니다."
+                    className="h-24 w-full resize-none rounded-[var(--radius-md)] bg-[var(--muted)] p-3 text-sm font-bold leading-relaxed outline-none focus:ring-2 focus:ring-[var(--accent)]/20 border border-[var(--border)] transition-all"
+                  />
                 </div>
 
                 <button
                   type="button"
                   data-testid="attendance-correction-submit"
                   onClick={handleSubmitCorrection}
-                  disabled={loading}
-                  className="w-full rounded-[var(--radius-md)] bg-[var(--accent)] py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:scale-[0.98] disabled:opacity-50"
+                  disabled={loading || !reason.trim()}
+                  className="w-full rounded-[var(--radius-md)] bg-[var(--accent)] py-3 text-sm font-bold text-white shadow-sm transition-all hover:scale-[0.98] disabled:opacity-40"
                 >
-                  {loading ? '신청 중...' : '결재 상신'}
+                  {loading ? '신청 중...' : `${selectedDates.length}건 결재 상신`}
                 </button>
               </div>
-            ) : null}
+            )}
           </div>
-        ) : null}
+        )}
 
-        {viewMode === STATUS_VIEW ? (
-          <div className="space-y-4">
+        {/* ── 신청 현황 탭 ── */}
+        {viewMode === STATUS_VIEW && (
+          <div className="space-y-3">
             {myCorrections.length === 0 ? (
-              <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-4 text-sm font-bold text-[var(--toss-gray-3)] shadow-sm">
+              <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-6 text-center text-sm font-bold text-[var(--toss-gray-3)] shadow-sm">
                 신청한 출결 정정 문서가 없습니다.
               </div>
             ) : (
-              myCorrections.map((correction, index) => (
-                <div
-                  key={correction.id || `${getCorrectionDate(correction)}-${index}`}
-                  className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm"
-                >
-                  <div className="mb-3 flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-[var(--foreground)]">
-                        {getCorrectionDate(correction)}
-                      </p>
-                      <p className="mt-1 text-xs font-bold text-[var(--toss-gray-3)]">{correction.reason}</p>
+              myCorrections.map((correction, index) => {
+                const status = getCorrectionStatus(correction);
+                const badge =
+                  status === '승인' ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' :
+                  status === '거절' ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' :
+                  'bg-orange-100 text-orange-500 dark:bg-orange-900/30 dark:text-orange-400';
+                return (
+                  <div
+                    key={correction.id || `${getCorrectionDate(correction)}-${index}`}
+                    className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-[var(--foreground)]">
+                          {getCorrectionDate(correction)}
+                        </p>
+                        <p className="mt-0.5 text-xs text-[var(--toss-gray-3)]">{correction.reason}</p>
+                      </div>
+                      <span className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-semibold ${badge}`}>
+                        {status}
+                      </span>
                     </div>
-                    <span
-                      className={`rounded-[var(--radius-md)] px-3 py-1 text-[11px] font-semibold ${
-                        getCorrectionStatus(correction) === '승인'
-                          ? 'bg-green-100 text-green-600'
-                          : getCorrectionStatus(correction) === '거절'
-                            ? 'bg-red-100 text-red-600'
-                            : 'bg-orange-100 text-orange-500'
-                      }`}
-                    >
-                      {getCorrectionStatus(correction)}
-                    </span>
+                    <div className="border-t border-[var(--border)] pt-2 mt-2">
+                      <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">
+                        정정 유형: {correction.correction_type}
+                      </p>
+                    </div>
                   </div>
-                  <div className="border-t border-[var(--border)] pt-3">
-                    <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">
-                      정정 유형: {correction.correction_type}
-                    </p>
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
-        ) : null}
+        )}
 
-        {viewMode === APPROVAL_VIEW && canApprove ? (
-          <div className="space-y-4">
+        {/* ── 결재 대기 탭 ── */}
+        {viewMode === APPROVAL_VIEW && canApprove && (
+          <div className="space-y-3">
             {pendingCorrections.length === 0 ? (
-              <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-4 text-sm font-bold text-[var(--toss-gray-3)] shadow-sm">
+              <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-6 text-center text-sm font-bold text-[var(--toss-gray-3)] shadow-sm">
                 결재 대기 중인 출결 정정 문서가 없습니다.
               </div>
             ) : (
@@ -559,13 +633,12 @@ export default function AttendanceCorrectionForm({
                       <p className="text-sm font-semibold text-[var(--foreground)]">
                         {getCorrectionDate(correction)}
                       </p>
-                      <p className="mt-1 text-xs font-bold text-[var(--toss-gray-3)]">{correction.reason}</p>
+                      <p className="mt-0.5 text-xs text-[var(--toss-gray-3)]">{correction.reason}</p>
                     </div>
-                    <span className="rounded-[var(--radius-md)] bg-orange-100 px-3 py-1 text-[11px] font-semibold text-orange-500">
+                    <span className="rounded-full bg-orange-100 dark:bg-orange-900/30 px-3 py-1 text-[11px] font-semibold text-orange-500">
                       대기
                     </span>
                   </div>
-
                   <div className="space-y-2 border-t border-[var(--border)] pt-3">
                     <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">
                       정정 유형: {correction.correction_type}
@@ -591,7 +664,7 @@ export default function AttendanceCorrectionForm({
               ))
             )}
           </div>
-        ) : null}
+        )}
       </div>
     </div>
   );
