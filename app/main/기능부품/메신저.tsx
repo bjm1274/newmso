@@ -25,7 +25,10 @@ const CHAT_FOCUS_KEY = 'erp_chat_focus_keyword';
 const CHAT_ROOM_PREFS_KEY = 'erp_chat_room_prefs';
 const CHAT_PINNED_KEY = 'erp_chat_pinned_messages';
 const CHAT_BOOKMARK_KEY = 'erp_chat_bookmarks';
-const MESSAGE_READ_WRITES_ENABLED = true;
+// 운영 DB의 legacy `message_reads`는 아직 `chat_messages`를 참조하고 있어
+// 현재 `messages` 기반 채팅과 직접 호환되지 않는다. 읽음 계산은
+// `room_read_cursors`로 이미 처리하므로, 충돌만 일으키는 legacy 쓰기는 비활성화한다.
+const MESSAGE_READ_WRITES_ENABLED = false;
 
 function sortChatRoomsWithNoticeFirst(rooms: ChatRoom[]): ChatRoom[] {
   const notice = rooms.find(( r: ChatRoom) => r.id === NOTICE_ROOM_ID);
@@ -98,6 +101,20 @@ function getAttachmentDisplayName(fileName: string | null | undefined, fileUrl?:
   const rawName = String(fileName || '').trim();
   if (rawName) return rawName;
   return extractFileNameFromUrl(fileUrl);
+}
+
+function getMessageDisplayText(
+  content: string | null | undefined,
+  fileName?: string | null,
+  fileUrl?: string | null,
+  fallback: unknown = ''
+): string {
+  const rawContent = String(content || '').trim();
+  if (rawContent) return rawContent;
+  if (String(fileName || '').trim() || String(fileUrl || '').trim()) {
+    return getAttachmentDisplayName(fileName, fileUrl);
+  }
+  return String(fallback ?? '');
 }
 
 function getPendingAttachmentDisplayName(file: File): string {
@@ -829,7 +846,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
           message_id: id,
           read_at: readAt,
         })),
-        { onConflict: 'message_id,reader_id' }
+        { onConflict: 'user_id,message_id' }
       );
       if (error && error.code !== '23503' && error.code !== '42P10') {
         console.warn('message_reads upsert skipped', error);
@@ -1081,7 +1098,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
     const isCurrentRoom = String(selectedRoomIdRef.current || '') === roomId;
     const isOwnMessage = String(row.sender_id || '') === String(effectiveChatUserId || '');
-    const previewText = row.content || (row.file_url ? '첨부 파일' : currentRoom?.last_message_preview || currentRoom?.last_message || '');
+    const previewText = getMessageDisplayText(
+      row.content,
+      row.file_name,
+      row.file_url,
+      currentRoom?.last_message_preview || currentRoom?.last_message || ''
+    );
 
     setChatRooms((prev) => {
       if (!prev.some((room: ChatRoom) => String(room.id) === roomId)) return prev;
@@ -1146,7 +1168,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       const senderProfile = resolveStaffProfile(row.sender_id, row.sender_name);
       const senderName = senderProfile?.name || row.sender_name || '알 수 없음';
       const roomName = currentRoom ? getRoomDisplayName(currentRoom, [], effectiveChatUserId) : '채팅';
-      const preview = row.content || (row.file_url ? '📎 첨부파일' : '새 메시지');
+      const preview = row.file_url
+        ? `📎 ${getAttachmentDisplayName(row.file_name, row.file_url)}`
+        : getMessageDisplayText(row.content, row.file_name, row.file_url, '새 메시지');
       const toastId = String(row.id);
       setInAppToasts((prev) => {
         if (prev.some((t) => t.id === toastId)) return prev;
@@ -2325,8 +2349,18 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             room.id === roomId
               ? {
                   ...room,
-                  last_message: content || (resolvedFileUrl ? '첨부파일' : room.last_message),
-                  last_message_preview: content || (resolvedFileUrl ? '첨부파일' : room.last_message_preview),
+                  last_message: getMessageDisplayText(
+                    content,
+                    resolvedFileName,
+                    resolvedFileUrl,
+                    room.last_message
+                  ),
+                  last_message_preview: getMessageDisplayText(
+                    content,
+                    resolvedFileName,
+                    resolvedFileUrl,
+                    room.last_message_preview
+                  ),
                   last_message_at: inserted.created_at || new Date().toISOString(),
                 }
               : room
@@ -2360,8 +2394,45 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     if (mime.startsWith('video/')) return 'video';
     return 'file';
   };
-  const CHAT_BUCKET = 'pchos-files';
+  const CHAT_BUCKET_CANDIDATES = ['pchos-files', 'board-attachments'] as const;
   const [isDragging, setIsDragging] = useState(false);
+
+  const isRecoverableChatBucketError = useCallback((error: unknown, bucketName: string) => {
+    if (!error) return false;
+    const message = String(
+      (error as { message?: string; details?: string })?.message ||
+      (error as { message?: string; details?: string })?.details ||
+      ''
+    ).toLowerCase();
+    return (
+      (message.includes('bucket') && message.includes('not found')) ||
+      message.includes(bucketName.toLowerCase()) ||
+      message.includes('policy') ||
+      message.includes('rls') ||
+      message.includes('row-level security') ||
+      message.includes('permission denied') ||
+      message.includes('unauthorized')
+    );
+  }, []);
+
+  const uploadChatAttachment = useCallback(async (path: string, file: File) => {
+    let lastError: unknown = null;
+
+    for (const bucket of CHAT_BUCKET_CANDIDATES) {
+      const { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: false });
+      if (!error) {
+        const publicUrl = supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+        return { publicUrl, bucket };
+      }
+
+      lastError = error;
+      if (!isRecoverableChatBucketError(error, bucket)) {
+        throw error;
+      }
+    }
+
+    throw lastError || new Error('No available storage bucket for chat attachments.');
+  }, [isRecoverableChatBucketError]);
 
   const processFileUpload = async (file: File) => {
     if (file.type.startsWith('video/')) {
@@ -2381,18 +2452,16 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         .replace(/[^a-zA-Z0-9가-힣ㄱ-ㅎㅏ-ㅣ._\-() ]/g, '_')
         .slice(0, 100);
       const path = `chat/${Date.now()}_${uuid}__${safeName}`;
-      const { error } = await supabase.storage.from(CHAT_BUCKET).upload(path, file, { upsert: false });
-      if (error) throw error;
-      const publicUrl = supabase.storage.from(CHAT_BUCKET).getPublicUrl(path).data.publicUrl;
+      const { publicUrl } = await uploadChatAttachment(path, file);
       const fileKind = getFileKind(file.type || '');
       await handleSendMessage(publicUrl, file.size, fileKind, undefined, getPendingAttachmentDisplayName(file));
     } catch (err: unknown) {
       console.error('파일 업로드 실패:', err);
       const msg = (err as Error)?.message || String(err);
       const hint = msg.includes('Bucket not found') || msg.includes('not found')
-        ? 'Supabase 대시보드에서 Storage > New bucket > 이름 "pchos-files" (Public)을 만든 뒤 다시 시도해 주세요.'
+        ? 'Supabase 대시보드에서 Storage > New bucket > 이름 "pchos-files" (Public)을 만들거나, 기존 "board-attachments" 버킷이 있는지 확인해 주세요.'
         : msg.includes('policy') || msg.includes('RLS')
-          ? 'Storage 버킷 pchos-files의 RLS 정책에서 INSERT를 허용해 주세요.'
+          ? 'Storage 버킷 pchos-files 또는 board-attachments의 RLS 정책에서 INSERT를 허용해 주세요.'
           : '버킷 생성 여부와 RLS 정책을 확인해 주세요.';
       toast(`파일 업로드에 실패했습니다.\n\n${hint}`, 'error');
     } finally {
@@ -2452,7 +2521,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         setActiveActionMsg(null);
         return;
       }
-      const content = (activeActionMsg.content || '').trim() || '첨부 파일 확인';
+      const content =
+        getMessageDisplayText(
+          activeActionMsg.content,
+          activeActionMsg.file_name,
+          activeActionMsg.file_url
+        ) || '첨부 파일 확인';
       const { error } = await supabase.from('todos').insert([{
         user_id: effectiveTodoUserId,
         content: `[채팅] ${content}`,
@@ -3285,7 +3359,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 >
                   <p className="text-[10px] font-bold text-orange-500">공지 메시지</p>
                   <p className="mt-1 max-w-[280px] truncate text-xs font-semibold text-[var(--foreground)]">
-                    {pinnedMessage.content || '첨부 파일 메시지'}
+                    {getMessageDisplayText(
+                      pinnedMessage.content,
+                      pinnedMessage.file_name,
+                      pinnedMessage.file_url,
+                      '첨부 파일 메시지'
+                    )}
                   </p>
                 </button>
               ))}
@@ -3460,7 +3539,14 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                 }}
                               >
                                 <span className="font-bold opacity-80">답글 {(parent.staff as { name?: string } | null | undefined)?.name}: </span>
-                                <span className="truncate block mt-0.5">{parent.content || '첨부 파일'}</span>
+                                <span className="truncate block mt-0.5">
+                                  {getMessageDisplayText(
+                                    parent.content,
+                                    parent.file_name,
+                                    parent.file_url,
+                                    '첨부 파일'
+                                  )}
+                                </span>
                               </div>
                             ) : null;
                           })()}
@@ -4364,7 +4450,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   스레드
                 </p>
                 <p className="text-xs font-semibold text-[var(--foreground)] mt-0.5 line-clamp-2">
-                  {threadRoot.content || '첨부 파일 메시지'}
+                  {getMessageDisplayText(
+                    threadRoot.content,
+                    threadRoot.file_name,
+                    threadRoot.file_url,
+                    '첨부 파일 메시지'
+                  )}
                 </p>
               </div>
               <button
@@ -4406,7 +4497,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                         </span>
                       </div>
                       <p className="text-[11px] text-[var(--foreground)] whitespace-pre-wrap break-words">
-                        {m.content || '첨부 파일 메시지'}
+                        {getMessageDisplayText(
+                          m.content,
+                          m.file_name,
+                          m.file_url,
+                          '첨부 파일 메시지'
+                        )}
                       </p>
                       {m.file_url && (
                         <a
@@ -4415,7 +4511,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-1 px-2 py-1 mt-1 rounded-[var(--radius-md)] bg-[var(--card)] border border-[var(--border)] text-[11px] font-bold text-[var(--accent)] hover:bg-[var(--toss-blue-light)]"
                         >
-                          첨부 파일 열기
+                          {getAttachmentDisplayName(m.file_name, m.file_url)}
                         </a>
                       )}
                     </div>
@@ -4436,7 +4532,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   읽음 확인 상세
                 </p>
                 <p className="text-xs font-semibold text-[var(--foreground)] mt-0.5 line-clamp-1 opacity-60">
-                  {unreadModalMsg.content || '첨부 파일 메시지'}
+                  {getMessageDisplayText(
+                    unreadModalMsg.content,
+                    unreadModalMsg.file_name,
+                    unreadModalMsg.file_url,
+                    '첨부 파일 메시지'
+                  )}
                 </p>
               </div>
               <button
@@ -4532,7 +4633,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                             sender_id: effectiveChatUserId || user?.id,
                             content:
                               `[전달] ${(forwardSourceMsg.staff as { name?: string } | null | undefined)?.name || '이름 없음'}: ` +
-                              (forwardSourceMsg.content || '첨부 파일'),
+                              getMessageDisplayText(
+                                forwardSourceMsg.content,
+                                forwardSourceMsg.file_name,
+                                forwardSourceMsg.file_url,
+                                '첨부 파일'
+                              ),
                             file_url: forwardSourceMsg.file_url || null,
                             file_name: forwardSourceMsg.file_name || null,
                           },

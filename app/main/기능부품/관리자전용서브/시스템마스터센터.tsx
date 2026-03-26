@@ -132,6 +132,7 @@ export default function SystemMasterCenter({
   const [showBannedModal, setShowBannedModal] = useState(false);
   const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);
   const [deletingMsgId, setDeletingMsgId] = useState<string | null>(null);
+  const [deletingRoomId, setDeletingRoomId] = useState<string | null>(null);
 
   const isSystemMaster = hasSystemMasterPermission(user);
 
@@ -213,9 +214,44 @@ export default function SystemMasterCenter({
   }, [activeTab, isSystemMaster, loadChats]);
 
   useEffect(() => {
-    if (selectedRoomId || chatRooms.length === 0) return;
-    setSelectedRoomId(chatRooms[0].id);
+    if (chatRooms.length === 0) {
+      if (selectedRoomId) setSelectedRoomId('');
+      return;
+    }
+
+    if (!selectedRoomId || !chatRooms.some((room: any) => room.id === selectedRoomId)) {
+      setSelectedRoomId(chatRooms[0].id);
+    }
   }, [chatRooms, selectedRoomId]);
+
+  const handleDeleteRoom = useCallback(async (room: any) => {
+    if (!room?.id) return;
+    if (!confirm(`"${room.room_label || '채팅방'}" 채팅방 자체를 삭제하시겠습니까?\n대화내역과 관련 데이터도 함께 삭제됩니다.`)) {
+      return;
+    }
+
+    setDeletingRoomId(room.id);
+    try {
+      const response = await fetch(`/api/admin/system-master?scope=chats&roomId=${encodeURIComponent(String(room.id))}`, {
+        method: 'DELETE',
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(payload?.error || '채팅방 삭제에 실패했습니다.');
+      }
+
+      setChatRooms((prev: any[]) => prev.filter((item: any) => item.id !== room.id));
+      setChatMessages((prev: any[]) => prev.filter((message: any) => message.room_id !== room.id));
+      setSelectedRoomId((prev) => (prev === room.id ? '' : prev));
+      toast('채팅방을 삭제했습니다.', 'success');
+    } catch (deleteError) {
+      const message = deleteError instanceof Error ? deleteError.message : '채팅방 삭제에 실패했습니다.';
+      toast(message, 'error');
+    } finally {
+      setDeletingRoomId(null);
+    }
+  }, []);
 
   const summaryCards = useMemo(() => {
     if (!overview?.summary) return [];
@@ -517,6 +553,19 @@ export default function SystemMasterCenter({
                 </p>
               </div>
               <div className="flex flex-wrap gap-2 items-center">
+                {selectedRoomId && (
+                  <button
+                    type="button"
+                    disabled={deletingRoomId === selectedRoomId}
+                    onClick={() => {
+                      const room = chatRooms.find((item: any) => item.id === selectedRoomId);
+                      if (room) void handleDeleteRoom(room);
+                    }}
+                    className="h-9 rounded-[var(--radius-md)] border border-red-200 px-3 text-xs font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {deletingRoomId === selectedRoomId ? '삭제 중...' : '선택 방 삭제'}
+                  </button>
+                )}
                 {(() => {
                   const flagged = chatMessages.filter((m: any) => m.content && hasBanned(m.content, bannedWords)).length;
                   return flagged > 0 ? (

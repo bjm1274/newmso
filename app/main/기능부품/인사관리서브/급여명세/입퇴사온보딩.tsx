@@ -25,7 +25,7 @@ export default function OnboardingChecklist({ staffId, staffName, type }: { staf
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from('onboarding_checklists').select('items').eq('staff_id', staffId).eq('checklist_type', type).single();
+      const { data } = await supabase.from('onboarding_checklists').select('items').eq('staff_id', staffId).eq('checklist_type', type).maybeSingle();
       if (data?.items?.length) setItems(data.items);
     })();
   }, [staffId, type]);

@@ -8,7 +8,7 @@ export default function PayrollLockPanel({ yearMonth, companyName, onLockChange 
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from('payroll_locks').select('id').eq('year_month', yearMonth).eq('company_name', companyName || '전체').single();
+      const { data } = await supabase.from('payroll_locks').select('id').eq('year_month', yearMonth).eq('company_name', companyName || '전체').maybeSingle();
       setLocked(!!data);
     })();
   }, [yearMonth, companyName]);
