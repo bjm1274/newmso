@@ -1,32 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// 인스턴스 내 IP별 로그인 시도 횟수 추적 (서버리스 환경에서 인스턴스 재시작 시 초기화됨)
+// 아이디별 로그인 실패 횟수 추적 (IP가 아닌 loginId 단위 — 다른 사람에게 영향 없음)
 const loginAttempts = new Map<string, { count: number; resetAt: number }>();
-const MAX_ATTEMPTS = 10;
+const MAX_FAILED_ATTEMPTS = 10; // 동일 아이디로 10회 연속 실패 시 차단
 const WINDOW_MS = 15 * 60 * 1000; // 15분
 
-function checkRateLimit(ip: string): { allowed: boolean } {
+function checkRateLimit(loginId: string): { allowed: boolean } {
   const now = Date.now();
-  const entry = loginAttempts.get(ip);
-  if (!entry || now > entry.resetAt) {
-    loginAttempts.set(ip, { count: 1, resetAt: now + WINDOW_MS });
-    return { allowed: true };
-  }
-  if (entry.count >= MAX_ATTEMPTS) {
-    return { allowed: false };
-  }
-  entry.count++;
-  return { allowed: true };
+  const entry = loginAttempts.get(loginId);
+  if (!entry || now > entry.resetAt) return { allowed: true };
+  return { allowed: entry.count < MAX_FAILED_ATTEMPTS };
 }
 
-function recordFailedAttempt(ip: string) {
+function recordFailedAttempt(loginId: string) {
   const now = Date.now();
-  const entry = loginAttempts.get(ip);
+  const entry = loginAttempts.get(loginId);
   if (!entry || now > entry.resetAt) {
-    loginAttempts.set(ip, { count: 1, resetAt: now + WINDOW_MS });
+    loginAttempts.set(loginId, { count: 1, resetAt: now + WINDOW_MS });
   } else {
     entry.count++;
   }
+}
+
+function resetAttempts(loginId: string) {
+  loginAttempts.delete(loginId);
 }
 import { createClient } from '@supabase/supabase-js';
 import { getAdminCredentialConfig, getRuntimeEnv, verifyPrivilegedLogin } from '@/lib/admin-credentials';
@@ -79,11 +76,6 @@ function failureResponse(error?: string, status = 200) {
 }
 
 export async function POST(request: NextRequest) {
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-  if (!checkRateLimit(ip).allowed) {
-    return failureResponse('로그인 시도 횟수를 초과했습니다. 15분 후 다시 시도해주세요.', 429);
-  }
-
   let loginId = '';
   let password = '';
 
@@ -97,6 +89,11 @@ export async function POST(request: NextRequest) {
 
   if (!loginId || !password) {
     return failureResponse('아이디와 비밀번호를 모두 입력해주세요.', 400);
+  }
+
+  // 아이디 단위로 차단 (IP 기반 X → 다른 사람에게 영향 없음)
+  if (!checkRateLimit(loginId).allowed) {
+    return failureResponse('비밀번호를 너무 많이 틀렸습니다. 15분 후 다시 시도해주세요.', 429);
   }
 
   const { adminName, adminPasswordHash, masterId, masterPasswordHash } = getAdminCredentialConfig();
@@ -281,7 +278,7 @@ export async function POST(request: NextRequest) {
           });
         }
 
-        recordFailedAttempt(ip);
+        recordFailedAttempt(loginId);
         return failureResponse('비밀번호가 일치하지 않습니다.');
       }
 
@@ -290,6 +287,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    resetAttempts(loginId); // 로그인 성공 시 실패 카운트 초기화
     return successResponse(userRow, notice);
   } catch (error) {
     return failureResponse('시스템 접속 중 오류가 발생했습니다.', 500);
