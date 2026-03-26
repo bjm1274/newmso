@@ -2639,6 +2639,19 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     [messages]
   );
 
+  const sharedFilePreviewMessages = useMemo(
+    () =>
+      messages
+        .filter((message) => {
+          const fileUrl = String(message.file_url || '');
+          if (!fileUrl) return false;
+          if (message.file_kind === 'file') return true;
+          return !isImageUrl(fileUrl) && !isVideoUrl(fileUrl);
+        })
+        .slice(-6),
+    [messages]
+  );
+
   const sharedLinkPreviewMessages = useMemo(
     () => messages.filter((message) => message.content && message.content.includes('http')).slice(-3),
     [messages]
@@ -3548,10 +3561,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                   <p className={`mt-1 max-w-[200px] md:max-w-[240px] truncate text-[10px] font-semibold ${isMine ? 'text-white/85' : 'text-[var(--toss-gray-4)]'}`}>{attachmentName}</p>
                                 </div>
                               ) : (
-                                <div className={`p-3 rounded-[var(--radius-md)] border ${isMine ? 'bg-[var(--card)]/10 border-white/20 text-white' : 'bg-[var(--toss-gray-0)] border-[var(--border)] text-[var(--foreground)]'} flex items-start gap-3 shadow-sm min-w-[200px]`}>
+                                <div className={`p-3 rounded-[var(--radius-md)] border ${isMine ? 'bg-white/95 border-white/40 text-slate-900' : 'bg-[var(--toss-gray-0)] border-[var(--border)] text-[var(--foreground)]'} flex items-start gap-3 shadow-sm min-w-[200px]`}>
                                   <div className="text-3xl">📎</div>
                                   <div className="flex-1 min-w-0 pt-0.5">
-                                    <p className={`font-bold text-[12px] truncate mb-1`}>{attachmentName}</p>
+                                    <p className="font-bold text-[12px] truncate mb-1 text-[var(--foreground)]">{attachmentName}</p>
                                     <div className="flex items-center gap-1.5 mt-2">
                                       <button onClick={() => window.open(furl, '_blank')} className="text-[10px] font-bold text-[var(--accent)] hover:text-blue-600 px-2 py-1 bg-blue-50 dark:bg-blue-900/30 rounded-md">미리보기</button>
                                       <button onClick={() => { navigator.clipboard.writeText(furl).then(() => toast('공유 링크를 복사했습니다.')) }} className="text-[10px] font-bold text-[var(--toss-gray-4)] hover:text-[var(--toss-gray-4)] px-2 py-1 bg-[var(--tab-bg)] dark:bg-zinc-800 rounded-md">공유</button>
@@ -3849,7 +3862,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 <div className="space-y-3">
                   <div className="flex justify-between items-center px-1">
                 <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider">사진 및 동영상</p>
-                    <button className="text-[10px] font-bold text-[var(--accent)]">전체보기</button>
+                    <button onClick={() => { setMediaFilter('all'); setShowMediaPanel(true); }} className="text-[10px] font-bold text-[var(--accent)]">전체보기</button>
                   </div>
                   <div className="grid grid-cols-3 gap-1 rounded-2xl overflow-hidden">
                     {sharedMediaPreviewMessages.map((m) => (
@@ -3864,6 +3877,41 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     {sharedMediaPreviewMessages.length === 0 && (
                       <div className="col-span-3 py-5 text-center bg-[var(--tab-bg)] dark:bg-zinc-800/30 rounded-2xl border border-dashed border-[var(--border)] dark:border-zinc-700">
                         <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">주고받은 미디어가 없습니다.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center px-1">
+                    <p className="text-[11px] font-bold text-[var(--toss-gray-3)] uppercase tracking-wider">파일</p>
+                    <button onClick={() => { setMediaFilter('file'); setShowMediaPanel(true); }} className="text-[10px] font-bold text-[var(--accent)]">전체보기</button>
+                  </div>
+                  <div className="space-y-2">
+                    {sharedFilePreviewMessages.map((m) => {
+                      const fileUrl = String(m.file_url || '');
+                      const attachmentName = getAttachmentDisplayName(m.file_name, fileUrl);
+                      return (
+                        <div key={m.id} className="p-3 bg-[var(--tab-bg)] dark:bg-zinc-800/50 rounded-xl border border-[var(--border-subtle)] dark:border-zinc-800">
+                          <div className="flex items-start gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-[var(--card)] dark:bg-zinc-900 flex items-center justify-center text-lg shrink-0">📎</div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[11px] font-bold text-foreground truncate">{attachmentName}</p>
+                              <p className="text-[10px] text-[var(--toss-gray-4)] truncate mt-0.5">
+                                {(m.staff as { name?: string } | null | undefined)?.name || '알 수 없음'} · {new Date(m.created_at || 0).toLocaleDateString()}
+                              </p>
+                              <div className="flex items-center gap-2 mt-2">
+                                <button onClick={() => window.open(fileUrl, '_blank')} className="text-[10px] font-bold text-[var(--accent)] hover:text-blue-600">미리보기</button>
+                                <a href={fileUrl} download={attachmentName} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700">다운로드</a>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {sharedFilePreviewMessages.length === 0 && (
+                      <div className="py-4 text-center bg-[var(--tab-bg)] dark:bg-zinc-800/30 rounded-xl border border-[var(--border-subtle)] dark:border-zinc-800">
+                        <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">공유된 파일이 없습니다.</p>
                       </div>
                     )}
                   </div>
@@ -4811,13 +4859,13 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             </div>
 
             <div className="flex p-2 gap-1 bg-[var(--tab-bg)] dark:bg-zinc-900 border-b border-[var(--border)]">
-              {(['all', 'image', 'file'] as const).map(f => (
+              {(['all', 'image', 'video', 'file'] as const).map(f => (
                 <button
                   key={f}
                   onClick={() => setMediaFilter(f)}
                   className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all ${mediaFilter === f ? 'bg-[var(--card)] dark:bg-zinc-800 text-blue-600 shadow-soft' : 'text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)]'}`}
                 >
-                  {f === 'all' ? '전체' : f === 'image' ? '이미지' : '파일'}
+                  {f === 'all' ? '전체' : f === 'image' ? '이미지' : f === 'video' ? '동영상' : '파일'}
                 </button>
               ))}
             </div>
@@ -4831,6 +4879,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
               ) : (
                 filteredMediaMessages.map(( m: ChatMessage) => {
                   const furl = (m.file_url || '') as string;
+                  const attachmentName = getAttachmentDisplayName(m.file_name, furl);
                   return (
                   <div key={m.id} className="p-3 bg-[var(--tab-bg)] dark:bg-zinc-900/50 border border-[var(--border-subtle)] dark:border-zinc-800 rounded-xl hover:border-blue-300 transition-all group">
                     {isImageUrl(furl) ? (
@@ -4839,10 +4888,13 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       <div className="w-full h-12 bg-[var(--tab-bg)] dark:bg-zinc-800 rounded-lg mb-2 flex items-center justify-center text-xl">📄</div>
                     )}
                     <div className="flex flex-col gap-1 min-w-0">
-                      <p className="text-[11px] font-bold text-foreground truncate">{m.content || '내용 없음'}</p>
+                      <p className="text-[11px] font-bold text-foreground truncate">{attachmentName}</p>
+                      {m.content && (
+                        <p className="text-[10px] text-[var(--toss-gray-4)] line-clamp-2">{m.content}</p>
+                      )}
                       <div className="flex items-center justify-between">
                         <span className="text-[9px] font-bold text-[var(--toss-gray-3)]">{new Date(m.created_at || 0).toLocaleDateString()}</span>
-                        <a href={furl} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-blue-600 hover:underline">다운로드</a>
+                        <a href={furl} download={attachmentName} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-blue-600 hover:underline">다운로드</a>
                       </div>
                     </div>
                   </div>
@@ -4907,7 +4959,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   const fileUrl = msg.file_url || '';
                   const isImage = /\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(fileUrl);
                   const isFile = !!fileUrl && !isImage;
-                  const fileName = fileUrl ? decodeURIComponent(fileUrl.split('/').pop()?.split('?')[0] || '') : '';
+                  const fileName = fileUrl ? getAttachmentDisplayName(msg.file_name, fileUrl) : '';
                   return (
                     <div
                       data-testid={`chat-global-search-result-${msg.id}`}
