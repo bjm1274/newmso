@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
   if (!session) {
     const response = NextResponse.json(
       { authenticated: false, error: '세션이 없습니다.' },
-      { status: 401 }
+      { status: 200 }
     );
     return clearSessionCookie(response);
   }
