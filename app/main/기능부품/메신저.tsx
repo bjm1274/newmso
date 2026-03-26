@@ -390,6 +390,10 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   const isNearBottomRef = useRef(true);
   const selectedRoomIdRef = useRef<string | null>(null);
   const fetchDataRef = useRef<(() => Promise<void>) | null>(null);
+  /** 방별 입력 draft 저장소 */
+  const draftMapRef = useRef<Map<string, string>>(new Map());
+  /** 현재 inputMsg 최신값을 ref로 유지 (setRoom 클로저에서 사용) */
+  const inputMsgRef = useRef('');
 
   const [mentionQuery, setMentionQuery] = useState('');
   const [showMentionList, setShowMentionList] = useState(false);
@@ -655,6 +659,10 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   }, []);
 
   const setRoom = (roomId: string | null) => {
+    // 현재 방의 입력 draft 저장
+    if (selectedRoomIdRef.current && selectedRoomIdRef.current !== roomId) {
+      draftMapRef.current.set(selectedRoomIdRef.current, inputMsgRef.current);
+    }
     pendingBottomAlignRoomIdRef.current = roomId;
     isNearBottomRef.current = true;
     setShowScrollToLatest(false);
@@ -678,6 +686,10 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       });
     }
     setSelectedRoomId(roomId);
+    // 새 방의 저장된 draft 복원
+    const savedDraft = (roomId ? draftMapRef.current.get(roomId) : '') || '';
+    inputMsgRef.current = savedDraft;
+    setInputMsg(savedDraft);
     // 채팅방 열 때 해당 방 관련 미읽 알림 자동 읽음 처리
     if (roomId && effectiveChatUserId) {
       void (async () => {
@@ -882,6 +894,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   }, [selectedRoomId, effectiveChatUserId, user?.name]);
 
   const handleComposerChange = useCallback((value: string, caret: number) => {
+    inputMsgRef.current = value;
     setInputMsg(value);
     const upToCaret = value.slice(0, caret);
     const match = upToCaret.match(/@([^\s@]{0,20})$/);
@@ -1738,7 +1751,13 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       String(lastMessage?.sender_id) === String(effectiveChatUserId || user?.id || '') ||
       String(lastMessage?.id || '').startsWith('temp-');
     if (shouldStick) {
-      requestAnimationFrame(() => scrollToBottom(String(lastMessage?.sender_id) === String(effectiveChatUserId || user?.id || '') ? 'smooth' : 'auto'));
+      // 채팅방 전환 중(pendingBottomAlignRoomIdRef 활성)이면 즉시 이동, 아니면 부드럽게
+      const isRoomSwitch = !!pendingBottomAlignRoomIdRef.current;
+      requestAnimationFrame(() => scrollToBottom(
+        (!isRoomSwitch && String(lastMessage?.sender_id) === String(effectiveChatUserId || user?.id || ''))
+          ? 'smooth'
+          : 'auto'
+      ));
     } else {
       setShowScrollToLatest(true);
     }
