@@ -946,6 +946,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [addMemberSearch, setAddMemberSearch] = useState('');
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const deferredAddMemberSearch = useDeferredValue(addMemberSearch);
   const [addMemberSelectingIds, setAddMemberSelectingIds] = useState<string[]>([]);
   // 기본 접힌 상태 — 펼쳐진 팀만 별도 추적
@@ -3433,15 +3434,15 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                             <div className="space-y-1 mt-2" onClick={(e) => e.stopPropagation()}>
                               {isImageUrl(furl) ? (
                                 <div className="relative group inline-block">
-                                  <a href={furl} target="_blank" rel="noopener noreferrer" className="block">
+                                  <button type="button" className="block" onClick={() => setImagePreviewUrl(furl)}>
                                     <img
                                       src={furl}
                                       alt="첨부 이미지"
-                                      className={`max-w-[200px] md:max-w-[240px] max-h-[200px] rounded-[var(--radius-md)] object-cover ${msg.content ? 'border border-[var(--border)]' : 'shadow-sm'}`}
+                                      className={`max-w-[200px] md:max-w-[240px] max-h-[200px] rounded-[var(--radius-md)] object-cover cursor-zoom-in ${msg.content ? 'border border-[var(--border)]' : 'shadow-sm'}`}
                                     />
-                                  </a>
+                                  </button>
                                   <div className="absolute opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity inset-0 flex items-center justify-center bg-black/40 rounded-[var(--radius-md)] gap-2 pointer-events-none">
-                                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(furl, '_blank') }} className="pointer-events-auto p-1.5 bg-[var(--card)]/20 hover:bg-[var(--card)]/40 rounded-[var(--radius-md)] text-white" title="미리보기">보기</button>
+                                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setImagePreviewUrl(furl); }} className="pointer-events-auto p-1.5 bg-[var(--card)]/20 hover:bg-[var(--card)]/40 rounded-[var(--radius-md)] text-white" title="미리보기">보기</button>
                                     <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigator.clipboard.writeText(furl).then(() => toast('공유 링크를 복사했습니다.')) }} className="pointer-events-auto p-1.5 bg-[var(--card)]/20 hover:bg-[var(--card)]/40 rounded-[var(--radius-md)] text-white" title="공유">공유</button>
                                     <a href={furl} download={attachmentName} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="pointer-events-auto p-1.5 bg-[var(--card)]/20 hover:bg-[var(--card)]/40 rounded-full text-white" title="다운로드">저장</a>
                                   </div>
@@ -3760,9 +3761,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   </div>
                   <div className="grid grid-cols-3 gap-1 rounded-2xl overflow-hidden">
                     {sharedMediaPreviewMessages.map((m) => (
-                      <div key={m.id} className="aspect-square bg-[var(--tab-bg)] dark:bg-zinc-800 relative group cursor-pointer">
+                      <div key={m.id} className="aspect-square bg-[var(--tab-bg)] dark:bg-zinc-800 relative group cursor-pointer" onClick={() => m.file_kind === 'image' && setImagePreviewUrl(m.file_url || '')}>
                         {m.file_kind === 'image' ? (
-                          <img src={m.file_url || ''} alt="Attached image" className="w-full h-full object-cover" />
+                          <img src={m.file_url || ''} alt="Attached image" className="w-full h-full object-cover hover:opacity-90 transition-opacity" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-xl">🎬</div>
                         )}
@@ -4721,7 +4722,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   return (
                   <div key={m.id} className="p-3 bg-[var(--tab-bg)] dark:bg-zinc-900/50 border border-[var(--border-subtle)] dark:border-zinc-800 rounded-xl hover:border-blue-300 transition-all group">
                     {isImageUrl(furl) ? (
-                      <img src={furl} alt="Attached media" className="w-full h-24 object-cover rounded-lg mb-2 cursor-pointer" onClick={() => window.open(furl)} />
+                      <img src={furl} alt="Attached media" className="w-full h-24 object-cover rounded-lg mb-2 cursor-zoom-in" onClick={() => setImagePreviewUrl(furl)} />
                     ) : (
                       <div className="w-full h-12 bg-[var(--tab-bg)] dark:bg-zinc-800 rounded-lg mb-2 flex items-center justify-center text-xl">📄</div>
                     )}
@@ -4831,6 +4832,47 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── 이미지 전체화면 미리보기 모달 ── */}
+      {imagePreviewUrl && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/85 backdrop-blur-sm"
+          onClick={() => setImagePreviewUrl(null)}
+          onKeyDown={(e) => { if (e.key === 'Escape') setImagePreviewUrl(null); }}
+          tabIndex={-1}
+        >
+          {/* 닫기 */}
+          <button
+            type="button"
+            className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white text-xl transition-colors z-10"
+            onClick={() => setImagePreviewUrl(null)}
+            aria-label="닫기"
+          >
+            ✕
+          </button>
+          {/* 다운로드 */}
+          <a
+            href={imagePreviewUrl}
+            download
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="absolute top-4 right-14 w-9 h-9 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white text-base transition-colors z-10"
+            aria-label="다운로드"
+            title="다운로드"
+          >
+            ↓
+          </a>
+          {/* 이미지 */}
+          <img
+            src={imagePreviewUrl}
+            alt="미리보기"
+            className="max-w-[92vw] max-h-[88vh] rounded-xl object-contain shadow-2xl select-none"
+            onClick={(e) => e.stopPropagation()}
+            draggable={false}
+          />
         </div>
       )}
     </div>
