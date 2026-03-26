@@ -538,7 +538,8 @@ test("chat retries a failed message send from the bubble", async ({ page }) => {
       .locator("span.break-words.whitespace-pre-wrap")
       .filter({ hasText: "재전송 메시지" }),
   ).toBeVisible();
-  await expect(page.getByText("전송됨")).toBeVisible();
+  await expect(page.getByText("전송 실패")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "재전송" })).toHaveCount(0);
 });
 test("board view opens from the main menu routing state", async ({ page }) => {
   await mockSupabase(page, {

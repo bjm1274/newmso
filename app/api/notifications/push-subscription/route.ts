@@ -83,6 +83,11 @@ export async function POST(request: NextRequest) {
         { staff_id: staffId, endpoint: `fcm:${staffId}`, p256dh: '', auth: '', fcm_token },
         { onConflict: 'staff_id,endpoint' }
       );
+      await supabase.from('push_subscriptions')
+        .delete()
+        .eq('staff_id', staffId)
+        .eq('fcm_token', fcm_token)
+        .neq('endpoint', `fcm:${staffId}`);
       return NextResponse.json({ ok: true });
     }
 
@@ -102,6 +107,14 @@ export async function POST(request: NextRequest) {
 
     if (upsertError) {
       return NextResponse.json({ error: '구독 정보 처리 중 오류가 발생했습니다.' }, { status: 500 });
+    }
+
+    if (fcm_token) {
+      await supabase.from('push_subscriptions')
+        .delete()
+        .eq('staff_id', staffId)
+        .eq('fcm_token', fcm_token)
+        .neq('endpoint', endpoint);
     }
 
     return NextResponse.json({ ok: true });

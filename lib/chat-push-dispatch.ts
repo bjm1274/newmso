@@ -121,6 +121,8 @@ function buildQueueFailurePatch(attemptCount: number, error: unknown, supportsRe
 
 async function selectPendingChatPushJobs(supabase: SupabaseClient, limit: number) {
   const nowIso = new Date().toISOString();
+  // 2분 이내 processing_started_at이 설정된 job은 현재 다른 경로(API)에서 처리 중 → 건너뜀
+  const staleThresholdIso = new Date(Date.now() - 2 * 60 * 1000).toISOString();
   const retryAwareSelection =
     'id, message_id, room_id, created_at, attempt_count, next_attempt_at, dead_lettered_at';
 
@@ -129,6 +131,7 @@ async function selectPendingChatPushJobs(supabase: SupabaseClient, limit: number
     .select(retryAwareSelection)
     .is('processed_at', null)
     .is('dead_lettered_at', null)
+    .or(`processing_started_at.is.null,processing_started_at.lt.${staleThresholdIso}`)
     .lte('next_attempt_at', nowIso)
     .order('created_at', { ascending: true })
     .limit(limit);
@@ -149,6 +152,7 @@ async function selectPendingChatPushJobs(supabase: SupabaseClient, limit: number
       .from('chat_push_jobs')
       .select('id, message_id, room_id, created_at, attempt_count')
       .is('processed_at', null)
+      .or(`processing_started_at.is.null,processing_started_at.lt.${staleThresholdIso}`)
       .order('created_at', { ascending: true })
       .limit(limit);
 
@@ -256,6 +260,12 @@ export async function dispatchChatPushForMessage(params: {
   supabase?: SupabaseClient;
 }) {
   const supabase = params.supabase || getAdminClient();
+
+  // ── 이중 발송 방지: 처리 시작 전 processing_started_at 선점 ──
+  // 다른 경로(cron 등)가 같은 job을 동시에 처리하지 못하게 한다.
+  await updateChatPushJobByMessageId(supabase, params.messageId, {
+    processing_started_at: new Date().toISOString(),
+  });
 
   const [messageRes, roomRes] = await Promise.all([
     supabase
@@ -393,6 +403,31 @@ export async function dispatchChatPushForMessage(params: {
     }
   }
 
+  const uniqueFcmTokens = Array.from(
+    new Set(
+      ((subscriptionRes.data || []) as PushSubscriptionRow[])
+        .filter((row) => row.fcm_token && row.staff_id && row.staff_id !== senderId)
+        .map((row) => String(row.fcm_token))
+        .filter(Boolean)
+    )
+  );
+
+  if (uniqueSubscriptions.size === 0 && uniqueFcmTokens.length === 0) {
+    await updateChatPushJobByMessageId(supabase, params.messageId, {
+      processing_started_at: null,
+      last_error: 'no-active-subscriptions',
+    });
+
+    return {
+      sent: 0,
+      failed: 0,
+      targets: targetIds.length,
+      notificationsCreated: notificationRows.length,
+      pushDisabled: false,
+      reason: 'no-active-subscriptions',
+    } satisfies ChatPushDispatchResult;
+  }
+
   // staff_id 기준으로 FCM 토큰이 있는 사용자 집합 구성 — Web Push + FCM 이중 발송 방지
   const staffIdsWithFcmToken = new Set(
     (subscriptionRes.data || [])
@@ -440,12 +475,8 @@ export async function dispatchChatPushForMessage(params: {
 
   // FCM 전송 (Web Push와 병렬 — 모바일 백그라운드 알림)
   try {
-    const fcmTokens = (subscriptionRes.data || [])
-      .filter((r: PushSubscriptionRow) => r.fcm_token && r.staff_id && r.staff_id !== senderId)
-      .map((r: PushSubscriptionRow) => r.fcm_token as string);
-
-    if (fcmTokens.length > 0) {
-      const fcmResult = await sendFcmBatch(fcmTokens, {
+    if (uniqueFcmTokens.length > 0) {
+      const fcmResult = await sendFcmBatch(uniqueFcmTokens, {
         title,
         body: previewBody,
         data: {

@@ -728,12 +728,31 @@ export default function NotificationSystem({
     };
 
     // A. notifications 테이블 INSERT 수신 → Toast + 소리 + 진동
+    const fetchUnreadNotificationsSince = async (since: string) => {
+      const { data: rows } = await supabase
+        .from('notifications')
+        .select('id,title,body,type,metadata,read_at,created_at')
+        .eq('user_id', uid)
+        .gte('created_at', since)
+        .order('created_at', { ascending: true })
+        .limit(50);
+
+      rows?.forEach((row: Record<string, unknown>) => {
+        if (!row?.read_at) emitIncomingNotification(row);
+      });
+      void syncBadge();
+    };
+
     const nTableChannel = supabase.channel(`noti-db-${uid}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${uid}` }, (payload: Record<string, unknown>) => {
         emitIncomingNotification(payload.new as Record<string, unknown>);
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${uid}` }, () => syncBadge())
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          void fetchUnreadNotificationsSince(mountedAt);
+        }
+      });
 
     // B. 결재 트리거 (채널명에 uid 포함 → 크로스유저 알림 누수 방지)
     const approvalsCh = supabase.channel(`approvals-trigger-${uid}`)
@@ -895,38 +914,21 @@ export default function NotificationSystem({
     }
 
     // 초기 렌더와 realtime 구독 사이에 들어온 unread 알림을 놓치지 않도록 한 번 더 보강 조회합니다.
-    supabase
-      .from('notifications')
-      .select('id,title,body,type,metadata,read_at,created_at')
-      .eq('user_id', uid)
-      .gte('created_at', mountedAt)
-      .order('created_at', { ascending: true })
-      .limit(20)
-      .then(({ data: rows }) => {
-        rows?.forEach((row: Record<string, unknown>) => {
-          if (!row?.read_at) emitIncomingNotification(row);
-        });
-        void syncBadge();
-      });
+    void fetchUnreadNotificationsSince(mountedAt);
+
+    let quickCatchupPolledAt = mountedAt;
+    const quickCatchupPoll = setInterval(() => {
+      const since = quickCatchupPolledAt;
+      quickCatchupPolledAt = new Date().toISOString();
+      void fetchUnreadNotificationsSince(since);
+    }, 10_000);
 
     // fallbackPoll: Realtime 누락 보완용. 마지막 폴링 이후 생성된 것만 조회하여 이중 알림 방지
     let lastPolledAt = mountedAt;
     const fallbackPoll = setInterval(() => {
       const since = lastPolledAt;
       lastPolledAt = new Date().toISOString();
-      supabase
-        .from('notifications')
-        .select('id,title,body,type,metadata,read_at,created_at')
-        .eq('user_id', uid)
-        .gte('created_at', since)
-        .order('created_at', { ascending: true })
-        .limit(20)
-        .then(({ data: rows }) => {
-          rows?.forEach((row: Record<string, unknown>) => {
-            if (!row?.read_at) emitIncomingNotification(row);
-          });
-          void syncBadge();
-        });
+      void fetchUnreadNotificationsSince(since);
     }, 30_000); // 5초 → 30초, Realtime이 주 경로이므로 보완용으로만
 
     // 30초 헬스체크
@@ -936,6 +938,7 @@ export default function NotificationSystem({
 
     return () => {
       clearInterval(hc);
+      clearInterval(quickCatchupPoll);
       clearInterval(fallbackPoll);
       channels.forEach(ch => supabase.removeChannel(ch));
     };

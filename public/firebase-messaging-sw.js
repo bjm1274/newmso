@@ -1,5 +1,5 @@
 // Firebase Cloud Messaging Service Worker
-// 앱이 완전히 닫혀 있을 때 백그라운드 푸시 알림 처리 (안드로이드/iOS)
+// 백그라운드 상태의 웹 앱에서 FCM data 메시지를 받아 알림을 직접 표시한다.
 importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js');
 
@@ -15,9 +15,9 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
-  const title = payload.notification?.title || '새 알림';
-  const body = payload.notification?.body || '새 알림이 있습니다.';
   const data = payload.data || {};
+  const title = payload.notification?.title || data.title || '새 알림';
+  const body = payload.notification?.body || data.body || '알림이 도착했습니다.';
   const tag = 'chat-msg-' + (data.message_id || data.id || Date.now());
 
   self.registration.showNotification(title, {
@@ -26,7 +26,7 @@ messaging.onBackgroundMessage((payload) => {
     badge: '/badge-72x72.png',
     tag,
     requireInteraction: true,
-    renotify: false,  // 같은 tag는 조용히 업데이트 (이중 알림 방지)
+    renotify: false,
     silent: false,
     vibrate: [200, 100, 200],
     data,
@@ -37,7 +37,6 @@ messaging.onBackgroundMessage((payload) => {
   });
 });
 
-// 알림 클릭 처리
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const data = event.notification.data || {};
