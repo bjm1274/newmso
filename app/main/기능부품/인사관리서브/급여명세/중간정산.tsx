@@ -1,6 +1,7 @@
 'use client';
 import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
+import { formatPayrollMutationError } from '@/lib/payroll-records';
 import { supabase } from '@/lib/supabase';
 import { calculateSeverancePay, formatWorkPeriod } from '@/lib/severance-pay';
 import { logAudit } from '@/lib/audit';
@@ -114,8 +115,14 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
       setSelectedStaff(null);
       if (_onRefresh) _onRefresh();
     } catch (e) {
-      console.error(e);
-      toast('저장 중 오류가 발생했습니다.', 'error');
+      const message = formatPayrollMutationError(e);
+      console.error('interim payroll finalize failed:', {
+        message,
+        error: e,
+        staffId: selectedStaff?.id,
+        settlementDate,
+      });
+      toast(`저장 중 오류가 발생했습니다. ${message}`, 'error');
     } finally {
       setLoading(false);
     }

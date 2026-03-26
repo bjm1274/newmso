@@ -78,6 +78,26 @@ function isDetailedBracket(entries: IncomeTaxBracketEntry[]) {
   );
 }
 
+function hasMonthlyWithholdingAmount(entry: IncomeTaxBracketEntry | null | undefined) {
+  return entry?.monthly_tax !== undefined && Number.isFinite(Number(entry.monthly_tax));
+}
+
+export function hasOfficialMonthlyIncomeTaxTable(brackets: any[] | null | undefined): boolean {
+  if (!Array.isArray(brackets) || brackets.length === 0) {
+    return false;
+  }
+
+  const normalized = brackets
+    .map((entry) => normalizeIncomeTaxBracketEntry(entry))
+    .filter((entry): entry is IncomeTaxBracketEntry => entry !== null);
+
+  if (normalized.length === 0) {
+    return false;
+  }
+
+  return normalized.every((entry) => entry.official === true && hasMonthlyWithholdingAmount(entry));
+}
+
 export function resolveIncomeTaxBracket(rates?: Partial<TaxInsuranceRates> | null): IncomeTaxBracketEntry[] {
   const normalized = Array.isArray(rates?.income_tax_bracket)
     ? rates!.income_tax_bracket
@@ -187,5 +207,5 @@ export function hasExactIncomeTaxBracket(rates: TaxInsuranceRates): boolean {
   if (rates.configured !== true || !Array.isArray(rates.income_tax_bracket) || rates.income_tax_bracket.length === 0) {
     return false;
   }
-  return rates.income_tax_bracket.every((entry: any) => entry && entry.official === true);
+  return hasOfficialMonthlyIncomeTaxTable(rates.income_tax_bracket);
 }

@@ -3,7 +3,7 @@ import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { DEFAULT_INCOME_TAX_BRACKET } from '@/lib/use-tax-insurance-rates';
+import { DEFAULT_INCOME_TAX_BRACKET, hasOfficialMonthlyIncomeTaxTable } from '@/lib/use-tax-insurance-rates';
 
 const COMPANY_FILTER = '전체';
 
@@ -84,6 +84,22 @@ export default function TaxInsuranceRatesPanel({ companyName }: { companyName?: 
       return false;
     }
   }, [form.income_tax_bracket_text]);
+
+  const exactBracketConfigured = useMemo(() => {
+    try {
+      if (!form.income_tax_bracket_text.trim()) return false;
+      const parsed = JSON.parse(form.income_tax_bracket_text);
+      if (!Array.isArray(parsed)) return false;
+      return hasOfficialMonthlyIncomeTaxTable(
+        parsed.map((entry) => ({
+          ...entry,
+          official: form.official_confirmed,
+        }))
+      );
+    } catch {
+      return false;
+    }
+  }, [form.income_tax_bracket_text, form.official_confirmed]);
 
   const handleSave = async () => {
     let parsedBracket: any[] = [];
@@ -287,6 +303,7 @@ export default function TaxInsuranceRatesPanel({ companyName }: { companyName?: 
                 placeholder='[{"min":0,"max":14000000,"rate":0.06,"deduction":0}]'
               />
               <div className="space-y-1 text-[11px] text-[var(--toss-gray-4)]">
+                <p>월 원천징수표 확인 상태: {exactBracketConfigured ? '확인 완료' : '미확인'}</p>
                 <p>현재 상태: {bracketConfigured ? '세율표 입력됨' : '세율표 미입력'}</p>
                 <label className="flex items-center gap-2 text-[11px] text-[var(--toss-gray-4)]">
                   <input

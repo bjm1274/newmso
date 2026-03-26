@@ -42,6 +42,19 @@ hydrateEnvFromLocalFile();
 const defaultYearMonth = new Date().toISOString().slice(0, 7);
 const noticeRoomId = '00000000-0000-0000-0000-000000000000';
 
+function buildMockMonthlyWithholdingTable() {
+  return DEFAULT_INCOME_TAX_BRACKET.map((entry) => ({
+    ...entry,
+    official: true,
+    monthly_tax: Math.max(
+      0,
+      Math.floor(
+        Math.max(0, entry.min * entry.rate - (entry.deduction ?? 0)) / 12
+      )
+    ),
+  }));
+}
+
 export const fakeUser = {
   id: '11111111-1111-1111-1111-111111111111',
   employee_no: 'E2E-001',
@@ -405,10 +418,7 @@ function buildFixtures(overrides: MockFixtures = {}) {
           long_term_care_rate: 0.0046,
           employment_insurance_rate: 0.009,
           configured: true,
-          income_tax_bracket: DEFAULT_INCOME_TAX_BRACKET.map((entry) => ({
-            ...entry,
-            official: true,
-          })),
+          income_tax_bracket: buildMockMonthlyWithholdingTable(),
         },
         {
           id: 'tax-rate-default-all',
@@ -419,10 +429,7 @@ function buildFixtures(overrides: MockFixtures = {}) {
           long_term_care_rate: 0.0046,
           employment_insurance_rate: 0.009,
           configured: true,
-          income_tax_bracket: DEFAULT_INCOME_TAX_BRACKET.map((entry) => ({
-            ...entry,
-            official: true,
-          })),
+          income_tax_bracket: buildMockMonthlyWithholdingTable(),
         },
       ],
     systemConfigs:
