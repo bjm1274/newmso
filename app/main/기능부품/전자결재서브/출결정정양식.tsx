@@ -112,33 +112,82 @@ export default function AttendanceCorrectionForm({
       const startStr = start.toISOString().slice(0, 10);
       const endStr = end.toISOString().slice(0, 10);
 
-      const { data: attendanceRows } = await supabase
-        .from('attendance')
-        .select('date, check_in, check_out, status')
-        .eq('staff_id', user.id)
-        .gte('date', startStr)
-        .lte('date', endStr);
+      /* ── 병렬 조회 ── */
+      const [
+        { data: attendanceRows },
+        { data: attendancesRows },
+        { data: myCorrections },
+        { data: staffRow },
+        { data: assignmentRows },
+      ] = await Promise.all([
+        supabase.from('attendance').select('date, check_in, check_out, status').eq('staff_id', user.id).gte('date', startStr).lte('date', endStr),
+        supabase.from('attendances').select('work_date, status').eq('staff_id', user.id).gte('work_date', startStr).lte('work_date', endStr),
+        withAttendanceCorrectionsFallback<any[]>(
+          () => supabase.from('attendance_corrections').select('attendance_date, original_date').eq('staff_id', user.id),
+          () => supabase.from('attendance_corrections').select('original_date').eq('staff_id', user.id),
+        ).then((r) => r),
+        supabase.from('staff_members').select('id, shift_id').eq('id', user.id).maybeSingle(),
+        supabase.from('shift_assignments').select('work_date, shift_id').eq('staff_id', user.id).gte('work_date', startStr).lte('work_date', endStr),
+      ]);
 
-      const { data: attendancesRows } = await supabase
-        .from('attendances')
-        .select('work_date, status')
-        .eq('staff_id', user.id)
-        .gte('work_date', startStr)
-        .lte('work_date', endStr);
-
-      const { data: myCorrections } = await withAttendanceCorrectionsFallback<any[]>(
-        () =>
-          supabase
-            .from('attendance_corrections')
-            .select('attendance_date, original_date')
-            .eq('staff_id', user.id),
-        () =>
-          supabase
-            .from('attendance_corrections')
-            .select('original_date')
-            .eq('staff_id', user.id),
+      /* ── 날짜별 배정 Map ── */
+      const assignmentByDate = new Map<string, string | null>(
+        (assignmentRows || []).map((a: any) => [String(a.work_date).slice(0, 10), a.shift_id ?? null])
       );
 
+      /* ── 관련된 shift_id 목록 수집 → work_shifts 조회 ── */
+      const defaultShiftId: string | null = (staffRow as any)?.shift_id ?? null;
+      const shiftIdSet = new Set<string>(
+        [...(assignmentRows || []).map((a: any) => a.shift_id).filter(Boolean), defaultShiftId].filter(Boolean) as string[]
+      );
+      const shiftsMap = new Map<string, any>();
+      if (shiftIdSet.size > 0) {
+        const { data: shiftRows } = await supabase
+          .from('work_shifts')
+          .select('id, name, shift_type, weekly_work_days, is_weekend_work')
+          .in('id', Array.from(shiftIdSet));
+        (shiftRows || []).forEach((s: any) => shiftsMap.set(s.id, s));
+      }
+
+      /* ── OFF shift 판단 ── */
+      const OFF_KEYWORDS = ['휴무', 'off', '비번', '오프'];
+      const isOffShift = (shiftId: string | null | undefined): boolean => {
+        if (!shiftId) return true; // shift_id가 null이면 OFF
+        const shift = shiftsMap.get(shiftId);
+        if (!shift) return false;
+        const name = String(shift.name || '').toLowerCase();
+        return OFF_KEYWORDS.some((kw) => name.includes(kw));
+      };
+
+      /* ── 근무유형 → 근무일 모드 ── */
+      const resolveWorkDayMode = (shiftId: string | null | undefined): 'all_days' | 'weekdays' => {
+        if (!shiftId) return 'weekdays';
+        const shift = shiftsMap.get(shiftId);
+        if (!shift) return 'weekdays';
+        if (String(shift.shift_type || '').includes('3교대')) return 'all_days';
+        if (shift.is_weekend_work === true || Number(shift.weekly_work_days) >= 7) return 'all_days';
+        return 'weekdays';
+      };
+
+      /* ── 해당 날짜가 근무일인지 판단 ── */
+      const isWorkDay = (dateStr: string): boolean => {
+        const dayOfWeek = new Date(`${dateStr}T00:00:00`).getDay(); // 0=일, 6=토
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+        if (assignmentByDate.has(dateStr)) {
+          // 근무표에 배정된 날짜
+          const assignedShiftId = assignmentByDate.get(dateStr);
+          if (isOffShift(assignedShiftId)) return false; // OFF 배정 → 근무 없음
+          return true; // 실제 근무 배정됨
+        } else {
+          // 근무표 배정 없음 → 기본 근무유형으로 판단
+          const mode = resolveWorkDayMode(defaultShiftId);
+          if (mode === 'all_days') return true;
+          return !isWeekend; // weekdays: 토/일 제외
+        }
+      };
+
+      /* ── 이미 신청한 날짜 Set ── */
       const alreadyRequested = new Set(
         (myCorrections || [])
           .map((item: any) => getCorrectionDate(item))
@@ -156,6 +205,9 @@ export default function AttendanceCorrectionForm({
 
         const dateStr = current.toISOString().slice(0, 10);
         if (alreadyRequested.has(dateStr)) continue;
+
+        // 근무 없는 날(휴무/주말 등)은 건너뜀
+        if (!isWorkDay(dateStr)) continue;
 
         const attendance = attendanceByDate.get(dateStr);
         const attendances = attendancesByDate.get(dateStr);
