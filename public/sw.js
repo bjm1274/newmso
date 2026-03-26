@@ -23,7 +23,7 @@ self.addEventListener('push', (event) => {
     badge: BADGE_URL,
     tag: tag,
     requireInteraction: true,    // 사용자가 확인할 때까지 유지 (카카오톡 방식)
-    renotify: true,              // 같은 tag라도 새 알림이면 다시 표시
+    renotify: false,             // 같은 tag는 조용히 업데이트 (이중 알림 방지)
     silent: false,
     vibrate: [200, 100, 200],    // 프리미엄 진동 패턴
     data: data.data || {},

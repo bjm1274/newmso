@@ -393,6 +393,13 @@ export async function dispatchChatPushForMessage(params: {
     }
   }
 
+  // staff_id 기준으로 FCM 토큰이 있는 사용자 집합 구성 — Web Push + FCM 이중 발송 방지
+  const staffIdsWithFcmToken = new Set(
+    (subscriptionRes.data || [])
+      .filter((r: PushSubscriptionRow) => r.fcm_token && r.staff_id && r.staff_id !== senderId)
+      .map((r: PushSubscriptionRow) => String(r.staff_id))
+  );
+
   let sent = 0;
   let failed = 0;
   const expiredIds: string[] = [];
@@ -411,8 +418,9 @@ export async function dispatchChatPushForMessage(params: {
     });
 
     for (const subscription of uniqueSubscriptions.values()) {
-      // FCM 토큰이 있는 구독은 FCM이 처리 — Web Push 중복 방지
+      // FCM 토큰이 있는 구독 자체 또는 해당 staff_id가 FCM 구독을 별도로 보유하면 Web Push 생략
       if (subscription.fcm_token) continue;
+      if (staffIdsWithFcmToken.has(String(subscription.staff_id))) continue;
       try {
         await sendWebPushNotification(subscription, payload);
         sent += 1;
