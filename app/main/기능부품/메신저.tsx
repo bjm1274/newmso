@@ -546,7 +546,8 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       }
 
       const knownStaff = allKnownStaffMap.get(memberId);
-      if (isActiveChatMember(knownStaff)) {
+      // staff 정보가 없는 경우(다른 회사 등)도 방 접근 허용 — 정보가 있으면 활성 여부 체크
+      if (!knownStaff || isActiveChatMember(knownStaff)) {
         memberIds.push(memberId);
       }
     });

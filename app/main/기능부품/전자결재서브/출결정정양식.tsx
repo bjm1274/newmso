@@ -20,6 +20,8 @@ type AttendanceCorrectionFormProps = {
   staffs?: any;
   initialSelectedDates?: string[];
   onConsumeInitialSelectedDates?: () => void;
+  setExtraData?: (data: Record<string, unknown>) => void;
+  setFormTitle?: (title: string) => void;
 };
 
 const REQUEST_VIEW = '신청';
@@ -69,6 +71,8 @@ export default function AttendanceCorrectionForm({
   user,
   initialSelectedDates = [],
   onConsumeInitialSelectedDates,
+  setExtraData,
+  setFormTitle,
 }: AttendanceCorrectionFormProps) {
   const [corrections, setCorrections] = useState<any[]>([]);
   const [problemDates, setProblemDates] = useState<ProblemDateItem[]>([]);
@@ -264,6 +268,25 @@ export default function AttendanceCorrectionForm({
     setSelectedDates(nextDates);
     onConsumeInitialSelectedDates?.();
   }, [initialSelectedDates, onConsumeInitialSelectedDates]);
+
+  // 부모(전자결재.tsx)에 선택 데이터 동기화 → approvals 기안함에 표시
+  useEffect(() => {
+    if (!setExtraData) return;
+    setExtraData({
+      form_slug: 'attendance_fix',
+      form_name: '출결정정',
+      correction_dates: selectedDates,
+      correction_type: correctionType,
+      correction_reason: reason,
+    });
+  }, [selectedDates, correctionType, reason, setExtraData]);
+
+  useEffect(() => {
+    if (!setFormTitle || selectedDates.length === 0) return;
+    const sorted = [...selectedDates].sort();
+    const preview = sorted.slice(0, 2).join(', ') + (sorted.length > 2 ? ` 외 ${sorted.length - 2}건` : '');
+    setFormTitle(`출결정정 신청 - ${preview}`);
+  }, [selectedDates, setFormTitle]);
 
   const toggleSelectedDate = (date: string) => {
     setSelectedDates((prev) =>
