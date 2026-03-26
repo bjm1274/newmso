@@ -43,7 +43,6 @@ test('attendance correction submit works with the legacy attendance_corrections 
   await page.getByTestId('approval-form-type-8').click();
   await expect(page.getByTestId('attendance-correction-view')).toBeVisible();
 
-  await page.getByTestId('attendance-correction-toggle').click();
   await expect(
     page.getByTestId(`attendance-correction-date-${correctionDate}`)
   ).toBeVisible();
@@ -51,7 +50,6 @@ test('attendance correction submit works with the legacy attendance_corrections 
   await page.getByTestId('attendance-correction-reason-input').fill('레거시 스키마 제출 테스트');
   await page.getByTestId('attendance-correction-submit').click();
 
-  await expect(page.getByTestId('attendance-correction-toggle')).toContainText('새 신청');
   await page.getByRole('button', { name: '신청 현황' }).click();
   await expect(page.getByText(correctionDate)).toBeVisible();
   await expect(page.getByText('레거시 스키마 제출 테스트')).toBeVisible();

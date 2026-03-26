@@ -14,8 +14,9 @@ self.addEventListener('push', (event) => {
     data = { title: '새 알림', body: event.data.text() };
   }
 
-  const notifType = (data.tag || data.data?.type || 'notification');
-  const tag = notifType + '-' + (data.data?.message_id || data.data?.id || Date.now());
+  // firebase-messaging-sw.js와 동일한 tag 형식 사용 → 이중 알림 방지
+  const messageId = data.data?.message_id || data.data?.id || '';
+  const tag = messageId ? 'chat-msg-' + messageId : (data.data?.type || 'notification') + '-' + Date.now();
 
   const options = {
     body: data.body || '새 알림이 있습니다.',
