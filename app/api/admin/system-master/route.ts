@@ -124,6 +124,8 @@ function normalizeChatRoom(room: Record<string, any>, staffMap: Map<string, Reco
     member_count: Array.isArray(room.members) ? room.members.length : 0,
     member_labels: memberNames,
     created_at: room.created_at,
+    last_message_at: room.last_message_at || null,
+    last_activity_at: room.last_message_at || room.created_at || null,
   };
 }
 
@@ -287,13 +289,20 @@ export async function GET(request: NextRequest) {
       const roomMap = new Map<string, Record<string, any>>(
         rooms.map((room: Record<string, any>) => [String(room.id), room])
       );
+      const normalizedRooms = rooms
+        .map((room: Record<string, any>) => normalizeChatRoom(room, staffMap))
+        .sort((left: Record<string, any>, right: Record<string, any>) => {
+          const leftTime = new Date(String(left.last_activity_at || left.created_at || 0)).getTime();
+          const rightTime = new Date(String(right.last_activity_at || right.created_at || 0)).getTime();
+          return rightTime - leftTime;
+        });
 
       const filteredMessages = (messageRes.data || [])
         .filter((message: Record<string, any>) => !keyword || matchSearch(message, keyword))
         .map((message: Record<string, any>) => normalizeMessage(message, roomMap, staffMap));
 
       return NextResponse.json({
-        rooms: rooms.map((room: Record<string, any>) => normalizeChatRoom(room, staffMap)),
+        rooms: normalizedRooms,
         messages: filteredMessages,
       });
     }
@@ -301,5 +310,113 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unsupported scope' }, { status: 400 });
   } catch {
     return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const session = await readSessionFromRequest(request);
+    if (!session || !isNamedSystemMasterAccount(session.user)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const searchParams = request.nextUrl.searchParams;
+    const scope = searchParams.get('scope') || 'overview';
+    const roomId = String(searchParams.get('roomId') || '').trim();
+
+    if (scope !== 'chats' || !roomId) {
+      return NextResponse.json({ error: 'Unsupported delete request' }, { status: 400 });
+    }
+
+    const supabase = getAdminClient();
+
+    const { data: room, error: roomError } = await supabase
+      .from('chat_rooms')
+      .select('id')
+      .eq('id', roomId)
+      .maybeSingle();
+
+    if (roomError) {
+      return NextResponse.json({ error: roomError.message }, { status: 500 });
+    }
+
+    if (!room) {
+      return NextResponse.json({ error: 'Chat room not found' }, { status: 404 });
+    }
+
+    const { data: messageRows, error: messageRowsError } = await supabase
+      .from('messages')
+      .select('id')
+      .eq('room_id', roomId);
+
+    if (messageRowsError) {
+      return NextResponse.json({ error: messageRowsError.message }, { status: 500 });
+    }
+
+    const { data: pollRows, error: pollRowsError } = await supabase
+      .from('polls')
+      .select('id')
+      .eq('room_id', roomId);
+
+    if (pollRowsError) {
+      return NextResponse.json({ error: pollRowsError.message }, { status: 500 });
+    }
+
+    const messageIds = (messageRows || []).map((row: Record<string, any>) => String(row.id)).filter(Boolean);
+    const pollIds = (pollRows || []).map((row: Record<string, any>) => String(row.id)).filter(Boolean);
+
+    if (pollIds.length > 0) {
+      const { error } = await supabase.from('poll_votes').delete().in('poll_id', pollIds);
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    if (messageIds.length > 0) {
+      const [{ error: reactionsError }, { error: bookmarksByMessageError }] = await Promise.all([
+        supabase.from('message_reactions').delete().in('message_id', messageIds),
+        supabase.from('message_bookmarks').delete().in('message_id', messageIds),
+      ]);
+
+      if (reactionsError) {
+        return NextResponse.json({ error: reactionsError.message }, { status: 500 });
+      }
+
+      if (bookmarksByMessageError) {
+        return NextResponse.json({ error: bookmarksByMessageError.message }, { status: 500 });
+      }
+    }
+
+    const cleanupResults = await Promise.all([
+      supabase.from('message_bookmarks').delete().eq('room_id', roomId),
+      supabase.from('pinned_messages').delete().eq('room_id', roomId),
+      supabase.from('room_read_cursors').delete().eq('room_id', roomId),
+      supabase.from('room_notification_settings').delete().eq('room_id', roomId),
+      supabase.from('polls').delete().eq('room_id', roomId),
+      supabase.from('messages').delete().eq('room_id', roomId),
+    ]);
+
+    for (const result of cleanupResults) {
+      if (result.error) {
+        return NextResponse.json({ error: result.error.message }, { status: 500 });
+      }
+    }
+
+    const { error: deleteRoomError } = await supabase.from('chat_rooms').delete().eq('id', roomId);
+
+    if (deleteRoomError) {
+      return NextResponse.json({ error: deleteRoomError.message }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      ok: true,
+      deletedRoomId: roomId,
+      deletedMessageCount: messageIds.length,
+      deletedPollCount: pollIds.length,
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error && error.message
+        ? error.message
+        : 'Server error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

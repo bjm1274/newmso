@@ -171,7 +171,9 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
         status: attStatus,
         work_hours_minutes: mins ?? undefined,
       }, { onConflict: 'staff_id,work_date' });
-    } catch (_) { }
+    } catch (syncErr) {
+      console.error('출퇴근 동기화 실패:', syncErr);
+    }
   };
 
   // 출퇴근 처리 (위치 검증 포함)
@@ -227,9 +229,10 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
           .eq('date', today)
           .is('check_out', null)
           .select()
-          .single();
+          .maybeSingle();
 
         if (error) throw error;
+        if (!data) throw new Error('이미 퇴근 처리되었거나 출근 기록이 없습니다.');
         await syncToAttendances(today, todayLog.check_in as string | null, timeString, (todayLog.status as string) || '정상');
         setTodayLog(data);
         toast('퇴근 처리되었습니다. 고생하셨습니다!', 'success');

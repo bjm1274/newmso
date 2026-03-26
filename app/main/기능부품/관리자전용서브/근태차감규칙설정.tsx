@@ -14,10 +14,10 @@ export default function AttendanceDeductionRules({ selectedCo = '전체' }: Reco
       .from('attendance_deduction_rules')
       .select('*')
       .eq('company_name', selectedCo)
-      .single();
+      .maybeSingle();
     if (data) setRules(data);
     else {
-      const { data: all } = await supabase.from('attendance_deduction_rules').select('*').eq('company_name', '전체').single();
+      const { data: all } = await supabase.from('attendance_deduction_rules').select('*').eq('company_name', '전체').maybeSingle();
       setRules(all || { company_name: selectedCo, late_deduction_type: 'fixed', late_deduction_amount: 10000, early_leave_deduction_type: 'fixed', early_leave_deduction_amount: 10000 });
     }
     setLoading(false);

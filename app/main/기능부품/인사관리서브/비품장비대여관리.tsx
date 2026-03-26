@@ -32,7 +32,7 @@ export default function AssetLoanManager({ staffs = [], selectedCo }: Record<str
     });
     setForm({ staffId: '', assetType: '노트북', assetName: '', loanedAt: new Date().toISOString().slice(0, 10) });
     setAdding(false);
-    const { data } = await supabase.from('asset_loans').select('*, staff_members(name)').order('loaned_at', { ascending: false }).limit(1).single();
+    const { data } = await supabase.from('asset_loans').select('*, staff_members(name)').order('loaned_at', { ascending: false }).limit(1).maybeSingle();
     if (data) setList((prev) => [data, ...prev]);
   };
 
