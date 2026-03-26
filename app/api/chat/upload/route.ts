@@ -34,10 +34,8 @@ function guessFileExtension(fileName: string, mimeType: string) {
 
 function buildSafeFilePath(fileName: string, mimeType: string) {
   const ext = guessFileExtension(fileName, mimeType);
-  const safeName = (fileName || `첨부파일.${ext}`)
-    .replace(/[^a-zA-Z0-9가-힣ㄱ-ㅎㅏ-ㅣ._\-() ]/g, '_')
-    .slice(0, 100);
-  return `chat/${Date.now()}_${crypto.randomUUID()}__${safeName}`;
+  const safeExt = /^[a-z0-9]+$/i.test(ext) ? ext.toLowerCase() : 'bin';
+  return `chat/${Date.now()}_${crypto.randomUUID()}.${safeExt}`;
 }
 
 function isMissingBucketError(error: unknown, bucketName: string) {
