@@ -1,7 +1,7 @@
 'use client';
 import { toast } from '@/lib/toast';
 import { useDeferredValue, useState, useEffect, useMemo, useRef } from 'react';
-import { canAccessBoard, isAdminUser, isPrivilegedUser } from '@/lib/access-control';
+import { canAccessBoard, isPrivilegedUser } from '@/lib/access-control';
 import { supabase } from '@/lib/supabase';
 import { withMissingColumnFallback } from '@/lib/supabase-compat';
 import SmartDatePicker from './공통/SmartDatePicker';
@@ -612,39 +612,44 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     if (!postId) return;
     setLikingPostId(postId);
     try {
-    const isLiked = myLikedPostIds.has(postId);
-    if (isLiked) {
-      // 이미 좋아요 → 취소
-      const { error: unlikeError } = await supabase.from('board_post_likes').delete().eq('post_id', post.id).eq('user_id', user.id);
-      if (unlikeError) throw unlikeError;
-      const likes = Math.max((post.likes_count ?? 1) - 1, 0);
-      const { error: unlikeCountError } = await supabase.from('board_posts').update({ likes_count: likes }).eq('id', post.id);
-      if (unlikeCountError) throw unlikeCountError;
-      setPosts((prev) => prev.map((p) => (String(p.id ?? '').trim() === postId ? { ...p, likes_count: likes } : p)));
-      setSelectedPostDetail((prev: BoardPost | null) => {
-        if (!prev || String(prev.id ?? '').trim() !== postId) return prev;
-        return { ...prev, likes_count: likes };
-      });
-      setMyLikedPostIds((prev) => { const next = new Set(prev); next.delete(postId); return next; });
-    } else {
-      // 좋아요 추가
-      const { error: likeError } = await supabase.from('board_post_likes').insert([{ post_id: post.id, user_id: user.id }]);
-      if (likeError) throw likeError;
-      const likes = (post.likes_count ?? 0) + 1;
-      const { error: likeCountError } = await supabase.from('board_posts').update({ likes_count: likes }).eq('id', post.id);
-      if (likeCountError) throw likeCountError;
-      setPosts((prev) => prev.map((p) => (String(p.id ?? '').trim() === postId ? { ...p, likes_count: likes } : p)));
-      setSelectedPostDetail((prev: BoardPost | null) => {
-        if (!prev || String(prev.id ?? '').trim() !== postId) return prev;
-        return { ...prev, likes_count: likes };
-      });
-      setMyLikedPostIds((prev) => new Set([...prev, postId]));
-    }
+      const isLiked = myLikedPostIds.has(postId);
+      if (isLiked) {
+        // 좋아요 취소
+        const { error: unlikeError } = await supabase.from('board_post_likes').delete().eq('post_id', post.id).eq('user_id', user.id);
+        if (unlikeError) {
+          // 테이블 없으면(42P01) 무시 — 로컬 상태만 반영
+          if (!(unlikeError.code === '42P01' || unlikeError.message?.includes('does not exist'))) throw unlikeError;
+        }
+        const likes = Math.max((post.likes_count ?? 1) - 1, 0);
+        // likes_count는 optional 컬럼 — 실패해도 UI는 유지
+        await supabase.from('board_posts').update({ likes_count: likes }).eq('id', post.id);
+        setPosts((prev) => prev.map((p) => (String(p.id ?? '').trim() === postId ? { ...p, likes_count: likes } : p)));
+        setSelectedPostDetail((prev: BoardPost | null) => {
+          if (!prev || String(prev.id ?? '').trim() !== postId) return prev;
+          return { ...prev, likes_count: likes };
+        });
+        setMyLikedPostIds((prev) => { const next = new Set(prev); next.delete(postId); return next; });
+      } else {
+        // 좋아요 추가
+        const { error: likeError } = await supabase.from('board_post_likes').insert([{ post_id: post.id, user_id: user.id }]);
+        if (likeError) {
+          // 테이블 없으면(42P01) 무시 — 로컬 상태만 반영
+          if (!(likeError.code === '42P01' || likeError.message?.includes('does not exist'))) throw likeError;
+        }
+        const likes = (post.likes_count ?? 0) + 1;
+        // likes_count는 optional 컬럼 — 실패해도 UI는 유지
+        await supabase.from('board_posts').update({ likes_count: likes }).eq('id', post.id);
+        setPosts((prev) => prev.map((p) => (String(p.id ?? '').trim() === postId ? { ...p, likes_count: likes } : p)));
+        setSelectedPostDetail((prev: BoardPost | null) => {
+          if (!prev || String(prev.id ?? '').trim() !== postId) return prev;
+          return { ...prev, likes_count: likes };
+        });
+        setMyLikedPostIds((prev) => new Set([...prev, postId]));
+      }
     } catch (error) {
       console.error('좋아요 처리 실패:', error);
       toast('좋아요 처리 중 오류가 발생했습니다.', 'error');
-    }
-    finally {
+    } finally {
       setLikingPostId(null);
     }
   };
@@ -685,9 +690,9 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     const list = comments[postId] || [];
     const comment = list.find((c: Record<string, unknown>) => c.id === commentId);
     if (!comment) return;
-    const isAdmin = user.permissions?.mso || user.role === 'admin';
-    if (String(comment.author_id) !== String(user.id) && !isAdmin) {
-      toast('본인이 작성한 댓글만 삭제할 수 있습니다.', 'success');
+    const isSysAdmin = isPrivilegedUser(user);
+    if (String(comment.author_id) !== String(user.id) && !isSysAdmin) {
+      toast('본인이 작성한 댓글만 삭제할 수 있습니다.', 'error');
       return;
     }
     if (!confirm('이 댓글을 삭제할까요?')) return;
@@ -794,7 +799,8 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     if (!user) return false;
     if (!canAccessBoard(user, (post?.board_type as string) || activeBoard, 'write')) return false;
     const isAuthor = Boolean(post.author_id && String(post.author_id) === String(user.id));
-    return isAuthor || isAdminUser(user) || isPrivilegedUser(user);
+    // 작성자 본인 또는 시스템관리자만 삭제 가능
+    return isAuthor || isPrivilegedUser(user);
   };
 
   const sendScheduleApprovalRequest = async (post: BoardPost, actionType: '삭제' | '수정', updatedData?: Record<string, unknown>) => {
@@ -2322,7 +2328,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                                     답글
                                   </button>
                                 )}
-                                {((user?.id && String(c.author_id) === String(user.id)) || user?.permissions?.mso || user?.role === 'admin') && (
+                                {((user?.id && String(c.author_id) === String(user.id)) || isPrivilegedUser(user)) && (
                                   <button
                                     type="button"
                                     onClick={() => handleDeleteComment(selectedPost.id, c.id)}
@@ -2337,7 +2343,7 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
                               <div key={r.id} className="ml-6 text-xs text-[var(--toss-gray-4)] flex gap-2 items-center flex-wrap">
                                 <span className="font-bold">{r.author_name}:</span>
                                 <span className="flex-1 min-w-0">{r.content}</span>
-                                {((user?.id && String(r.author_id) === String(user.id)) || user?.permissions?.mso || user?.role === 'admin') && (
+                                {((user?.id && String(r.author_id) === String(user.id)) || isPrivilegedUser(user)) && (
                                   <button
                                     type="button"
                                     onClick={() => handleDeleteComment(selectedPost.id, r.id)}
