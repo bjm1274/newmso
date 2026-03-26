@@ -72,7 +72,7 @@ export default function RoleDashboard({ user, setMainMenu, onOpenApproval }: Pro
         .from('staff_members')
         .select('annual_leave_total, annual_leave_used')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
       if (data) {
         setAnnualLeave({

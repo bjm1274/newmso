@@ -534,6 +534,8 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     const channel = supabase
       .channel('board-posts-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'board_posts' }, () => {
+        // 좋아요 처리 중이면 realtime fetch 건너뜀 (로컬 state 덮어쓰기 방지)
+        if (likingRef.current) return;
         fetchPosts();
       })
       .subscribe();
@@ -605,51 +607,58 @@ export default function BoardView({ user, subView, setSubView, selectedCo, selec
     }
   };
 
+  const likingRef = useRef(false);
   const [likingPostId, setLikingPostId] = useState<string | null>(null);
   const handleLike = async (post: BoardPost) => {
-    if (!user?.id || likingPostId) return;
+    if (!user?.id || likingRef.current) return;
     const postId = String(post.id ?? '').trim();
     if (!postId) return;
+    likingRef.current = true;
     setLikingPostId(postId);
+
+    const isLiked = myLikedPostIds.has(postId);
+
+    // ── Optimistic UI 즉시 반영 ──
+    const optimisticLikes = isLiked ? Math.max((post.likes_count ?? 1) - 1, 0) : (post.likes_count ?? 0) + 1;
+    const updateLocalLikes = (count: number) => {
+      setPosts((prev) => prev.map((p) => (String(p.id ?? '').trim() === postId ? { ...p, likes_count: count } : p)));
+      setSelectedPostDetail((prev: BoardPost | null) => {
+        if (!prev || String(prev.id ?? '').trim() !== postId) return prev;
+        return { ...prev, likes_count: count };
+      });
+    };
+    updateLocalLikes(optimisticLikes);
+    if (isLiked) {
+      setMyLikedPostIds((prev) => { const next = new Set(prev); next.delete(postId); return next; });
+    } else {
+      setMyLikedPostIds((prev) => new Set([...prev, postId]));
+    }
+
     try {
-      const isLiked = myLikedPostIds.has(postId);
       if (isLiked) {
-        // 좋아요 취소
         const { error: unlikeError } = await supabase.from('board_post_likes').delete().eq('post_id', post.id).eq('user_id', user.id);
-        if (unlikeError) {
-          // 테이블 없으면(42P01) 무시 — 로컬 상태만 반영
-          if (!(unlikeError.code === '42P01' || unlikeError.message?.includes('does not exist'))) throw unlikeError;
-        }
-        const likes = Math.max((post.likes_count ?? 1) - 1, 0);
-        // likes_count는 optional 컬럼 — 실패해도 UI는 유지
-        await supabase.from('board_posts').update({ likes_count: likes }).eq('id', post.id);
-        setPosts((prev) => prev.map((p) => (String(p.id ?? '').trim() === postId ? { ...p, likes_count: likes } : p)));
-        setSelectedPostDetail((prev: BoardPost | null) => {
-          if (!prev || String(prev.id ?? '').trim() !== postId) return prev;
-          return { ...prev, likes_count: likes };
-        });
-        setMyLikedPostIds((prev) => { const next = new Set(prev); next.delete(postId); return next; });
+        if (unlikeError && !(unlikeError.code === '42P01' || unlikeError.message?.includes('does not exist'))) throw unlikeError;
       } else {
-        // 좋아요 추가
         const { error: likeError } = await supabase.from('board_post_likes').insert([{ post_id: post.id, user_id: user.id }]);
-        if (likeError) {
-          // 테이블 없으면(42P01) 무시 — 로컬 상태만 반영
-          if (!(likeError.code === '42P01' || likeError.message?.includes('does not exist'))) throw likeError;
-        }
-        const likes = (post.likes_count ?? 0) + 1;
-        // likes_count는 optional 컬럼 — 실패해도 UI는 유지
-        await supabase.from('board_posts').update({ likes_count: likes }).eq('id', post.id);
-        setPosts((prev) => prev.map((p) => (String(p.id ?? '').trim() === postId ? { ...p, likes_count: likes } : p)));
-        setSelectedPostDetail((prev: BoardPost | null) => {
-          if (!prev || String(prev.id ?? '').trim() !== postId) return prev;
-          return { ...prev, likes_count: likes };
-        });
-        setMyLikedPostIds((prev) => new Set([...prev, postId]));
+        if (likeError && !(likeError.code === '42P01' || likeError.message?.includes('does not exist'))) throw likeError;
       }
+      // ── 실제 COUNT 기반으로 likes_count 동기화 (race condition 방지) ──
+      const { count, error: countError } = await supabase.from('board_post_likes').select('id', { count: 'exact', head: true }).eq('post_id', post.id);
+      const realCount = countError ? optimisticLikes : (count ?? optimisticLikes);
+      await supabase.from('board_posts').update({ likes_count: realCount }).eq('id', post.id);
+      updateLocalLikes(realCount);
     } catch (error) {
+      // ── 실패 시 롤백 ──
       console.error('좋아요 처리 실패:', error);
       toast('좋아요 처리 중 오류가 발생했습니다.', 'error');
+      updateLocalLikes(post.likes_count ?? 0);
+      if (isLiked) {
+        setMyLikedPostIds((prev) => new Set([...prev, postId]));
+      } else {
+        setMyLikedPostIds((prev) => { const next = new Set(prev); next.delete(postId); return next; });
+      }
     } finally {
+      likingRef.current = false;
       setLikingPostId(null);
     }
   };

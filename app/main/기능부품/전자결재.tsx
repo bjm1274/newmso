@@ -1233,7 +1233,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
 
         if (item.type === '인사명령' && itemMetaData?.orderTargetId) {
           const { orderTargetId, newPosition, orderCategory, targetDept } = itemMetaData as { orderTargetId: string; newPosition?: string; orderCategory?: string; targetDept?: string };
-          const { data: currentStaff } = await supabase.from('staff_members').select('department, position').eq('id', orderTargetId).single();
+          const { data: currentStaff } = await supabase.from('staff_members').select('department, position').eq('id', orderTargetId).maybeSingle();
 
           const staffUpdate: Record<string, unknown> = {};
           if (newPosition) staffUpdate.position = newPosition;
