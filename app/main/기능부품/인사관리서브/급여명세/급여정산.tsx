@@ -9,9 +9,11 @@ import { formatPayrollMutationError } from '@/lib/payroll-records';
 import { fetchTaxFreeSettings, DEFAULT_SETTINGS, type TaxFreeSettings } from '@/lib/use-tax-free-settings';
 import {
   calculateMonthlyIncomeTax,
+  calculateQualifyingChildTaxCredit,
   fetchTaxInsuranceRates,
   DEFAULT_TAX_INSURANCE_RATES,
   hasExactIncomeTaxBracket,
+  normalizeWithholdingRatePercent,
   type TaxInsuranceRates,
 } from '@/lib/use-tax-insurance-rates';
 
@@ -32,6 +34,8 @@ interface SettlementEntry {
   attendance_deduction_detail: Record<string, unknown>;
   custom_deduction: number;
   dependent_count: number;
+  child_count_8_20: number;
+  withholding_rate_percent: 80 | 100 | 120;
   advance_pay: number;
 }
 
@@ -252,6 +256,19 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
               s.permissions?.dependents ??
               0
             ) || 0,
+          child_count_8_20:
+            Number(
+              (s as Record<string, unknown>).child_count_8_20 ??
+              (s.permissions?.payroll as Record<string, unknown>)?.child_count_8_20 ??
+              (s.permissions?.tax as Record<string, unknown>)?.child_count_8_20 ??
+              0
+            ) || 0,
+          withholding_rate_percent: normalizeWithholdingRatePercent(
+            ((s as Record<string, unknown>).withholding_rate_percent ??
+              (s.permissions?.payroll as Record<string, unknown>)?.withholding_rate_percent ??
+              (s.permissions?.tax as Record<string, unknown>)?.withholding_rate_percent ??
+              100) as number | string | null | undefined
+          ),
           advance_pay: 0,
         };
       });
@@ -266,9 +283,35 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
   };
 
   const updateData = (id: string, field: string, value: any) => {
-    setSettlementData({
-      ...settlementData,
-      [id]: { ...settlementData[id], [field]: value }
+    setSettlementData((prev) => {
+      const current = prev[id];
+      if (!current) return prev;
+
+      const nextEntry = { ...current, [field]: value } as SettlementEntry;
+
+      if (field === 'dependent_count') {
+        const nextDependentCount = Math.max(0, parseInt(String(value), 10) || 0);
+        nextEntry.dependent_count = nextDependentCount;
+        if ((nextEntry.child_count_8_20 || 0) > nextDependentCount) {
+          nextEntry.child_count_8_20 = nextDependentCount;
+        }
+      }
+
+      if (field === 'child_count_8_20') {
+        nextEntry.child_count_8_20 = Math.min(
+          Math.max(0, parseInt(String(value), 10) || 0),
+          Math.max(0, Number(nextEntry.dependent_count) || 0),
+        );
+      }
+
+      if (field === 'withholding_rate_percent') {
+        nextEntry.withholding_rate_percent = normalizeWithholdingRatePercent(value);
+      }
+
+      return {
+        ...prev,
+        [id]: nextEntry,
+      };
     });
   };
 
@@ -331,11 +374,30 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
       employment_insurance = isDuruNuriActive ? Math.floor(full_employment * 0.2) : full_employment;
     }
     const dependentCount = Math.max(0, Number(data.dependent_count) || 0);
-    const baselineIncomeTax = calculateMonthlyIncomeTax(total_taxable, taxInsuranceRates, 0);
-    const exactIncomeTax = calculateMonthlyIncomeTax(total_taxable, taxInsuranceRates, dependentCount);
+    const qualifyingChildCount = Math.min(dependentCount, Math.max(0, Number(data.child_count_8_20) || 0));
+    const withholdingRatePercent = normalizeWithholdingRatePercent(data.withholding_rate_percent);
+    const baselineIncomeTax = calculateMonthlyIncomeTax(total_taxable, taxInsuranceRates, 0, {
+      withholdingRatePercent: 100,
+      qualifyingChildCount: 0,
+    });
+    const familyAdjustedIncomeTax = calculateMonthlyIncomeTax(total_taxable, taxInsuranceRates, dependentCount, {
+      withholdingRatePercent: 100,
+      qualifyingChildCount: 0,
+    });
+    const preRatioIncomeTax = calculateMonthlyIncomeTax(total_taxable, taxInsuranceRates, dependentCount, {
+      withholdingRatePercent: 100,
+      qualifyingChildCount,
+    });
+    const exactIncomeTax = calculateMonthlyIncomeTax(total_taxable, taxInsuranceRates, dependentCount, {
+      withholdingRatePercent,
+      qualifyingChildCount,
+    });
     const dependentTaxCredit = hasExactWithholdingTable
-      ? Math.max(0, baselineIncomeTax - exactIncomeTax)
+      ? Math.max(0, baselineIncomeTax - familyAdjustedIncomeTax)
       : dependentCount * 12500;
+    const childTaxCredit = hasExactWithholdingTable
+      ? Math.max(0, familyAdjustedIncomeTax - preRatioIncomeTax)
+      : calculateQualifyingChildTaxCredit(qualifyingChildCount);
     if (data.apply_tax && hasExactWithholdingTable) {
       income_tax = Math.max(0, exactIncomeTax);
       local_tax = Math.floor(income_tax * 0.1 / 10) * 10; // 지방소득세 10%, 10원 단위 절사 (국고금관리법 제47조)
@@ -351,7 +413,11 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
       local_tax,
       custom_deduction,
       dependent_count: dependentCount,
+      child_count_8_20: qualifyingChildCount,
+      withholding_rate_percent: withholdingRatePercent,
       dependent_tax_credit: dependentTaxCredit,
+      child_tax_credit: childTaxCredit,
+      income_tax_before_withholding_ratio: preRatioIncomeTax,
       is_duru_nuri: isDuruNuriActive,
       is_medical_benefit: isMedicalBenefit,
       tax_estimated: data.apply_tax && !hasExactWithholdingTable,
