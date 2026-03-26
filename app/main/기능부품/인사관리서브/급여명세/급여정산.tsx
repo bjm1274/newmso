@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { calculateAttendanceDeduction } from '@/lib/attendance-deduction';
 import { logAudit } from '@/lib/audit';
+import { formatPayrollMutationError } from '@/lib/payroll-records';
 import { fetchTaxFreeSettings, DEFAULT_SETTINGS, type TaxFreeSettings } from '@/lib/use-tax-free-settings';
 import {
   calculateMonthlyIncomeTax,
@@ -174,6 +175,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
 
   const calculateSalary = (id: string) => {
     const data = settlementData[id];
+    const hasExactWithholdingTable = hasExactIncomeTaxBracket(taxInsuranceRates);
 
     // 비과세 한도 체크 및 과세 전환 계산
     const meal_tf = Math.min(Number(data.meal_allowance), TAX_FREE_LIMITS.meal);
@@ -230,7 +232,7 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
     }
     const dependentCount = Math.max(0, Number(data.dependent_count) || 0);
     const dependentTaxCredit = dependentCount * 12500;
-    if (data.apply_tax) {
+    if (data.apply_tax && hasExactWithholdingTable) {
       income_tax = Math.max(0, calculateMonthlyIncomeTax(total_taxable, taxInsuranceRates) - dependentTaxCredit);
       local_tax = Math.floor(income_tax * 0.1 / 10) * 10; // 지방소득세 10%, 10원 단위 절사 (국고금관리법 제47조)
     }
@@ -248,7 +250,8 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
       dependent_tax_credit: dependentTaxCredit,
       is_duru_nuri: isDuruNuriActive,
       is_medical_benefit: isMedicalBenefit,
-      tax_estimated: data.apply_tax && !hasExactIncomeTaxBracket(taxInsuranceRates),
+      tax_estimated: data.apply_tax && !hasExactWithholdingTable,
+      missing_monthly_withholding_table: data.apply_tax && !hasExactWithholdingTable,
     };
 
     return {
@@ -293,7 +296,6 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
           extra_allowance: data.extra_allowance,
           overtime_pay: data.overtime_pay,
           bonus: data.bonus,
-          gross_pay: isAdvanceOnly ? advancePay : calc!.total,
           total_taxable: isAdvanceOnly ? 0 : calc!.taxable,
           total_taxfree: isAdvanceOnly ? 0 : calc!.taxfree,
           total_deduction: isAdvanceOnly ? 0 : calc!.deduction,
@@ -348,8 +350,14 @@ export default function SalarySettlement({ staffs, selectedCo, onRefresh }: { st
       setStep(3);
       if (onRefresh) onRefresh();
     } catch (err) {
-      console.error('payroll finalize failed:', err);
-      toast("정산 처리 중 오류가 발생했습니다.", 'error');
+      const message = formatPayrollMutationError(err);
+      console.error('payroll finalize failed:', {
+        message,
+        error: err,
+        yearMonth,
+        staffIds: selectedStaffs.map((staff: StaffMember) => staff.id),
+      });
+      toast(`정산 처리 중 오류가 발생했습니다. ${message}`, 'error');
     } finally {
       setLoading(false);
     }

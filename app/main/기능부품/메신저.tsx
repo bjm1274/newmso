@@ -2,6 +2,7 @@
 import { toast } from '@/lib/toast';
 import { useDeferredValue, useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { withMissingColumnFallback } from '@/lib/supabase-compat';
 import { getProfilePhotoUrl, normalizeProfileUser } from '@/lib/profile-photo';
 import SmartDatePicker from './공통/SmartDatePicker';
 import type { StaffMember, ChatRoom, ChatMessage } from '@/types';
@@ -46,6 +47,20 @@ function isVideoUrl(url: string): boolean {
   return /^(mp4|webm|mov|m4v|avi|mkv)$/.test(ext || '');
 }
 
+function extractFileNameFromUrl(url: string | null | undefined): string {
+  const rawUrl = String(url || '').trim();
+  if (!rawUrl) return '첨부파일';
+  try {
+    const parsed = new URL(rawUrl);
+    const lastSegment = parsed.pathname.split('/').pop() || '';
+    return decodeURIComponent(lastSegment || '첨부파일');
+  } catch {
+    const withoutQuery = rawUrl.split('?')[0] || '';
+    const lastSegment = withoutQuery.split('/').pop() || '';
+    return decodeURIComponent(lastSegment || '첨부파일');
+  }
+}
+
 function guessFileExtension(file: File): string {
   const rawName = String(file.name || '').trim();
   const lastDotIndex = rawName.lastIndexOf('.');
@@ -67,6 +82,21 @@ function guessFileExtension(file: File): string {
     'application/zip': 'zip',
   };
   return mimeMap[mime] || 'bin';
+}
+
+function getAttachmentDisplayName(fileName: string | null | undefined, fileUrl?: string | null): string {
+  const rawName = String(fileName || '').trim();
+  if (rawName) return rawName;
+  return extractFileNameFromUrl(fileUrl);
+}
+
+function getPendingAttachmentDisplayName(file: File): string {
+  const rawName = String(file.name || '').trim();
+  if (rawName) return rawName;
+  const extension = guessFileExtension(file);
+  if (String(file.type || '').startsWith('image/')) return `붙여넣은 이미지.${extension}`;
+  if (String(file.type || '').startsWith('video/')) return `붙여넣은 동영상.${extension}`;
+  return `첨부파일.${extension}`;
 }
 
 function normalizeMemberIds(members: unknown): string[] {
@@ -151,6 +181,7 @@ type MessageRetryPayload = {
   roomId: string;
   content: string;
   fileUrl: string | null;
+  fileName: string | null;
   fileSizeBytes: number | null;
   fileKind: 'image' | 'video' | 'file' | null;
   replyToId: string | null;
@@ -647,6 +678,23 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       });
     }
     setSelectedRoomId(roomId);
+    // 채팅방 열 때 해당 방 관련 미읽 알림 자동 읽음 처리
+    if (roomId && effectiveChatUserId) {
+      void (async () => {
+        try {
+          await supabase
+            .from('notifications')
+            .update({ read_at: new Date().toISOString() })
+            .eq('user_id', effectiveChatUserId)
+            .in('type', ['message', 'mention'])
+            .is('read_at', null)
+            .filter('metadata->>room_id', 'eq', roomId);
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('erp-notification-read'));
+          }
+        } catch { /* ignore */ }
+      })();
+    }
     if (typeof window === 'undefined') return;
     try {
       if (roomId) {
@@ -2066,11 +2114,28 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
 
 
   const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;
+  const insertChatMessage = useCallback(
+    <TData extends Record<string, unknown> = Record<string, unknown>>(
+      payload: Record<string, unknown>,
+      selectClause = '*',
+    ) =>
+      withMissingColumnFallback<TData>(
+        () => supabase.from('messages').insert([payload]).select(selectClause).single(),
+        () => {
+          const fallbackPayload = { ...payload };
+          delete fallbackPayload.file_name;
+          return supabase.from('messages').insert([fallbackPayload]).select(selectClause).single();
+        },
+        'file_name',
+      ),
+    [],
+  );
   const handleSendMessage = useCallback(async (
     fileUrl?: string,
     fileSizeBytes?: number,
     fileKind?: 'image' | 'video' | 'file',
-    retryMessageId?: string
+    retryMessageId?: string,
+    fileName?: string,
   ) => {
     const retryPayload = retryMessageId
       ? deliveryStatesRef.current[retryMessageId]?.retryPayload || null
@@ -2079,6 +2144,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     const roomId = retryPayload?.roomId || selectedRoomId;
     const content = retryPayload ? retryPayload.content : trimmed;
     const resolvedFileUrl = retryPayload?.fileUrl ?? fileUrl ?? null;
+    const resolvedFileName = retryPayload?.fileName ?? fileName ?? null;
     const resolvedFileSizeBytes = retryPayload?.fileSizeBytes ?? fileSizeBytes ?? null;
     const resolvedFileKind = retryPayload?.fileKind ?? fileKind ?? null;
     const resolvedReplyToId = retryPayload?.replyToId ?? replyTo?.id ?? null;
@@ -2131,6 +2197,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       roomId,
       content,
       fileUrl: resolvedFileUrl,
+      fileName: resolvedFileName,
       fileSizeBytes: resolvedFileSizeBytes,
       fileKind: resolvedFileKind,
       replyToId: resolvedReplyToId,
@@ -2143,6 +2210,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       sender_id: effectiveChatUserId || user!.id,
       content,
       file_url: resolvedFileUrl,
+      file_name: resolvedFileName,
       file_size_bytes: resolvedFileSizeBytes,
       file_kind: resolvedFileKind,
       reply_to_id: resolvedReplyToId,
@@ -2186,11 +2254,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       sender_id: effectiveChatUserId || user!.id,
       content,
       file_url: resolvedFileUrl,
+      file_name: resolvedFileName,
       file_size_bytes: resolvedFileSizeBytes,
       file_kind: resolvedFileKind,
       reply_to_id: resolvedReplyToId,
     };
-    const { data: inserted, error } = await supabase.from('messages').insert([payload]).select().single();
+    const { data: inserted, error } = await insertChatMessage<ChatMessage>(payload);
     if (!error && inserted) {
       const optimisticMsg = {
         ...inserted,
@@ -2246,7 +2315,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       }));
       console.error('message send failed', error);
     }
-  }, [selectedRoomId, user?.id, user?.name, user?.avatar_url, replyTo, inputMsg, canWriteNotice, scrollToBottom, broadcastChatSync, emitTypingState, triggerChatPush, selectedRoom, visibleRoomIds]);
+  }, [selectedRoomId, user?.id, user?.name, user?.avatar_url, replyTo, inputMsg, canWriteNotice, scrollToBottom, broadcastChatSync, emitTypingState, triggerChatPush, selectedRoom, visibleRoomIds, insertChatMessage]);
 
   const retryFailedMessage = useCallback(async (messageId: string) => {
     await handleSendMessage(undefined, undefined, undefined, messageId);
@@ -2281,7 +2350,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       if (error) throw error;
       const publicUrl = supabase.storage.from(CHAT_BUCKET).getPublicUrl(path).data.publicUrl;
       const fileKind = getFileKind(file.type || '');
-      await handleSendMessage(publicUrl, file.size, fileKind);
+      await handleSendMessage(publicUrl, file.size, fileKind, undefined, getPendingAttachmentDisplayName(file));
     } catch (err: unknown) {
       console.error('파일 업로드 실패:', err);
       const msg = (err as Error)?.message || String(err);
@@ -3260,7 +3329,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                       ? '전송 실패'
                       : totalRecipients > 0 && unreadRecipients > 0
                         ? `${unreadRecipients}`
-                        : '전송됨';
+                        : null;
                 const canOpenReadStatus = Boolean(
                   isMine &&
                   deliveryState === 'sent' &&
@@ -3360,7 +3429,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                           <div className={`leading-relaxed ${(msg.content && !isDeletedMessage) ? 'mb-0.5' : ''}`}>
                             {isDeletedMessage ? '삭제된 메시지입니다.' : renderMessageContent(msg.content || '', isMine)}
                           </div>
-                          {!isDeletedMessage && msg.file_url && (() => { const furl = msg.file_url!; return (
+                          {!isDeletedMessage && msg.file_url && (() => { const furl = msg.file_url!; const attachmentName = getAttachmentDisplayName(msg.file_name, furl); return (
                             <div className="space-y-1 mt-2" onClick={(e) => e.stopPropagation()}>
                               {isImageUrl(furl) ? (
                                 <div className="relative group inline-block">
@@ -3374,24 +3443,26 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                   <div className="absolute opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity inset-0 flex items-center justify-center bg-black/40 rounded-[var(--radius-md)] gap-2 pointer-events-none">
                                     <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(furl, '_blank') }} className="pointer-events-auto p-1.5 bg-[var(--card)]/20 hover:bg-[var(--card)]/40 rounded-[var(--radius-md)] text-white" title="미리보기">보기</button>
                                     <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigator.clipboard.writeText(furl).then(() => toast('공유 링크를 복사했습니다.')) }} className="pointer-events-auto p-1.5 bg-[var(--card)]/20 hover:bg-[var(--card)]/40 rounded-[var(--radius-md)] text-white" title="공유">공유</button>
-                                    <a href={furl} download target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="pointer-events-auto p-1.5 bg-[var(--card)]/20 hover:bg-[var(--card)]/40 rounded-full text-white" title="다운로드">저장</a>
+                                    <a href={furl} download={attachmentName} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="pointer-events-auto p-1.5 bg-[var(--card)]/20 hover:bg-[var(--card)]/40 rounded-full text-white" title="다운로드">저장</a>
                                   </div>
+                                  <p className={`mt-1 max-w-[200px] md:max-w-[240px] truncate text-[10px] font-semibold ${isMine ? 'text-white/85' : 'text-[var(--toss-gray-4)]'}`}>{attachmentName}</p>
                                 </div>
                               ) : isVideoUrl(furl) ? (
                                 <div className="block">
                                   <video controls className={`max-w-[200px] md:max-w-[240px] max-h-[200px] rounded-[var(--radius-md)] bg-black ${msg.content ? 'border border-[var(--border)]' : 'shadow-sm'}`}>
                                     <source src={furl} />
                                   </video>
+                                  <p className={`mt-1 max-w-[200px] md:max-w-[240px] truncate text-[10px] font-semibold ${isMine ? 'text-white/85' : 'text-[var(--toss-gray-4)]'}`}>{attachmentName}</p>
                                 </div>
                               ) : (
                                 <div className={`p-3 rounded-[var(--radius-md)] border ${isMine ? 'bg-[var(--card)]/10 border-white/20 text-white' : 'bg-[var(--toss-gray-0)] border-[var(--border)] text-[var(--foreground)]'} flex items-start gap-3 shadow-sm min-w-[200px]`}>
                                   <div className="text-3xl">📎</div>
                                   <div className="flex-1 min-w-0 pt-0.5">
-                                    <p className={`font-bold text-[12px] truncate mb-1`}>첨부 파일</p>
+                                    <p className={`font-bold text-[12px] truncate mb-1`}>{attachmentName}</p>
                                     <div className="flex items-center gap-1.5 mt-2">
                                       <button onClick={() => window.open(furl, '_blank')} className="text-[10px] font-bold text-[var(--accent)] hover:text-blue-600 px-2 py-1 bg-blue-50 dark:bg-blue-900/30 rounded-md">미리보기</button>
                                       <button onClick={() => { navigator.clipboard.writeText(furl).then(() => toast('공유 링크를 복사했습니다.')) }} className="text-[10px] font-bold text-[var(--toss-gray-4)] hover:text-[var(--toss-gray-4)] px-2 py-1 bg-[var(--tab-bg)] dark:bg-zinc-800 rounded-md">공유</button>
-                                  <a href={furl} download target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 px-2 py-1 bg-emerald-50 dark:bg-emerald-900/30 rounded-md inline-block">다운로드</a>
+                                  <a href={furl} download={attachmentName} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 px-2 py-1 bg-emerald-50 dark:bg-emerald-900/30 rounded-md inline-block">다운로드</a>
                                     </div>
                                   </div>
                                 </div>
@@ -3521,11 +3592,26 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
           {pendingAttachmentFiles.length > 0 && (
             <div
               data-testid="chat-pending-upload-panel"
-              className="mb-2 flex flex-col gap-2 rounded-[var(--radius-lg)] border border-blue-200 bg-blue-50 px-3 py-2 text-[12px] text-blue-900 md:flex-row md:items-center md:justify-between"
+              className="mb-2 flex flex-col gap-2 rounded-[var(--radius-lg)] border border-blue-200 bg-blue-50 px-3 py-2 text-[12px] text-blue-900"
             >
               <p className="font-semibold">
                 선택한 파일 {pendingAttachmentFiles.length}개를 채팅방에 전송할까요?
               </p>
+              <div className="flex flex-wrap gap-1.5">
+                {pendingAttachmentFiles.map((file, index) => {
+                  const displayName = getPendingAttachmentDisplayName(file);
+                  return (
+                    <span
+                      key={`${displayName}-${index}`}
+                      data-testid={`chat-pending-upload-file-${index}`}
+                      className="max-w-full truncate rounded-full border border-blue-200 bg-white px-2 py-1 text-[11px] font-semibold text-blue-900"
+                      title={displayName}
+                    >
+                      {displayName}
+                    </span>
+                  );
+                })}
+              </div>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -3583,10 +3669,19 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 }}
                 onPaste={handleComposerPaste}
                 onKeyDown={e => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSendMessage();
+                  if (e.key !== 'Enter') return;
+                  if (e.nativeEvent.isComposing) return;
+
+                  const isMobileComposer =
+                    typeof window !== 'undefined' &&
+                    window.matchMedia('(max-width: 767px), (hover: none) and (pointer: coarse)').matches;
+
+                  if (isMobileComposer || e.shiftKey) {
+                    return;
                   }
+
+                  e.preventDefault();
+                  void handleSendMessage();
                 }}
               />
               {showMentionList && mentionCandidates.length > 0 && (
@@ -4393,7 +4488,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                     type="button"
                     onClick={async () => {
                       try {
-                        const { data: forwardedMessage, error } = await supabase.from('messages').insert([
+                        const { data: forwardedMessage, error } = await insertChatMessage<Pick<ChatMessage, 'id' | 'room_id'>>(
                           {
                             room_id: room.id,
                             sender_id: effectiveChatUserId || user?.id,
@@ -4401,8 +4496,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                               `[전달] ${(forwardSourceMsg.staff as { name?: string } | null | undefined)?.name || '이름 없음'}: ` +
                               (forwardSourceMsg.content || '첨부 파일'),
                             file_url: forwardSourceMsg.file_url || null,
+                            file_name: forwardSourceMsg.file_name || null,
                           },
-                        ]).select('id, room_id').single();
+                          'id, room_id'
+                        );
                         if (error) throw error;
                         if (forwardedMessage?.id && forwardedMessage?.room_id) {
                           await triggerChatPush(String(forwardedMessage.room_id), String(forwardedMessage.id));

@@ -440,6 +440,69 @@ test("chat can send a message and render it immediately", async ({ page }) => {
       .filter({ hasText: "새 메시지" }),
   ).toBeVisible();
 });
+test("chat uses Shift+Enter for a newline and Enter for send on desktop", async ({
+  page,
+}) => {
+  await mockSupabase(page, {
+    chatRooms: [
+      {
+        id: "00000000-0000-0000-0000-000000000000",
+        name: "怨듭?硫붿떆吏",
+        type: "notice",
+        members: [],
+        created_at: "2026-03-08T00:00:00.000Z",
+        last_message_at: "2026-03-08T00:00:00.000Z",
+      },
+      {
+        id: "room-1",
+        name: "?뚯뒪??梨꾪똿諛?",
+        type: "group",
+        members: [fakeUser.id],
+        created_at: "2026-03-08T09:00:00.000Z",
+        last_message_at: "2026-03-08T10:00:00.000Z",
+      },
+    ],
+    messages: [],
+  });
+  await seedSession(page, {
+    localStorage: {
+      erp_last_menu: "채팅",
+      erp_chat_last_room: "room-1",
+    },
+  });
+  await page.goto(
+    `/main?${new URLSearchParams({ open_menu: "채팅" }).toString()}`,
+  );
+  await expect(page.getByTestId("chat-view")).toBeVisible();
+  await page.getByTestId("chat-room-room-1").click();
+
+  const composer = page.getByTestId("chat-message-input");
+  await composer.fill("첫줄");
+  await composer.press("Shift+Enter");
+  await composer.type("둘째줄");
+
+  await expect(composer).toHaveValue("첫줄\n둘째줄");
+  await expect(
+    page
+      .locator("span.break-words.whitespace-pre-wrap")
+      .filter({ hasText: "첫줄" })
+      .filter({ hasText: "둘째줄" }),
+  ).toHaveCount(0);
+
+  await composer.press("Enter");
+
+  await expect(
+    page
+      .locator("span.break-words.whitespace-pre-wrap")
+      .filter({ hasText: "첫줄" }),
+  ).toBeVisible();
+  await expect(
+    page
+      .locator("span.break-words.whitespace-pre-wrap")
+      .filter({ hasText: "둘째줄" }),
+  ).toBeVisible();
+});
+
 test("chat retries a failed message send from the bubble", async ({ page }) => {
   await mockSupabase(page, {
     messageInsertFailures: 1,
@@ -2008,7 +2071,7 @@ test("employee and admin can complete a realistic monthly operations lifecycle",
         health_insurance_rate: 0.0355,
         long_term_care_rate: 0.0046,
         employment_insurance_rate: 0.009,
-        income_tax_bracket: [{ min: 0, rate: 0.03 }],
+        income_tax_bracket: [{ min: 0, rate: 0.03, monthly_tax: 120000, official: true }],
       },
       {
         id: "tax-rate-all-1",
@@ -2018,7 +2081,7 @@ test("employee and admin can complete a realistic monthly operations lifecycle",
         health_insurance_rate: 0.0355,
         long_term_care_rate: 0.0046,
         employment_insurance_rate: 0.009,
-        income_tax_bracket: [{ min: 0, rate: 0.03 }],
+        income_tax_bracket: [{ min: 0, rate: 0.03, monthly_tax: 120000, official: true }],
       },
     ],
   });

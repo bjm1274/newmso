@@ -2,6 +2,7 @@
 import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useState } from 'react';
+import { getPayrollGrossPay } from '@/lib/payroll-records';
 import { supabase } from '@/lib/supabase';
 
 type TaxRow = {
@@ -58,7 +59,7 @@ export default function TaxAutoReport({ selectedCo = '전체' }: Record<string, 
 
         const { data: payrollRows, error: payrollError } = await supabase
           .from('payroll_records')
-          .select('staff_id, gross_pay, total_deduction, net_pay, deduction_detail, year_month, record_type')
+          .select('staff_id, total_taxable, total_taxfree, total_deduction, net_pay, deduction_detail, year_month, record_type')
           .in('staff_id', staffIds)
           .gte('year_month', `${selectedYear}-01`)
           .lte('year_month', `${selectedYear}-12`)
@@ -90,7 +91,7 @@ export default function TaxAutoReport({ selectedCo = '전체' }: Record<string, 
             };
 
           const detail = row.deduction_detail || {};
-          current.total_salary += Number(row.gross_pay || 0);
+          current.total_salary += getPayrollGrossPay(row);
           current.health_insurance += Number(detail.health_insurance || 0);
           current.long_term_care += Number(detail.long_term_care || 0);
           current.employment_insurance += Number(detail.employment_insurance || 0);

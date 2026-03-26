@@ -100,6 +100,8 @@ export default function NotificationCenter({
       prevCountRef.current = typeof unread === 'number' ? unread : prevCountRef.current;
     };
 
+    const handleNotificationRead = () => void fetchNotifications();
+
     const handleClickOutside = (event: Event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
@@ -107,6 +109,7 @@ export default function NotificationCenter({
     };
 
     window.addEventListener('erp-new-notification', handleNewNotification);
+    window.addEventListener('erp-notification-read', handleNotificationRead);
     document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('touchstart', handleClickOutside, { passive: true });
 
@@ -117,6 +120,7 @@ export default function NotificationCenter({
 
     return () => {
       window.removeEventListener('erp-new-notification', handleNewNotification);
+      window.removeEventListener('erp-notification-read', handleNotificationRead);
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('touchstart', handleClickOutside);
       window.clearInterval(fallbackPoll);

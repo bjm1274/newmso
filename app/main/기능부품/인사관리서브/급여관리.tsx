@@ -2,6 +2,7 @@
 import { toast } from '@/lib/toast';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { hasOfficialMonthlyIncomeTaxTable } from '@/lib/use-tax-insurance-rates';
 import SalaryDetail from './급여명세/급여상세';
 import PayrollTable from './급여명세/급여대장표';
 import PayrollMonthlySummary from './급여명세/급여대장월별요약';
@@ -113,9 +114,7 @@ export default function PayrollMain({ staffs = [], selectedCo, onRefresh }: Payr
           .eq('effective_year', targetYear)
           .eq('company_name', selectedCo && selectedCo !== '전체' ? selectedCo : '전체')
           .maybeSingle();
-        officialBracketConfigured = Array.isArray(data?.income_tax_bracket)
-          && data.income_tax_bracket.length > 0
-          && data.income_tax_bracket.every((entry: any) => entry?.official === true);
+        officialBracketConfigured = hasOfficialMonthlyIncomeTaxTable(data?.income_tax_bracket);
       }
 
       setPayrollAudit({ orphanCount, officialBracketConfigured });

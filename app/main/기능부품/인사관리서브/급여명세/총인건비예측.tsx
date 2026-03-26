@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { getPayrollGrossPay } from '@/lib/payroll-records';
 import { supabase } from '@/lib/supabase';
 
 interface Props {
@@ -26,7 +27,7 @@ export default function TotalLaborCostForecast({ staffs, selectedCo, user }: Pro
         }
         const { data, error } = await supabase
           .from('payroll_records')
-          .select('year_month, gross_pay, staff_id')
+          .select('year_month, total_taxable, total_taxfree, staff_id')
           .in('year_month', months);
         if (error) throw error;
         const records = data || [];
@@ -37,7 +38,7 @@ export default function TotalLaborCostForecast({ staffs, selectedCo, user }: Pro
             const staff = staffs.find((s: any) => String(s.id) === String(r.staff_id));
             return staff?.company === selectedCo;
           });
-          const total = monthRecords.reduce((sum: number, r: any) => sum + (r.gross_pay || 0), 0);
+          const total = monthRecords.reduce((sum: number, r: any) => sum + getPayrollGrossPay(r), 0);
           return { month: m, total };
         });
         setMonthlyData(result);

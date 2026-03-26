@@ -509,15 +509,14 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     win.document.close();
   }, [resolveApprovalTemplateDesign, resolveApprovalTemplateMeta, staffs]);
 
-  // 결재자 후보: 부서장 이상(팀장·부장·병원장 등)을 목록 상단에, 그 다음 나머지 직원 (staffs는 이미 메인에서 회사별로 불러옴)
-  const APPROVER_POSITIONS = ['팀장', '간호과장', '실장', '부장', '이사', '병원장'];
+  // 결재자 후보: 부서장 이상(팀장·부장·병원장 등)만 표시 (staffs는 이미 메인에서 회사별로 불러옴)
+  const APPROVER_POSITIONS = ['팀장', '간호과장', '실장', '부장', '본부장', '총무부장', '진료부장', '간호부장', '이사', '병원장', '원장', '대표'];
   const approverCandidates = useMemo(() => {
     if (!Array.isArray(staffs)) return [];
-    const order = (s: StaffMember) => {
-      const i = APPROVER_POSITIONS.indexOf(s.position || '');
-      return i >= 0 ? i : 999;
-    };
-    return [...staffs].sort((a, b) => order(a) - order(b) || (a.name || '').localeCompare(b.name || ''));
+    const order = (s: StaffMember) => APPROVER_POSITIONS.indexOf(s.position || '');
+    return [...staffs]
+      .filter((s) => APPROVER_POSITIONS.includes(s.position || ''))
+      .sort((a, b) => order(a) - order(b) || (a.name || '').localeCompare(b.name || ''));
   }, [staffs]);
   const normalizeApprovalLineIds = useCallback((line: unknown): string[] => {
     if (!Array.isArray(line)) return [];

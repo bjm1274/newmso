@@ -2,6 +2,7 @@
 import { toast } from '@/lib/toast';
 import type { StaffMember } from '@/types';
 import { useState, useEffect } from 'react';
+import { getPayrollGrossPay } from '@/lib/payroll-records';
 import { supabase } from '@/lib/supabase';
 import {
   calculateAnnualIncomeTax,
@@ -100,7 +101,7 @@ export default function YearEndSettlement({ staffs = [], selectedCo }: YearEndSe
       payroll?.forEach((pay: any) => {
         if (settlementByStaff[pay.staff_id]) {
           const deductionDetail = pay.deduction_detail || {};
-          const grossPay = Number(pay.gross_pay) || Number(pay.total_taxable || 0) + Number(pay.total_taxfree || 0);
+          const grossPay = getPayrollGrossPay(pay);
           const incomeTax = Number(deductionDetail.income_tax || 0);
           const localTax = Number(deductionDetail.local_tax || 0);
           const insuranceTotal =

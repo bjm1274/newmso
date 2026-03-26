@@ -94,6 +94,24 @@ async function countSavedClipboardImages(page: Page) {
     : 0;
 }
 
+async function getSavedClipboardImageMessages(page: Page) {
+  const savedMessages = await page.evaluate(async () => {
+    const response = await fetch('/rest/v1/messages?room_id=eq.room-clipboard&select=*');
+    return response.json();
+  });
+
+  return Array.isArray(savedMessages)
+    ? savedMessages.filter((message) => {
+        const fileUrl = String(message?.file_url || '');
+        return (
+          message?.file_kind === 'image' &&
+          fileUrl.includes('/storage/v1/object/public/pchos-files/chat/') &&
+          fileUrl.endsWith('.png')
+        );
+      })
+    : [];
+}
+
 test('chat composer asks for confirmation before sending a pasted clipboard image', async ({ page }) => {
   const runtimeErrors = trackRuntimeErrors(page);
 
@@ -263,11 +281,19 @@ test('chat composer asks for confirmation before sending a dropped attachment', 
   await dropAttachmentFile(page);
 
   await expect(page.getByTestId('chat-pending-upload-panel')).toBeVisible();
+  await expect(page.getByTestId('chat-pending-upload-panel')).toContainText('drop-image.png');
   await expect.poll(async () => countSavedClipboardImages(page)).toBe(0);
 
   await page.getByTestId('chat-pending-upload-send-button').click();
   await expect(page.getByTestId('chat-pending-upload-panel')).toBeHidden();
   await expect.poll(async () => countSavedClipboardImages(page)).toBe(1);
+  await expect(page.getByText('drop-image.png').last()).toBeVisible();
+  await expect
+    .poll(async () => {
+      const messages = await getSavedClipboardImageMessages(page);
+      return messages[0]?.file_name ?? null;
+    })
+    .toBe('drop-image.png');
 
   expect(runtimeErrors).toEqual([]);
 });
