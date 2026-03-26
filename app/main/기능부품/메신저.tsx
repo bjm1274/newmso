@@ -52,12 +52,22 @@ function extractFileNameFromUrl(url: string | null | undefined): string {
   if (!rawUrl) return '첨부파일';
   try {
     const parsed = new URL(rawUrl);
-    const lastSegment = parsed.pathname.split('/').pop() || '';
-    return decodeURIComponent(lastSegment || '첨부파일');
+    const lastSegment = decodeURIComponent(parsed.pathname.split('/').pop() || '') || '첨부파일';
+    // {타임스탬프}_{UUID}__{원본파일명} 패턴: 원본 파일명 추출
+    const withOriginal = lastSegment.match(/^\d+_[0-9a-f-]{36}__(.+)$/i);
+    if (withOriginal) return withOriginal[1];
+    // {타임스탬프}_{UUID}.ext 패턴: "첨부파일.ext" 로 표시
+    const uuidOnly = lastSegment.match(/^\d+_[0-9a-f-]{36}(\.[a-z0-9]+)?$/i);
+    if (uuidOnly) return `첨부파일${uuidOnly[1] || ''}`;
+    return lastSegment;
   } catch {
     const withoutQuery = rawUrl.split('?')[0] || '';
-    const lastSegment = withoutQuery.split('/').pop() || '';
-    return decodeURIComponent(lastSegment || '첨부파일');
+    const lastSegment = decodeURIComponent(withoutQuery.split('/').pop() || '') || '첨부파일';
+    const withOriginal = lastSegment.match(/^\d+_[0-9a-f-]{36}__(.+)$/i);
+    if (withOriginal) return withOriginal[1];
+    const uuidOnly = lastSegment.match(/^\d+_[0-9a-f-]{36}(\.[a-z0-9]+)?$/i);
+    if (uuidOnly) return `첨부파일${uuidOnly[1] || ''}`;
+    return lastSegment;
   }
 }
 
@@ -2365,7 +2375,11 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     try {
       const ext = guessFileExtension(file);
       const uuid = crypto.randomUUID();
-      const path = `chat/${Date.now()}_${uuid}.${ext}`;
+      // 원본 파일명을 경로에 포함 (file_name 컬럼 없는 환경에서도 복원 가능)
+      const safeName = (file.name || `첨부파일.${ext}`)
+        .replace(/[^a-zA-Z0-9가-힣ㄱ-ㅎㅏ-ㅣ._\-() ]/g, '_')
+        .slice(0, 100);
+      const path = `chat/${Date.now()}_${uuid}__${safeName}`;
       const { error } = await supabase.storage.from(CHAT_BUCKET).upload(path, file, { upsert: false });
       if (error) throw error;
       const publicUrl = supabase.storage.from(CHAT_BUCKET).getPublicUrl(path).data.publicUrl;
