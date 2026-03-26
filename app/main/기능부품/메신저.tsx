@@ -2394,45 +2394,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     if (mime.startsWith('video/')) return 'video';
     return 'file';
   };
-  const CHAT_BUCKET_CANDIDATES = ['pchos-files', 'board-attachments'] as const;
   const [isDragging, setIsDragging] = useState(false);
-
-  const isRecoverableChatBucketError = useCallback((error: unknown, bucketName: string) => {
-    if (!error) return false;
-    const message = String(
-      (error as { message?: string; details?: string })?.message ||
-      (error as { message?: string; details?: string })?.details ||
-      ''
-    ).toLowerCase();
-    return (
-      (message.includes('bucket') && message.includes('not found')) ||
-      message.includes(bucketName.toLowerCase()) ||
-      message.includes('policy') ||
-      message.includes('rls') ||
-      message.includes('row-level security') ||
-      message.includes('permission denied') ||
-      message.includes('unauthorized')
-    );
-  }, []);
-
-  const uploadChatAttachment = useCallback(async (path: string, file: File) => {
-    let lastError: unknown = null;
-
-    for (const bucket of CHAT_BUCKET_CANDIDATES) {
-      const { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: false });
-      if (!error) {
-        const publicUrl = supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
-        return { publicUrl, bucket };
-      }
-
-      lastError = error;
-      if (!isRecoverableChatBucketError(error, bucket)) {
-        throw error;
-      }
-    }
-
-    throw lastError || new Error('No available storage bucket for chat attachments.');
-  }, [isRecoverableChatBucketError]);
 
   const processFileUpload = async (file: File) => {
     if (file.type.startsWith('video/')) {
@@ -2445,24 +2407,31 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     }
     setFileUploading(true);
     try {
-      const ext = guessFileExtension(file);
-      const uuid = crypto.randomUUID();
-      // 원본 파일명을 경로에 포함 (file_name 컬럼 없는 환경에서도 복원 가능)
-      const safeName = (file.name || `첨부파일.${ext}`)
-        .replace(/[^a-zA-Z0-9가-힣ㄱ-ㅎㅏ-ㅣ._\-() ]/g, '_')
-        .slice(0, 100);
-      const path = `chat/${Date.now()}_${uuid}__${safeName}`;
-      const { publicUrl } = await uploadChatAttachment(path, file);
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await fetch('/api/chat/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      const payload = await response.json().catch(() => null) as {
+        url?: string;
+        error?: string;
+      } | null;
+      if (!response.ok || !payload?.url) {
+        throw new Error(payload?.error || '파일 업로드에 실패했습니다.');
+      }
+
+      const publicUrl = payload.url;
       const fileKind = getFileKind(file.type || '');
       await handleSendMessage(publicUrl, file.size, fileKind, undefined, getPendingAttachmentDisplayName(file));
     } catch (err: unknown) {
       console.error('파일 업로드 실패:', err);
       const msg = (err as Error)?.message || String(err);
-      const hint = msg.includes('Bucket not found') || msg.includes('not found')
-        ? 'Supabase 대시보드에서 Storage > New bucket > 이름 "pchos-files" (Public)을 만들거나, 기존 "board-attachments" 버킷이 있는지 확인해 주세요.'
-        : msg.includes('policy') || msg.includes('RLS')
-          ? 'Storage 버킷 pchos-files 또는 board-attachments의 RLS 정책에서 INSERT를 허용해 주세요.'
-          : '버킷 생성 여부와 RLS 정책을 확인해 주세요.';
+      const hint = msg.includes('Unauthorized')
+        ? '로그인 세션이 만료되었을 수 있습니다. 다시 로그인 후 시도해 주세요.'
+        : msg.includes('버킷') || msg.includes('bucket') || msg.includes('not found')
+          ? 'Supabase Storage에 pchos-files 또는 board-attachments 버킷이 실제로 생성되어 있는지 확인해 주세요.'
+          : msg;
       toast(`파일 업로드에 실패했습니다.\n\n${hint}`, 'error');
     } finally {
       setFileUploading(false);
