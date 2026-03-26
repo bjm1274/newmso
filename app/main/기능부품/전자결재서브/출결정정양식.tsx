@@ -429,7 +429,7 @@ export default function AttendanceCorrectionForm({
                   <p className="text-sm font-bold">최근 60일 내 정정 대상 기록이 없습니다.</p>
                 </div>
               ) : (
-                <div className="divide-y divide-[var(--border)]">
+                <div className="p-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                   {problemDates.map((item) => {
                     const isSelected = selectedDates.includes(item.date);
                     const badge = REASON_BADGE[item.reason] ?? REASON_BADGE['미체크'];
@@ -442,43 +442,41 @@ export default function AttendanceCorrectionForm({
                         type="button"
                         data-testid={`attendance-correction-date-${item.date}`}
                         onClick={() => toggleSelectedDate(item.date)}
-                        className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all ${
+                        className={`relative flex flex-col gap-1.5 p-2.5 rounded-[var(--radius-md)] border-2 text-left transition-all ${
                           isSelected
-                            ? 'bg-[var(--toss-blue-light)] dark:bg-blue-900/20'
-                            : 'hover:bg-[var(--muted)]'
+                            ? 'border-[var(--accent)] bg-[var(--toss-blue-light)] dark:bg-blue-900/20'
+                            : 'border-[var(--border)] bg-[var(--muted)] hover:border-[var(--toss-gray-3)]'
                         }`}
                       >
-                        {/* 체크박스 */}
-                        <div className={`w-5 h-5 rounded flex items-center justify-center shrink-0 border-2 transition-all ${
+                        {/* 체크박스 (우상단) */}
+                        <div className={`absolute top-2 right-2 w-4 h-4 rounded flex items-center justify-center border-2 transition-all ${
                           isSelected
                             ? 'bg-[var(--accent)] border-[var(--accent)]'
                             : 'border-[var(--border)] bg-[var(--card)]'
                         }`}>
                           {isSelected && (
-                            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                              <path d="M2 5l2.5 2.5L8 3" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                            <svg width="8" height="8" viewBox="0 0 10 10" fill="none">
+                              <path d="M2 5l2.5 2.5L8 3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                             </svg>
                           )}
                         </div>
 
                         {/* 날짜 */}
-                        <div className="w-12 shrink-0 text-center">
-                          <p className="text-sm font-black text-[var(--foreground)]">{short}</p>
-                          <p className={`text-[10px] font-bold ${day === '일' ? 'text-red-500' : day === '토' ? 'text-blue-500' : 'text-[var(--toss-gray-3)]'}`}>{day}요일</p>
+                        <div>
+                          <p className="text-sm font-black text-[var(--foreground)] leading-none">{short}</p>
+                          <p className={`text-[10px] font-bold mt-0.5 ${day === '일' ? 'text-red-500' : day === '토' ? 'text-blue-500' : 'text-[var(--toss-gray-3)]'}`}>{day}요일</p>
                         </div>
 
                         {/* 사유 뱃지 */}
-                        <span className={`shrink-0 px-2 py-1 rounded-[var(--radius-md)] text-[11px] font-bold flex items-center gap-1 ${badge.bg} ${badge.text}`}>
+                        <span className={`self-start px-1.5 py-0.5 rounded text-[10px] font-bold flex items-center gap-0.5 ${badge.bg} ${badge.text}`}>
                           {badge.icon} {item.label}
                         </span>
 
                         {/* 출퇴근 시간 */}
-                        <div className="flex-1 flex items-center gap-2 text-[11px] text-[var(--toss-gray-3)] font-medium">
-                          {checkInTime && <span>출근 {checkInTime}</span>}
-                          {checkOutTime && <span>퇴근 {checkOutTime}</span>}
-                          {!checkInTime && !checkOutTime && (
-                            <span className="text-[var(--toss-gray-3)]">기록 없음</span>
-                          )}
+                        <div className="text-[10px] text-[var(--toss-gray-3)] font-medium leading-tight">
+                          {checkInTime && <div>↑ {checkInTime}</div>}
+                          {checkOutTime && <div>↓ {checkOutTime}</div>}
+                          {!checkInTime && !checkOutTime && <div>기록 없음</div>}
                         </div>
                       </button>
                     );
