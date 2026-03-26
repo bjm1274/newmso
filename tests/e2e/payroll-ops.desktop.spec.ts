@@ -32,10 +32,24 @@ test('regular payroll settlement stores dependent deductions in the finalized re
     annual_leave_pay: 0,
     permissions: {},
   };
+  const shiftAssignments = Array.from({ length: 20 }, (_, index) => ({
+    id: `shift-assignment-${index + 1}`,
+    staff_id: payrollStaff.id,
+    work_date: `${yearMonth}-${String(index + 1).padStart(2, '0')}`,
+    shift_id: 'work-shift-day',
+  }));
+  const workShifts = [
+    {
+      id: 'work-shift-day',
+      name: '주간',
+    },
+  ];
 
   await mockSupabase(page, {
     staffMembers: [payrollStaff],
     payrollRecords: [],
+    shiftAssignments,
+    workShifts,
     attendances: [
       {
         id: 'attendance-1',
@@ -87,7 +101,7 @@ test('regular payroll settlement stores dependent deductions in the finalized re
   expect(record.staff_id).toBe(payrollStaff.id);
   expect(record.attendance_deduction).toBeGreaterThan(0);
   expect(record.deduction_detail.dependent_count).toBe(2);
-  expect(record.deduction_detail.dependent_tax_credit).toBe(25000);
+  expect(record.deduction_detail.dependent_tax_credit).toBe(31170);
   expect(record.deduction_detail.custom_deduction).toBe(10000);
   expect(record.total_deduction).toBe(
     Number(record.deduction_detail.national_pension || 0) +
