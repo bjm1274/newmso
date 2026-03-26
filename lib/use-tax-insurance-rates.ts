@@ -82,20 +82,56 @@ function hasMonthlyWithholdingAmount(entry: IncomeTaxBracketEntry | null | undef
   return entry?.monthly_tax !== undefined && Number.isFinite(Number(entry.monthly_tax));
 }
 
-export function hasOfficialMonthlyIncomeTaxTable(brackets: any[] | null | undefined): boolean {
+export function validateOfficialMonthlyIncomeTaxTable(brackets: any[] | null | undefined): string[] {
   if (!Array.isArray(brackets) || brackets.length === 0) {
-    return false;
+    return ['월 근로소득 간이세액표가 비어 있습니다.'];
   }
 
   const normalized = brackets
     .map((entry) => normalizeIncomeTaxBracketEntry(entry))
-    .filter((entry): entry is IncomeTaxBracketEntry => entry !== null);
+    .filter((entry): entry is IncomeTaxBracketEntry => entry !== null)
+    .sort((left, right) => left.min - right.min);
 
   if (normalized.length === 0) {
-    return false;
+    return ['월 근로소득 간이세액표를 해석할 수 없습니다.'];
   }
 
-  return normalized.every((entry) => entry.official === true && hasMonthlyWithholdingAmount(entry));
+  const errors: string[] = [];
+  let previousMax: number | null = null;
+
+  normalized.forEach((entry, index) => {
+    if (entry.official !== true) {
+      errors.push(`${index + 1}번 구간이 공식 확인 상태가 아닙니다.`);
+    }
+
+    if (!hasMonthlyWithholdingAmount(entry)) {
+      errors.push(`${index + 1}번 구간에 monthly_tax 값이 없습니다.`);
+    }
+
+    if (!Number.isFinite(entry.min) || entry.min < 0) {
+      errors.push(`${index + 1}번 구간의 min 값이 올바르지 않습니다.`);
+    }
+
+    if (entry.max !== null && entry.max < entry.min) {
+      errors.push(`${index + 1}번 구간의 max 값이 min보다 작습니다.`);
+    }
+
+    if (index === 0 && entry.min !== 0) {
+      errors.push('첫 구간은 min 0부터 시작해야 합니다.');
+    }
+
+    if (previousMax !== null && entry.min < previousMax) {
+      errors.push(`${index + 1}번 구간이 이전 구간과 겹칩니다.`);
+    }
+
+    previousMax = entry.max;
+  });
+
+  return Array.from(new Set(errors));
+}
+
+export function hasOfficialMonthlyIncomeTaxTable(brackets: any[] | null | undefined): boolean {
+  return validateOfficialMonthlyIncomeTaxTable(brackets).length === 0;
 }
 
 export function resolveIncomeTaxBracket(rates?: Partial<TaxInsuranceRates> | null): IncomeTaxBracketEntry[] {
