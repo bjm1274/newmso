@@ -68,6 +68,14 @@ const TYPE_CFG: Record<string, { icon: string; bg: string; progress: string; acc
 const DEFAULT_CFG = { icon: '🔔', bg: 'bg-[var(--toss-gray-4)]', progress: 'bg-[var(--toss-gray-3)]', accent: 'border-[var(--border)]' };
 const getTypeCfg = (type: string) => TYPE_CFG[type] || DEFAULT_CFG;
 
+function toNotificationText(value: unknown, fallback = '') {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+    return String(value);
+  }
+  return fallback;
+}
+
 function getInitials(name: string) {
   if (!name) return '?';
   const t = name.trim();
@@ -122,6 +130,10 @@ function getPushSubscriptionActiveKey(staffId?: string) {
   return `erp_push_subscription_active:${staffId || 'guest'}`;
 }
 
+function getPushDeviceIdKey(staffId?: string) {
+  return `erp_push_device_id:${staffId || 'guest'}`;
+}
+
 function setPushSubscriptionActiveState(staffId: string | undefined, isActive: boolean) {
   if (typeof window === 'undefined') return;
   try {
@@ -142,6 +154,68 @@ function hasPushSubscriptionActive(staffId?: string) {
   } catch {
     return false;
   }
+}
+
+function getOrCreatePushDeviceId(staffId?: string) {
+  if (typeof window === 'undefined') return null;
+  const storageKey = getPushDeviceIdKey(staffId);
+  try {
+    const existing = window.localStorage.getItem(storageKey);
+    if (existing) return existing;
+    const nextId =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `device-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    window.localStorage.setItem(storageKey, nextId);
+    return nextId;
+  } catch {
+    return null;
+  }
+}
+
+function isAppleMobileDevice() {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  const platform = navigator.platform || '';
+  const maxTouchPoints = Number((navigator as Navigator & { maxTouchPoints?: number }).maxTouchPoints || 0);
+  return /iPhone|iPad|iPod/i.test(ua) || (platform === 'MacIntel' && maxTouchPoints > 1);
+}
+
+function isStandaloneWebApp() {
+  if (typeof window === 'undefined') return false;
+  const nav = navigator as Navigator & { standalone?: boolean };
+  return Boolean(nav.standalone || window.matchMedia?.('(display-mode: standalone)')?.matches);
+}
+
+function requiresUserGestureForPushPermission() {
+  if (typeof window === 'undefined' || typeof Notification === 'undefined') return false;
+  return isAppleMobileDevice() && Notification.permission === 'default';
+}
+
+function getPushClientPlatform() {
+  if (typeof navigator === 'undefined') return 'unknown';
+  if (isAppleMobileDevice()) {
+    return isStandaloneWebApp() ? 'ios-webapp' : 'ios-browser';
+  }
+  if (/android/i.test(navigator.userAgent || '')) return 'android';
+  return 'web';
+}
+
+function getNotificationDisplayKey(row: Record<string, unknown>) {
+  const metadata =
+    row.metadata && typeof row.metadata === 'object'
+      ? (row.metadata as Record<string, unknown>)
+      : {};
+  const type = String(row.type || 'notification');
+  const messageId = String(metadata.message_id || metadata.id || '').trim();
+  if ((type === 'message' || type === 'mention') && messageId) {
+    return `chat:${messageId}`;
+  }
+
+  const dedupeKey = String(metadata.dedupe_key || '').trim();
+  if (dedupeKey) return dedupeKey;
+
+  return String(row.id || '');
 }
 
 function claimNotificationSlot(key: string, ownerId: string, ttlMs: number) {
@@ -216,8 +290,12 @@ async function buildDeterministicNotificationId(userId: string, dedupeKey: strin
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }
 
-async function syncPushSubscriptionOnServer(staffId: string | undefined, subscription: PushSubscriptionJSON & { fcm_token?: string | null }) {
+async function syncPushSubscriptionOnServer(
+  staffId: string | undefined,
+  subscription: PushSubscriptionJSON & { fcm_token?: string | null }
+) {
   if (!staffId || !subscription.endpoint || !subscription.keys?.p256dh || !subscription.keys?.auth) return;
+  const deviceId = getOrCreatePushDeviceId(staffId);
 
   const response = await fetch('/api/notifications/push-subscription', {
     method: 'POST',
@@ -227,6 +305,9 @@ async function syncPushSubscriptionOnServer(staffId: string | undefined, subscri
       p256dh: subscription.keys.p256dh,
       auth: subscription.keys.auth,
       fcm_token: subscription.fcm_token ?? null,
+      device_id: deviceId,
+      platform: getPushClientPlatform(),
+      user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
     }),
   });
 
@@ -245,7 +326,25 @@ async function deletePushSubscriptionOnServer(endpoint?: string | null) {
   });
 }
 
-export async function initNotificationService(staffId?: string) {
+type InitNotificationServiceOptions =
+  | string
+  | {
+      staffId?: string;
+      requestPermission?: boolean;
+    };
+
+function normalizeInitNotificationServiceOptions(options?: InitNotificationServiceOptions) {
+  if (typeof options === 'string') {
+    return { staffId: options, requestPermission: false };
+  }
+  return {
+    staffId: options?.staffId,
+    requestPermission: Boolean(options?.requestPermission),
+  };
+}
+
+export async function initNotificationService(options?: InitNotificationServiceOptions) {
+  const { staffId, requestPermission } = normalizeInitNotificationServiceOptions(options);
   if (typeof window === 'undefined') return;
   if (!('serviceWorker' in navigator) || !('Notification' in window)) return;
   if (!window.isSecureContext) return;
@@ -254,7 +353,13 @@ export async function initNotificationService(staffId?: string) {
     if (!reg || typeof reg !== 'object' || !('pushManager' in reg) || !reg.pushManager) {
       return;
     }
-    if (Notification.permission === 'default') await Notification.requestPermission();
+    if (Notification.permission === 'default') {
+      if (requiresUserGestureForPushPermission() && !requestPermission) {
+        setPushSubscriptionActiveState(staffId, false);
+        return;
+      }
+      await Notification.requestPermission();
+    }
     const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim();
     if (Notification.permission === 'granted' && vapidKey) {
       let sub = await reg.pushManager.getSubscription();
@@ -293,7 +398,7 @@ export async function initNotificationService(staffId?: string) {
           let fcmToken: string | null = null;
           try {
             const fcmVapidKey = process.env.NEXT_PUBLIC_FCM_VAPID_KEY?.trim();
-            if (fcmVapidKey) {
+            if (fcmVapidKey && !isAppleMobileDevice()) {
               const { initializeApp, getApps } = await import('firebase/app');
               const { getMessaging, getToken } = await import('firebase/messaging');
               const firebaseConfig = {
@@ -587,19 +692,22 @@ export default function NotificationSystem({
   const emitIncomingNotification = useCallback((row: Record<string, unknown>) => {
     if (!row?.id) return;
     const rowId = String(row.id);
-    if (shownIdsRef.current.has(rowId)) return;
-    shownIdsRef.current.add(rowId);
+    const displayKey = getNotificationDisplayKey(row);
+    if (shownIdsRef.current.has(displayKey)) return;
+    shownIdsRef.current.add(displayKey);
 
     const settings = loadNotifSettings();
     const type = String(row.type || 'notification');
     if (settings.types[type] === false) return;
 
     const rowMetadata = (row.metadata && typeof row.metadata === 'object') ? row.metadata as Record<string, unknown> : {};
+    const title = toNotificationText(row.title, '?뚮┝');
+    const body = toNotificationText(row.body, '');
 
     addToast({
       id: rowId,
-      title: String(row.title || '알림'),
-      body: String(row.body || ''),
+      title,
+      body,
       type,
       senderName: rowMetadata.sender_name as string | undefined,
       data: rowMetadata,
@@ -609,8 +717,8 @@ export default function NotificationSystem({
       const evt = (type === 'message' || type === 'mention') ? 'erp-chat-notification' : 'erp-alert';
       window.dispatchEvent(new CustomEvent(evt, {
         detail: {
-          title: row.title,
-          body: row.body,
+          title,
+          body,
           type,
           room_id: rowMetadata.room_id,
           data: rowMetadata,
@@ -628,9 +736,13 @@ export default function NotificationSystem({
 
     const isChatType = type === 'message' || type === 'mention';
     void (async () => {
-      const canShowNativeNotification = await claimCrossTabDisplayNotificationAsync(rowId, 5000);
+      const canShowNativeNotification = await claimCrossTabDisplayNotificationAsync(displayKey, 5000);
       if (canShowNativeNotification && (!isChatType || !hasPushSubscriptionActive(effectiveUserId))) {
-        sendNotification(String(row.title || '알림'), { body: String(row.body || ''), tag: type, data: rowMetadata });
+        sendNotification(title, {
+          body,
+          tag: displayKey || type,
+          data: rowMetadata,
+        });
       }
     })();
     void syncBadge();
@@ -668,7 +780,10 @@ export default function NotificationSystem({
   // ─── Supabase Realtime 구독 ───
   useEffect(() => {
     if (!effectiveUserId) return;
-    initNotificationService(effectiveUserId);
+    void initNotificationService({
+      staffId: effectiveUserId,
+      requestPermission: !requiresUserGestureForPushPermission(),
+    });
     const uid = effectiveUserId;
     const mountedAt = mountedAtRef.current;
     void syncBadge();
@@ -901,14 +1016,14 @@ export default function NotificationSystem({
       didPrimeNotificationsRef.current = true;
       supabase
         .from('notifications')
-        .select('id')
+        .select('id,type,metadata')
         .eq('user_id', uid)
         .lt('created_at', mountedAt)
         .order('created_at', { ascending: false })
         .limit(50)
         .then(({ data: rows }) => {
           rows?.forEach((row: Record<string, unknown>) => {
-            if (row?.id) shownIdsRef.current.add(String(row.id));
+            if (row?.id) shownIdsRef.current.add(getNotificationDisplayKey(row));
           });
         });
     }
@@ -967,6 +1082,32 @@ export default function NotificationSystem({
     };
   }, [effectiveUserId, emitIncomingNotification]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined' || !effectiveUserId) return;
+    if (!isStandaloneWebApp()) return;
+    if (!requiresUserGestureForPushPermission()) return;
+
+    let handled = false;
+    const handleUserGesture = () => {
+      if (handled) return;
+      handled = true;
+      window.removeEventListener('pointerdown', handleUserGesture, true);
+      window.removeEventListener('keydown', handleUserGesture, true);
+      void initNotificationService({
+        staffId: effectiveUserId,
+        requestPermission: true,
+      });
+    };
+
+    window.addEventListener('pointerdown', handleUserGesture, true);
+    window.addEventListener('keydown', handleUserGesture, true);
+    return () => {
+      handled = true;
+      window.removeEventListener('pointerdown', handleUserGesture, true);
+      window.removeEventListener('keydown', handleUserGesture, true);
+    };
+  }, [effectiveUserId]);
+
   // 백그라운드 복귀 시 놓친 알림 재조회
   useEffect(() => {
     const onVis = () => {
@@ -985,13 +1126,24 @@ export default function NotificationSystem({
     return () => document.removeEventListener('visibilitychange', onVis);
   }, [effectiveUserId, emitIncomingNotification, syncBadge]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleNotificationRead = () => {
+      void syncBadge();
+    };
+    window.addEventListener('erp-notification-read', handleNotificationRead);
+    return () => {
+      window.removeEventListener('erp-notification-read', handleNotificationRead);
+    };
+  }, [syncBadge]);
+
   useEffect(() => () => { timersRef.current.forEach(t => clearTimeout(t)); timersRef.current.clear(); }, []);
 
   if (toasts.length === 0) return null;
 
   return (
     <div
-      className="fixed top-[calc(env(safe-area-inset-top)+12px)] left-1/2 z-[999] flex w-[min(calc(100vw-24px),420px)] -translate-x-1/2 flex-col gap-2.5 items-center md:top-auto md:bottom-5 md:left-auto md:right-5 md:w-auto md:translate-x-0 md:flex-col-reverse md:items-end"
+      className="fixed top-[calc(env(safe-area-inset-top)+92px)] left-1/2 z-[999] flex w-[min(calc(100vw-24px),420px)] -translate-x-1/2 flex-col gap-2.5 items-center md:top-auto md:bottom-5 md:left-auto md:right-5 md:w-auto md:translate-x-0 md:flex-col-reverse md:items-end"
       aria-live="polite"
       aria-label="알림"
       data-testid="notification-toast-stack"

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { toast } from '@/lib/toast';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -73,12 +73,12 @@ const APPROVAL_REFERENCE_TARGETS = [
   { key: 'annual_plan', label: '연차계획서' },
   { key: 'overtime', label: '연장근무' },
   { key: 'purchase', label: '물품신청' },
-  { key: 'repair_request', label: '수리요청서' },
+  { key: 'repair_request', label: '수리요청' },
   { key: 'draft_business', label: '업무기안' },
   { key: 'cooperation', label: '업무협조' },
   { key: 'generic', label: '양식신청' },
   { key: 'attendance_fix', label: '출결정정' },
-  { key: 'personnel_order', label: '인사명령' },
+  { key: 'personnel_order', label: '?몄궗紐낅졊' },
 ] as const;
 
 type ApprovalReferenceSettingUser = {
@@ -97,7 +97,7 @@ function normalizeApprovalReferenceUser(entry: any, staffs: any[] = []): Approva
     if (!matched) return null;
     return {
       id: String(matched.id),
-      name: String(matched.name || '이름 없음'),
+      name: String(matched.name || '?대쫫 ?놁쓬'),
       position: matched.position ?? null,
       department: matched.department ?? null,
       company: matched.company ?? null,
@@ -110,7 +110,7 @@ function normalizeApprovalReferenceUser(entry: any, staffs: any[] = []): Approva
     const matched = staffs.find((staff) => String(staff?.id) === String(rawId));
     return {
       id: String(rawId),
-      name: String(entry.name || matched?.name || '이름 없음'),
+      name: String(entry.name || matched?.name || '?대쫫 ?놁쓬'),
       position: typeof entry.position === 'string' ? entry.position : matched?.position ?? null,
       department: typeof entry.department === 'string' ? entry.department : matched?.department ?? null,
       company: typeof entry.company === 'string' ? entry.company : matched?.company ?? null,
@@ -144,7 +144,6 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
   const [staffs, setStaffs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedStaff, setSelectedStaff] = useState<Record<string, unknown> | null>(null);
-  const [newPassword, setNewPassword] = useState('');
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [copySourceId, setCopySourceId] = useState<string>('');
   const [copyRoleToo, setCopyRoleToo] = useState(true);
@@ -155,7 +154,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
     setLoading(true);
     const { data, error } = await supabase.from('staff_members').select(STAFF_LIST_SELECT).order('employee_no');
     if (error) {
-      console.error('직원 권한 목록 조회 실패:', error);
+      console.error('吏곸썝 沅뚰븳 紐⑸줉 議고쉶 ?ㅽ뙣:', error);
       setLoading(false);
       return;
     }
@@ -187,9 +186,9 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
     [onRefresh]
   );
 
-  const setPassword = async () => {
-    if (!selectedStaff?.id || !newPassword.trim()) {
-      toast('새 비밀번호를 입력해주세요.', 'warning');
+  const resetPassword = async () => {
+    if (!selectedStaff?.id) {
+      toast('초기화할 직원을 먼저 선택해 주세요.', 'warning');
       return;
     }
 
@@ -201,31 +200,30 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         staffId: selectedStaff.id,
-        password: newPassword,
+        clearPassword: true,
       }),
     });
     const payload = await response.json().catch(() => null);
     setPasswordSaving(false);
 
     if (!response.ok || !payload?.ok) {
-      toast('비밀번호 변경 중 오류가 발생했습니다.', 'error');
+      toast('비밀번호 초기화 중 오류가 발생했습니다.', 'error');
       return;
     }
 
-    setNewPassword('');
     await fetchStaffs();
     await logAudit(
-      '비밀번호재설정',
+      '비밀번호 초기화',
       'staff_permission',
       String(selectedStaff.id),
       {
         staff_name: beforeStaff?.name || selectedStaff.name,
-        ...buildAuditDiff({ password: '[EXISTING]' }, { password: '[UPDATED]' }, ['password']),
+        ...buildAuditDiff({ password: '[EXISTING]' }, { password: '[CLEARED]' }, ['password']),
       },
       actor.userId,
       actor.userName
     );
-    toast('비밀번호가 변경되었습니다.');
+    toast('비밀번호가 지정되지 않은 상태로 초기화되었습니다.');
   };
 
   const handleRoleChange = async (staffId: string, newRole: string) => {
@@ -233,12 +231,12 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
     const beforeStaff = staffs.find((staff) => staff.id === staffId);
     const { error } = await updateStaffRecord(staffId, { role: newRole });
     if (error) {
-      toast('역할 변경 중 오류가 발생했습니다.', 'error');
+      toast('??븷 蹂寃?以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.', 'error');
       return;
     }
 
     await logAudit(
-      '직원권한수정',
+      '吏곸썝沅뚰븳?섏젙',
       'staff_permission',
       String(staffId),
       {
@@ -256,12 +254,12 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
       const beforeStaff = staffs.find((staff) => staff.id === staffId);
       const { error } = await updateStaffRecord(staffId, { permissions: nextPermissions });
       if (error) {
-        toast('권한 변경 중 오류가 발생했습니다.', 'error');
+        toast('沅뚰븳 蹂寃?以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.', 'error');
         return false;
       }
 
       await logAudit(
-        '권한수정',
+        '沅뚰븳?섏젙',
         'staff_permission',
         String(staffId),
         {
@@ -301,11 +299,11 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
 
   const copyPermissionsToStaff = async () => {
     if (!copySourceId || !selectedStaff?.id) {
-      toast('복사할 직원(A)과 적용할 직원(B)을 모두 선택해주세요.', 'warning');
+      toast('蹂듭궗??吏곸썝(A)怨??곸슜??吏곸썝(B)??紐⑤몢 ?좏깮?댁＜?몄슂.', 'warning');
       return;
     }
     if (copySourceId === selectedStaff.id) {
-      toast('복사할 직원과 적용할 직원은 같을 수 없습니다.');
+      toast('蹂듭궗??吏곸썝怨??곸슜??吏곸썝? 媛숈쓣 ???놁뒿?덈떎.');
       return;
     }
 
@@ -326,13 +324,13 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
     setCopying(false);
 
     if (error) {
-      toast('권한 복사 중 오류가 발생했습니다.', 'error');
+      toast('沅뚰븳 蹂듭궗 以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.', 'error');
       return;
     }
 
-    toast(`[${source.name}]의 권한${copyRoleToo ? '과 역할' : ''}이 [${target.name}]에게 적용되었습니다.`);
+    toast(`[${source.name}]??沅뚰븳${copyRoleToo ? '怨???븷' : ''}??[${target.name}]?먭쾶 ?곸슜?섏뿀?듬땲??`);
     await logAudit(
-      '권한복사',
+      '沅뚰븳蹂듭궗',
       'staff_permission',
       String(target.id),
       {
@@ -455,7 +453,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
         ...currentApprovalReferenceUsers,
         {
           id: String(matched.id),
-          name: String(matched.name || '이름 없음'),
+          name: String(matched.name || '?대쫫 ?놁쓬'),
           position: matched.position ?? null,
           department: matched.department ?? null,
           company: matched.company ?? null,
@@ -476,7 +474,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
   );
 
   if (loading) {
-    return <div className="p-5 text-center text-[var(--toss-gray-3)] font-bold">로딩 중...</div>;
+    return <div className="p-5 text-center text-[var(--toss-gray-3)] font-bold">濡쒕뵫 以?..</div>;
   }
 
   return (
@@ -486,7 +484,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
     >
       <div className="flex w-full max-h-[34vh] shrink-0 flex-col border-[var(--border)] md:sticky md:top-0 md:max-h-[calc(100vh-8rem)] md:min-w-[200px] md:self-start md:w-[200px] md:border-r lg:w-[216px]">
         <div className="p-4 border-b border-[var(--border)] bg-[var(--muted)]">
-          <h3 className="text-sm font-semibold text-[var(--foreground)]">직원 명단</h3>
+          <h3 className="text-sm font-semibold text-[var(--foreground)]">吏곸썝 紐낅떒</h3>
         </div>
         <div className="flex-1 overflow-y-auto bg-[var(--muted)]/40">
           <div className="space-y-2 p-2">
@@ -535,17 +533,17 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
 
       <div className="flex min-w-0 flex-1 flex-col overflow-visible bg-[var(--muted)]/50">
         <div className="shrink-0 mx-2 mt-2 rounded-[var(--radius-md)] border border-[var(--border)] border-l-4 border-l-[var(--accent)] bg-[var(--card)] p-2.5 shadow-sm md:mx-4 md:mt-4 md:p-3">
-          <p className="mb-2 text-[13px] font-semibold text-[var(--foreground)]">권한 빠른 복사 (A → B)</p>
+          <p className="mb-2 text-[13px] font-semibold text-[var(--foreground)]">沅뚰븳 鍮좊Ⅸ 蹂듭궗 (A ??B)</p>
           <div className="flex flex-col gap-2.5 lg:flex-row lg:items-end">
             <div className="min-w-[180px] flex-1">
-              <label className="mb-1 block text-[11px] font-bold text-[var(--toss-gray-3)]">권한 가져올 직원</label>
+              <label className="mb-1 block text-[11px] font-bold text-[var(--toss-gray-3)]">沅뚰븳 媛?몄삱 吏곸썝</label>
               <select
                 data-testid="staff-permission-copy-source"
                 value={copySourceId}
                 onChange={(e) => setCopySourceId(e.target.value)}
                 className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-2.5 py-2 text-[11px] font-bold"
               >
-                <option value="">직원 선택</option>
+                <option value="">吏곸썝 ?좏깮</option>
                 {groupedStaffSections.map((companySection) =>
                   companySection.teams.map((teamSection) => (
                     <optgroup
@@ -563,14 +561,14 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
               </select>
             </div>
             <div className="min-w-[180px] flex-1">
-              <label className="mb-1 block text-[11px] font-bold text-[var(--toss-gray-3)]">적용할 직원</label>
+              <label className="mb-1 block text-[11px] font-bold text-[var(--toss-gray-3)]">?곸슜??吏곸썝</label>
               <select
                 data-testid="staff-permission-copy-target"
                 value={(selectedStaff?.id as string) || ''}
                 onChange={(e) => setSelectedStaff(staffs.find((staff) => staff.id === e.target.value) ?? null)}
                 className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] px-2.5 py-2 text-[11px] font-bold"
               >
-                <option value="">직원 선택</option>
+                <option value="">吏곸썝 ?좏깮</option>
                 {groupedStaffSections.map((companySection) =>
                   companySection.teams.map((teamSection) => (
                     <optgroup
@@ -595,7 +593,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                 onChange={(e) => setCopyRoleToo(e.target.checked)}
                 className="rounded border-[var(--border)]"
               />
-              역할까지 함께 복사
+              ??븷源뚯? ?④퍡 蹂듭궗
             </label>
             <button
               type="button"
@@ -604,7 +602,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
               disabled={copying || !copySourceId || !selectedStaff?.id || copySourceId === selectedStaff?.id}
               className="rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-2 text-[10px] font-bold text-white hover:bg-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {copying ? '적용 중...' : '현재 직원에 복사'}
+              {copying ? '?곸슜 以?..' : '?꾩옱 吏곸썝??蹂듭궗'}
             </button>
           </div>
         </div>
@@ -614,17 +612,17 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
             <div className="max-w-6xl space-y-3">
               <div className="border-b border-[var(--border)] pb-3">
                 <h3 className="text-lg font-semibold text-[var(--foreground)] tracking-tight">
-                  [{selectedStaff.name as string}] 직원 권한 설정
+                  [{selectedStaff.name as string}] 吏곸썝 沅뚰븳 ?ㅼ젙
                 </h3>
                 <p className="mt-1 text-[11px] font-bold text-[var(--accent)]">
-                  사번 {selectedStaff.employee_no as string} | {selectedStaff.department as string} {selectedStaff.position as string}
+                  ?щ쾲 {selectedStaff.employee_no as string} | {selectedStaff.department as string} {selectedStaff.position as string}
                 </p>
               </div>
 
               <div className="grid gap-3 xl:grid-cols-[minmax(0,300px)_minmax(0,1fr)]">
               <div className="space-y-3">
                 <div className="bg-[var(--card)] p-3 rounded-[var(--radius-md)] shadow-sm border border-[var(--border)]">
-                  <p className="mb-2 text-[13px] font-semibold text-[var(--foreground)]">역할</p>
+                  <p className="mb-2 text-[13px] font-semibold text-[var(--foreground)]">??븷</p>
                   <select
                     data-testid={`staff-role-select`}
                     value={(selectedStaff.role as string) || 'staff'}
@@ -633,33 +631,28 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                       selectedStaff.role === 'admin' ? 'border-red-200 text-red-600 bg-red-50' : 'border-[var(--border)]'
                     }`}
                   >
-                    <option value="staff">일반 직원 (기본)</option>
-                    <option value="manager">부서장</option>
-                    <option value="admin">시스템 관리자</option>
+                    <option value="staff">?쇰컲 吏곸썝 (湲곕낯)</option>
+                    <option value="manager">遺?쒖옣</option>
+                    <option value="admin">?쒖뒪??愿由ъ옄</option>
                   </select>
                 </div>
 
                 <div className="bg-[var(--card)] p-3 rounded-[var(--radius-md)] shadow-sm border border-[var(--border)]">
-                  <p className="mb-2 text-[13px] font-semibold text-[var(--foreground)]">비밀번호 설정</p>
-                  <div className="flex gap-2">
-                      <input
-                        type="password"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="새 비밀번호"
-                        className="flex-1 px-2.5 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-[11px]"
-                      />
+                  <p className="mb-2 text-[13px] font-semibold text-[var(--foreground)]">비밀번호 초기화</p>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="flex-1 text-[11px] font-medium text-[var(--toss-gray-3)]">
+                      관리자 초기화 시 직원 비밀번호는 지정되지 않은 상태로 돌아갑니다.
+                    </p>
                     <button
                       type="button"
-                      onClick={setPassword}
-                      disabled={passwordSaving || !newPassword.trim()}
+                      onClick={resetPassword}
+                      disabled={passwordSaving}
                       className="px-3 py-2 bg-[var(--foreground)] text-white rounded-[var(--radius-md)] text-[10px] font-bold hover:bg-[var(--foreground)] disabled:opacity-50"
                     >
-                      {passwordSaving ? '변경 중...' : '변경'}
+                      {passwordSaving ? '초기화 중...' : '초기화'}
                     </button>
                   </div>
                 </div>
-
                 <div className="bg-[var(--card)] p-3 rounded-[var(--radius-md)] shadow-sm border border-[var(--border)] space-y-3">
                   <div>
                     <p className="text-[13px] font-semibold text-[var(--foreground)]">문서별 기본 참조자</p>
@@ -692,7 +685,7 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                       <option value="">참조자 추가...</option>
                       {approvalReferenceCandidateStaffs.map((staff) => (
                         <option key={staff.id} value={staff.id}>
-                          {staff.name} {staff.position ? `(${staff.position})` : ''} {staff.company ? `· ${staff.company}` : ''}
+                          {staff.name} {staff.position ? `(${staff.position})` : ''} {staff.company ? ` · ${staff.company}` : ''}
                         </option>
                       ))}
                     </select>
@@ -713,26 +706,26 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                             onClick={() => void removeApprovalReferenceRecipient(staff.id)}
                             className="text-yellow-500 hover:text-red-500"
                           >
-                            ✕
+                            ×
                           </button>
                         </span>
                       ))}
                     </div>
                   ) : (
                     <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--border)] px-3 py-3 text-[10px] font-semibold text-[var(--toss-gray-3)]">
-                      현재 선택한 문서 종류에 자동 참조자가 없습니다.
+                        현재 선택한 문서 종류에 자동 참조자가 없습니다.
                     </div>
                   )}
                 </div>
 
                 <div className="bg-red-50 p-3 rounded-[var(--radius-md)] shadow-sm border border-red-200">
-                  <p className="mb-2 text-[13px] font-semibold text-red-600">보안 및 세션 관리</p>
+                  <p className="mb-2 text-[13px] font-semibold text-red-600">보안 및 계정 관리</p>
                   <button
                     type="button"
                     onClick={async () => {
                       if (
                         !confirm(
-                          `[${selectedStaff.name}] 직원을 즉시 강제 로그아웃 시키겠습니까?\n현재 활성화된 모든 기기의 세션이 즉시 종료됩니다.`
+                          `[${selectedStaff.name}] 吏곸썝??利됱떆 媛뺤젣 濡쒓렇?꾩썐 ?쒗궎寃좎뒿?덇퉴?\n?꾩옱 ?쒖꽦?붾맂 紐⑤뱺 湲곌린???몄뀡??利됱떆 醫낅즺?⑸땲??`
                         )
                       ) {
                         return;
@@ -741,12 +734,12 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                         .from('staff_members')
                         .update({ force_logout_at: new Date().toISOString() })
                         .eq('id', selectedStaff.id);
-                      if (!error) toast('강제 로그아웃 명령이 전송되었습니다.', 'success');
-                      else toast('처리 중 오류가 발생했습니다.', 'error');
+                      if (!error) toast('媛뺤젣 濡쒓렇?꾩썐 紐낅졊???꾩넚?섏뿀?듬땲??', 'success');
+                      else toast('泥섎━ 以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.', 'error');
                     }}
                     className="w-full py-2 bg-red-600 text-white rounded-[var(--radius-md)] text-[10px] font-bold hover:bg-red-700 transition-colors shadow-sm"
                   >
-                    기기 전체 강제 로그아웃 (Session Kill)
+                    湲곌린 ?꾩껜 媛뺤젣 濡쒓렇?꾩썐 (Session Kill)
                   </button>
                 </div>
               </div>
@@ -772,14 +765,14 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
                             onClick={() => applyGroupPermission(selectedStaff.id as string, group.items.map((item) => item.key), true)}
                             className="rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] px-2.5 py-1.5 text-[10px] font-bold text-[var(--accent)]"
                           >
-                            전체 허용
+                            ?꾩껜 ?덉슜
                           </button>
                           <button
                             type="button"
                             onClick={() => applyGroupPermission(selectedStaff.id as string, group.items.map((item) => item.key), false)}
                             className="rounded-[var(--radius-md)] bg-[var(--muted)] px-2.5 py-1.5 text-[10px] font-bold text-[var(--toss-gray-4)]"
                           >
-                            전체 해제
+                            ?꾩껜 ?댁젣
                           </button>
                         </div>
                       </div>
@@ -826,8 +819,8 @@ export default function StaffPermissionManager({ onRefresh }: { onRefresh?: () =
           </div>
         ) : (
           <div className="flex-1 min-h-0 flex flex-col items-center justify-center px-4 text-center text-[var(--toss-gray-3)]">
-            <span className="mb-4 text-5xl">🔐</span>
-            <p className="text-sm font-semibold">왼쪽에서 직원을 선택해 권한과 역할을 설정해주세요.</p>
+            <span className="mb-4 text-5xl">?뵍</span>
+            <p className="text-sm font-semibold">?쇱そ?먯꽌 吏곸썝???좏깮??沅뚰븳怨???븷???ㅼ젙?댁＜?몄슂.</p>
           </div>
         )}
       </div>

@@ -77,6 +77,51 @@ export default function PermissionPromptModal() {
     );
   };
 
+  const requestLocationRobust = () => {
+    if (!navigator.geolocation) {
+      toast('이 기기는 위치(GPS) 기능을 지원하지 않습니다.');
+      return;
+    }
+    setGpsing(true);
+
+    const requestCurrentPosition = (options: PositionOptions) =>
+      new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, options);
+      });
+
+    void (async () => {
+      try {
+        try {
+          await requestCurrentPosition({
+            enableHighAccuracy: true,
+            timeout: 12000,
+            maximumAge: 0,
+          });
+        } catch {
+          await requestCurrentPosition({
+            enableHighAccuracy: false,
+            timeout: 10000,
+            maximumAge: 60000,
+          });
+        }
+
+        toast('위치 권한을 허용했습니다. 출퇴근 시 GPS 인증을 사용할 수 있습니다.');
+        setActionDone(true);
+      } catch (err: any) {
+        if (err?.code === 1) {
+          toast('위치 권한이 거부되었습니다. 브라우저 또는 앱 설정에서 다시 허용해 주세요.', 'error');
+        } else if (err?.code === 3) {
+          toast('위치 확인 시간이 초과되었습니다. 야외에서 다시 시도하거나 GPS를 켜 주세요.', 'error');
+        } else {
+          toast('위치를 가져오지 못했습니다. 다시 시도하거나 위치 설정을 확인해 주세요.', 'error');
+        }
+        setActionDone(true);
+      } finally {
+        setGpsing(false);
+      }
+    })();
+  };
+
   if (!open) return null;
 
   return (
@@ -101,7 +146,7 @@ export default function PermissionPromptModal() {
           </button>
           <button
             type="button"
-            onClick={requestLocation}
+            onClick={requestLocationRobust}
             disabled={gpsing}
             className="w-full py-3 px-4 rounded-[var(--radius-lg)] bg-[#00C48C] text-white text-sm font-bold disabled:opacity-60"
           >

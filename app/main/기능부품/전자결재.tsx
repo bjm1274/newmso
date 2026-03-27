@@ -199,6 +199,50 @@ function normalizeComposeFormType(value?: string) {
   return value;
 }
 
+function isAttendanceCorrectionApprovalSchemaError(error: unknown) {
+  return ['attendance_date', 'requested_at', 'approval_status', 'approved_by', 'approved_at'].some((column) =>
+    isMissingColumnError(error, column)
+  );
+}
+
+async function withAttendanceCorrectionApprovalFallback<T>(
+  primary: () => PromiseLike<{ data: T | null; error: any }>,
+  fallback: () => PromiseLike<{ data: T | null; error: any }>
+) {
+  const result = await primary();
+  if (isAttendanceCorrectionApprovalSchemaError(result.error)) {
+    return fallback();
+  }
+  return result;
+}
+
+function isAttendanceCorrectionApprovalItem(
+  item: Record<string, unknown>,
+  metaData: Record<string, unknown> | null | undefined
+) {
+  const rawType = String(item?.type || '').trim();
+  const rawSlug = String(metaData?.form_slug || '').trim();
+  const rawName = String(metaData?.form_name || '').trim();
+
+  return (
+    rawType === '출결정정' ||
+    rawType === 'attendance_fix' ||
+    rawSlug === 'attendance_fix' ||
+    rawName === '출결정정' ||
+    rawName === '출결 정정'
+  );
+}
+
+function resolveAttendanceCorrectionStatusPair(correctionTypeValue: string) {
+  const statusMap: Record<string, { att: string; atts: string }> = {
+    정상반영: { att: '정상', atts: 'present' },
+    지각처리: { att: '지각', atts: 'late' },
+    결근처리: { att: '결근', atts: 'absent' },
+  };
+
+  return statusMap[correctionTypeValue] || statusMap['정상반영'];
+}
+
 function sanitizeCustomFormTypes(
   rows: Array<{ name?: string; slug?: string; is_active?: boolean }> = [],
   builtInFormTypes: string[] = []
@@ -254,6 +298,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const [formTemplateDesigns, setFormTemplateDesigns] = useState<Record<string, Record<string, unknown>>>({});
   const [lastDraftByType, setLastDraftByType] = useState<Record<string, Record<string, unknown> | null>>({});
   const [suppliesLoadKey, setSuppliesLoadKey] = useState(0);
+  const [composeSeedApproval, setComposeSeedApproval] = useState<Record<string, unknown> | null>(null);
   const [selectedApprovalId, setSelectedApprovalId] = useState<string | null>(null);
   const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대기' | '승인' | '반려'>('전체');
   const [approvalDocumentFilter, setApprovalDocumentFilter] = useState(ALL_DOCUMENT_FILTER);
@@ -273,6 +318,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   const [attendanceCorrectionSeedDates, setAttendanceCorrectionSeedDates] = useState<string[]>([]);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoSaveMsgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isHydratingComposeRef = useRef(false);
   const fetchApprovalsRef = useRef<() => void>(() => {});
   const isMso = user?.company === 'SY INC.' || user?.permissions?.mso === true;
   const visibleApprovalViews = useMemo(
@@ -384,11 +430,115 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     };
   }, [formTemplateDesigns, resolveApprovalTemplateMeta, user?.company]);
 
+  const getSupplyRequestItems = useCallback((metaData: Record<string, unknown> | null | undefined) => {
+    if (!Array.isArray(metaData?.items)) return [] as Array<{
+      name: string;
+      qty: string;
+      dept: string;
+      purpose: string;
+    }>;
+
+    return metaData.items
+      .map((entry) => {
+        const row = (entry && typeof entry === 'object' ? entry : {}) as Record<string, unknown>;
+        return {
+          name: String(row.name || '').trim(),
+          qty: String(row.qty ?? row.quantity ?? '').trim(),
+          dept: String(row.dept || row.department || '').trim(),
+          purpose: String(row.purpose || row.reason || '').trim(),
+        };
+      })
+      .filter((row) => row.name || row.qty || row.dept || row.purpose);
+  }, []);
+
+  const renderSupplyRequestItemsHtml = useCallback((metaData: Record<string, unknown> | null | undefined) => {
+    const items = getSupplyRequestItems(metaData);
+    if (items.length === 0) return '';
+
+    return `
+      <div class="section">
+        <div class="section-title">물품 신청 목록</div>
+        <table class="supply-table">
+          <thead>
+            <tr>
+              <th>품목명</th>
+              <th>수량</th>
+              <th>사용 부서</th>
+              <th>용도</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${items
+              .map(
+                (row) => `
+                  <tr>
+                    <td>${escapeHtml(row.name || '-')}</td>
+                    <td>${escapeHtml(row.qty || '-')}</td>
+                    <td>${escapeHtml(row.dept || '-')}</td>
+                    <td>${escapeHtml(row.purpose || '-')}</td>
+                  </tr>`
+              )
+              .join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }, [getSupplyRequestItems]);
+
+  const renderSupplyRequestItemsPanel = useCallback((metaData: Record<string, unknown> | null | undefined) => {
+    const items = getSupplyRequestItems(metaData);
+    if (items.length === 0) return null;
+
+    return (
+      <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)]">
+        <div className="border-b border-[var(--border)] px-4 py-3">
+          <h4 className="text-sm font-bold text-[var(--foreground)]">물품 신청 목록</h4>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-xs">
+            <thead className="bg-[var(--muted)]">
+              <tr>
+                <th className="px-3 py-2 text-left font-bold text-[var(--toss-gray-4)]">품목명</th>
+                <th className="px-3 py-2 text-left font-bold text-[var(--toss-gray-4)]">수량</th>
+                <th className="px-3 py-2 text-left font-bold text-[var(--toss-gray-4)]">사용 부서</th>
+                <th className="px-3 py-2 text-left font-bold text-[var(--toss-gray-4)]">용도</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((row, index) => (
+                <tr key={`${row.name}-${row.qty}-${index}`} className="border-t border-[var(--border)]">
+                  <td className="px-3 py-2 font-semibold text-[var(--foreground)]">{row.name || '-'}</td>
+                  <td className="px-3 py-2 font-bold text-[var(--accent)]">{row.qty || '-'}</td>
+                  <td className="px-3 py-2 text-[var(--toss-gray-4)]">{row.dept || '-'}</td>
+                  <td className="px-3 py-2 text-[var(--toss-gray-4)]">{row.purpose || '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }, [getSupplyRequestItems]);
+
   const openApprovalPrintView = useCallback((item: Record<string, unknown>) => {
     const design = resolveApprovalTemplateDesign(item);
     const templateMeta = resolveApprovalTemplateMeta(item);
     const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
     const ccUsers = normalizeApprovalCcUsers(metaData?.cc_users, staffs);
+    const supplyItemsSection = renderSupplyRequestItemsHtml(metaData);
+    const contentSection = `
+      <div class="body">
+        <div class="doc-title">${escapeHtml(item?.title || '(제목 없음)')}</div>
+        <div class="content">${escapeHtml(item?.content || '-').replace(/\n/g, '<br>')}</div>
+      </div>
+    `;
+    const autoPrintScript = `<script>
+window.onafterprint = () => {
+  try { if (window.opener && !window.opener.closed) window.opener.focus(); } catch (error) {}
+  try { window.close(); } catch (error) {}
+};
+window.onload = () => window.print();
+</script>`;
 
     const approvalBoxes = Array.isArray(item?.approver_line)
       ? item.approver_line.map((_: string, index: number) => (
@@ -420,6 +570,12 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     .body{padding:0 40px 24px}
     .doc-title{font-size:20px;font-weight:800;color:#111827;margin:0 0 12px}
     .content{border:1px solid ${escapeHtml(alphaColor(design.borderColor || '#d7e3ff', 0.9))};border-radius:20px;padding:18px 20px;min-height:220px;font-size:13px;line-height:1.75;white-space:pre-wrap}
+    .section{padding:0 40px 24px}
+    .section-title{margin:0 0 12px;font-size:15px;font-weight:800;color:#111827}
+    .supply-table{width:100%;border-collapse:collapse;border:1px solid ${escapeHtml(alphaColor(design.borderColor || '#d7e3ff', 0.9))};border-radius:20px;overflow:hidden;font-size:12px}
+    .supply-table th,.supply-table td{padding:12px 14px;border-bottom:1px solid ${escapeHtml(alphaColor(design.borderColor || '#d7e3ff', 0.75))};text-align:left;vertical-align:top}
+    .supply-table th{background:${escapeHtml(alphaColor(design.primaryColor, 0.08))};font-weight:800;color:#475569}
+    .supply-table tbody tr:last-child td{border-bottom:none}
     .reference{display:flex;gap:12px;align-items:flex-start;margin:0 40px 24px;padding:14px 18px;border:1px solid ${escapeHtml(alphaColor(design.borderColor || '#d7e3ff', 0.9))};border-radius:18px;background:${escapeHtml(alphaColor(design.primaryColor, 0.05))};font-size:12px;line-height:1.7}
     .reference strong{min-width:52px;color:${escapeHtml(design.primaryColor || '#155eef')}}
     .approval-line{display:flex;flex-wrap:wrap;gap:12px;padding:0 40px 28px}
@@ -449,6 +605,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       <div class="doc-title">${escapeHtml(item?.title || '(제목 없음)')}</div>
       <div class="content">${escapeHtml(item?.content || '-').replace(/\n/g, '<br>')}</div>
     </div>
+    ${supplyItemsSection}
     ${referenceSection}
     ${design.showSignArea === false ? '' : `<div class="approval-line">${approvalBoxes}</div>`}
     <div class="footer">
@@ -459,7 +616,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
       ${design.showSeal === false ? '' : `<div class="seal">${escapeHtml(design.sealLabel || `${design.companyLabel || 'SY INC.'} 직인`)}</div>`}
     </div>
   </div>
-  <script>window.onload=()=>window.print()</script>
+  ${autoPrintScript}
 </body>
 </html>`;
 
@@ -496,7 +653,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
         cleanup();
       };
 
-      iframe.srcdoc = html.replace('<script>window.onload=()=>window.print()</script>', '');
+      iframe.srcdoc = html.replace(autoPrintScript, '');
       document.body.appendChild(iframe);
       return;
     }
@@ -508,7 +665,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     }
     win.document.write(html);
     win.document.close();
-  }, [resolveApprovalTemplateDesign, resolveApprovalTemplateMeta, staffs]);
+  }, [renderSupplyRequestItemsHtml, resolveApprovalTemplateDesign, resolveApprovalTemplateMeta, staffs]);
 
   // 결재자 후보: 부서장 이상(팀장·부장·병원장 등)만 표시 (staffs는 이미 메인에서 회사별로 불러옴)
   const APPROVER_POSITIONS = ['팀장', '간호과장', '실장', '부장', '본부장', '총무부장', '진료부장', '간호부장', '이사', '병원장', '원장', '대표'];
@@ -729,6 +886,10 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     if (item?.status !== '대기' || !user?.id) return false;
     return String(resolveCurrentApproverId(item) || '') === String(user.id);
   }, [resolveCurrentApproverId, user?.id]);
+  const canUserRecallItem = useCallback((item: Record<string, unknown>) => {
+    if (item?.status !== '대기' || !user?.id) return false;
+    return String(item?.sender_id || '') === String(user.id);
+  }, [user?.id]);
   const syncApprovalRouting = useCallback(async (item: Record<string, unknown>, currentApproverId: string | null) => {
     if (!item?.id || !currentApproverId) return null;
     const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
@@ -999,6 +1160,10 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
   // → 한 양식에서 쓰던 내용이 다른 탭으로 "따라가는" 현상 방지
   useEffect(() => {
     if (viewMode !== '작성하기') return;
+    if (isHydratingComposeRef.current) {
+      isHydratingComposeRef.current = false;
+      return;
+    }
     setFormTitle('');
     setFormContent('');
     setExtraData({});
@@ -1021,6 +1186,36 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     setCcLine(storedCcUsers.length > 0 ? storedCcUsers : resolveDefaultReferenceUsersForForm(formType));
     if (formType === '물품신청' && (lastMeta?.items as unknown[] | null | undefined)?.length) setSuppliesLoadKey((k) => k + 1);
   }, [formType, lastDraftByType, resolveDefaultReferenceUsersForForm, staffs]);
+
+  const hydrateComposeFromApproval = useCallback((approval: Record<string, unknown>) => {
+    const approvalMeta = approval.meta_data as Record<string, unknown> | null | undefined;
+    const nextFormType = normalizeComposeFormType(
+      String(approvalMeta?.form_name || approvalMeta?.form_slug || approval.type || '업무기안')
+    );
+    const storedApproverLine = Array.isArray(approval.approver_line)
+      ? approval.approver_line as unknown[]
+      : Array.isArray(approvalMeta?.approver_line)
+        ? approvalMeta.approver_line as unknown[]
+        : [];
+    const storedCcUsers = normalizeApprovalCcUsers(approvalMeta?.cc_users, staffs);
+
+    isHydratingComposeRef.current = true;
+    setFormType(nextFormType);
+    setFormTitle((approval.title as string) || '');
+    setFormContent((approval.content as string) || '');
+    setExtraData((approvalMeta as Record<string, unknown>) || {});
+    setApproverLine(resolveApprovalStaffLine(storedApproverLine, staffs));
+    setCcLine(storedCcUsers.length > 0 ? storedCcUsers : resolveDefaultReferenceUsersForForm(nextFormType));
+    if (nextFormType === '물품신청' && (approvalMeta?.items as unknown[] | null | undefined)?.length) {
+      setSuppliesLoadKey((key) => key + 1);
+    }
+  }, [resolveDefaultReferenceUsersForForm, staffs]);
+
+  useEffect(() => {
+    if (viewMode !== '작성하기' || !composeSeedApproval) return;
+    hydrateComposeFromApproval(composeSeedApproval);
+    setComposeSeedApproval(null);
+  }, [composeSeedApproval, hydrateComposeFromApproval, viewMode]);
 
   // 물품신청은 같은 내용을 자주 쓰므로,
   // 작성하기 탭에서 '물품신청'으로 들어왔을 때 마지막 기안을 자동으로 한번 불러와 주고 수정해서 상신할 수 있게 처리
@@ -1304,35 +1499,95 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
           }
         }
 
-        if (item.type === '출결정정' && Array.isArray(itemMetaData?.correction_dates) && itemMetaData.correction_dates.length > 0) {
+        if (
+          isAttendanceCorrectionApprovalItem(item, itemMetaData) &&
+          Array.isArray(itemMetaData?.correction_dates) &&
+          itemMetaData.correction_dates.length > 0
+        ) {
           try {
-            const requestedAt = new Date().toISOString();
+            const approvedAt = new Date().toISOString();
+            const correctionType = String(itemMetaData?.correction_type || '정상반영');
             const correctionRows = (itemMetaData.correction_dates as string[]).map((dateStr: string) => ({
               staff_id: item.sender_id,
               attendance_date: dateStr,
               original_date: dateStr,
               reason: String(itemMetaData?.correction_reason || item.content || ''),
-              correction_type: String(itemMetaData?.correction_type || '정상반영'),
-              requested_at: requestedAt,
+              correction_type: correctionType,
+              requested_at: approvedAt,
               approval_status: '승인',
               status: '승인',
               approved_by: user?.id,
-              approved_at: requestedAt,
+              approved_at: approvedAt,
             }));
-            await supabase.from('attendance_corrections').upsert(correctionRows, { onConflict: 'staff_id,attendance_date' });
-            // attendance / attendances 상태 반영
-            const statusMap: Record<string, { att: string; atts: string }> = {
-              정상반영: { att: '정상', atts: 'present' },
-              지각처리: { att: '지각', atts: 'late' },
-              결근처리: { att: '결근', atts: 'absent' },
-            };
-            const corrType = String(itemMetaData?.correction_type || '정상반영');
-            const { att, atts } = statusMap[corrType] || statusMap['정상반영'];
-            for (const dateStr of itemMetaData.correction_dates as string[]) {
-              await supabase.from('attendance').upsert({ staff_id: item.sender_id, date: dateStr, status: att }, { onConflict: 'staff_id,date' });
-              await supabase.from('attendances').upsert({ staff_id: item.sender_id, work_date: dateStr, status: atts }, { onConflict: 'staff_id,work_date' });
+
+            const correctionResult = await withAttendanceCorrectionApprovalFallback<null>(
+              () =>
+                supabase.from('attendance_corrections').upsert(correctionRows, {
+                  onConflict: 'staff_id,attendance_date',
+                }),
+              async () => {
+                for (const row of correctionRows) {
+                  const { data: existingRow, error: existingRowError } = await supabase
+                    .from('attendance_corrections')
+                    .select('id')
+                    .eq('staff_id', row.staff_id)
+                    .eq('original_date', row.original_date)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+
+                  if (existingRowError) {
+                    return { data: null, error: existingRowError };
+                  }
+
+                  if (existingRow?.id) {
+                    const { error: updateError } = await supabase
+                      .from('attendance_corrections')
+                      .update({
+                        status: '승인',
+                        reason: row.reason,
+                        correction_type: row.correction_type,
+                      })
+                      .eq('id', existingRow.id);
+
+                    if (updateError) {
+                      return { data: null, error: updateError };
+                    }
+                  } else {
+                    const { error: insertError } = await supabase.from('attendance_corrections').insert({
+                      staff_id: row.staff_id,
+                      original_date: row.original_date,
+                      reason: row.reason,
+                      correction_type: row.correction_type,
+                      status: '승인',
+                    });
+
+                    if (insertError) {
+                      return { data: null, error: insertError };
+                    }
+                  }
+                }
+
+                return { data: null, error: null };
+              }
+            );
+
+            if (correctionResult.error) {
+              throw correctionResult.error;
             }
-          } catch (_) { /* 출결정정 처리 실패 시 무시 */ }
+
+            const { att, atts } = resolveAttendanceCorrectionStatusPair(correctionType);
+            for (const dateStr of itemMetaData.correction_dates as string[]) {
+              await supabase
+                .from('attendance')
+                .upsert({ staff_id: item.sender_id, date: dateStr, status: att }, { onConflict: 'staff_id,date' });
+              await supabase
+                .from('attendances')
+                .upsert({ staff_id: item.sender_id, work_date: dateStr, status: atts }, { onConflict: 'staff_id,work_date' });
+            }
+          } catch (attendanceCorrectionError) {
+            console.error('출결정정 승인 반영 실패:', attendanceCorrectionError);
+          }
         }
 
         if (item.type === '양식신청' && itemMetaData?.form_type && itemMetaData?.target_staff && itemMetaData?.auto_issue) {
@@ -1390,6 +1645,51 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
     } else {
       toast("반려 처리에 실패했습니다. " + (error?.message || ""), 'error');
     }
+  };
+
+  const handleRecallAction = async (item: Record<string, unknown>) => {
+    if (!canUserRecallItem(item)) {
+      toast('대기 중인 내 기안만 회수할 수 있습니다.', 'warning');
+      return;
+    }
+    if (!window.confirm('이 기안을 회수하고 수정 화면으로 가져오시겠습니까?')) {
+      return;
+    }
+
+    const recalledMetaData = {
+      ...((item.meta_data as Record<string, unknown> | null | undefined) || {}),
+      recalled_at: new Date().toISOString(),
+      recalled_by: user?.id,
+    };
+
+    const { error } = await supabase
+      .from('approvals')
+      .update({
+        status: '회수',
+        current_approver_id: null,
+        meta_data: recalledMetaData,
+      })
+      .eq('id', item.id);
+
+    if (error) {
+      toast(`기안 회수에 실패했습니다. ${error.message || ''}`, 'error');
+      return;
+    }
+
+    setComposeSeedApproval({
+      ...item,
+      status: '회수',
+      current_approver_id: null,
+      meta_data: recalledMetaData,
+    });
+    setSelectedApprovalId(null);
+    const nextView = resolveAccessibleView('작성하기');
+    if (nextView) {
+      setViewMode(nextView);
+      if (typeof onViewChange === 'function') onViewChange(nextView);
+    }
+    fetchApprovals();
+    toast('기안을 회수했고 작성하기에서 바로 수정할 수 있습니다.', 'success');
   };
 
   const handleSubmit = async () => {
@@ -1683,12 +1983,12 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                   </div>
                 </div>
 
-                <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2 items-start">
+                <div className="grid grid-cols-1 gap-2 items-start sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
                   <select data-testid="approval-approver-select" onChange={(e) => {
                     const s = approverCandidates.find((st) => st.id === e.target.value);
                     if (s && !approverLine.find(al => al.id === s.id)) setApproverLine([...approverLine, s]);
                     e.target.value = '';
-                  }} className="min-w-0 p-3 bg-[var(--input-bg)] rounded-[var(--radius-md)] text-xs font-bold border border-[var(--border)] outline-none shadow-sm">
+                  }} className="min-w-0 w-full p-3 bg-[var(--input-bg)] rounded-[var(--radius-md)] text-xs font-bold border border-[var(--border)] outline-none shadow-sm">
                     <option value="">결재자 추가...</option>
                     {approverCandidates.map((s) => (
                       <option key={s.id} value={s.id}>{s.name} {s.position || ''} {s.company ? `(${s.company})` : ''}</option>
@@ -1698,14 +1998,14 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                     const s = staffs.find((sf) => String(sf.id) === e.target.value);
                     if (s && !ccLine.find(c => c.id === s.id)) setCcLine(prev => [...prev, { id: s.id, name: s.name, position: s.position }]);
                     e.target.value = '';
-                  }} className="min-w-0 p-3 bg-[var(--input-bg)] rounded-[var(--radius-md)] text-xs font-bold border border-[var(--border)] outline-none shadow-sm">
+                  }} className="min-w-0 w-full p-3 bg-[var(--input-bg)] rounded-[var(--radius-md)] text-xs font-bold border border-[var(--border)] outline-none shadow-sm">
                     <option value="">참조자 추가...</option>
                     {staffs.filter((s) => !ccLine.find(c => c.id === s.id)).map((s) => <option key={s.id} value={s.id}>{s.name} ({s.position})</option>)}
                   </select>
                   <button
                     type="button"
                     onClick={() => { setTemplateNameInput(''); setShowTemplateModal(true); }}
-                    className="px-3 py-3 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] text-[11px] font-bold text-[var(--accent)] hover:bg-[var(--muted)] whitespace-nowrap"
+                    className="w-full px-3 py-3 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-md)] text-[11px] font-bold text-[var(--accent)] hover:bg-[var(--muted)] whitespace-nowrap sm:w-auto"
                   >
                     💾 템플릿 저장
                   </button>
@@ -1802,7 +2102,11 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                 {['연차/휴가', '연장근무'].includes(formType) ? (
                   <AttendanceForms user={user} staffs={staffs} formType={formType} setExtraData={setExtraData} setFormTitle={setFormTitle} />
                 ) : formType === '물품신청' ? (
-                  <SuppliesForm key={suppliesLoadKey} setExtraData={setExtraData} initialItems={suppliesLoadKey > 0 ? ((lastDraftByType['물품신청']?.meta_data as Record<string, unknown> | null | undefined)?.items as unknown[] | undefined) : undefined} />
+                  <SuppliesForm
+                    key={suppliesLoadKey}
+                    setExtraData={setExtraData}
+                    initialItems={Array.isArray(extraData.items) ? (extraData.items as unknown[]) : undefined}
+                  />
                 ) : formType === '수리요청서' ? (
                   <RepairRequestForm setExtraData={setExtraData} />
                 ) : formType === '양식신청' ? (
@@ -2089,6 +2393,16 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                           win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>결재문서</title><style>body{font-family:'Malgun Gothic',sans-serif;padding:30px;max-width:800px;margin:0 auto}h1{font-size:20px;text-align:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:20px}.meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;font-size:12px}.meta div{border:1px solid #ccc;padding:8px;border-radius:4px}.content{border:1px solid #ccc;padding:15px;min-height:200px;font-size:13px;line-height:1.6;border-radius:4px}.approval-line{margin-top:20px;display:flex;gap:10px}.sig-box{border:1px solid #ccc;padding:10px;min-width:80px;text-align:center;font-size:11px}@media print{button{display:none}}</style></head><body><h1>결 재 문 서</h1><div class="meta"><div><strong>문서번호:</strong> ${itemDocNumber || '-'}</div><div><strong>기안일:</strong> ${new Date(itemCreatedAt).toLocaleDateString('ko-KR')}</div><div><strong>기안자:</strong> ${itemSenderName}</div><div><strong>소속:</strong> ${itemSenderCompany}</div><div><strong>문서종류:</strong> ${itemType}</div><div><strong>상태:</strong> ${itemStatus}</div></div><h3 style="font-size:16px;margin-bottom:10px">${itemTitle}</h3><div class="content">${((item.content as string) || '').replace(/\n/g, '<br>')}</div><div class="approval-line">${((item.approver_line as string[]) || []).map((id: string, i: number) => `<div class="sig-box">${i + 1}단계<br><br><br>(인)</div>`).join('')}</div><script>window.onload=()=>window.print()</script></body></html>`);
                           win.document.close();
                         }} className="px-2 py-1 bg-[var(--tab-bg)] text-[var(--toss-gray-4)] border border-[var(--border)] rounded-md text-[10px] font-semibold hover:bg-[var(--muted)]">PDF</button>
+                        {canUserRecallItem(item) && (
+                          <button
+                            type="button"
+                            data-testid={`approval-recall-${itemId}`}
+                            onClick={() => handleRecallAction(item)}
+                            className="px-2 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-md text-[10px] font-semibold shadow-sm hover:bg-amber-100 active:scale-[0.98] transition-all"
+                          >
+                            회수/수정
+                          </button>
+                        )}
                         {(viewMode === '결재함' || (viewMode === '기안함' && itemStatus === '대기')) && canUserApproveItem(item) && (
                           <>
                             <button type="button" onClick={() => handleApproveAction(item)} className="px-2 py-1 bg-[var(--accent)] text-white rounded-md text-[10px] font-semibold shadow-sm hover:opacity-95 active:scale-[0.98] transition-all">승인</button>
@@ -2187,6 +2501,7 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                   </div>
                 )}
                 <div className="text-sm text-[var(--toss-gray-4)] whitespace-pre-wrap border-t border-[var(--border)] pt-4">{detailContent || '-'}</div>
+                {renderSupplyRequestItemsPanel(detailMetaData)}
               </div>
               {detailStatus === '대기' && (
                 <div className="p-4 md:p-4 border-t border-[var(--border)] safe-area-pb">
@@ -2194,6 +2509,17 @@ export default function ApprovalView({ user, staffs, selectedCo, setSelectedCo, 
                     <div className="flex gap-3">
                       <button type="button" onClick={async () => { await handleApproveAction(item); setSelectedApprovalId(null); }} className="flex-1 py-3 bg-[var(--accent)] text-white rounded-[var(--radius-lg)] text-sm font-bold">승인</button>
                       <button type="button" onClick={async () => { await handleRejectAction(item); setSelectedApprovalId(null); }} className="flex-1 py-3 bg-red-50 border border-red-200 text-red-600 rounded-[var(--radius-lg)] text-sm font-bold hover:bg-red-100 transition-all">반려</button>
+                    </div>
+                  ) : canUserRecallItem(item) ? (
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        data-testid="approval-detail-recall"
+                        onClick={async () => { await handleRecallAction(item); }}
+                        className="flex-1 py-3 bg-amber-50 border border-amber-200 text-amber-700 rounded-[var(--radius-lg)] text-sm font-bold hover:bg-amber-100 transition-all"
+                      >
+                        회수 후 수정
+                      </button>
                     </div>
                   ) : (
                     <p className="text-[11px] text-[var(--toss-gray-3)] text-center py-2">승인·반려는 <strong className="text-[var(--accent)]">결재함</strong>에서 결재자 계정으로만 할 수 있습니다. 왼쪽 메뉴에서 <strong>결재함</strong>을 눌러 주세요.</p>

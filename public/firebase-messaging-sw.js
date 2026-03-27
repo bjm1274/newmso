@@ -13,12 +13,27 @@ firebase.initializeApp({
 });
 
 const messaging = firebase.messaging();
+const recentlyShownNotifications = new Map();
+
+function shouldShowNotification(key) {
+  const now = Date.now();
+  for (const [entryKey, timestamp] of recentlyShownNotifications.entries()) {
+    if (now - timestamp > 2 * 60 * 1000) {
+      recentlyShownNotifications.delete(entryKey);
+    }
+  }
+  if (!key) return true;
+  if (recentlyShownNotifications.has(key)) return false;
+  recentlyShownNotifications.set(key, now);
+  return true;
+}
 
 messaging.onBackgroundMessage((payload) => {
   const data = payload.data || {};
   const title = payload.notification?.title || data.title || '새 알림';
   const body = payload.notification?.body || data.body || '알림이 도착했습니다.';
   const tag = 'chat-msg-' + (data.message_id || data.id || Date.now());
+  if (!shouldShowNotification(tag)) return;
 
   self.registration.showNotification(title, {
     body,

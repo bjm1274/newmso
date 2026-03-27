@@ -1,14 +1,22 @@
 'use client';
 import { useState, useEffect, useRef, useCallback, type KeyboardEvent } from 'react';
 
-type ChatDetail  = { title: string; body: string; room_id?: string };
-type AlertDetail = { title: string; body: string; type: string; data?: any };
+type ChatDetail = { title?: unknown; body?: unknown; room_id?: unknown };
+type AlertDetail = { title?: unknown; body?: unknown; type?: unknown; data?: unknown };
 
 type BannerItem =
   | { kind: 'chat';  id: string; title: string; body: string; room_id?: string }
   | { kind: 'alert'; id: string; title: string; body: string; type: string; data?: any };
 
 const DISPLAY_MS = 6000;
+
+function toBannerText(value: unknown, fallback = '') {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+    return String(value);
+  }
+  return fallback;
+}
 
 const TYPE_CFG: Record<string, { bg: string; icon: string; label: string }> = {
   message:    { bg: 'bg-[var(--accent)]',  icon: '💬', label: '채팅 열기' },
@@ -61,13 +69,28 @@ export default function ChatAlertBanner({
   useEffect(() => {
     const chatHandler = (e: Event) => {
       const d = (e as CustomEvent<ChatDetail>).detail;
-      if (!d?.title) return;
-      enqueue({ kind: 'chat', id: Date.now().toString(), title: d.title, body: d.body || '', room_id: d.room_id });
+      const title = toBannerText(d?.title, '새 메시지');
+      if (!title) return;
+      enqueue({
+        kind: 'chat',
+        id: Date.now().toString(),
+        title,
+        body: toBannerText(d?.body, ''),
+        room_id: typeof d?.room_id === 'string' ? d.room_id : undefined,
+      });
     };
     const alertHandler = (e: Event) => {
       const d = (e as CustomEvent<AlertDetail>).detail;
-      if (!d?.title) return;
-      enqueue({ kind: 'alert', id: Date.now().toString(), title: d.title, body: d.body || '', type: d.type || 'notification', data: d.data });
+      const title = toBannerText(d?.title, '알림');
+      if (!title) return;
+      enqueue({
+        kind: 'alert',
+        id: Date.now().toString(),
+        title,
+        body: toBannerText(d?.body, ''),
+        type: typeof d?.type === 'string' && d.type ? d.type : 'notification',
+        data: d?.data,
+      });
     };
     window.addEventListener('erp-chat-notification', chatHandler);
     window.addEventListener('erp-alert', alertHandler);
@@ -108,15 +131,15 @@ export default function ChatAlertBanner({
       tabIndex={0}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
-      className={`fixed top-0 left-0 right-0 z-[100] flex items-center gap-3 px-4 py-3 ${cfg.bg}/90 text-white shadow-sm animate-in slide-in-from-top duration-200 safe-area-inset-top select-none`}
+      className={`fixed top-0 left-0 right-0 z-[100] flex items-center gap-3 px-4 py-3 ${cfg.bg}/90 text-white shadow-sm animate-in slide-in-from-top duration-200 safe-area-inset-top select-none md:hidden`}
     >
       {/* 아이콘 */}
       <span className="text-2xl shrink-0 drop-shadow-sm">{cfg.icon}</span>
 
       {/* 내용 */}
       <div className="flex-1 min-w-0 text-left">
-        <p className="font-black text-sm truncate leading-tight">{current.title}</p>
-        <p className="text-xs opacity-90 truncate mt-0.5">{current.body}</p>
+        <p className="font-black text-sm truncate leading-tight">{toBannerText(current.title, '알림')}</p>
+        <p className="text-xs opacity-90 truncate mt-0.5">{toBannerText(current.body, '')}</p>
       </div>
 
       {/* 대기 알림 수 */}
