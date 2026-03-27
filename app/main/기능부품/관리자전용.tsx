@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import { canAccessAdminSection, canAccessMainMenu } from '@/lib/access-control';
@@ -23,6 +23,7 @@ import AccessAuditLog from './관리자전용서브/접근감사로그';
 import CompanyPnL from './관리자전용서브/법인손익현황';
 import OfficialDocumentLog from './관리자전용서브/공문서발송대장';
 import SystemMasterCenter from './관리자전용서브/시스템마스터센터';
+import AssetLoanSettingsAdminView from './관리자전용서브/비품대여물품설정';
 import { hasSystemMasterPermission } from '@/lib/system-master';
 
 type AnalysisTabId = '경영대시보드' | '재무대시보드' | '예산관리' | '통합보고서' | '법인손익';
@@ -41,7 +42,8 @@ type AdminOuterTabId =
   | '데이터초기화'
   | '문서양식'
   | '급여이상치'
-  | '공문서대장';
+  | '공문서대장'
+  | '비품대여설정';
 
 const ANALYSIS_TABS: { id: AnalysisTabId; label: string; icon: string }[] = [
   { id: '경영대시보드', label: '경영대시보드', icon: '📊' },
@@ -68,6 +70,7 @@ const DIRECT_ADMIN_TABS: AdminOuterTabId[] = [
   '문서양식',
   '급여이상치',
   '공문서대장',
+  '비품대여설정',
   '시스템마스터센터',
 ];
 
@@ -223,6 +226,7 @@ export default function AdminView(props: Record<string, unknown>) {
     if (canAccessAdminTab(user, '문서양식')) tabs.push('문서양식');
     if (canAccessAdminTab(user, '급여이상치')) tabs.push('급여이상치');
     if (canAccessAdminTab(user, '공문서대장')) tabs.push('공문서대장');
+    if (canAccessAdminTab(user, '비품대여설정')) tabs.push('비품대여설정');
     if (isSystemMaster && canAccessAdminTab(user, '시스템마스터센터')) {
       tabs.push('시스템마스터센터');
     }
@@ -327,6 +331,7 @@ export default function AdminView(props: Record<string, unknown>) {
         {activeTab === '문서양식' && <FormBuilder user={user} />}
         {activeTab === '급여이상치' && <SalaryAnomalyDetector staffs={staffs} />}
         {activeTab === '공문서대장' && <OfficialDocumentLog staffs={staffs} selectedCo="전체" user={user} />}
+        {activeTab === '비품대여설정' && <AssetLoanSettingsAdminView staffs={staffs} user={user as any} />}
         {activeTab === '시스템마스터센터' && (
           <SystemMasterCenter
             user={user}

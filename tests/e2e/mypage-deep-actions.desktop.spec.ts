@@ -101,6 +101,132 @@ test('mypage commute can check in and out with geolocation permission', async ({
   expect(runtimeErrors).toEqual([]);
 });
 
+test('mypage commute marks check-in as late when the assigned shift start time has passed', async ({
+  page,
+}) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+  const frozenIso = '2026-03-27T08:33:00+09:00';
+  const workDate = '2026-03-27';
+  const shiftUser = {
+    ...fakeUser,
+    shift_id: 'shift-day-0830',
+  };
+
+  await page.addInitScript(({ iso }) => {
+    const RealDate = Date;
+    class MockDate extends RealDate {
+      constructor(...args: any[]) {
+        if (args.length === 0) {
+          super(iso);
+          return;
+        }
+        if (args.length === 1) {
+          super(args[0]);
+          return;
+        }
+        if (args.length === 2) {
+          super(args[0], args[1]);
+          return;
+        }
+        if (args.length === 3) {
+          super(args[0], args[1], args[2]);
+          return;
+        }
+        if (args.length === 4) {
+          super(args[0], args[1], args[2], args[3]);
+          return;
+        }
+        if (args.length === 5) {
+          super(args[0], args[1], args[2], args[3], args[4]);
+          return;
+        }
+        if (args.length === 6) {
+          super(args[0], args[1], args[2], args[3], args[4], args[5]);
+          return;
+        }
+        super(args[0], args[1], args[2], args[3], args[4], args[5], args[6]);
+      }
+
+      static now() {
+        return new RealDate(iso).getTime();
+      }
+    }
+
+    MockDate.parse = RealDate.parse;
+    MockDate.UTC = RealDate.UTC;
+    // @ts-expect-error test shim
+    window.Date = MockDate;
+  }, { iso: frozenIso });
+
+  await mockSupabase(page, {
+    staffMembers: [shiftUser],
+    attendance: [],
+    attendances: [],
+    shiftAssignments: [
+      {
+        id: 'shift-assignment-1',
+        staff_id: shiftUser.id,
+        work_date: workDate,
+        shift_id: 'shift-day-0830',
+      },
+    ],
+    workShifts: [
+      {
+        id: 'shift-day-0830',
+        name: '외래/검사 월-금',
+        start_time: '08:30',
+        end_time: '17:30',
+        company_name: shiftUser.company,
+      },
+    ],
+  });
+
+  await page.context().grantPermissions(['geolocation'], {
+    origin: 'http://127.0.0.1:3000',
+  });
+  await page.context().setGeolocation({
+    latitude: 34.806074,
+    longitude: 126.405525,
+  });
+
+  await seedSession(page, {
+    user: shiftUser,
+    localStorage: {
+      erp_last_menu: '내정보',
+      erp_mypage_tab: 'commute',
+    },
+  });
+
+  await openMyPage(page);
+  await page.getByRole('button', { name: /출퇴근/ }).click();
+  await expect(page.getByTestId('commute-check-in-button')).toBeVisible();
+  await page.getByTestId('commute-check-in-button').click();
+
+  const snapshot = await expect
+    .poll(
+      async () =>
+        page.evaluate(async ({ staffId, targetDate }) => {
+          const [attendanceResponse, attendancesResponse] = await Promise.all([
+            fetch(`/rest/v1/attendance?staff_id=eq.${staffId}&select=*`),
+            fetch(`/rest/v1/attendances?staff_id=eq.${staffId}&select=*`),
+          ]);
+          const attendanceRows = await attendanceResponse.json();
+          const attendancesRows = await attendancesResponse.json();
+          return {
+            attendance: attendanceRows.find((row: any) => String(row.date) === targetDate) ?? null,
+            attendances:
+              attendancesRows.find((row: any) => String(row.work_date || row.date) === targetDate) ?? null,
+          };
+        }, { staffId: shiftUser.id, targetDate: workDate }),
+      { timeout: 5000 }
+    )
+    .toMatchObject({
+      attendance: { status: '지각' },
+      attendances: { status: 'late' },
+    });
+  expect(runtimeErrors).toEqual([]);
+});
+
 test('mypage documents can upload a file and save it to the repository', async ({ page }) => {
   const runtimeErrors = trackRuntimeErrors(page);
 

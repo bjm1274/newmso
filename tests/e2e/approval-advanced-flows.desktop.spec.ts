@@ -242,6 +242,197 @@ test('rejecting a pending approval stores the reject reason in metadata', async 
   expect(runtimeErrors).toEqual([]);
 });
 
+test('supply approval shows requested items in detail and print view, then can be recalled for editing', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+
+  await page.addInitScript(() => {
+    (window as any).__printedHtml = '';
+    window.confirm = () => true;
+    window.open = () =>
+      ({
+        document: {
+          write: (html: string) => {
+            (window as any).__printedHtml = html;
+          },
+          close: () => {},
+        },
+      } as any);
+  });
+
+  await mockSupabase(page, {
+    staffMembers: [requester, firstApprover],
+    approvals: [
+      {
+        id: 'approval-supply-recall-1',
+        type: '물품신청',
+        title: '병동 물품 보충 요청',
+        content: '야간 사용분 보충이 필요합니다.',
+        sender_id: requester.id,
+        sender_name: requester.name,
+        sender_company: requester.company,
+        company_id: requester.company_id,
+        current_approver_id: firstApprover.id,
+        approver_line: [firstApprover.id],
+        status: '대기',
+        doc_number: 'APR-202603-0101',
+        created_at: '2026-03-17T11:00:00.000Z',
+        meta_data: {
+          form_slug: 'supplies',
+          form_name: '물품신청',
+          items: [
+            {
+              name: '멸균 거즈',
+              qty: 12,
+              dept: '병동팀',
+              purpose: '드레싱 교체',
+            },
+          ],
+        },
+      },
+    ],
+    companies: [
+      { id: 'hospital-1', name: '테스트병원', type: 'HOSPITAL', is_active: true },
+      { id: 'mso-company-id', name: 'SY INC.', type: 'MSO', is_active: true },
+    ],
+  });
+
+  await seedSession(page, {
+    user: requester,
+    localStorage: {
+      erp_last_menu: '전자결재',
+      erp_last_subview: '기안함',
+      erp_permission_prompt_shown: '1',
+    },
+  });
+
+  await page.goto('/main?open_menu=전자결재&open_subview=기안함');
+  await expect(page.getByTestId('approval-view')).toBeVisible();
+
+  const approvalCard = page.getByTestId('approval-card-approval-supply-recall-1');
+  await expect(approvalCard).toBeVisible();
+  await approvalCard.getByRole('button', { name: 'PDF' }).click();
+
+  const printedHtml = await page.evaluate(() => (window as any).__printedHtml);
+  expect(printedHtml).toContain('물품 신청 목록');
+  expect(printedHtml).toContain('멸균 거즈');
+  expect(printedHtml).toContain('12');
+
+  await approvalCard.click();
+  await expect(page.getByText('물품 신청 목록')).toBeVisible();
+  await expect(page.getByText('멸균 거즈')).toBeVisible();
+  await expect(page.getByText('드레싱 교체')).toBeVisible();
+
+  await page.getByTestId('approval-detail-recall').click();
+
+  const approvals = await readApprovals(page);
+  const updatedRow = approvals.find((item: any) => item.id === 'approval-supply-recall-1');
+  expect(updatedRow?.status).toBe('회수');
+
+  await expect(page.getByTestId('approval-title-input')).toHaveValue('병동 물품 보충 요청');
+  await expect(page.getByTestId('approval-content-input')).toHaveValue('야간 사용분 보충이 필요합니다.');
+  await expect(page.getByTestId('supplies-item-name-0')).toHaveValue('멸균 거즈');
+  await expect(page.getByTestId('supplies-item-qty-0')).toHaveValue('12');
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('final approval for an attendance correction syncs attendance records', async ({ page }) => {
+  const runtimeErrors = trackRuntimeErrors(page);
+  const correctionDate = '2026-03-18';
+
+  await page.addInitScript(() => {
+    window.confirm = () => true;
+  });
+
+  await mockSupabase(page, {
+    staffMembers: [requester, firstApprover],
+    approvals: [
+      {
+        id: 'approval-attendance-fix-1',
+        type: 'attendance_fix',
+        title: '출결 정정 요청',
+        content: '출근 누락 정정 요청입니다.',
+        sender_id: requester.id,
+        sender_name: requester.name,
+        sender_company: requester.company,
+        company_id: requester.company_id,
+        current_approver_id: firstApprover.id,
+        approver_line: [firstApprover.id],
+        status: '대기',
+        created_at: '2026-03-18T09:00:00.000Z',
+        meta_data: {
+          form_slug: 'attendance_fix',
+          form_name: '출결정정',
+          correction_dates: [correctionDate],
+          correction_type: '정상반영',
+          correction_reason: '외근으로 출근 체크가 누락되었습니다.',
+        },
+      },
+    ],
+    attendance: [],
+    attendances: [],
+    attendanceCorrections: [],
+    companies: [
+      { id: 'hospital-1', name: '테스트병원', type: 'HOSPITAL', is_active: true },
+      { id: 'mso-company-id', name: 'SY INC.', type: 'MSO', is_active: true },
+    ],
+  });
+
+  await seedSession(page, {
+    user: firstApprover,
+    localStorage: {
+      erp_last_menu: '전자결재',
+      erp_last_subview: '결재함',
+      erp_permission_prompt_shown: '1',
+    },
+  });
+
+  await openApprovalInbox(page);
+  const approvalCard = page.getByTestId('approval-card-approval-attendance-fix-1');
+  await expect(approvalCard).toBeVisible();
+  await approvalCard.getByRole('button', { name: '승인' }).click();
+
+  await expect
+    .poll(async () => {
+      const snapshot = await page.evaluate(async ({ approvalId, staffId, date }) => {
+        const headers = { Accept: 'application/json' };
+        const [approvalResponse, correctionsResponse, attendanceResponse, attendancesResponse] =
+          await Promise.all([
+            fetch(`/rest/v1/approvals?id=eq.${approvalId}&select=*`, { headers }),
+            fetch(`/rest/v1/attendance_corrections?staff_id=eq.${staffId}&select=*`, { headers }),
+            fetch(`/rest/v1/attendance?staff_id=eq.${staffId}&date=eq.${date}&select=*`, { headers }),
+            fetch(`/rest/v1/attendances?staff_id=eq.${staffId}&work_date=eq.${date}&select=*`, { headers }),
+          ]);
+
+        const approvals = await approvalResponse.json();
+        const corrections = await correctionsResponse.json();
+        const attendance = await attendanceResponse.json();
+        const attendances = await attendancesResponse.json();
+
+        return {
+          approvalStatus: approvals[0]?.status,
+          correctionStatus:
+            corrections.find((item: any) => String(item.original_date || item.attendance_date) === date)?.status,
+          attendanceStatus: attendance[0]?.status,
+          attendancesStatus: attendances[0]?.status,
+        };
+      }, {
+        approvalId: 'approval-attendance-fix-1',
+        staffId: requester.id,
+        date: correctionDate,
+      });
+
+      return snapshot;
+    })
+    .toMatchObject({
+      approvalStatus: '승인',
+      correctionStatus: '승인',
+      attendanceStatus: '정상',
+      attendancesStatus: 'present',
+    });
+
+  expect(runtimeErrors).toEqual([]);
+});
+
 test('custom approval form submits and its PDF print HTML is generated', async ({ page }) => {
   const runtimeErrors = trackRuntimeErrors(page);
 

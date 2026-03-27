@@ -2,6 +2,20 @@
 // FCM 백그라운드 알림은 /firebase-messaging-sw.js 에서 처리
 const BADGE_URL = '/badge-72x72.png';
 const ICON_URL = '/sy-logo.png';
+const recentlyShownNotifications = new Map();
+
+function shouldShowNotification(key) {
+  const now = Date.now();
+  for (const [entryKey, timestamp] of recentlyShownNotifications.entries()) {
+    if (now - timestamp > 2 * 60 * 1000) {
+      recentlyShownNotifications.delete(entryKey);
+    }
+  }
+  if (!key) return true;
+  if (recentlyShownNotifications.has(key)) return false;
+  recentlyShownNotifications.set(key, now);
+  return true;
+}
 
 // 1. 푸시 알림 수신
 self.addEventListener('push', (event) => {
@@ -17,6 +31,7 @@ self.addEventListener('push', (event) => {
   // firebase-messaging-sw.js와 동일한 tag 형식 사용 → 이중 알림 방지
   const messageId = data.data?.message_id || data.data?.id || '';
   const tag = messageId ? 'chat-msg-' + messageId : (data.data?.type || 'notification') + '-' + Date.now();
+  if (!shouldShowNotification(tag)) return;
 
   const options = {
     body: data.body || '새 알림이 있습니다.',

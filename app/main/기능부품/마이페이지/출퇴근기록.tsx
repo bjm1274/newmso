@@ -1,6 +1,6 @@
 'use client';
 import { toast } from '@/lib/toast';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { WORKPLACE_LOCATION, ALLOWED_DISTANCE_M } from '@/lib/location';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
@@ -24,12 +24,43 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
   const [loading, setLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const effectiveUserId = getStaffLikeId(resolvedUser);
+  const lastResolvedLocationRef = useRef<{
+    latitude: number;
+    longitude: number;
+    distance: number;
+    capturedAt: number;
+  } | null>(null);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     // 컴포넌트 로드 시 위치 권한 요청 및 거리 계산 미리 해보기
-    getCurrentLocation();
+    void resolveCurrentLocation({ showErrors: false, preferCached: false });
     return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const refreshLocation = () => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+        return;
+      }
+      void resolveCurrentLocation({ showErrors: false, preferCached: false });
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('focus', refreshLocation);
+    }
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', refreshLocation);
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('focus', refreshLocation);
+      }
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', refreshLocation);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -138,6 +169,116 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
   };
 
   // 📏 하버사인(Haversine) 공식: 두 좌표 간 거리 계산 (단위: m)
+  const requestCurrentPosition = (options: PositionOptions) =>
+    new Promise<GeolocationPosition>((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, options);
+    });
+
+  const updateDistanceFromPosition = (latitude: number, longitude: number) => {
+    const dist = calculateDistance(
+      latitude,
+      longitude,
+      HOSPITAL_LOCATION.latitude,
+      HOSPITAL_LOCATION.longitude
+    );
+    const roundedDistance = Math.floor(dist);
+    setDistance(roundedDistance);
+    lastResolvedLocationRef.current = {
+      latitude,
+      longitude,
+      distance: roundedDistance,
+      capturedAt: Date.now(),
+    };
+    return dist;
+  };
+
+  const resolveCurrentLocation = async ({
+    showErrors = true,
+    preferCached = true,
+  }: {
+    showErrors?: boolean;
+    preferCached?: boolean;
+  } = {}): Promise<boolean> => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      if (showErrors) {
+        toast('브라우저가 위치 정보를 지원하지 않습니다.', 'error');
+      }
+      return false;
+    }
+
+    const cachedLocation = lastResolvedLocationRef.current;
+    if (preferCached && cachedLocation && Date.now() - cachedLocation.capturedAt <= 2 * 60 * 1000) {
+      setDistance(cachedLocation.distance);
+      if (cachedLocation.distance <= ALLOWED_RADIUS_METER) {
+        return true;
+      }
+      if (showErrors) {
+        toast(
+          `현재 병원과 거리가 ${cachedLocation.distance}m입니다. 병원 반경 ${ALLOWED_RADIUS_METER}m 안에서만 출퇴근 처리할 수 있습니다.`,
+          'warning'
+        );
+      }
+      return false;
+    }
+
+    try {
+      if ('permissions' in navigator && navigator.permissions?.query) {
+        try {
+          const permissionStatus = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
+          if (permissionStatus.state === 'denied') {
+            if (showErrors) {
+              toast('위치 권한이 차단되어 있습니다. 브라우저 또는 앱 설정에서 위치 권한을 허용해 주세요.', 'error');
+            }
+            return false;
+          }
+        } catch {
+          // Some browsers do not fully support querying geolocation permission state.
+        }
+      }
+
+      let position: GeolocationPosition;
+      try {
+        position = await requestCurrentPosition({
+          enableHighAccuracy: true,
+          timeout: 12000,
+          maximumAge: 0,
+        });
+      } catch {
+        position = await requestCurrentPosition({
+          enableHighAccuracy: false,
+          timeout: 10000,
+          maximumAge: 60000,
+        });
+      }
+
+      const { latitude, longitude } = position.coords;
+      const dist = updateDistanceFromPosition(latitude, longitude);
+      if (dist <= ALLOWED_RADIUS_METER) {
+        return true;
+      }
+      if (showErrors) {
+        toast(
+          `현재 병원과 거리가 ${Math.floor(dist)}m입니다. 병원 반경 ${ALLOWED_RADIUS_METER}m 안에서만 출퇴근 처리할 수 있습니다.`,
+          'warning'
+        );
+      }
+      return false;
+    } catch (error: any) {
+      console.warn('위치 확인 실패:', error?.message ?? error);
+      if (!showErrors) {
+        return false;
+      }
+      if (error?.code === 1) {
+        toast('위치 권한이 차단되어 있습니다. 브라우저 또는 앱 설정에서 위치 권한을 허용해 주세요.', 'error');
+      } else if (error?.code === 3) {
+        toast('위치 확인 시간이 초과되었습니다. 야외에서 다시 시도하거나 GPS를 켜 주세요.', 'error');
+      } else {
+        toast('위치 정보를 정확히 가져올 수 없습니다. 다시 시도하거나 브라우저 위치 권한을 확인해 주세요.', 'error');
+      }
+      return false;
+    }
+  };
+
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371e3; // 지구 반경 (미터)
     const φ1 = (lat1 * Math.PI) / 180;
@@ -176,13 +317,103 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     }
   };
 
+  const resolveLateThreshold = async (
+    workDate: string,
+    fallbackDepartment?: string
+  ) => {
+    const buildFallback = (department?: string) => {
+      if (department === '의료진') {
+        return {
+          hour: 8,
+          minute: 30,
+          label: '08:30',
+        };
+      }
+
+      return {
+        hour: 9,
+        minute: 10,
+        label: '09:10',
+      };
+    };
+
+    const userId = effectiveUserId;
+    if (!userId) return buildFallback(fallbackDepartment);
+
+    try {
+      const currentShiftId = String((resolvedUser as Record<string, unknown>)?.shift_id || '').trim();
+      const needsStaffLookup = !currentShiftId || !fallbackDepartment;
+
+      const [assignmentResult, staffResult] = await Promise.all([
+        supabase
+          .from('shift_assignments')
+          .select('shift_id')
+          .eq('staff_id', userId)
+          .eq('work_date', workDate)
+          .maybeSingle(),
+        needsStaffLookup
+          ? supabase
+              .from('staff_members')
+              .select('shift_id, department')
+              .eq('id', userId)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+      ]);
+
+      const effectiveDepartment =
+        fallbackDepartment ||
+        (staffResult?.data as Record<string, unknown> | null | undefined)?.department?.toString();
+
+      const shiftId =
+        String(
+          assignmentResult?.data?.shift_id ||
+            (staffResult?.data as Record<string, unknown> | null | undefined)?.shift_id ||
+            currentShiftId ||
+            ''
+        ).trim();
+
+      if (!shiftId) {
+        return buildFallback(effectiveDepartment);
+      }
+
+      const { data: shiftRow } = await supabase
+        .from('work_shifts')
+        .select('start_time')
+        .eq('id', shiftId)
+        .maybeSingle();
+
+      const startTime = String((shiftRow as Record<string, unknown> | null | undefined)?.start_time || '').trim();
+      const match = startTime.match(/^(\d{1,2}):(\d{2})/);
+
+      if (!match) {
+        return buildFallback(effectiveDepartment);
+      }
+
+      const hour = Number(match[1]);
+      const minute = Number(match[2]);
+
+      if (Number.isNaN(hour) || Number.isNaN(minute)) {
+        return buildFallback(effectiveDepartment);
+      }
+
+      return {
+        hour,
+        minute,
+        label: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
+      };
+    } catch (error) {
+      console.warn('지각 기준 시간 조회 실패:', error);
+      return buildFallback(fallbackDepartment);
+    }
+  };
+
   // 출퇴근 처리 (위치 검증 포함)
   const handleCommute = async (type: 'in' | 'out') => {
     if (isProcessing) return;
     setIsProcessing(true);
 
     // 1. 위치 검증 먼저 수행
-    const isLocationValid = await getCurrentLocation();
+    const isLocationValid = await resolveCurrentLocation({ showErrors: true, preferCached: true });
     if (!isLocationValid) {
       setIsProcessing(false);
       return; // 위치가 안 맞으면 여기서 중단!
@@ -202,11 +433,10 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
 
     try {
       if (type === 'in') {
-        let lateThreshold = 9;
-        let lateMinute = 10;
-        if (userDepartment === '의료진') { lateThreshold = 8; lateMinute = 30; }
-
-        const isLate = now.getHours() > lateThreshold || (now.getHours() === lateThreshold && now.getMinutes() > lateMinute);
+        const lateThreshold = await resolveLateThreshold(today, userDepartment);
+        const isLate =
+          now.getHours() > lateThreshold.hour ||
+          (now.getHours() === lateThreshold.hour && now.getMinutes() > lateThreshold.minute);
 
         const { data, error } = await supabase.from('attendance').upsert([{
           staff_id: userId,
@@ -218,7 +448,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
         if (error) throw error;
         await syncToAttendances(today, timeString, null, isLate ? '지각' : '정상');
         setTodayLog(data);
-        toast(isLate ? `지각 처리되었습니다. (기준: ${lateThreshold}:${lateMinute})` : '정상 출근되었습니다. 오늘도 화이팅!', 'success');
+        toast(isLate ? `지각 처리되었습니다. (기준: ${lateThreshold.label})` : '정상 출근되었습니다. 오늘도 화이팅!', 'success');
 
       } else {
         if (!todayLog) return;

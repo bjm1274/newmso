@@ -35,6 +35,14 @@ type AttendanceRow = {
   status?: string | null;
 };
 
+type AttendancesRow = {
+  staff_id: string;
+  work_date?: string | null;
+  check_in_time?: string | null;
+  check_out_time?: string | null;
+  status?: string | null;
+};
+
 type ShiftBand = 'D' | 'E' | 'N' | 'OTHER' | 'NONE';
 
 type ShiftCardRow = {
@@ -207,7 +215,7 @@ export default function WorkStatus({ user }: { user?: any }) {
     const load = async () => {
       setLoading(true);
       try {
-        const [shiftRes, staffRes, assignmentRes, attendanceRes] = await Promise.allSettled([
+        const [shiftRes, staffRes, assignmentRes, attendanceRes, attendancesRes] = await Promise.allSettled([
           supabase.from('work_shifts').select('id, name, start_time, end_time').eq('is_active', true),
           supabase.from('staff_members').select('id, name, shift_id, department, position, status'),
           supabase
@@ -217,8 +225,12 @@ export default function WorkStatus({ user }: { user?: any }) {
             .lte('work_date', queryRange.endKey),
           supabase
             .from('attendance')
-            .select('staff_id, date, check_in, check_out, check_in_time, check_out_time, status')
+            .select('staff_id, date, check_in, check_out, status')
             .eq('date', todayKey),
+          supabase
+            .from('attendances')
+            .select('staff_id, work_date, check_in_time, check_out_time, status')
+            .eq('work_date', todayKey),
         ]);
 
         if (cancelled) return;
@@ -238,11 +250,32 @@ export default function WorkStatus({ user }: { user?: any }) {
             ? (assignmentRes.value.data as ShiftAssignmentRow[])
             : [],
         );
-        setTodayAttendance(
+        const attendanceRows =
           attendanceRes.status === 'fulfilled' && Array.isArray(attendanceRes.value.data)
             ? (attendanceRes.value.data as AttendanceRow[])
-            : [],
-        );
+            : [];
+        const attendancesRows =
+          attendancesRes.status === 'fulfilled' && Array.isArray(attendancesRes.value.data)
+            ? (attendancesRes.value.data as AttendancesRow[])
+            : [];
+
+        const mergedAttendance = new Map<string, AttendanceRow>();
+        attendanceRows.forEach((row) => {
+          mergedAttendance.set(row.staff_id, { ...row });
+        });
+        attendancesRows.forEach((row) => {
+          const existing = mergedAttendance.get(row.staff_id);
+          mergedAttendance.set(row.staff_id, {
+            ...existing,
+            staff_id: row.staff_id,
+            date: existing?.date || row.work_date || todayKey,
+            check_in_time: row.check_in_time ?? existing?.check_in_time ?? null,
+            check_out_time: row.check_out_time ?? existing?.check_out_time ?? null,
+            status: row.status ?? existing?.status ?? null,
+          });
+        });
+
+        setTodayAttendance(Array.from(mergedAttendance.values()));
       } catch {
         if (cancelled) return;
         setWorkShifts([]);

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -199,21 +199,33 @@ export default function NotificationInbox({ user: _rawUser, onRefresh }: Record<
     return () => { supabase.removeChannel(ch); };
   }, [_u?.id, fetchNotifications]);
 
+  const emitNotificationReadSync = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('erp-notification-read'));
+    }
+    if (typeof onRefresh === 'function') {
+      onRefresh();
+    }
+  }, [onRefresh]);
+
   const markAsRead = async (id: string) => {
     await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('id', id);
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read_at: new Date().toISOString() } : n));
+    emitNotificationReadSync();
   };
 
   const markAllAsRead = async () => {
     if (!_u?.id) return;
     await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('user_id', _u.id as string).is('read_at', null);
     setNotifications(prev => prev.map(n => ({ ...n, read_at: n.read_at || new Date().toISOString() })));
+    emitNotificationReadSync();
   };
 
   const deleteNotif = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     await supabase.from('notifications').delete().eq('id', id);
     setNotifications(prev => prev.filter(n => n.id !== id));
+    emitNotificationReadSync();
   };
 
   const handleClick = (n: any) => {

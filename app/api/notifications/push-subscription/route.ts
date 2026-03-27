@@ -21,14 +21,52 @@ type PushSubscriptionPayload = {
   p256dh?: string;
   auth?: string;
   fcm_token?: string;
+  device_id?: string;
+  platform?: string;
+  user_agent?: string;
 };
+
+function isMissingColumnError(error: unknown, columnName: string) {
+  const payload = error as { code?: string; message?: string; details?: string } | null;
+  const message = `${payload?.message || ''} ${payload?.details || ''}`.toLowerCase();
+  return String(payload?.code || '') === '42703' && message.includes(columnName.toLowerCase());
+}
 
 function parsePayload(body: PushSubscriptionPayload | null) {
   const endpoint = String(body?.endpoint || '').trim();
   const p256dh = String(body?.p256dh || '').trim();
   const auth = String(body?.auth || '').trim();
-  const fcm_token = String(body?.fcm_token || '').trim() || null;
-  return { endpoint, p256dh, auth, fcm_token };
+  const fcmToken = String(body?.fcm_token || '').trim() || null;
+  const deviceId = String(body?.device_id || '').trim() || null;
+  const platform = String(body?.platform || '').trim() || null;
+  const userAgent = String(body?.user_agent || '').trim() || null;
+  return { endpoint, p256dh, auth, fcmToken, deviceId, platform, userAgent };
+}
+
+async function detectExtendedColumnSupport(supabase: ReturnType<typeof getAdminClient>) {
+  const { error } = await supabase.from('push_subscriptions').select('device_id').limit(1);
+  if (!error) return true;
+  if (isMissingColumnError(error, 'device_id')) return false;
+  throw error;
+}
+
+async function upsertPushSubscription(
+  supabase: ReturnType<typeof getAdminClient>,
+  record: Record<string, unknown>,
+  supportsExtendedColumns: boolean
+) {
+  const baseRecord = {
+    staff_id: record.staff_id,
+    endpoint: record.endpoint,
+    p256dh: record.p256dh,
+    auth: record.auth,
+    fcm_token: record.fcm_token,
+  };
+  const payload = supportsExtendedColumns ? record : baseRecord;
+  const { error } = await supabase
+    .from('push_subscriptions')
+    .upsert(payload, { onConflict: 'staff_id,endpoint' });
+  return error;
 }
 
 export async function POST(request: NextRequest) {
@@ -39,10 +77,9 @@ export async function POST(request: NextRequest) {
     }
 
     const body = (await request.json().catch(() => null)) as PushSubscriptionPayload | null;
-    const { endpoint, p256dh, auth, fcm_token } = parsePayload(body);
+    const { endpoint, p256dh, auth, fcmToken, deviceId, platform, userAgent } = parsePayload(body);
 
-    // FCM token만 있는 경우도 허용 (Web Push 없이 FCM만 등록)
-    if (!endpoint && !fcm_token) {
+    if (!endpoint && !fcmToken) {
       return NextResponse.json({ error: 'Invalid push subscription payload.' }, { status: 400 });
     }
     if (endpoint && (!p256dh || !auth)) {
@@ -51,75 +88,96 @@ export async function POST(request: NextRequest) {
 
     const supabase = getAdminClient();
     const staffId = String(session.user.id);
+    const supportsExtendedColumns = await detectExtendedColumnSupport(supabase);
+    const effectiveEndpoint = endpoint || (deviceId ? `fcm:${staffId}:${deviceId}` : `fcm:${staffId}`);
 
-    const { error: deleteNullError } = await supabase
-      .from('push_subscriptions')
-      .delete()
-      .eq('endpoint', endpoint)
-      .is('staff_id', null);
+    if (endpoint) {
+      const { error: deleteNullError } = await supabase
+        .from('push_subscriptions')
+        .delete()
+        .eq('endpoint', endpoint)
+        .is('staff_id', null);
 
-    if (deleteNullError) {
-      return NextResponse.json({ error: '구독 정보 처리 중 오류가 발생했습니다.' }, { status: 500 });
+      if (deleteNullError) {
+        return NextResponse.json({ error: '구독 정보를 처리하는 중 오류가 발생했습니다.' }, { status: 500 });
+      }
+
+      const { error: deleteError } = await supabase
+        .from('push_subscriptions')
+        .delete()
+        .eq('endpoint', endpoint)
+        .neq('staff_id', staffId);
+
+      if (deleteError) {
+        return NextResponse.json({ error: '구독 정보를 처리하는 중 오류가 발생했습니다.' }, { status: 500 });
+      }
     }
 
-    const { error: deleteError } = await supabase
-      .from('push_subscriptions')
-      .delete()
-      .eq('endpoint', endpoint)
-      .neq('staff_id', staffId);
-
-    if (deleteError) {
-      return NextResponse.json({ error: '구독 정보 처리 중 오류가 발생했습니다.' }, { status: 500 });
-    }
-
-    // FCM token만 있는 경우 별도 upsert
-    if (fcm_token && !endpoint) {
-      // 기존 fcm_token 없는(Web Push 전용) 레코드 정리 → 이중 알림 방지
-      await supabase.from('push_subscriptions')
+    if (fcmToken && !endpoint) {
+      await supabase
+        .from('push_subscriptions')
         .delete()
         .eq('staff_id', staffId)
         .is('fcm_token', null);
-      await supabase.from('push_subscriptions').upsert(
-        { staff_id: staffId, endpoint: `fcm:${staffId}`, p256dh: '', auth: '', fcm_token },
-        { onConflict: 'staff_id,endpoint' }
-      );
-      await supabase.from('push_subscriptions')
-        .delete()
-        .eq('staff_id', staffId)
-        .eq('fcm_token', fcm_token)
-        .neq('endpoint', `fcm:${staffId}`);
-      return NextResponse.json({ ok: true });
     }
 
-    // FCM 토큰이 포함된 Web Push 구독 등록 시: 같은 staff의 fcm_token 없는 다른 레코드 정리
-    if (fcm_token && endpoint) {
-      await supabase.from('push_subscriptions')
+    if (fcmToken && endpoint) {
+      await supabase
+        .from('push_subscriptions')
         .delete()
         .eq('staff_id', staffId)
         .is('fcm_token', null)
         .neq('endpoint', endpoint);
     }
 
-    const { error: upsertError } = await supabase.from('push_subscriptions').upsert(
-      { staff_id: staffId, endpoint, p256dh, auth, fcm_token },
-      { onConflict: 'staff_id,endpoint' }
+    if (supportsExtendedColumns && deviceId) {
+      const cleanupQuery = supabase
+        .from('push_subscriptions')
+        .delete()
+        .eq('staff_id', staffId)
+        .eq('device_id', deviceId)
+        .neq('endpoint', effectiveEndpoint);
+      const { error: cleanupError } = await cleanupQuery;
+      if (cleanupError) {
+        return NextResponse.json({ error: '구독 정보를 처리하는 중 오류가 발생했습니다.' }, { status: 500 });
+      }
+    }
+
+    const upsertError = await upsertPushSubscription(
+      supabase,
+      {
+        staff_id: staffId,
+        endpoint: effectiveEndpoint,
+        p256dh,
+        auth,
+        fcm_token: fcmToken,
+        device_id: deviceId,
+        platform,
+        user_agent: userAgent,
+      },
+      supportsExtendedColumns
     );
 
     if (upsertError) {
-      return NextResponse.json({ error: '구독 정보 처리 중 오류가 발생했습니다.' }, { status: 500 });
+      return NextResponse.json({ error: '구독 정보를 처리하는 중 오류가 발생했습니다.' }, { status: 500 });
     }
 
-    if (fcm_token) {
-      await supabase.from('push_subscriptions')
+    if (fcmToken) {
+      let dedupeQuery = supabase
+        .from('push_subscriptions')
         .delete()
         .eq('staff_id', staffId)
-        .eq('fcm_token', fcm_token)
-        .neq('endpoint', endpoint);
+        .eq('fcm_token', fcmToken)
+        .neq('endpoint', effectiveEndpoint);
+      if (supportsExtendedColumns && deviceId) {
+        dedupeQuery = dedupeQuery.eq('device_id', deviceId);
+      }
+      await dedupeQuery;
     }
 
     return NextResponse.json({ ok: true });
   } catch {
-    return NextResponse.json({ error: '구독 정보 처리 중 오류가 발생했습니다.' }, { status: 500 });
+    return NextResponse.json({ error: '구독 정보를 처리하는 중 오류가 발생했습니다.' }, { status: 500 });
   }
 }
 
@@ -145,7 +203,7 @@ export async function DELETE(request: NextRequest) {
       .eq('endpoint', endpoint);
 
     if (error) {
-      return NextResponse.json({ error: '구독 정보 처리 중 오류가 발생했습니다.' }, { status: 500 });
+      return NextResponse.json({ error: '구독 정보를 처리하는 중 오류가 발생했습니다.' }, { status: 500 });
     }
 
     const { error: deleteNullError } = await supabase
@@ -155,11 +213,11 @@ export async function DELETE(request: NextRequest) {
       .is('staff_id', null);
 
     if (deleteNullError) {
-      return NextResponse.json({ error: '구독 정보 처리 중 오류가 발생했습니다.' }, { status: 500 });
+      return NextResponse.json({ error: '구독 정보를 처리하는 중 오류가 발생했습니다.' }, { status: 500 });
     }
 
     return NextResponse.json({ ok: true });
   } catch {
-    return NextResponse.json({ error: '구독 정보 처리 중 오류가 발생했습니다.' }, { status: 500 });
+    return NextResponse.json({ error: '구독 정보를 처리하는 중 오류가 발생했습니다.' }, { status: 500 });
   }
 }

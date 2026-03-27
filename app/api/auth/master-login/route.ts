@@ -75,6 +75,11 @@ function failureResponse(error?: string, status = 200) {
   return clearSessionCookie(response);
 }
 
+function isActiveStaffForLogin(row: any) {
+  const status = String(row?.status ?? '').trim();
+  return status !== '퇴사';
+}
+
 export async function POST(request: NextRequest) {
   let loginId = '';
   let password = '';
@@ -115,17 +120,21 @@ export async function POST(request: NextRequest) {
         .from('staff_members')
         .select('*')
         .eq('name', loginId)
-        .limit(2);
+        .limit(10);
 
       if (byNameError) {
         return failureResponse('등록된 사용자 조회 중 오류가 발생했습니다.', 500);
       }
 
-      if (byName.length > 1) {
+      const activeNameMatches = (byName ?? []).filter(isActiveStaffForLogin);
+
+      if (activeNameMatches.length > 1) {
         return failureResponse('동명이인이 있습니다. 로그인 아이디에 사번을 입력해 주세요.');
       }
 
-      if (byName?.length === 1) {
+      if (activeNameMatches.length === 1) {
+        userRow = activeNameMatches[0];
+      } else if (byName?.length === 1) {
         userRow = byName[0];
       }
     }

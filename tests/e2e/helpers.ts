@@ -488,6 +488,26 @@ function markNotificationsRead(rows: any[], id?: string | null) {
   });
 }
 
+function patchRowsMatchingFilters(rows: any[], url: URL, patch: Record<string, any>) {
+  const matchedIndexes: number[] = [];
+  const nextRows = rows.map((row: any, index: number) => {
+    if (!matchFilters(row, url)) {
+      return row;
+    }
+
+    matchedIndexes.push(index);
+    return {
+      ...row,
+      ...patch,
+    };
+  });
+
+  return {
+    nextRows,
+    updatedRows: matchedIndexes.map((index) => nextRows[index]),
+  };
+}
+
 export async function seedSession(page: Page, options: SeedOptions = {}) {
   const user = {
     ...fakeUser,
@@ -1669,10 +1689,9 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
 
       if (method === 'PATCH') {
         const body = request.postDataJSON();
-        attendance = attendance.map((row: any) =>
-          matchFilters(row, url) ? { ...row, ...body } : row
-        );
-        const updated = applyQueryFilters(attendance, url);
+        const { nextRows, updatedRows } = patchRowsMatchingFilters(attendance, url, body);
+        attendance = nextRows;
+        const updated = updatedRows;
         return json(route, wantsObject ? updated[0] ?? null : updated);
       }
 

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { sound } from '@/lib/sounds';
+import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
 
 const TYPE_CFG: Record<string, { icon: string; color: string; label: string }> = {
   message: { icon: '💬', color: 'text-blue-500', label: '채팅' },
@@ -20,6 +21,14 @@ const TYPE_CFG: Record<string, { icon: string; color: string; label: string }> =
 };
 
 const getTypeCfg = (type: string) => TYPE_CFG[type] || TYPE_CFG.default;
+
+function toNotificationText(value: unknown, fallback = '') {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+    return String(value);
+  }
+  return fallback;
+}
 
 function timeAgo(dateStr: string) {
   const elapsedSeconds = (Date.now() - new Date(dateStr).getTime()) / 1000;
@@ -60,21 +69,58 @@ export default function NotificationCenter({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const prevCountRef = useRef(0);
+  const normalizedUser = useMemo(
+    () => normalizeStaffLike((user ?? {}) as Record<string, unknown>),
+    [user]
+  );
+  const [resolvedUser, setResolvedUser] = useState<Record<string, unknown> | null>(() => {
+    const directId = getStaffLikeId(normalizedUser);
+    return directId ? normalizedUser : null;
+  });
+  const effectiveUser = (resolvedUser || normalizedUser) as Record<string, unknown>;
+  const effectiveUserId = getStaffLikeId(effectiveUser);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const syncUserIdentity = async () => {
+      const directId = getStaffLikeId(normalizedUser);
+      if (directId) {
+        setResolvedUser(normalizedUser);
+        return;
+      }
+
+      if (!normalizedUser?.name && !normalizedUser?.employee_no && !normalizedUser?.auth_user_id) {
+        setResolvedUser(normalizedUser);
+        return;
+      }
+
+      const recoveredUser = await resolveStaffLike(normalizedUser);
+      if (!cancelled) {
+        setResolvedUser(recoveredUser as Record<string, unknown>);
+      }
+    };
+
+    void syncUserIdentity();
+    return () => {
+      cancelled = true;
+    };
+  }, [normalizedUser?.id, normalizedUser?.name, normalizedUser?.employee_no, normalizedUser?.auth_user_id]);
 
   const fetchNotifications = useCallback(async () => {
-    if (!user?.id) return;
+    if (!effectiveUserId) return;
 
     // unread count는 전체 기준으로 정확하게 계산
     const { count: totalUnread } = await supabase
       .from('notifications')
       .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
+      .eq('user_id', effectiveUserId)
       .is('read_at', null);
 
     const { data } = await supabase
       .from('notifications')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', effectiveUserId)
       .order('created_at', { ascending: false })
       .limit(50);
 
@@ -84,10 +130,10 @@ export default function NotificationCenter({
     const unread = totalUnread ?? list.filter((notification: any) => !notification.read_at).length;
     setUnreadCount(unread);
     return unread;
-  }, [user?.id]);
+  }, [effectiveUserId]);
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!effectiveUserId) return;
 
     void fetchNotifications();
 
@@ -125,7 +171,7 @@ export default function NotificationCenter({
       document.removeEventListener('touchstart', handleClickOutside);
       window.clearInterval(fallbackPoll);
     };
-  }, [user?.id, fetchNotifications]);
+  }, [effectiveUserId, fetchNotifications]);
 
   useEffect(() => {
     if (unreadCount > prevCountRef.current && prevCountRef.current > 0) {
@@ -136,13 +182,13 @@ export default function NotificationCenter({
   }, [unreadCount]);
 
   const markAllAsRead = useCallback(async () => {
-    if (!user?.id) return;
+    if (!effectiveUserId) return;
 
     const readAt = new Date().toISOString();
     await supabase
       .from('notifications')
       .update({ read_at: readAt })
-      .eq('user_id', user.id)
+      .eq('user_id', effectiveUserId)
       .is('read_at', null);
 
     setNotifications((prev) => prev.map((notification) => ({
@@ -150,8 +196,11 @@ export default function NotificationCenter({
       read_at: notification.read_at || readAt,
     })));
     setUnreadCount(0);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('erp-notification-read'));
+    }
     sound.playSystem();
-  }, [user?.id]);
+  }, [effectiveUserId]);
 
   const markAsRead = useCallback(async (id: string) => {
     const readAt = new Date().toISOString();
@@ -162,6 +211,9 @@ export default function NotificationCenter({
       )
     );
     setUnreadCount((prev) => Math.max(0, prev - 1));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('erp-notification-read'));
+    }
   }, []);
 
   const openMyPage = useCallback(() => {
@@ -319,7 +371,7 @@ export default function NotificationCenter({
                           <div className="min-w-0 flex-1">
                             <div className="flex justify-between items-start gap-1">
                               <p className="text-[12px] font-bold text-[var(--foreground)] truncate flex-1">
-                                {notification.title}
+                                {toNotificationText(notification.title, '알림')}
                               </p>
                               <span className="text-[9px] text-[var(--toss-gray-3)] shrink-0 mt-0.5">
                                 {timeAgo(notification.created_at)}
@@ -328,9 +380,9 @@ export default function NotificationCenter({
                             <p className="text-[10px] text-[var(--toss-gray-3)] font-bold mt-0.5">
                               {cfg.label}
                             </p>
-                            {notification.body && (
+                            {toNotificationText(notification.body, '') && (
                               <p className="text-[11px] text-[var(--toss-gray-4)] line-clamp-2 mt-0.5 leading-relaxed">
-                                {notification.body}
+                                {toNotificationText(notification.body, '')}
                               </p>
                             )}
                           </div>
@@ -364,7 +416,7 @@ export default function NotificationCenter({
                           <div className="min-w-0 flex-1">
                             <div className="flex justify-between items-start gap-1">
                               <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] truncate flex-1">
-                                {notification.title}
+                                {toNotificationText(notification.title, '알림')}
                               </p>
                               <span className="text-[9px] text-[var(--toss-gray-3)] shrink-0 mt-0.5">
                                 {timeAgo(notification.created_at)}
@@ -373,9 +425,9 @@ export default function NotificationCenter({
                             <p className="text-[10px] text-[var(--toss-gray-3)] font-bold mt-0.5">
                               {cfg.label}
                             </p>
-                            {notification.body && (
+                            {toNotificationText(notification.body, '') && (
                               <p className="text-[10px] text-[var(--toss-gray-3)] line-clamp-1 mt-0.5">
-                                {notification.body}
+                                {toNotificationText(notification.body, '')}
                               </p>
                             )}
                           </div>

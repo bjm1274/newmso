@@ -137,8 +137,29 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   // ESS (직원 셀프 서비스) 승인 대기함 관련
   const [essRequests, setEssRequests] = useState<any[]>([]);
   const [showEssModal, setShowEssModal] = useState(false);
+  const [staffNameSearchInput, setStaffNameSearchInput] = useState('');
+  const [appliedStaffNameSearch, setAppliedStaffNameSearch] = useState('');
 
   const 한글정렬 = (a: string, b: string) => a.localeCompare(b, 'ko');
+
+  const normalizeEmployeeNoForSort = (value: unknown) => {
+    const raw = String(value ?? '').trim();
+    const digitsOnly = raw.replace(/[^0-9]/g, '');
+
+    if (digitsOnly && digitsOnly.length === raw.length) {
+      return {
+        isNumeric: true,
+        numericValue: Number(digitsOnly),
+        textValue: raw,
+      };
+    }
+
+    return {
+      isNumeric: false,
+      numericValue: Number.POSITIVE_INFINITY,
+      textValue: raw,
+    };
+  };
 
   const getVisibleShiftOptions = (companyName: string) =>
     근무형태목록
@@ -567,15 +588,50 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     }
   };
 
-  const 필터목록 = 직원목록.filter((s: StaffMember) => {
-    const companyMatch = 선택사업체 === '전체' ? true : s.company === 선택사업체;
-    const status = s.status || '재직';
-    if (보기상태 === '퇴사') {
-      return companyMatch && status === '퇴사';
-    }
-    // 기본은 재직자 위주
-    return companyMatch && status !== '퇴사';
-  });
+  const 필터목록 = useMemo(() => {
+    const normalizedKeyword = appliedStaffNameSearch.trim().toLocaleLowerCase('ko-KR');
+
+    return [...직원목록]
+      .filter((s: StaffMember) => {
+        const companyMatch = 선택사업체 === '전체' ? true : s.company === 선택사업체;
+        const status = s.status || '재직';
+        const nameMatch = !normalizedKeyword
+          ? true
+          : String(s.name || '').toLocaleLowerCase('ko-KR').includes(normalizedKeyword);
+
+        if (보기상태 === '퇴사') {
+          return companyMatch && status === '퇴사' && nameMatch;
+        }
+
+        // 기본은 재직자 위주
+        return companyMatch && status !== '퇴사' && nameMatch;
+      })
+      .sort((a: StaffMember, b: StaffMember) => {
+        const aEmployeeNo = normalizeEmployeeNoForSort(a.employee_no);
+        const bEmployeeNo = normalizeEmployeeNoForSort(b.employee_no);
+
+        if (aEmployeeNo.isNumeric && bEmployeeNo.isNumeric && aEmployeeNo.numericValue !== bEmployeeNo.numericValue) {
+          return aEmployeeNo.numericValue - bEmployeeNo.numericValue;
+        }
+
+        if (aEmployeeNo.isNumeric !== bEmployeeNo.isNumeric) {
+          return aEmployeeNo.isNumeric ? -1 : 1;
+        }
+
+        const employeeNoCompare = aEmployeeNo.textValue.localeCompare(bEmployeeNo.textValue, 'ko', {
+          numeric: true,
+          sensitivity: 'base',
+        });
+
+        if (employeeNoCompare !== 0) {
+          return employeeNoCompare;
+        }
+
+        return String(a.name || '').localeCompare(String(b.name || ''), 'ko', {
+          sensitivity: 'base',
+        });
+      });
+  }, [appliedStaffNameSearch, 보기상태, 선택사업체, 직원목록]);
   const 면허등록인원수 = 필터목록.filter((직원: StaffMember) => Boolean(직원.license || 직원.permissions?.license_no)).length;
   const 계약직인원수 = 필터목록.filter((직원: StaffMember) => 직원고용형태(직원) === '계약직').length;
   const 부서수 = new Set(필터목록.map((직원: StaffMember) => 직원.department).filter(Boolean)).size;
@@ -620,6 +676,48 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       </header>
 
       <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+        <div className="mb-4 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end">
+            <div className="flex-1">
+              <label className="mb-1 block text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                직원 이름 검색
+              </label>
+              <input
+                type="text"
+                value={staffNameSearchInput}
+                onChange={(event) => setStaffNameSearchInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    setAppliedStaffNameSearch(staffNameSearchInput);
+                  }
+                }}
+                placeholder="직원 이름 검색"
+                className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 py-2 text-sm text-[var(--foreground)] outline-none transition focus:border-[var(--accent)]"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setAppliedStaffNameSearch(staffNameSearchInput)}
+                className="h-[42px] rounded-[var(--radius-md)] bg-[var(--accent)] px-4 text-sm font-semibold text-white shadow-sm transition hover:opacity-95"
+              >
+                검색
+              </button>
+              {(staffNameSearchInput || appliedStaffNameSearch) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStaffNameSearchInput('');
+                    setAppliedStaffNameSearch('');
+                  }}
+                  className="h-[42px] rounded-[var(--radius-md)] border border-[var(--border)] px-4 text-sm font-semibold text-[var(--foreground)] transition hover:bg-[var(--muted)]"
+                >
+                  초기화
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
         {false && (
           <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
           {[

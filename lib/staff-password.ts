@@ -68,6 +68,41 @@ export async function updateStaffPasswordWithFallback(
   return { error: null, updatedColumn: 'passwd' as const, passwordHash };
 }
 
+export async function clearStaffPasswordWithFallback(supabase: any, staffId: string) {
+  let clearedPassword = false;
+  let clearedPasswd = false;
+
+  const passwordUpdate = await supabase
+    .from('staff_members')
+    .update({ password: null })
+    .eq('id', staffId);
+
+  if (!passwordUpdate.error) {
+    clearedPassword = true;
+  } else if (!isMissingColumnError(passwordUpdate.error, 'password')) {
+    return { error: passwordUpdate.error, clearedColumns: [] as string[] };
+  }
+
+  const passwdUpdate = await supabase
+    .from('staff_members')
+    .update({ passwd: null })
+    .eq('id', staffId);
+
+  if (!passwdUpdate.error) {
+    clearedPasswd = true;
+  } else if (!isMissingColumnError(passwdUpdate.error, 'passwd')) {
+    return { error: passwdUpdate.error, clearedColumns: [] as string[] };
+  }
+
+  return {
+    error: null,
+    clearedColumns: [
+      ...(clearedPassword ? ['password'] : []),
+      ...(clearedPasswd ? ['passwd'] : []),
+    ],
+  };
+}
+
 export async function selectStaffPasswordRowsWithFallback<T = StaffCredentialRow[]>(
   runSelect: (selectClause: string) => PromiseLike<{ data: any; error: any }>
 ): Promise<{ data: T | null; error: any }> {

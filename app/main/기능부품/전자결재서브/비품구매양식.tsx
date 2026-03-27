@@ -176,10 +176,10 @@ export default function SuppliesForm({ setExtraData, initialItems }: Record<stri
         <div className="overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] shadow-sm">
           <table className="w-full max-w-full table-fixed border-collapse">
             <colgroup>
-              <col className="w-[42%]" />
-              <col className="w-[8%]" />
-              <col className="w-[38%]" />
-              <col className="w-[12%]" />
+              <col className="w-[40%]" />
+              <col className="w-[14%]" />
+              <col className="w-[32%]" />
+              <col className="w-[14%]" />
             </colgroup>
             <thead className="bg-[var(--muted)]">
               <tr className="border-b border-[var(--border)]">
@@ -232,7 +232,7 @@ export default function SuppliesForm({ setExtraData, initialItems }: Record<stri
                       min="1"
                       value={item.qty}
                       onChange={e => updateItemField(idx, 'qty', Number(e.target.value))}
-                      className="h-10 w-full rounded-[var(--radius-md)] border-none bg-[var(--toss-blue-light)]/50 px-2 text-center text-xs font-bold text-[var(--accent)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+                      className="h-10 w-full min-w-[64px] rounded-[var(--radius-md)] border-none bg-[var(--toss-blue-light)]/50 px-2.5 text-center text-sm font-black tabular-nums tracking-tight text-[var(--accent)] outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
                     />
                   </td>
                   <td className="px-2 py-1.5 align-middle">

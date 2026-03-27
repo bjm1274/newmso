@@ -25,6 +25,7 @@ const CHAT_FOCUS_KEY = 'erp_chat_focus_keyword';
 const CHAT_ROOM_PREFS_KEY = 'erp_chat_room_prefs';
 const CHAT_PINNED_KEY = 'erp_chat_pinned_messages';
 const CHAT_BOOKMARK_KEY = 'erp_chat_bookmarks';
+const CHAT_PINNED_ROOM_ORDER_KEY = 'erp_chat_pinned_room_order';
 // 운영 DB의 legacy `message_reads`는 아직 `chat_messages`를 참조하고 있어
 // 현재 `messages` 기반 채팅과 직접 호환되지 않는다. 읽음 계산은
 // `room_read_cursors`로 이미 처리하므로, 충돌만 일으키는 legacy 쓰기는 비활성화한다.
@@ -220,6 +221,8 @@ type DeliveryState = {
   error?: string | null;
 };
 
+type GlobalSearchTab = 'all' | 'member' | 'room' | 'message' | 'file';
+
 function getRoomPrefsStorageKey(userId: string | null | undefined): string {
   return `${CHAT_ROOM_PREFS_KEY}:${userId || 'guest'}`;
 }
@@ -234,6 +237,10 @@ function getPinnedStorageKey(roomId: string | null | undefined): string {
 
 function getBookmarkStorageKey(userId: string | null | undefined): string {
   return `${CHAT_BOOKMARK_KEY}:${userId || 'guest'}`;
+}
+
+function getPinnedRoomOrderStorageKey(userId: string | null | undefined): string {
+  return `${CHAT_PINNED_ROOM_ORDER_KEY}:${userId || 'guest'}`;
 }
 
 function readStoredStringArray(storageKey: string): string[] {
@@ -268,6 +275,11 @@ function writeStoredBookmarks(userId: string | null | undefined, messageIds: str
   writeStoredStringArray(getBookmarkStorageKey(userId), messageIds);
 }
 
+function arraysMatch(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) return false;
+  return left.every((value, index) => value === right[index]);
+}
+
 function getKoreanTodayString() {
   const now = new Date();
   const koreaNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
@@ -294,7 +306,11 @@ function getRoomPreviewText(room: ChatRoom): string {
   return (room?.last_message_preview as string | null | undefined) || (room?.last_message as string | null | undefined) || '대화가 없습니다.';
 }
 
-function sortRoomsForSidebar(rooms: ChatRoom[], prefs: Record<string, RoomPreference>): ChatRoom[] {
+function sortRoomsForSidebar(
+  rooms: ChatRoom[],
+  prefs: Record<string, RoomPreference>,
+  pinnedRoomOrder: string[]
+): ChatRoom[] {
   const notice = rooms.find(( room: ChatRoom) => room.id === NOTICE_ROOM_ID);
   const rest = rooms
     .filter(( room: ChatRoom) => room.id !== NOTICE_ROOM_ID)
@@ -303,7 +319,19 @@ function sortRoomsForSidebar(rooms: ChatRoom[], prefs: Record<string, RoomPrefer
       const bt = new Date(b.last_message_at || b.created_at || 0).getTime();
       return bt - at;
     });
-  const pinned = rest.filter(( room: ChatRoom) => prefs[room.id]?.pinned);
+  const pinnedOrderIndex = new Map(
+    pinnedRoomOrder.map((roomId, index) => [String(roomId), index])
+  );
+  const pinned = rest
+    .filter(( room: ChatRoom) => prefs[room.id]?.pinned)
+    .sort((a: ChatRoom, b: ChatRoom) => {
+      const aIndex = pinnedOrderIndex.get(String(a.id)) ?? Number.MAX_SAFE_INTEGER;
+      const bIndex = pinnedOrderIndex.get(String(b.id)) ?? Number.MAX_SAFE_INTEGER;
+      if (aIndex !== bIndex) return aIndex - bIndex;
+      const at = new Date(a.last_message_at || a.created_at || 0).getTime();
+      const bt = new Date(b.last_message_at || b.created_at || 0).getTime();
+      return bt - at;
+    });
   const regular = rest.filter(( room: ChatRoom) => !prefs[room.id]?.pinned);
   return notice ? [notice, ...pinned, ...regular] : [...pinned, ...regular];
 }
@@ -395,14 +423,17 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   const [editingRoomName, setEditingRoomName] = useState(false);
   const [roomNameDraft, setRoomNameDraft] = useState('');
   const [roomPrefs, setRoomPrefs] = useState<Record<string, RoomPreference>>({});
+  const [pinnedRoomOrder, setPinnedRoomOrder] = useState<string[]>([]);
   const [showHiddenRooms, setShowHiddenRooms] = useState(false);
   const [presenceMap, setPresenceMap] = useState<Record<string, PresenceInfo>>({});
   const [typingUsers, setTypingUsers] = useState<Record<string, string>>({});
 
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
+  const [globalSearchTab, setGlobalSearchTab] = useState<GlobalSearchTab>('all');
   const [globalSearchResults, setGlobalSearchResults] = useState<ChatMessage[]>([]);
   const [globalSearchLoading, setGlobalSearchLoading] = useState(false);
+  const deferredGlobalSearchQuery = useDeferredValue(globalSearchQuery);
 
 
   const chatRoomsRef = useRef<any[]>([]);
@@ -415,6 +446,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   const readWriteInFlightRef = useRef<Set<string>>(new Set());
   const incomingRealtimeMessageIdsRef = useRef<Map<string, number>>(new Map());
   const isNearBottomRef = useRef(true);
+  const lastTimelineTailRef = useRef('');
   const selectedRoomIdRef = useRef<string | null>(null);
   const fetchDataRef = useRef<(() => Promise<void>) | null>(null);
   /** 방별 입력 draft 저장소 */
@@ -694,6 +726,7 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     isNearBottomRef.current = true;
     setShowScrollToLatest(false);
     if (selectedRoomIdRef.current !== roomId) {
+      lastTimelineTailRef.current = '';
       setMessages([]);
       setReadCounts({});
       setRoomReadCursorMap({});
@@ -717,17 +750,26 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     const savedDraft = (roomId ? draftMapRef.current.get(roomId) : '') || '';
     inputMsgRef.current = savedDraft;
     setInputMsg(savedDraft);
-    // 채팅방 열 때 해당 방 관련 미읽 알림 자동 읽음 처리
+    // 채팅방 열 때 해당 방 관련 미읽 알림/안읽음 개수 즉시 정리
     if (roomId && effectiveChatUserId) {
+      const readAt = new Date().toISOString();
+      setRoomUnreadCounts((prev) => {
+        if (!prev[roomId]) return prev;
+        return { ...prev, [roomId]: 0 };
+      });
       void (async () => {
         try {
-          await supabase
-            .from('notifications')
-            .update({ read_at: new Date().toISOString() })
-            .eq('user_id', effectiveChatUserId)
-            .in('type', ['message', 'mention'])
-            .is('read_at', null)
-            .filter('metadata->>room_id', 'eq', roomId);
+          await Promise.allSettled([
+            supabase
+              .from('notifications')
+              .update({ read_at: readAt })
+              .eq('user_id', effectiveChatUserId)
+              .in('type', ['message', 'mention'])
+              .is('read_at', null)
+              .filter('metadata->>room_id', 'eq', roomId),
+            persistRoomReadCursor(roomId, readAt),
+          ]);
+          broadcastChatSync('message-read', roomId);
           if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('erp-notification-read'));
           }
@@ -745,6 +787,8 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     }
   };
 
+  const roomPrefsUserId = effectiveChatUserId || user?.id || null;
+
   const updateRoomPreference = useCallback((roomId: string, patch: RoomPreference) => {
     setRoomPrefs((prev) => {
       const next = {
@@ -756,14 +800,49 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
       };
       if (typeof window !== 'undefined') {
         try {
-          window.localStorage.setItem(getRoomPrefsStorageKey(user?.id), JSON.stringify(next));
+          window.localStorage.setItem(getRoomPrefsStorageKey(roomPrefsUserId), JSON.stringify(next));
         } catch {
           // ignore
         }
       }
       return next;
     });
-  }, [user?.id]);
+  }, [roomPrefsUserId]);
+
+  const persistPinnedRoomOrder = useCallback((nextOrder: string[]) => {
+    const normalized = Array.from(new Set(nextOrder.map((roomId) => String(roomId))));
+    setPinnedRoomOrder(normalized);
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem(
+          getPinnedRoomOrderStorageKey(roomPrefsUserId),
+          JSON.stringify(normalized)
+        );
+      } catch {
+        // ignore
+      }
+    }
+  }, [roomPrefsUserId]);
+
+  const toggleRoomPinned = useCallback((roomId: string, shouldPin: boolean) => {
+    updateRoomPreference(roomId, { pinned: shouldPin });
+    persistPinnedRoomOrder(
+      shouldPin
+        ? [...pinnedRoomOrder.filter((id) => String(id) !== String(roomId)), String(roomId)]
+        : pinnedRoomOrder.filter((id) => String(id) !== String(roomId))
+    );
+  }, [persistPinnedRoomOrder, pinnedRoomOrder, updateRoomPreference]);
+
+  const movePinnedRoom = useCallback((roomId: string, direction: 'up' | 'down') => {
+    const currentOrder = [...pinnedRoomOrder];
+    const currentIndex = currentOrder.findIndex((id) => String(id) === String(roomId));
+    if (currentIndex < 0) return;
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= currentOrder.length) return;
+    const [moved] = currentOrder.splice(currentIndex, 1);
+    currentOrder.splice(targetIndex, 0, moved);
+    persistPinnedRoomOrder(currentOrder);
+  }, [persistPinnedRoomOrder, pinnedRoomOrder]);
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
     const listEl = messageListRef.current;
@@ -828,6 +907,31 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
     window.setTimeout(tryAlign, 260);
   }, [scrollToBottom]);
 
+  const alignRoomToLatestImmediately = useCallback((roomId: string | null | undefined) => {
+    if (!roomId) return;
+    if (selectedRoomIdRef.current !== roomId) return;
+
+    const listEl = messageListRef.current;
+    if (listEl) {
+      listEl.scrollTop = listEl.scrollHeight;
+    } else {
+      scrollRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
+    }
+
+    composerRef.current?.scrollIntoView({
+      behavior: 'auto',
+      block: 'end',
+      inline: 'nearest',
+    });
+
+    isNearBottomRef.current = true;
+    setShowScrollToLatest(false);
+
+    if (pendingBottomAlignRoomIdRef.current === roomId) {
+      pendingBottomAlignRoomIdRef.current = null;
+    }
+  }, []);
+
   const persistMessageReads = useCallback(async (messageIds: string[]) => {
     if (!effectiveChatUserId || messageIds.length === 0) return;
     if (!MESSAGE_READ_WRITES_ENABLED) return;
@@ -878,8 +982,17 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   }, [selectedRoomId]);
 
   const broadcastChatSync = useCallback((action: string, roomId?: string | null) => {
-    if (!syncChannelRef.current) return;
     try {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('erp-chat-sync', {
+          detail: {
+            action,
+            roomId: roomId || selectedRoomId || null,
+            at: Date.now(),
+          },
+        }));
+      }
+      if (!syncChannelRef.current) return;
       syncChannelRef.current.postMessage({
         action,
         roomId: roomId || selectedRoomId || null,
@@ -953,12 +1066,19 @@ export default function ChatView({ user, onRefresh, staffs = [], initialOpenChat
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
-      const raw = window.localStorage.getItem(getRoomPrefsStorageKey(user?.id));
+      const raw = window.localStorage.getItem(getRoomPrefsStorageKey(roomPrefsUserId));
       setRoomPrefs(raw ? JSON.parse(raw) : {});
     } catch {
       setRoomPrefs({});
     }
-  }, [user?.id]);
+    try {
+      const rawPinnedOrder = window.localStorage.getItem(getPinnedRoomOrderStorageKey(roomPrefsUserId));
+      const parsedPinnedOrder = rawPinnedOrder ? JSON.parse(rawPinnedOrder) : [];
+      setPinnedRoomOrder(Array.isArray(parsedPinnedOrder) ? parsedPinnedOrder.map((value) => String(value)) : []);
+    } catch {
+      setPinnedRoomOrder([]);
+    }
+  }, [roomPrefsUserId]);
 
   useEffect(() => {
     deliveryStatesRef.current = deliveryStates;
@@ -1339,14 +1459,13 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     if (msgs?.length) {
       const ids = msgs.map(( m: ChatMessage) => String(m.id));
       const roomMemberIds = getEffectiveRoomMemberIds(selectedRoomRecord);
-      const recipientIds = roomMemberIds.filter((memberId) => memberId !== effectiveChatUserId);
       const nextRoomReadCursorMap: Record<string, string> = {};
-      if (recipientIds.length > 0) {
+      if (roomMemberIds.length > 0) {
         const { data: cursors } = await supabase
           .from('room_read_cursors')
           .select('user_id, last_read_at')
           .eq('room_id', roomIdForFetch)
-          .in('user_id', recipientIds);
+          .in('user_id', roomMemberIds);
         (cursors || []).forEach((cursor: Record<string, unknown>) => {
           const memberId = String(cursor.user_id || '');
           const lastReadAt = String(cursor.last_read_at || '');
@@ -1359,8 +1478,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       const counts: Record<string, number> = {};
       (msgs || []).forEach((message: ChatMessage) => {
         const messageId = String(message.id || '');
-        if (!messageId || String(message.sender_id) !== effectiveChatUserId) return;
-        const readersCount = recipientIds.filter((memberId) =>
+        if (!messageId) return;
+        const messageRecipientIds = roomMemberIds.filter((memberId) => memberId !== String(message.sender_id || ''));
+        const readersCount = messageRecipientIds.filter((memberId) =>
           isMessageReadByCursor(message.created_at, nextRoomReadCursorMap[memberId])
         ).length;
         counts[messageId] = readersCount;
@@ -1781,15 +1901,19 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
   useEffect(() => {
     if (!selectedRoomId || messages.length === 0) return;
     const lastMessage = messages[messages.length - 1];
+    const tailSignature = `${messages.length}:${String(lastMessage?.id || '')}:${String(lastMessage?.created_at || '')}`;
+    const tailChanged = lastTimelineTailRef.current !== tailSignature;
+    lastTimelineTailRef.current = tailSignature;
+    const isOwnNewestMessage = String(lastMessage?.sender_id) === String(effectiveChatUserId || user?.id || '');
     const shouldStick =
       isNearBottomRef.current ||
-      String(lastMessage?.sender_id) === String(effectiveChatUserId || user?.id || '') ||
-      String(lastMessage?.id || '').startsWith('temp-');
+      String(lastMessage?.id || '').startsWith('temp-') ||
+      (tailChanged && isOwnNewestMessage);
     if (shouldStick) {
       // 채팅방 전환 중(pendingBottomAlignRoomIdRef 활성)이면 즉시 이동, 아니면 부드럽게
       const isRoomSwitch = !!pendingBottomAlignRoomIdRef.current;
       requestAnimationFrame(() => scrollToBottom(
-        (!isRoomSwitch && String(lastMessage?.sender_id) === String(effectiveChatUserId || user?.id || ''))
+        (!pendingBottomAlignRoomIdRef.current && isOwnNewestMessage)
           ? 'smooth'
           : 'auto'
       ));
@@ -1809,8 +1933,8 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       return;
     }
     if (pendingBottomAlignRoomIdRef.current !== selectedRoomId) return;
-    alignRoomToLatest(selectedRoomId, 'auto');
-  }, [alignRoomToLatest, selectedRoomId, messages.length, polls.length, pinnedIds.length, persistedPinnedMessages.length]);
+    alignRoomToLatestImmediately(selectedRoomId);
+  }, [alignRoomToLatestImmediately, selectedRoomId, messages.length, polls.length, pinnedIds.length, persistedPinnedMessages.length]);
 
   const pinnedMessages = useMemo(
     () => messages.filter((m) => pinnedIds.includes(String(m.id))),
@@ -1925,8 +2049,30 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       if (!keyword) return true;
       return label.includes(keyword);
     });
-    return sortRoomsForSidebar(filtered, roomPrefs);
-  }, [visibleRooms, deferredOmniSearch, roomPrefs, showHiddenRooms, roomLabelMap]);
+    return sortRoomsForSidebar(filtered, roomPrefs, pinnedRoomOrder);
+  }, [visibleRooms, deferredOmniSearch, roomPrefs, showHiddenRooms, roomLabelMap, pinnedRoomOrder]);
+  const effectivePinnedRoomOrder = useMemo(() => {
+    const pinnedIds = visibleRooms
+      .filter((room: ChatRoom) => roomPrefs[room.id]?.pinned)
+      .map((room: ChatRoom) => String(room.id));
+    const preserved = pinnedRoomOrder.filter((roomId) => pinnedIds.includes(String(roomId)));
+    const missing = pinnedIds.filter((roomId) => !preserved.includes(roomId));
+    return [...preserved, ...missing];
+  }, [visibleRooms, roomPrefs, pinnedRoomOrder]);
+  useEffect(() => {
+    if (arraysMatch(effectivePinnedRoomOrder, pinnedRoomOrder)) return;
+    setPinnedRoomOrder(effectivePinnedRoomOrder);
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem(
+          getPinnedRoomOrderStorageKey(roomPrefsUserId),
+          JSON.stringify(effectivePinnedRoomOrder)
+        );
+      } catch {
+        // ignore
+      }
+    }
+  }, [effectivePinnedRoomOrder, pinnedRoomOrder, roomPrefsUserId]);
   const forwardTargetRooms = useMemo(
     () =>
       visibleRooms.filter(( room: ChatRoom) => {
@@ -1937,6 +2083,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     [roomPrefs, selectedRoomId, visibleRooms]
   );
   const sidebarRoomItems = useMemo(() => {
+    const pinnedOrderIndex = new Map(
+      effectivePinnedRoomOrder.map((roomId, index) => [String(roomId), index])
+    );
+    const pinnedCount = effectivePinnedRoomOrder.length;
     return sidebarRooms.map((room: ChatRoom) => {
       const roomId = String(room.id);
       const members = normalizeMemberIds(room.members);
@@ -1961,10 +2111,13 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         isPeerOnline: peer ? isStaffCurrentlyOnline(peer) : false,
         isPinned: roomPrefs[room.id]?.pinned === true,
         isHidden: roomPrefs[room.id]?.hidden === true,
+        pinnedIndex: pinnedOrderIndex.get(roomId) ?? -1,
+        pinnedCount,
       };
     });
   }, [
     allKnownStaffMap,
+    effectivePinnedRoomOrder,
     effectiveChatUserId,
     isStaffCurrentlyOnline,
     roomLabelMap,
@@ -1977,6 +2130,87 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     () => visibleRooms.map((room: ChatRoom) => room.id),
     [visibleRooms]
   );
+  const normalizedGlobalSearchQuery = deferredGlobalSearchQuery.trim().toLowerCase();
+  const closeGlobalSearch = useCallback(() => {
+    setShowGlobalSearch(false);
+    setGlobalSearchQuery('');
+    setGlobalSearchResults([]);
+    setGlobalSearchTab('all');
+    setGlobalSearchLoading(false);
+  }, []);
+  const openGlobalSearch = useCallback(() => {
+    setGlobalSearchTab('all');
+    setShowGlobalSearch(true);
+  }, []);
+  const globalSearchMemberResults = useMemo(() => {
+    if (!normalizedGlobalSearchQuery) return [];
+    return allKnownStaffs
+      .filter((staff: StaffMember) => String(staff.id) !== String(effectiveChatUserId || ''))
+      .filter((staff: StaffMember) => {
+        const haystack = [
+          staff.name,
+          staff.company,
+          staff.department,
+          staff.position,
+          (staff as Record<string, unknown>).employee_no,
+        ]
+          .map((value) => String(value || '').toLowerCase())
+          .join(' ');
+        return haystack.includes(normalizedGlobalSearchQuery);
+      })
+      .slice(0, 50);
+  }, [allKnownStaffs, effectiveChatUserId, normalizedGlobalSearchQuery]);
+  const globalSearchRoomResults = useMemo(() => {
+    if (!normalizedGlobalSearchQuery) return [];
+    return visibleRooms
+      .map((room: ChatRoom) => {
+        const roomId = String(room.id);
+        return {
+          room,
+          roomId,
+          label: roomLabelMap.get(roomId) || '',
+          preview: getRoomPreviewText(room),
+          memberCount: normalizeMemberIds(room.members).length,
+          isHidden: roomPrefs[room.id]?.hidden === true,
+          isNoticeChannel: room.id === NOTICE_ROOM_ID,
+        };
+      })
+      .filter(({ label, preview }) => {
+        const haystack = `${String(label || '').toLowerCase()} ${String(preview || '').toLowerCase()}`;
+        return haystack.includes(normalizedGlobalSearchQuery);
+      })
+      .slice(0, 50);
+  }, [normalizedGlobalSearchQuery, roomLabelMap, roomPrefs, visibleRooms]);
+  const globalSearchMessageResults = useMemo(
+    () => globalSearchResults.filter((message: ChatMessage) => !String(message.file_url || '').trim()),
+    [globalSearchResults]
+  );
+  const globalSearchFileResults = useMemo(
+    () => globalSearchResults.filter((message: ChatMessage) => Boolean(String(message.file_url || '').trim())),
+    [globalSearchResults]
+  );
+  const globalSearchCounts = useMemo(
+    () => ({
+      all:
+        globalSearchMemberResults.length +
+        globalSearchRoomResults.length +
+        globalSearchMessageResults.length +
+        globalSearchFileResults.length,
+      member: globalSearchMemberResults.length,
+      room: globalSearchRoomResults.length,
+      message: globalSearchMessageResults.length,
+      file: globalSearchFileResults.length,
+    }),
+    [globalSearchFileResults.length, globalSearchMemberResults.length, globalSearchMessageResults.length, globalSearchRoomResults.length]
+  );
+  const openGroupFromGlobalSearch = useCallback(() => {
+    closeGlobalSearch();
+    setShowGroupModal(true);
+  }, [closeGlobalSearch]);
+  const openRoomFromGlobalSearch = useCallback((roomId: string) => {
+    setRoom(roomId);
+    closeGlobalSearch();
+  }, [closeGlobalSearch]);
 
   const typingNoticeText = useMemo(() => {
     const names = Object.values(typingUsers).filter(Boolean);
@@ -2294,7 +2528,11 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
         error: null,
       },
     }));
+    inputMsgRef.current = '';
     setInputMsg('');
+    if (selectedRoomIdRef.current) {
+      draftMapRef.current.delete(selectedRoomIdRef.current);
+    }
     setReplyTo(null);
     requestAnimationFrame(() => scrollToBottom('smooth'));
 
@@ -2620,6 +2858,10 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       toast('채팅방을 여는 중 오류가 발생했습니다.', 'error');
     }
   }, [effectiveChatUserId, fetchData, repairDirectRooms]);
+  const openMemberFromGlobalSearch = useCallback(async (staff: StaffMember) => {
+    closeGlobalSearch();
+    await openDirectChat(staff);
+  }, [closeGlobalSearch, openDirectChat]);
 
   const mediaMessages = useMemo(() => {
     return messages.filter(( m: ChatMessage) => m.file_url);
@@ -2818,15 +3060,19 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
     } catch (_) { }
   };
 
-  const handleGlobalSearch = useCallback(async () => {
-    if (!globalSearchQuery.trim()) return;
+  const handleGlobalSearch = useCallback(async (rawQuery?: string) => {
+    const q = String(rawQuery ?? globalSearchQuery).trim();
+    if (!q) {
+      setGlobalSearchResults([]);
+      setGlobalSearchLoading(false);
+      return;
+    }
     setGlobalSearchLoading(true);
     try {
       if (visibleRoomIds.length === 0) {
         setGlobalSearchResults([]);
         return;
       }
-      const q = globalSearchQuery.trim();
       // 대화내용 + 파일URL(파일명·사진명) 통합 OR 검색
       const { data, error } = await supabase
         .from('messages')
@@ -2867,6 +3113,19 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       setGlobalSearchLoading(false);
     }
   }, [globalSearchQuery, resolveStaffProfile, visibleRoomIds]);
+  useEffect(() => {
+    if (!showGlobalSearch) return;
+    const q = deferredGlobalSearchQuery.trim();
+    if (!q) {
+      setGlobalSearchResults([]);
+      setGlobalSearchLoading(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      void handleGlobalSearch(q);
+    }, 180);
+    return () => clearTimeout(timer);
+  }, [deferredGlobalSearchQuery, handleGlobalSearch, showGlobalSearch]);
 
   const visibleTimelineMessages = useMemo(() => {
     const msgs = messages;
@@ -3109,7 +3368,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
               type="button"
               onClick={() => setShowGroupModal(true)}
               title="새 그룹 채팅방 만들기"
-              className="shrink-0 flex items-center justify-center w-8 h-8 rounded-xl bg-[var(--tab-bg)] dark:bg-zinc-800 text-[var(--toss-gray-4)] hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all"
+              className="hidden"
             >
               <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M10 4v12"/><path d="M4 10h12"/>
@@ -3117,12 +3376,12 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             </button>
             <button
               data-testid="chat-open-global-search"
-              onClick={() => setShowGlobalSearch(true)}
+              onClick={openGlobalSearch}
               title="대화내용·파일·사진 통합 검색"
-              className="shrink-0 flex items-center justify-center w-8 h-8 rounded-xl bg-[var(--tab-bg)] dark:bg-zinc-800 text-[var(--toss-gray-4)] hover:text-[var(--accent)] hover:bg-[var(--toss-blue-light)] transition-all"
+              className="shrink-0 flex items-center justify-center w-9 h-8 rounded-xl bg-[var(--tab-bg)] dark:bg-zinc-800 text-[var(--toss-gray-4)] hover:text-[var(--accent)] hover:bg-[var(--toss-blue-light)] transition-all"
             >
-              <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="9" cy="9" r="6"/><line x1="15" y1="15" x2="19" y2="19"/>
+              <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="8" cy="8" r="5.5"/><line x1="12.5" y1="12.5" x2="18" y2="18"/><path d="M15 3v4"/><path d="M13 5h4"/>
               </svg>
             </button>
           </div>
@@ -3145,7 +3404,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                   {showHiddenRooms ? '숨김방 닫기' : '숨김방 보기'}
                 </button>
               </div>
-              {sidebarRoomItems.map(({ room, roomId, unread, isSelected, isNoticeChannel, label, preview, isPeerOnline, isPinned, isHidden }) => {
+              {sidebarRoomItems.map(({ room, roomId, unread, isSelected, isNoticeChannel, label, preview, isPeerOnline, isPinned, isHidden, pinnedIndex, pinnedCount }) => {
                   return (
                     <div
                       key={roomId}
@@ -3191,13 +3450,43 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                data-testid={`chat-room-pin-${roomId}`}
                               onClick={(event) => {
                                 event.stopPropagation();
-                                 updateRoomPreference(room.id, { pinned: !isPinned });
+                                 toggleRoomPinned(room.id, !isPinned);
                               }}
                               className={`min-w-[44px] min-h-[44px] flex items-center justify-center px-1.5 py-1 rounded-md text-[9px] font-bold ${isSelected ? 'text-white/80 hover:bg-[var(--card)]/10' : 'text-[var(--toss-gray-3)] hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800'}`}
                               title={isPinned ? '고정 해제' : '상단 고정'}
                             >
                               {isPinned ? '해제' : '고정'}
                             </button>
+                            {isPinned && (
+                              <>
+                                <button
+                                  type="button"
+                                  data-testid={`chat-room-pin-up-${roomId}`}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    movePinnedRoom(room.id, 'up');
+                                  }}
+                                  disabled={pinnedIndex <= 0}
+                                  className={`min-w-[36px] min-h-[44px] flex items-center justify-center px-1 py-1 rounded-md text-[10px] font-bold ${isSelected ? 'text-white/80 hover:bg-[var(--card)]/10 disabled:text-white/30' : 'text-[var(--toss-gray-3)] hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 disabled:text-[var(--toss-gray-1)]'} disabled:cursor-not-allowed`}
+                                  title="고정방 위로"
+                                >
+                                  ↑
+                                </button>
+                                <button
+                                  type="button"
+                                  data-testid={`chat-room-pin-down-${roomId}`}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    movePinnedRoom(room.id, 'down');
+                                  }}
+                                  disabled={pinnedIndex < 0 || pinnedIndex >= pinnedCount - 1}
+                                  className={`min-w-[36px] min-h-[44px] flex items-center justify-center px-1 py-1 rounded-md text-[10px] font-bold ${isSelected ? 'text-white/80 hover:bg-[var(--card)]/10 disabled:text-white/30' : 'text-[var(--toss-gray-3)] hover:bg-[var(--tab-bg)] dark:hover:bg-zinc-800 disabled:text-[var(--toss-gray-1)]'} disabled:cursor-not-allowed`}
+                                  title="고정방 아래로"
+                                >
+                                  ↓
+                                </button>
+                              </>
+                            )}
                             <button
                               type="button"
                                data-testid={`chat-room-hide-${roomId}`}
@@ -3373,10 +3662,6 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
             (() => {
               let lastDateLabel = '';
               let lastSenderId = '';
-              const totalRecipients = Math.max(
-                0,
-                roomMembers.filter((member: StaffMember) => String(member.id) !== effectiveChatUserId).length
-              );
               return combinedTimeline.map((item) => {
                 if (item.type === 'poll') {
                   const pollItem = item as unknown as PollItem;
@@ -3416,22 +3701,26 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                 const hasReacts = Object.keys(msgReacts).some(e => (msgReacts[e] || 0) > 0);
 
                 const readersCount = readCounts[msg.id] || 0;
-                const unreadRecipients = isMine ? Math.max(0, totalRecipients - readersCount) : 0;
+                const totalRecipients = Math.max(
+                  0,
+                  roomMembers.filter((member: StaffMember) => String(member.id) !== String(msg.sender_id || '')).length
+                );
+                const unreadRecipients = Math.max(0, totalRecipients - readersCount);
                 const deliveryState = deliveryStates[msg.id]?.status || (String(msg.id).startsWith('temp-') ? 'sending' : 'sent');
-                const readStatusSummary = !isMine
-                  ? null
-                  : deliveryState === 'sending'
+                const readStatusSummary = isMine && deliveryState === 'sending'
                     ? '전송중'
-                    : deliveryState === 'failed'
+                    : isMine && deliveryState === 'failed'
                       ? '전송 실패'
                       : totalRecipients > 0 && unreadRecipients > 0
                         ? `${unreadRecipients}`
                         : null;
                 const canOpenReadStatus = Boolean(
-                  isMine &&
                   deliveryState === 'sent' &&
                   totalRecipients > 0
                 );
+                const displayedReadStatusSummary = !isMine && !readStatusSummary && totalRecipients > 0 && readersCount > 0
+                  ? `${readersCount}`
+                  : readStatusSummary;
 
                 const TOOLBAR_EMOJIS = ['👍', '❤️', '👏', '🎉', '🔥', '✅', '👀', '🙏'];
 
@@ -3598,7 +3887,7 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                             className={`absolute bottom-0 ${isMine ? 'right-full mr-2 items-end' : 'left-full ml-2 items-start'
                               } flex flex-col gap-0.5 whitespace-nowrap`}
                           >
-                            {readStatusSummary && (
+                            {displayedReadStatusSummary && (
                               canOpenReadStatus ? (
                                 <button
                                   type="button"
@@ -3608,11 +3897,11 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
                                   }}
                                   className="text-[10px] font-bold text-emerald-500 hover:text-emerald-600 underline underline-offset-2"
                                 >
-                                  {readStatusSummary}
+                                  {displayedReadStatusSummary}
                                 </button>
                               ) : (
                                 <span className={`text-[10px] font-bold ${deliveryState === 'failed' ? 'text-red-500' : 'text-emerald-500'}`}>
-                                  {readStatusSummary}
+                                  {displayedReadStatusSummary}
                                 </span>
                               )
                             )}
@@ -4907,6 +5196,215 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
       )}
 
       {showGlobalSearch && (
+        <div data-testid="chat-global-search-modal" className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-start md:items-center justify-center p-4 pt-12 md:p-4 animate-in fade-in" onClick={closeGlobalSearch}>
+          <div className="bg-[var(--card)] dark:bg-zinc-900 w-full max-w-3xl rounded-2xl shadow-sm overflow-hidden flex flex-col max-h-[80vh] md:max-h-[85vh] border border-[var(--border)] dark:border-zinc-800" onClick={e => e.stopPropagation()}>
+            <div className="p-3 border-b border-[var(--border)] dark:border-zinc-800 space-y-3">
+              <div className="flex items-center gap-2">
+                <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-[var(--toss-gray-3)]">
+                  <circle cx="8" cy="8" r="5.5"/><line x1="12.5" y1="12.5" x2="18" y2="18"/><path d="M15 3v4"/><path d="M13 5h4"/>
+                </svg>
+                <input
+                  data-testid="chat-global-search-input"
+                  autoFocus
+                  value={globalSearchQuery}
+                  onChange={e => setGlobalSearchQuery(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && void handleGlobalSearch(globalSearchQuery)}
+                  placeholder="멤버, 채팅방, 메시지, 파일을 통합 검색"
+                  className="flex-1 bg-transparent text-foreground text-sm font-bold outline-none placeholder:text-[var(--toss-gray-3)] placeholder:font-normal"
+                />
+                <button
+                  data-testid="chat-open-group-modal"
+                  type="button"
+                  onClick={openGroupFromGlobalSearch}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-bold hover:bg-emerald-100 transition-colors whitespace-nowrap"
+                >
+                  새 그룹
+                </button>
+                <button
+                  data-testid="chat-global-search-submit"
+                  onClick={() => { void handleGlobalSearch(globalSearchQuery); }}
+                  className="px-3 py-1.5 bg-[var(--accent)] text-white font-bold text-xs rounded-lg hover:opacity-90 transition-opacity whitespace-nowrap"
+                >
+                  검색
+                </button>
+                <button onClick={closeGlobalSearch} className="text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] text-lg font-bold leading-none px-1">×</button>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {([
+                  ['all', '전체', globalSearchCounts.all],
+                  ['member', '멤버', globalSearchCounts.member],
+                  ['room', '채팅방', globalSearchCounts.room],
+                  ['message', '메시지', globalSearchCounts.message],
+                  ['file', '파일', globalSearchCounts.file],
+                ] as const).map(([tab, label, count]) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setGlobalSearchTab(tab)}
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-colors ${globalSearchTab === tab ? 'bg-[var(--accent)] text-white' : 'bg-[var(--tab-bg)] dark:bg-zinc-800 text-[var(--toss-gray-4)] hover:text-[var(--toss-gray-5)]'}`}
+                  >
+                    {label}{count > 0 ? ` ${count}` : ''}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto custom-scrollbar bg-[var(--tab-bg)] dark:bg-zinc-950 p-3">
+              {!globalSearchQuery.trim() ? (
+                <div className="h-40 flex flex-col items-center justify-center text-[var(--toss-gray-3)] gap-2">
+                  <p className="text-sm font-bold">통합 검색으로 멤버, 채팅방, 메시지, 파일을 한 번에 찾을 수 있습니다.</p>
+                  <button
+                    type="button"
+                    onClick={openGroupFromGlobalSearch}
+                    className="px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-bold hover:bg-emerald-100 transition-colors"
+                  >
+                    새 그룹 채팅 만들기
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {globalSearchLoading && (
+                    <div className="px-1 text-[11px] font-bold text-[var(--toss-gray-3)]">메시지와 파일을 검색하고 있습니다…</div>
+                  )}
+
+                  {(globalSearchTab === 'all' || globalSearchTab === 'member') && (
+                    globalSearchMemberResults.length > 0 ? (
+                      <div className="space-y-2">
+                        {globalSearchTab === 'all' && <p className="px-1 text-[10px] font-bold text-[var(--toss-gray-3)]">멤버</p>}
+                        {globalSearchMemberResults.slice(0, globalSearchTab === 'all' ? 4 : globalSearchMemberResults.length).map((staff: StaffMember) => (
+                          <button
+                            key={`member-${staff.id}`}
+                            type="button"
+                            onClick={() => void openMemberFromGlobalSearch(staff)}
+                            className="w-full text-left p-3 bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border)] dark:border-zinc-800 rounded-xl hover:border-[var(--accent)] hover:shadow-sm transition-all"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-xl bg-[var(--tab-bg)] dark:bg-zinc-800 overflow-hidden flex items-center justify-center text-[12px] font-bold text-[var(--toss-gray-3)] shrink-0">
+                                {staff.photo_url ? <img src={staff.photo_url} alt={staff.name} className="w-full h-full object-cover" /> : staff.name?.[0]}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-[12px] font-bold text-foreground truncate">{staff.name}</p>
+                                <p className="text-[10px] text-[var(--toss-gray-3)] truncate">{[staff.company, staff.department, staff.position].filter(Boolean).join(' · ')}</p>
+                              </div>
+                              <span className="text-[10px] font-bold text-blue-600 shrink-0">대화</span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    ) : globalSearchTab === 'member' ? (
+                      <div className="h-24 flex items-center justify-center text-[var(--toss-gray-3)] text-sm font-bold">멤버 검색 결과가 없습니다.</div>
+                    ) : null
+                  )}
+
+                  {(globalSearchTab === 'all' || globalSearchTab === 'room') && (
+                    globalSearchRoomResults.length > 0 ? (
+                      <div className="space-y-2">
+                        {globalSearchTab === 'all' && <p className="px-1 text-[10px] font-bold text-[var(--toss-gray-3)]">채팅방</p>}
+                        {globalSearchRoomResults.slice(0, globalSearchTab === 'all' ? 4 : globalSearchRoomResults.length).map(({ room, roomId, label, preview, memberCount, isHidden, isNoticeChannel }) => (
+                          <button
+                            key={`room-${roomId}`}
+                            type="button"
+                            onClick={() => openRoomFromGlobalSearch(String(room.id))}
+                            className="w-full text-left p-3 bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border)] dark:border-zinc-800 rounded-xl hover:border-[var(--accent)] hover:shadow-sm transition-all"
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <p className="text-[12px] font-bold text-foreground truncate">{label}</p>
+                                  {isNoticeChannel && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-bold shrink-0">공지</span>}
+                                  {isHidden && <span className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-500 font-bold shrink-0">숨김</span>}
+                                </div>
+                                <p className="text-[10px] text-[var(--toss-gray-3)] truncate">{preview || '대화가 없습니다.'}</p>
+                              </div>
+                              <span className="text-[10px] font-bold text-[var(--toss-gray-3)] shrink-0">{memberCount}명</span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    ) : globalSearchTab === 'room' ? (
+                      <div className="h-24 flex items-center justify-center text-[var(--toss-gray-3)] text-sm font-bold">채팅방 검색 결과가 없습니다.</div>
+                    ) : null
+                  )}
+
+                  {(globalSearchTab === 'all' || globalSearchTab === 'message' || globalSearchTab === 'file') && (() => {
+                    const targetResults =
+                      globalSearchTab === 'file'
+                        ? globalSearchFileResults
+                        : globalSearchTab === 'message'
+                          ? globalSearchMessageResults
+                          : globalSearchResults;
+                    if (!globalSearchLoading && targetResults.length === 0) {
+                      return (globalSearchTab === 'message' || globalSearchTab === 'file') ? (
+                        <div className="h-24 flex items-center justify-center text-[var(--toss-gray-3)] text-sm font-bold">
+                          {globalSearchTab === 'file' ? '파일 검색 결과가 없습니다.' : '메시지 검색 결과가 없습니다.'}
+                        </div>
+                      ) : null;
+                    }
+                    return (
+                      <div className="space-y-2">
+                        {globalSearchTab === 'all' && <p className="px-1 text-[10px] font-bold text-[var(--toss-gray-3)]">메시지 / 파일</p>}
+                        {targetResults.slice(0, globalSearchTab === 'all' ? 6 : targetResults.length).map((msg: ChatMessage) => {
+                          type SearchRoom = { name?: string; type?: string; members?: string[] };
+                          const msgRoom = (msg.chat_rooms as SearchRoom | null | undefined);
+                          let roomName = msgRoom?.name || '채팅방';
+                          if (msgRoom?.type === 'direct' && Array.isArray(msgRoom?.members)) {
+                            const otherStaff = allKnownStaffs.find((s: StaffMember) => msgRoom.members!.includes(String(s.id)) && String(s.id) !== effectiveChatUserId);
+                            if (otherStaff) roomName = otherStaff.name;
+                          }
+                          const fileUrl = msg.file_url || '';
+                          const isImage = /\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(fileUrl);
+                          const isFile = !!fileUrl && !isImage;
+                          const fileName = fileUrl ? getAttachmentDisplayName(msg.file_name, fileUrl) : '';
+                          return (
+                            <button
+                              data-testid={`chat-global-search-result-${msg.id}`}
+                              key={msg.id}
+                              type="button"
+                              onClick={() => openRoomFromGlobalSearch(String(msg.room_id))}
+                              className="w-full text-left p-3 bg-[var(--card)] dark:bg-zinc-900 border border-[var(--border)] dark:border-zinc-800 rounded-xl hover:border-[var(--accent)] hover:shadow-sm transition-all"
+                            >
+                              <div className="flex items-center justify-between mb-1.5 gap-3">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className="px-1.5 py-0.5 bg-[var(--muted)] dark:bg-zinc-800 text-[var(--toss-gray-4)] rounded text-[10px] font-bold truncate shrink-0 max-w-[110px]">
+                                    {roomName}
+                                  </span>
+                                  <span className="text-[11px] font-bold text-foreground truncate">{(msg.staff as { name?: string } | null | undefined)?.name || '이름 없음'}</span>
+                                  {isImage && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold shrink-0">이미지</span>}
+                                  {isFile && <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-bold shrink-0">파일</span>}
+                                </div>
+                                <span className="text-[10px] font-medium text-[var(--toss-gray-3)] shrink-0">
+                                  {new Date(msg.created_at || 0).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })} {new Date(msg.created_at || 0).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              </div>
+                              {msg.content && (
+                                <p className="text-[12px] font-semibold text-[var(--toss-gray-5)] dark:text-[var(--toss-gray-3)] line-clamp-2 leading-relaxed">
+                                  {msg.content}
+                                </p>
+                              )}
+                              {fileName && (
+                                <p className="text-[11px] font-semibold text-[var(--toss-gray-4)] truncate mt-0.5">첨부 {fileName}</p>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+
+                  {!globalSearchLoading && globalSearchCounts.all === 0 && (
+                    <div className="h-24 flex flex-col items-center justify-center text-[var(--toss-gray-3)]">
+                      <p className="text-sm font-bold">검색 결과가 없습니다.</p>
+                      <p className="text-xs mt-1 text-[var(--toss-gray-3)]">멤버, 채팅방, 메시지, 파일을 함께 검색했습니다.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {false && showGlobalSearch && (
         <div data-testid="chat-global-search-modal" className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-start md:items-center justify-center p-4 pt-12 md:p-4 animate-in fade-in" onClick={() => { setShowGlobalSearch(false); setGlobalSearchQuery(''); setGlobalSearchResults([]); }}>
           <div className="bg-[var(--card)] dark:bg-zinc-900 w-full max-w-2xl rounded-2xl shadow-sm overflow-hidden flex flex-col max-h-[80vh] md:max-h-[85vh] border border-[var(--border)] dark:border-zinc-800" onClick={e => e.stopPropagation()}>
             {/* 검색 헤더 */}
@@ -4925,7 +5423,9 @@ const [pollOptions, setPollOptions] = useState<string[]>(['찬성', '반대']);
               />
               <button
                 data-testid="chat-global-search-submit"
-                onClick={handleGlobalSearch}
+                onClick={() => {
+                  void handleGlobalSearch();
+                }}
                 className="px-3 py-1.5 bg-[var(--accent)] text-white font-bold text-xs rounded-lg hover:opacity-90 transition-opacity whitespace-nowrap"
               >
                 {globalSearchLoading ? '검색중…' : '검색'}

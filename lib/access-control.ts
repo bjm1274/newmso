@@ -125,6 +125,7 @@ const ADMIN_PERMISSION_KEYS: Record<string, string> = {
   문서양식: 'admin_문서양식',
   급여이상치: 'admin_급여이상치',
   공문서대장: 'admin_공문서대장',
+  비품대여설정: 'admin_비품대여설정',
 };
 
 const LEGACY_PERMISSION_ALIASES: Record<string, string[]> = {
@@ -193,6 +194,7 @@ const LEGACY_PERMISSION_ALIASES: Record<string, string[]> = {
   admin_문서양식: ['admin'],
   admin_급여이상치: ['admin'],
   admin_공문서대장: ['admin'],
+  admin_비품대여설정: ['admin'],
   board_공지사항_read: ['board_공지사항_write'],
   board_자유게시판_read: ['board_자유게시판_write'],
   board_경조사_read: ['board_경조사_write'],
